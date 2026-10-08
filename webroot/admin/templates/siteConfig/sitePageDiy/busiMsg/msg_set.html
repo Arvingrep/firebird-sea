@@ -1,0 +1,245 @@
+<!-- 商家端  消息通知 -->
+<div :class="['rightCon',{'show':currEditPart === 20}] " v-cloak>
+    <div class="modBox msgContainer">
+
+        <div class="title" v-if="currEditPart == 20">消息通知
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 20 && showResetPop" @show="showResetPop = true" v-if="!checkHasIn('msg',20)">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('msg')"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div :class="['smPop',{'show':showResetPop && currEditPart == 20}]">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 20 && showResetPop" v-if="checkHasIn('msg',20)" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('msg',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">恢复上次保存</li> 
+                        </el-popover>
+                        <!-- <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 20 && showResetPop" v-if="checkModelHasIn() && checkCompInModel()" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认将该组件恢复成模板样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="reChangeToModel('msg',20)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置模板样式</li> 
+                        </el-popover> -->
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 20 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('msg',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    
+        <div class="modInfoStyle">
+            <div class="modstyleBox contentSetBox">
+                <h2 class="stitle">组件样式</h2>
+                <div class="sContent ">
+                   
+                    <div class="style_options flexItem " >
+                        <div class="titleBox">
+                            <div class="inpCon">
+                                <el-input v-if="msgFormData.title.type == 'text'" placeholder="请输入标题" v-model="msgFormData.title.text"></el-input>
+                                <div class="imgTitle" v-else> 
+                                    <div class="imgbox"><img :src="msgFormData.title.image" alt=""></div>
+                                    <span class="del_title" @click="msgFormData.title.type = 'text'; msgFormData.title.image = ''"></span>
+                                </div>
+                            </div>
+                            <div class="colorPicker">
+                                <el-color-picker  popper-class="borderColorPicker" v-model="msgFormData.title.style.color" @active-change="(value) => activeChangeColor(value,'msgFormData.title.style.color')" @change="(value) => pickerChangeColor(value ? value : msgDefault.title.style.color,'msgFormData.title.style.color')"></el-color-picker>
+                            </div>
+                            <div class="pic_upload"><input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" id="msgTitle_filedata" @change="msgFormData.title.type = 'image';fileInpChange(`msgFormData.title.image`);"  data-type="msgTitle"></div>
+                        </div>
+                    </div>
+                    <div class="style_options flex_l" >
+                        <label for="">添加方式：</label>
+                        <div class="split_options radioBox">
+                            <span :class="[{'onChose':msgFormData.msgType == item.type}]" @click="msgFormData.msgType = item.type,announceChange(item.type)" v-for="(item,ind) in msgType" ><s></s>{{item.text}}</span>
+                        </div>
+                    </div>
+                    <div class="arrList sortInpList " v-show="msgFormData.msgType == 2">
+                        <div  class="btnsBox btn_item btnsSort sortBox"  data-sort="msgFormData.listArr" data-drag=".item" data-filter="input">
+                            <div class="option_item item" v-for="(link,ind) in msgFormData.listArr" :data-id="ind" :key="'msg_' + link.id">
+                                <s class="del_item" @click="delTopBtns('msgFormData',ind)"></s>
+                                <s class="left_icon"><img src="/static/images/admin/order_icon.png" alt=""></s>
+                                <div class="item_con ">
+                                    <div class="imgText inpGroup">
+                                        <div class="inpbox" v-if="msgFormData.labShow">
+                                            <el-input class="btn" v-model="link.lab"><template slot="prepend">标签</template></el-input>
+                                        </div>
+                                        <div class="inpbox" >
+                                            <el-input  class="iconName" v-model="link.text"><template slot="prepend">内容</template></el-input>
+                                        </div>
+                                    </div>
+                                    <div :class="['inpbox linkbox linkChose fullLink']" @click="changeLink('msgFormData.listArr.' + ind + '.link')" >
+                                        <s>
+                                            <img v-if="link.linkInfo.type == 4"  src="/static/images/admin/siteMemberPage/tel.png">
+                                            <img v-else src="/static/images/admin/link.png">
+                                        </s>
+                                        <input type="text" placeholder="请选择链接" class="iconLink" readonly :value="link.linkInfo.linkText || link.link">
+                                    </div>
+                                    
+                                </div>
+                            </div>
+                            <a href="javascript:;" class="add_more" @click="addNewTopBtns('msgFormData','list')"  ><s></s>添加内容</a>
+                        </div>
+                    </div>
+                    <div class="style_options flexItem" v-if="msgFormData.msgType == 1">
+                        <label for="">显示条数：</label>
+                        <div class="flex_l">
+                            最近<el-input class="smInp" @keyup.native="msgFormData.listShow = msgFormData.listShow.replace(/\D/g,'')" @paste.native="msgFormData.listShow = msgFormData.listShow.replace(/\D/g,'')" v-model="msgFormData.listShow" @input="msgFormData.listShow = (Number(msgFormData.listShow) > 20 ? '20' : msgFormData.listShow)" @change="getInfoMation"><template slot="append">条</template></el-input><span class="limit_tip">*最多设置20</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modstyleBox">
+                <h2 class="stitle">组件样式</h2>
+                <div class="sContent ">
+                    <div class="style_item">
+                        <div class="style_options" >
+                            <label for="">通知内容：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" v-model="msgFormData.style.textColor" @active-change="(value) => activeChangeColor(value,'msgFormData.style.textColor')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="(msgFormData.style.textColor).replace('#','')" @change="changeColor('msgFormData.style.textColor')" maxlength="6">
+                                <button @click="resetColor('msgFormData.style.textColor')">重置</button>
+                            </div>
+                        </div>
+                       
+                        <div class="style_options" >
+                            <label for="">背景：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'msgFormData.style.bgColor')" v-model="msgFormData.style.bgColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="msgFormData.style.bgColor.replace('#','')" spellcheck="false" maxlength="6"  @change="changeColor('msgFormData.style.bgColor')">
+                                <button  @click="resetColor('msgFormData.style.bgColor')">重置</button>
+                            </div>
+                            <div class="opciatyBox">
+                                <input type="text" class="opciatySet" v-model="msgFormData.style.opacity">
+                                <span  class="single back">%</span>
+                            </div>
+                        </div>
+                        <div class="style_options" >
+                            <label for="">边框：</label>
+                            <div :class="['colorpickerBox',{'noColor':!msgFormData.style.borderColor}]">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'msgFormData.style.borderColor')" v-model="msgFormData.style.borderColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="msgFormData.style.borderColor.replace('#','')" spellcheck="false" maxlength="6"  @change="changeColor('msgFormData.style.borderColor')">
+                                <button  @click="resetColor('msgFormData.style.borderColor')">重置</button>
+                            </div>
+                            <div class="opciatyBox">
+                                <input type="text" class="opciatySet" v-model="msgFormData.style.borderSize">
+                                <span  class="single back">px</span>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">分隔线：</label>
+                            <div class="split_options radioBox">
+                                <span :class="{'onChose':msgFormData.splitLine == key}" v-for="(item,key) in 3" :key="key" @click="msgFormData.splitLine = key"><s></s>{{!key ? '无' : (key == 1 ? '上分隔线' : '下分隔线')}}</span> 
+                            </div>
+                        </div>
+                        <div class="style_options" >
+                            <label for="">分隔线色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" v-model="msgFormData.style.splitLine" @active-change="(value) => activeChangeColor(value,'msgFormData.style.splitLine')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="(msgFormData.style.splitLine).replace('#','')" @change="changeColor('msgFormData.style.splitLine')" maxlength="6">
+                                <button @click="resetColor('msgFormData.style.splitLine')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+             <!-- 间距设置 -->
+             <div class="marginSetBox modstyleBox contentSetBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" >
+                        <div class="sContent">
+                           
+                            <div class="style_options" >
+                                <label for="">{{msgFormData.splitLine > 0 ? '上圆角' : '圆角值' }}：</label>
+                                <el-slider tooltip-class="tooltip_show"  v-model="msgFormData.style.borderRadiusTop" :show-tooltip="showTooltip"  :min="0" :max="50"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"  @input="checkMax(0,50,'msgFormData.style.borderRadiusTop')" :value="msgFormData.style.borderRadiusTop">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options" v-show="msgFormData.splitLine" >
+                                <label for="">下圆角：</label>
+                                <el-slider tooltip-class="tooltip_show"  v-model="msgFormData.style.borderRadiusBottom" :show-tooltip="showTooltip"  :min="0" :max="50"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"  @input="checkMax(0,50,'msgFormData.style.borderRadiusBottom')" :value="msgFormData.style.borderRadiusBottom">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                          
+                            <div class="style_options">
+                                <label for="">高度：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="msgFormData.style.height" :show-tooltip="showTooltip"  :min="72" :max="120"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="checkMax(72,120,'msgFormData.style.height')" :value="msgFormData.style.height">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">上间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="msgFormData.style.marginTop" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,40,'msgFormData.style.marginTop')" :value="msgFormData.style.marginTop">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="msgFormData.style.marginLeft" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,40,'msgFormData.style.marginLeft')" :value="msgFormData.style.marginLeft">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options" :style="msgFormData.style.marginLeft != 0 ? 'visibility:hidden; opacity:0;':''">
+                                <label for="">内边距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="msgFormData.style.paddingLeft" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,40,'msgFormData.style.paddingLeft')" :value="msgFormData.style.paddingLeft">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+        </div>
+    </div>
+</div>

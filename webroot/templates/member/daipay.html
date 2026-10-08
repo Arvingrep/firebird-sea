@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>朋友代付</title>
+		<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/login.css?v={#$cfg_staticVersion#}" media="all" />
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/to_daipay.css?v={#$cfg_staticVersion#}" media="all" />
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/clipboard.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+			var masterDomain = '{#$cfg_basehost#}', redirectUrl = '{#$redirectUrl#}', site = '{#$site#}';
+			var criticalPoint = 1240, criticalClass = "w1200";
+			$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+		  var geetest = {#$cfg_geetest#};
+		  var timeCount = {#$second#};
+		  var state = {#$state#};
+		</script>
+	</head>
+	<body>
+		{#include file="../siteConfig/top1.html"#}
+		<!-- head s -->
+		<div class="wrap header fn-clear">
+			<div class="logo">
+				<a href="{#$cfg_basehost#}" title="{#$cfg_webname#}">
+					<img src="{#$cfg_weblogo#}" alt="{#$cfg_webname#}">
+					<div class="shortname"><h2>{#$cfg_shortname#}</h2><p>{#$langData['siteConfig'][23][26]#}</p></div>{#* 地方最大最全生活网 *#}
+				</a>
+			</div>
+			<dl class="kefu fn-clear">
+				<dt><img src="{#$templets_skin#}images/kf_tel.png" alt=""></dt>
+				<dd>
+					<p class="p1">{#$langData['siteConfig'][19][275]#}</p>{#* 客服热线 *#}
+					<p class="p2">{#$cfg_hotline#}</p>
+				</dd>
+			</dl>
+		</div>
+		<!-- head e -->
+
+		{#if !$isPeerpay#}
+		<!-- 找人代付 -->
+		<div class="wrap to_daipay_box">
+			<div class="pay_info">
+				<h2><s class="icon"></s>朋友代付！请确认代付信息并复制链接给好友</h2>
+				<p>
+					<span class="price">代付金额：<em>{#echoCurrency type="symbol"#}{#$orderprice#}</em></span>
+					<span>订单号：{#$ordernum#}</span>
+				</p>
+			</div>
+
+			{#if $state == 0#}
+			<div class="linkbox">
+				<p id="link_txt">{#getUrlPath service="member" type="user" template="daipay" param="module={#$module#}&ordernum={#$ordernum#}&peerpay=1"#}</p>
+				<div class="btns"><a href="javascript:;" class="btn_copy" data-clipboard-target="#link_txt" data-clipboard-action="copy">复制链接给好友</a><a href="{#$payurl#}" style="display: none;">改变主意，自己在线付款</a></div>
+			</div>
+			{#/if#}
+
+			{#if $state == 1#}
+			<div class="pay_detail pay_fail">
+				<div class="pay_tip">
+					<s></s>
+					<p>好友已经支付成功啦！</p>
+				</div>
+			</div>
+			{#/if#}
+		</div>
+		{#/if#}
+
+		{#if $isPeerpay#}
+		<!-- 好友付款 -->
+		<div class="wrap daipay_box">
+			<div class="pay_info ">
+				<div class="headicon">
+					<img src="{#$uinfo['photo']#}" onerror="this.src='/static/images/noPhoto_100.jpg'" />
+				</div>
+				<div class="detail">
+					<h2>{#$uinfo['nickname']#}：</h2>
+					<p><b>“</b>我刚下了个订单，请帮我付个款吧~<b>”</b></p>
+				</div>
+				<p class="pay_num">
+					<span>代付金额：<em>{#echoCurrency type="symbol"#}{#$orderprice#}</em></span>
+					{#if $state == 0 && $second > 0#}<span class="timeCut">剩余支付时间：<b>00 : 00 : 00</b></span>{#/if#}
+				</p>
+			</div>
+
+			{#if $state == 0#}
+			<div class="pay_detail">
+				<div class="pay_tip">
+					<s></s>
+					<p>我清楚该订单为他人付款，商品或服务不归我所有，付款前务必和好友再次确认，避免诈骗行为；该订单付款成功后如发生退款， 款项将退还至好友余额账户中。</p>
+				</div>
+				<a href="javascript:;" class="btn_pay">确认支付</a>
+			</div>
+			{#/if#}
+
+			{#if $state == 1#}
+			{#if $userinfo && $peerpay == $userinfo['userid']#}
+			<!-- wo已支付 -->
+			<div class="pay_detail pay_success">
+				<div class="pay_tip">
+					<s></s>
+					<p>已经帮好友支付成功啦！</p>
+				</div>
+			</div>
+			{#else#}
+			<!-- 好友已支付 -->
+			<div class="pay_detail pay_fail">
+				<div class="pay_tip">
+					<s></s>
+					<p>好友已经支付成功啦！</p>
+				</div>
+			</div>
+			{#/if#}
+			{#/if#}
+
+		</div>
+
+		<div class="QR_Mask"></div>
+		<div class="QR_box">
+			<a href="javascript:;" class="close"></a>
+			<div class="QR"><div class="QRshow"><img src="/include/qrcode.php?data={#$daipayUrl#}" alt=""></div></div>
+			<p><s></s>扫码为好友支付吧</p>
+		</div>
+		{#/if#}
+
+
+	<!-- 底部 s -->
+	<div class="footer-login">
+		<p>
+			{#siteConfig action="singel"#}
+			<a href="{#getUrlPath service='siteConfig' template='about' id={#$row.id#}#}">{#$row.title#}</a><span class="pice">|</span>
+			{#/siteConfig#}
+			<a href="{#getUrlPath service='siteConfig' template='help'#}">帮助中心</a><span class="pice">|</span>
+	        <a href="{#getUrlPath service='siteConfig' template='feedback'#}">意见反馈</a>
+		</p>
+		{#$cfg_powerby#}
+	</div>
+	<!-- 底部 e -->
+	{#$cfg_statisticscode#}
+	<script src="{#$templets_skin#}js/daipay.js?v={#$cfg_staticVersion#}" charset="utf-8"></script>
+</body>
+</html>

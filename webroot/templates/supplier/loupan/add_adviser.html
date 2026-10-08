@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+	<title>新增顾问</title>
+	<meta name="keywords" content="{#$cfg_keywords#}">
+	<meta name="description" content="{#$cfg_description#}">
+	<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+	<!-- <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}"> -->
+	<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$templets_skin#}css/add_adviser.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}',
+			staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = '{#$cfg_hideUrl#}';
+		var cookiePre = '{#$cfg_cookiePre#}',
+			cfg_clihost = '{#$cfg_clihost#}';
+		var templets = '{#$templets_skin#}';
+
+		var buildtypenames = ['低层', '高层', '小高层', '联排别墅', '公寓']; //建筑类型
+		// var salestatenames = ['新盘待售','在售','尾盘','售罄']; //销售状态
+		// var existingnames = ['现房','期房']; //销售状态
+		var salestate = 0, //销售状态
+			existing = 0, //楼盘状态
+			buildtype = []; //物业类型
+		var thumbSize = '{#$thumbSize#}',
+			thumbType = "{#$thumbType#}", //缩略图配置
+			addrid = '{#$addrid#}',
+			addrListArr = '{#$addrListArr#}',
+			mapCity = "{#$mapCity#}",
+			subwayCity = 0;
+		var peitaoList = [];
+		var imglist = {"list1": '{#$imglist#}',};
+		var currid = 7;
+		var gwinfo = '{#$gwlist#}';
+		// gwinfo = ;
+		var loupanid = "{#$loupanid#}";
+		var aid = "{#$aid#}";
+		var modelType = 'house';
+	</script>
+</head>
+
+<body class="w1200">
+	<div id="page">
+		<!-- 头部 -->
+		{#include file="top.html"#}
+		<div class="conbox">
+			{#include file="left.html"#}
+			<!-- 右侧 -->
+			<div class="right_box">
+				<div class="rConBox">
+					<h3>{#if $aid#}编辑顾问{#else#}新增顾问{#/if#}</h3>
+					<div class="formbox huxingFormbox">
+						<form action="" id="form">
+							<div class="inpbox required">
+								<label><em>* </em>顾问姓名</label>
+								<div class="inp_div">
+									<div class="inp "><input type="text" name="name" placeholder="请输入顾问姓名" data-regex=".{3,60}" :value="gwinfo.username" {#if $aid#} {#/if#}></div>
+								</div>
+							</div>
+
+							<div class="inpbox required">
+								<label><em>* </em>顾问头像</label>
+								<div class="inp_div img_upload listImgBox">
+									<input type="hidden" name="photo" :value="gwinfo.photo" class="imglist-hidden" placeholder="请上传顾问头像"/>
+									<div class="imgbox">
+										<div v-cloak class="upload_btn filePicker uploadinp" v-show="!gwinfo.photo" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist="">
+											<s></s>
+											<p>点击上传图片</p>
+										</div>
+										<div class="imgShow">
+											<ul id="listSection1" class="listSection thumblist">
+												<li v-if="gwinfo.photo"  id="WU_FILE_tx" class="pubitem">
+													<img style="border-radius: 4px;" :src="'{#$cfg_basehost#}/include/attachment.php?f='+gwinfo.photo" :data-val="gwinfo.photo" :data-url="'{#$cfg_basehost#}/include/attachment.php?f='+gwinfo.photo">
+													<a class="reupload li-rm" href="javascript:;">重新上传</a>
+												</li>
+											</ul>
+											<!-- <div class="reupload">重新上传</div> -->
+										</div>
+									</div>
+									<p class="tip">推荐尺寸500像素*500像素</p>
+								</div>
+							</div>
+
+
+
+							<div class="inpbox picsInp">
+								<label><em>* </em>微信二维码</label>
+								<div class="inp_div img_upload listImgBox pics_upload">
+									<input type="hidden" name="wxQr" :value="gwinfo.wxQr" class="imglist-hidden" placeholder="请上传微信二维码"/>
+									<div class="imgbox" v-cloak>
+
+										<ul id="listSection2" class="listSection thumblist fn-clear" data-type="before">
+											<div  v-show="!gwinfo.wxQr" class="upload_btn filePicker uploadinp img_upload" id="filePicker2" data-type="pics"  data-count="1" data-size="{#$thumbSize#}" data-imglist="">
+												<s></s>
+												<p>点击上传图片</p>
+											</div>
+
+<!--											<li class="pubitem fn-clear" id="WU_FILE_0"><a class="li-rm" href="javascript:;">×</a><div class="li-thumb" style="display: block;"><div class="r-progress"><s></s></div><span class="ibtn"><a href="javascript:;" class="Lrotate" title="逆时针旋转90度"></a><a href="javascript:;" class="Rrotate" title="顺时针旋转90度"></a><a href="https://upload.ihuoniao.cn//siteConfig/atlas/large/2021/04/30/16197768163539.png" target="_blank" class="enlarge" title="放大"></a></span><span class="ibg"></span><img data-val="WGpKZE5RUnFWRzBDTTF3NA==" src="https://upload.ihuoniao.cn//siteConfig/atlas/large/2021/04/30/16197768163539.png" data-url="https://upload.ihuoniao.cn//siteConfig/atlas/large/2021/04/30/16197768163539.png"></div><div class="li-info" style="display:block;"><input class="li-title inputVal" placeholder="请输入图片名称" style="width:225px; display:inline-block;" value=""></div></li>-->
+											<li v-if="gwinfo.wxQr"  id="WU_FILE_wx" class="pubitem">
+												<a class=" li-rm" href="javascript:;"></a>
+												<div class="li-thumb" style="display: block;">
+													<img :src="'{#$cfg_basehost#}/include/attachment.php?f='+gwinfo.wxQr" :data-val="gwinfo.wxQr" :data-url="'{#$cfg_basehost#}/include/attachment.php?f='+gwinfo.wxQr">
+												</div>
+											</li>
+										</ul>
+
+									</div>
+									<p class="tip">上传户型图片，推荐尺寸500像素*360像素</p>
+								</div>
+							</div>
+
+							<div class="inpbox required">
+								<label><em>* </em>手机号</label>
+								<div class="inp_div" style="display: flex;">
+										<div class="areaCodeSelect">
+											<select name="areaCode" id="areaCode">
+												{#loop service="siteConfig" action="internationalPhoneSection" return="itemCode"#}
+												<option value="{#$itemCode.code#}" :selected="gwinfo.areaCode=={#$itemCode.code#}">{#$itemCode.name#} +{#$itemCode.code#}</option>
+												{#/loop#}
+											</select>
+											<s></s>
+										</div>
+										<div class="inp " style="width: 150px;">
+											<input type="tel" name="phone" :value="gwinfo.phone" placeholder="请输入手机号" id="phoneNumber">
+										</div>
+
+								</div>
+							</div>
+							<div class="inpbox required">
+								<label><em>* </em>微信号</label>
+								<div class="inp_div">
+										<div class="inp ">
+											<input type="text" name="wx" :value="gwinfo.wx" placeholder="请输入微信号">
+										</div>
+
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>职位名称</label>
+								<div class="inp_div">
+										<div class="inp ">
+											<input type="text" name="post" :value="gwinfo.post" placeholder="请输入职位名称">
+										</div>
+
+								</div>
+							</div>
+
+
+							<div class="inpbox">
+								<label>带看次数</label>
+								<div class="inp_div xs_inp ">
+										<div class="inp ">
+											<input type="text" name="dknum" :value="gwinfo.dknum"  placeholder="请输入带看次数">
+										</div>
+										<span class="dw">次</span>
+								</div>
+							</div>
+							<div class="inpbox">
+								<label>成交次数</label>
+								<div class="inp_div xs_inp">
+										<div class="inp ">
+											<input type="text" name="cjnum" :value="gwinfo.cjnum" placeholder="请输入成交次数">
+										</div>
+										<span class="dw">次</span>
+								</div>
+							</div>
+							<div class="inpbox">
+								<label>自定义项</label>
+								<div class="inp_div xs_inp">
+                                    <div>
+                                        <span class="dw" style="margin: 0 -1px 0 0!important;">标题</span><div class="inp " style="width: 100px;"><input type="text" name="ext_title_1" :value="gwinfo.ext_title_1" placeholder="自定义标题"></div><span class="dw" style="margin: 0 -1px 0 -1px!important;">内容</span><div class="inp " style="width: 150px;"><input type="text" name="ext_val_1" :value="gwinfo.ext_val_1" placeholder="自定义内容"></div>
+                                    </div>
+                                    <div style="margin-top: 10px;">
+                                        <span class="dw" style="margin: 0 -1px 0 0!important;">标题</span><div class="inp " style="width: 100px;"><input type="text" name="ext_title_2" :value="gwinfo.ext_title_2" placeholder="自定义标题"></div><span class="dw" style="margin: 0 -1px 0 -1px!important;">内容</span><div class="inp " style="width: 150px;"><input type="text" name="ext_val_2" :value="gwinfo.ext_val_2" placeholder="自定义内容"></div>
+                                    </div>
+								</div>
+							</div>
+
+
+							<a href="javascript:;" class="submit" @click="submit">确认提交</a>
+						</form>
+						<div class="loading" v-show="loading"><s></s></div>
+					</div>
+				</div>
+			</div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div>{#$cfg_statisticscode#}</div>
+</body>
+
+<script type="text/javascript" src="{#$templets_skin#}js/publicUpload_v2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicAddr.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/add_adviser.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+
+
+</html>

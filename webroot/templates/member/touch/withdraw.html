@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<title>{#$langData['siteConfig'][19][716]#} </title>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<!-- <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/money.css?v={#$cfg_staticVersion#}" media="all" /> -->
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/withdraw.css?v={#$cfg_staticVersion#}" media="all" />
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/vant/vant.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var money = {#$userinfo.money#}, withdrawLog = '{#getUrlPath service="member" type="user" template="withdraw_log_detail" id="%id%"#}';
+	var minWithdraw = {#$minWithdraw#}, maxWithdraw = {#$maxWithdraw#}, withdrawFee = {#$withdrawFee#};
+	var from = '{#$from#}';
+	var memberDomain = '{#$member_userDomain#}';
+	var totalCanWithdrawn = {#$totalCanWithdrawn#}, moneyRegGivingWithdraw = {#$cfg_moneyRegGivingWithdraw#};
+
+	var withdrawJfFee = {#$cfg_withdrawJfFee|default:0#};  //提现扣除积分比例
+
+	var BindWeixin='{#$alreadyBindWeixin#}';
+	var realname='{#$userinfo.realname#}'
+    var wmsj_userid = '{#$userinfo.userid#}';
+    var bindwxUrl = 'wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}?/pages/bindwx/index?qishouid=wmsj_{#$userinfo.userid#}';
+    var bindwxInterval;
+	var wxminiPath_withdraw = 'wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}';
+
+    var currType = {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform)#}2{#elseif $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}0{#elseif $withdrawPlatform && in_array('bank', $withdrawPlatform)#}1{#else#}''{#/if#};
+	var app_platform = '{#$app_platform#}';
+	var wxconfig  = {  //微信相关配置
+		appId: '{#$wxjssdk_appId#}',
+		timestamp: '{#$wxjssdk_timestamp#}',
+		nonceStr: '{#$wxjssdk_nonceStr#}',
+		signature: '{#$wxjssdk_signature#}',
+		wxjssdk_url: '{#$wxjssdk_url#}',
+	}
+</script>
+<style>
+    .van-overlay .wrapper {
+        display: -webkit-box;
+        display: -webkit-flex;
+        display: flex;
+        -webkit-box-align: center;
+        -webkit-align-items: center;
+        align-items: center;
+        -webkit-box-pack: center;
+        -webkit-justify-content: center;
+        justify-content: center;
+        height: 100%;
+    }
+</style>
+</head>
+
+<body>
+	{#include file="top.html" pageTitle="申请提现"#}
+	<div id="app" v-cloak>
+		<div class="tabContain same" @click='selectAccount'>
+			<div class="sameBox" v-show='isShow'>
+				<div class="sameDiv">
+					<span>请选择提现账号</span>
+				</div>
+				<div class="arrow"></div>
+			</div>
+            {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform) && ($from != 'wmsj' || $app_platform != 'ios')#}
+			<div class="weixin sameBox" v-show='weixinIsShow'>
+				<div class="sameDiv">
+					<span class="sameIcon"></span>
+					<div>
+						<em>{{realname}}</em>
+					</div>
+				</div>
+				<div class="arrow"></div>
+			</div>
+            {#/if#}
+            {#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+			<div class="alipay sameBox" v-show='alipayIsShow'>
+				<div class="sameDiv">
+					<span class="sameIcon"></span>
+					<div>
+						<em>{{cardname}}</em>
+						<span>{{cardnum}}</span>
+					</div>
+				</div>
+				<div class="arrow"></div>
+			</div>
+            {#/if#}
+            {#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+			<div class="bank sameBox" v-show='bankIsShow'>
+				<div class="sameDiv">
+					<img v-if="bankCode" class="sameIcon" :src=`/static/images/bank/${bankCode}.png` alt="">
+					<span v-else class="sameIcon"></span>
+					<div>
+						<em v-if="bankCode">{{bank}}({{cardnum.slice(-4)}})</em>
+						<em v-else>其他银行({{cardnum.slice(-4)}})</em>
+						<span>{{bankName}}</span>
+					</div>
+				</div>
+				<div class="arrow"></div>
+			</div>
+            {#/if#}
+		</div>
+		<div class="content same">
+			<span>提现金额</span>
+			<div class="amount">
+				<label>
+					<div style="display: flex; align-items: center; ">
+						<span>{#echoCurrency type='symbol'#}</span>
+						<input type="number" v-model='amountNum' @input="changeAmount">
+					</div>
+					<span  v-show='!changeRateColor'><em :class={rageColor:changeRateColor}>手续费{{withdrawFee}}%</em></span>
+					<span  v-show='changeRateColor'><em :class={rageColor:changeRateColor}>手续费{{rate}}{#echoCurrency type='short'#}</em></span>
+				</label>
+			</div>
+			<div class="maxAmount">
+				<span>最多可提现<em>{{allAmount}}</em>{#echoCurrency type='short'#},</span>
+				<span class="allWithdraw" @click='allWithdraw'>全部提现</span>
+			</div>
+		</div>
+		<div class="withdrawLimit same" v-show='showWithdrawLimit'>
+			<span></span>
+			<span>单次提现金额不得少于{{minAmount}}{#echoCurrency type='short'#}</span>
+		</div>
+		<div class="withdrawTips same">
+			<div>
+				<span></span>
+				<span>提现须知</span>
+			</div>
+			<div class="withdrawText">
+				{#$withdrawNote#}
+				<!-- <p>1. 单笔提现金额最低为{{minAmount}}元</p>
+				<p>2. 每日最多提现10笔，单笔限额2000元，总限额5000元</p>
+				<p>3. 提现手续费为每笔{{withdrawFee}}%</p> -->
+			</div>
+		</div>
+		<div class="bottomBtns">
+			{#if $from #}<a href="{#getUrlPath service="member" type="user" template="withdraw_log" param="from={#$from#}"#}" v-if="" class="btn_log">提现明细</a>{#/if#}
+			<button :class="{'submitBtn':true,btnNoClick:isClick}" @click='submitBtn' :disabled='isClick'>申请提现</button>
+		</div>
+		
+		<!-- 首次提现未绑定微信 弹出框 -->
+		<van-popup v-model="firstPopup" round position="bottom" :style="{ height: '50%' }">
+			<div class="selectAccount">
+				<div class="selectAccountTitlte">请选择提现账号</div>
+				<div class="selectAccountContent same">
+                    {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform) && ($from != 'wmsj' || $app_platform != 'ios')#}
+					<div class="weixin sameBox" @click="addWeixinAccount">
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<span>绑定微信提现</span>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+					<div class="alipay sameBox" @click='addAlipayAccount'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<span>添加支付宝</span>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+					<div class="bank sameBox" @click='addBankAccount'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<span>添加银行卡</span>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+				</div>
+			</div>
+		</van-popup>
+		<!-- 未绑定微信 弹出框 -->
+		<van-popup v-model="noWeixinPopup" round position="bottom" :style="{ height: '50%' }">
+			<div class="selectAccount">
+				<div class="selectAccountTitlte">请选择提现账号</div>
+                {#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+				<div class="same">
+					<div class="alipay sameBox" v-for="(item,index) in historyData.alipay" @click='selectAlipay(item)'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<div>
+								<em>{{item.cardname}}</em>
+								<span>{{item.cardnum}}</span>
+							</div>
+						</div>
+						<div class="arrow"></div>
+					</div>
+				</div>
+                {#/if#}
+                {#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+				<div class="same">
+					<div class="bank sameBox" v-for="(item,index) in historyData.bank" @click='selectBank(item)'>
+						<div class="sameDiv">
+							<img v-if="item.bankCode" class="sameIcon" :src=`/static/images/bank/${item.bankCode}.png` alt="">
+							<span v-else class="sameIcon"></span>
+							<div>
+								<em v-if="item.bankCode">{{item.bank}}({{item.cardnum.slice(-4)}})</em>
+								<em  v-else>其他银行({{item.cardnum.slice(-4)}})</em>
+								<span>{{item.bankName}}</span>
+							</div>
+						</div>
+						<div class="arrow"></div>
+					</div>
+				</div>
+                {#/if#}
+				<div class="addNewAccount">添加新账号</div>
+				<div class="selectAccountContent same">
+                    {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform) && ($from != 'wmsj' || $app_platform != 'ios')#}
+					<div class="weixin sameBox" @click="addWeixinAccount">
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<span>绑定微信提现</span>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+					<div class="alipay sameBox" @click='addAlipayAccount'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<span>添加支付宝</span>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+					<div class="bank sameBox" @click='addBankAccount'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<span>添加银行卡</span>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+				</div>
+			</div>
+		</van-popup>
+
+		<!-- 已绑定微信 弹出框 -->
+		<van-popup v-model="hasWeixinPopup" round position="bottom" :style="{ height: '50%' }">
+			<div class="selectAccount">
+				<div class="selectAccountTitlte">请选择提现账号</div>
+				<div class="same">
+                    {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform) && ($from != 'wmsj' || $app_platform != 'ios')#}
+					<div class="weixin sameBox" @click='selectWeixin'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<div>
+								<em>{{realname}}</em>
+							</div>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+					<div class="alipay sameBox" v-for="(item,index) in historyData.alipay" @click='selectAlipay(item)'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<div>
+								<em>{{item.cardname}}</em>
+								<span>{{item.cardnum}}</span>
+							</div>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+					<div class="bank sameBox" v-for="(item,index) in historyData.bank" @click='selectBank(item)'>
+						<div class="sameDiv">
+							<img v-if="item.bankCode" class="sameIcon" :src=`/static/images/bank/${item.bankCode}.png` alt="">
+							<span v-else class="sameIcon"></span>
+							<div>
+								<em v-if="item.bankCode">{{item.bank}}({{item.cardnum.slice(-4)}})</em>
+								<em  v-else>其他银行({{item.cardnum.slice(-4)}})</em>
+								<span>{{item.bankName}}</span>
+							</div>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+				</div>
+				<div class="addNewAccount">添加新账号</div>
+				<div class="selectAccountContent same">
+                    {#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+					<div class="alipay sameBox" @click='addAlipayAccount'>
+						<div class="sameDiv" >
+							<span class="sameIcon"></span>
+							<span>添加支付宝</span>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+					<div class="bank sameBox" @click='addBankAccount'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<span>添加银行卡</span>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+				</div>
+			</div>
+            {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform)#}
+			<div class="weixinTip same">微信提现仅支持绑定本人实名微信账户，如需更换请<span @click="addWeixinAccount">前往修改</span></div>
+            {#/if#}
+		</van-popup>
+		<!-- 全部添加过 弹出框 -->
+		<van-popup v-model="allAddPopup" round position="bottom" :style="{ height: '53%' }">
+			<div class="selectAccount">
+				<div class="selectAccountTitlte">请选择提现账号</div>
+				<div class="selectAccountContent same">
+                    {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform) && ($from != 'wmsj' || $app_platform != 'ios')#}
+					<div class="weixin sameBox" @click='selectWeixin'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<div>
+								<em>{{realname}}</em>
+							</div>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+					<div class="alipay sameBox" v-for="(item,index) in historyData.alipay" @click='selectAlipay(item)'>
+						<div class="sameDiv">
+							<span class="sameIcon"></span>
+							<div>
+								<em>{{item.cardname}}</em>
+								<span>{{item.cardnum}}</span>
+							</div>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+                    {#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+					<div class="bank sameBox" v-for="(item,index) in historyData.bank" @click='selectBank(item)'>
+						<div class="sameDiv">
+							<img v-if="item.bankCode" class="sameIcon" :src=`/static/images/bank/${item.bankCode}.png` alt="">
+							<span v-else class="sameIcon"></span>
+							<div>
+								<em v-if="item.bankCode">{{item.bank}}({{item.cardnum.slice(-4)}})</em>
+								<em  v-else>其他银行({{item.cardnum.slice(-4)}})</em>
+								<span>{{item.bankName}}</span>
+							</div>
+						</div>
+						<div class="arrow"></div>
+					</div>
+                    {#/if#}
+				</div>
+				<div class="addAlipayorBank" @click='{#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}addAlipayAccount{#else#}addBankAccount{#/if#}'>添加{#if $withdrawPlatform && in_array('alipay', $withdrawPlatform) && in_array('bank', $withdrawPlatform)#}支付宝/银行卡{#elseif $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}支付宝{#elseif $withdrawPlatform && in_array('bank', $withdrawPlatform)#}银行卡{#/if#}</div>
+			</div>
+		</van-popup>
+
+        <van-overlay :show="loading">
+            <div class="wrapper" @click.stop>
+                <van-loading size="48" />
+            </div>
+        </van-overlay>
+	</div>
+	
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/withdraw.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>面试日程</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/interviewManage.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    
+</head>
+<body>
+    <div class="pageBox" id="page" v-cloak>
+        <div class="fixedTop">
+            <div class="headerBox">
+                <template v-if="!searchShow">
+                    <div class="flexLeft">
+                        <a href="javascript:;" class="goBack" onclick="history.go(-1)"></a>
+                        <h4>面试日程 {{toInterview ? toInterview : ''}}</h4>
+                        {#if $currentDayInterview > 0#}
+                        <div class="interviewTip">
+                            今日面试安排 <span> {#$currentDayInterview#} </span>
+                        </div>
+                        {#/if#}
+                    </div>
+                    <div class="flexRight">
+                        <a href="javascript:;" class="date_btn" @click="showType = 'calendar' ; showSlidePop = true;"></a>
+                        <a href="javascript:;" class="search_btn" @click="searchShow = true"></a>
+                    </div>
+                </template>
+                
+                <template v-else>
+                    <a href="javascript:;" class="goBack" v-show="!miniprogram" onclick="history.go(-1)"></a>
+                    <a href="javascript:;" class="date_btn" v-show="miniprogram"  style="margin-right:.12rem; margin-left:.2rem;" @click="showType = 'calendar' ; showSlidePop = true;"></a>
+                    <div class="searchBox" >
+                        <!-- @keyup="searchKeyResult" -->
+                        <input type="text" placeholder="请输入搜索关键字" v-model="keywords" @keyup="toSearch" >
+                        <a href="javascript:;" class="clear_btn" v-show="keywords" @click="keywords = ''"></a>
+                    </div>
+                    <a href="javascript:;" class="hideSearch" @click="searchShow = false;initData();keywords = ''" v-show="searchShow && !miniprogram">取消</a>
+                </template>
+            </div>
+            <div class="filterBox">
+                <div class="tabBox">
+                    <ul>
+                        <li v-for="(item,ind) in tabsArr" :class="{'on_chose':ind== currTab}" @click="currTab = ind">{{item.text}}<span>{{item.count}}</span></li>
+                    </ul>
+                </div>
+                <a href="javascript:;" class="btn_job shai_btn" @click="showSlidePop = true; showType='postSelect'"><span>{{checkPostName}}</span></a>
+            </div>
+        </div>
+
+        <div class="listPage" v-cloak>
+            <!-- 待面试的 -->
+            <div :class="['dateChange',{'today':checkToday(currDate)}]" v-if="currDate && currTab === 0"  @click="showType = 'calendar' ; showSlidePop = true;" >
+                <h4 v-html="timeStrToDate(currDate)"></h4>
+            </div>
+            <div class="listContainer swiper-container">
+                <div class="swiper-wrapper" >
+
+                    <div class="listBox interviewBox swiper-slide">
+                        <ul class="list_ul">
+                            <li :class="['list_li',{'today':checkToday(date)}]" v-for="date in dateArr" >
+                                <dl v-for="item in solveDate[date]" :data-time="item.date">
+                                    <dt v-html="timeStrToDate(item.date)"></dt>
+                                    <dd>
+                                        <a :href="'{#$cfg_basehost#}/supplier/job/interviewDetail?appFullScreen&id=' + item.id" class="item">
+                                            <div class="resumeInfo fn-clear">
+                                                <div class="photo"><img :src="item.resume.photo_url" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'"><div :class="['sex', 'sex_' +item.resume.sex]"></div></div>
+                                                <div class="rdetail">
+                                                    <h4>{{item.resume.name}}</h4>
+                                                    <p><span>{{item.resume.age}}岁</span><em>|</em><span>{{item.resume.edu_tallest_name}}</span><em>|</em><span>{{item.resume.work_jy_name}}</span><em>|</em><span>{{item.resume.edu_school}}</span></p>
+                                                    <div class="rIntention"><label for="">面试职位：</label><span class="jobs">{{item.job.title}}</span><em>({{item.job.show_salary}})</em></div>
+                                                    <div class="rIntention"><label for="">期望薪资：</label> <span class="salary">{{item.resume.show_salary}}</span> </div>
+                                                    <div class="mark" v-if="item.remark && item.remark.remark_invitation">
+                                                        <label for="">标注：</label><span>{{item.remark.remark_invitation}}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="btnsBox">
+                                                <span class="btn" @click.prevent.stop="showSlidePop = true; showType = 'marked' ;editItem = item">{{item.remark.remark_invitation ? '修改':''}}标注</span>
+                                                <span class="btn callPhone" @click.prevent.stop="callPhone(item)">打电话</span>
+                                            </div>
+                                        </a>
+                                    </dd>
+                                </dl>
+                            </li>
+                        </ul>
+                        <div class="noData" v-if="tabsArr[0].loadEnd && interviewList.length == 0">
+                            <div class="img"><img src="{#$templets_skin#}images/noData4.png" alt=""></div>
+                            <h4 v-if="tabsArr[currTab].value || cancelFilter || postSelect || dateChose">暂无相关面试安排</h4>
+                            <h4 v-else>暂无面试安排</h4>
+                            <p>立即下载人才简历，发送面试邀请</p>
+                            <a href="{#getModuleConfig module='job' key='channelDomain'#}/talent" v-if="!tabsArr[currTab].value && !cancelFilter && !postSelect && !dateChose">查看人才库</a>
+                        </div>
+                        <div class="loading" v-else-if="tabsArr[0].loadEnd && interviewList.length > 0">
+                            <p>没有更多了~</p>
+                        </div>
+                        <div class="loading" v-else-if="!tabsArr[0].loadEnd">
+                            <p v-if="tabsArr[0].isload">加载中</p>
+                            <p v-else-if="!tabsArr[0].isload">下拉加载更多</p>
+                        </div>
+                        <div class="loading" v-else><p>没有更多了~</p></div>
+                    </div>
+    
+                    <div class="listBox  swiper-slide" >
+                        <ul>
+    
+                            <li :class="['list_li']" v-for="item in tabsArr[1].list">
+                                <a :href="'{#$cfg_basehost#}/supplier/job/interviewDetail?appFullScreen&id=' + item.id" :class="['item']">
+                                    <div class="item_header">
+                                        <span class="itime">面试时间：{{transTimes(item.date,6)}}</span>
+                                        <span class="istate" >沟通offer</span>
+                                    </div>
+                                    <div class="item_con">
+                                        <div class="resumeInfo fn-clear">
+                                            <div class="photo"><img :src="item.resume.photo_url" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'"><div :class="['sex', 'sex_' +item.resume.sex]"></div></div>
+                                            <div class="rdetail">
+                                                <h4>{{item.resume.name}}</h4>
+                                                <p><span>{{item.resume.age}}岁</span><em>|</em><span>{{item.resume.edu_tallest_name}}</span><em>|</em><span>{{item.resume.work_jy_name}}</span><em>|</em><span>{{item.resume.edu_school}}</span></p>
+                                                <div class="rIntention"><label for="">面试职位：</label><span class="jobs">{{item.job.title}}</span></div>
+                                                <div class="mark" v-if="item.remark && item.remark.remark_invitation">
+                                                    <label for="">标注：</label><span>{{item.remark.remark_invitation}}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="btnsBox" >
+                                            <span class="btn"  @click.prevent.stop="showSlidePop = true; showType = 'marked';editItem = item">{{item.remark.remark_invitation ? '修改':''}}标注</span>
+                                            <span class="btn callPhone" @click.prevent.stop="callPhone(item)">打电话</span>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="noData" v-if="tabsArr[1].loadEnd && tabsArr[1]['list'].length == 0">
+                            <div class="img"><img src="{#$templets_skin#}images/noData4.png" alt=""></div>
+                            <h4>暂无面试安排</h4>
+                            <p>立即下载人才简历，发送面试邀请</p>
+                            <a href="{#getModuleConfig module='job' key='channelDomain'#}/talent">查看人才库</a>
+                        </div>
+                        <div class="loading" v-else-if="tabsArr[1].loadEnd && tabsArr[1]['list'].length > 0">
+                            <p>没有更多了~</p>
+                        </div>
+                        <div class="loading" v-else-if="!tabsArr[1].loadEnd">
+                            <p v-if="!tabsArr[1].isload">加载中</p>
+                            <p v-else-if="tabsArr[1].isload  ">下拉加载更多</p>
+                        </div>
+                        <div class="loading" v-else><p>没有更多了~</p></div>
+                    </div>
+                    <div class="listBox  swiper-slide">
+                        <ul  class="list_ul">
+                            <!-- && checkRzDate(item.rz_date) -->
+                            <li class="list_li" v-for="item in tabsArr[2].list">
+                                <a :href="'{#$cfg_basehost#}/supplier/job/interviewDetail?appFullScreen&id=' + item.id" class="item">
+                                    <div :class="['state','state_' + item.rz_state ]">
+                                        <span v-if="!item.rz_state ">待入职</span>
+                                        <span v-else-if="item.rz_state === 1">已入职</span>
+                                        <span v-else>取消入职</span>
+                                    </div>
+                                    <div class="resumeInfo fn-clear">
+                                        
+                                        <div class="photo"><img :src="item.resume.photo_url" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'"><div :class="['sex', 'sex_' +item.resume.sex]"></div></div>
+                                        <div class="rdetail">
+                                            <h4>{{item.resume.name}}</h4>
+                                            <p><span>{{item.resume.age}}</span><em>|</em><span>{{item.resume.edu_tallest_name}}</span><em>|</em><span>{{item.resume.work_jy_name}}</span><em>|</em><span>{{item.resume.edu_school}}</span></p>
+                                            <div class="rIntention"><label for="" >入职时间：</label> <span :class="[{'hasRZ':checkRzDate(item.rz_date)},'rz_date']" v-html="timeStrToDate(item.rz_date)"></span> </div>
+                                            <div class="rIntention"><label for="">入职职位：</label><span class="jobs">{{item.job.title}}</span><em>({{item.job.nature}})</em></div>
+                                            <div class="mark" v-if="item.remark && item.remark.remark_invitation">
+                                                <label for="">标注：</label><span>*{{item.remark.remark_invitation}}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="btnsBox">
+                                        <span class="btn changeBtn" @click.prevent.stop="showSlidePop = true; showType='ruzhi'; editItem = item">更改入职信息</span>
+                                        <span class="btn callPhone" @click.prevent.stop="callPhone(item)">打电话</span>
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="noData" v-if="tabsArr[2].loadEnd && tabsArr[2]['list'].length == 0">
+                            <div class="img"><img src="{#$templets_skin#}images/noData4.png" alt=""></div>
+                            <h4>暂无面试安排</h4>
+                            <p>立即下载人才简历，发送面试邀请</p>
+                            <a href="{#getModuleConfig module='job' key='channelDomain'#}/talent">查看人才库</a>
+                        </div>
+                        <div class="loading" v-else-if="tabsArr[2].loadEnd && tabsArr[2]['list'].length > 0">
+                            <p>没有更多了~</p>
+                        </div>
+                        <div class="loading" v-else-if="!tabsArr[2].loadEnd">
+                            <p v-if="!tabsArr[2].isload">加载中</p>
+                            <p v-else-if="tabsArr[2].isload ">下拉加载更多</p>
+                        </div>
+                        <div class="loading" v-else><p>没有更多了~</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 历史面试记录 -->
+            <div class="interview_history" v-show="!filterDate && currTab === 0 && interview_history.length ">
+                <h3>历史面试记录</h3>
+                <ul>
+                    <li class="list_li" v-for="item in interview_history">
+                        <a :href="'{#$cfg_basehost#}/supplier/job/interviewDetail?appFullScreen&type=1&id=' + item.id" :class="['item',{'noFit_item':item.state == 5}]">
+                            <div class="item_header">
+                                <span class="itime">面试时间：{{transTimes(item.date,6)}}</span>
+                                <!-- <span class="istate state1" v-if="item.state === 1 && item.stating">已取消</span> -->
+                                <span class="istate state1" v-if="item.state === 2 || item.state === 6">已取消</span>
+                                <span class="istate" v-else-if="item.state === 3">沟通offer</span>
+                                <span class="istate state2" v-else-if="item.state === 4">{{ new Date().valueOf() > (item.rz_date * 1000) ? '已录取':'已录取，待入职'}}</span>
+                                <span class="istate state1" v-else-if="item.state === 5">不合适</span>
+                            </div>
+                            <div class="item_con">
+                                <div class="resumeInfo fn-clear">
+                                    <div class="photo"><img :src="item.resume.photo_url" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'"><div :class="['sex', 'sex_' +item.resume.sex]"></div></div>
+                                    <div class="rdetail">
+                                        <h4>{{item.resume.name}}</h4>
+                                        <p><span>{{item.resume.age}}岁</span><em>|</em><span>{{item.resume.edu_tallest_name}}</span><em>|</em><span>{{item.resume.work_jy_name}}</span><em>|</em><span>{{item.resume.edu_school}}</span></p>
+                                        <div class="rIntention"><label for="">面试职位：</label><span class="jobs">{{item.job.title}}</span></div>
+                                        <div class="mark" v-if="item.remark && item.remark.remark_invitation">
+                                            <label for="">标注：</label><span>*{{item.remark.remark_invitation}}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="btnsBox" v-if="[1,3,4,5].indexOf(item.state) > -1">
+                                    <span class="btn" @click.prevent.stop="showSlidePop = true; showType = 'marked' ;editItem = item">{{item.remark.remark_invitation ? '修改':''}}标注</span>
+                                    <span class="btn callPhone" @click.prevent.stop="callPhone(item)" v-if="[3,4].indexOf(item.state) > -1">打电话</span>
+                                </div>
+                                <div class="tip" v-else>
+                                    <p class="" v-if="item.refuse_author">{{item.refuse_author == 'company' ? '招聘方' : '对方'}}取消了面试<span>({{item.refuse_author == 'company' ? '请务必联系对方达成一致' : '理由：' + item.refuse_msg}})</span></p>
+                                    <!-- <p class="" v-else>对方取消了面试<span>（理由：未及时到达面试地点）</span></p> -->
+                                </div>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="bottomBox fixBottom" v-show="dateChose">
+            <a href="javascript:;" class="noDate" @click="dateChose = ''; initData()">返回全部数据</a>
+        </div>
+
+        <div class="popContainer">
+            <div :class="['mask_pop',{'zIndex': ['marked','calendar','ruzhi'].includes(showType)}]" v-show="showSlidePop" @click="showSlidePop = false"></div>
+
+            <!-- 应聘职位 -->
+            <div :class="['slidePop',{'showPop':showSlidePop && showType=='postSelect'}]"  >  
+                <ul  class="selectUl">
+                    <li @click="postSelect = ''" :class="{'on_chose':postSelect === ''}">全部职位</li>
+                    <li v-for="item in postArr" @click="postSelect = (postSelect == item.id ? '' : item.id)" :class="{'on_chose':postSelect == item.id}">{{item.title}}</li>
+                </ul>
+            </div>
+
+            <!-- 添加标注 -->
+            <div :class="['bottomPop markBottom' ,{'showPop':showSlidePop && showType=='marked'}]">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header">
+                    <h4 v-if="remarkForm.markState != 6">面试备注<span>(仅自己可见)</span></h4>
+                    <h4 v-else>取消面试<span>(将通知求职者)</span></h4>
+                </div>
+                <div class="pop_con">
+                    <div class="state_invitation">
+                        <ul class="state_ul">
+                            <li v-for="(item,ind) in markArr" :class="['state_' + item.value,{'on_chose':remarkForm.markState == item.value}]" @click="remarkForm.markState = item.value " v-if="(editItem && (new Date().valueOf() <= (editItem.date * 1000)) || item.value !== 6)">
+                                <div class="icon"><img :src="'{#$templets_skin#}images/icon' + ind + (remarkForm.markState == item.value ? '_1':'') +'.png'" alt=""></div>
+                                <p>{{item.labText}}</p>
+                            </li>
+                        </ul>
+                        
+                        <div class="inputBox" v-if="remarkForm.markState == 4"  @click="datePop = true; dateType = 1">
+                            <label for="">添加入职时间<em>(选填)</em></label>
+                            <div class="inp" >
+                                <input type="text" readonly  :value="remarkForm.joinDate ? transTimes(remarkForm.joinDate,2) : ''">
+                            </div>
+                        </div>
+                        <div class="formFields" v-if="remarkForm.markState != 6 " >
+                            <van-field
+                            ref="textarea"
+                            v-model="remarkForm.markText"
+                            rows="2"
+                            @focus="inputFocus"
+                            autosize
+                            type="textarea"
+                            maxlength="50"
+                            placeholder="可添加备注，最多50个字"
+                            show-word-limit
+                            />
+                        </div>
+                        <p class="errTip" v-if="remarkForm.markState == 6">务必先联系求职者，达成一致后才可取消</p>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" :class="['btn_sure',{'red_btn':remarkForm.markState == 6}]" @click="updateRemark()">{{remarkForm.markState == 6 ? '确定取消' : '确定'}}</a>
+                </div>
+            </div>
+
+
+            <!-- 日历 -->
+            <div :class="['bottomPop calendarPop',{'showPop':showSlidePop && showType == 'calendar'}] ">
+                <div class="pop_header calendar_tit">
+                    <span></span>
+                    <h4><span>{{choseDate.year}}</span><b>年/</b><span>{{choseDate.month > 9 ? choseDate.month : '0' + choseDate.month }}</span><b>月</b></h4>
+                    <span></span>
+                </div>
+                <div class="pop_con">
+                    <div class="weeks">
+                        <ul>
+                            <li v-for="(item,ind) in weeks">{{item}}</li>
+                        </ul>
+                    </div>
+                    <div class="allDates">
+
+                        <div class="dateBox" v-for="month in weekDays" :data-year="month.year" :data-month="month.month">
+                            <h2><span>{{month.month}}</span>月</h2>
+                            <div :class="['week','week_' + ind]" v-for="(week,ind) in month.weekday">
+                                <ul>
+                                    <li v-for="d in week" :class="[{'hasInterview':d.num},{'borderLeft':d.bleft},{'borderRight':d.bright},{'today':checkToday(transTimes(d.dateStr,7))}]" @click="choseShaiDate(d)">
+                                        <h4>{{d.date ? d.date : ''}}</h4>
+                                        <p v-if="d.num">面试{{d.num}}</p>
+                                        <p v-else-if="checkToday(transTimes(d.dateStr,7))">今天</p>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 更改入职信息 -->
+            <div :class="['bottomPop ruzhiPop',{'showPop':showSlidePop && showType == 'ruzhi'}]">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header">
+                    <h4>入职信息<span>(仅供招聘方快速查阅入职安排）</span></h4>
+                </div>
+                <div class="pop_con">
+                    <ul class="labBox">
+                        <li v-for="item in stateArr" @click="ruzhiForm.rz_state = item.value" :class="['rzState_' + item.value,{'on_chose':item.value == ruzhiForm.rz_state}]">{{item.label}}</li>
+                    </ul>
+                    <div class="state_invitation">
+
+                        <div class="inputBox"  @click="datePop = true; dateType = 2">
+                            <label for="">入职时间：</label>
+                            <div class="inp" >
+                                <input type="text" readonly  :value="ruzhiForm.rz_date ? transTimes(ruzhiForm.rz_date,2) : ''">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" :class="['btn_sure']" @click="updateRemark(1)">确定</a>
+                </div>
+            </div>
+
+            
+            <!-- 时间选择 -->
+            <div class="date_mask mask_pop zIndex" v-show="datePop"></div>
+            <div :class="['bottomPop  datePicker',{'showPop':datePop}]">
+                <van-datetime-picker @confirm="sureDate" @cancel="hideDatePop" :min-date="minDate" round :title="(dateType === 1 ? '入职时间':'选择时间')" type="date" v-model="remarkForm.rz_date"></van-datetime-picker>
+            </div>
+
+        </div>
+    </div>
+</body>
+<script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/interviewManage.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+</html>

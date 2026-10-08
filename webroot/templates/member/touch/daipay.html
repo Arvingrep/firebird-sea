@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>代付款</title>
+	<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+	<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/pay/daipay.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+	<script>
+		var masterDomain  = '{#$cfg_basehost#}';
+		var timeCount = {#$second#};
+		var expiredDate = '{#$expiredDate|date_format:"%Y/%m/%d %H:%M:%S"#}';
+		var state = {#$state#};
+		var price = {#$orderprice#};
+		var staticPath = '{#$cfg_staticPath#}';
+		var sservice = '{#$module#}';
+		var ordernum = '{#$ordernum#}';
+		var confirmtype = '{#$confirmtype#}';
+		var paotuitype = '{#(int)$paotuitype#}';
+		var isMaster = {#if $userinfo && $userinfo['userid'] == $uinfo['userid']#}1{#else#}0{#/if#};
+
+		var usermoney ='{#$userino.money#}';
+	</script>
+</head>
+<body>
+	{#include file="../../siteConfig/touch_top.html" pageTitle="代付款" #}
+	<div class="payinfo">
+		<div class="head_icon"><img src="{#$uinfo['photo']#}" onerror="this.src='/static/images/noPhoto_100.jpg'" /></div>
+		<div class="detail">
+			<h3>{#$uinfo['nickname']#}：</h3>
+			<p>我刚下了个订单，请帮我付个款吧~</p>
+		</div>
+	</div>
+
+	{#* 如果是自己打开的页面 *#}
+	{#if $userinfo && $userinfo['userid'] == $uinfo['userid']#}
+
+	<div class="pay_detail share_pay">
+		<dl class="pay_num">
+			<dt>代付金额</dt>
+			<dd>
+				<div class="count">{#echoCurrency type="symbol"#}<span><b>{#$orderpriceArr[0]#}</b>{#if $orderpriceArr[1]#}.{#$orderpriceArr[1]#}{#/if#}</span></div>
+
+				{#if $state == 0 && $second > 0#}
+				<!-- 未付款 -->
+				<div class="timebox">
+					剩余支付时间
+					<div class="time_cut">
+						<span class="mm">00</span>
+						:
+						<span class="ss">00</span>
+					</div>
+				</div>
+				{#/if#}
+
+				{#if $state == 1#}
+				{#if $userinfo && $peerpay == $userinfo['userid']#}
+				<!-- 自己付款成功 -->
+				<div class="pay_tip">已经帮好友支付成功啦</div>
+				{#else#}
+				<!-- 别人支付成功 -->
+				<div class="pay_tip">代付链接已失效</div>
+				{#/if#}
+				{#/if#}
+
+				{#if $state != 0 && $state != 1#}
+				<!-- 别人取消订单 -->
+				<div class="pay_tip">好友已经取消订单啦</div>
+				{#/if#}
+
+			</dd>
+		</dl>
+
+
+		{#if $state == 0#}
+		<div class="qrBox">
+			<div class="qrcode">
+				<div class="qr"><img src="/include/qrcode.php?data={#$daipayUrl#}" /></div>
+			</div>
+			<h3>请好友当面扫码</h3>
+			<p>或</p>
+		</div>
+
+		<a href="javascript:;" class="pay_btn HN_PublicShare">发送给好友代付</a>
+		<a href="javascript:;" class="pay_btn copy_btn fn-hide" data-clipboard-action="copy" data-clipboard-text="我刚下了个订单，请帮我付个款吧~  {#$daipayUrl|urldecode#}">复制链接给好友</a>
+		{#/if#}
+
+	</div>
+
+	<div class="pay_know_box">
+		<dl class="pay_know">
+			<dt>付款说明：</dt>
+			<dd>1、付款前务必和好友再次确认，避免是诈骗行为；</dd>
+			<dd>2、如果发生退款，钱将退还至好友余额账户中。</dd>
+		</dl>
+	</div>
+
+	{#else#}
+	<div class="pay_detail">
+		<dl class="pay_num">
+			<dt>代付金额</dt>
+			<dd>
+				<div class="count">{#echoCurrency type="symbol"#}<span><b>{#$orderpriceArr[0]#}</b>{#if $orderpriceArr[1]#}.{#$orderpriceArr[1]#}{#/if#}</span></div>
+
+				{#if $state == 0 && $second > 0#}
+				<!-- 未付款 -->
+				<div class="timebox">
+					剩余支付时间
+					<div class="time_cut">
+						<span class="mm">00</span>
+						:
+						<span class="ss">00</span>
+					</div>
+				</div>
+				{#/if#}
+
+				{#if $state == 1#}
+				{#if $userinfo && $peerpay == $userinfo['userid']#}
+				<!-- 自己付款成功 -->
+				<div class="pay_tip">已经帮好友支付成功啦</div>
+				{#else#}
+				<!-- 别人支付成功 -->
+				<div class="pay_tip">好友已经支付成功啦</div>
+				{#/if#}
+				{#/if#}
+
+				{#if $state != 0 && $state != 1#}
+				<!-- 别人取消订单 -->
+				<div class="pay_tip">好友已经取消订单啦</div>
+				{#/if#}
+
+			</dd>
+		</dl>
+		<dl class="pay_know">
+			<dt>付款说明：</dt>
+			<dd>1、付款前务必和好友再次确认，避免是诈骗行为；</dd>
+			<dd>2、如果发生退款，钱将退还至好友余额账户中。</dd>
+		</dl>
+
+		{#if $state == 0#}
+		<a href="javascript:;" class="pay_btn publicPay">立即支付</a>
+		{#/if#}
+	</div>
+	{#/if#}
+
+	<!-- 代付列表 -->
+	{#if $proList#}
+	<div class="OrderBox">
+		<h3>商品信息</h3>
+		<ul class="order_ul">
+			{#foreach from=$proList item=pro#}
+			<li class="order_li">
+				<a href="{#$pro.url#}">
+					<div class="img"><img src="{#$pro.litpic#}" onerror="this.src='/static/images/404.jpg'" /></div>
+					<div class="orderinfo">
+						<h4>{#$pro.title#}</h4>
+						<div class="orderDetail">
+							<div class="price">{#echoCurrency type="symbol"#}<b>{#$pro.priceArr[0]#}</b><em>.{#$pro.priceArr[1]#}</em></div>
+							<div class="num">数量：{#$pro.count#}</div>
+						</div>
+					</div>
+				</a>
+			</li>
+			{#/foreach#}
+		</ul>
+	</div>
+	{#/if#}
+	{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+<script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '我在{#$cfg_shortname#}下了订单，请帮我付个款吧~',
+        "title": '代付款申请',
+        "imgUrl": '{#$cfg_basehost#}/templates/member/touch/images/daipay.png',
+        "link": '{#$daipayUrl|urldecode#}',
+    };
+
+    document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script src="{#$templets_skin#}js/daipay.js?v={#$cfg_staticVersion#}" charset="utf-8"></script>
+</body>
+</html>

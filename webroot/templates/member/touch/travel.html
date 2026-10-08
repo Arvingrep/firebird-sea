@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="{#$cfg_soft_lang#}">
+  <title>{#$langData['travel'][0][0]#}</title> {#* 旅游频道 *#}
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+  <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/travel.css?v={#$cfg_staticVersion#}">
+  <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+  <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+  <script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+  <script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+    var hideFileUrl = '{#$cfg_hideUrl#}', cookiePre = '{#$cfg_cookiePre#}';
+    var module = 'travel';
+    var wxconfig = {
+      appId: '{#$wxjssdk_appId#}',
+      timestamp: '{#$wxjssdk_timestamp#}',
+      nonceStr: '{#$wxjssdk_nonceStr#}',
+      signature: '{#$wxjssdk_signature#}',
+    };
+    var userId = `{#$userinfo.userid#}`;
+    var imgError = `{#$cfg_staticPath#}images/404.jpg?v={#$cfg_staticVersion#}`; //图片404地址
+    var memberUrl = `{#getUrlPath service='member'#}`; //店铺配置页面
+    if (!userId) {
+      location.href = `${masterDomain}/login.html`;
+    }
+  </script>
+</head>
+
+<body>
+  <div id="vue" v-cloak>
+    <!-- 页面载入loading -->
+    <div class="loading" v-if="false">页面加载中...</div>
+    <div :class="['Shell',{'app':appBoolean}]" v-if="detail.id">
+      <!-- 商家信息 -->
+      <div class="companyDetail">
+        <div class="c-nav">
+          <img src="{#$templets_skin#}images/back-r.png?v={#$cfg_staticVersion#}" class="cn-left" @click="backFn">
+          <img src="{#$templets_skin#}images/shop/set-icon.png?v={#$cfg_staticVersion#}" class="cn-right"
+            @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+        </div>
+        <div class="c-info">
+          <div class="ci-left">
+            <img :src="detail.logo||imgError" class="cil-logo" @error="detail.logo=imgError">
+            <div class="cil-info">
+              <div class="title">{{detail.name}}</div>
+              <!-- 审核中 -->
+              <div class="aduit" @click="linkTo(`{#getUrlPath service='member' template='config-travel'#}`)"
+                v-if="detail.state==0">商家资料审核中</div>
+              <!-- 审核拒绝 -->
+              <div class="refuse" @click="linkTo(`{#getUrlPath service='member' template='config-travel'#}`)"
+                v-else-if="detail.state==2">商家资料审核未通过</div>
+              <!-- 审核通过 -->
+              <div class="tip" v-else>
+                <span>商家版到期 {{detail.endTime}}</span>
+                <div @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">续费</div>
+              </div>
+            </div>
+          </div>
+          <div class="ci-right" @click="linkTo(detail.homepage)">
+            <img src="{#$templets_skin#}images/houseWhite.png?v={#$cfg_staticVersion#}">
+            <span>我的主页</span>
+          </div>
+        </div>
+        <div class="c-data">
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.order.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.order.yesterday}}</div>
+            <div class="cdi-text">今日订单(笔)</div>
+          </div>
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.money.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.money.yesterday}}</div>
+            <div class="cdi-text">今日成交额(元)</div>
+          </div>
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.click.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.click.yesterday}}</div>
+            <div class="cdi-text">今日客流(人)</div>
+          </div>
+        </div>
+      </div>
+      <!-- 订单管理 -->
+      <div class="orderNav">
+        <div class="o-title" @click="linkTo(`{#getUrlPath service='member' template='order-travel'#}`)">
+          <div class="ot-left">管理订单</div>
+          <div class="ot-right">查看全部订单
+          </div>
+        </div>
+        <div class="o-list">
+          <div class="ol-item"
+            @click="linkTo(`{#getUrlPath service='member' template='order-travel' param='state=1'#}`)">
+            <img src="{#$templets_skin#}images/travel/newCard.png?v={#$cfg_staticVersion#}">
+            <span>未付款({{orderInfo.state0||0}})</span>
+          </div>
+          <div class="ol-item"
+            @click="linkTo(`{#getUrlPath service='member' template='order-travel' param='state=2'#}`,true)">
+            <img src="{#$templets_skin#}images/travel/newCoupon.png?v={#$cfg_staticVersion#}">
+            <span>未使用({{orderInfo.state1||0}})</span>
+          </div>
+          <div class="ol-item"
+            @click="linkTo(`{#getUrlPath service='member' template='order-travel' param='state=3'#}`,true)">
+            <img src="{#$templets_skin#}images/travel/newMoney.png?v={#$cfg_staticVersion#}">
+            <span>退款售后({{orderInfo.state8||0}})</span>
+          </div>
+          <div class="ol-item" @click="linkTo(`{#getUrlPath service='member' template='order-travel'#}`)">
+            <img src="{#$templets_skin#}images/travel/newPlan.png?v={#$cfg_staticVersion#}">
+            <span>全部订单</span>
+          </div>
+        </div>
+      </div>
+      <!-- 跳转 -->
+      <div class="manageItem">
+        <div class="m-left" @click="scanFn">
+          <div class="ml-right">
+            <div class="title">扫码核销</div>
+            <div class="tip">核销券码门票等</div>
+          </div>
+          <img src="{#$templets_skin#}images/travel/newScan.png?v={#$cfg_staticVersion#}" class="ml-pic">
+        </div>
+        <div class="m-right"
+          @click="linkTo(`{#getUrlPath service='member' type='user' template='fabu-travel-strategy'#}`)">
+          <div class="mr-right">
+            <div class="title">发布攻略</div>
+            <div class="tip">推广文章/植入</div>
+          </div>
+          <img src="{#$templets_skin#}images/travel/newNote.png?v={#$cfg_staticVersion#}" class="mr-pic">
+        </div>
+      </div>
+      <!-- 旅游产品管理 -->
+      <div class="decorationManage"
+        v-if="typeList.includes('2')||typeList.includes('3')||typeList.includes('4')||typeList.includes('7')">
+        <div class="d-title"
+          @click="linkTo(`{#getUrlPath service='member' type='user' template='travel-manage'#}`,true)">
+          <div class="title">旅游产品管理</div>
+          <div class="tip">
+            管理经营类别</div>
+        </div>
+        <div class="d-list">
+          <div class="dl-item" @click="linkTo(`{#getUrlPath service='member' template='manage-travel' param="ttype=ticket"#}`,false,`/pages/packages/mcenter/bfabu/bfabu?ttype=ticket&mold=travel`)"
+            v-if="typeList.includes('2')">
+            <img src="{#$templets_skin#}images/travel/newFloor.png?v={#$cfg_staticVersion#}">
+            <span>景点门票</span>
+          </div>
+          <div class="dl-item" @click="linkTo(`{#getUrlPath service='member' template='manage-travel' param="ttype=around"#}`,false,`/pages/packages/mcenter/bfabu/bfabu?ttype=around&mold=travel`)"
+            v-if="typeList.includes('4')">
+            <img src="{#$templets_skin#}images/travel/newMount.png?v={#$cfg_staticVersion#}">
+            <span>周边游</span>
+          </div>
+          <div class="dl-item" @click="linkTo(`{#getUrlPath service='member' template='manage-travel' param="ttype=rentcar"#}`,false,`/pages/packages/mcenter/bfabu/bfabu?ttype=rentcar&mold=travel`)"
+            v-if="typeList.includes('3')">
+            <img src="{#$templets_skin#}images/travel/newCar.png?v={#$cfg_staticVersion#}">
+            <span>租车</span>
+          </div>
+          <div class="dl-item" @click="linkTo(`{#getUrlPath service='member' template='manage-travel' param="ttype=visa"#}`,false,`/pages/packages/mcenter/bfabu/bfabu?ttype=visa&mold=travel`)"
+            v-if="typeList.includes('7')">
+            <img src="{#$templets_skin#}images/travel/newVisa.png?v={#$cfg_staticVersion#}">
+            <span>签证</span>
+          </div>
+        </div>
+      </div>
+      <!-- 酒店列表 -->
+      <template v-if="typeList.includes('1')">
+        <div class="hotelList" v-if="hotelList.length>0">
+          <div class="h-title" @click="linkTo(`{#getUrlPath service='member' template='manage-travel' param="ttype=hotel"#}`,false,`/pages/packages/mcenter/bfabu/bfabu?ttype=hotel&mold=travel`)">
+            <div class="ht-left">酒店/民宿</div>
+            <div class="ht-right">
+              查看全部/<span
+                @click.stop="linkTo(`{#getUrlPath service='member' template='fabu-travel-hotel'#}`)">添加酒店</span>
+            </div>
+          </div>
+          <!-- 大于一个 -->
+          <div class="h-list" v-if="hotelList.length>1">
+            <div class="swiper-wrapper">
+              <div class="hl-item swiper-slide" v-for="(item,index) in hotelList" :key="index"
+                @click="linkTo(item.url)">
+                <div class="hli-picture">
+                  <img :src="item.litpic||imgError" @error="item.litpic=imgError">
+                  <div class="label">{{item.typename}}</div>
+                </div>
+                <div class="hli-right">
+                  <div class="title">{{item.title}}</div>
+                  <div class="items">
+                    <div
+                      @click.stop="linkTo(`{#getUrlPath service='member' template='fabu-travel-hotel' param='id=${item.id}'#}`)">
+                      <img src="{#$templets_skin#}images/travel/newAnomaly.png?v={#$cfg_staticVersion#}">
+                      <span>酒店资料</span>
+                    </div>
+                    <div
+                      @click.stop="linkTo(`{#getUrlPath service='member' template='fabu-travel-hotel' param='id=${item.id}&scroll=1'#}`)">
+                      <img src="{#$templets_skin#}images/travel/newBook.png?v={#$cfg_staticVersion#}">
+                      <span>房型信息</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 只有一个 -->
+          <div class="h-list" v-else>
+            <div class="hl-item one">
+              <div class="hli-picture">
+                <img :src="hotelList[0].litpic||imgError" @error="hotelList[0].litpic=imgError">
+                <div class="label">{{hotelList[0].typename}}</div>
+              </div>
+              <div class="hli-right">
+                <div class="title">{{hotelList[0].title}}</div>
+                <div class="items">
+                  <div
+                    @click.stop="linkTo(`{#getUrlPath service='member' template='fabu-travel-hotel' param='id=${hotelList[0].id}'#}`)">
+                    <img src="{#$templets_skin#}images/travel/newAnomaly.png?v={#$cfg_staticVersion#}">
+                    <span>酒店资料</span>
+                  </div>
+                  <div
+                    @click.stop="linkTo(`{#getUrlPath service='member' template='fabu-travel-hotel' param='id=${hotelList[0].id}&scroll=1'#}`)">
+                    <img src="{#$templets_skin#}images/travel/newBook.png?v={#$cfg_staticVersion#}">
+                    <span>房型信息</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="h-pagination"></div>
+        </div>
+        <div class="staffNone" v-else>
+          <div class="s-title">
+            <div class="st-left">酒店/民宿</div>
+            <div class="st-right" v-if="hotelList.length>0">无此业务？<span @click="popFn(1,'stop')">可关闭组件</span></div>
+          </div>
+          <div class="s-tip">发布酒店信息、完善房型与价格</div>
+          <div class="s-add" @click.stop="linkTo(`{#getUrlPath service='member' template='fabu-travel-hotel'#}`)">
+            添加酒店</div>
+        </div>
+      </template>
+      <!-- 续费标签 -->
+      <div class="continueLabel" v-if="detail.continue">
+        <div class="c-left">
+          <div class="title">商家版即将到期</div>
+          <div class="tip">续费套餐，续享全部商家服务</div>
+        </div>
+        <div class="c-btn" @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">
+          <span>查看/续费</span>
+          <img src="{#$templets_skin#}images/newRight.png?v={#$cfg_staticVersion#}">
+        </div>
+      </div>
+      <!-- 公司管理项 -->
+      <div class="orderList">
+        <div>
+          <div class="l-title">旅游管理</div>
+          <div class="l-list">
+            <div class="ll-item" @click="linkTo(`{#getUrlPath service='member' template='config-travel'#}`)">
+              <img src="{#$templets_skin#}images/travel/newConfig.png?v={#$cfg_staticVersion#}">
+              <div>公司信息</div>
+            </div>
+            <div class="ll-item"
+              @click="linkTo(`{#getUrlPath service='member' type='user' template='travel-manage'#}`,true)"
+              v-if="!typeList.includes('2')&&!typeList.includes('3')&&!typeList.includes('4')&&!typeList.includes('7')">
+              <img src="{#$templets_skin#}images/travel/newClassify.png?v={#$cfg_staticVersion#}">
+              <div>经营类别</div>
+            </div>
+            <div class="ll-item"
+              @click="hotelList.length==0?linkTo(`{#getUrlPath service='member' template='fabu-travel-hotel'#}`):popFn(1,'open')"
+              v-if="!typeList.includes('1')">
+              <img src=" {#$templets_skin#}images/travel/newSofa.png?v={#$cfg_staticVersion#}">
+              <div>酒店民宿</div>
+            </div>
+            <div class="ll-item" @click="linkTo(`{#getUrlPath service='member' type='user' template='manage-travel' param="otherActive=1"#}`,false,`/pages/packages/mcenter/fabu/fabu?otherActive=1&mold=travel&code=1`)">
+              <img src="{#$templets_skin#}images/travel/newVideo.png?v={#$cfg_staticVersion#}">
+              <div>视频管理</div>
+            </div>
+            <div class="ll-item"
+              @click="linkTo(`{#getUrlPath service='member' type='user' template='manage-travel' param="otherActive=0"#}`,false,`/pages/packages/mcenter/fabu/fabu?otherActive=0&mold=travel&code=1`)">
+              <img src="{#$templets_skin#}images/travel/newMap.png?v={#$cfg_staticVersion#}">
+              <div>攻略管理</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="l-title">常用功能</div>
+          <div class="l-list">
+            <div class="ll-item" @click="linkTo(`{#$cfg_basehost#}/mobile.html`)" v-if="!appBoolean">
+              <img src="{#$templets_skin#}images/travel/newShield.png?v={#$cfg_staticVersion#}">
+              <div>下载APP</div>
+            </div>
+            <div class="ll-item" @click="linkTo(`{#getUrlPath service='member' type='user' template='pocket'#}`)">
+              <img src="{#$templets_skin#}images/travel/newWallet.png?v={#$cfg_staticVersion#}">
+              <div>我的钱包</div>
+            </div>
+            <div class="ll-item" @click="linkTo(`tel:${detail.hotline}`)">
+              <img src="{#$templets_skin#}images/travel/newHeadset.png?v={#$cfg_staticVersion#}">
+              <div>客服帮助</div>
+            </div>
+            <div class="ll-item app_show" @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+              <img src="{#$templets_skin#}images/set_icon_green.png?v={#$cfg_staticVersion#}" onerror="this.src='/static/images/404.jpg'" />
+              <div>系统设置</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template v-if="!appBoolean">
+        {#include file="../../siteConfig/touch_bottom_5.0.html" active="fourthicon"
+        bottom_module="travel"#}
+      </template>
+      <!-- 弹窗提示 -->
+      <div class="warnPop" v-if="popb">
+        <div class="w-content">
+          <template v-if="popType=='stop'">
+            <div class="wc-title">
+              <div class="title">确定停止经营酒店/民宿?</div>
+              <div class="tip">此操作将下架所有相关信息</div>
+            </div>
+            <div class="wc-btn">
+              <div class="cancel" @click="popFn(0,'')">取消</div>
+              <div class="confirm" @click="openFn(0)">停止经营</div>
+            </div>
+          </template>
+          <template v-else-if="popType=='open'">
+            <div class="wc-title">
+              <div class="title">确定开启经营酒店/民宿?</div>
+            </div>
+            <div class="wc-btn">
+              <div class="cancel" @click="popFn(0,'')">取消</div>
+              <div class="confirm" @click="openFn(1)">确定</div>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div class="warnTip" v-if="warnb">{{errInfo}}</div>
+    </div>
+    <!-- 页面载入失败提示 -->
+    <div class="Warn" v-else-if="!loadingb">
+      <div class="w-tip">
+        <img src="{#$cfg_staticPath#}images/notfindempty.png?v={#$cfg_staticVersion#}" class="wt-pic">
+        <div class="wt-title">{{info}}</div>
+        <div class="wt-btn" @click="linkTo(`{#getUrlPath service='member' type='user' template='enter_contrast'#}`)">
+          确定
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript'
+  src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/travel.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

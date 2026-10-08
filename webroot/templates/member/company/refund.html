@@ -1,0 +1,138 @@
+{#$pageTitle = "申请退款"|cat:" - "|cat:$cfg_webname#}
+{#include file="head.html"#}
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/refund.css?v={#$cfg_staticVersion#}" media="all" />
+<script>
+	var atpage = 1, pageSize=6;
+	var orderdetailUrl = '{#getUrlPath service="member" type="user" template="orderdetail-{#$module#}"   id={#$id#}#}';
+	var imconfig = {
+        'mod':'{#$module#}',
+        'chatid':"{#$detail_userid#}",
+    }
+    var datedjs=1000000;//平台设置的商家处理退款剩余时间
+    var datetds=800000;//此订单的剩余时间
+
+	var  module = '{#$module#}';
+
+	var  id = '{#$id#}', title ="{#$detail_product['title']#}";
+	var pics ="{#$detail_product['pics']#}";
+	var price = "{#$detail_totalmoney#}"
+	var proid = "{#$proid#}"
+
+	//var datetads=900000;//平台设置的整个退款过程申请时间
+</script>
+</head>
+{#$pageCurr = "refund-{#$module#}"#}
+<body>
+{#include file="headSidebar.html"#}
+<div class="main">
+	<div class="container">
+		
+		<s class="jgeLine"></s>
+		<div class="toprefundTab">
+			{#if $module == 'shop'#}
+				{#*商城仅退款 需要判断*#}
+				<ul class="fn-clear">
+					<li class="firLi active"><a href="javascript:;"><span>1</span>买家申请退款</a><s></s></li>
+					<li class="secLi  {#if $detail_refundnumber == 0 || $detail_refundnumber == 1#} active {#/if#}"><a href="javascript:;"><span>2</span>商家处理申请退款</a><s></s></li>
+					<li class="thirLi  {#if $detail_orderstate == 7#} active {#/if#}"><a href="javascript:;"><span>3</span>退款完毕</a></li>
+				</ul>
+				{#*商城退货退款 需要判断*#}
+				<!-- <ul class="fn-clear speUl">
+					<li class="firLi active"><a href="javascript:;"><span>1</span>买家申请退款</a><s></s></li>
+					<li class="secLi {#if $detail_refundnumber == 0 || $detail_refundnumber == 1#} active {#/if#}"><a href="javascript:;"><span>2</span>商家处理申请退款</a><s></s></li>
+					<li class="thirLi "><a href="javascript:;"><span>3</span>买家退货</a><s></s></li>
+					<li class="fourLi  {#if $detail_status == 1 || $detail_refundnumber ==2#} active {#/if#}"><a href="javascript:;"><span>4</span>退款完毕</a></li>
+				</ul> -->
+			{#else#}
+				{#* 其余模块 *#}
+				<ul class="fn-clear">
+				<li class="firLi active"><a href="javascript:;"><span>1</span>买家申请退款</a><s></s></li>
+				<li class="secLi  {#if $detail_orderstate ==  8 || $detail_orderstate == 9#} active {#/if#}"><a href="javascript:;"><span>2</span>商家处理申请退款</a><s></s></li>
+				<li class="thirLi  {#if $detail_orderstate == 9#} active {#/if#}"><a href="javascript:;"><span>3</span>退款完毕</a></li>
+				
+				</ul>
+			{#/if#}
+		</div>
+		<div class="refundCon fn-clear">
+
+            <div class="refundRight">
+				<h3 class="refundH">订单详情</h3>
+                {#if $module =='shop'#}
+                {#foreach from=$detail_product item="pro"#}
+                <div class="orderCon">
+                {#if !$proid || ($proid && $pro.id == $proid)#}
+                <div class="proimg"><a href="{#getUrlPath service='shop' template='detail' id={#$pro['id']#}#}" target="_blank"><img src="{#$pro['litpic']#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/good_default.png';"></a></div>
+                <div class="proInfo">
+                    <h3><a href="{#getUrlPath service='shop' template='detail' id={#$pro['id']#}#}" target="_blank">{#$pro['title']#}</a></h3>
+                </div>
+                        {#$orderprice = $pro.price#}
+                        {#$procount = $pro.count#}
+                    {#/if#}
+                </div>
+                {#/foreach#}
+                {#$totalmoney = $detail_totalPayPrice#}
+
+                {#else#}
+                <div class="orderCon">
+                    <div class="proimg"><a href="{#$detail_product['url']#}"><img src="{#$detail_product['litpic']#}" alt=""></a></div>
+                    <div class="proInfo">
+                        <h3><a href="{#$detail_product['url']#}">{#$detail_product['title']#}</a></h3>
+                    </div>
+                </div>
+                {#/if#}
+				<div class="storeCon">
+					<dl><dt>买&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 家：</dt><dd><span class="storeTit">{#$detail_username#}</span><a href="javascript:;" class="contactStore chat_to-Link" data-type="user"></a></dd></dl>
+					<dl><dt>买家电话：</dt><dd>{#$detail_usercontact#}</dd></dl>
+					<!-- <dl><dt>订单编号：</dt><dd>{#$detail_ordernum#}</dd></dl> -->
+                    {#if $proid#}
+					<dl><dt>单&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 价：</dt><dd>{#echoCurrency type='symbol'#} {#$orderprice#}</dd></dl>
+					<dl><dt>数&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 量：</dt><dd>{#$procount#}</dd></dl>
+					<dl><dt>商品总价：</dt><dd>{#echoCurrency type='symbol'#} {#$totalmoney#}</dd></dl>
+                    {#/if#}
+				</div>
+				<div class="storeCon tuiCon">
+					<dl><dt>退款编号：</dt><dd id="tuinum">{#$detail_ordernum#}</dd></dl>
+					<dl><dt>退款金额：</dt><dd id="tuimoney">{#echoCurrency type='symbol'#} {#if $module == 'shop'#}{#$detail_ret_amount#}{#else#}{#$detail_product['price']#}{#/if#}</dd></dl>
+					<dl><dt>原&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 因：</dt><dd id="tuiType">{#if $module == 'shop'#}{#$detail_retType#}{#else#}{#$detail_rettype#}{#/if#}</dd></dl>
+					<dl><dt>退款类型：</dt><dd>仅退款</dd></dl>
+					<dl><dt>退款说明：</dt><dd id="tuiNote">{#if $module == 'shop'#}{#$detail_retNote#}{#else#}{#$detail_retnote#}{#/if#}</dd></dl>
+				</div>
+
+			</div>
+			
+			{#include file="refund-$module.html"#}
+			{#$orderprice = $detail_orderprice#}
+			{#$procount = $detail_procount#}
+			{#$totalmoney = $detail_totalmoney#}
+			
+			
+		</div>
+
+		
+
+	</div>
+
+</div>
+
+<!-- 拒绝原因弹窗 s-->
+<div class="fwMask"></div>
+<div class="refuseWrap jzComWrap">
+  <div class="refuseAlert">
+  	<h2 class="sureFwAlertTit">拒绝申请</h2>
+  	<a href="javascript:;" class="close"></a>
+    {#* 请填写拒绝退款原因 *#}
+    <div class="refuse_note">
+    	<span>拒绝原因：</span>
+    	<textarea name="rettype" id="refuse_tip"  placeholder="请填写拒绝退款原因"></textarea>
+  </div>
+
+ 	<div class="refusesubmit"  data-id="">
+		<a href="javascript:;">确认拒绝</a>		{#* 确认拒绝 *#}
+	</div>
+  </div>
+</div>
+<!-- 拒绝原因弹窗 e-->
+{#include file="footer.html"#}
+<script type="text/javascript" src="{#$templets_skin#}js/refund-{#$module#}.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

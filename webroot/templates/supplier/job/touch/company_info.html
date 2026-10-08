@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>公司配置</title>
+    <meta name="keywords" content="{#$job__keywords#}">
+    <meta name="description" content="{#$marry_description#}">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/company_info.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+    <script>
+        var hasConfig = {#if $job_cid#}true{#else#}false{#/if#}; //是否是第一次配置
+        var firstConfig = {#if $job_cid#}true{#else#}false{#/if#}; //是否是第一次配置
+        var cityid = '{#$siteCityInfo.cityid#}'
+        var memberDomain  = '{#$member_userDomain#}'
+        var masterDomain = '{#$cfg_basehost#}'
+        var tempSkin = '{#$templets_skin#}'
+        var currtab = {#if $job_cid#}{#$smarty.get.to|default:0#}{#else#}0{#/if#};
+        var direct = {#$smarty.get.direct|default:0#}; //直接点击进入
+        var industryid_list = '{#if $company_industryid_list#}{#json_encode($company_industryid_list)#}{#/if#}'
+        industryid_list = industryid_list ? JSON.parse(industryid_list) : ''
+        var changeCheck = '{#$job_changeCheck#}'
+    </script>
+</head>
+<body>
+    <div class="pageBox" id="page" v-cloak>
+        <div class="pageCon" v-cloak>
+            <div class="header alignLeft">
+                <div class="header-l">
+                    <a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+                </div>
+                <div class="header-address" v-if="currTab < 3">
+                    <span>{{tabArr[currTab]}}</span>
+                </div>
+                <div class="header-address tabBox" v-else>
+                    <span :class="{'on_chose':currTab === 3 }" @click="currTab = 3">公司简介</span>
+                    <span :class="{'on_chose':currTab === 4 }" @click="currTab = 4">公司相册</span>
+                    <s></s>
+                </div>
+                <div class="header-search"><s></s></div>
+            </div>
+    
+            <!-- 基础信息 -->
+            <dl class="baseInfo formPart" v-if="currTab === 0">
+                <template v-if="hasConfig || direct">
+                    <dt class="fromTipIn" v-if="businessInfo &&  businessInfo.state == 0 "><div class="textCon">企业资料审核中，部分招聘功能不可用</div></dt>
+                    <dt class="fromTipIn red" v-else-if="businessInfo &&  businessInfo.state == 2 "><div class="textCon">审核不通过，请修改后提交：{{businessInfo.refuse}}</div></dt>
+                    <template v-else-if="sensitiveInfo['logo']||sensitiveInfo['title']">
+
+                        <!-- 编辑提示 -->
+                        <template v-if="sensitiveInfo['logo'] && !sensitiveInfo['logo']['refuse'] && sensitiveInfo['title'] && !sensitiveInfo['title']['refuse'] ">
+
+                            <dt class="fromTipIn" v-if="(sensitiveInfo['title'] && sensitiveInfo['title']['change']) || (sensitiveInfo['logo'] && sensitiveInfo['logo']['change'])">
+                                <div class="textCon">公司名称、LOGO属敏感信息，如有修改审核通过后即可显示</div>
+                            </dt>
+                            <dt class="fromTipIn" v-else-if="(sensitiveInfo['title'] ) || (sensitiveInfo['logo'])">
+                                <div class="textCon">公司名称、LOGO审核中，审核通过后即可显示</div>
+                            </dt>
+                        </template>
+
+                        <!-- 审核不通过 -->
+                        <dt class="fromTipIn red arr" @click="showRefuse" v-else-if="!never_showCompanyTip && ((sensitiveInfo['title'] && sensitiveInfo['title']['refuse']) || (sensitiveInfo['logo'] && sensitiveInfo['logo']['refuse']))">
+                            <div class="textCon">
+                                {{sensitiveInfo['title'] && sensitiveInfo['title']['refuse'] ? '公司名称' : ''}}{{sensitiveInfo['title'] && sensitiveInfo['title']['refuse'] && sensitiveInfo['logo'] && sensitiveInfo['logo']['refuse'] ? '/' : ''}}{{sensitiveInfo['logo'] && sensitiveInfo['logo']['refuse'] ? 'LOGO' : ''}}审核不通过：{{sensitiveInfo['title'] && sensitiveInfo['title']['refuse'] ? sensitiveInfo['title']['refuse'] : ''}}{{sensitiveInfo['title'] && sensitiveInfo['title']['refuse'] && sensitiveInfo['logo'] && sensitiveInfo['logo']['refuse'] ? '/' : ''}}{{sensitiveInfo['logo'] && sensitiveInfo['logo']['refuse'] ?  sensitiveInfo['logo']['refuse'] : ''}}
+                            </div>
+                        </dt>
+    
+                        <!-- 待审核 -->
+                        <dt class="fromTipIn" v-else-if="(sensitiveInfo['title'] && !sensitiveInfo['title']['refuse']) || (sensitiveInfo['logo'] && !sensitiveInfo['logo']['refuse'])">
+                            <div class="textCon"> {{sensitiveInfo['title'] ? '公司名称' : ''}}{{sensitiveInfo['title'] && sensitiveInfo['logo'] ? '/' : '' }}{{sensitiveInfo['logp'] ? 'LOGO' : ''}}相关修改已提交，审核通过后即可显示</div>
+                        </dt>
+                    </template>
+                    <dt v-else>基本资料</dt>
+                </template>
+                
+
+                <dt class="fromTipIn" v-else>请先完善企业资料！完善基本信息后即可发布职位</dt>
+                
+    
+                <dd>
+                    <div class="formItem" data-param="title">
+                        <div class="labelBox">
+                            <label for="title">公司名称</label>
+                            <span class="tip">如有官方简称（如腾讯)，可直接填写</span>
+                        </div>
+                        <div class="inputBox">
+                            <input type="text" placeholder="请填写" v-model="formData.title" >
+                        </div>
+                    </div>
+                    <div class="formItem" data-param="nature">
+                        <div class="labelBox">
+                            <label for="title">公司性质</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox selectBox ">
+                            <input type="text" placeholder="请选择" readonly v-model="formData.nature_name"  @click="showPop = true; showType = 'nature'">
+                        </div>
+                    </div>
+                    <div class="formItem"  data-param="scale">
+                        <div class="labelBox">
+                            <label for="title">公司规模</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox selectBox">
+                            <input type="text" placeholder="请选择" readonly @click="showPop = true; showType = 'scale'" v-model="formData.scale_name">
+                        </div>
+                    </div>
+                    <div class="formItem" data-param="industry">
+                        <div class="labelBox">
+                            <label for="title">经营行业</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox selectBox">
+                            <input type="text" placeholder="请选择" readonly  @click="showPop = true; showType = 'industry'" v-model="formData.industry_name"> 
+                        </div>
+                    </div>
+                    <div class="formItem noBorde"  data-param="logo">
+                        <div class="labelBox">
+                            <label for="title">公司LOGO</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="logoBox uploadBox fn-clear "  >
+
+                            <van-uploader :after-read="afterRead" accept="image/*" name="logo" v-model="logoObj" @delete="changeLogo">
+                                <template #default >
+                                    <div class="upload_btn " v-show="!logoObj || !logoObj.length">
+                                        <s></s>
+                                        上传logo
+                                    </div>
+                                </template>
+                                <template #preview-cover="{file}">
+                                    <!-- <div class="imgShow" v-for="item in file">
+                                        <img :src="file.url" alt="">
+                                        <span class="del_btn"></span>
+                                    </div> -->
+                                </template>
+                            </van-uploader>
+                        </div>
+                    </div>
+                </dd>
+            </dl>
+    
+            <!-- 工商信息 -->
+            
+            <dl :class="['formPart ',{'hasGetInfo':!changeBusiness}]" v-else-if="currTab === 1">
+                <dt class="fromTipIn"  v-if="(sensitiveInfo['full_name'] && sensitiveInfo['full_name']['change']) || (sensitiveInfo['business_license'] && sensitiveInfo['business_license']['change'])"><div class="textCon">公司全称、营业执照属敏感信息，如有修改审核通过后即可显示</div></dt>
+                <dt class="fromTipIn" v-else-if="(sensitiveInfo['full_name'] && !sensitiveInfo['full_name']['refuse'] ) || (sensitiveInfo['business_license'] && !sensitiveInfo['business_license']['refuse'])">
+                    <div class="textCon">工商信息审核中，审核通过后即可显示</div>
+                </dt>
+                 <!-- 审核不通过 -->
+                 <dt class="fromTipIn red arr" @click="showRefuse" v-else-if="!never_showCompanyTip && ((sensitiveInfo['full_name'] && sensitiveInfo['full_name']['refuse']) || (sensitiveInfo['business_license'] && sensitiveInfo['business_license']['refuse']))">
+                    <div class="textCon">
+                        {{sensitiveInfo['full_name'] && sensitiveInfo['full_name']['refuse'] ? '公司全称' : ''}}{{sensitiveInfo['full_name'] && sensitiveInfo['full_name']['refuse'] && sensitiveInfo['business_license'] && sensitiveInfo['business_license']['refuse'] ? '/' : ''}}{{sensitiveInfo['business_license'] && sensitiveInfo['business_license']['refuse'] ? '营业执照' : ''}}审核不通过：{{sensitiveInfo['full_name'] && sensitiveInfo['full_name']['refuse'] ? sensitiveInfo['full_name']['refuse'] : ''}}{{sensitiveInfo['full_name'] && sensitiveInfo['full_name']['refuse'] && sensitiveInfo['business_license'] && sensitiveInfo['business_license']['refuse'] ? '/' : ''}}{{sensitiveInfo['business_license'] && sensitiveInfo['business_license']['refuse'] ?  sensitiveInfo['business_license']['refuse'] : ''}}
+                    </div>
+                </dt>
+                <dt>工商信息
+                    <span class="tip" v-if="gsInfo" @click="changeBusiness = true">已自动同步以下信息，如有误可手动修改></span>
+                    <span class="tip" v-else-if="!gsInfo && !hasConfig"  @click="changeBusiness = true">未查询到该企业，请手动完善信息></span>
+                    <span class="tip" v-else-if="changeBusiness"  @click="changeBusiness = true">请自行校正信息></span>
+                    <span class="tip" v-else @click="changeBusiness = true">如信息有误可点击修改  ></span>
+                </dt>
+                <dd>
+                    <div class="formItem"  data-param="full_name">
+                        <div class="labelBox">
+                            <label for="title">企业名称</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox">
+                            <input type="text" placeholder="请填写" v-model="formData.full_name" readonly v-if="!changeBusiness" >
+                            <input type="text" placeholder="请填写" v-model="formData.full_name" v-else >
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">企业类型</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox selectBox" @click="changeNature">
+                            <input type="text" placeholder="请选择" readonly v-model="formData.enterprise_type"  >
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">成立日期</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox selectBox" @click="changeEstablish">
+                            <input type="text" placeholder="请选择" readonly :value="formData.enterprise_establish !== '' ? transTimes(formData.enterprise_establish,2).replace(/-/g,'/') : ''">
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">注册资本</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox ">
+                            <input type="text" placeholder="请填写" readonly :value="formData.enterprise_money + '万元'" v-if="!changeBusiness" >
+                            <template v-else>
+                                <input type="text" oninput ="value = value.replace(/[^\d]/g,''); "  placeholder="请填写" class="number"  v-model="formData.enterprise_money">
+                                <span class="unit" >万元人民币</span>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">法定代表人</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox ">
+                            <input type="text" placeholder="请填写" v-model="formData.enterprise_people" v-if="!changeBusiness" >
+                            <input type="text" placeholder="请填写" v-model="formData.enterprise_people" v-else>
+                        </div>
+                    </div>
+                </dd>
+                <dd class="dataFrom" v-if="!changeBusiness && businessInfo && businessInfo.config">以上数据来源：{{businessInfo.config.gsName ? businessInfo.config.gsName : '企业主动上传'}} <span><img src="/static/images/job/businInfoFrom_icon.png?v={#$cfg_staticVersion#}" alt=""></span></dd>
+            </dl>
+    
+    
+            <!-- 资质认证 -->
+            <dl class="formPart" v-if="!currTab && !hasConfig || (currTab === 1  )">
+                <dt>资质认证 
+                    <span class="tip" v-if="sensitiveInfo['full_name'] && sensitiveInfo['full_name']['change'] && changeBusiness" >企业名称已修改，请重新认证</span>
+                </dt>
+                <dd class="">
+                    <div class="formItem" v-if="!hasConfig && !currTab">
+                        <div class="labelBox">
+                            <label for="title">企业全称</label>
+                            <span class="tip">请正确填写企业全称，以同步工商信息</span>
+                        </div>
+                        <div class="inputBox">
+                            <input type="text" placeholder="请填写" v-model="formData.full_name" >
+                        </div>
+                    </div>
+                    <div class="formItem" data-param="business_license">
+                        <div class="labelBox">
+                            <label for="title">营业执照认证</label>
+                            <span class="tip" v-if="businessInfo.state != 2 && !hasConfig">仅用于平台验证企业身份</span>
+                        </div>
+                        <div class="licenceBox uploadBox fn-clear">
+                                
+                            <div class="" v-if="businessInfo && businessInfo.certification && (!changeBusiness && !sensitiveInfo['full_name']) ">
+                                <div class="upload_btn hasUpload">
+                                    <img :src="licenceObj[0] && licenceObj[0].url ?licenceObj[0].url : '/static/images/404.jpg' " alt="" onerror="this.src='/static/images/404.jpg'">
+                                    <span class="hasCer">已认证</span>
+                                </div>
+                            </div>
+                            <van-uploader v-else :after-read="afterRead"  accept="image/*" name="licence" v-model="licenceObj" >
+                                <div class="upload_btn" v-show="!licenceObj || !licenceObj.length">
+                                    <s></s>
+                                    上传营业执照
+                                </div>
+                            </van-uploader>
+                        </div>
+                    </div>
+                </dd>
+            </dl>
+    
+            <!-- 联系方式 -->
+            <dl class="formPart" v-if="currTab == 2">
+                <dt>联系方式</dt>
+                <dd>
+                    <div class="formItem photoBox">
+                        <div class="flexLeft">
+                            <div class="labelBox">
+                                <label for="title">招聘联系人</label>
+                                <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                            </div>
+                            <div class="inputBox">
+                                <input type="text" placeholder="请填写" v-model="formData.people">
+                            </div>
+                        </div>
+                        <div class="addPhoto">
+                            <img v-if="photoObj.length" :src="(photoObj[0].url)" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'">
+                            <van-uploader :after-read="afterRead"  accept="image/*" name="photo" v-model="photoObj" :preview-image="false">
+                                <span class="changeBtn"></span>
+                            </van-uploader>
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">职位</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox">
+                            <input type="text" placeholder="请填写"  v-model="formData.people_job">
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">联系电话</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox">
+                            <input type="text" placeholder="请填写"  v-model="formData.contact">
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">电子邮箱</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox">
+                            <input type="text" placeholder="选填" v-model="formData.email">
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">公司官网</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox">
+                            <input type="text" placeholder="选填" v-model="formData.site">
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">公司所在地</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox selectBox">
+                            <input type="text" placeholder="请选择" readonly :value="(formData.addr?formData.addr.join('/'):'')" @click="showCityChose">
+                        </div>
+                    </div>
+                    <div class="formItem">
+                        <div class="labelBox">
+                            <label for="title">详细地址</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox posiBox">
+                            <input type="text" placeholder="请填写" v-model="formData.address">
+                            <a href="javascript:;" class="posi_btn" @click="goPosi"></a>
+                        </div>
+                    </div>
+                </dd>
+            </dl>
+            
+            <dl class="formPart" v-if="currTab == 3">
+                <!-- <dt></dt> -->
+                <dd>
+                    <div class="formItem ">
+                        <div class="labelBox">
+                            <label for="title">员工福利</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="labSelectBox">
+                            <ul>
+                                <li v-for="item in baseConfig.welfare" @click="editWelfare(item)" :class="{'on_chose':formData.welfare.includes(item.id) }">{{item.typename}}</li>
+                                
+                            </ul>
+                        </div>
+                    </div> 
+
+                    <div class="formItem " >
+                        <div class="labelBox">
+                            <label for="title">工作时间</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox selectBox" @click="showType = 'workTime'; showPop = true">
+                            <input type="text" placeholder="请选择" :value="(formData.work_time_s + (!formData.work_time_s || !formData.work_time_e ? '' : '-') + formData.work_time_e)" readonly>
+                        </div>
+                        <div class="labSelectBox smLab">
+                            <ul>
+                                <li :class="{'on_chose':formData.rest_flag === 2}" @click="formData.rest_flag = 2">双休</li>
+                                <li :class="{'on_chose':formData.rest_flag === 1}" @click="formData.rest_flag = 1">单休</li>
+                                <li  :class="{'on_chose':formData.work_over === 1}" @click="formData.work_over = (formData.work_over === 2 ? 1 : 2)">不加班</li>
+                            </ul>
+                        </div>
+                    </div> 
+                    <div class="formItem noBorde">
+                        <div class="labelBox">
+                            <label for="title">公司简介</label>
+                            <!-- <span class="tip">如有官方简称（如腾讯)，可直接填写</span> -->
+                        </div>
+                        <div class="inputBox textAreaBox">
+                            <!-- <textarea v-model="formData.body" class="textarea" maxlength="2000" name="" id="" cols="30" rows="10" placeholder="可填写公司简介、产品介绍、业绩成果等"></textarea> -->
+                            <!-- <div class="textarea"  contenteditable="true"  placeholder="可填写公司简介、产品介绍、业绩成果等"  v-html="formData.body"></div> -->
+                            <van-field
+                                class="textarea"
+                                v-model="formData.body"
+                                rows="1"
+                                autosize
+                                type="textarea"
+                                placeholder="可填写公司简介、产品介绍、业绩成果等"
+                                maxlength="2000"
+                                show-word-limit
+                                />
+                            <!-- <div class="textCount"><span>{{formData.body.length}}</span>/2000</div> -->
+                        </div>
+                        
+                    </div> 
+                </dd>
+            </dl>
+
+            <div class="formPart" v-if="currTab == 4">
+                <div :class="['uploadPhotoBox',{'onEditBox' : editPics}]">
+                    <van-uploader :after-read="afterRead"  accept="image/*" name="pic" multiple  :preview-image="false" >
+                        
+                        <div class="uploadBtn">
+                            <s></s>
+                            <span>上传图片</span>
+                        </div>
+                    </van-uploader>
+                    
+                    <div :class="['imgShow',{'on_chose':editPicsArr.indexOf(ind) > -1}]" v-for="(item,ind) in fileList" @click="choseEditPics(ind)">
+                        <img :src="item.url" alt="">
+                        <s  class="chose_btn" @click="removePic(ind)"></s>
+                        <p class="progress" v-if="item.percent >= 0  && item.percent < 100"><span :style="'width:'+(item.percent ? item.percent : 0)+'%;'"></span></p>
+                    </div>
+                    
+                
+                </div>
+            </div>
+
+
+        </div>
+
+        <div class="btnsBox">
+            <div :class="['bottonBottom',{'noClick':checkFormData(1)}]" v-if="currTab !== 4">
+                <a href="javascript:;" class="sure_btn submit" @click="submitData" v-if="currTab != 1 || changeBusiness">{{currTab != 2  || hasConfig ? '确认提交' : '确认无误，下一步'}}</a>
+                <template  v-else-if="!hasConfig">
+                    <p @click="changeBusiness = true">信息有误？手动修改</p>
+                    <a href="javascript:;" class="sure_btn submit" @click="currTab = currTab + 1">确认无误，下一步</a>
+                </template>
+                <a href="javascript:;" v-else class="btnChange" @click="changeBusiness = true">修改信息</a>
+            </div>
+            <div class="bottonBottom fixedBottom" v-if="currTab === 4 && !editPics && fileList.length > 0">
+                <span class="selectAll" @click="editPicAll">批量全选</span>
+                <!-- <a href="javascript:;" class="manageBtn borderBtn" @click="editPics = true;">批量管理</a> -->
+                <a href="javascript:;" class="btn_save bigBtn"  @click="submitData">保存</a>
+            </div>
+            <div class="bottonBottom fixedBottom" v-if="currTab === 4 && editPics">
+                <div class="flexLeft">
+                    <div class="choseAll" @click="editPics = false;">退出批量</div>
+                    <a href="javascript:;" class=" borderBtn delPics" @click="delPics"><s></s>删除</a>
+                </div>
+                <a href="javascript:;" class="btn_save" @click="submitData">保存</a>
+            </div>
+        </div>
+
+        <!-- 弹窗 -->
+        <van-popup 
+            :lock-scroll="true"
+            class="popBox"
+            v-model="showPop"
+            :lazy-render="false"
+            round position="bottom" 
+        >
+
+            <!-- 选择公司性质 -->
+            <van-picker 
+                ref="nature"
+                title="公司性质"
+                v-show="showType == 'nature'"
+                show-toolbar
+                :columns="baseConfig.nature"
+                value-key="typename"
+                :columns-field-names="{text:'typename',value:'id'}"
+                @confirm="sureChose"
+                @cancel="showPop = false"
+            ></van-picker>
+            <van-picker
+                ref="scale"
+                title="公司规模"
+                v-show="showType == 'scale'"
+                show-toolbar
+                :columns="baseConfig.scale"
+                value-key="typename"
+                :columns-field-names="{text:'typename',value:'id'}"
+                @confirm="sureChose"
+                @cancel="showPop = false"
+            ></van-picker>
+            <van-picker
+                ref="industry"
+                title="行业选择"
+                v-show="showType == 'industry'"
+                show-toolbar
+                :columns="industry"
+                @confirm="sureChose"
+                @cancel="showPop = false"
+            ></van-picker>
+            <van-datetime-picker
+                ref="enterprise_establish"
+                title="成立日期"
+                :value="new Date(formData.enterprise_establish * 1000)"
+                v-show="showType == 'enterprise_establish'"
+                show-toolbar
+                visible-item-count="5"
+                :max-date="maxDate"
+                :min-date="minDate"
+                type="date"
+                @cancel="showPop = false"
+                @confirm="sureChose"
+            ></van-datetime-picker>
+
+
+            <!-- 工作时间选择 -->
+            <div class="workTimeBox" v-show="showType == 'workTime'" >
+                <div class="pickerHeader">
+                    <span class="cancel" @click="cancelWorkTime">取消</span>
+                    <span class="title">工作时间</span>
+                    <span class="sure" @click="confirmWorkTime">确定</span>
+                </div>
+                <div class="pickerBox">
+                    <van-datetime-picker
+                    :show-toolbar="false"
+                    :value="formData.work_time_s ? formData.work_time_s : '9:00'"
+                    type="time"
+                    title="选择时间"
+                    visible-item-count="5"
+                    :default-index="9"
+                    ref="workStart"
+                    ></van-datetime-picker>
+                    <van-datetime-picker
+                    :show-toolbar="false"
+                    :value="formData.work_time_e ? formData.work_time_e : '18:00'"
+                    visible-item-count="5"
+                    type="time"
+                    :defaultIndex="18"
+                    title="选择时间"
+                    ref="workEnd"
+                    ></van-datetime-picker>
+                </div>
+            </div>
+
+            <!-- 显示审核失败弹窗 -->
+            <div class="refusePop" v-show="showType == 'refuse'">
+                <div class="pop_header">
+                    <h4>审核未通过</h4>
+                    <p>请按提示修改后提交，可设置后续不再提醒</p>
+                </div>
+                <div class="pop_con">
+                    <div class="refuseCon" v-show="currTab == 0">
+                        <p class="errTip">很抱歉，您的公司名称/LOGO修改审核未通过 </p>
+                        <p class="refuse_text">
+                            <span>拒绝原因：</span>{{sensitiveInfo['title'] && sensitiveInfo['title']['refuse'] ? sensitiveInfo['title']['refuse'] : ''}}{{sensitiveInfo['title'] && sensitiveInfo['title']['refuse'] && sensitiveInfo['logo'] && sensitiveInfo['logo']['refuse'] ? '/' : ''}}{{sensitiveInfo['logo'] && sensitiveInfo['logo']['refuse'] ?  sensitiveInfo['logo']['refuse'] : ''}}
+                        </p>
+                    </div>
+                    <div class="refuseCon" v-show="currTab == 1">
+                        <p class="errTip">很抱歉，您的公司全称/营业执照修改审核未通过 </p>
+                        <p class="refuse_text">
+                            <span>拒绝原因：</span>{{sensitiveInfo['full_name'] && sensitiveInfo['full_name']['refuse'] ? sensitiveInfo['full_name']['refuse'] : ''}}{{sensitiveInfo['full_name'] && sensitiveInfo['full_name']['refuse'] && sensitiveInfo['business_license'] && sensitiveInfo['business_license']['refuse'] ? '/' : ''}}{{sensitiveInfo['business_license'] && sensitiveInfo['business_license']['refuse'] ?  sensitiveInfo['business_license']['refuse'] : ''}}
+                        </p>
+                    </div>
+                </div>
+                <div class="pop_foot">
+                    <a href="javascript:;" class="btn_noTip" @click="neverShowPop">不再提示</a>
+                    <a href="javascript:;" class="btn_toChange" @click="showPop = false;">好的，知道了</a>
+                </div>
+            </div>
+        </van-popup>
+        <div class="successConfirmPopBox" v-if="successPop" v-cloak>
+            <div class="mask" v-show="successPop"></div>
+            <div class="successConfirmPop" v-show="successPop">
+                <s class="success_icon"></s>
+                <h2>企业资料已完善！立即发布职位吧！</h2>
+                <p>招聘职位快速发布！</p>
+                <a href="{#$cfg_basehost#}/supplier/job/add_post.html?appFullScreen" class="fb_btn">发布职位</a>
+                <a href="javascript:;" class="close_btn" @click="successPop"></a>
+            </div>
+        </div>
+    </div>
+    {#include file="../../../member/touch/cityChose.html"#}
+</body>
+<script src="{#$cfg_staticPath#}/js/publicLocation.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/company_info.js?v={#$cfg_staticVersion#}"></script>
+</html>

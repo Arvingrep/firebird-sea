@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<link rel="stylesheet" href="/templates/member/touch/uniapp/css/uni.000a8f76.css">
+
+		<meta charset="UTF-8" />
+		<meta name="viewport"
+			content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no,viewport-fit=cover, viewport-fit=cover" />
+		<title>{#if strpos($smarty.server.REQUEST_URI,'order')#}我的订单{#else#}我的发布{#/if#}</title>
+		<meta name="apptitle" content="{#if strpos($smarty.server.REQUEST_URI,'order')#}我的订单{#else#}我的发布{#/if#}">
+		<meta property="og:title" content="" />
+		<meta property="og:description" content="" />
+		<meta property="og:image" content="{#$shareAdvancedUrl#}" />
+		<link rel="canonical" href="">
+		<script type="module" crossorigin src="/templates/member/touch/uniapp/js/index-18tTlfaA.js"></script>
+		<link rel="stylesheet" crossorigin href="/templates/member/touch/uniapp/css/index-C_Bs1vyw.css">
+	</head>
+	<body>
+		<div id="app"></div>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}">
+		</script>
+		<script src="//res2.wx.qq.com/open/js/jweixin-1.6.0.js?v={#$cfg_staticVersion#}"></script>
+		<script src="https://lf3-cdn-tos.bytegoofy.com/goofy/developer/jssdk/jssdk-1.2.1.js?v={#$cfg_staticVersion#}">
+		</script>
+		<script>
+			var templateTitle = '{#if strpos($smarty.server.REQUEST_URI,"order")#}我的订单{#else#}我的发布{#/if#}';
+			var masterDomains = '{#$cfg_basehost#}';
+			var memberDomain = '{#$member_userDomain#}'.replace(masterDomains,''); //个人路由/u(勿删)
+			var businessDomain='{#$member_busiDomain#}'.replace(masterDomains,''); //商家路由/b(勿删)
+			var cfg_staticVersion = "{#$cfg_staticVersion#}";
+			var service = '{#$service#}';
+			var templateSkin = '{#$templets_skin|replace:$cfg_basehost:""#}'
+			var cityUrl = '{#$cfg_basehost#}/changecity.html?currentPageOpen=1';
+			var pathname = (location.href.includes(memberDomain)?memberDomain:businessDomain).replace(masterDomains, '');
+			// 此处不同的模块调用不同的数据
+			var wxconfig = {
+				appId: '{#$wxjssdk_appId#}',
+				timestamp: '{#$wxjssdk_timestamp#}',
+				nonceStr: '{#$wxjssdk_nonceStr#}',
+				signature: '{#$wxjssdk_signature#}',
+				wxjssdk_url: '{#$wxjssdk_url#}',
+				imgUrl: '{#$cfg_weblogo#}',
+				"description": '',
+				"title": '{#if strpos($smarty.server.REQUEST_URI,'order')#}我的订单{#else#}我的发布{#/if#}',
+				"link": '{#$member_userDomain#}',
+			};
+			var pageData = {
+				mapType: '{#$site_map#}',
+				mapKey: '{#$site_map_key#}'
+			}; //地图跳转用
+			// 避免与 uni-app 内置 wx 全局对象冲突
+			window.jWeixin = window.wx;
+			delete window.wx;
+			window.touTiao = window.tt;
+			delete window.tt;
+			//微信分享
+			var wxBoolean = Boolean(navigator.userAgent.toLowerCase().match(/micromessenger/))
+			if (wxBoolean) {
+				jWeixin.config({
+					debug: false,
+					appId: wxconfig.appId,
+					timestamp: wxconfig.timestamp,
+					nonceStr: wxconfig.nonceStr,
+					signature: wxconfig.signature,
+					jsApiList: ['onMenuShareTimeline', 'onMenuShareAppMessage', 'onMenuShareQQ',
+						'onMenuShareWeibo', 'updateAppMessageShareData', 'updateTimelineShareData',
+						'onMenuShareQZone', 'openLocation', 'scanQRCode', 'chooseImage', 'previewImage',
+						'uploadImage', 'downloadImage', 'getLocation'
+					],
+					openTagList: ['wx-open-launch-app',
+						'wx-open-launch-weapp'
+					] // 可选，需要使用的开放标签列表，例如['wx-open-launch-app']
+				});
+			};
+			var loginUserId = '{#$userinfo.userid#}'; //用户id 
+			var appBoolean = {#$is_app|default:0#}; //app判断
+			if(!appBoolean && navigator.userAgent.toLowerCase().includes('huoniao_ios')){
+				appBoolean = 1
+			}
+			var app_platform = "{#$app_platform#}"
+			var Android = Boolean(navigator.userAgent.toLowerCase().match(/android/)); //安卓判断
+			var cityInfo = JSON.parse($.cookie('HN_siteCityInfo')) || {}; // 地址信息
+			if (cityInfo != {}) { //城市切换提示用
+				localStorage.setItem('cityInfo', JSON.stringify({
+					type: "object",
+					data: cityInfo
+				}));
+			}
+			var url = location.search;
+			var params = new URLSearchParams(url.slice(1));
+			// 地图相关
+			var site_map = '{#$site_map#}'; //地图类型
+			var site_map_key = '{#$site_map_key#}'; //地图key
+			//注册客户端webview
+			function setupWebViewJavascriptBridge(callback) {
+				if (window.WebViewJavascriptBridge) {
+					return callback(WebViewJavascriptBridge);
+				} else {
+					document.addEventListener("WebViewJavascriptBridgeReady", function() {
+						return callback(WebViewJavascriptBridge);
+					}, false);
+				}
+
+				var _device = navigator.userAgent.toLowerCase();
+				if (_device.indexOf('huoniao') > -1) {
+					if (window.WVJBCallbacks) {
+						return window.WVJBCallbacks.push(callback);
+					}
+					window.WVJBCallbacks = [callback];
+					var WVJBIframe = document.createElement("iframe");
+					WVJBIframe.style.display = "none";
+					WVJBIframe.src = "wvjbscheme://__BRIDGE_LOADED__";
+
+					document.documentElement.appendChild(WVJBIframe);
+					setTimeout(function() {
+						document.documentElement.removeChild(WVJBIframe)
+					}, 0);
+				}
+			}
+		</script>
+		{#if $site_map == "amap"#}
+		{#$amap_jscode#} {#* 高德地图安全密钥 *#}
+		{#/if#}
+		<script type="text/javascript" src="{#$site_map_apiFile#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/publicLocation.js?v={#$cfg_staticVersion#}">
+		</script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/publicOpenMap.js?v={#$cfg_staticVersion#}">
+		</script>
+		{#if $site_map=="baidu"#}
+		<script src="https://api.map.baidu.com/getscript?v=3.0&ak={#$site_map_baidu#}=&t=20200914160603"></script>
+		{#else if $site_map=="amap"#}
+		<script src="https://webapi.amap.com/maps?v=1.4.15&key={#$site_map_amap#}&plugin=AMap.Riding"></script>
+		{#else if $site_map == 'google'#}
+		<script src="{#$templets_skin#}js/markerwithlabel.js?v={#$cfg_staticVersion#}"></script>
+		{#/if#}
+
+	</body>
+</html>

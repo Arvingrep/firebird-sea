@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var action = '{#$action#}', adminPath = "{#$adminPath#}", id = {#$id#};
+</script>
+</head>
+
+<body>
+    {#if $bank == "weixin" && $state != 1#}
+    <div class="alert alert-success" style="margin:10px 100px 0 20px;"><button type="button" class="close" data-dismiss="alert">×</button>如果打款失败原因是以下两种情况：<br />1. 
+        Openid校验失败,Openid格式错误或者不属于商家公众账号<br />2. 产品权限异常<br />说明微信商户没有申请<code>商家转账到零钱</code>接口，或者用户与平台的<code>微信公众号绑定关系</code>出现了异常，请确认是否已经申请<code>商家转账到零钱</code>接口，或者联系用户<code>重新绑定微信公众号</code>！</div>
+    {#/if#}
+
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  {#if $bank == "weixin"#}
+  <dl class="clearfix">
+    <dt>提现到：</dt>
+    <dd class="singel-line">微信</dd>
+  </dl>
+  {#elseif $bank == "alipay"#}
+  <dl class="clearfix">
+    <dt>提现到：</dt>
+    <dd class="singel-line">支付宝</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>收款人帐号：</dt>
+    <dd class="singel-line">{#$cardnum#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>收款人姓名：</dt>
+    <dd class="singel-line">{#$cardname#}</dd>
+  </dl>
+  {#else#}
+  <dl class="clearfix">
+    <dt>提现银行：</dt>
+    <dd class="singel-line">{#$bank#}</dd>
+  </dl>
+  {#if $bankName#}
+  <dl class="clearfix">
+    <dt>开户行：</dt>
+    <dd class="singel-line">{#$bankName#}</dd>
+  </dl>
+  {#/if#}
+  <dl class="clearfix">
+    <dt>提现卡号：</dt>
+    <dd class="singel-line">{#$cardnum#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>收  款  人：</dt>
+    <dd class="singel-line">{#$cardname#}</dd>
+  </dl>
+  {#/if#}
+  <dl class="clearfix">
+    <dt>申请时间：</dt>
+    <dd class="singel-line">{#$tdate#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>提现金额：</dt>
+    <dd class="singel-line">{#$amount#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>提现手续费：</dt>
+    <dd class="singel-line">{#$shouxu#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>实际到账金额：</dt>
+    <dd class="singel-line">{#$price#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>扣除积分：</dt>
+    <dd class="singel-line">{#$jifen#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>提现类型：</dt>
+    <dd class="singel-line">{#if $type == 0#}余额提现{#elseif $type == 1#}分站佣金{#elseif $type == 2#}推荐奖金{#/if#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>申请会员：</dt>
+    <dd class="singel-line"><a href="javascript:;" data-id="{#$uid#}" {#if $usertype ==0 #}class="userinfo" {#/if#}>{#$username#}</a></dd>
+  </dl>
+  <dl class="clearfix">
+
+    <dt>申请设备：</dt>
+    <dd class="singel-line">{#if $source == 0#}h5{#else if $source == 1#}小程序{#else if $source == 2#}门户app{#else if $source == 3#}商家app{#else#}骑手app{#/if#}</dd>
+  </dl>
+
+  {#if $state != 0#}
+  <dl class="clearfix">
+    <dt>申请状态：</dt>
+    <dd class="singel-line">
+      {#if $state == 1#}
+      成功
+      {#elseif $state == 2#}
+      失败
+      {#elseif $state == 3#}
+      微信打款中
+      {#elseif $state == 4#}
+      打款撤销中
+      {#elseif $state == 5#}
+       失败
+      {#elseif $state == 6#}
+      用户确认中
+      {#/if#}
+      {#if $state == 6 && $bank == 'weixin'#}
+      <button type="button"  id="cancelBtn">撤销转账</button>
+      {#/if#}
+    </dd>
+  </dl>
+  
+  {#if $state==1 && ($bank == "alipay" || $bank== "weixin")#}
+    {#if $receipting==0 && $receipt#}  {#* 回单正常 *#}
+      <dl class="clearfix">
+        <dt>电子回单凭证：</dt>
+        <dd class="singel-line"><a target="_blank" href="/include/attachment.php?f={#$receipt#}">点击查看</a></dd>
+      </dl>
+    {#elseif $receipting==1#}
+      <dl class="clearfix">
+        <dt>电子回单生成中：</dt>
+        <dd class="singel-line">请添加定时任务，稍后查看生成结果</dd>
+      </dl>
+    {#elseif $receipting==2#}
+      <dl class="clearfix">
+        <dt>电子回单失败原因：</dt>
+        <dd class="singel-line" style="color: red;">{#$receipt_fail_reason#} <button class="btn btn-primary" onclick="applyReceipt()">重新申请电子回单</button></dd>
+      </dl>
+    {#elseif $receipting==3#}
+      <dl class="clearfix">
+        <dt>电子回单待申请：</dt>
+        <dd class="singel-line">等待定时计划申请</dd>
+      </dl>
+    {#/if#}  {#* 旧数据，不会显示，因为无法显示 *#}
+  {#/if#}
+  <dl class="clearfix">
+    <dt>{#if $state == 1 || $state == 3 || $state == 6#}流水单号/{#/if#}备注：</dt>
+    <dd class="singel-line">{#$note#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>操作时间：</dt>
+    <dd class="singel-line">{#$rdate#}</dd>
+  </dl>
+  {#/if#}
+
+<br /><br />
+
+  {#if $state == 0#}
+  {#if ($bank == 'weixin' || $bank == 'alipay') && $auditstate == 1 && $withdrawtransfer == 1#}
+  <dl class="clearfix">
+    <dt>&nbsp;</dt>
+    <dd class="radio">
+      <button type="button" id="payment">直接在线打款</button><span class="help-inline">  或  线下转账，手动更新状态</span><br /><br />
+    </dd>
+  </dl>
+  {#/if#}
+  {#if $withdrawaudit == 1 && $auditstate ==0#}
+  <dl class="clearfix">
+    <dt>审核状态：</dt>
+    <dd class="radio">
+      <label><input type="radio" name="auditstate" value="1" onclick="fail('success')">审核通过</label>
+      <label><input type="radio" name="auditstate" value="2" onclick="fail('fail')">审核失败</label>
+    </dd>
+  </dl>
+  <dl class="clearfix hide" id="fail">
+      <dt>失败原因：</dt>
+      <dd class="radio">
+        <textarea class="input-xxlarge" type="text" name="note" id="note"></textarea>
+      </dd>
+  </dl>
+  {#/if#}
+  {#if $withdrawtransfer == 1 && $auditstate == 1#}
+  <dl class="clearfix">
+    <dt>状态：</dt>
+    <dd class="radio">
+      <label><input type="radio" name="state" value="1">成功</label>
+      <label><input type="radio" name="state" value="2">失败</label>
+    </dd>
+  </dl>
+  {#/if#}
+  {#if $withdrawtransfer == 1 && $auditstate == 1#}
+  <dl class="clearfix">
+    <dt>备注：</dt>
+    <dd class="radio">
+      <textarea class="input-xxlarge" type="text" name="note" id="note"></textarea>
+    </dd>
+  </dl>
+  {#/if#}
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+
+  {#/if#}
+</form>
+
+{#$jsFile#}
+</body>
+</html>

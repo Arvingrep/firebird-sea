@@ -1,0 +1,281 @@
+
+<!-- 门店服务 -->
+<div :class="['rightCon',{'show':currEditPart === 35}] " v-cloak>
+    <div class="modBox">
+        <div class="title">{{storeManFormData.isStore ? '门店服务' : '普通按钮组'}} 
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 35 && showResetPop" @show="showResetPop = true" v-if="!config">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('storeMan',0)"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 35 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('storeMan',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference" @click="">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 35 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end" >
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('storeMan',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+            
+        </div>
+
+        <div class="modInfoStyle">
+            <div class="modstyleBox">
+                <h2 class="stitle">组件设置</h2>
+                <div class="sContent" >
+                    <div class="columbox">
+                        <div class="column_chose">
+                            <s :class="{'layout2': storeManFormData.column === 5}"></s>
+                            <span @click="storeManFormData.column = 4">每行4个</span>
+                            <span @click="storeManFormData.column = 5">每行5个</span>
+                        </div>
+                        <div class="checkBox">
+                            <el-checkbox v-model="storeManFormData.title.show"@change="value => showMoreBtn(value,'storeManFormData.more.show','title')">显示标题</el-checkbox>
+                            <el-checkbox :class="['checkbox',{'disabled':!storeManFormData.title.show}]"  v-model="storeManFormData.more.show" @change="value => showMoreBtn(value,'ibtnsFormData.title.show','more')" v-model="storeManFormData.more.show" @change="value => showMoreBtn(value,'storeManFormData.title.show','more')">显示查看更多</el-checkbox>
+                        </div>
+                    </div>
+                    <div class="inpbox" v-show="storeManFormData.title.show">
+                        <el-input class="bgColorInp" v-model="storeManFormData.title.text" placeholder="请输入标题"></el-input>
+                    </div>
+                </div>
+            </div>
+            <div class="modstyleBox contentSetBox">
+                <h2 class="stitle">内容设置</h2>
+                <div class="sContent">
+                    <div class="style_options" style="margin-bottom: 10px;" v-if="storeManFormData.isStore">
+                        <el-checkbox v-for="item in storeOption" :value="checkValIn(storeManFormData.btns,item.id)" @change="val => changeStoreBtns(val,item)" :key="item.id">{{item.text}}</el-checkbox>
+                    </div>
+                    <div  class="btnsBox btn_item btnsSort sortBox"  data-sort="storeManFormData.btns"  data-drag=".item" data-filter=".inpbox">
+                        <div class="option_item item" v-for="(btn,ind) in storeManFormData.btns" :key="'btns_' + btn.id" :data-id="ind"> 
+                            <s class="del_item" @click="delTopBtns('storeManFormData',ind)"></s>
+                            <s class="left_icon"><img src="/static/images/admin/order_icon.png" alt=""></s>
+                            <div class="item_con flex_r">
+                                <div class="img_up fn-clear">
+                                    <div :class="['upbtn',{'hasup':btn.icon}]">
+                                        <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" :id="'btnsIcon_'+ind+'_filedata'" :data-type="'btnsIcon_'+ind"  @change="fileInpChange('storeManFormData.btns.' + ind + '.icon')">
+                                        <img v-if="btn.icon" :src="btn.icon"  alt="">
+                                        <span>更换图片</span>
+                                    </div>
+                                    <div class="imgText">
+                                        <div class="inpbox" >
+                                            <el-input   show-word-limit maxlength="6" v-model="btn.text" placeholder="请输入文字内容" class="iconName" ></el-input>
+                                        </div>
+                                        <div :class="['inpbox linkbox linkChose',{'disabled':['maidan','dingzuo','paidui','diancan'].includes(btn.id)}]" @click="changeLink('storeManFormData.btns.' + ind + '.link')">
+                                            <div class="noClick" v-if="['maidan','dingzuo','paidui','diancan'].includes(btn.id)" @click.stop=""></div>
+                                            <s>
+                                                <img v-if="btn.linkInfo.type == 4"  src="/static/images/admin/siteMemberPage/tel.png">
+                                                <img v-else src="/static/images/admin/link.png">
+                                            </s>
+                                            <input type="text"  placeholder="请选择链接" :class="['iconLink',{'disabled':['maidan','dingzuo','paidui','diancan'].includes(btn.id)}]" readonly :value="btn.linkInfo.linkText ? btn.linkInfo.linkText  : btn.link ">
+                                        </div>
+                                        
+                                        
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                        <a href="javascript:;" class="add_more" @click="addNewTopBtns('storeManFormData')"  ><s></s>添加按钮</a>
+                    </div>
+                    
+                </div>
+            </div>
+
+            <div class="modstyleBox">
+                <h2 class="stitle">组件样式</h2>
+                <div class="sContent ">
+                    <div class="style_item">
+                        <div class="style_options flexStart" v-if="storeManFormData.isStore">
+                            <label for="" style="line-height: 30px;">未开服务：</label>
+                            <div class="rbox">
+                                <div class="split_options radioBox">
+                                    <span :class="{'onChose':storeManFormData.serviceShow == (key == 0 ? 1 : 0)}" v-for="(item,key) in 2" :key="key" @click="storeManFormData.serviceShow = (key == 0 ? 1 : 0)"><s></s>{{!key ? '显示' : '隐藏'}}</span> 
+                                </div>
+                                <p class="tip">如某商家未开通排队服务，是否仍显示排队按钮</p>
+                            </div>
+                        </div>
+                        <div class="style_options" v-if="storeManFormData.title.show">
+                            <label for="">标题颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'storeManFormData.title.style.color')"  v-model="storeManFormData.title.style.color"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('storeManFormData.title.style.color')"  :value="storeManFormData.title.style.color.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('storeManFormData.title.style.color')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">按钮文本：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'storeManFormData.style.color')"  v-model="storeManFormData.style.color"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('storeManFormData.style.color')"  :value="storeManFormData.style.color.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('storeManFormData.style.color')">重置</button>
+                            </div>
+                        </div>
+
+                        <template v-if="storeManFormData.isStore">
+                            <div class="style_options">
+                                <label for="">标签颜色：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'storeManFormData.style.labBgColor')"  v-model="storeManFormData.style.labBgColor"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" @change="changeColor('storeManFormData.style.labBgColor')"  :value="storeManFormData.style.labBgColor.replace('#','')" spellcheck="false" maxlength="6">
+                                    <button @click="resetColor('storeManFormData.style.labBgColor')">重置</button>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">标签文本：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'storeManFormData.style.labColor')"  v-model="storeManFormData.style.labColor"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" @change="changeColor('storeManFormData.style.labColor')"  :value="storeManFormData.style.labColor.replace('#','')" spellcheck="false" maxlength="6">
+                                    <button @click="resetColor('storeManFormData.style.labColor')">重置</button>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="style_options" >
+                            <label for="">背景：</label>
+                            <div :class="['colorpickerBox',{'noColor':!storeManFormData.style.cardBg}]">
+                                <el-color-picker class="colorpicker" popper-class="borderColorPicker" @active-change="(value) => activeChangeColor(value,'storeManFormData.style.cardBg')"  v-model="storeManFormData.style.cardBg"  ></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('storeManFormData.style.cardBg')"  :value="storeManFormData.style.cardBg && storeManFormData.style.cardBg.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('storeManFormData.style.cardBg')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modstyleBox contentSetBox" v-show="storeManFormData.more.show">
+                <h2 class="stitle">查看更多</h2>
+                <div class="sContent">
+                    <div class="item style_item ">
+                        <div class="style_options" >
+                            <label for="">显示文本：</label>
+                            <div class="textSetBox">
+                                <el-input placeholder="请输入文本" maxlength="8" show-word-limit v-model="storeManFormData.more.text"></el-input>
+                            </div>
+                            <span :class="['showArr',{'noColor':!storeManFormData.more.arr}] " @click="storeManFormData.more.arr = !storeManFormData.more.arr"></span>
+                        </div>
+                        <div class="style_options" @click="changeLink('storeManFormData.more.link')">
+                            <label for="">链接：</label>
+                            <div class="inpbox linkbox">
+                                <s><img src="/static/images/admin/link.png" alt=""></s>
+                                <input type="text" placeholder="请选择链接" class="iconLink" readonly :value="storeManFormData.more.linkInfo.linkText ? storeManFormData.more.linkInfo.linkText : storeManFormData.more.link ">
+                            </div>
+                        </div>
+
+                        <div class="style_options" >
+                            <label for="">文本颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" v-model="storeManFormData.more.style.color" @active-change="(value) => activeChangeColor(value,'storeManFormData.more.style.color')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="(storeManFormData.more.style.color).replace('#','')" @change="changeColor('storeManFormData.more.style.color')" maxlength="6">
+                                <button @click="resetColor('storeManFormData.more.style.color')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 间距设置 -->
+            <div class="marginSetBox modstyleBox contentSetBox" >
+                <h2 class="stitle" >间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" >
+                        <div class="sContent">
+                            <div class="style_options">
+                                <label for="">图标大小：</label>
+                                <el-slider tooltip-class="tooltip_show"  v-model="storeManFormData.style.btnSize" :show-tooltip="showTooltip"  :min="64" :max="108"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"   @change="checkMax(64,108,'storeManFormData.style.btnSize')" :value="storeManFormData.style.btnSize">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">上圆角：</label>
+                                <el-slider tooltip-class="tooltip_show"  @input="val => checkRadius(val,storeManFormData)" v-model="storeManFormData.style.borderRadiusTop" :show-tooltip="showTooltip"  :min="0" :max="50"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"   @input="checkMax(0,50,'storeManFormData.style.borderRadiusTop')" :value="storeManFormData.style.borderRadiusTop">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">下圆角：</label>
+                                <el-slider tooltip-class="tooltip_show"  @input="val => checkRadius(val,storeManFormData)" v-model="storeManFormData.style.borderRadiusBottom" :show-tooltip="showTooltip"  :min="0" :max="50"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"   @input="checkMax(0,50,'storeManFormData.style.borderRadiusBottom')" :value="storeManFormData.style.borderRadiusBottom">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            
+                            
+                            <div class="style_options">
+                                <label for="">上间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="storeManFormData.style.marginTop" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"  @input="checkMax(0,40,'storeManFormData.style.marginTop')" :value="storeManFormData.style.marginTop">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="storeManFormData.style.marginLeft" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"  @input="checkMax(0,40,'storeManFormData.style.marginLeft')" :value="storeManFormData.style.marginLeft">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+
+                            <div class="style_options" :style="storeManFormData.style.marginLeft != 0 || !storeManFormData.style.cardBg ? 'visibility:hidden; opacity:0;':''">
+                                <label for="">内边距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="storeManFormData.style.paddingLeft" :show-tooltip="showTooltip"  :min="0" :max="60"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"  @input="checkMax(0,40,'storeManFormData.style.paddingLeft')" :value="storeManFormData.style.paddingLeft">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+
+        </div>
+
+    </div>
+</div>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>发布招聘</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu_worker_seek.css?v={#$cfg_staticVersion#}" media="all" />
+    <script>
+        var geetest = {#$cfg_geetest#} ; //是否开启极验
+        var cfg_smsLogin_state = '{#$cfg_smsLoginState#}' ; //是否短信验证
+        var checkInfo = {#$fabuCheck|default:1#}  ; //信息是否需要审核
+        var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+        var memberDomain = '{#$member_userDomain#}'
+        const cityid = "{#$siteCityInfo.cityid#}"
+        var userPhone = '{#$userinfo.phone|default:""#}'
+    </script>
+</head>
+
+<body>
+    <div id="page"  v-cloak>
+        <!-- 职位分类选择 -->
+        <div class="jobChosePage" v-if="showChosePage">
+            <div class="header ">
+                <div class="header-l">
+                    <a href="javascript:;" @click="pageBack()" class="goBack"></a>
+                </div>
+                <div class="header-address">
+                    <span>选择招聘职位</span>
+                </div>
+                <div class="header-search hideEle">
+                    <a href="javascript:;" class="dropnav"></a>
+                </div>
+            </div>
+            <div class="pageCon">
+                <p class="headtip">选择招聘职位，可精准推送给更多求职者</p>
+                <div :class="['typeListBox',{'open':showLeftPop}]">
+                    <ul class="categoryList_ul root_ul">
+                        <li v-for="item in postTypeList" @click="chosePostType(item)" :class="[{'on_chose':item.id == currChoseType.id   || checkHasChosed(item.id,0) > -1},{'chose_line':item.id == currChoseType.id}]">{{item.typename}}<span v-if="choseTypeArrCountObj && choseTypeArrCountObj[item.id]">{{choseTypeArrCountObj[item.id].length}}</span></li>
+                    </ul>
+                    <!-- showLeftPop -->
+                    <div v-if="currChoseType && currChoseType.lower && currChoseType.lower.length "
+                        :class="['parentContainer']">
+                        <div :class="['parentBox',{'open':showRightPop}]">
+                            <ul class="categoryList_ul childrenBox">
+                                <li v-for="item in currChoseType.lower"
+                                    :class="[{'on_chose':(currChoseStype.id == item.id && currChoseStype.lower && currChoseStype.lower.length )|| checkHasChosed(item.id,1) > -1}]"
+                                    @click="chosePostType(item,1)">{{item.typename}}</li>
+                            </ul>
+                    
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pop_foot">
+                <div class="hasChoseBox">
+                    <div class="label">
+                        已选<span><b class="hasNum">{{choseTypeObj.length}}</b>/<b>5</b></span>
+                    </div>
+                    <div class="hasChose">
+                        <span v-for="(item,ind) in choseTypeObj" @click="removeChose(item,ind,'post')">{{item.title}}<s></s></span>
+                    </div>
+                </div>
+                <div class="btn_groups">
+                    <a href="javascript:;" class="sureBtn btn" @click="sureChose('post')">确定</a>
+                </div>
+            </div>
+        </div>
+        <div class="fabuPage" v-else>
+            <div class="header ">
+                <div class="header-l">
+                        <a href="javascript:;"  @click="pageBack()" class="goBack"></a>
+                    </div>
+                <div class="header-address">
+                <span>发布招聘</span>
+            </div>
+                <div class="header-search hideEle">
+                        <a href="javascript:;" class="dropnav"></a>
+                    </div>
+            </div>
+            <div class="formbox" >
+                <p v-if=" formData.job && formData.job.length" class="job_Chose" @click="showChosePage = true; pageFromPost = 1;">招聘职位：<span>{{Array.isArray(formData.job_name) ? formData.job_name.join('、') : ''}}</span></p>
+                <div class="form_item_box">
+                    <div class="form_item flex_item">
+                        <label for="title">标题</label>
+                        <input type="text" name="title" placeholder="请输入招聘标题" v-model="formData.title">
+                    </div>
+                    
+                </div>
+    
+                <!-- <div class="form_item_box">
+                    <div class="form_item flex_item" @click="showScrollPop = true">
+                        <div class="experience alignLeft">
+                            <label for="experience">工作经验</label>
+                            <input type="text" readonly class="inp" placeholder="请选择" readonly :value="formData.experience < 60 ? (formData.experience + '年') : (formData.experience + '年以上') ">
+                        </div>
+                        <div class="sex alignLeft">
+                            <label for="sex">性别</label>
+                            <input type="text" name="sex" readonly class="inp" placeholder="请选择" :value="formData.sex ? '女' : '男'">
+                        </div>
+                        <div class="age alignLeft">
+                            <label for="age">年龄</label>
+                            <input type="text" name="age" readonly class="inp" placeholder="请选择" :value="formData.age < 60 ? (formData.age + '岁') : (formData.age + '岁以上') ">
+                        </div>
+                    </div>
+                    <div class="form_item flex_item">
+                        <dl class="textareaBox">
+                            <dt>
+                                <h4>求职描述</h4>
+                                <p>请填写你擅长的技能、对工作的要求等</p>
+                            </dt>
+                            <dd>
+                                <div class="textarea" contenteditable="true" v-html="initNote" @keydown="changeTextCount(0)"
+                                    @keyup="changeTextCount(1)"></div>
+                                <div class="placeholderText" v-show="textCount == 0">
+                                    例：本人电机熟练工，能吃苦耐劳，希望包吃住，月薪6000以上<br>
+                                    或者：现有30位工友求职，可做装卸搬运保安普工，勤劳肯干，联系人吴某某
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div> -->
+                <div class="form_item_box">
+                    <div class="form_item flex_item">
+                        <label for="nickname">职位性质</label>
+                        <div class="postNatureBox">
+                            <span :class="{'checked': formData.nature === 1}" data-id="1" @click="formData.nature = 1; formData.salary_type = 1">全职</span>
+                            <span :class="{'checked': formData.nature === 2}" data-id="2" @click="formData.nature = 2; formData.salary_type = 2">兼职</span>
+                        </div>
+                    </div>
+                    <div class="form_item flex_item noArr" v-if="formData.nature === 2">
+                        <label for="slalary">{{formData.salary_type === 1 ? '月薪' : '时薪'}}<span class="salaryChange" @click="checkSalary">(<s></s>{{formData.salary_type === 1 ? '时薪' : '月薪'}})</span></label>
+                        <div class="salaryBox" v-if="formData.salary_type === 1">
+                            <input type="text" class="sm_inp" name="min_salary" oninput="value = value.replace(/[^\d]/g,''); " v-model="formData.min_salary" placeholder="请填写">-<input type="text" class="sm_inp" name="max_salary" v-model="formData.max_salary"  placeholder="请填写" oninput="value = value.replace(/[^\d]/g,''); "> <span>{#echoCurrency type="short"#}/{{formData.salary_type === 1 ? '月' : '小时'}}</span>
+                        </div>
+                        <div class="salaryBox" v-else>
+                            <input type="text" class="sm_inp" name="min_salary" oninput="value=value.replace(/^\D*(\d*(?:\.\d{0,1})?).*$/g, '$1')" v-model="formData.min_salary" placeholder="请填写">-<input type="text" class="sm_inp" name="max_salary" v-model="formData.max_salary"  placeholder="请填写" oninput="value=value.replace(/^\D*(\d*(?:\.\d{0,1})?).*$/g, '$1')" > <span>{#echoCurrency type="short"#}/{{formData.salary_type === 1 ? '月' : '小时'}}</span>
+                        </div>
+                    </div>
+                    <div class="form_item flex_item noArr" v-else>
+                        <label for="slalary">薪资待遇</label>
+                        <div class="salaryBox">
+                            <input type="text" class="sm_inp" name="min_salary" oninput="value = value.replace(/[^\d]/g,''); "   placeholder="请填写" v-model="formData.min_salary" >-<input type="text" class="sm_inp" name="max_salary" placeholder="请填写" v-model="formData.max_salary" oninput="value = value.replace(/[^\d]/g,''); "> <span>{#echoCurrency type="short"#}/月</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form_item flex_item ">
+                        <label for="slalary">招聘人数</label>
+                        <div class="flexBox"><input type="text" name="number" placeholder="(选填)" autocomplete="off" v-model="formData.number"><span>人</span></div>
+                    </div>
+                    <div class="form_item flex_item ">
+                        <label for="company">公司名称</label>
+                        <div class="flexBox"><input type="text" name="company" placeholder="请填写工作单位/公司/店铺名"  autocomplete="off" v-model="formData.company"></div>
+                    </div>
+                    <div class="form_item flex_item ">
+                        <label for="slalary">工作地区</label>
+                        <div class="selectBox"><input type="text" name="addr" placeholder="请选择" :value="formData.addrName.join('/')" readonly="readonly" @click="changeAddr()"></div>
+                    </div>
+                    <div class="form_item flex_item ">
+                        <input type="text" class="alignLeft" name="addr" placeholder="(选填)详细工作地点" v-model="formData.address" readonly  @click="goPosiPage()">
+                    </div>
+                </div>
+                <div class="form_item_box">
+                    <div class="form_item flex_item ">
+                        <label for="slalary">信息有效期</label>
+                        <div class="selectBox"><input type="text" name="valid" placeholder="请选择" readonly="readonly" :value="checkTime(formData.valid_end)" @click="showScrollPop = true; showScrollType = 'valid'"></div>
+                    </div>
+                </div>
+                <div class="form_item_box">
+                    <div class="form_item">
+                        <dl class="textareaBox">
+                            <dt>
+                                <h4>职位描述</h4>
+                                <p>请填写工作福利、招工要求等</p>
+                                <a href="javascript:;" @click="useModel">使用模板</a>
+                            </dt>
+                            <dd>
+                                <div class="textarea" contenteditable="true" v-html="initNote" @keydown="changeTextCount(0)"
+                                    @keyup="changeTextCount(1)"></div>
+                                <div class="placeholderText" v-show="textCount == 0">
+                                    例：
+                                    招货船普工/搬运工/装卸工/保安 月薪1万起<br/>
+                                    基本要求：年龄18-55，做事有责任心，有无经验均可。<br/>
+                                    公司直接招聘，不收取费用，如有意向请直接来电咨询
+                                </div>
+                            </dd>
+                        </dl>
+                        <div class="tagBox">
+                            <ul>
+                                <li v-for="item in welfare" :class="{'on_chose':formData.welfare && formData.welfare.length && formData.welfare.indexOf(item.id) > -1}" @click="pushWelfare(item)"><span>{{item.typename}}</span></li>
+                                
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="form_item flex_item" @click="showScrollPop = true; showScrollType = 'eduWorkYear'">
+                        <div class="age alignLeft" @click.stop="showScrollPop = true; showScrollType = 'age'">
+                            <label for="age">年龄要求</label>
+                            <input type="text" name="age" readonly class="inp" placeholder="(选填)" :value="checkAge(formData.min_age,formData.max_age)">
+                        </div>
+                        <div class="experience alignLeft">
+                            <label for="experience">学历要求</label>
+                            <input type="text" readonly class="inp" placeholder="(选填)" readonly :value="formData.education_name ">
+                        </div>
+                        <div class="experience alignLeft">
+                            <label for="experience">经验要求</label>
+                            <input type="text" readonly class="inp" placeholder="(选填)" readonly :value="formData.experience !== '' ?(formData.experience < 10 ? (formData.experience ? formData.experience + '年' : '不限') : (formData.experience + '年以上')):'' ">
+                        </div>    
+                    </div>
+                </div>
+                <div class="form_item_box">
+                    <dl class="form_item_dl">
+                        <dt>
+                            <h4>联系方式</h4>
+                            <p>手机号将用于他人联系你，和自己管理发布的信息！</p>
+                        </dt>
+                        <dd>
+                            <div class="form_item flex_item">
+                                <label for="nickname">联系人</label>
+                                <input type="text" name="nickname" placeholder="请输入你的称呼" v-model="formData.nickname">
+                            </div>
+                            <div class="form_item flex_item">
+                                <div class="leftInfo">
+                                    <label for="phone">联系方式</label>
+                                    <div class="telCode" @click="areaCodePop = true;">+{{formData.area_code}}</div>
+                                </div>
+                                <input type="text" name="phone" placeholder="请输入手机号" @change="changePhone = true"  v-model="formData.phone">
+                            </div>
+                            <div class="form_item flex_item" v-if="checkReg('phone') && changePhone">
+                                <div class="flex_left">
+                                    <label for="phonecode">验证码</label>
+                                    <input type="text" name="phonecode" placeholder="请输入验证码" v-model="formData.vercode">
+                                </div>
+                                <a href="javascript:;" class="getCode" @click="getPhoneMsg">获取验证码</a>
+                            </div>
+                        </dd>
+                    </dl>
+                </div>
+                <!-- <p class="usePhoneTip">使用该手机号登录，求职招聘更便捷</p> -->
+    
+                <div class="bottomBox">
+                    <a href="javascript:;" class="btn_fabu" @click="submitData">立即发布</a>
+                </div>
+            </div>
+        </div>
+        
+        <van-popup v-model="fabuSuccessPop" class="successPop" round >
+            <div class="popCon" v-if="checkInfo">
+                <div class="successTip">
+                    <h3>发布成功</h3>
+                    <p>信息将在审核通过后显示</p>
+                </div>
+                <div class="btns"><a href="javascript:;" class="ok_btn" @click="fabuSuccessPop = false">好的</a></div>
+            </div>
+            <div class="popCon noBtn" v-else>
+                <div class="successTip">
+                    <h3>发布成功</h3>
+                </div>
+            </div>
+        </van-popup>
+
+        <!-- 弹窗 -->
+        <van-popup class="mobsciPop" :close-on-click-overlay="true" v-model="showScrollPop" :round="true" lock-scroll
+            position="bottom">
+            <div class="mobsci_header">
+                <span class="cancel" @click="showScrollPop = false">取消</span>
+                <h4>{{showScrollType == 'age' ? '年龄要求' : '选择有效期'}}</h4>
+                <span class="sure" @click="addWorkDate">确定</span>
+            </div>
+            <div class="mobsci_con " v-if="showScrollType == 'eduWorkYear'">
+                <div class="titBox">
+                    <!-- <span>年龄要求</span> -->
+                    <span>学历要求</span>
+                    <span>工作经验</span>
+                </div>
+                <div class="pickerBox">
+                    <van-picker ref="picker" :columns="columns" :visible-item-count="4"  v-if="" />
+                </div>
+            </div>
+            <div class="mobsci_con " v-if="showScrollType == 'valid'">
+                <van-picker ref="picker" :columns="validArr" :visible-item-count="6" />
+            </div>
+            <div class="mobsci_con ages_con" v-if="showScrollType == 'age'">
+                <van-picker ref="picker_age" :columns="ages" :visible-item-count="6" @change="changePicker" />
+            </div>
+        </van-popup>
+
+        <!-- 号码区域代码 弹窗 -->
+        <van-popup class="popl_box anum_box" :close-on-click-overlay="true" v-model="areaCodePop" :round="true" lock-scroll
+        position="bottom">
+            <h2>{#$langData['siteConfig'][40][1]#}<a href="javascript:;" class="back" @click="areaCodePop = false;">{#$langData['siteConfig'][6][117]#}</a></h2> {#*返回 *#}
+            <div class="areacodeList" id="areacodeList">
+                <ul>
+                    <li :class="{'achose': formData.area_code == item.code}" v-for="item in areaCodeList" @click="formData.area_code = item.code; areaCodePop = false;" :data-cn="item.name" :data-code="item.code"><span>{{item.name}}<span><em class="fn-right">+{{item.code}}</em></span></span></li>
+                </ul>
+            </div>
+        </van-popup>
+    </div>
+    {#include file="cityChose.html" noLimit='1'#}
+</body>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}	
+{#if $cfg_geetest#}
+{#if $cfg_geetest == 1#}
+<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script src="{#$templets_skin#}js/fabu_worker_seek.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

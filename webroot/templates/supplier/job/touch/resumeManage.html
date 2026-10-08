@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>简历管理</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/resumeManage.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}';
+        var delivery_filter = {#$company_delivery_filter|default:0#}
+        var delivery_smart = {#$company_delivery_smart|default:0#}
+        var count0 = '{#$deliveryUserCount|default:0#}';
+        var count1 = '{#$collectResumeCount|default:0#}';
+        var count2 = '{#$resumeDownUserCount|default:0#}';
+        var companyEmail = '{#$company_email#}'
+        var email_buyResume = {#$company_email_buyResume|default:0#}
+        var combo_id = '{#$company_combo_id#}'; //套餐id
+        var can_resume_down = '{#$company_can_resume_down#}'
+        var package_resume = '{#$company_package_resume#}'
+        var comp_config = '{#json_encode($company_config)#}'
+        var people = '{#$company_people#}';
+        var people_job = '{#$company_people_job#}';
+        var people_phone = '{#$company_phone#}';
+        var address = '{#($company_address)#}';
+        var type = '{#$smarty.get.type|default:"0"|replace:"?appFullScreen":""#}'
+        type = type.split('?')[0]
+        var cityid = '{#$siteCityInfo.cityid#}';
+        var city = '{#$siteCityInfo.name#}';
+
+    </script>
+</head>
+<body>
+    <div class="HN_Jubao"></div> <!--举报按钮-->
+    <div class="pageBox" id="page" v-cloak :style="fixedTop ? 'padding-top:'+fixedTop+'px;' : ''">
+
+        <div class="fixedTop">
+            <div class="headerBox flexBox" v-show="!searchShow">
+                <div class="flexLeft">
+                    <a href="javascript:;" onclick="history.go(-1)"  class="goBack"></a>
+                    <h4 @click="resumePageChange"><span>{{checkTitle}}</span></h4>
+                </div>
+                <div class="flexRight">
+                    <a href="javascript:;" class="search_btn" @click="searchShow = true"></a>
+                    <a href="javascript:;" class="setting_btn" @click="showSettingSlide"></a>
+    
+                </div>
+            </div>
+            <div class="headerBox searchKeyBox" v-show="searchShow">
+                <a href="javascript:;" class="goBack" onclick="history.go(-1);"></a>
+                <div class="searchBox" >
+                    <input type="text" placeholder="请输入搜索关键字" ref="searchInp" v-model="keywords" @keyup="searchKeyResult()" @blur="loseFocus">
+                    <a href="javascript:;" class="clear_btn" v-show="keywords" @click="clearKey"></a>
+                </div>
+                <a href="javascript:;" class="hideSearch" @click="searchShow = false;" v-show="searchShow">取消</a>
+            </div>
+            <div class="pageTabBox" v-if="!currPage">
+                <div class="tabBox tab">
+                    <ul>
+                        <li v-for="item in tabsArrList" @click="currTab = item.id" v-show="deliveryFilter || item.id != 2 " :class="{'on_chose': currTab == item.id}"><h4>{{item.text}}</h4><span>{{item.count}}</span></li>
+                    </ul>
+                </div>
+                <div class="filterBox">
+                    <div class="flexLeft">
+                        <a href="javascript:;" class="btn_job shai_btn" @click="showSlidePop = true; showType='postSelect'"><span>{{checkPostName}}</span></a>
+                        <a href="javascript:;" v-if="!currTab" :class="['btn_filter',{'on_chose':noFit}]" @click="noFit = !noFit"><s></s>过滤不合适</a>
+                    </div>
+                    <a href="javascript:;" class="btn_clear" @click="clearConfirm">清除失效</a>
+                </div>
+            </div>
+            <div class="pageTabBox" v-else-if="currPage == 2">
+                <div :class="['downloadTip',{'slideUp':slideUp}]">
+                    您已下载<span>{#$invitationUserCount#}</span>份简历，如遇虚假简历可立即举报，平台将对违规简历进行严肃处理
+                </div>
+                <div class="filterBox">
+                    <div class="flexLeft">
+                        <a href="javascript:;" class="btn_job shai_btn" @click="showSlidePop = true; showType='postSelect'"  v-if="postArr.length"><span>{{checkPostName}}</span></a>
+                        <a href="javascript:;" class="btn_state shai_btn" @click="showSlidePop = true; showType='resumeState'"><span>{{checkStateName}}</span></a>
+                    </div>
+                    <a href="javascript:;" class="btn_clear" @click="clearConfirm">清除失效</a>
+                </div>
+            </div>
+            <div class="pageTabBox" v-else>
+                <div class="filterBox">
+                    <div class="flexLeft">
+                        <a href="javascript:;" class="btn_job shai_btn" @click="showSlidePop = true; showType='postSelect'"  v-if="postArr.length"><span>{{checkPostName}}</span></a>
+                        <a href="javascript:;" v-if="!currTab" :class="['btn_filter',{'on_chose':noFit}]" @click="noFit = !noFit"><s></s>过滤不合适</a>
+                    </div>
+                    <a href="javascript:;" class="btn_clear" @click="pl_manage = !pl_manage">{{pl_manage ? '完成': '批量管理'}}</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 切换页面 -->
+        <div :class="['pageChangeBox',{'show':showPageChose}]">
+            <ul>
+                <li v-for="item in pageList" :class="{'on_chose':item.id == currPage}" @click="currPage = item.id">
+                    <h5><s><img :src="'{#$templets_skin#}images/page' + item.id+'.png'" alt=""></s>{{item.title}}</h5> 
+                    <span class="count">{{item.count}}</span>
+                </li>
+            </ul>
+        </div>
+
+        <div :class="['listBox',{'loadPage':loading}]">
+            <!-- 投递简历 -->
+            <ul class="deliveryList " v-if="currPage == 0">
+                <li v-if="item && item.resume.id" :class="[{'new':item.un_read === '1' && currPage === 0},{'resumeDel':item.resume && item.resume.del}]" v-for="(item,ind) in resumeList">
+            
+                    <a :href="item.resume.del ? 'javascript:;' : item.resume.url" :class="['resumeBox',{'toMini':!item.resume.del}] " data-module="job" data-temp="resume" :data-id="item.resume.id" @click="checkGoLink(item)">
+                        <div class="buy_tag" v-if="item.resume.invitation && currTab == 3"><span>已约面</span></div>
+                        <div class="buy_tag" v-else-if="item.resume.buy"><span>已购买</span></div>
+                        <div class="rheader">
+                            <h5>
+                                <span>{{timeStrToDate(item.date)}} 投递 </span>
+                                <span>{{item.post ? item.post.title : ''}}</span>
+                            </h5>
+
+                            <div v-if="!item.resume.buy" :class="['state','state' + (deliveryFilter && item.state != 2 ? 0 : item.state) ,{'hasDel':item.resume.del}]">{{item.resume.del ? '简历已失效' :(item.state == 0 ? '待处理':(item.state == 2 ? '已回绝' : (deliveryFilter ? '通过初筛' : '待通过')))}}</div>
+                        </div>
+                        <div class="rDetail" v-if="item.resume && item.resume.id">
+                            <div class="rPhoto">
+                                <img :src="item.resume.photo_url" alt="" onerror="this.src='/static/images/noPhoto_40.jpg'">
+                                <s :class="['sex',{'sex1':!item.resume.sex}]"></s>
+                            </div>
+                            <div class="rInfo">
+                                <h4><b>{{item.resume.name}}</b>
+                                    <span v-if="item.resume.delivery && item.deliveryCount > 1 && item.post_last && item.post_last.id" @click.prevent="showSlidePop = true; showType = 'deliveryDetail'; curroptItem = item">已投递{{item.deliveryCount > 1 ? item.deliveryCount+ '次' : ''}}</span>
+                                    <span class="remark" v-if="item.resume.custom_unsuit" @click.prevent="curroptItem = item; showType='marked'; showSlidePop = true">标记过</span></h4>
+                                <p><span>{{item.resume.age}}岁</span><em v-if="item.resume.age">|</em><span>{{item.resume.edu_tallest_name}}</span><em v-if="item.resume.edu_tallest_name">|</em><span>{{item.resume.work_jy_name}}</span><em v-if="item.resume.work_jy_name">|</em><span>{{item.resume.edu_school}}</span></p>
+                                <div class="labs"><span v-if="item.resume.nature_name">{{item.resume.nature_name}}</span><span v-if="item.resume.startWork_name">{{item.resume.startWork_name}}</span></div>
+                                <div class="rIntention">
+                                    <label for="">期望：</label>
+                                    <span class="salary">{{item.resume.show_salary}}</span>
+                                    <span class="jobs">{{item.resume.type_name.join('、')}}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="rOptBox" v-if="currTab != 3">
+                            
+                            <span class="del" v-if="(item.resume && item.resume.del) || item.state == 2" @click.prevent.stop="delConfirm(item)">删除</span>
+                            <template v-else>
+                                <span class="noSuit" v-if="item.state != 2" @click.prevent.stop="showSlidePop = true;showType = 'refuseTd'; curroptItem = item">不合适</span>
+                                <span class="pass" v-if="item.state == 0 && !item.resume.buy && deliveryFilter" @click.prevent.stop="changeResumeState(item,1)">通过初筛</span>
+                                <span class="pass" v-if="item.state == 1 && !item.resume.buy && deliveryFilter" @click.prevent.stop="changeResumeState(item,0)">取消通过</span>
+                                <span class="download {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" v-if="!item.resume.buy" @click.prevent.stop="showDownloadPop(item,ind)">下载简历</span>
+                                <span class="callPhone" v-else @click.prevent.stop="callPhone(item.resume)">打电话</span> 
+                            </template>
+                        </div>
+                        <div class="rOptBox flexBox" v-else>
+                            <div class="flexLeft">
+                                <div class="more_btn" @click.prevent.stop="showMoreBtn">
+                                    <div class="popover">
+                                        <ul>
+                                            <li @click.stop.prevent="sendResume('email',item)">
+                                                <div class="icon"><img src="{#$templets_skin#}images/email.png" alt=""></div>
+                                                <p>发送邮箱</p>
+                                            </li>
+                                            <li @click.stop.prevent="sendResume('phone',item)" class="save_by_phone">
+                                                <div class="icon"><img src="{#$templets_skin#}images/save.png" alt=""></div>
+                                                <p>保存至手机</p>
+                                            </li>
+                                            <li v-if="(!item.resume || !item.resume.invitation) && (!item.remark || item.remark.remark_type != 5 || !item.refuse_msg)" @click.stop.prevent="showRefusePop(item)">
+                                                <div class="icon"><img src="{#$templets_skin#}images/noFit.png" alt=""></div>
+                                                <p>不合适</p>
+                                            </li>
+                                        </ul>
+                                        <div class="jb_btn" @click.stop.prevent="jubaoResume(item)">
+                                            <div class="icon"><img src="{#$templets_skin#}images/jubao.png" alt=""></div>
+                                            <p>举报</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div :class="['flexRight',{'lightBtns':item.remark && item.remark.remark_type === 1}] ">
+
+                                <span class="del" v-if="(item.resume && item.resume.del) || (item.delivery && item.remark && item.remark.remark_type == 5)" @click.prevent.stop="delConfirm(item)">删除</span>
+                                <template v-else>
+                                    <template  v-if="!item.remark || !item.remark.remark_type || (item.remark.remark_type != 5)">
+                                        <span class="mark"   @click.stop.prevent="showSlidePop = true; showType = 'markPop'; curroptItem = item">标注</span>
+                                        <span class="callPhone" @click.stop.prevent="callPhone(item.resume)">打电话</span>
+                                        <span class="invitate" v-if=" !item.resume.invitation" @click.prevent.stop="showInvitePop(item,ind)">邀请面试</span>
+                                    </template>
+                                    <template  v-else>
+                                        <span class="cancelDel" @click.prevent="cancelNofit(item)">取消不合适</span>
+                                        <span class="del"  @click.stop.prevent="delConfirm(item)">删除</span>
+                                    </template>
+                                    
+                                </template>
+                            </div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+
+            <!-- 下载的简历 -->
+            <ul class="deliveryList downloadList" v-if="currPage == 2">
+                <li  v-if="item && item.resume.id":class="[{'resumeDel':item.resume && item.resume.del}]" v-for="(item,ind) in resumeList">
+            
+                    <a :href="item.resume.del || item.resume.private ? 'javascript:;' : item.resume.url" :class="['resumeBox',{'toMini':!item.resume.del && !item.resume.private}]" @click="showResumePop(item)" data-module="job" data-temp="resume" :data-id="item.resume.id">
+                        <div class="buy_tag" v-if="item.remark && item.remark.remark_type && item.remark.remark_type == 1"><span>已约面</span></div>
+                        <div class="rheader">
+                            <h5>
+                                <span>下载时间：{{timeStrToDate(item.pubdate)}}</span>
+                            </h5>
+
+                            <div :class="['state','mark' + (item.remark.remark_type) ,{'hasDel':item.resume.del}]"  v-if="item.remark && item.remark.remark_type" >{{item.resume.del ? '简历已失效' : checkRemark_type(item.remark.remark_type)}}</div>
+                        </div>
+                        <div class="rDetail" v-if="item.resume && item.resume.id">
+                            <div class="rPhoto">
+                                <img :src="item.resume.photo_url" alt="" onerror="this.src='/static/images/noPhoto_40.jpg'">
+                                <s :class="['sex',{'sex1':!item.resume.sex}]"></s>
+                            </div>
+                            <div class="rInfo">
+                                <h4><b>{{item.resume.name}}</b><span v-if="item.delivery">投递</span><span class="remark" v-if="item.resume.custom_unsuit" @click.prevent="curroptItem = item; showType='marked'; showSlidePop = true">标记过</span></h4>
+                                <p><span>{{item.resume.age}}岁</span><em v-if="item.resume.age">|</em><span>{{item.resume.edu_tallest_name}}</span><em v-if="item.resume.edu_tallest_name">|</em><span>{{item.resume.work_jy_name}}</span><em v-if="item.resume.work_jy_name">|</em><span>{{item.resume.edu_school}}</span></p>
+                                <div class="labs"><span v-if="item.resume.nature_name">{{item.resume.nature_name}}</span><span v-if="item.resume.startWork_name">{{item.resume.startWork_name}}</span></div>
+                                <div class="rIntention">
+                                    <label for="">期望：</label>
+                                    <span class="salary">{{item.resume.show_salary}}</span>
+                                    <span class="jobs">{{item.resume.type_name.join('、')}}</span>
+                                </div>
+                                <div class="remarkDetail" v-if="item.remark && item.remark.remark_resume"  @click.stop.prevent="showSlidePop = true; showType = 'markPop'; curroptItem = item">
+                                    <span>标注：</span>{{item.remark.remark_resume}}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="rOptBox flexBox">
+                            <div class="flexLeft">
+                                <div class="more_btn" @click.prevent="showMoreBtn">
+                                    <div class="popover">
+                                        <ul>
+                                            <li @click.stop.prevent="sendResume('email',item)">
+                                                <div class="icon"><img src="{#$templets_skin#}images/email.png" alt=""></div>
+                                                <p>发送邮箱</p>
+                                            </li>
+                                            <li @click.stop.prevent="sendResume('phone',item)" class="save_by_phone">
+                                                <div class="icon"><img src="{#$templets_skin#}images/save.png" alt=""></div>
+                                                <p>保存至手机</p>
+                                            </li>
+                                            <li v-if="(!item.resume || !item.resume.invitation) && (!item.remark || item.remark.remark_type != 5 && !item.refuse_msg)" @click.stop.prevent="showRefusePop(item)">
+                                                <div class="icon"><img src="{#$templets_skin#}images/noFit.png" alt=""></div>
+                                                <p>不合适</p>
+                                            </li>
+                                        </ul>
+                                        <div class="jb_btn" @click.stop.prevent="jubaoResume(item)">
+                                            <div class="icon"><img src="{#$templets_skin#}images/jubao.png" alt=""></div>
+                                            <p>举报</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div :class="['flexRight',{'lightBtns':item.remark && item.remark.remark_type === 1}] ">
+
+                                <span class="del" v-if="(item.resume && item.resume.del) || (item.delivery && item.remark && item.remark.remark_type == 5)" @click.prevent.stop="delConfirm(item)">删除</span>
+                                <template v-else>
+                                    <template  v-if="!item.remark || !item.remark.remark_type || (item.remark.remark_type != 5)">
+                                        <span class="mark"   @click.stop.prevent="showSlidePop = true; showType = 'markPop'; curroptItem = item">标注</span>
+                                        <span class="callPhone" @click.prevent.stop="callPhone(item.resume)">打电话</span>
+                                        <span class="invitate" v-if="item.remark && item.remark.remark_type !== 1 && !item.resume.invitation" @click.stop.prevent="showInvitePop(item,ind)">邀请面试</span>
+                                    </template>
+                                    <template  v-else>
+                                        <span class="cancelDel" @click.prevent="cancelNofit(item)">取消不合适</span>
+                                        <span class="del"  @click.stop.prevent="delConfirm(item)">删除</span>
+                                    </template>
+                                    
+                                </template>
+                            </div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+
+            <!-- 收藏的简历 -->
+            <ul  :class="['deliveryList collectList',{'manageResume':pl_manage}]" v-if="currPage === 1">
+                <li v-if="item && item.resume.id" :class="[{'resumeDel':item.resume && item.resume.del},{'on_chose':plOptArr.indexOf(item.resume.id) > -1}]" v-for="(item,ind) in resumeList" @click="choseItem(item)">
+                    <a :href="item.resume.del || item.resume.private ? 'javascript:;' : item.resume.url" :class="['resumeBox',{'toMini':!item.resume.del && !item.resume.private}]"  data-module="job" data-temp="resume" :data-id="item.resume.id" @click="showResumePop(item)">
+                        <div class="buy_tag" v-if="item.resume && item.resume.buy"><span>已购买</span></div>
+                        <div class="rDetail" v-if="item.resume && item.resume.id">
+                            <div class="rPhoto">
+                                <img :src="item.resume.photo_url" alt="" onerror="this.src='/static/images/noPhoto_40.jpg'">
+                                <s :class="['sex',{'sex1':!item.resume.sex}]"></s>
+                            </div>
+                            <div class="rInfo">
+                                <div class="state hasDel" v-if="item.resume.del">简历已失效</div>
+                                <h4><b>{{item.resume.name}}</b><span v-if="item.delivery">投递</span><span class="remark" v-if="item.resume.custom_unsuit" @click.prevent="curroptItem = item; showType='marked'; showSlidePop = true">标记过</span><span v-if="item.resume.private" class="private">暂不公开</span></h4>
+                                <p><span>{{item.resume.age}}岁</span><em v-if="item.resume.age">|</em><span>{{item.resume.edu_tallest_name}}</span><em v-if="item.resume.edu_tallest_name">|</em><span>{{item.resume.work_jy_name}}</span><em v-if="item.resume.work_jy_name">|</em><span>{{item.resume.edu_school}}</span></p>
+                                <div class="labs"><span v-if="item.resume.nature_name">{{item.resume.nature_name}}</span><span v-if="item.resume.startWork_name">{{item.resume.startWork_name}}</span></div>
+                                <div class="rIntention">
+                                    <label for="">期望：</label>
+                                    <span class="salary">{{item.resume.show_salary}}</span>
+                                    <span class="jobs">{{item.resume.type_name.join('、')}}</span>
+                                </div>
+                                <div class="remarkDetail" v-if="item.resume && item.resume.advantage">
+                                    <span>优势：</span>{{item.resume.advantage}}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="rOptBox flexBox">
+                            <div class="flexLeft"> </div>
+                            <div :class="['flexRight',{'lightBtns':item.remark && item.remark.remark_type === 1}] ">
+
+                                <span class="del collect_cancel" v-if="(item.resume && item.resume.del) || (item.delivery && item.remark && item.remark.remark_type == 5)" @click.prevent.stop="cancelCollect(item)">取消收藏</span>
+                                <template v-else>
+                                    <span class="del collect_cancel" @click.prevent.stop="cancelCollect(item)">取消收藏</span>
+                                    <span class="callPhone" v-if="item.resume && item.resume.buy" @click.prevent.stop="callPhone(item.resume)">打电话</span>
+                                    <span class="buyResume" v-else @click.prevent.stop="showDownloadPop(item,ind)">下载简历</span>
+                                </template>
+                            </div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+            <div class="loading" v-if="loadEnd">
+                <p v-if="resumeList.length">没有更多了</p>
+                <div class="noData" v-else>
+                    <div class="img">
+                        <img src="{#$templets_skin#}images/noData.png" alt="" v-if="currPage">
+                        <img src="{#$templets_skin#}images/noData0.png" alt="" v-else>
+                    </div>
+                    <template v-if="currPage == 0">
+                        <h4 v-if="currTab || keySave || postSelect ">暂无相关简历投递</h4>
+                        <h4 v-else>暂无投递的简历</h4>
+                        <p >立即下载人才简历，发送面试邀请</p>
+                    </template>
+                    <template v-else-if="currPage == 1">
+                        <h4 v-if="currTab || keySave || postSelect ">暂未收藏相关简历</h4>
+                        <h4 v-else>暂未收藏简历</h4>
+                        <p >立即下载人才简历，发送面试邀请</p>
+                    </template>
+                    <template v-else>
+                        <h4 v-if="currTab || keySave || postSelect ">暂未下载相关简历</h4>
+                        <h4 v-else>暂未下载简历</h4>
+                        <p >立即前往人才库，查阅优秀简历</p>
+                    </template>
+                    <a href="{#getModuleConfig module='job' key='channelDomain'#}/talent" v-if="!currTab && !keySave && !postSelect">查看人才库</a>
+                </div>
+            </div>
+            <div class="loading" v-else>{{isload ? '加载中':'下拉加载更多'}}</div>
+
+            <div class="bottomFixed" v-show="pl_manage">
+                <p>已选择<span>{{plOptArr.length}}</span>份简历</p>
+                <div class="btnsGroup">
+                    <div class="flexLeft" @click="choseAll">
+                        <span :class="{'on_chose' : plOptArr.length == resumeList.length}" v-if="pl_manage">全选{{resumeList.length}},{{plOptArr.length}}</span>
+                    </div>
+                    <div class="flexRight">
+                        <a href="javascript:;" class="confirmDel" @click="cancelCollect">取消收藏</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 弹窗 -->
+        <div class="popContainer"  v-cloak>
+            <div :class="['mask_pop',{'zIndex': ['marked','deliveryDetail','resumeHasDel','refuseTd','markPop','setEmail','downloadResume','invitatePop'].includes(showType)}]" v-show="showSlidePop" @click="showSlidePop = false"></div>
+
+            <!-- 沟通状态 -->
+            <div :class="['slidePop',{'showPop':showSlidePop && showType=='resumeState'}]" :style="fixedTop ? 'top:'+(fixedTop - (slideUp ? slideH : 0) - 1)+'px;' : ''">
+                <ul class="selectUl">
+                    <li v-for="item in communication" @click="resumeState = (resumeState === item.value ? '' : item.value)" :class="{'on_chose':resumeState == item.value}">{{item.label}}</li>
+                </ul>
+            </div>
+
+            <!-- 应聘职位 -->
+            <div :class="['slidePop',{'showPop':showSlidePop && showType=='postSelect'}]"  :style="fixedTop ? 'top:'+(fixedTop -1)+'px;' : ''">  
+                <ul  class="selectUl">
+                    <li @click="postSelect = ''" :class="{'on_chose':postSelect == ''}">全部职位</li>
+                    <li v-for="item in postArr" @click="postSelect = item.id" :class="{'on_chose':postSelect == item.id}">{{item.title}}</li>
+                </ul>
+            </div>
+
+            <!-- 设置弹窗 -->
+            <div :class="['slidePop settingPop',{'showPop':showSlidePop && showType=='setting'}]" >    
+                <!-- 设置 -->
+                <div class="slideCon" >
+                    <div class="header">
+                        <div class="header-l">
+                            <a href="javascript:;" @click="showSlidePop = false"></a>
+                        </div>
+                        <div class="header-address">
+                            <h4>投递设置</h4>
+                        </div>
+                        <div class="header-search">
+                            <a href="javascript:;" class="setIcon"></a>
+                        </div>
+                    </div>
+                    <ul class="gridBox">
+                        <li v-for="(btn,ind) in setBtns" :class="[{'set':btn.type === 1},{'hasset':btn.set === 1},{'fn-hide':(ind == 0 || ind == 2) && currPage != 0}]" @click="setResume(btn)">
+                            <div class="iconBox">
+                                <img :src="'{#$templets_skin#}images/set_icon' + btn.id + '.png'" alt="">
+                            </div>
+                            <h4>{{btn.title}}</h4>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 底部弹窗 -->
+            <div :class="['markPop bottomPop',{'showPop':showSlidePop && showType == 'marked'}] ">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header">
+                    <h4><s></s>标记过不合适</h4>
+                </div>
+                <div class="pop_con" v-if="curroptItem">
+                    <div class="markCon">
+                        <h5>该求职者被你标记过<span>不合适</span>，理由：<span>{{curroptItem.resume.remark.custom_remark ? curroptItem.resume.remark.custom_remark : curroptItem.resume.remark.remark_resume}} </span></h5>
+                        <p>辅助您判别简历，快速处理</p>
+                    </div>
+                    <div class="markObj">
+                        <h2><b>{{curroptItem.resume.name}}</b><span v-if="curroptItem">标记过</span></h2>
+                        <div class="headPhoto">
+                            <img :src="curroptItem.resume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" alt="">
+                        </div>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" class="btn"  @click="showSlidePop = false">好的</a>
+                </div>
+            </div>
+
+            <!-- 投递详情 -->
+            <div :class="['markPop bottomPop hasDeliveryPop',{'showPop':showSlidePop && showType == 'deliveryDetail'}] ">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header">
+                    <h4>该求职者已投递过{{curroptItem && curroptItem.resume.deliveryCount}}次</h4>
+                </div>
+                <div class="pop_con" v-if="curroptItem && curroptItem.post_last">
+                    <div class="markCon">
+                        <ul>
+                            <li class="dpost">
+                                <label for="">投递职位：</label>
+                                <span>{{curroptItem.post_last.title}}<em>(仅记录最近一次)</em></span>
+                            </li>
+                            <li>
+                                <label for="">投递时间：</label>
+                                <span>{{transTimes(curroptItem.post_last.post_date,2)}}</span>
+                            </li>
+                            <li class="result">
+                                <label for="">结&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;果：</label>
+                                <span>{{curroptItem.post_last.result}}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="markObj">
+                        <h2><b>{{curroptItem.resume.name}}</b><span v-if="curroptItem">投递过</span></h2>
+                        <div class="headPhoto">
+                            <img :src="curroptItem.resume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" alt="">
+                        </div>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" class="btn"  @click="showSlidePop = false">好的</a>
+                </div>
+            </div>
+
+            <!-- 简历已失效 -->
+            <div :class="['bottomPop delResumePop ',{'showPop':showSlidePop && showType == 'resumeHasDel'}]">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <template v-if="curroptItem && curroptItem.resume.del">
+                    <div class="pop_header">
+                        <h4>该简历线上版本已失效</h4>
+                    </div>
+                    <div class="pop_con">
+                        <h6>可前往邮箱查看历史附件，如需重新下载或了解更多，<br>您可以联系求职者 </h6>
+                        <p>(可能的失效原因：求职者删除了简历/Ta的账号出现问题等)</p>
+                        <div class="markObj" v-if="curroptItem">
+                            <h2><b>{{curroptItem.resume.name}}</b><span>{{curroptItem.resume.phone}}<em>（联系电话）</em></span></h2>
+                            <div class="headPhoto">
+                                <img :src="curroptItem.resume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" alt="">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pop_bottom">
+                        <a href="javascript:;" class="btn">联系Ta</a>
+                    </div>
+
+                </template>
+                <template v-else-if="curroptItem && curroptItem.resume.private">
+                    <div class="pop_header">
+                        <h4>该简历不在公开人才库内，是否需要查阅？</h4>
+                    </div>
+                    <div class="pop_con">
+                        <h6>可询问求职者为您开放查阅权限 </h6>
+                        <div class="markObj" v-if="curroptItem">
+                            <h2><b>{{curroptItem.resume.name}}</b><span class="private_lab">暂不公开</span></h2>
+                            <div class="headPhoto">
+                                <img :src="curroptItem.resume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" alt="">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pop_bottom">
+                        <a :href="'{#$member_userDomain#}/im/chat-' + curroptItem.resume.userid + '.html'" class="btn">向求职者询问查阅</a>
+                    </div>
+                </template>
+            </div>
+
+            <!-- 选择拒绝原因  投递过 => 不合适 -->
+            <div :class="['bottomPop refuseTd',{'showPop':showSlidePop && showType == 'refuseTd'}]">
+                <div class="pop_header">
+                    <h4>选择拒绝原因<span >(将通知求职者)</span></h4>
+                </div>
+                <div class="pop_con">
+                    <van-picker
+                    v-model="refuseMsg"
+                    :show-toolbar="false"
+                    visible-item-count="3"
+                    :columns="refuseArr"
+                    />
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" class="btn"  @click="refuseResume()">回绝投递</a>
+                </div>
+            </div>
+
+
+            <!-- 简历备注 -->
+            <div :class="['bottomPop markPop toMarkBox',{'showPop':showSlidePop && showType == 'markPop'}]" ref="toMarkBox">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header" v-if="refuseForm.remark_type === 1 ">
+                    <h4>添加面试信息</h4>
+                    <p>请确认已主动联系求职者沟通一致，发送面试短信等</p>
+                </div>
+                <div class="pop_header" v-else-if="(curroptItem.delivery < 1 || ( refuseForm.remark_type  != 5 && curroptItem.delivery >= 1)) || (curroptItem.deliveryCount < 1 || ( refuseForm.remark_type  != 5 && curroptItem.deliveryCount >= 1))">
+                    <h4>简历标注<span >(仅自己可见)</span></h4>
+                </div>
+                <div class="pop_header" v-else>
+                    <h4>请选择拒绝原因<span>(将通知求职者)</span></h4>
+                </div>
+                <div class="pop_con">
+                    <div class="cStateBox">
+                        <ul>
+                            <li v-for="item in communication_s" v-if="(curroptItem.resume && !curroptItem.resume.invitation ) || (item.value !== 1 && item.value !== 5)" @click="refuseForm.remark_type = item.value" :class="[{'on_chose': item.value == refuseForm.remark_type} ,{'stateRed':item.value == 5}]">{{item.label}}</li>
+                        </ul>
+                    </div>
+                    <div class="optConBox">
+                        <!-- 邀请面试 -->
+                        <div class="inviteBox" v-if="refuseForm.remark_type === 1 && (curroptItem.resume && curroptItem.resume.invitation < 1)  ">
+                            <div class="inviteFormBox">
+                                <ul>
+                                    <li class="date_icon"  @click="invitateDateChose = true">
+                                        <label for="">面试时间</label>
+                                        <div class="formInp">
+                                            <input type="text" readonly placeholder="请选择" :value="invitateForm.interview_time ? transTimes(invitateForm.interview_time,6) : ''" >
+                                        </div>
+                                    </li>
+                                    <li class="arr_icon"  @click="invitatePostChose = true">
+                                        <label for="">面试职位</label>
+                                        <div class="formInp">
+                                            <div placeholder="请选择" v-if="invitateForm.postName">
+                                                <div v-if="invitateForm.postName" class="postName">
+                                                    <h3>{{invitateForm.post.show_salary}} <span v-if="invitateForm.post.dy_salary > 12">· {{invitateForm.postName.dy_salary}}<b>薪</b></span></h3> 
+                                                    <h4>{{ invitateForm.post.title }}</h4>
+                                                </div>
+                                            </div>
+                                            <div class="placeholder" v-else>请选择面试职位</div>
+                                        </div>
+                                    </li>
+                                    
+                                    <li class="arr_icon addr_posi">
+                                        <label for="">面试地点</label>
+                                        <div class="formInp"  @click="invitateAddrChose = true">
+                                            <input type="text" readonly placeholder="请选择面试地点" :value="invitateForm.placeName"> 
+                                        </div>
+                                    </li>
+                                    <li class="remarkBox">
+                                        <div class="label">
+                                            <h4>添加备注</h4>
+                                            <p>(仅我可见)</p>
+                                        </div>
+                                        <div class="formInp">
+                                            <van-field
+                                                v-model="refuseForm.remark"
+                                                rows="2"
+                                                autosize
+                                                type="textarea"
+                                                maxlength="50"
+                                                show-word-limit
+                                                />
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="custom_msg" v-else-if="(curroptItem.delivery < 1 || ( refuseForm.remark_type  != 5 && curroptItem.delivery >= 1)) || (curroptItem.deliveryCount < 1 || ( refuseForm.remark_type  != 5 && curroptItem.deliveryCount >= 1))">
+                            <van-field
+                            v-model="refuseForm.remark"
+                            rows="2"
+                            autosize
+                            type="textarea"
+                            maxlength="50"
+                            @focus="checkMark"
+                            placeholder="可添加备注，最多50个字"
+                            show-word-limit
+                            />
+                        </div>
+                        <div class="refuseBox" v-else>
+                            <label for="">拒绝原因:</label>
+                            <div class="resonBox">
+                                <ul>
+                                    <li v-for="item in refuseArr" :class="{'on_chose':refuseForm.remark == item}" @click="refuseForm.remark = item">{{item}}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" v-if="refuseForm.remark_type !== 1" class="btn"  @click="showSlidePop = false;confirmMark()">{{curroptItem.delivery != 1 || ( refuseForm.remark_type  != 5) ? '确定':'回绝投递'}}</a>
+                    <a href="javascript:;" class="btn" v-else @click="sureSubmitInv">确定</a>
+                </div>
+            </div>
+
+            <!-- 设置邮箱 -->
+            <div class="popBox centerPop" v-show="showSlidePop && showType == 'setEmail'">
+                <h4>设置招聘邮箱</h4>
+                <div class="inputBox">
+                    <input type="email" v-model="setEmail" placeholder="请输入企业招聘邮箱">
+                </div>
+                <p v-if="!setEmail">*设置后，购买简历可自动发送简历附件到邮箱</p>
+                <p v-else class="blue">为顺利发送简历，请确保邮箱填写正确</p>
+                <div class="btnsGroup"><a href="javascript:;" class="cancel" @click="showSlidePop = false ">取消</a><a href="javascript:;" :class="['btn_sure',{'disables_btn':!setEmail}]" @click="setCompanyEmail">确定</a></div>
+            </div>
+
+
+            <!-- 下载简历弹窗 -->
+            <div :class="['resumeDownloadPopBox bottomPop',{'showPop':showType == 'downloadResume' && showSlidePop},{'resumeDetailPop':curroptItem && curroptItem.resume.buy}]">
+
+                <div class="resumeDownloadPop">
+                    <div class="pop_head" v-if="curroptItem && !curroptItem.resume.buy">
+                        <h2>下载简历</h2>
+                        <p >立即解锁人才联系方式，在线发起面试邀请</p>
+                    </div>
+                    <div class="pop_head" v-else>
+                        <h4>继续处理简历</h4>
+                    </div>
+
+                    <div class="pop_con" v-if="curroptItem">
+                        <div class="resumeBox">
+                            <div class="resumeDetail">
+                                <div class="leftInfo">
+                                    <h3>{{curroptItem.resume.name}} <p><span>{{curroptItem.resume.age}}岁</span><em>|</em><span>{{curroptItem.resume.edu_tallest_name}}</span><em>|</em><span>{{curroptItem.resume.work_jy_name}}</span></p></h3>
+                                    <h4 v-if="curroptItem.resume.job_name ">{{curroptItem.resume.job_name.join('、')}}</h4>
+                                </div>
+                                <div class="rightPhoto">
+                                    <img  :src="curroptItem.resume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'">
+                                    <s :class="['sex',{'sex_1' : !curroptItem.resume.sex}]"></s>
+                                </div>
+                            </div>
+                            <div class="contact" v-if="curroptItem.resume.buy"><label for="">联系电话：</label><b>{{curroptItem.resume.phone}}</b></div>
+                        </div> 
+                    </div>
+                    <div class="pop_foot" v-if="curroptItem && !curroptItem.resume.buy">
+                        <div class="bottomBox" v-if="!companyDetail.combo_id">
+                            <p class="tip" v-if="download_tip"><span>您还未开通招聘套餐，</span>剩余体验下载次数<b>{{companyDetail.can_resume_down}}</b>次</p>
+                            <div class="btnsBox">
+                                <button class="showJobTc">招聘套餐<span>企业必选</span></button>
+                                <button class="download" @click="directDownload()">下载<span v-if="companyDetail.config && companyDetail.config.resume_fee > 0">（{{companyDetail.config.resume_fee}}）</span></button>
+                            </div>
+                        </div>
+                        <div class="bottomBox" v-else-if="companyDetail.can_resume_down || companyDetail.can_resume_down == -1 ">
+                            <p class="tip" v-if="download_tip">套餐剩余简历下载<b>{{companyDetail.can_resume_down == -1 ? '不限' : companyDetail.can_resume_down}}</b>次 <em v-if="companyDetail.package_resume">,增值包<b>{{companyDetail.package_resume}}</b>次</em></p>
+                            <div class="btnsBox">
+                                <button class="download_tc" @click="topayDownload()">下载<span v-if="companyDetail.can_resume_down !== -1 && download_tip">（使用1次）</span></button>
+                            </div>
+                        </div>
+                        <div class="bottomBox" v-else>
+                            <p class="tip" v-if="download_tip"><span>套餐内简历下载次数已用完，</span>选择增值包更划算</p>
+                            <div class="btnsBox">
+                                <button class="showJobTc">招聘套餐<span>推荐选择</span></button>
+                                <button class="download" @click="topayDownload()">下载<span v-if="companyDetail.config && companyDetail.config.resume_fee > 0">（{{companyDetail.config.resume_fee}}）</span></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="pop_foot">
+                        <div class="btn_groups" v-if="curroptItem">
+
+                            <a :href="'{#$member_userDomain#}/im/chat-'+curroptItem.resume.userid+'.html'" class="chat_btn" v-if="companyDetail.email && companyDetail.email_buyResume">聊一聊</a>
+                            <a href="javascript:;" class="setEmail_btn" v-else @click="sendResume('email',curroptItem)">发至邮箱</a>
+                            <a href="javascript:;" class="invite_btn" @click.prevent.stop="showInvitePop(curroptItem)">邀请面试</a>
+                            <a href="javascript:;" class="callPhone" @click.prevent.stop="callPhone(curroptItem.resume)">电话联系</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 邀请面试 -->
+            <div :class="['invitatePop bottomPop',{'showPop':showType == 'invitatePop' && showSlidePop}]">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="invitatePopBox">
+                    <div class="pop_head">
+                        <h2>邀请面试</h2>
+                        <p class="post_intention" v-if="invitatePostChose">求职者意向<span v-if="curroptItem.resume.job_name">{{curroptItem.resume.job_name.join('、')}}</span></p>
+                        <p class="tip" v-else-if="invitateAddrChose">请确认面试的地址</p>
+                        <p class="tip" v-else>请先与求职者联系，传达面试意向、沟通时间后，再发送邀请 <br/>或您可以直接以短信形式发送</p>
+                    </div>
+                    <div class="pop_con">
+                        <div class="invitate_form">
+                            <div class="form_item select_item">
+                                <label for="">面试时间</label>
+                                <div class="interview_time inpbox" @click="invitateDateChose = true">
+                                    <input type="text" readonly placeholder="请选择面试时间" :value="invitateForm.interview_time ? transTimes(invitateForm.interview_time,6) : ''"> 
+                                </div>
+                            </div>
+                            <div class="form_item select_item">
+                                <label for="">面试职位</label>
+                                <div class="interview_post inpbox" @click="invitatePostChose = true">
+                                    <div  placeholder="请选择面试职位" :value="invitateForm.postName"><div v-if="invitateForm.postName" class="postName"><h3>{{invitateForm.post.show_salary}} <span v-if="invitateForm.post.dy_salary > 12">· {{invitateForm.postName.dy_salary}}<b>薪</b></span></h3> <h4>{{ invitateForm.post.title }}</h4></div></div>
+                                </div>
+                            </div>
+                            <div class="form_item  select_item">
+                                <label for="">面试地点</label>
+                                <div class="interview_addr inpbox" @click="invitateAddrChose = true">
+                                    <input type="text" readonly placeholder="请选择面试地点" :value="invitateForm.placeName"> 
+                                </div>
+                            </div>
+                            <div class="form_item">
+                                <label for="">其他须知</label>
+                                <div class="interview_reamrk inpbox">
+                                    <div class="remark" placeholder="添加其他面试提醒" contenteditable="" @input="checkNotice"></div>
+                                </div>
+                            </div>
+                            <div class="form_item">
+                                <label for="">联系方式</label>
+                                <div class="interview_contact inpbox">
+                                    <div class="contact_info">
+                                        <h4>{{companyDetail.people}}<em>/{{companyDetail.people_job}}</em></h4>
+                                        <p>{{companyDetail.phone}}</p>
+                                    </div>
+                                    <a href="{#$cfg_basehost#}/supplier/job/company_info.html?to=2&appFullScreen" class="changeInfo">修改我的联系方式 ></a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pop_foot">
+                        <button :class="['sendInvitation', {'disabled':!checkForm()},{'loading':btnLoad}]" @click="sendInvitation"><span>发送</span></button>
+                    </div>
+                </div>
+            </div>
+
+            
+        </div>
+
+        <!-- 地址选中弹窗-->
+        <div class="mask_pop" v-show="invitateAddrChose" @click="invitateAddrChose = false"></div>
+        <div :class="['addrListPop invitatePop bottomPop',{'showPop':invitateAddrChose}]">
+            <div class="pop_header">
+                <a href="javascript:;" class="back_btn"  @click="invitateAddrChose = false"></a>
+                <h4>确认面试地点</h4>
+            </div>
+            <div class="pop_con slidePopCon">
+                <ul class="addr_list">
+                    
+                    <li v-for="item in jobAddrList" :key="item.id" v-if="item.address"  :class="[{'on_chose':item.id == invitateForm.place},{'edit_item':item.id == 0}]" @click="choseInvitateAddress(item)">
+                        <div v-if="item.id">{{item.address}}</div>
+                        <div v-else class="editAddrCon">
+                            <div class="editAddr">
+                                <h4>{{item.address}}</h4>
+                                <div class="addr_btns" v-show="item.id ==invitateForm.place">
+                                    <span>已选择新地址，可编辑</span>
+                                    <a href="javascript:;" class="btn_posi" @click.stop="showMapCurr()">查看定位</a>
+                                </div>
+                                <div class="addr_btns" v-show="item.id !== invitateForm.place">
+                                    <span>刚刚添加</span>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="pop_foot">
+                <a href="javascript:;" @click="addWorkPosi = true" class="add_address">添加新地址</a>
+            </div>
+        </div> 
+
+        <!-- 职位选中弹窗-->
+        <div class="mask_pop" v-show="invitatePostChose" @click="invitatePostChose = false"></div>
+        <div :class="['addrListPop invitatePop bottomPop',{'showPop':invitatePostChose}]">
+            <div class="pop_header">
+                <a href="javascript:;" class="back_btn"  @click="invitatePostChose = false"></a>
+                <h4>确认面试职位</h4>
+                <p class="job_name" v-if="curroptItem">求职者意向：<span>{{curroptItem.resume.job_name.join('、')}}</span></p>
+            </div>
+            <div class="pop_con slidePopCon">
+                <ul class="post_list">
+                    <li v-for="item in postArr" :key="item.id" :class="{'on_chose':item.id == invitateForm.pid}" @click="choseInvitePost(item)">
+                        <span class="lab" v-if="delivery_pid == item.id">投递</span>
+                        <h3>{{item.show_salary}} <span v-if="item.dy_salary > 12">· {{item.dy_salary}}<b>薪</b></span></h3>
+                        <h4>{{ item.title }}<span class="state" v-if="item.del">(已删除)</span> <span class="state" v-else-if="item.off == 1 ">(已下架)</span><span class="state" v-else-if="item.state == 2 ">(审核不通过)</span><span class="state" v-else-if="!item.state ">(审核中)</span>
+                        </h4>
+                    </li>
+                </ul>
+            </div>
+        </div> 
+
+
+
+        <!-- 弹窗 -->
+        <div class="popContainer">
+            <div class="mask_pop zIndex" v-if="invitateDateChose" @click="invitateDateChose = false"></div>
+
+            <!-- 修改面试时间 -->
+            <div :class="['bottomPopBox changeInterviewPop',{'showPop':invitateDateChose }]" >
+                <a href="javascript:;" class="close_pop" @click="invitateDateChose = false"></a>
+                <div class="pop_header">
+                    <h4>选择面试时间</h4>
+                    <p class="errTip">务必与求职者达成一致后修改</p>
+                </div>
+                <div class="pop_con">
+                    <div class="leftDate">
+                        <ul>
+                            <li v-for="(item,ind) in dateArr" :class="{'on_chose':dateChose.day == item.dateStr}"  @click="dateChose.day = item.dateStr;choseTime('day')" v-html="timeStrToDates(item.dateStr)"></li>
+                        </ul>
+                    </div>
+                    <div class="timeChose">
+                        <ul>
+                            <li v-for="item in hourArr" :class="{'on_chose':item.hour === dateChose.hour}" @click="dateChose.hour = item.hour;choseTime('hour')" v-if="checkTime(item.hour)">{{item.hourText}}</li>
+                        </ul>
+                        <ul>
+                            <li v-for="item in minArr" :class="{'on_chose':item.min === dateChose.min}" @click="dateChose.min = item.min;choseTime('min')"  v-if="checkTime('',item.min)">{{item.minText}}</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" :class="['btn_sure',{'disabled' : dateChose.min === '' || dateChose.hour === '' || dateChose.day === ''}]" @click="changeTime">确定修改</a>
+                </div> 
+            </div>
+        </div>
+        
+        <!-- 添加地址 -->
+        <div :class="['mask_pop addWorkPosiMask' ,{'showMask':addWorkPosi}]"></div>
+        <div :class="['pubPopBox addWorkPosiPopBox', {'showPop':addWorkPosi}]">
+            <!-- 新增 工作地 -->
+            <div class="addWorkPosiPop popBox" >
+                <div class="popHeader">
+                    <div class="btnsGroup">
+                        <a href="javascript:;" class="cancel_btn" @click="hideAddPosiPop">取消</a>
+                        <a href="javascript:;" class="sure_btn" @click="confirmAddr">确定</a>
+                    </div>
+                    <div class="searchBox">
+                        <input type="text" placeholder="搜索位置" @input="searchKey" @focus="showSearchPage" @blur="hideSearchPage">
+                    </div>
+                </div>
+                <div class="popCon">
+                    <div class="searchPage" v-show="showSearch">
+                        <ul>
+                            <li v-for="(item,ind) in searchList" :class="{'on_chose':ind == currInd}" @click="chosePosi(item,'',ind)">
+                                <h4>{{item.name}}</h4>
+                                <p>{{item.address}}</p>
+                            </li>
+                            <!-- <li class="toDefine" v-show="loadEndAddr">
+                                <a :href="'{#$member_userDomain#}/mapDefine.html?cityid='+cityid+'&city='+city+'&currentPageOpen=1'"  @click.prevent="toLink">
+                                    <div class="addrInfo" >
+                                        <h3>{{searchList.length ? '以上都不是' : '暂无相关地址'}}</h3>
+                                        <p>点击添加自定义位置</p>
+                                    </div>
+                                </a>
+                            </li> -->
+                        </ul>
+                    </div>
+                    <div class="showPage" v-show="!showSearch">
+                        <div class="mapBox">
+                            <div class="mapdiv" id="mapdiv"></div>
+                            <div class="mapCenter"></div>
+                        </div>
+                        <div class="suggestList">
+                            <ul>
+                                <li v-for="(item,ind) in surroundingPois"  @click="chosePosi(item,1,ind)" :class="{'on_chose':ind === currInd}">
+                                    <h4>{{item.title}}</h4>
+                                    <p>{{item.address}}</p>
+                                </li>
+                                <!-- <li class="toDefine" v-show="loadEnd">
+                                    <a :href="'{#$member_userDomain#}/mapDefine.html?cityid='+cityid+'&city='+city+'&currentPageOpen=1'" >
+                                        <div class="addrInfo">
+                                            <h3>以上都不是</h3>
+                                            <p>点击添加自定义位置</p>
+                                        </div>
+                                    </a>
+                                </li> -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+    {#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html" noVue="true"#}
+    {#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+    {#include file="{#$HUONIAOROOT#}/templates/siteConfig/touch_top.html" noHeader=1 dopost='resume'#}
+    <script>
+        var JubaoConfig = {
+            "module" : 'job',
+            "action" : 'resume',
+            "id" : ''
+        }
+    </script>
+</body>
+</body>
+<script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/resumeManage.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+
+</html>

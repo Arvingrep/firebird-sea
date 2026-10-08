@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>{#if $id == ''#}新建优惠券{#else#}编辑优惠券{#/if#}</title>
+<meta name="wap-font-scale" content="no">
+<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabuquan.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript"  src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.deferred.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script src="{#$cfg_staticPath#}js/ui/noscroll.js" type="text/javascript"></script>
+<script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+    var modelType = '{#$module#}';
+    var id = '{#$id#}',editId = '{#$id#}';
+    var beforeDays = 60;//提前多久参加活动
+    var backUrl = '{#getUrlPath service='member' template='shop_huodong'#}';
+    var specifiVal = '{#if !$detail_specifiVal#}[]{#else#}{#$detail_specifiVal#}{#/if#}';//多规格
+    var goodidVal      = "{#$detail_fid#}";//已选商品的id
+    var limitNum = '{#$detail_limit#}';
+    var oldNumber = '{#$detail_number#}';
+</script>
+</head>
+<body>
+{#$pageTitle = "{#if $id == ''#}新建优惠券{#else#}编辑优惠券{#/if#}"#}
+{#include file="top.html"#}
+
+
+<div class="container">
+    <form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=shop&action={#if $id#}quanEdit&qid={#$id#}{#else#}quanAdd{#/if#}" data-url="{#getUrlPath service='member' template='quan-shop'#}">
+        <h3 class="quanTit">基本信息</h3>
+        <input type="hidden" name="fid" id="goodsId" value="{#$detail_fid#}">
+    <ul class="info">
+        <li class="fn-clear">
+            <span class="name"><label for="quanname">优惠券名称</label></span>
+            <input type="text" value="{#$detail_name#}" id="quanname" placeholder="请输入" autocomplete="off" name="name">
+        </li>
+        <li class="fn-clear hdTime">
+            <div class="timeWrap fn-clear">
+               <span class="name"><label for="usedate">使用时间</label></span>
+               <div>
+                    <i class="arr"></i>
+                    <input mbsc-input type="text" value="{#if $id#}{#date('Y.m.d H:i',$detail_ktime)#}至{#date('Y.m.d H:i',$detail_etime)#}{#/if#}" id="usedate" placeholder="请选择" readonly>
+               </div> 
+            </div>  
+            <span class="time-tip">最长可提前60天创建，有效期不能超过60天</span>
+
+            <input type="hidden" name="ktime" id="startdate" value="{#if $detail_ktime#}{#date('Y-m-d H:i:s',$detail_ktime)#}{#/if#}">
+            <input type="hidden" name="etime" id="enddate" value="{#if $detail_etime#}{#date('Y-m-d H:i:s',$detail_etime)#}{#/if#}">
+        </li>
+        <li class="radiobox shiyong">
+            <p class="mrtit">适用范围</p>
+            <div class="radio" data-title="请选择">
+                <span data-id="0" {#if $detail_shoptype ==0#} class="curr"{#/if#}><i></i><em>全店通用</em></span>
+                <span data-id="1"{#if $detail_shoptype == 1#} class="curr"{#/if#}><i></i><em>指定商品</em></span>
+                <input type="hidden" name="shoptype" id="shoptype" value="{#$detail_shoptype#}">
+            </div>
+        </li>
+        <li class="choseGoodW {#if $detail_shoptype ==0#}fn-hide{#/if#}">
+            <p class="mrtit">商品范围</p>
+            <p class="goodsTip">一张商品券最多可选择100个指定商品。优惠券一旦创建，商品只能增加，不能删除</p>
+            <div class="goodWrap">
+                <ul class="goodlist"></ul>
+            </div>
+            <div class="chooseSp"><a href="javascript:;">选择可用商品</a></div>
+        </li>
+
+        <li class="radiobox yhtype">
+            <p class="mrtit">优惠方式</p>
+            <div class="radio" data-title="请选择">
+                <span data-id="0" {#if $detail_promotiotype ==0#} class="curr"{#/if#}><i></i><em>满减优惠</em></span>
+                <span data-id="1"{#if $detail_promotiotype == 1#} class="curr"{#/if#}><i></i><em>折扣优惠</em></span>
+                <input type="hidden" name="promotiotype" id="promotiotype" value="{#if $detail_promotiotype#}{#$detail_promotiotype#}{#else#}0{#/if#}">
+            </div>
+        </li>
+
+        <li class="fn-clear yhmoney {#if $detail_promotiotype == 1#}fn-hide{#/if#}">          
+            <span class="name"><label for="promotio">优惠金额</label></span>
+            <span class="fn-right un">{#echoCurrency type='short'#}</span>
+            <input type="number" name="promotio" value="{#if $detail_promotiotype ==0#}{#$detail_promotio#}{#/if#}" id="promotio" placeholder="" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">                                
+        </li>
+        <li class="yhzhe {#if !$detail_promotiotype|| $detail_promotiotype ==0#}fn-hide{#/if#}">   
+            <div class="pinTop fn-clear">       
+                <span class="name"><label for="promotio1">优惠折扣</label></span>
+                <span class="fn-right un">折</span>
+                <input type="number" value="{#if $detail_promotiotype == 1#}{#$detail_promotio#}{#/if#}" id="promotio1" placeholder="" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+            </div>
+            <span class="time-tip">最高9.99，最低可填0.01，数字越小折扣越大，请谨慎设置</span>                                
+        </li>
+        <li class="menkan">
+            <div class="pinTop fn-clear">
+                <span class="name"><label for="basic_price">使用门槛</label></span>
+                <div class="pintuanPrice">
+                    <span class="fn-right un">{#echoCurrency type='short'#}</span>
+                    <input type="number" name="basic_price" value="{#$detail_basic_price#}" id="basic_price" placeholder="" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+                </div>
+            </div> 
+            <span class="time-tip yhmoney {#if $detail_promotiotype == 1#}fn-hide{#/if#}">门槛需高于优惠金额，或无门槛可填写“0”</span>      
+            <span class="time-tip {#if !$detail_promotiotype|| $detail_promotiotype ==0#}fn-hide{#/if#} yhzhe">无门槛可填写“0”</span>
+        </li>
+
+
+    </ul>
+    <h3 class="quanTit">发放信息</h3>
+    <ul class="info info2">
+        <li class="fn-clear kucun">
+            <span class="name"><label for="number">发放量</label></span>
+            <span class="fn-right un">张</span>
+            <input type="number" name="number" value="{#$detail_number#}" id="number"  placeholder="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
+        </li>
+
+        <li class="fn-clear xianling">
+            <span class="name"><label for="quanlimit">每人限领</label></span>
+            <i class="arr"></i>
+            <input type="text" value="" id="quanlimitname"  placeholder="请选择" readonly>
+            <input type="hidden" name="limit" id="quanlimit" value="{#$detail_limit#}">
+        </li>
+    </ul>
+    <p class="yhTip">优惠券创建后，发放量只能增加不能减少，请谨慎设置</p>
+    </form>
+    <div class="fabu_btn"><a class="btn" href="javascript:;">{#if $id#}提交修改{#else#}立即添加{#/if#}</a></div>
+</div>
+<div class="commask"></div>
+
+
+<!-- 跳转弹窗 e-->
+<div class="pro_mask"></div>
+<div class="pro_box">
+    <div class="pro_tit">
+        <a href="javascript:;" class="pro_cancel">取消</a>
+        <h3>选择可用商品</h3>
+        <a href="javascript:;" class="pro_sure">确定</a>
+    </div>
+    <div class="search_box">
+        <form id="searchForm">
+            <s></s>
+            <div>
+              <input type="search" id="search_pro" placeholder=" 搜索商品" enterkeyhint="search">  
+            </div>
+              
+        </form>
+    </div>
+    <div class="error"></div>
+    <div class="proScrollBox">
+        <ul>
+           
+        </ul>
+    </div>
+</div>
+<!-- 加载页面效果 -->
+<div class="loadIcon"></div>
+<script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}'
+    };
+</script>
+<script src="//res.wx.qq.com/open/js/jweixin-1.3.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<!-- 选择时间-->
+<script type="text/javascript" src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fabuquan-shop.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

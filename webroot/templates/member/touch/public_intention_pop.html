@@ -1,0 +1,267 @@
+<link rel="stylesheet" href="{#$templets_skin#}css/public_intention_pop.css?v={#$cfg_staticVersion#}">
+<script>
+    var userid_  = '{#$userinfo.userid#}'
+    var identify = '{#$detail_identify#}'; //身份
+    var ordertype = 'refreshTop'
+    var memberDomain  = '{#$member_userDomain#}';
+    var cityid = '{#$siteCityInfo.cityid#}'; // 城市id
+    var noDeirectShow = {#$noDeirectShow|default:1#}; //1 没有设置过意向，直接弹窗 0表示不需要直接弹窗
+    var refreshFree = 0; //剩余刷新次数
+    var refreshFreeCount = 0; //免费刷新总次数
+    var refreshEnd = '{#$detail_refreshNext#}'
+</script>
+<div class="popContainer" id="popContainer" v-cloak>
+    <!-- 求职意向 -->
+    <!-- 当前简历的预览信息 -->
+    <div :class="['preview_mask mask_pop',{'showMask': previewPop}]" @click="previewPop = false"></div>
+    <div :class="['preview_pop pubPopBox',{'showPop':previewPop}]">
+        <div class="pop_head">
+            <h2>我的求职意向</h2>
+            <a href="javascript:;" class="close_pop" @click="previewPop = false"></a>
+        </div>
+        <div class="pop_con">
+            <ul class="selectUl">
+                <li @click="joinPopConfig = workStateConfig;joinStatePop = true">
+                    <label for="">求职状态</label>
+                    <span>{{reseumeDetail.workState_name ? reseumeDetail.workState_name : '去选择'}}</span>
+                </li>
+                <li @click="joinPopConfig = workTimeConfig;joinStatePop = true">
+                    <label for="">到岗时间</label>
+                    <span>{{reseumeDetail.startWork ? reseumeDetail.startWork_name : '去选择'}}</span>
+                </li>
+            </ul>
+            <ul class="postLikeUl">
+                <li v-for="(item,ind) in reseumeDetail.job_list_name" v-if="item && item.length > 0" @click="showPostChose(ind)" >
+                    <div class="left_info">
+                        <h4>{{item[item.length - 1]}}</h4>
+                        <p><template v-for="(jname,i) in item" v-if="(i<item.length - 1)">{{jname}} <em
+                                    v-if="i < (item.length - 2)">/</em></template> </p>
+                    </div>
+                    <div class="right_btn"><a href="javascript:;" ></a></div>
+                </li>
+
+            </ul>
+        </div>
+        <div class="pop_foot" v-show="reseumeDetail.job_list_name && reseumeDetail.job_list_name.length < 3">
+            <a href="javascript:;"  class="btn_blue" @click="showPostChose">添加意向工作</a>
+        </div>
+    </div>
+
+
+    <!-- 求职状态 -->
+    <div class="popbox">
+        <div :class="['state_mask mask_pop',{'showMask':joinStatePop}]" @click="joinStatePop = false;"></div>
+        <div :class="['state_pop',{'showPop':joinStatePop}]">
+            <h3>{{joinPopConfig.title}}</h3>
+            <div class="popCon">
+                <ul v-for="item in joinPopConfig.stateGroup">
+                    <li v-for="state in item"
+                        :class="{'on_chose':(reseumeDetail.workState == state.id && joinPopConfig.name == 'workState') || (reseumeDetail.startWork == state.id && joinPopConfig.name == 'startWork')}"
+                        @click="updateResume(joinPopConfig.name,state)">{{state.title}}</li>
+                </ul>
+                <ul v-if="joinPopConfig.btnCancel"></ul>
+            </div>
+            <div class="pop_foot" v-if="joinPopConfig.btnCancel">
+                <a href="javascript:;" class=" btn_cancel" @click="joinStatePop = false;">取消</a>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- 简历可见 -->
+    <div :class="['preview_mask mask_pop ',{'showMask':resumeShowPop}]" @click="resumeShowPop = false;"></div>
+    <div :class="['resumeShow_pop pubPopBox',{'showPop':resumeShowPop}] ">
+        <div class="pop_head">
+            <h2>能看到本人简历的招聘方范围</h2>
+            <a href="javascript:;" class="close_pop" @click="resumeShowPop = false;"></a>
+        </div>
+        <div class="pop_con">
+
+            <ul class="postLikeUl">
+                <li :class="{'on_chose':!resumeShow}" @click="resumeShow = 0">
+                    <div class="left_info">
+                        <h4>所有招聘方</h4>
+                        <p>所有招聘企业均可查看我的简历 </p>
+                    </div>
+                </li>
+                <li :class="{'on_chose':resumeShow}" @click="resumeShow = 1">
+                    <div class="left_info">
+                        <h4>仅对投递方可见</h4>
+                        <p>不会出现在公开简历库，仅主动投递后可查看我的简历</p>
+                    </div>
+                    <!-- <div class="right_btn"></div> -->
+                </li>
+            </ul>
+        </div>
+        <div class="pop_foot">
+            <a href="javascript:;" class="btn_blue" @click="updateResumePrivate">确定</a>
+        </div>
+    </div>
+
+
+    <!-- 选择意向职位 -->
+    <div :class="['intention_mask mask_pop', {'showMask':showPostPop}]" @click="showPostPop = false;"></div>
+    <div :class="['intention_pop pubPopBox', {'showPop':showPostPop}]">
+        <div class="headTit">
+            <h3>期望职位</h3>
+            <p>请选择职位，最多选3个{#$has_tip#}</p>
+            <a href="javascript:;" @click="showPostPop = false" class="close_pop"></a>
+        </div>
+        <div class="pop_con">
+            <div class="rootBox">
+                <ul class="categoryList_ul root_ul" v-if="postList">
+                    <li v-for="item in postList" @click="chosePostType(item)" :data-id="item.id"
+                        :class="[{'on_chose':item.id == currChoseType.id   || checkHasChosed(item.id,0) > -1},{'curr_chose':item.id == currChoseType.id }]">
+                        {{item.typename}}</li>
+                </ul>
+            </div>
+            <!-- showLeftPop -->
+            <div v-if="currChoseType && currChoseType.lower && currChoseType.lower.length "
+                :class="['parentContainer' ,{'showLeftPop':currChoseType && currChoseType.lower && currChoseType.lower.length && showLeftPop}]">
+                <div class="parent_mask" @click="showLeftPop = false" v-if="showLeftPop"></div>
+                <div :class="['parentBox',{'open':showRightPop}]">
+                    <div class="parentBoxS">
+                        <ul class="categoryList_ul parent_ul">
+                            <li v-for="item in currChoseType.lower"
+                                :data-id="item.id"
+                                :class="[{'on_chose':currChoseStype.id == item.id || checkHasChosed(item.id,1) > -1},{'curr_chose':currChoseStype.id && currChoseStype.id == item.id}]"
+                                @click="chosePostType(item,1)">{{item.typename}}</li>
+                        </ul>
+                    </div>
+                    <div :class="['childrenBox']"
+                        v-if="currChoseStype && currChoseStype.lower  && currChoseStype.lower.length">
+                        <ul class="categoryList_ul children_ul">
+                            <li v-for="(item ,ind) in currChoseStype.lower" :data-id="item.id"  @click="chosePostType(item,2)"
+                                :class="{'on_chose': checkHasChosed(item.id,2) > -1}">
+                                <h4>{{item.typename}}</h4>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="pop_foot">
+            <div class="hasChoseBox">
+                <div class="label">
+                    已选<span><b class="hasNum">{{choseTypeObj.length}}</b>/<b>3</b></span>
+                </div>
+                <div class="hasChose">
+                    <span v-for="(item,ind) in choseTypeObj">{{item.title}}<s
+                            @click="removeChose(item,ind,'post')"></s></span>
+                </div>
+            </div>
+            <div class="btn_groups">
+                <a href="javascript:;" class="clearAll btn" @click="clearAll('post')">清除</a>
+                <a href="javascript:;" class="sureBtn btn" @click="sureChose('post')">确定</a>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 刷新置顶弹窗 -->
+    <div :class="['refresh_mask',{'showPop':refreshPopShow}]" @click="refreshPopShow = false;"></div>
+    <div :class="['refresh_pop onfreshPop',{'showPop':refreshPopShow}]">
+        <div class="top_tit">
+            <h4><b>智能刷新</b><span>每6小时定时刷新，效果更显著！</span></h4>
+        </div>
+        <div class="popCon">
+            <div class="refresh_smart">
+                <div class="refreshBox" v-if="reseumeDetail.refreshNext && checkTime(reseumeDetail.refreshNext)"><span>智能刷新</span> 生效中：剩余{{reseumeDetail.refreshSurplus}}次，{{parseInt((reseumeDetail.refreshEnd - parseInt(new Date().valueOf() / 1000)) / 86400)}}天后结束 </div>
+                <ul v-if="refresh_tc">
+                    <li :class="{'on_chose':ind == ref_chose}" v-for="(item,ind) in refresh_tc"
+                        @click="ref_chose = ind">
+                        <div class="leftinfo" v-if="item.days">
+                            {{item.days}}天 {{item.fresh}}次 <span
+                                v-if="item.offer>0">省{{item.offer}}{#echoCurrency type="short"#}</span>
+                        </div>
+                        <div class="leftinfo" v-else>
+                            或立即刷新{{item.fresh}}次
+                        </div>
+                        <div class="price_show">{#echoCurrency type="symbol"#}<b>{{item.countPrice}}</b></div>
+                    </li>
+                    <li :class="['last',{'on_chose':ref_chose == refresh_tc.length}]" @click="ref_chose = refresh_tc.length ">
+                        <div class="leftinfo">
+                            或立即刷新1次
+                        </div>
+                        <div class="price_show">{#echoCurrency type="symbol"#}<b>{{normalRefreshPice}}</b></div>
+                    </li>
+                </ul>
+            </div>
+            <div class="btnBox">
+                <p v-if="refresh_tc && refresh_tc[ref_chose]">已选择{{refresh_tc[ref_chose].days}}天智能刷新套餐<span>稳定曝光</span></p> <a href="javascript:;"
+                    class="btn_top " @click="smartFresh">立即购买</a>
+            </div>
+        </div>		
+    </div>
+
+    <!-- 置顶弹窗 -->
+    <div :class="['refresh_mask' ,{'showPop':toTopPopShow}]"  @click="toTopPopShow = false;"></div>
+    <div :class="['refresh_pop totop_pop',{'showPop':toTopPopShow}]">
+        <div class="top_tit">
+            <h4><b>简历置顶</b><span>迅速提升曝光，获取更多机遇</span></h4>
+        </div>
+        <div class="popCon">
+            <div class="refresh_smart">
+                <div class="refreshBox" v-if="reseumeDetail.bid_end && checkTime(reseumeDetail.bid_end)"><span>置顶</span> 生效中：剩余<em>0</em> </div>
+                <ul>
+                    <li :class="{'on_chose':top_chose == ind}" v-for="(item,ind) in top_tc" @click="top_chose = ind">
+                        <div class="leftinfo">
+                            {{item.days}}天  <span v-if="item.offer && item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</span>
+                        </div>
+                        <div class="price_show">{#echoCurrency type="symbol"#}<b>{{item.countPrice}}</b></div>
+                    </li>
+                </ul>
+            </div>
+            <div class="btnBox" v-if="top_tc && top_tc[top_chose]"><p>已选择{{top_tc[top_chose].days}}天<span>置顶推广</span></p> <a href="javascript:;" class="btn_top " @click="mustTop">{{reseumeDetail.bid_end && checkTime(reseumeDetail.bid_end) ? '续费置顶' : '立即购买'}}</a></div>
+        </div>		
+    </div>
+
+    <div class="successPopMask" v-show="successPop.show"></div>
+    <div class="successPop" v-show="successPop.show">
+        <h4><s></s>{{successPop.tit}}</h4>
+        <p>{{successPop.tip}}</p>
+    </div>
+
+
+    <div class="refreshNow_mask" v-show="refreshNow"></div>
+    <div class="refreshNowPop" v-show="refreshNow">
+        <a href="javascript:;" class="close_pop" @click="refreshNow = false;"></a>
+        <div class="refreshCon">
+            <h4><b>智能刷新</b>生效中，仍要立即刷新简历吗？</h4>
+            <p>下次自动刷新时间：<span class="refreshNext">{{timeStrToDate(refreshNext)}}</span></p>
+            <a href="javascript:;" class="btn_refresh" @click="refreshResume();refreshNow = false ">立即刷新</a>
+        </div>
+    </div>
+
+</div>
+<form action="/include/ajax.php" method="get" id="refreshTopForm">
+    <input type="hidden" name="service" id="service" value="siteConfig">
+    <input type="hidden" name="action" id="action" value="refreshTop">
+    <input type="hidden" name="type" id="type" value="">
+    <input type="hidden" name="module" id="module" value="job">
+    <input type="hidden" name="act" id="act" value="resume">
+    <input type="hidden" name="paytype" id="paytype" value="{#$paytype#}">
+    <input type="hidden" name="aid" id="aid" value="" />
+    <input type="hidden" name="amount" id="amount" value="" />
+    <input type="hidden" name="useBalance" id="useBalance" value="" />
+    <input type="hidden" name="config" id="config" value="" />
+    <input type="hidden" name="tourl" id="tourl" value="{#$member_userDomain#}/index_job.html" />
+</form>
+<form action="/include/ajax.php" method="post" id="payform">
+    <input type="hidden" name="service" value="member">
+    <input type="hidden" name="action" value="fabuPay">
+    <input type="hidden" name="module" value="info">
+    <input type="hidden" name="type" value="">
+    <input type="hidden" name="paytype" value="">
+    <input type="hidden" name="aid" value="" />
+    <input type="hidden" name="amount" value="" />
+    <input type="hidden" name="useBalance" value="" />
+    <input type="hidden" name="tourl" value="" />
+    <input type="hidden" name="createtype" value="1" />
+    <input type="hidden" name="valid" value="" />
+    <input type="hidden" name="validType" value="0" />
+</form>
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+<script type="text/javascript" src="{#$templets_skin#}js/mcenter/public_intention_pop.js?v={#$cfg_staticVersion#}"></script>

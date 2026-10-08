@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu-paimai.css?v={#$cfg_staticVersion#}">
+
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <title>{#if $do#}编辑商品{#else#}发布商品{#/if#}</title>
+    <script>
+        var manageURl = '{#$member_busiDomain#}/manage-paimai.html';
+        var id = '{#$id#}';
+    </script>
+</head>
+<body>
+    {#if $do#}
+    {#$pageTitle = '编辑商品'#}
+    {#else#}
+    {#$pageTitle = '发布商品'#}
+    {#/if#}
+    
+    {#$pageRight = "<a href='javascript:;' class='notMenu'></a>"#}
+    {#include file="../../../siteConfig/touch_top.html"#} 
+    
+    <div class="fabuContainer" id="fabuContainer">
+        <van-form @submit="onSubmit">
+            
+            <van-field
+                v-model="formData.title"
+                name="title"
+                label="标题"
+                placeholder="商品标题"
+                rows="2"
+                autosize
+                type="textarea"
+                maxlength="50"
+                show-word-limit
+                :rules="[{ required: true, message: '请输入商品标题' }]"
+            ></van-field>
+
+            <van-cell class="group_title">商品主图</van-cell>
+            <van-cell>
+                <van-uploader v-model="litpicObj" :after-read="onReadLitpic" max-count="1" >
+                    <template #preview-cover="{ file }">
+                        <!-- <div class="preview-cover van-ellipsis" ></div> -->
+                    </template>
+                </van-uploader>
+            </van-cell>
+            <van-cell class="group_title">商品图集</van-cell>
+            <van-cell>
+                <van-uploader v-model="fileList" :after-read="onRead" multiple >
+                    <template #preview-cover="{ file }">
+                        <!-- <div class="preview-cover van-ellipsis" ></div> -->
+                    </template>
+                </van-uploader>
+            </van-cell>
+            <van-cell-group>
+                <van-cell class="group_title">基础配置</van-cell>
+                <van-field
+                    readonly
+                    clickable
+                    label="选择分类"
+                    :value="formData.typename"
+                    placeholder="请选择"
+                    @click="showPicker = true"
+                    :rules="[{ required: true, message: '请选择商品分类' }]"
+                    is-link
+                ></van-field>
+                <van-popup v-model="showPicker" round position="bottom" >
+                    <van-picker
+                      title="选择分类"
+                      show-toolbar
+                      :columns="typeList"
+                      children-key="lower"
+                      text-key="typename"
+                      :value="formData.ptype"
+                      @cancel="showPicker = false"
+                      @confirm="onConfirmType"
+                    />
+                  </van-popup> 
+                <van-field
+                    v-model="formData.maxnum"
+                    name="maxnum"
+                    label="最大拍卖数"
+                    type="number"
+                    placeholder="请输入最大拍卖数，默认为1"
+                ></van-field>
+                <van-cell class="flexWrap">
+                    <div class="van-cell__title van-field__label"> <span >交易类型</span></div>
+                    <van-radio-group class="jy_type" v-model="formData.jy_type"  direction="horizontal">
+                        <van-radio name="0">平台交易</van-radio>
+                        <van-radio name="1">线下交易</van-radio>
+                    </van-radio-group>
+                </van-cell>
+                
+                </van-cell-group>
+            <van-cell class="group_title">价格配置</van-cell>
+            <van-cell-group>
+                <van-field
+                    v-model="formData.start_money"
+                    name="start_money"
+                    label="起步价"
+                    placeholder="商品初始价格"
+                    :rules="[{ required: true, message: '请输入起步价' }]"
+                ></van-field>
+                <van-field
+                    v-model="formData.add_money"
+                    name="add_money"
+                    label="加价幅度"
+                    placeholder="请输入加价幅度"
+                    :rules="[{ required: true, message: '请输入加价幅度' }]"
+                ></van-field>
+                <van-field
+                    v-model="formData.amount"
+                    name="amount"
+                    label="保证金"
+                    placeholder="请输入保证金金额，不填则默认为0"
+                ></van-field>
+                <van-field
+                    v-model="formData.min_money"
+                    name="min_money"
+                    label="保留价"
+                    placeholder="拍品最低成交价，不填则默认为0"
+                ></van-field>
+            </van-cell-group>
+
+            <van-cell class="group_title">时间配置</van-cell>
+            <van-cell-group>
+                <van-field
+                    v-model="formData.add_interval"
+                    name="add_interval"
+                    label="延时周期"
+                    type="number"
+                    placeholder="请输入延时周期,单位：分钟"
+                    :rules="[{ required: true, message: '请输入延时周期' }]"
+                ></van-field>
+                <van-field
+                    v-model="formData.pay_limit"
+                    name="pay_limit"
+                    label="付款期限"
+                    placeholder="竞拍成功后付款时限，单位：小时"
+                    :rules="[{ required: true, message: '请输入付款期限' }]"
+                ></van-field>
+
+                <van-field
+                    readonly
+                    clickable
+                    label="拍卖开始时间"
+                    :value="transTime(formData.startdate)"
+                    placeholder="请选择"
+                    @click="showStarttime = true"
+                    :rules="[{ required: true, message: '请选择拍卖开始时间' }]"
+                    is-link
+                ></van-field>
+                <van-popup v-model="showStarttime" round position="bottom" >
+
+                    <van-datetime-picker
+                        v-model="startdate"
+                        type="datetime"
+                        title="选择开始时间"
+                        :min-date="minDate"
+                        :columns-order="['年', '月', '日', '时', '分']"
+                        :formatter="formatter"
+                        @confirm="onConfirmStarttime"
+                        @cancel="showStarttime = false"
+                        />
+                </van-popup>
+                <van-field
+                    readonly
+                    clickable
+                    label="拍卖结束时间"
+                    :value="transTime(formData.enddate)"
+                    placeholder="请选择"
+                    @click="showEndtime = true"
+                    :rules="[{ required: true, message: '请选择拍卖结束时间' }]"
+
+                    is-link
+                ></van-field>
+                <van-popup v-model="showEndtime" round position="bottom" >
+
+                    <van-datetime-picker
+                        v-model="enddate"
+                        type="datetime"
+                        title="选择结束时间"
+                        :columns-order="['年', '月', '日', '时', '分']"
+                        :formatter="formatter"
+                        :min-date="minDate2"
+                        @confirm="onConfirmEndtime"
+                        @cancel="showEndtime = false"
+                        />
+                </van-popup>
+            </van-cell-group>
+
+            
+
+                <!-- 图文 -->
+                <van-cell-group>
+                    <van-cell class="group_title">图文详情</van-cell>
+                    <van-cell>
+                        <div class="editCon" contenteditable="true" placeholder="请输入内容" v-html="formData.body"></div>
+                        <van-uploader :after-read="onReadBody" multiple class="upload_body" ></van-uploader>
+                    </van-cell>
+
+                </van-cell-group>
+
+            <!-- <van-calendar v-model="show" type="range" @confirm="onConfirm" @close="show = false" /> -->
+
+            <van-cell><van-button round block type="info" native-type="submit">提交</van-button></van-cell>
+        </van-form>
+    </div>
+
+<script src="{#$templets_skin#}js/fabu-paimai.js?v={#$cfg_staticVersion#}"></script>
+
+</body>
+</html>

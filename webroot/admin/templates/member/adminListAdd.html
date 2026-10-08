@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>添加管理员</title>
+{#$cssFile#}
+<script>
+var mtype = {#$mtype#}, mgroupid = {#$mgroupid#}, adminPath = "{#$adminPath#}",basehost = "{#$cfg_basehost#}",cityList  = {#json_encode($cityArr)#};
+</script>
+<style media="screen">
+  .purviews .item {margin-bottom: 15px; border-bottom: 1px dotted #ccc; padding-bottom: 15px;}
+  .purviews h3 {font-size: 14px; padding: 0; margin: 0;}
+  .purviews h3 a {font-size: 12px; font-weight: 500; margin-left: 5px;}
+  .purviews label {width: 170px; margin-right: 5px;}
+
+  /* .wx_openid{display: none;} */
+  .wx_btn{font-size: 14px;}
+</style>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="username">用户名：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="username" id="username" data-regex=".{1,20}" maxlength="20" value="{#$username#}" />
+      <span class="input-tips"><s></s>请输入用户名，1-20个字符。</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="password">密码：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="password" id="password" data-regex=".{8,50}" maxlength="50" value="" autocomplete="off" />
+      <a href="javascript:;" class="autoPassword" data-id="password" style="display: inline;">随机生成</a>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="nickname">真实姓名：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="nickname" id="nickname" data-regex=".{2,36}" maxlength="36" value="{#$nickname#}" />
+      <span class="input-tips"><s></s>请输入真实姓名，2-36个字符。</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="phone">手机号码：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="phone" id="phone" value="{#$phone#}" />
+      <span class="input-tips"><s></s>请输入手机号码。</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="expired">使用期限：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="expired" id="expired" value="{#$expired#}" />
+      <span class="input-tips" style="display: inline-block;"><s></s>不填表示永久使用。</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="expired">权限标签：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="discount" id="discount" value="{#$discount#}" />
+      <span class="input-tips" style="display: inline-block;"><s></s>主要给城市招聘模块使用，用于识别该管理员只管理某个模块，固定值为：<code>zhaopin</code></span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="mgroupid">管理员类型：</label></dt>
+    <dd class="radio">
+      {#html_radios name="mtype" values=$mtypeArr checked=$mtype output=$mtypeNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#if $userType != 3#}
+  <dl class="clearfix{#if $mtype == 3#} hide{#/if#}" id="mtype0">
+    <dt><label for="mgroupid">所属管理组：</label></dt>
+    <dd style="overflow: visible; padding-left: 140px;">
+      <select name="mgroupid" id="mgroupid" class="chosen-select">
+        <option value="">选择管理组</option>
+        {#foreach from=$groupList item=group#}
+        <option value="{#$group.id#}"{#if $mgroupid == $group.id#} selected{#/if#}>{#$group.groupname#}</option>
+        {#/foreach#}
+      </select>
+    </dd>
+  </dl>
+  {#/if#}
+  <dl class="clearfix{#if $mtype == 0 && $userType != 3#} hide{#/if#}" id="mtype5">
+    <dt><label for="alicard">支付宝账号：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="alicard" id="alicard" data-regex=".{2,36}" maxlength="36" value="{#$alicard#}" />
+      <span class="input-tips"><s></s>请输入支付宝账号</span>
+    </dd>
+  </dl>
+  {#if $dopost== 'edit'#}
+  <dl class="clearfix wx_openid" id="mtype5">
+    <dt><label for="openid">微信openid：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="openid" id="openid" readonly  data-regex=".{2,36}" maxlength="36" value="{#$openid#}" />
+	  <a href="javascript:;" class="wx_btn">点击授权</a>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>是否接收微信通知：</dt>
+    <dd class="radio">
+      {#html_radios name="notice" values=$noticeList checked=$notice output=$noticename separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#/if#}
+  <!-- <dl class="clearfix{#if $mtype == 0 && $userType != 3#} hide{#/if#}" id="mtype6">
+    <dt><label for="nickname">微信openid：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="wechat_openid" id="wechat_openid" data-regex=".{2,36}" maxlength="36" value="{#$wechat_openid#}" />
+      <span class="input-tips"><s></s>请输入微信openid</span>
+      <a href="{#$cfg_basehost#}/api/login.php?type=wechat&getopenid=1" title="获取微信openid" target="_blank" class="loginconnect">获取微信openid</a>
+    </dd>
+  </dl> -->
+  <dl class="clearfix{#if $mtype == 0 || $userType == 3#} hide{#/if#}" id="mtype3">
+    <dt><label for="mgroupid">管辖城市：</label></dt>
+    <dd style="overflow: visible; padding-left: 140px;">
+     <div class="choseCity"><input type="hidden" id="mcityid" name="mcityid" placeholder="请选择城市分站" value="{#$mgroupid#}"></div>
+    </dd>
+  </dl>
+  <dl class="clearfix{#if $mtype == 0 && $userType != 3#} hide{#/if#}" id="purviews">
+    <dt>管理权限：<br /><a href="javascript:;" id="selectAll" data-type="1">选择所有权限</a>&nbsp;&nbsp;&nbsp;</dt>
+    <dd class="purviews">
+      {#foreach from=$cityPurviews item=pur#}
+      <div class="item">
+      <h3>{#$pur.name#}<a href="javascript:;" data-type="1">全选</a></h3>
+      {#foreach from=$pur.list item=list#}
+      <label><input type="checkbox" name="purviews[]" value="{#$list.mark#}"{#if $list.mark|in_array:$purviews#} checked{#/if#} />{#$list.title#}</label>
+      {#/foreach#}
+    </div>
+      {#/foreach#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>状态：</dt>
+    <dd class="radio">
+      {#html_radios name="state" values=$stateList checked=$state output=$stateName separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+</form>
+
+{#$jsFile#}
+</body>
+</html>

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>发布页自定义</title>
+<link rel="stylesheet" href="/static/css/core/base.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="/static/css/ui/element_ui_index.css">
+<link rel="stylesheet" href="/static/css/admin/sitePcFabuPages.css?v={#$cfg_staticVersion#}">
+<script src="/static/js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="/static/js/common.js?v={#$cfg_staticVersion#}"></script>
+
+<script language="javascript" type="text/javascript">
+    var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}", adminPath = "{#$adminPath#}", modelType = action = "{#$action#}", cfg_staticVersion = '{#$cfg_staticVersion#}';
+
+    var infoArr = {#json_encode($infoarr)#}
+   var masterDomain = '{#$cfg_basehost#}';
+   var memberDomain = '{#$member_userDomain#}';
+   var fabu_post = '{#$masterDomain#}/supplier/job/add_post.html';
+   var fabu_tieba = '{#getUrlPath service='tieba' template='fabu'#}'
+   var fabu_huodong = '{#getUrlPath service='huodong' template='fabu'#}';
+   let carDomain = '{#getUrlPath service='car' template='sell'#}'
+   var optAction = false;
+   var headtitle = '{#json_encode($title)#}';
+   var sfcar_displayConfig = {#json_encode($sfcar_displayConfig)#};
+   headtitle = JSON.parse(headtitle)
+   window.onbeforeunload = function(){
+     if(optAction){
+       return ("还没有完成,确认退出吗?");
+     }
+   }
+</script>
+</head>
+
+<body>
+  <div class="pageBox w1200" id="page">
+    <div class="headBox">
+      <h3><a href="javascript:;" target="_blank" class="backHome"></a> <s class="line1"></s>电脑端发布设置</h3>
+      <div class="btnsGroup">
+        <a href="javascript:;" class="preview" @click="saveFabuCon(1)">预览</a>
+        <a href="javascript:;" class="save" @click="saveFabuCon()">保存</a>
+        <div class="success_tip"><s></s><p>保存成功</p></div>
+        <div class="error_tip"><s></s><p>请补全未完善信息！</p></div>
+       
+      </div>
+    </div>
+    <div :class="['containBox showPage',{'pageMask':platformDefault}]" >
+      <div class="mask_pageMask" @click="editPageTip"></div>
+      <div class="top">
+        {#include file="{#$HUONIAOROOT#}/templates/siteConfig/top1.html"#}
+      </div>
+      <div class="headerBox" >
+        <div class="header wrap " v-cloak >
+          <div class="logoBox" @click="initSort()">
+            <el-popover
+              placement="bottom-start"
+              :visible-arrow="false"
+              width="420"
+              popper-class="guidePop"
+              trigger="hover">
+              <div class="imgBox"><img src="/static/images/admin/fabuPage/guide_fabu.png" alt=""></div>
+              <div class="logo" slot="reference" >
+                <img src="{#if $cfg_weblogo#}{#$cfg_weblogo#}{#else#}{#$cfg_basehost#}/static/images/admin/2.0/logo.png{#/if#}"  alt="{#$cfg_shortname#}" />
+              </div>
+            </el-popover>
+            
+          </div>
+          <div class="stepBox">
+            <ul>  
+              <template v-for="(item,ind) in steps" :key="ind">
+                <li :class="{'on_chose': ind == 0}" @mouseover="changeTheme(1,ind);" @mouseleave="changeTheme(0)" :style="ind == 0 ? `color:${formData.themeColor}` : ''">
+                  <span :style="ind == 0 ? `background-color:${formData.themeColor}` : ''">{{ind + 1 }}</span>{{item}}
+                  <div class="pover" v-if="ind == 0" v-show="popOver.themeColor">
+                    <div class="color_picke" @click.stop="clickFn(popOver,'themeColor')">
+                      <el-color-picker popper-class="themeColorPicker colorPickerPop" :show-alpha="false" color-format="hex" @active-change="value => {activeChangeColor(value,formData,'themeColor')}" v-model="formData.themeColor" @change="val => colorPickerHide(val,'themeColorPicker')"></el-color-picker>
+                    </div>
+                    <div class="color_show">
+                      <div class="color_prev_l">
+                        <div class="preview" :style="`background-color:${formData.themeColor};`"></div>
+                        <div class="text">主题色 </div>
+                      </div>
+                      <s></s>
+                      
+                    </div>
+                  </div>
+                  <div class="line_after" v-if="ind == 0" :style="ind == 0 ? `background-color:${formData.themeColor}` : ''"></div>
+                </li>
+              </template>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="conBox" v-loading="loading" >
+        <div :class="['setBox',{'showSet':setColShow}]" :style="setColShow ? `height:${setConH}px;` : 'height:60px;'" v-cloak>
+          <div class="set_btn" v-show="!setColShow" @click="setColShow = true">设置<i></i></div>
+          <div class="set_pop" v-show="setColShow">
+            <div class="set_header">
+              <h4>发布页设置</h4>
+              <a href="javascript:;" class="close_btn" @click="setColShow = false" ></a>
+            </div>
+            <div class="set_con">
+              <ul class="tab_ul">
+                <li :class="['tab_li',{'on_chose':platformDefault == 1}]" @click="changeDefault(1)">默认设置</li>
+                <li :class="['tab_li',{'on_chose':platformDefault == 0}]" @click="changeDefault(0)" >自定义</li>
+              </ul>
+              <dl>
+                <dt><h4>选择模块</h4></dt>
+                <dd>
+                  <ul>
+                   
+                    <template v-for="mod in siteModule" :key="mod.code">
+                      <li v-if="mod.fabu" :class="[{'on_chose':currModule.code == mod.code}]" @click="choseMod(mod)">{{mod.name}}</li>
+                    </template>
+                  </ul>
+                </dd>
+              </dl>
+              <dl v-if="currModule && currModule.code">
+                <dt>
+                  <h4>发布项设置</h4>
+                  <a href="javascript:;" class="resetItem" @click="resetModule(currModule.code)">重置此项</a>
+                </dt>
+                <dd>
+                  <div class="item_set ">
+                    <label for="">显示开关：</label>
+                    <div class="radioBox">
+                      <!-- currModule.show = (ind == 0 ? 1 : 0) -->
+                      <div class="radio" v-for="(item,ind) in 2" :class="{'on_chose':currModule.show == (ind == 0 ? 1 : 0)}" @click="checkBtnShow(ind)"><span></span>{{ind == 1 ? '不' : ''}}显示</div>
+                    </div>
+                  </div>
+                  <div class="item_set" v-if="currModule.level">
+                    <label for="">二级分类：</label>
+                    <div :class="['radioBox',{'disabledRadio':currModule.level_disabeld}]" @click="showTip(currModule)">
+                      <!-- currModule.showLevel = (ind == 0 ? 1 : 0) -->
+                      <div class="radio" v-for="(item,ind) in 2" :class="[{'on_chose':currModule.showLevel == (ind == 0 ? 1 : 0)},{'disabled':currModule.level_disabeld}]" @click="changeLevelShow(ind)"><span></span>{{ind == 1 ? '不' : ''}}显示</div>
+                    </div>
+                  </div>
+                </dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+        <div class="conMid wrap" >
+          <div class="fabuListBox" v-cloak>
+            <dl :class="['fabu_dl fabu' + fblist.setStyle.marginStyle ,{'onEdit':currEditInd === ind && currEditLowerInd == null && currHoverLowerInd == null && !currEditTitle && !currEditIcon && !editText},{'onHover':currHoverInd === ind && !currHoverTitle && currHoverLowerInd == null && !currHoverIcon && !editText  && !editLink && isBlank(currEditInd)}]" v-for="(fblist,ind) in formData.fabuArr" :key="'fabu_' + fblist.id" @mouseover="dlHover(1,ind)" @mouseleave="dlHover(0,ind)" v-show="fblist.show == 1 || !fblist.code || (Array.isArray(fblist.code))" :data-id="ind">
+              <dt :class="['fbList_title',{'onHover':currHoverInd === ind && currHoverTitle  && (isBlank(currEditInd) || currHoverInd == currEditInd) && !editLink && !currEditLowerInd},{'onEdit':currEditInd === ind && currEditTitle}]" @mouseover="dtHover(1)" @mouseleave="dtHover(0)" >
+                <input type="text" v-show="currEditInd === ind && currEditTitle && editText" :style="`color:${fblist.setStyle.tStyle.color}; font-size:${fblist.setStyle.tStyle.fontSize}px;font-weight:${fblist.setStyle.tStyle.fontWeight ? 'bold':'normal'};`" @click.stop="" v-model="fblist.setStyle.name" class="h4 editInp "  :data-color="fblist.setStyle.tStyle.color">
+                <h4 class="h4" v-show="!(currEditInd === ind && currEditTitle && editText)"  @dblclick="toEditText('currEditTitle')" :style="`color:${fblist.setStyle.tStyle.color}; font-size:${fblist.setStyle.tStyle.fontSize}px;font-weight:${fblist.setStyle.tStyle.fontWeight ? 'bold':'normal'};`">{{fblist.setStyle.name ? fblist.setStyle.name : '请输入标题'}}</h4>
+                <div  class="pover" @click="editCurrModule('currEditTitle')" >
+                  <a :class="['edit_text',{'onEdit':editText && currHoverInd === ind && currHoverTitle }]" href="javascript:;" @click.stop="toEditText('currEditTitle')">编辑文本</a>
+                  
+                  <div class="inp" slot="reference" @mouseover="popOver.tStylePover = true" @mouseleave="popOver.tStylePover = false">
+                    <input v-model="fblist.setStyle.tStyle.fontSize" @focus="popOver.tStylePover = true" :focus="currEditInd === ind && currEditTitle && editText" type="text" class="fontSize" />
+                    <div class="popover fontPopver" v-show="popOver.tStylePover">
+                      <div class="fontArr">
+                        <ul>
+                          <li v-for="font in fontArr" :keu="'font' + ind" @click="fblist.setStyle.tStyle.fontSize = font;$set(formData.fabuArr,ind,fblist)">{{font}}px</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  <div :class="['fontBold',{'boldOn':fblist.setStyle.tStyle.fontWeight}]" @click="fblist.setStyle.tStyle.fontWeight = !fblist.setStyle.tStyle.fontWeight;$set(formData.fabuArr,ind,fblist)"></div>
+                  <div class="colorSet">
+                    <div class="color_picke" >
+                      <el-color-picker @change="val => colorPickerHide(val,'tStyleColorPicker',ind)" popper-class="tStyleColorPicker colorPickerPop" :show-alpha="false" color-format="hex" @active-change="value => {activeChangeColor(value,fblist.setStyle.tStyle,'color');$set(formData.fabuArr,ind,fblist) }" v-model="fblist.setStyle.tStyle.color"></el-color-picker>
+                    </div>
+                    <div class="color_show">
+                      <div class="preview" :style="`background-color:${fblist.setStyle.tStyle.color};`"></div>
+                    </div>
+                  </div>
+                </div>
+              </dt>
+              <dd class="fabu_btn" v-loading="loadInfo && fblist.code =='info'">
+                <ul class="fb_ul sortUl" :data-id="fblist.id" :data-ind="ind">
+                  <li v-for="(item,fb_ind) in fblist.setStyle.typeList" :class="['fb_li sort_li',{'onHover':currHoverInd === ind && currHoverLowerInd == fb_ind && !currHoverIcon  && isBlank(currEditInd)},{'onEdit':currEditInd === ind && currEditLowerInd == fb_ind && !currEditIcon && !currHoverIcon}]" :key="'btn_'+ fblist.id +'_'+ item.id" @mouseover="btnHover(1,fb_ind)" @mouseleave="btnHover(0)" v-show="item.show == 1 || !item.code" @click.stop="editLink = false;" :data-id="fb_ind">
+
+                    <a href="javascript:;" :class="['fb_btn']" :style="`background:${item.setStyle.bgColor};`">
+                      <div :class="['btn_icon',{'onEdit':currEditIcon && currEditInd === ind && currEditLowerInd == fb_ind },{'onHover':currHoverIcon && currHoverInd === ind && currHoverLowerInd == fb_ind && !currEditTitle}]" v-if="item.icon && fblist.setStyle.marginStyle != 1" @mouseleave="iconHover(0)" @mouseover="iconHover(1)" >
+                        <img :src="item.icon" alt="" @click="editCurrModule('currEditIcon'),uploadImg()">
+                        <div class="pover iconPover" @click.stop="editCurrModule('currEditIcon')">
+                          <div class="setCon">
+                            <div class="img_btn icon_btn" >
+                              <el-upload
+                                  :ref="'iconUp_' + ind + '_' + fb_ind"
+                                  class="icon-uploader"
+                                  action="/include/upload.inc.php"
+                                  name="Filedata"
+                                  accept="png,jpg,jpeg"
+                                  :data="{mod:'siteConfig',type:'atlas',filetype:'image'}"
+                                  :show-file-list="false"
+                                  :on-change="uploadBefore"
+                                  :on-success="iconUploadSuccess">
+                                </el-upload>
+                            </div>
+                            <div class="line"></div>
+                            <div class="delItem">
+                              <div class="del_btn icon_btn" @click.stop="delIcon(item)"></div>
+                            </div>
+                          </div>
+                          <svg height="36" width="70">
+                            <polygon points="0,0 0,36 70,0"
+                            style="fill:transparent;" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="flex_right"  @dblclick="toEditText('currEditLowerInd')">
+                        <div class="colorInpBox" @click.stop="" v-if="editText && currEditInd === ind && currEditLowerInd == fb_ind">
+                          <input type="text" @focus="inputFocus"  @input="inputChange" @blur="inputBlur"  :class="['typename editInp colorChangeInp',{'alignCenter':!item.icon || fblist.setStyle.marginStyle == 1}]"  :style="`color:${item.setStyle.color};`" v-model="item.typename"  :readonly="editText && currEditInd === ind && currEditLowerInd == fb_ind ? false : true"/>
+                          <input @focus="inputFocus"   @input="inputChange" @blur="inputBlur"  v-if="fblist.setStyle.marginStyle == 3" :style="`color:${item.setStyle.subColor};`" :class="['subname colorChangeInp editInp',{'alignCenter':!item.icon}]" type="text" v-model="item.subname"  :readonly="editText && currEditInd === ind && currEditLowerInd == fb_ind ? false : true"  />
+                        </div>
+                        <div class="colorDivBox" :style="`pointer-events:${editText && currEditInd === ind && currEditLowerInd == fb_ind ? 'none' : 'auto'};`">
+                          <div data-type="typename" :class="['typename editInp colorDiv ' ,{'placeholder':!item.typename },{'alignCenter':!item.icon || fblist.setStyle.marginStyle == 1}]" :style="`color:${item.setStyle.color};opacity:${( item.typename || (focusInp == 'typename' && inputData)) && editText && currEditInd === ind && currEditLowerInd == fb_ind ? 0 : ''}`" >{{item.typename ? item.typename : '发布项'}}</div>
+                          <div data-type="subname" v-if="fblist.setStyle.marginStyle == 3" :class="['subname colorDiv editInp',{'alignCenter':!item.icon} ,{'placeholder':!item.subname }]" :style="`color:${item.setStyle.subColor};opacity:${(item.subname || (focusInp == 'subname' &&  inputData)) && editText && currEditInd === ind && currEditLowerInd == fb_ind ? 0 : ''};}`" >{{item.subname ? item.subname : '按钮副标题'}}</div>
+                        </div>
+                        
+                      </div>
+                      <div class="pover"  @click.stop="editCurrModule('currEditLowerInd')">
+                        <div class="setCon">
+                          <div :class="['edit_text',{'onEdit':editText && currEditInd === ind && currEditLowerInd == fb_ind }]" @click="toEditText('currEditLowerInd');">编辑文本</div>
+                          <div class="setStyle">
+                            <el-tooltip class="item" effect="dark" content="更换图标" placement="top" transition="none">
+                              <div class="img_btn icon_btn" v-if="fblist.setStyle.marginStyle != 1">
+                                <el-upload
+                                  :ref="'iconUp_' + ind + '_' + fb_ind"
+                                  class="icon-uploader"
+                                  action="/include/upload.inc.php"
+                                  name="Filedata"
+                                  accept="png,jpg,jpeg"
+                                  :data="{mod:'siteConfig',type:'atlas',filetype:'image'}"
+                                  :show-file-list="false"
+                                  :on-change="uploadBefore"
+                                  :on-success="iconUploadSuccess">
+                                </el-upload>
+                              </div>
+                            </el-tooltip>
+                            <template v-if="!item.default && !item.code">
+                            
+                              <template >
+                                <!-- <el-popover
+                                  placement="top"
+                                  width="360"
+                                  :value="editLink && currEditInd === ind && currEditLowerInd == fb_ind"
+                                  :popper-class="'linkSetPop linkSet_' + currEditInd + '_' +fb_ind "
+                                  trigger="click">
+                                  <div class="linkSet">
+                                    <label for="">发布链接：</label>
+                                    <div class="el-input">
+                                      <i class="el-input__icon link_icon"></i>
+                                      <input type="text" placeholder="请设置链接" :focus="editLink" v-model="item.url" @input="linkChange" :readonly="!item.default && !item.code ? false : true">
+                                      <i class="el-input__icon del_icon" v-if="item.url" v-show="!item.default && !item.code" @click="item.url=''"></i>
+                                    </div>
+                                  </div>
+                                  <div slot="reference"  :class="['link_btn icon_btn tip_btn',{'disabledLink':item.default || item.code}]" @click="showLink">
+                                    <div class="toolTip" v-if="!editLink && !item.url">设置链接</div>
+                                  </div>
+                                </el-popover> -->
+                                <div slot="reference"  :class="['link_btn icon_btn tip_btn']" @mouseover="linkHover(1,item)" @mouseleave="linkHover(0,item)"  @click="showLink">
+                                  <div :class="['linkSetPop',{'show':(editLink || (linkOn )) && (currEditInd === ind && currEditLowerInd == fb_ind || currHoverInd === ind && currHoverLowerInd == fb_ind)}]"  @click.stop="">
+                                    <div class="linkSet">
+                                      <label for="">发布链接：</label>
+                                      <div class="el-input">
+                                        <i class="el-input__icon link_icon"></i>
+                                        <input type="text" placeholder="请设置链接" v-model="item.url" @focus="linkInpFocus" @input="linkChange" :readonly="!item.default && !item.code ? false : true">
+                                        <i class="el-input__icon del_icon" v-if="item.url" v-show="!item.default && !item.code" @click="item.url=''"></i>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <!-- <div :class="['toolTip',{'show':linkOn  && !editLink}]" v-if="!editLink && item.url">设置链接</div> -->
+                                </div>
+                              </template>
+
+                            </template>
+                            <template v-else>
+                              
+                              <div slot="reference" @click.stop="" :class="['link_btn icon_btn',{'disabledLink':item.default || item.code}]">
+                                <div class="linkSetPop">
+                                  <div class="linkSet">
+                                    <label for="">发布链接：</label>
+                                    <div class="el-input">
+                                      <i class="el-input__icon link_icon"></i>
+                                      <input type="text" placeholder="请设置链接" v-model="item.link_title" @input="linkChange" :readonly="!item.default && !item.code ? false : true">
+                                      <i class="el-input__icon del_icon" v-if="item.url" v-show="!item.default && !item.code"></i>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </template>
+                            <div class="colorSet">
+                              <div class="colorShow">
+                                <div class="selectText">
+                                  <ul>
+                                    <li class="preview" :style="`background-color:${item.setStyle.color};`"></li>
+                                    <li class="preview" :style="`background-color:${item.setStyle.subColor};`" v-if="fblist.setStyle.marginStyle == 3"></li>
+                                    <li class="preview" :style="`background-color:${item.setStyle.bgColor};`"></li>
+                                  </ul>
+                                </div>
+                                <div :class="['selectPover',{'show':(popOver.styleColorPicker || popOver.styleBgColorPicker || popOver.styleSubColorPicker) }]">
+                                  <ul>
+                                    <li :class="['color_li',{'on_chose': popOver.styleColorPicker}]">
+                                      <div class="color_picke" @click.stop="clickFn(popOver,'styleColor',2)">
+                                        <el-color-picker popper-class="styleColorPicker colorPickerPop" :show-alpha="false" color-format="hex" @change="val => colorPickerHide(val,'styleColorPicker',ind,fb_ind)" @active-change="value => {activeChangeColor(value,item.setStyle,'color',fblist);$set(formData.fabuArr,ind,fblist) }" v-model="item.setStyle.color"></el-color-picker>
+                                      </div>
+                                      <div class="color_show">
+                                        <div class="preview" :style="`background-color:${item.setStyle.color};`"></div>
+                                        <div class="text">文本</div>
+                                      </div>
+                                    </li>
+                                    <li :class="['color_li',{'on_chose': popOver.styleSubColorPicker}]" v-if="fblist.setStyle.marginStyle == 3">
+                                      <div class="color_picke" @click.stop="clickFn(popOver,'styleSubColor',2)">
+                                        <el-color-picker popper-class="styleSubColorPicker colorPickerPop" :show-alpha="false" @change="val => colorPickerHide(val,'styleSubColorPicker',ind,fb_ind)"  color-format="hex" @active-change="value => {activeChangeColor(value,item.setStyle,'subColor',fblist);$set(formData.fabuArr,ind,fblist) }" v-model="item.setStyle.subColor"></el-color-picker>
+                                      </div>
+                                      <div class="color_show">
+                                        <div class="preview" :style="`background-color:${item.setStyle.subColor};`"></div>
+                                        <div class="text">副文本</div>
+                                      </div>
+                                    </li>
+                                    <li :class="['color_li',{'on_chose': popOver.styleBgColorPicker}]">
+                                      <div class="color_picke" @click.stop="clickFn(popOver,'styleBgColor',2)" >
+                                        <el-color-picker popper-class="styleBgColorPicker colorPickerPop" @change="val => colorPickerHide(val,'styleBgColorPicker',ind,fb_ind)"  :show-alpha="false" color-format="hex" @active-change="value => {activeChangeColor(value,item.setStyle,'bgColor',fblist);$set(formData.fabuArr,ind,fblist) }" v-model="item.setStyle.bgColor"></el-color-picker>
+                                      </div>
+                                      <div class="color_show">
+                                        <div class="preview" :style="`background-color:${item.setStyle.bgColor};`"></div>
+                                        <div class="text">按钮 </div>
+                                      </div>
+                                    </li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="delItem">
+                            <div class="del_btn tip_btn" @click.stop="delItem(fb_ind,'currEditLowerInd')">
+                              <div class="toolTip">删除此项</div>
+                            </div>
+                            <!-- <el-tooltip class="item" effect="dark" content="删除此项" placement="top" transition="none" >
+                            </el-tooltip> -->
+                            
+                          </div>
+                        </div>
+                        <svg v-if="fblist.setStyle.marginStyle == 1"  height="34" width="164">
+                          <polygon points="0,0 0,34 164,0"
+                          style="fill:transparent;" />
+                        </svg>
+                        <svg v-if=" fblist.setStyle.marginStyle == 2" height="50" width="76">
+                          <polygon points="0,0 0,50 76,0"
+                          style="fill:transparent;" />
+                        </svg>
+                      </div>
+                    </a>
+                  </li>
+                  <li :class="['fb_li add_btn',{'onHover':currHoverInd === ind && currHoverLowerInd == fblist.setStyle.typeList.length && !currHoverIcon && !editLink},{'onEdit':currEditInd === ind && currEditLowerInd == fblist.setStyle.typeList.length && !currEditIcon}]" @mouseover="btnHover(1,fblist.setStyle.typeList.length)" @mouseleave="btnHover(0)" @click.stop="addBtn(ind)">
+                    <a href="javascript:;" class="fb_btn">
+                      <i class="el-icon-plus"></i>
+                    </a>
+                  </li>
+                </ul>
+              </dd>
+              <dd class="pover" @click="editCurrModule('currEditInd')">
+                <div class="setCon">
+                  <div class="setMargin">
+                    <div class="selectText">{{fblist.setStyle.marginStyle == 1 ? '密集' : (fblist.setStyle.marginStyle == 2 ? '中等' : '疏松')}}间距</div>
+                    <div class="selectPover">
+                      <ul>
+                        <!-- fblist.setStyle.marginStyle = margin -->
+                        <li v-for="margin in 3" :class="{'on_chose':fblist.setStyle.marginStyle == margin}" @click="changeMargin(margin,fblist)">{{margin == 1 ? '密集' : (margin == 2 ? '中等' : '疏松')}}</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="setStyle">
+                    <div class="colorSet">
+                      <div class="colorShow">
+                        <div class="selectText">
+                          <ul>
+                            <li class="preview" :style="`background-color:${fblist.setStyle.style.color};`"></li>
+                            <li class="preview" :style="`background-color:${fblist.setStyle.style.subColor};`" v-if="fblist.setStyle.marginStyle == 3"></li>
+                            <li class="preview" :style="`background-color:${fblist.setStyle.style.bgColor};`"></li>
+                          </ul>
+                        </div>
+                        <div :class="['selectPover',{'show':(popOver.styleColorPicker || popOver.styleBgColorPicker || popOver.styleSubColorPicker) }]">
+                          <ul>
+                            <li :class="['color_li',{'on_chose': popOver.styleColorPicker}]">
+                              <div class="color_picke" @click.stop="clickFn(popOver,'styleColor',1)">
+                                <el-color-picker popper-class="styleColorPicker colorPickerPop" :show-alpha="false" color-format="hex" @change="val => colorPickerHide(val,'styleColorPicker',ind)" @active-change="value => {changAllItem(value,fblist.setStyle,'color');$set(formData.fabuArr,ind,fblist) }" v-model="fblist.setStyle.style.color"></el-color-picker>
+                              </div>
+                              <div class="color_show">
+                                <div class="preview" :style="`background-color:${fblist.setStyle.style.color};`"></div>
+                                <div class="text">文本 </div>
+                              </div>
+                            </li>
+                            <li :class="['color_li',{'on_chose': popOver.styleSubColorPicker}]" v-if="fblist.setStyle.marginStyle == 3">
+                              <div class="color_picke" @click.stop="clickFn(popOver,'styleSubColor',1)">
+                                <el-color-picker popper-class="styleSubColorPicker colorPickerPop" :show-alpha="false" color-format="hex" @change="val => colorPickerHide(val,'styleSubColorPicker',ind)" @active-change="value => {changAllItem(value,fblist.setStyle,'subColor');$set(formData.fabuArr,ind,fblist) }" v-model="fblist.setStyle.style.subColor"></el-color-picker>
+                              </div>
+                              <div class="color_show">
+                                <div class="preview" :style="`background-color:${fblist.setStyle.style.subColor};`"></div>
+                                <div class="text">副文本</div>
+                              </div>
+                            </li>
+                            <li :class="['color_li',{'on_chose': popOver.styleBgColorPicker}]">
+                              <div class="color_picke" @click.stop="clickFn(popOver,'styleBgColor',1)">
+                                <el-color-picker popper-class="styleBgColorPicker colorPickerPop" :show-alpha="false" color-format="hex" @change="val => colorPickerHide(val,'styleBgColorPicker',ind)" @active-change="value => {changAllItem(value,fblist.setStyle,'bgColor');$set(formData.fabuArr,ind,fblist) }" v-model="fblist.setStyle.style.bgColor"></el-color-picker>
+                              </div>
+                              <div class="color_show">
+                                <div class="preview" :style="`background-color:${fblist.setStyle.style.bgColor};`"></div>
+                                <div class="text">按钮 </div>
+                              </div>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- <el-tooltip class="item" effect="dark" content="复制组" placement="top" transition="none">
+                    </el-tooltip> -->
+                    <div class="copy_btn icon_btn tip_btn"  @click.stop="copyGroup(fblist)"><div class="toolTip">复制组</div></div>
+                    <div class="reset_btn icon_btn tip_btn" title="重置组" @click.stop="resetGroup(fblist)"><div class="toolTip">重置组</div></div>
+                    <!-- <el-tooltip class="item" effect="dark" content="重置组" placement="top" transition="none">
+                    </el-tooltip> -->
+                    
+                    
+                  </div>
+                  <div class="delItem">
+                    <!-- <el-tooltip class="item" effect="dark" content="删除此项" placement="top" transition="none">
+                    </el-tooltip> -->
+
+                      <div class="del_btn tip_btn" @click.stop="delItem(ind,'currEditInd')"><div class="toolTip">删除此项</div></div>
+                  </div>
+                </div>
+                
+              </dd>
+            </dl>
+            <div class="add_group" @click="addGroup"><i class="el-icon-plus"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="changeLayout" data-val="1"><s></s><p>已切换至默认布局，如需设置生效请及时保存</p></div>
+    <div class="changeLayout" data-val="2"><s></s><p>已切换至自定义发布设置，修改后请及时保存</p></div>
+  </div>
+  <!-- 底部 s -->
+<div class="footer-login">
+	<p>
+		{#loop service="siteConfig" action="singel"#}
+		<a href="{#getUrlPath service='siteConfig' template='about' id={#$row.id#}#}">{#$row.title#}</a><span class="pice">|</span>
+		{#/loop#}
+		<a href="{#getUrlPath service='siteConfig' template='help'#}">{#$langData['siteConfig'][19][273]#}</a>    {#* 帮助中心 *#}
+		<span class="pice">|</span>
+		<a href="{#getUrlPath service='siteConfig' template='feedback'#}">{#$langData['siteConfig'][16][171]#}</a>    {#* 意见反馈 *#}
+	</p>
+	{#$cfg_powerby#}
+</div>
+<!-- 底部 e -->
+</body>
+<script src="/static/js/vue/vue.min.js"></script>
+<script src="/static/js/ui/element_ui_index.js"></script>
+<script src="/static/js/ui/Sortable.js"></script>
+<!-- <script src="/static/js/ui/ewPlugins.min.js?v={#$cfg_staticVersion#}"></script> -->
+<script src="/static/js/admin/sitePcFabuPages.js?v={#$cfg_staticVersion#}"></script>
+</html>

@@ -1,0 +1,201 @@
+
+<!-- <div class="dsMask" v-show="ds_inp" @click="ds_inp = false;"></div> -->
+<style type="text/css">
+  [v-cloak]{display: none !important;}
+</style>
+<div :class="['ds_keyboard',{'toTop':ds_inp}]" v-cloak>
+  <ul>
+    <li @touchstart="numIn" v-for="i in 9" :data-id="i">{{i}}</li>
+
+    <li @touchstart="numIn" v-if="noDot" data-id="0" style="width:5.26rem;">0</li>
+    <li @touchstart="numIn" v-if="!noDot" data-id="0" class="ds_wmore">0</li>
+    <li @touchstart="numIn" v-if="!noDot" data-id=".">.</li>
+  </ul>
+  <div class="rightDs_btns">
+    <a href="javascript:;" class="ds_delNum" @touchstart="ds_delNum"></a>
+    <a href="javascript:;" :class="['ds_sure publicpaybtn' ,{'noClick': Number(dsNum)==0 || dsNum=='.'}]" @click="payPop">确定</a>
+  </div>
+</div>
+
+
+<script type="text/javascript">
+  var slfBox = new Vue({
+    el:"#selfNumBox",
+    data:{
+      ds_inp:false,
+      dsNum:'',
+      noDot:false,
+      ds_num_in:[],
+      currInd:'0', //当前所在inp
+    },
+    created(){
+      var tt = this;
+      if(typeof(maidan)!='undefined'){ //买单
+
+        tt.ds_inp = true
+      }
+    },
+    mounted(){
+      var tt = this;
+      if(typeof(type)!='undefined' && type==''){
+        this.noDot = true;
+      }
+
+      $("body").off('click').click(function(e) {
+         if(e.isTrusted){
+          
+          if($(e.target).closest('.ds_keyboard').length < 1 && $(e.target).closest('#selfNumBox').length <1){
+            tt.ds_inp = false;
+          }
+
+          if($(e.target).closest('.mainUl').length >=1){
+            tt.dsNum = '';
+            tt.ds_num_in = [];
+          }
+         }
+    
+      });
+
+
+    },
+    methods:{
+      numIn:function(e){
+        var tt = this;
+        var el = event.currentTarget;
+        var num = $(el).attr('data-id');
+        if(tt.ds_num_in.indexOf('.') <= -1 || num != '.'){
+          tt.ds_num_in.push(num);
+        }
+        e.stopPropagation()
+      },
+      checkInp:function(ind){
+        var tt = this;
+        tt.ds_inp = true;
+        tt.currInd = ind.toString();
+        // console.log(tt.ds_inp,tt.currInd)
+        setTimeout(function(){
+          tt.ds_num_in = $(".currInd").val().split('')
+        },500)
+      },
+      // 删除输入的数字
+      ds_delNum:function() {
+        var tt = this;
+        tt.ds_num_in.pop();
+      },
+
+      payPop:function() {
+        this.ds_inp = false;
+        if(typeof(type)!='undefined'){ //积分充值
+          $(".btn_pay").click();
+
+          //防止重复点击
+          if($(".btn_pay").size() == 0){
+            $('#tj').click();
+          }
+        }
+        if(typeof(maidan)!='undefined'){ //买单
+          // 支付
+            var price = getTotalMoney();
+
+            if($("#all_money_show").val()==''){
+              showErr('请输入总金额');
+              return false;
+            }
+            $.ajax({
+              url: '/include/ajax.php?service=business&action=maidanDeal',
+              type: 'post',
+              data: {
+                store  :  shopid,
+                amount :  price.amount,
+                amount_alone : price.amount_alone
+              },
+              dataType: 'json',
+              success: function(data){
+                if(data && data.state == 100) {
+                  if (typeof (data.info) == 'object') {
+                    sinfo = data.info;
+                    service = 'business';
+                    $('#ordernum').val(sinfo.ordernum);
+                    $('#action').val('pay');
+
+                    $('#pfinal').val('1');
+                    $("#amout").text(sinfo.order_amount);
+                    $('.payMask').show();
+                    $('.payPop').css('transform', 'translateY(0)');
+
+                    if (totalBalance * 1 < sinfo.order_amount * 1) {
+
+                      $("#moneyinfo").text('余额不足，');
+
+                      $('#balance').hide();
+                    }
+
+                    ordernum = sinfo.ordernum;
+                    order_amount = sinfo.order_amount;
+                    orderurl = sinfo.orderurl;
+
+                    payCutDown('', sinfo.timeout, sinfo);
+                  } else {
+
+                    if (data && data.state == 100) {
+                      location.href = payUrl.replace('%ordernum%', data.info);
+                    } else {
+                      alert(data.info);
+                    }
+                  }
+                }
+
+              },
+              error: function(){
+                alert(langData['siteConfig'][20][183]);
+              }
+            })
+        }
+      }
+    },
+    watch:{
+      ds_num_in:function() {
+        var tt = this;
+        tt.dsNum = tt.ds_num_in.join('');
+        if(tt.dsNum.toString().split('.').length > 1 && tt.dsNum.toString().split('.')[1].length>2){
+          tt.ds_num_in.pop();
+        }
+        if(tt.dsNum.split('.')[0].length > 1 && tt.dsNum.split('.')[0] == 0){
+          tt.ds_num_in.pop();
+        }
+      },
+      dsNum:function() {
+        var tt =this;
+
+        if(typeof(maidan)!='undefined'){ //买单
+          // $("#all_money_show").val(tt.dsNum)
+          $(".currInd").val(tt.dsNum)
+          getTotalMoney()
+        }
+        
+        if(tt.dsNum == '') return false;
+        pointNum = Number(tt.dsNum);
+        if(typeof(type)!='undefined'){ //积分充值
+          jsPrice()
+        }
+        
+
+
+      },
+      ds_inp:function() {
+        var tt = this;
+        if(tt.ds_inp){
+          $("body").css({
+            'padding-bottom':'2.5rem'
+          })
+          $(window).scrollTop($("body").height());
+          $(".mainUl li").removeClass('active')
+        }else{
+          $("body").css({
+            'padding-bottom':'0'
+          })
+        }
+      }
+    }
+  })
+</script>

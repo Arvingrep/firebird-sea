@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var print_config = "{#if count($printret) ==0 #}1{#else#}{#count($printret)#}{#/if#}";
+var sid = "{#$id#}";
+var atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 0;  //图集配置
+var imglist = {"imgpics": {#$pics#}, "certify": {#$certify#}, "banner": {#$banner#}, "quality": {#$quality#}}, mapCity = "{#$cfg_mapCity#}",
+  typeid = {#$typeid#}, addrid = {#$addrid#}, typeListArr = {#$typeListArr#}, addrListArr = {#$addrListArr#}, action = '{#$action#}', modelType = '{#$action#}', adminPath = "{#$adminPath#}";
+  var service = 'business';
+</script>
+<style>
+  .editform dt {width: 160px;}
+  #videoPreview video {width:200px;}
+  #bannerBox .list-holder li {width: 115px !important;height: 86px;}
+  #bannerBox .list-holder li .li-thumb {margin: -5px 0 0 0 !important;}
+  #bannerBox .list-holder li a.li-rm {margin: -17px -14px 0 0 !important;}
+  .ui-datepicker {background: #fff; z-index: 9999!important;}
+  </style>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="company">管理会员：</label></dt>
+    <dd style="position:static;">
+      <input class="input-large" type="text" name="username" id="username" value="{#$username#}" autocomplete="off" />
+      <input type="hidden" name="uid" id="uid" value="{#$uid#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>此会员可以管理商家信息</span>
+      <div id="companyList" class="popup_key"></div>
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label>入驻类型：</label></dt>
+    <dd class="radio">
+    <label><input type="radio" name="type" value="-1"{#if $type == -1#} checked="checked"{#/if#}>自选套餐</label>&nbsp;&nbsp;
+    {#foreach from=$businessJoinConfig['package'] item=config key=index#}
+      <label><input type="radio" name="type" value="{#$index#}"{#if $type == $index && $type != ''#} checked="checked"{#/if#}>{#$config.title#}({#$config.price#}/月)</label>&nbsp;&nbsp;
+    {#/foreach#}
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label>过期时间</label><input type="hidden" name="level" id="level" value="{#$level#}" /></dt>
+    <dd class="radio" style="overflow: inherit; padding-left: 140px;">
+      <div class="input-prepend" style="margin-left:5px; margin-bottom: 0;">
+        <input class="input-medium" type="text" name="expired" id="expired" autocomplete="off" value="{#if $expired#}{#$expired|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}">
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>权限设置：</label></dt>
+    <dd class="radio package" style="padding-bottom: 15px;">
+    <div class="fn-clear">
+      <label style="display: block; margin-bottom: 10px;"><strong>商家特权：</strong></label>
+        {#foreach from=$businessJoinConfig['privilege'] item=config key=index#}
+      <div style="float: left; margin: 0 30px 8px 0;">
+        <label style="width: 180px; margin-right: 0;"><input style="margin-bottom: 5px;" type="checkbox" name="package[]" value="{#$index#}"{#if in_array($index, $packageName)#} checked="checked"{#/if#}>{#$config.title#}({#$config.price#}元/{#if $business_joinTimesUnit#}年{#else#}月{#/if#})</label>&nbsp;<input type="text" autocomplete="off" style="padding: 1px 6px;" name="datetime[]" class="input-medium datetime" placeholder="过期时间"{#if in_array($index, $packageName)#} value="{#$packageExpired[$index]#}"{#else#} disabled{#/if#} />
+      </div>
+        {#/foreach#}
+    </div>
+
+    <div class="fn-clear">
+      <label style="display: block; margin-bottom: 10px;"><strong>行业特权：</strong></label>
+        {#foreach from=$businessJoinConfig['store'] item=config key=index#}
+      <div style="float: left; margin: 0 30px 8px 0;">
+        <label style="width: 180px; margin-right: 0;"><input style="margin-bottom: 5px;" type="checkbox" name="package[]" value="{#$index#}"{#if in_array($index, $packageName)#} checked="checked"{#/if#}>{#$config.title#}({#$config.price#}元/{#if $business_joinTimesUnit#}年{#else#}月{#/if#})</label>&nbsp;<input type="text" autocomplete="off" style="padding: 1px 6px;" name="datetime[]" class="input-medium datetime" placeholder="过期时间"{#if in_array($index, $packageName)#} value="{#$packageExpired[$index]#}"{#else#} disabled{#/if#} />
+      </div>
+        {#/foreach#}
+    </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="title">店铺名称：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="title" id="title" data-regex=".{1,200}" maxlength="200" value="{#$title#}" />
+      <span class="input-tips"><s></s>请输入店铺名称。</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>店铺LOGO：</dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $logo != ""#} hide{#/if#}" id="filePicker1" data-type="logo"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $logo != ""#}
+      <ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='/include/attachment.php?f={#$logo#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$logo#}" data-val="{#$logo#}" data-url="/include/attachment.php?f={#$logo#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection1" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="logo" value="{#$logo#}" class="imglist-hidden" id="logo">
+    </dd>
+  </dl>
+
+
+  <dl class="clearfix">
+    <dt><label for="typeid">经营品类：</label></dt>
+    <dd>
+      <span id="typeList">
+        <select name="typeid" id="typeid" class="input-large"></select>
+      </span>
+      <span class="input-tips"><s></s>请选择经营品类</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="addrid">所属地区：</label></dt>
+    <dd>
+      <div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id="{#$addrid#}">{#if $addrid != ""#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}</div>
+      <input type="hidden" name="addrid" id="addrid" value="{#$addrid#}" />
+    <input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+      <span class="input-tips"><s></s>请选择所属地区</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="address">详细地址：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" maxlength="60" data-regex=".{2,60}" />
+      <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+      <span class="input-tips"><s></s>请输入详细地址，2-60位</span>
+      <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+      <dt>地图截图：</dt>
+      <dd class="thumb clearfix listImgBox">
+        <div class="uploadinp filePicker thumbtn{#if $mappic != ""#} hide{#/if#}" id="filePicker11" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+        {#if $mappic != ""#}
+        <ul id="listSection11" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_11_1"><a href='{#$mappic#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$mappic#}" data-val="{#$mappic#}" data-url="/include/attachment.php?f={#$mappic#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+        {#else#}
+        <ul id="listSection11" class="listSection thumblist clearfix"></ul>
+        {#/if#}
+        <input type="hidden" name="mappic" value="{#$mappic#}" class="imglist-hidden" id="mappic">
+      </dd>
+    </dl>
+  <dl class="clearfix hide">
+    <dt><label for="name">法人姓名：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="name" id="name" maxlength="50" value="{#$name#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label for="cardnum">身份证号码：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="cardnum" id="cardnum" maxlength="18" value="{#$cardnum#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label for="phone">手机号码：</label><input type="hidden" name="areaCode" id="areaCode" value="{#$areaCode#}" /></dt>
+    <dd style="overflow: inherit; padding-left: 160px;" id="phoneArea">
+      <button type="button" class="btn dropdown-toggle" data-toggle="dropdown">{#if $areaCode#}+{#$areaCode#}{#else#}区号{#/if#}<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left: 140px; max-height: 300px; overflow-y: auto;">
+        {#foreach from=$internationalPhoneCode item=p#}
+              <li><a href="javascript:;" data-id="+{#$p.code#}">{#$p.name#}&nbsp;&nbsp;+{#$p.code#}</a></li>
+              {#/foreach#}
+      </ul>
+      <input class="input-medium" type="text" name="phone" id="phone"  maxlength="60" value="{#$phone#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="email">邮箱地址：</label></dt>
+    <dd><input class="input-large" type="text" name="email" id="email" value="{#$email#}" /></dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label for="company">公司名称：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="company" id="company" maxlength="100" value="{#$company#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label for="licensenum">营业执照号码：</label></dt>
+    <dd><input class="input-large" type="text" name="licensenum" id="licensenum" value="{#$licensenum#}" /></dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label for="wechatname">微信名称：</label></dt>
+    <dd><input class="input-large" type="text" name="wechatname" id="wechatname" value="{#$wechatname#}" /></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="wechatcode">微信号：</label></dt>
+    <dd><input class="input-large" type="text" name="wechatcode" id="wechatcode" value="{#$wechatcode#}" /></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>微信二维码：</label></dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $wechatqr != ""#} hide{#/if#}" id="filePicker14" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $wechatqr != ""#}
+      <ul id="listSection14" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_14_1"><a href='/include/attachment.php?f={#$wechatqr#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$wechatqr#}" data-val="{#$wechatqr#}" data-url="/include/attachment.php?f={#$wechatqr#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection14" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="wechatqr" value="{#$wechatqr#}" class="imglist-hidden" id="wechatqr">
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="people">联系人：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="people" id="people" maxlength="50" value="{#$people#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="tel">联系电话：</label></dt>
+    <dd><input type="text" class="input-large" id="tel" name="tel" value="{#$tel#}" /><span class="input-tips"><s></s>多个请用,分隔</span></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="qq">联系QQ：</label></dt>
+    <dd><input type="text" class="input-large" id="qq" name="qq" value="{#$qq#}" /><span class="input-tips"><s></s>多个请用,分隔</span></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="landmark">附近地标：</label></dt>
+    <dd><input type="text" class="input-large" id="landmark" name="landmark" value="{#$landmark#}" /></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>幻灯图片：</dt>
+    <dd class="listImgBox hide">
+      <div class="list-holder">
+        <ul id="listSection3" class="clearfix listSection piece"></ul>
+        <input type="hidden" name="banner" value='{#$banner#}' class="imglist-hidden">
+      </div>
+      <div class="btn-section clearfix">
+        <div class="uploadinp filePicker" id="filePicker3" data-type="album" data-count="999" data-size="{#$atlasSize#}" data-imglist="banner"><div id="flasHolder"></div><span>添加图片</span></div>
+        <div class="upload-tip">
+          <p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+        </div>
+      </div>
+    </dd>
+  </dl>
+
+  <dl class="clearfix hide">
+    <dt>店铺图集：</dt>
+    <dd class="listImgBox hide">
+      <div class="list-holder">
+        <ul id="listSection4" class="clearfix listSection piece"></ul>
+        <input type="hidden" name="pics" value='{#$pics#}' class="imglist-hidden">
+      </div>
+      <div class="btn-section clearfix">
+        <div class="uploadinp filePicker" id="filePicker4" data-type="album" data-count="999" data-size="{#$atlasSize#}" data-imglist="imgpics"><div id="flasHolder"></div><span>添加图片</span></div>
+        <div class="upload-tip">
+          <p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+        </div>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix" id="type0">
+    <dt>上传视频：</dt>
+    <dd>
+      <input name="video" type="hidden" id="video" value="{#$video#}" />
+      <div class="spic{#if !$video#} hide{#/if#}">
+        <div class="sholder" id="videoPreview">
+          {#if $video != ""#}
+            <a href="/include/videoPreview.php?f=" data-id="{#$video#}">预览视频</a>
+          {#/if#}
+        </div>
+        <a href="javascript:;" class="reupload">重新上传</a>
+      </div>
+      <iframe src ="/include/upfile.inc.php?mod=business&type=video&obj=video&filetype=video" style="width:100%; height:25px;{#if $video != ""#} display: none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>视频封面：</dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $video_pic != ""#} hide{#/if#}" id="filePicker12" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $video_pic != ""#}
+      <ul id="listSection12" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_12_1"><a href='{#$video_pic#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$video_pic#}" data-val="{#$video_pic#}" data-url="/include/attachment.php?f={#$video_pic#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection12" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="video_pic" value="{#$video_pic#}" class="imglist-hidden" id="video_pic">
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>商家资质：</dt>
+    <dd class="listImgBox hide">
+      <div class="list-holder">
+        <ul id="listSection15" class="clearfix listSection piece"></ul>
+        <input type="hidden" name="quality" value='{#$quality#}' class="imglist-hidden">
+      </div>
+      <div class="btn-section clearfix">
+        <div class="uploadinp filePicker" id="filePicker15" data-type="certificate" data-count="10" data-size="{#$atlasSize#}" data-imglist="quality"><div id="flasHolder"></div><span>添加图片</span></div>
+        <div class="upload-tip">
+          <p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+        </div>
+      </div>
+    </dd>
+  </dl>
+  <!--
+  <dl class="clearfix">
+    <dt><label>全景类型：</label></dt>
+    <dd class="radio">
+      <input name="qj_pic" type="hidden" id="litpic" value="{#$qj_file#}" />
+      {#html_radios name="typeidArr" values=$typeidArr checked=$qj_type output=$typeidNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#if $qj_type == 0#}
+  <dl class="clearfix" id="qj_type0">
+  {#else#}
+  <dl class="clearfix hide" id="qj_type0">
+  {#/if#}
+    <dt>全景图片：</dt>
+    <dd class="listImgBox hide">
+      <div class="btn-section clearfix">
+        <div class="uploadinp filePicker" id="filePicker2" data-type="quanj" data-count="6" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>添加图片</span></div>
+        <div class="upload-tip">
+          <p><a href="/include/360panorama.php?f=" class="btn-mini btn-link{#if ($qj_type == 0 && $qj_file == "") || ($qj_type == 1)#} hide{#/if#}" id="previewQj">预览</a>&nbsp;&nbsp;{#$thumbType|replace:"*.":""|replace:";":"、"#}，单张最大{#$atlasSize/1024#}M，最多6张图片<span class="fileerror"></span></p>
+        </div>
+      </div>
+      <div class="list-holder qj360">
+        <ul id="listSection2" class="clearfix listSection piece"></ul>
+        <ul class="picbg"><li>前</li><li>右</li><li>后</li><li>左</li><li>顶</li><li>底</li></ul>
+      </div>
+    </dd>
+  </dl>
+  {#if $qj_type == 1#}
+  <dl class="clearfix" id="qj_type1">
+  {#else#}
+  <dl class="clearfix hide" id="qj_type1">
+  {#/if#}
+    <dt><label for="url">远程地址：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="qj_url" id="url" value="{#if $qj_type == 1#}{#$qj_file#}{#/if#}" data-regex="[a-zA-z]+:\/\/[^\s]+" />
+      <span class="input-tips"><s></s>请输入网址，以http://开头</span>
+    </dd>
+  </dl>
+  -->
+  <dl class="clearfix hide">
+    <dt><label>营业执照：</label></dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $license != ""#} hide{#/if#}" id="filePicker5" data-type="card"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $license != ""#}
+      <ul id="listSection5" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_5_1"><a href='/include/attachment.php?f={#$license#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$license#}" data-val="{#$license#}" data-url="/include/attachment.php?f={#$license#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection5" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="license" value="{#$license#}" class="imglist-hidden" id="license">
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label>开户许可证：</label></dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $accounts != ""#} hide{#/if#}" id="filePicker7" data-type="card"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $accounts != ""#}
+      <ul id="listSection7" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_7_1"><a href='/include/attachment.php?f={#$accounts#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$accounts#}" data-val="{#$accounts#}" data-url="/include/attachment.php?f={#$accounts#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection7" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="accounts" value="{#$accounts#}" class="imglist-hidden" id="accounts">
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label>经营许可证：</label></dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $jingying != ""#} hide{#/if#}" id="filePicker8" data-type="card"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $jingying != ""#}
+      <ul id="listSection8" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_8_1"><a href='/include/attachment.php?f={#$jingying#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$jingying#}" data-val="{#$jingying#}" data-url="/include/attachment.php?f={#$jingying#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection8" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="jingying" value="{#$jingying#}" class="imglist-hidden" id="jingying">
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label>身份证正面：</label></dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $cardfront != ""#} hide{#/if#}" id="filePicker9" data-type="card"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $cardfront != ""#}
+      <ul id="listSection9" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_9_1"><a href='/include/attachment.php?f={#$cardfront#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$cardfront#}" data-val="{#$cardfront#}" data-url="/include/attachment.php?f={#$cardfront#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection9" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="cardfront" value="{#$cardfront#}" class="imglist-hidden" id="cardfront">
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label>身份证反面：</label></dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $cardbehind != ""#} hide{#/if#}" id="filePicker10" data-type="card"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $cardbehind != ""#}
+      <ul id="listSection10" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_10_1"><a href='/include/attachment.php?f={#$cardbehind#}' target="_blank" title=""><img alt="" src="/include/attachment.php?f={#$cardbehind#}" data-val="{#$cardbehind#}" data-url="/include/attachment.php?f={#$cardbehind#}" width="100"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection10" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="cardbehind" value="{#$cardbehind#}" class="imglist-hidden" id="cardbehind">
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt>其他证明文件：</dt>
+    <dd class="listImgBox hide">
+      <div class="list-holder">
+        <ul id="listSection6" class="clearfix listSection piece"></ul>
+        <input type="hidden" name="certify" value='{#$certify#}' class="imglist-hidden">
+      </div>
+      <div class="btn-section clearfix">
+        <div class="uploadinp filePicker" id="filePicker6" data-type="album" data-count="999" data-size="{#$atlasSize#}" data-imglist="certify"><div id="flasHolder"></div><span>添加图片</span></div>
+        <div class="upload-tip">
+          <p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+        </div>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="body">店铺详情：</label></dt>
+    <dd>
+      <script id="body" name="body" type="text/plain" style="width:85%;height:500px">{#$body#}</script>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>营业日：</dt>
+    <dd>
+        <label><input type="checkbox" name="openweek[]" value="1" {#if $openweek && in_array(1, $openweek)#} checked{#/if#}>{#$langData['siteConfig'][34][5][1]#}</label> {#* 周一 *#}
+        &nbsp;&nbsp;
+        <label><input type="checkbox" name="openweek[]" value="2" {#if $openweek && in_array(2, $openweek)#} checked{#/if#}>{#$langData['siteConfig'][34][5][2]#}</label> {#* 周二 *#}
+        &nbsp;&nbsp;
+        <label><input type="checkbox" name="openweek[]" value="3" {#if $openweek && in_array(3, $openweek)#} checked{#/if#}>{#$langData['siteConfig'][34][5][3]#}</label> {#* 周三 *#}
+        &nbsp;&nbsp;
+        <label><input type="checkbox" name="openweek[]" value="4" {#if $openweek && in_array(4, $openweek)#} checked{#/if#}>{#$langData['siteConfig'][34][5][4]#}</label> {#* 周四 *#}
+        &nbsp;&nbsp;
+        <label><input type="checkbox" name="openweek[]" value="5" {#if $openweek && in_array(5, $openweek)#} checked{#/if#}>{#$langData['siteConfig'][34][5][5]#}</label> {#* 周五 *#}
+        &nbsp;&nbsp;
+        <label><input type="checkbox" name="openweek[]" value="6" {#if $openweek && in_array(6, $openweek)#} checked{#/if#}>{#$langData['siteConfig'][34][5][6]#}</label> {#* 周六 *#}
+        &nbsp;&nbsp;
+        <label><input type="checkbox" name="openweek[]" value="7" {#if $openweek && in_array(7, $openweek)#} checked{#/if#}>{#$langData['siteConfig'][34][5][0]#}</label> {#* 周日 *#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="opentime">营业时间：</label></dt>
+    <dd class="timelist">
+        {#if $opentimes#}
+        {#foreach from=$opentimes item="time" key='k'#}
+        {#$timeArr = "-"|explode:$time#}
+        <div class="input-append input-prepend">
+           <input type="text" class="input-mini startime chooseTime" name='limit_time[{#$k#}][start]' size="5" maxlength="5" autocomplete="off" value="{#$timeArr[0]#}">
+           <span class="add-on">到</span>
+           <input type="text" class="input-mini stoptime chooseTime" name='limit_time[{#$k#}][stop]' size="5" maxlength="5" autocomplete="off" value="{#$timeArr[1]#}">
+           <span class="add-on"><a href="javascript:;" title="删除" class="icon-trash"></a></span>
+        </div>
+        {#/foreach#}
+        {#/if#}
+        <a href="javascript:;" class="addtime" style="margin-left: 10px;">增加时间段</a>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="amount">人均消费：</label></dt>
+    <dd><input type="text" class="input-large" id="amount" name="amount" value="{#$amount#}" /></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="parking">停车位：</label></dt>
+    <dd><input type="text" class="input-large" id="parking" name="parking" value="{#$parking#}" /></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>特色标签：</label></dt>
+    <dd>
+    {#foreach from=$tagArr item=item#}
+    <label><input type="checkbox" name="tag[]" value="{#$item#}"{#if $tag && in_array($item, $tagSel)#} checked{#/if#} />{#$item#}</label>&nbsp;&nbsp;
+    {#/foreach#}
+  </dd>
+  <dl class="clearfix">
+    <dt><label for="tag_shop">店铺标签：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="tag_shop" id="tag_shop" maxlength="60" value="{#$tag_shop#}" />
+      <span class="input-tips"><s></s>多个请用|分隔</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>是否置顶：</label></dt>
+    <dd class="radio">
+      <label><input type="checkbox" name="isbid" value="1"{#if $isbid == 1#} checked{#/if#} />置顶</label>
+    </dd>
+  </dl>
+  {#if $isJoin || !$id#}
+  <dl class="clearfix">
+    <dt><label for="state">店铺状态：</label></dt>
+    <dd class="radio">
+      {#html_radios  name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix{#if $state != 2#} hide{#/if#}" id="refuseObj">
+    <dt>拒审原因：</dt>
+    <dd>
+        <textarea class="input-xxlarge" rows="2" name="refuse" id="refuse" data-regex=".{0,250}">{#$refuse#}</textarea>
+    </dd>
+  </dl>
+  {#/if#}
+
+  <hr>
+  <dl class="clearfix">
+    <dt><label>二级商户分账：</label></dt>
+    <dd>
+      <div>
+        <div class="input-prepend">
+            <span class="add-on">微信特约商户号：</span>
+            <input class="input-large" type="text" name="wxpay_submchid" id="wxpay_submchid" value="{#$wxpay_submchid#}" />
+        </div>
+        <span class="input-tips" style="display: inline-block;"><s></s>请先开通并接入微信服务商<br />配置教程：<a href="https://help.kumanyun.com/help-51-755.html" target="_blank">https://help.kumanyun.com/help-51-755.html</a></span>
+      </div>
+      <hr>
+      <div>
+        <div class="input-prepend">
+            <span class="add-on">支付宝商家PID：</span>
+            <input class="input-large" type="text" name="alipay_pid" id="alipay_pid" value="{#$alipay_pid#}" />
+        </div>
+        <span class="input-tips" style="display: inline-block;"><s></s>请先开通支付宝商家分账能力<br />配置教程：<a href="https://help.kumanyun.com/help-51-767.html" target="_blank">https://help.kumanyun.com/help-51-767.html</a></span>
+        <br />
+        <p style="font-size: 12px; padding-top: 10px;">商家应用授权状态：{#if !$alipay_app_auth_token#}<span class="label label-important">未授权</span>{#else#}<span class="label label-success">已授权</span>{#/if#}</p>
+      </div>
+      <hr>
+      <div>
+        <div class="input-prepend">
+          <span class="add-on">E商通二级商编号：</span>
+          <input class="input-large" type="text" name="icbc_subMerId" id="icbc_subMerId" value="{#$icbc_subMerId#}" />
+        </div>
+        <span class="input-tips" style="display: inline-block;"><s></s>请先接入工行E商通支付方式</span>
+        <br />
+        <div class="input-prepend">
+          <span class="add-on">E商通协议编号：</span>
+          <input class="input-large" type="text" name="icbc_subMerPrtclNo" id="icbc_subMerPrtclNo" value="{#$icbc_subMerPrtclNo#}" />
+        </div>
+      </div>
+    </dd>
+  </dl>
+  <hr>
+  {#if $userType != 3#}
+  <dl class="clearfix">
+    <dt><label for="maidanFee">买单抽成佣金：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="text" name="maidanFee" min="0" id="maidanFee" value="{#$maidanFee#}" />%</span>
+      <span class="input-tips" style="display: inline-block;"><s></s>留空或0将使用系统结算设置中的默认比例</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="bonusMaidanFee">{#$payname#}买单抽成佣金：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="text" name="bonusMaidanFee" min="0" id="bonusMaidanFee" value="{#$bonusMaidanFee#}" />%</span>
+      <span class="input-tips" style="display: inline-block;"><s></s>留空或0将使用系统结算设置中的默认比例</span>
+    </dd>
+  </dl>
+    <dl class="clearfix">
+      <dt><label>买单分销佣金比例：</label></dt>
+      <dd>
+        <div class="input-prepend input-append">
+          <span class="add-on">老客：</span>
+          <input class="input-mini" type="number" name="maidan_fenxiaoFee" id="maidan_fenxiaoFee" value="{#$maidan_fenxiaoFee#}" /><span class="add-on">%</span>
+	    </div>&nbsp;
+        <div class="input-prepend input-append">
+          <span class="add-on">新客：</span>
+          <input class="input-mini" type="number" name="maidan_XfenxiaoFee" id="maidan_XfenxiaoFee" value="{#$maidan_XfenxiaoFee#}" /><span class="add-on">%</span>
+        </div>
+		<span class="input-tips" style="display: block;"><s></s>用户没有绑定推荐人关系时，扫商家的收款码付款后，会自动绑定此商家为推荐人，后续的购物行为会有分销佣金（商家需要入驻成为分销商），此时的用户为新客。<br />如果用户已经有推荐人，扫商家的收款码付款后，此时的用户为老用户；<br />此处可以针对新老会员设置不同的佣金比例，以实现推广获客效果；</span>
+      </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt><label for="speakerDeviceSn">买单喇叭设备编码：</label></dt>
+      <dd>
+		  <input type="text" class="input-large" id="speakerDeviceSn" name="speakerDeviceSn" value="{#$speakerDeviceSn#}" />
+		  <span class="input-tips" style="display: inline-block;"><s></s>设备编码位于机器底部，详情请联系酷曼云官方客服！</span>
+	  </dd>
+    </dl>
+
+  <dl class="clearfix">
+    <dt><label>认证信息：</label></dt>
+    <dd>
+    {#foreach from=$authArr item=auth#}
+    <label><input type="checkbox" name="authattr[]" value="{#$auth.id#}"{#if $authattr && in_array($auth.id, $authattr)#} checked{#/if#} />{#$auth.typename#}</label>&nbsp;&nbsp;
+    {#/foreach#}
+    <a href="businessAuthAttr.php" class="btn btn-info btn-mini" style="display: inline-block; vertical-align: middle;" id="customRz">自定义认证属性</a>
+  </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="short_video_promote">短视频推广口令：</label></dt>
+    <dd>
+      <textarea class="input-xxlarge" rows="3" name="short_video_promote" id="short_video_promote" placeholder="复制抖音/快手等短视频平台的分享链接，用户访问商家店铺主页或者买单页面，会自动记录推广信息，打开抖音或者快手时会有弹窗推广信息展示！" data-regex=".{0,250}">{#$short_video_promote#}</textarea>
+      <span class="input-tips"><s></s>不填写将自动使用分站/总站设置的推广信息</span>
+    </dd>
+  </dl>
+<!--  <div class="printcopy" >-->
+<!--    {#if $printret#}-->
+<!--    {#foreach from=$printret key=a item=b#}-->
+
+<!--    <div class="printer" style="border: solid 1px;width: 480px; position: relative; margin-bottom: 20px;">-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="bind_print">是否开启打印机：</label></dt>-->
+<!--        <dd class="radio">-->
+<!--          <select name="print_config[{#$a#}][bind_print]" id="bind_print" class="input-medium">-->
+<!--            <option value="0"{#if !$b['bind_print']#} selected{#/if#}>关闭</option>-->
+<!--            <option value="1"{#if $b['bind_print']#} selected{#/if#}>开启</option>-->
+<!--          </select>-->
+<!--        </dd>-->
+<!--      </dl>-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="print_config">备注：</label></dt>-->
+<!--        <dd><input type="text" class="input-large" id="print_config_mcode" name="print_config[{#$a#}][remarks]" value="{#$b['remarks']#}" /></dd>-->
+<!--      </dl>-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="print_config">打印机终端号：</label></dt>-->
+<!--        <dd><input type="text" class="input-large" id="print_config_mcode" name="print_config[{#$a#}][mcode]" value="{#$b['mcode']#}" /></dd>-->
+<!--      </dl>-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="print_config">打印机密钥：</label></dt>-->
+<!--        <dd><input type="text" class="input-large" id="print_config_msign" name="print_config[{#$a#}][msign]" value="{#$b['msign']#}" /></dd>-->
+<!--      </dl>-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="print_state">打印机状态：</label></dt>-->
+<!--        <dd>-->
+<!--          {#if $b['bind_print'] && $b['mcode'] != '' && $b['msign'] != ''#}-->
+<!--          {#if $b['print_state'] == 1#}-->
+<!--            <p style="padding:4px 0;vertical-align:middle;color:green">在线</p>-->
+<!--          {#elseif $b['print_state'] == 2#}-->
+<!--            <p style="padding:4px 0;vertical-align:middle;color:red">缺纸</p>-->
+<!--          {#elseif $b['print_state'] == 3#}-->
+<!--            <p style="padding:4px 0;vertical-align:middle;color:red">离线</p>-->
+<!--          {#else#}-->
+<!--            <p style="padding:4px 0;vertical-align:middle;color:#ccc">未知</p>-->
+<!--          {#/if#}-->
+<!--        {#else#}-->
+<!--          <p style="padding:4px 0;vertical-align:middle;color:#ccc">未配置</p>-->
+<!--        {#/if#}-->
+<!--        </dd>-->
+<!--      </dl>-->
+<!--        <input type="hidden" name="print_config[{#$a#}][id]" type="text" value="{#$b['id']#}">-->
+<!--       <div class="btn btn-sm btn-danger del" style="position: absolute; right: 2px; top: 2px;"  data-id="{#$b['id']#}" >删除</div>-->
+<!--    </div>-->
+<!--    {#/foreach#}-->
+<!--    {#else#}-->
+<!--    <div class="printer" style="border: solid 1px;width: 480px; position: relative; margin-bottom: 20px;">-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="bind_print">是否开启打印机：</label></dt>-->
+<!--        <dd class="radio">-->
+<!--          <select name="print_config[0][bind_print]" id="bind_print" class="input-medium">-->
+<!--            <option value="0" >关闭</option>-->
+<!--            <option value="1" >开启</option>-->
+<!--          </select>-->
+<!--        </dd>-->
+<!--      </dl>-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="print_config">备注：</label></dt>-->
+<!--        <dd><input type="text" class="input-large" id="print_config_mcode" name="print_config[0][remarks]" value="" /></dd>-->
+<!--      </dl>-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="print_config">打印机终端号：</label></dt>-->
+<!--        <dd><input type="text" class="input-large" id="print_config_mcode" name="print_config[0][mcode]" value="" /></dd>-->
+<!--      </dl>-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="print_config">打印机密钥：</label></dt>-->
+<!--        <dd><input type="text" class="input-large" id="print_config_msign" name="print_config[0][msign]" value="" /></dd>-->
+<!--      </dl>-->
+<!--      <dl class="clearfix">-->
+<!--        <dt><label for="print_state">打印机状态：</label></dt>-->
+<!--        <dd>-->
+
+<!--        </dd>-->
+<!--      </dl>-->
+<!--      <input type="hidden" name="print_config[0][id]" type="text" value="">-->
+<!--       &lt;!&ndash; <div class="btn btn-sm btn-danger del" style="position: absolute; right: 2px; top: 2px;" data-id="" >删除</div> &ndash;&gt;-->
+<!--    </div>-->
+<!--    {#/if#}-->
+<!--  <div class="btn btn-sm btn-success" id="copy" style="margin-left: 425px">新增</div>-->
+<!--  </div>-->
+  {#*
+  <dl class="clearfix">
+    <dt>模板风格</dt>
+    <dd id="tplList">
+      <div class="tpl-list touch" style="margin: 0; padding: 0 15px;">
+        <h5 class="stit"><span class="label label-warning">移动端：</span></h5>
+        <ul class="clearfix">
+          {#foreach from=$touchTplList item=tplItem#}
+          <li{#if $touch_skin == $tplItem.directory#} class="current"{#/if#}>
+            <a href="javascript:;" data-id="{#$tplItem.directory#}" data-title="{#$tplItem.tplname#}" class="img" title="模板名称：{#$tplItem.tplname#}&#10;版权所有：{#$tplItem.copyright#}"><img src="{#$adminPath#}../templates/store/business/touch/{#$tplItem.directory#}/preview.jpg" /></a>
+            <p>
+              <span title="{#$tplItem.tplname#}">模板：{#$tplItem.tplname#}</span><br />
+              <a href="javascript:;" class="choose">选择</a><br />
+            </p>
+          </li>
+          {#/foreach#}
+        </ul>
+        <input type="hidden" name="touch_skin" id="touch_skin" value="{#$touch_skin#}" />
+      </div>
+    </dd>
+  </dl>
+  *#}
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+</form>
+{#$editorFile#}
+
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+
+{#$jsFile#}
+</body>
+</html>

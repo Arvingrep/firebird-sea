@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>招聘系统企业端-个性化</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/member/pub_supplier.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/setting.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		
+		<script type="text/javascript">
+            var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+            var hideFileUrl = '{#$cfg_hideUrl#}';
+            var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+            var templets = '{#$templets_skin#}';
+            var loupanid = '{#$loupanid#}';
+			var endDate = '{#$company_combo_enddate#}';
+			var memberDomain = '{#$member_userDomain#}';
+		</script>
+	</head>
+	<body class="w1200">
+		{#$pageTitle = '招聘系统企业端'#}
+		<!-- 头部 -->
+		{#include file="top.html" pageTitle=$pageTitle module='job' showMap=2#}
+		
+		<div id="page" >
+			<!-- <div class="lodingSelf" v-if="lodingSelf"><i class="el-icon-loading"></i></div> -->
+            <div class="conbox">
+                <div class="left_box" v-cloak>
+					<ul v-cloak>
+						<li v-for=" (item,i) in navList" :class="{'curr':i==currid || i === hoverid}"  @mouseover="hoverid = i" @mouseleave="hoverid = ''"  >
+							<a :href="item.link" @click="currid = i">
+								<s v-if="i!=currid && i !== hoverid"><img :src="'{#$templets_skin#}images/'+(i+1)+'.png'" ></s>
+								<s v-else><img :src="'{#$templets_skin#}images/'+(i+1)+'_on.png'" ></s>
+								<span>{{item.txt}}</span>
+							</a>
+						</li>
+					</ul>
+				</div>
+				<div class="right_box">
+					<div class="rConBox" >
+						
+						<!-- 左侧 -->
+						<div class="fn-left leftBox">
+							<div class="setHead ltitle">
+								<h3>招聘设置</h3>
+								<p>设置更适合企业的招聘模式</p>
+							</div>
+							<div class="setCon setNav">
+								<ul>
+									<li v-for="nav in setNavList" @click="nav.url ? '': currNavOn = nav.id" :class="{'currOn' : currNavOn == nav.id}"><a :href="nav.url ? nav.url:'javascript:;'" :target="nav.url ? '_blank':''">{{nav.title}}<s></s></a></li>
+								</ul>
+							</div>
+						</div>
+
+						<!-- 右侧 -->
+						<div class=" rightBox">
+							<!-- 账号绑定 -->
+							<div class="setPageBox" v-if="currNavOn == 0">
+								<div class="setHead loginInfoBox">
+									<div class="loginInfo">
+										<p>上次登录时间：{#$logintime|date_format:'%Y-%m-%d %H:%M:%S'#} , 若非本人操作可<a href="{#$member_userDomain#}/security-chpassword.html">修改密码</a></p>
+									</div>
+								</div>
+								<div class="setCon">
+									<ul class="codeConnect">
+										<li class="phoneCheck checkItem {#if $userinfo.phoneCheck#}hasCheck{#/if#}">
+											<div class="left_info fn-left">
+												<s class="icon"></s>
+												<h4>手机认证</h4>
+												<div class="checkInfo">
+													{#if $userinfo.phoneCheck#}
+													<p>当前手机已认证：<span>{#$userinfo.phoneEncrypt#}</span></p>
+													{#else#}
+													<p class="err"><s></s>未认证</p>
+													<p>认证绑定后，可使用手机号快速登录</p>
+													{#/if#}
+												</div>
+											</div>
+											<div class="right_btn">
+												{#if !$userinfo.phoneCheck#}
+												<el-button class="bind_phone" type="primary" data-url="{#$member_userDomain#}/security-chphone.html" @click="toUrl()">立即认证</el-button>
+												{#else#}
+												<el-button class="bind_phone" type="primary" data-url="{#$member_userDomain#}/security-chphone.html" @click="toUrl()">更换手机</el-button>
+												{#/if#}
+											</div>
+										</li>
+										<li class="emailCheck checkItem {#if $company_email#}hasCheck{#/if#}">
+											<div class="left_info fn-left">
+												<s class="icon"></s>
+												<h4>招聘邮箱</h4>
+												<div class="checkInfo">
+													{#if !$company_email#}
+													<p class="err"><s></s>未设置</p>
+													<p>邮箱设置后，可用于接收求职者简历、投递信息</p>
+													{#else#}
+													<p>邮箱已设置：<span>{#$company_email#}</span> 可用于接收求职者简历、投递信息</p>
+													{#/if#}
+												</div>
+											</div>
+											<div class="right_btn">
+												{#if !$company_email#}
+												{#if $userinfo.emailCheck#}
+												<p>当前账号已绑定登录邮箱<em>{#$userinfo.emailEncrypt#},可直接</em><span @click="setDefaultEmail('{#$userinfo.email#}','{#$userinfo.emailEncrypt#}')">设为招聘邮箱</span></p>
+												{#/if#}
+												<el-button class="bind_phone" type="primary"  @click="setEmail()">立即设置</el-button>
+												{#else#}
+												<el-button class="bind_phone" type="primary"  @click="setEmail()">更换邮箱</el-button>
+												{#/if#}
+											</div>
+										</li>
+										<li class="wechatCheck checkItem {#if $userinfo.wechat_conn#}hasCheck{#/if#}">
+											<div class="left_info fn-left">
+												<s class="icon"></s>
+												<h4>绑定微信</h4>
+												<div class="checkInfo">
+													{#if $userinfo.wechat_conn#}
+													<p>已绑定，可使用微信扫码快速登录</p>
+													{#else#}
+													<p class="err"><s></s>未绑定</p>
+													<p>授权绑定后，可使用微信扫码快速登录</p>
+													{#/if#}
+												</div>
+											</div>
+											<div class="right_btn">
+													{#if $userinfo.wechat_conn#}
+													<el-button class="bind_phone" type="primary" data-url="{#$cfg_basehost#}/api/login.php?type=wechat&qr={#$userinfo.userid#}" @click="toUrl(1)">解除绑定</el-button>
+													{#else#}
+													<el-button class="bind_phone" type="primary" data-url="{#$cfg_basehost#}/api/login.php?type=wechat&qr={#$userinfo.userid#}" @click="toUrl(1)">立即绑定</el-button>
+													{#/if#}
+											</div>
+										</li>
+										<li class="QQCheck checkItem {#if $userinfo.qq#}hasCheck{#/if#}">
+											<div class="left_info fn-left">
+												<s class="icon"></s>
+												<h4>绑定QQ</h4>
+												<div class="checkInfo">
+													{#if $userinfo.qq#}
+													<p>已绑定，可使用QQ账号快速登录</p>
+													{#else#}
+													<p class="err"><s></s>未绑定</p>
+													<p>授权绑定后，可使用QQ账号快速登录</p>
+													{#/if#}
+												</div>
+											</div>
+											<div class="right_btn">
+												{#if $userinfo.qq#}
+												<el-button class="bind_phone" type="primary" data-url="{#$cfg_basehost#}/api/login.php?type=qq&qr={#$userinfo.userid#}" @click="toUrl(1)">解除绑定</el-button>
+												{#else#}
+												<el-button class="bind_phone" type="primary" data-url="{#$cfg_basehost#}/api/login.php?type=qq&qr={#$userinfo.userid#}" @click="toUrl(1)">立即绑定</el-button>
+												{#/if#}
+											</div>
+										</li>
+									</ul>
+								</div>
+							</div>
+
+							<!-- 个性化主页 -->
+							<div class="setPageBox" v-if="currNavOn == 2">
+								<div class="setHead loginInfoBox">
+									<div class="loginInfo">
+										<p>企业主页个性化设置，美化企业形象，获得更多求职者注意。更多高级设定、自定义请咨询<a href="javascript:;">{#$hotline#}</a></p>
+									</div>
+								</div>
+								<div class="setCon">
+									<div class="defineHomepage">
+										<h4><span class="onTab">移动端</span><em>/</em><span>pc端</span></h4>
+										<ul class="styleList fn-clear">
+											<li v-for="item in 5">
+												<div class="previewBox">
+													<div class="previewImg"></div>
+													<div class="previewUrl">
+														<div class="prev_mask"></div>
+														<div class="prev_con">
+															<div class="prev_code"></div>
+															<p>手机扫码预览</p>
+														</div>
+													</div>
+												</div>
+												<div class="styleInfo">
+													<h5>默认北京</h5>
+													<h2>免费</h2>
+												</div>
+												<div class="styleBtns">
+													<el-button class="toChose" round>使用</el-button>
+													<el-button class="preview" round >预览</el-button>
+												</div>
+											</li>
+										</ul>
+									</div>
+								</div>
+							</div>
+							
+							<!-- 消息通知 -->
+							<div class="setPageBox" v-if="currNavOn == 3">
+								<div class="setHead loginInfoBox">
+									<div class="loginInfo">
+										<p>设置邮件与短信推送与通知，助力企业高效招聘</p>
+									</div>
+								</div>
+								<div class="setCon" style="padding:23px 15px 15px">
+									<!-- 短信通知 -->
+									<div class="msgInfoBox infoBox">
+										<h2><s></s>短信通知</h2>
+										<div class="infoList fn-clear">
+											<div class="infoItem">
+												<div class="left_info">
+													<h4>投递短信通知</h4>
+													<p>求职者投递简历，将会收到短信通知</p>
+												</div>
+												<el-switch v-model="bindInfoForm.sms_delivery" > </el-switch>
+											</div>
+                                            {#*
+											<div class="infoItem">
+												<div class="left_info">
+													<h4>在线消息通知</h4>
+													<p>离线时求职者发送在线消息，将短信通知我</p>
+												</div>
+												<el-switch v-model="bindInfoForm.sms_onlineNotice" > </el-switch>
+											</div>
+                                            *#}
+											<div class="infoItem">
+												<div class="left_info">
+													<h4>面试取消通知</h4>
+													<p>求职者回绝面试邀请，将会收到短信通知</p>
+												</div>
+												<el-switch v-model="bindInfoForm.sms_interviewRefuse" > </el-switch>
+											</div>
+                                            {#*
+											<div class="infoItem">
+												<div class="left_info">
+													<h4>招聘会通知</h4>
+													<p>有招聘会计划时短信通知我</p>
+												</div>
+												<el-switch v-model="bindInfoForm.sms_fair" > </el-switch>
+											</div>
+                                            *#}
+										</div>
+									</div>
+									<!-- 邮件通知 -->
+									<div class="emailInfoBox infoBox">
+										<h2><s></s>邮件设置</h2>
+										<div class="infoList  fn-clear">
+											<div class="infoItem">
+												<div class="left_info">
+													<h4>投递邮件通知</h4>
+													<p>求职者投递简历，将会收到带简历附件的邮件通知</p>
+												</div>
+												<el-switch v-model="bindInfoForm.email_delivery" > </el-switch>
+											</div>
+											<div class="infoItem">
+												<div class="left_info">
+													<h4>自动发送简历</h4>
+													<p>企业购买简历，将会自动发送简历附件到邮箱</p>
+												</div>
+												<el-switch v-model="bindInfoForm.email_buyResume" > </el-switch>
+											</div>
+										</div>
+										{#if !$userinfo.emailCheck#}
+										<p class="email_tip"><s></s>如需开启邮件功能，请先设置招聘邮箱 <el-button type="primary" @click="toSetEmail">去设置</el-button></p>
+										{#/if#}
+									</div>
+								</div>
+							</div>
+
+							<!-- 智能处理 -->
+							<div class="setPageBox" v-if="currNavOn == 4">
+								<div class="setHead loginInfoBox">
+									<div class="loginInfo">
+										<p>设置自动处理项，即刻开启企业高效招聘</p>
+									</div>
+								</div>
+								<div class="setCon smartHandleBox" style="padding:23px 15px 15px">
+									<el-form class="formBox">
+										<!-- 投递限制 -->
+										<div class="infoBox limitBox">
+											<h2><s></s>投递限制<em>被限制的求职者将无法投递简历</em></h2>
+											<div class="infoList fn-clear">
+												<div class="infoItem">
+													<el-form-item label="投递间隔" label-width="130px">	
+														<el-select v-model="smartyForm.time" placeholder="请选择">
+															<el-option
+																v-for="item in tiemSpaceList"
+																:key="item.value"
+																:label="item.time"
+																:value="item.value">
+															</el-option>
+														</el-select>
+														<span style="color: #999999;font-size: 12px;margin-left: 15px;" v-if="smartyForm.time > 0">{{smartyForm.time}}个月内无法重复投递同一职位或公司的其他职位</span>
+													</el-form-item>
+													<el-form-item label="账号限制" label-width="130px">
+														<el-checkbox-group v-model="smartyForm.account">
+															<el-checkbox :label="1" name="account" :checked="false">实名认证</el-checkbox>
+															<el-checkbox :label="2" name="account" >手机认证</el-checkbox>
+														</el-checkbox-group>
+														</el-select>
+													</el-form-item>
+												</div>
+												
+											</div>
+										</div>
+										<!-- 自动过滤 -->
+										<div class="infoBox autoBox">
+											<h2><s></s>自动过滤<em>不符合要求的求职者投递简历，系统将自动为您拒绝</em></h2>
+											<div class="infoList  fn-clear">
+												<div class="infoItem fn-clear">
+													<el-form-item label="工作经验" label-width="130px" class="fn-left">
+														<el-popover
+														v-model="popover_experience"
+														placement="bottom-start"
+														width="270"
+														ref="experiencePopper"
+														popper-class="popoverBox_experience">
+														<div class="popover_exper">
+															<ul>
+																<li v-for="item in optionArr" @click="checkItem(item,'experience')"  :class="[{'not_bg':item.id == 2}]">
+																	<template v-if="item.id != 2">{{item.text.replace('1','经验')}}</template>
+																	<template v-else>与要求相差<el-input type="text" class="expe_input"  @click.stop="" v-model="smartyForm.experience_off" @focus="focusIn = true" @blue="focusIn = false" ><em slot="suffix" class="suffix">年</em></el-input>内<el-button type="primary" size="mini" @click.stop="checkItem(item,'experience',1)">确定</el-button></template>
+																</li>
+															</ul>
+														</div>
+														<div class="inpbox" slot="reference">
+															<el-input :class="{'is-focus':popover_experience}"  placeholder="经验要求" readonly v-model="experienceText" >
+																<i slot="suffix" :class="['el-select__caret el-input__icon el-icon-arrow-up',{'is-reverse':popover_experience}]"></i>
+															</el-input>
+														</div>
+														</el-popover>
+													</el-form-item>
+													<el-form-item label="期望薪资" label-width="130px" class="fn-left">
+														<el-popover
+															v-model="popover_salary"
+															placement="bottom-start"
+															width="300"
+															ref="salaryPopper"
+															popper-class="popoverBox_experience">
+															<div class="popover_exper">
+																<ul>
+																	<li v-for="item in optionArr" @click="checkItem(item,'salary')"  :class="[{'not_bg':item.id == 2}]">
+																		<template v-if="item.id != 2">{{item.id ? '不高于发布薪资范围' : '不限'}}</template>
+																		<template v-else>与发布薪资偏差<el-input type="text" class="expe_input"  @click.stop="" v-model="smartyForm.salary_off" @focus="focusIn = true" @blue="focusIn = false" ><em slot="suffix" class="suffix">{#echoCurrency type="short"#}</em></el-input>内<el-button type="primary" size="mini" @click.stop="checkItem(item,'salary',1)">确定</el-button></template>
+																	</li>
+																	
+																</ul>
+															</div>
+															<div class="inpbox" slot="reference">
+																<el-input :class="{'is-focus':popover_salary}"  placeholder="期望薪资" readonly v-model="salaryText" >
+																	<i slot="suffix" :class="['el-select__caret el-input__icon el-icon-arrow-up',{'is-reverse':popover_salary}]"></i>
+																</el-input>
+															</div>
+														</el-popover>
+													</el-form-item>
+													<el-form-item label="学历要求" label-width="130px" class="fn-left">
+														<el-popover
+															v-model="popover_edu"
+															placement="bottom-start"
+															width="270"
+															ref="salaryPopper"
+															popper-class="popoverBox_experience">
+															<div class="popover_exper">
+																<ul>
+																	<li v-for="item in optionArr" @click="checkItem(item,'edu')"  :class="[{'not_bg':item.id == 2}]" v-if="item.id != 2">
+																		<template v-if="item.id != 2">{{item.text.replace('1','学历')}}</template>
+																	</li>
+																	
+																</ul>
+															</div>
+															<div class="inpbox" slot="reference">
+																<el-input :class="{'is-focus':popover_edu}"  placeholder="学历要求" readonly v-model="eduText" >
+																	<i slot="suffix" :class="['el-select__caret el-input__icon el-icon-arrow-up',{'is-reverse':popover_edu}]"></i>
+																</el-input>
+															</div>
+														</el-popover>
+													</el-form-item>
+													<el-form-item label="年龄要求" label-width="130px" class="fn-left age">
+														<el-input :class="['age_inp',{'is-focus':popover_min_age}]"  placeholder="最小年龄"  v-model="smartyForm.min_age">
+														</el-input>
+														-
+														<el-input :class="['age_inp',{'is-focus':popover_max_age}]"  placeholder="最大年龄"  v-model="smartyForm.max_age">
+														</el-input>
+													</el-form-item>
+													<el-form-item label="简历完整度" label-width="130px" class="fn-left">
+														<el-select v-model="smartyForm.finish" placeholder="请选择" popper-class="finishPopper" @focus="        popover_experience=false;popover_salary=false;popover_edu=false;popover_min_age=false;popover_max_age=false">
+															<el-option 
+																v-for="item in completionList"
+																:key="item"
+																:label="item==0?'不限':item + '%'"
+																:value="item?item:''">
+																<div class="select">
+																	<h6 v-if="item">{{item}}%</h6>
+																	<div v-if="item==0">不限</div>
+																	<p v-if="item == 60">(基本信息包含工作经验、教育、求职意向)</p>
+																	<p v-if="item == 85">(增加了个人技能/优势)</p>
+																	<p v-if="item == 90">(全部完善，描述详尽，要求较高慎选)</p>
+																</div>
+															</el-option>
+														</el-select>
+													</el-form-item>
+												</div>
+											</div>
+											
+										</div>
+									</el-form>
+								</div>
+								<el-button type="primart" class="submit" @click="submitConfig" :loading="isload">{{isload ? '提交中...' : '确认更改'}}</el-button>
+							</div>
+						</div>
+					</div>
+					
+				</div>
+
+            </div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+		<div>{#$cfg_statisticscode#}</div>
+		<!-- <el-popover v-model="popover_min_age" placement="bottom-start" width="300" ref="min_agePopper"
+			popper-class="popoverBox_experience">
+			<div class="popover_exper">
+				<ul>
+					<li v-for="item in optionArr" @click="checkItem(item,'min_age')" :class="[{'not_bg':item.id == 2}]">
+						<template v-if="item.id != 2">{{item.text.replace('1','年龄')}}</template>
+						<template v-else>与要求相差<el-input type="text" class="expe_input" @click.stop=""
+								v-model="smartyForm.min_age_off" @focus="focusIn = true" @blue="focusIn = false"><em
+									slot="suffix" class="suffix">岁</em></el-input>内<el-button type="primary" size="mini"
+								@click.stop="checkItem(item,'min_age',1)">确定</el-button></template>
+					</li>
+				</ul>
+			</div>
+			<div class="inpbox age_inpbox" slot="reference">
+				<el-input :class="['age_inp',{'is-focus':popover_min_age}]" placeholder="最小年龄" readonly v-model="min_ageText">
+					<i slot="suffix"
+						:class="['el-select__caret el-input__icon el-icon-arrow-up',{'is-reverse':popover_min_age}]"></i>
+				</el-input>
+			</div>
+		</el-popover>
+		-
+		<el-popover v-model="popover_max_age" placement="bottom-start" width="300" ref="max_agePopper"
+			popper-class="popoverBox_experience">
+			<div class="popover_exper">
+				<ul>
+					<li v-for="item in optionArr" @click="checkItem(item,'max_age')" :class="[{'not_bg':item.id == 2}]">
+						<template v-if="item.id != 2">{{item.text.replace('1','年龄')}}</template>
+						<template v-else>与要求相差<el-input type="text" class="expe_input" @click.stop=""
+								v-model="smartyForm.max_age_off" @focus="focusIn = true" @blue="focusIn = false"><em
+									slot="suffix" class="suffix">岁</em></el-input>内<el-button type="primary" size="mini"
+								@click.stop="checkItem(item,'max_age',1)">确定</el-button></template>
+					</li>
+				</ul>
+			</div>
+			<div class="inpbox age_inpbox" slot="reference">
+				<el-input :class="['age_inp',{'is-focus':popover_max_age}]" placeholder="最大年龄" readonly v-model="max_ageText">
+					<i slot="suffix"
+						:class="['el-select__caret el-input__icon el-icon-arrow-up',{'is-reverse':popover_max_age}]"></i>
+				</el-input>
+			</div>
+		</el-popover> -->
+	</body>
+	<!-- <script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script> -->
+	<!-- <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/echarts/echarts.js?v={#$cfg_staticVersion#}"></script> -->
+	<!-- <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script> -->
+	<script type="text/javascript" src="{#$templets_skin#}js/setting.js?v={#$cfg_staticVersion#}"></script>
+</html>

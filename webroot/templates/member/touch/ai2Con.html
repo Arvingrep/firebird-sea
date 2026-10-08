@@ -1,0 +1,81 @@
+<link rel="stylesheet" href="/templates/member/touch/css/ai2con.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+    var ai_token = '{#$token#}'
+    
+</script>
+<div class="openAiConBox" id="ai2Content" v-cloak>
+    <div v-if="showAiCon">
+        <div class="ai_mask" v-if="aiResultPop || showAiPop" @click="aiResultPop = false; showAiPop = false"></div>
+        <!-- 描述弹窗 -->
+        <div :class="`aiTipPop ${showAiPop ? 'show' : ''}`" >
+            <div class="aipop_header">
+                <h3>提供一些描述<span>{{aiContent.length > 1 ? 'Ai生成更准确' : 'Ai就能帮写啦'}}</span></h3>
+                <a href="javascript:;" class="close_pop" @click="showAiPop = false;"></a>
+            </div>
+            <div class="aipop_con">
+                <dl v-if="module == 'info'" class="otherInfo">
+                    <!-- <dt></dt> -->
+                    <template v-for="item in filter_addInputArr" >
+
+                        <dd class="inpbox"   v-if="item.formtype =='radio' || item.formtype =='checkbox'" :data-name="'huoniao_'+item.field" :data-type="item.formtype" :data-title="item.title" :data-id="item.id" :data-required="item.required">
+                            <label :for="'huoniao_'+item.field"><span v-if="item.required == '1'" style="color:red;">*</span>{{item.title}}</label>
+                            <div class="inpAll">
+                                <div :class="['inp click',{'on_chose':checkInput(item).value == ir || (checkInput(item).valueArr && checkInput(item).valueArr && checkInput(item).valueArr.indexOf(ir) > -1)}]" v-for="ir in item.options" v-if="ir != ''">{{ir}}</div>
+                            </div>
+                        </dd>
+                    </template>
+                </dl>
+                <textarea class="txtarea" v-model="textarea" placeholder="简单描述你要发布的内容" @keypress="onSubmit"></textarea>
+            </div>
+            <div class="aipop_foot" v-if="module == 'info'">
+                <a href="javascript:;" class="ai_btnSure disflex a-c j-c" @click="getKeyword()">确定</a>
+            </div>
+        </div>
+
+        <div :class="`aiResultPop ${isload ? 'aiLoad' : ''} ${aiResultPop ? 'show' : ''}`">
+            <div class="mask_noClick" v-if="isload" @click="showClickTip()"></div>
+
+            <div class="aipop_header">
+                <h3>{{isload ? '思考中' : '内容助手'}}</h3>
+                <a href="javascript:;" class="close_pop" @click="aiResultPop = false;"></a>
+            </div>
+            <div class="aipop_con" id="typeCon" >
+                <div class="aiConShow" placeholder="正在生成内容…" v-html="aiContent && aiContent.length && aiContent[ai_ind] && aiContent[ai_ind].content.replace(/\n/g,'</br>')  || ''" v-if="!isStreaming && !isTyping && !isload"></div>
+                <div class="aiConShow"  placeholder="正在生成内容…" v-html="displayText.replace(/\n/g,'</br>')" v-else></div>
+
+                
+            </div>
+            <div class="aipop_foot">
+                <div class="btns disflex j-b" v-if="!isFocus">
+                    <a href="javascript:;" class="setCon disflex j-c a-c" @click="useContent">使用此内容</a>
+                    <div class="disflex flexRight">
+                        <a href="javascript:;" class="reGet disflex j-c a-c" @click="reGetByKey()"><span>换一换</span></a>
+                        <div class="btnsChange disflex j-c a-c">
+                            <a href="javascript:;" :class="`use_last disflex j-c a-c ${ai_ind == 0 || aiContent.length == 1 ? 'noClick' : ''}`" @click="changeCon('prev')"></a>
+                            <em class="line"></em>
+                            <a href="javascript:;" :class="`use_next disflex j-c a-c ${ai_ind == (aiContent.length - 1) || aiContent.length == 0 ? 'noClick' : ''}`"  @click="changeCon('next')"></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="aiconOptionsBox" v-if="!isFocus">
+                    <h5>智能调整</h5>
+                    <div class="aioptions">
+                        <ul class="disflex">
+                            <li v-for="item in changeList" @click="addKey(item)" class="li disflex a-c j-c">更{{item}}</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="textboxContainer">
+                    <div class="textbox">
+                        <textarea class="addCon" @focus="isFocus = true" @blur="isFocus = false" placeholder="补充要求，让Ai生成你要的内容" v-model="reSearchKey"></textarea>
+                        <a href="javascript:;" v-if="isFocus || reSearchKey" class="btn_sub" @click="reSearchByAi()"></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+<script type="text/javascript" src="/templates/member/touch/js/ai2con.js?v={#$cfg_staticVersion#}" ></script>

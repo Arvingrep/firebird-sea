@@ -1,0 +1,226 @@
+ <!-- 导航按钮组 s -->
+ <div :class="['rightCon' ,{'show':currEditPart == 5}]">
+    <div class="modBox sNavContainer">
+        <div class="title" v-if="currEditPart == 5">导航按钮组
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 5 && showResetPop" @show="showResetPop = true" v-if="checkHasIn('sNav',5) && (!checkModelHasIn() || !checkCompInModel())">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('sNav')"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 5 && showResetPop" v-if="checkHasIn('sNav',5)" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('sNav',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 5 && showResetPop" v-if="checkModelHasIn() && checkCompInModel()" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认将该组件恢复成模板样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="reChangeToModel('sNav',5)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置模板样式</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 5 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('sNav',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="modInfoStyle">
+            <div class="modstyleBox">
+                <h2 class="stitle">导航内容<span> *为方便设置，左侧预览已显示全部导航，实际以各终端设置为准</span></h2>
+                <div class="sContent setNavBox" @click="modNavPop = true; sortObj('.sortBox.nav_tbody')">
+                    <h6><s></s><span>设置导航内容</span></h6>
+                </div>
+            </div>
+            <div class="modstyleBox">
+                <h2 class="stitle">组件设置</h2>
+                <div class="sContent ">
+                    <div class="checkbox">
+                        <!-- v-show="sNavFormData.slide" -->
+                        <el-checkbox v-model="sNavFormData.cardStyle" @change="styleChange('sNav')" >显示卡片样式</el-checkbox>
+                        <el-checkbox v-model="sNavFormData.btnRadius" @change="val => sNavFormData.style.btnRadius = (val ? 50 : 0)">按钮圆角<em> *圆角值可在最下方自定义</em></el-checkbox>
+                    </div>
+                    <div class="columbox">
+                        <div class="column_chose">
+                            <s :class="{'layout2': sNavFormData.layout === 1}"></s>
+                            <span @click="sNavFormData.layout = 2">2行</span>
+                            <span @click="sNavFormData.layout = 1">1行</span>
+                        </div>
+                        <div class="column_chose">
+                            <s :class="{'layout2': sNavFormData.column === 4}"></s>
+                            <span @click="sNavFormData.column = 5">每行5个</span>
+                            <span @click="sNavFormData.column = 4">每行4个</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modstyleBox">
+                <h2 class="stitle">标签设置</h2>
+                <div class="sContent ">
+                    <el-checkbox v-for="(item,ind) in getShowModules(allModules,'',1)" :key="item.id" :label="item" :value="checkModuleShow(item,sNavFormData.labsData)" @change="(value) => changeModuleShow(value,item,ind)">{{item.subject}}</el-checkbox>
+                    <div class="style_item module_item" v-for="(item,ind) in sNavFormData.labsData" >
+                        <div class="style_options">
+                            <label for="">{{item.subject}}：</label>
+                            <el-input placeholder="请输入标签" type="text" maxlength="8" v-model="item.lab.text"></el-input>
+                        </div>
+                        <div class="style_options">
+                            <label for="">标签颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'sNavFormData.labsData.'+ ind +'.lab.style.bgColor')"  v-model="item.lab.style.bgColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('sNavFormData.labsData.'+ ind +'.lab.style.bgColor')"  :value="item.lab.style.bgColor.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('sNavFormData.labsData.'+ ind +'.lab.style.bgColor')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">文本颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'sNavFormData.labsData.'+ ind +'.lab.style.color')"  v-model="item.lab.style.color"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('sNavFormData.labsData.'+ ind +'.lab.style.color')"  :value="item.lab.style.color.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('sNavFormData.labsData.'+ ind +'.lab.style.color')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modstyleBox">
+                <h2 class="stitle">组件样式</h2>
+                <div class="sContent ">
+                    <div class="style_item">
+                        <div class="style_options">
+                            <label for="">交互效果：</label>
+                            <div class="split_options radioBox">
+                                <span :class="{'onChose':!sNavFormData.slide}" @click="sNavFormData.slide = 0; sNavFormData.cardStyle = false"><s></s>平滑</span>
+                                <span :class="{'onChose':sNavFormData.slide}" @click="sNavFormData.slide = 1"><s></s>分页</span>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">文本大小：</label>
+                            <div class="split_options radioBox">
+                                <span :class="{'onChose':sNavFormData.style.fontSize == 24}" @click="sNavFormData.style.fontSize = 24"><s></s>常规</span>
+                                <span :class="{'onChose':sNavFormData.style.fontSize != 24}" @click="sNavFormData.style.fontSize = 26"><s></s>加大</span>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">按钮文本：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'sNavFormData.style.color')"  v-model="sNavFormData.style.color"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('sNavFormData.style.color')"  :value="sNavFormData.style.color.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('sNavFormData.style.color')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">卡片：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'sNavFormData.style.cardBg')"  v-model="sNavFormData.style.cardBg"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('sNavFormData.style.cardBg')"  :value="sNavFormData.style.cardBg.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('sNavFormData.style.cardBg')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">分页指示：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'sNavFormData.style.dotColor')"  v-model="sNavFormData.style.dotColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('sNavFormData.style.dotColor')"  :value="sNavFormData.style.dotColor.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('sNavFormData.style.dotColor')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 间距设置 -->
+            <div class="marginSetBox modstyleBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" >
+                        <div class="sContent">
+                            <div class="style_options" v-show="sNavFormData.cardStyle">
+                                <label for="">卡片圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip"  :min="0" :max="50" v-model="sNavFormData.style.cardRadius"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,50,'sNavFormData.style.cardRadius')" :value="sNavFormData.style.cardRadius">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options" >
+                                <label for="">按钮圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" @input="val => checkRadius(val,sNavFormData)" v-model="sNavFormData.style.btnRadius" :show-tooltip="showTooltip"  :min="0" :max="55"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"  @input="checkMax(0,55,'sNavFormData.style.btnRadius')" :value="sNavFormData.style.btnRadius">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">按钮大小：</label>
+                                <el-slider tooltip-class="tooltip_show"  v-model="sNavFormData.style.btnSize" :show-tooltip="showTooltip"  :min="64" :max="110"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"  @change="checkMax(64,110,'sNavFormData.style.btnSize')" :value="sNavFormData.style.btnSize">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">上间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="sNavFormData.style.marginTop" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,40,'sNavFormData.style.marginTop')" :value="sNavFormData.style.marginTop">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="sNavFormData.style.marginLeft" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,40,'sNavFormData.style.marginLeft')" :value="sNavFormData.style.marginLeft">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+
+        </div>
+    </div>
+</div>
+<!-- 导航按钮组 e -->

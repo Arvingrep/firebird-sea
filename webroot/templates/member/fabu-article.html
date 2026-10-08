@@ -1,0 +1,294 @@
+<script type="text/javascript">
+	var payReturn = "{#getUrlPath service='member' type='user' template='manage' action='article'#}";
+	var mold = {#$detail_mold|default:0#};
+	var detail = {
+		videotype: {#$detail_videotype|default:0#}
+	}
+	var reprintUrl = '{#$reprintUrl#}';
+</script>
+<style>
+	.variable {display: none;}
+	.variable-{#$detail_mold|default:0#} {display: block;}
+	#listSection1 {display:block !important;}
+	#listSection1:empty {}
+	.fg {margin:20px 0;background:#eee;border-color: #f8c5c5;}
+	#zhuanzai {height: 32px;line-height: 32px;margin:0 0 0 10px;width:auto;padding:0 15px;font-size: 14px;}
+	.zhuanzaiBox {position:relative;}
+	.zhuanzaiBox .close {position: absolute;right:0;top:0;display: block;width:18px;height:18px;background: url('/templates/member/images/error_icon.png');}
+	.zhuanzaiBox.hover {background: #eee;}
+</style>
+<ul class="main-tab">
+	<li class="curr"><a href="javascript:;">{#if $do == "edit"#}{#$langData['siteConfig'][16][157]#}{#else#}{#$langData['siteConfig'][16][16]#}{#/if#}</a></li>
+	<li><a href="{#getUrlPath service='member' type='user' template='manage' action='article'#}">{#$langData['siteConfig'][23][0]#}</a></li>
+</ul>
+
+<div class="w-form">
+	{#if !$id && $reprintUrl#}
+	<div class="zhuanzaiBox fn-hide">
+		<a href="javascript:;" class="close"></a>
+		<dl class="fn-clear">
+			<dt><span></span></dt>
+			<dd>
+				<input type="text" name="remoteUrl" class="inp" id="remoteUrl" size="60" maxlength="200" placeholder="输入网址一键转载" />
+				<button class="submit" id="zhuanzai">转载</button>
+			</dd>
+		</dl>
+		<hr class="fg">
+	</div>
+	{#/if#}
+	<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=article&action={#if $do == "edit"#}edit&id={#$id#}{#else#}put{#/if#}" data-url="{#getUrlPath service='member' type='user' template='manage' action='article'#}">
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['siteConfig'][19][892]#}：</dt>{#* 城市 *#}
+			<dd>
+				<select class="chosen-select" id="cityid" name="cityid" style="width: auto; min-width: 150px;" data-title="{#$langData['siteConfig'][20][585]#}">{#* 请选择城市 *#}
+					<option selected="" value="0">{#$langData['siteConfig'][7][2]#}</option>{#* 请选择 *#}
+					{#loop service="article" action="city" return="city"#}
+					<option value="{#$city.id#}" {#if $detail_cityid == $city.id#} selected{#/if#}>{#$city.name#}</option>
+					{#/loop#}
+				</select>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear" id="box_mold" data-required="1">
+		  <dt>{#$langData['siteConfig'][31][0]#}：</dt>{#* 新闻类型 *#}
+		  <dd>
+			  <div class="radio">
+			  	{#loop service="article" action="get_article_mold" return="mttype"#}
+					<span data-id="{#$mttype.id#}"{#if $detail_mold == $mttype.id#} class="curr"{#/if#}>	{#$mttype.typename#}</span>
+					{#/loop#}
+					<input type="hidden" name="mold" id="mold" value="{#$detail_mold|default:0#}" />
+				</div>
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][0]#}：</dt>{#* 标题 *#}
+			<dd>
+				<input type="text" name="title" class="inp" id="title" size="60" maxlength="50" data-title="{#$langData['siteConfig'][20][40]#}" value="{#$detail_title#}" />{#* 请输入信息标题，2-50个字 *#}
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][393]#}：</dt>{#* 分类 *#}
+			<dd id="selType">
+				<div class="sel-group" data-title="{#$langData['siteConfig'][20][41]#}">
+					<button type="button" class="sel">{#if $do == "edit"#}{#$detail_typeName#}{#else#}{#$langData['siteConfig'][7][2]#}{#/if#}{#* 请选择 *#}<span class="caret"></span></button>
+					<ul class="sel-menu">
+						{#loop service="article" action="type" mold=$detail_mold return="type"#}
+						<li><a href="javascript:;" data-id="{#$type.id#}">{#$type.typename#}</a></li>
+						{#/loop#}
+					</ul>
+				</div>
+				<input type="hidden" name="typeid" id="typeid" value="{#$detail_typeid#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#if $ac_type == 3 || $ac_type == 4#}
+		<dl class="fn-clear" data-required="1" id="box_mediaArcType">
+			<dt><span>*</span>栏目：</dt>{#* 栏目 *#}
+			<dd id="selType">
+				<div class="sel-group" data-title="{#$langData['siteConfig'][20][41]#}">
+					<button type="button" class="sel">{#if $do == "edit"#}{#$detail_media_arctypeName#}{#else#}{#$langData['siteConfig'][7][2]#}{#/if#}{#* 请选择 *#}<span class="caret"></span></button>
+					<ul class="sel-menu">
+						{#loop service="article" action="mediaArcType" id=$ac_id return="type"#}
+						<li><a href="javascript:;" data-id="{#$type.id#}">{#$type.typename#}</a></li>
+						{#/loop#}
+					</ul>
+				</div>
+				<input type="hidden" name="media_arctype" id="media_arctype" value="{#$detail_media_arctype#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#/if#}
+		<dl class="fn-clear">
+			<dt>{#$langData['siteConfig'][19][19]#}：</dt>{#* 缩略图 *#}
+			<dd class="thumb fn-clear listImgBox">
+				<div class="uploadinp filePicker thumbtn{#if $detail_litpic != ""#} fn-hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+				{#if $detail_litpic != ""#}
+				<ul id="listSection1" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$detail_litpic#}' target="_blank" title=""><img alt="" src="{#changeFileSize url="$detail_litpic" type="small"#}" data-val="{#$detail_litpicSource#}"/></a><a class="reupload li-rm" href="javascript:;">{#$langData['siteConfig'][19][176]#}</a></li></ul>{#* 删除图片 *#}
+				{#else#}
+				<ul id="listSection1" class="listSection thumblist fn-clear"></ul>
+				{#/if#}
+				<div>
+					<div class="variable variable-2 variable-3" style="font-size:14px;color:#999;">{#$langData['siteConfig'][31][1]#}</div>{#* 本地上传视频可以不上传缩略图，系统将会选取视频第一帧作为封面（会有一定延迟） *#}
+				</div>
+				<input type="hidden" name="litpic" value="{#$detail_litpicSource#}" class="imglist-hidden">
+			</dd>
+		</dl>
+		<dl class="fn-clear variable variable-0{#if $id && ($detail_body)#} variable-1{#/if#}">
+			<dt><span>*</span>{#$langData['siteConfig'][19][1]#}：</dt>{#* 内容 *#}
+			<dd>
+				<script id="body" name="body" type="text/plain" style="width:750px;height:300px">{#$detail_body#}</script>
+			</dd>
+		</dl>
+		<dl class="fn-clear variable variable-1">
+			<dt>{#$langData['siteConfig'][19][2]#}：</dt>{#* 图集 *#}
+			<dd class="listImgBox fn-hide">
+				<div class="list-holder">
+					<ul id="listSection2" class="fn-clear listSection fn-hide"{#if $detail_imglist#} style="display: block;"{#/if#}>
+						{#foreach from=$detail_imglist key=k item=i#}
+						<li class="fn-clear" id="WU_FILE_1_{#$k#}">
+							<span class="li-move" title="{#$langData['siteConfig'][23][42]#}">↕</span>{#* 拖动调整图片顺序 *#}
+							<a class="li-rm" href="javascript:;">×</a>
+							<div class="li-thumb" style="display: block;">
+								<div class="r-progress"><s></s></div>
+								<span class="ibtn">
+									<a href="javascript:;" class="Lrotate" title="{#$langData['siteConfig'][23][43]#}"></a>{#* 逆时针旋转90度 *#}
+									<a href="javascript:;" class="Rrotate" title="{#$langData['siteConfig'][23][44]#}"></a>{#* 顺时针旋转90度 *#}
+									<a href="{#$i.path#}" target="_blank" class="enlarge" title="{#$langData['siteConfig'][23][45]#}"></a>{#* 放大 *#}
+								</span>
+								<span class="ibg"></span>
+								<img data-val="{#$i.pathSource#}" data-url="{#changeFileSize url="{#$i.path#}" type="small"#}" src="{#changeFileSize url="{#$i.path#}" type="small"#}" />
+							</div>
+							<textarea class="li-desc" placeholder="{#$langData['siteConfig'][20][477]#}" style="display: inline-block;">{#$i.info#}</textarea>
+						</li>
+						{#/foreach#}
+					</ul>
+					<input type="hidden" name="imglist" value="" class="imglist-hidden">
+				</div>
+				<div class="btn-section fn-clear">
+					<div class="wxUploadObj fn-clear">
+						<div class="uploadinp filePicker" id="filePicker2" data-type="desc" data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][168]#}</span></div>
+						<span class="upload-split fn-hide">{#$langData['siteConfig'][13][0]#}</span>{#* 或 *#}
+						<dl class="wxUpload fn-hide fn-clear">
+							<dt><img id="wxUploadImg" /></dt>
+							<dd>{#$langData['siteConfig'][19][362]#}<em class="wx">{#$langData['siteConfig'][27][139]#}</em>{#$langData['siteConfig'][27][140]#}<br />{#$langData['siteConfig'][19][846]#}{#$cfg_weixinName#}{#$langData['siteConfig'][27][141]#}<br />{#$langData['siteConfig'][27][142]#}<em class="fs">{#$langData['siteConfig'][6][139]#}</em>{#$langData['siteConfig'][27][143]#}</dd>{#* 使用-微信-扫描左侧二维码-关注-公众号后-将图片-发送-给公众号即可传图 *#}
+						</dl>
+					</div>
+					<div class="upload-tip">
+						<p><a href="javascript:;" class="fn-hide deleteAllAtlas"{#if $detail_imglist#} style="display: inline-block;"{#/if#}>{#$langData['siteConfig'][6][79]#}</a>{#* 删除所有 *#}
+							&nbsp;&nbsp;{#$langData['siteConfig'][20][10]|replace:'1':{#$atlasSize/1024#}|replace:'2':$atlasMax#} <span class="fileerror"></span></p>{#* 单张最大1M，最多2张 *#}
+					</div>
+				</div>
+			</dd>
+		</dl>
+		<dl class="fn-clear variable variable-2" id="box_videotype" data-required="1">
+		  <dt>{#$langData['siteConfig'][31][2]#}：</dt>{#* 视频类型 *#}
+		  <dd>
+			  <div class="radio">
+					<span data-id="0"{#if !$detail_videotype#} class="curr"{#/if#}>&nbsp;&nbsp;&nbsp;{#$langData['siteConfig'][31][3]#}&nbsp;&nbsp;&nbsp;</span>{#* 本地 *#}
+					<span data-id="1"{#if $detail_videotype == 1#} class="curr"{#/if#}>{#$langData['siteConfig'][31][4]#}</span>{#* 外站调用 *#}
+					<input type="hidden" name="videotype" id="videotype" value="{#$detail_videotype|default:0#}" />
+				</div>
+			</dd>
+		</dl>
+		<dl class="fn-clear uploadVideo variable variable-2 video_1">
+			<dt>{#$langData['siteConfig'][6][195]#}：</dt>{#* 上传视频 *#}
+			<dd class="listImgBox fn-clear">
+				<div class="list-holder">
+					<ul id="listSection3" class="fn-clear listSection">
+						{#if !$detail_videotype && $detail_videoSource#}
+						<li id="WU_FILE_00" class="pubitem complete">
+							{#if $detail_videotype == 0#}
+							<video class="video-js enlarge" id="WU_FILE_V_00" src="/include/attachment.php?f={#$detail_videoSource#}" data-val="{#$detail_videoSource#}"></video>
+							{#else#}
+							<a href="{#$detail_videoSource#}" target="_blank"></a>
+							{#/if#}
+              <div class="file-panel li-rm"><span class="cancel">{#$langData['siteConfig'][6][8]#}</span></div>{#* 删除 *#}
+              <span class="player"></span>
+						</li>
+						{#/if#}
+					</ul>
+					<input type="hidden" name="video" value="{#if !$detail_videotype#}{#$detail_videoSource#}{#/if#}" class="imglist-hidden">
+				</div>
+				<div class="btn-section fn-clear">
+					<div class="uploadinp filePicker" id="filePicker3" data-extensions="mp4,mov" data-mimeTypes="video/*" data-type="filenail" data-type-real="video" data-count="1" data-size="{#$videoSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][196]#}</span><em>+</em></div>{#* 添加视频 *#}
+				</div>
+			</dd>
+		</dl>
+		<dl class="fn-clear fn-hide variable variable-2 video_2">
+            <dt>{#$langData['siteConfig'][19][476]#}：</dt>{#* 视频地址 *#}
+            <dd>
+                <input type="text" name="videourl" class="inp" id="videourl" size="60" maxlength="300" placeholder="{#$langData['siteConfig'][31][5]#}" value="{#if $detail_videotype == 1#}{#$detail_videoSource#}{#/if#}" />{#* 目前仅支持第三方平台的通用代码播放 *#}
+            </dd>
+		</dl>
+        <dl class="fn-clear fn-hide variable variable-2 video_2">
+            <dt><label for="hour">视频时长：</label></dt>
+            <dd>
+            <span>
+                <input class="inp" style="width: 50px;" type="number" name="hour" min="0" id="hour" value="{#$detail_video_hour#}" /><span class="fn-left">&nbsp;小时&nbsp;&nbsp;</span>
+                <input class="inp" style="width: 50px;" type="number" name="minute" min="0" id="minute" value="{#$detail_video_minute#}" /><span class="fn-left">&nbsp;分钟&nbsp;&nbsp;</span>
+                <input class="inp" style="width: 50px;" type="number" name="second" min="0" id="second" value="{#$detail_video_second#}" /><span class="fn-left">&nbsp;秒</span>
+            </span>
+            </dd>
+        </dl>
+		<!-- 短视频 -->
+		<dl class="fn-clear uploadVideo variable variable-3" id="video_3">
+			<dt>{#$langData['siteConfig'][18][10]#}：</dt>{#* 视频 *#}
+			<dd class="listImgBox fn-clear">
+				<div class="list-holder">
+					<ul id="listSection4" class="fn-clear listSection">
+						{#if $detail_videoSource#}
+						<li id="WU_FILE_V3_00" class="pubitem complete">
+							<video class="video-js" id="WU_FILE_V3_00" src="/include/attachment.php?f={#$detail_videoSource#}" data-val="{#$detail_videoSource#}"></video>
+							<div class="file-panel li-rm"><span class="cancel">{#$langData['siteConfig'][6][8]#}</span></div>{#* 删除 *#}
+              <span class="player"></span>
+						</li>
+						{#/if#}
+					</ul>
+					<input type="hidden" name="video" value="{#$detail_videoSource#}" class="imglist-hidden">
+				</div>
+				<div class="btn-section fn-clear">
+					<div class="uploadinp filePicker" id="filePicker4" data-extensions="mp4" data-mime="video/mp4" data-type="filenail" data-type-real="video" data-count="1" data-size="{#$videoSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][196]#}</span><em>+</em></div>{#* 添加视频 *#}
+				</div>
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt>{#$langData['siteConfig'][19][18]#}：</dt>{#* 关键词 *#}
+			<dd>
+				<input type="text" name="keywords" class="inp" id="keywords" size="60" maxlength="50" data-title="{#$langData['siteConfig'][20][33]#}" value="{#$detail_keywords#}" />
+				<a href="javascript:;" class="autoget variable variable-0 inline" data-type="keywords" style="display: inline;">{#$langData['siteConfig'][19][88]#}</a> {#* 自动获取 *#}
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt>{#$langData['siteConfig'][19][335]#}：</dt>{#* 描述 *#}
+			<dd>
+				<textarea class="inp text" name="description" id="description" rows="3" cols="60" data-title="{#$langData['siteConfig'][20][35]#}">{#$detail_description#}</textarea>{#* 请输入描述，10-200个字 *#}
+				<a href="javascript:;" class="autoget variable variable-0 inline" data-type="description" style="display: inline;">{#$langData['siteConfig'][19][88]#}</a> {#* 自动获取 *#}
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>性质：</dt>{#* 来源 *#}
+			<dd class="radioBox">
+				<label><input type="radio" name="article_prop" value="0"  {#if !$detail_prop#} checked{#/if#} /> 原创</label>&nbsp;&nbsp;
+				<label><input type="radio" name="article_prop"  value="1" {#if $detail_prop#} checked{#/if#} /> 转载/二改</label>&nbsp;&nbsp;
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<div class="editInfoBox {#if $detail_source#}reEdit{#/if#}">
+
+			<dl class="fn-clear" data-required="1">
+				<dt class="forSource"><span>*</span>{#$langData['siteConfig'][19][5]#}：</dt>{#* 来源 *#}
+				<dt class="forWriter">编辑：</dt>{#* 编辑 *#}
+				<dd>
+					<div class="fn-left forSource">
+						<input type="text" name="source" class="inp" id="source" size="20" maxlength="20" data-title="来源" value="{#if $do == "edit"#}{#$detail_source#}{#else#}{#/if#}" />{#* 请输入来源，2-20个字 - 原创 *#}
+						<span class="tip-inline"></span>
+					</div>
+					<div class="fn-left">
+						<label for="writer" class="fn-left forSource labelStyle">编辑：</label>
+						<input type="text" name="writer" class="inp" id="writer" size="20" placeholder="(选填)" maxlength="20" data-title="" value="{#if $do == "edit"#}{#$detail_writer#}{#else#}{#/if#}" />{#* 请输入作者，2-10个字 *#}
+						<!-- <span class="tip-inline"></span> -->
+					</div>
+				</dd>
+			</dl>
+			<dl class="fn-clear reEditItemInfo">
+				<dt>{#$langData['siteConfig'][19][24]#}：</dt>{#* 来源网址 *#}
+				<dd><input type="text" name="sourceurl" class="inp" id="sourceurl" placeholder="(选填)" size="40" maxlength="150" value="{#if $do == "edit"#}{#$detail_sourceurl#}{#/if#}" /></dd>
+			</dl>
+		</div>
+		<!-- <dl class="fn-clear" >
+			<dt>编辑：</dt>{#* 编辑 *#}
+			<dd>
+				<input type="text" name="writer" class="inp" id="writer" size="40" placeholder="选填" maxlength="40" data-title="{#$langData['siteConfig'][20][38]#}" value="{#if $do == "edit"#}{#$detail_writer#}{#else#}{#$userinfo.nickname#}{#/if#}" />{#* 请输入作者，2-10个字 *#}
+				<span class="tip-inline"></span>
+			</dd>
+		</dl> -->
+		
+		<dl class="fn-clear">
+			<dt>&nbsp;</dt>
+			<dd><button class="submit" id="submit">{#if $id == 0#}{#$langData['siteConfig'][6][69]#}{#else#}{#$langData['siteConfig'][6][122]#}{#/if#}</button></dd>{#* 立即投稿 - 提交修改 *#}
+		</dl>
+	</form>
+</div>

@@ -1,0 +1,135 @@
+{#* 
+{#$pageTit = "invitation"#}
+
+<div class="tab">
+  <ul>
+    <li data-id="0" class="type curr"><a href="javascript:;">{#$langData['siteConfig'][9][31]#}</a></li>
+    <li class="type" data-id="1"><a href="javascript:;">{#$langData['siteConfig'][9][32]#}</a></li>
+    <li class="type" data-id="2"><a href="javascript:;">{#$langData['siteConfig'][9][33]#}</a></li>
+  </ul>
+</div>
+<div class="count">
+  <ul>
+    <li>{#$langData['siteConfig'][20][267]|replace:'1':'<span id="state0">0</span>'#}</li>
+    <li>{#$langData['siteConfig'][20][267]|replace:'1':'<span id="state1">0</span>'#}</li>
+    <li>{#$langData['siteConfig'][20][267]|replace:'1':'<span id="state2">0</span>'#}</li>
+  </ul>
+</div>
+<div class="list"></div>
+
+  *#}
+
+  {#$pageTitle = '我的面试'#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$pageTitle#}</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/job-invitation.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+      var cookiePre = '{#$cfg_cookiePre#}';
+    </script>
+</head>
+<body>
+    <div class="header alignLeft">
+		<div class="header-l">
+				<a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+			</div>
+		<div class="header-address">
+            <span>我的面试</span>
+        </div>
+		
+	</div>
+
+    <div class="page" id="page" v-cloak>
+        <div class="container">
+            <div class="resumeTab">
+                <span :class="{'on_chose':end === 0}" @click="changeEnd(0)">待面试 <em v-if="end0 > 0">{{end0}}</em></span>
+                <span :class="{'on_chose':end === 1}"  @click="changeEnd(1)">已结束 <em v-if="end1 > 0">{{end1}}</em></span>
+            </div>
+            <div class="tdListBox">
+                <ul>
+                    <!-- <li v-for="item in tdList" @click="showtdPopInfo(item)">
+                        <div :class="['tdInfoBox', {'cancel_td':item.state == 2 || item.state == 3 }]">
+                            <div :class="'td_state state' + item.postState" :key="item.id">
+                                <div class="left_info">
+                                    <s><img :src="'{#$templets_skin#}images/job/td_icon_' + item.postState +'.png'" alt=""></s>
+                                    <h4 v-if="item.postState == 0">已投递</h4>
+                                    <h4 v-else-if="item.postState == 1">被查看</h4>
+                                    <h4 v-else-if="item.postState == 2">有意向</h4>
+                                    <h4 v-else-if="item.postState == 3">邀面试</h4>
+                                    <h4 v-else-if="item.postState == 4">不合适</h4>
+                                    <span class="td_time">{{timeStrToDate(item.newTime)}}</span>
+                                </div>
+                                <div class="right_info" v-if="item.state == 2 || item.state == 3"><span>{{item.state == 2 ? '已取消' : '已回绝'}}</span></div>
+                            </div>
+                            <div class="td_post">
+                                <h2><span class="title">{{item.job.title}}</span><span class="salary">{{item.job.show_salary}}</span></h2>
+                                <p class="typename">{{item.job.type}}<span class="addr" v-if="item.job.job_addr_detail.addrName && item.job.job_addr_detail.addrName.length">{{item.job.job_addr_detail.addrName[item.job.job_addr_detail.addrName.length - 1]}}</span></p>
+                                <p class="company">{{item.companyTitle}}</p>
+                            </div>
+                        </div>
+                    </li> -->
+                    <li v-for="(item,ind) in tdList">
+                      <a class="invitationBox tdInfoBox" :href="'{#$member_userDomain#}/post_detail.html?type=invitation&appFullsreen&id=' + item.id">
+                        <div class="td_post">
+                          <div class="h2">
+                            <h2 ><span class="title">{{item.job.title}}</span><span v-if="item.u_remark != 0" :class="['lab', {'noFit':item.u_remark && item.u_remark === 2}]">{{item.u_remark == 1 ? '备选' : '不合适'}}</span></h2>
+                            <span class="salary">{{item.job.show_salary}} <s v-if="item.job.dy_salary > 12"> · {{item.job.dy_salary}}<b>薪</b></s></span>
+                          </div>
+                          <p class="typename">{{item.job.type}}<span class="addr" v-if="item.job.job_addr_detail && item.job.job_addr_detail.addrName && item.job.job_addr_detail.addrName.length">{{item.job.job_addr_detail.addrName[item.job.job_addr_detail.addrName.length - 1]}}</span></p>
+                          <p class="company">{{item.companyTitle}}</p>
+                        </div>
+                        <div class="invitation_state" v-if="item.invition_state === 3 || !end">
+                          <div class="invitation_info">
+                            <span>待面试</span>
+                            <span class="invaitation_time">{{timeStrToDate(item.date)}}</span>
+                          </div>
+                          <div  class="btn_click">查看</div>
+                        </div>
+                        <div class="invitation_state invitation_end"  v-else>
+                          <div class="invitation_info">
+                            <span :class="{'red':item.invition_state}">{{item.invition_state === 1 ? '已取消' : (item.invition_state === 2 ? '已回绝' : '面试时间')}}</span>
+                            <span class="invaitation_time">{{timeStrToDate(item.date)}}</span>
+                          </div>
+                          <div class="solveData" v-if="item.invition_state != 1 && item.invition_state != 2" @click.stop.prevent="showBtn = true, showId = item.id">
+                            <div class="dot" >···</div>
+                            <div class="remarkbox" v-show="showBtn && showId == item.id">
+                              <ul>
+            
+                                <li @click="changeUreamark(1,item)">备选</li>
+                                <li @click="changeUreamark(2,item)">不合适</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </a>
+                    </li>
+
+                </ul>
+                <div class="loadingText" v-if="isload && tdList.length">{{loadEnd ? '没有更多了' : '下拉加载更多'}}</div>
+                <div class="noData" v-else-if="loadEnd && !tdList.length">
+                    <div class="noDataImg"><img src="{#$templets_skin#}images/job/invitation_nodata.png" alt=""></div>
+                    <h4>暂无面试邀请</h4>
+                    <p>快去寻找心仪的职位，投递简历增加面试机率吧</p>
+                </div>
+                <div class="loadingText" v-else>加载中...</div>
+    
+            </div>
+          
+        </div>
+    </div>
+
+    {#include file="../../siteConfig/touch_bottom_5.0.html" active="fifthicon" bottom_module="job"#}
+<script src="{#$templets_skin#}js/job-invitation.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="{#$cfg_soft_lang#}">
+    <title>准点抢购</title>{#*准点抢购*#}
+    <meta name="wap-font-scale" content="no">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}../../touch/css/mobileSelect.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu_shop_qianggou.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript"  src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.deferred.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+        var modelType = '{#$module#}';
+        var id = '{#$id#}',editId = '{#$id#}';
+        var beforeDays = 60;//提前多久参加活动
+        var endHour = 24;//活动开始多少小时后结束
+        var backUrl = '{#getUrlPath service='member' template='shop_huodong'#}';
+        var specifiVal = '{#if !$detail_specifiVal#}[]{#else#}{#$detail_specifiVal#}{#/if#}';//多规格
+        var goodidVal      = "{#$detail_goodid#}";
+        var huodongArr = [];
+    </script>
+</head>
+<body>
+{#$pageTitle = "准点抢购"#}{#*准点抢购*#}
+{#$pageLeft = '<div class="header-l"><a href="javascript:;" class="goBack"></a></div>'#}
+{#include file="top.html"#}
+<h3 class="tuanTip">同一商品，同一时段只能参加一个活动，商家需合理安排！</h3>
+<div class="container">
+    <form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=shop&action=huodongJoin&oper={#if $id#}update&hid={#$id#}{#else#}add{#/if#}" data-url="{#getUrlPath service='member' template='manage-shop' param="stype=activity&title=活动管理"#}">
+        <div class="chooseGoods" data-url="{#getUrlPath service='member' template='shop_goodlist'#}">
+            {#if $id#}
+            <div class="goodImg"><img src="{#$detail_litpic#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+            <div class="goodInfo"><h4>{#$detail_title#}</h4></div>
+            {#else#}
+            <span class="first">请先选择报名商品</span><i class="arr"></i>
+            {#/if#}
+        </div>
+        <input type="hidden" name="hdtype" value="qianggou" id="hdtype">
+        <input type="hidden" name="typeid" id="typeid" value="{#$typeid#}" />
+        <input type="hidden" name="id" id="goodsId" value="{#$detail_goodid#}">
+    <ul class="info {#if !$id#}disabled {#/if#}">
+        <li class="fn-clear yuanLi {#if $id#}noChange_{#/if#}">
+            <span class="name"><label for="market">原价</label></span>{#*原价*#}
+            <input type="text" value="{#if $detail_mprice#}{#echoCurrency type='symbol'#}{#$detail_mprice#}{#/if#}" id="market" placeholder="请先选择商品" autocomplete="off" readonly>
+            <input type="hidden" name="market" id="marketVal" value="{#$detail_mprice#}">
+        </li>
+        <li class="{#if $id#}noChange_{#/if#}">
+            <div class="pinTop fn-clear">
+                <span class="name"><label for="hdprice"><em class="star">*</em>抢购价</label></span>{#* 抢购价*#}
+                <div class="pintuanPrice">
+                    <span class="fn-right un">{#echoCurrency type='short'#}</span>
+                    <input type="text" name="hdprice" value="{#$detail_huodongprice#}" id="hdprice" placeholder="" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+                </div>
+            </div>
+            <!-- 存放多规格 -->
+            <div class="pinBot">
+            </div>         
+        </li>
+        <li class="fn-clear kucun">
+            <span class="name"><label for="inventory"><em class="star">*</em>活动库存</label></span>{#* 活动库存*#}
+            <span class="fn-right un">{#$langData['siteConfig'][21][10]#}</span>{#*件*#}
+            <input type="number" name="inventory" value="{#$detail_huodonginventory#}" id="inventory"  placeholder="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
+        </li>
+
+        <li class="fn-clear">
+            <span class="name"><label for="maxnum"><em class="star">*</em>每人限购</label></span>{#* 每人限购*#}
+            <span class="fn-right un">{#$langData['siteConfig'][21][10]#}</span> {#* 件*#}
+            <input type="number" name="maxnum" value="{#$detail_limit#}" id="maxnum"  placeholder="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
+        </li>
+        <li class="fn-clear hdTime {#if $id#}noChange_{#/if#}">
+            <span class="name"><label for="huodongtime"><em class="star">*</em>活动时间</label></span>{#* 活动时间*#}
+            <i class="arr"></i>
+            <span id="qghour">{#if $detail_changci#}{#$detail_changcinem#} {#/if#}</span>
+            <input mbsc-input type="text" value="{#if $detail_ktime#}{#date('Y-m-d',$detail_ktime)#}{#/if#}" id="huodongtime"  placeholder="选择场次" readonly {#if $detail_changci#}class="hasc"{#/if#}>
+            
+            <!-- 开始-结束时间 传至后台 -->
+            <input type="hidden" name="startdate" id="startdate" value="{#$detail_ktime|date_format:'%Y-%m-%d %H:%M:%S'#}">
+            <input type="hidden" name="enddate" id="enddate" value="{#$detail_etime|date_format:'%Y-%m-%d %H:%M:%S'#}">
+            <input type="hidden" name="changci" id="changci" value="{#$detail_changci#}">
+            <!-- 触发点击 无须传值-->
+            <input type="hidden" class="hourchose" value="">
+
+        </li>   
+
+    </ul>
+    <div class="qgTip">准点抢购每场活动时长有限，到点活动自动结束恢复常价</div>
+
+    
+    <div class="fabu_btn"> <span class="btn">提交报名</span> </div>{#*提交报名*#}
+    </form>
+</div>
+
+<div class="commask"></div>
+<div class="batch">
+    <h2>批量设定抢购价/活动库存</h2>
+    <div>
+      <input type="text" placeholder="输入抢购价" id="batchprice"  onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">  
+      <i>{#echoCurrency type='short'#}</i>
+    </div>
+    <div class="speDiv">
+       <input type="number" placeholder="输入活动库存" id="batchinventory" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');"> 
+       <i>件</i>
+    </div>
+    <h3>您可以只填其中一项</h3>
+    <ul class="fn-clear">
+        <li class="cancelbatch">取消</li>
+        <li class="surebatch">确认</li>
+    </ul> 
+</div>
+<!-- 跳转弹窗 s-->
+<div class="commask2"></div>
+<div class="jumpAlert">
+    <h2>重新选择报名商品？</h2>
+    <h3>重选商品后，当前商品已填内容将清空</h3>
+    <ul class="fn-clear">
+        <li class="canceljump">取消</li>
+        <li class="surejump">确认</li>
+    </ul> 
+</div>
+<!-- 跳转弹窗 e-->
+<script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}'
+    };
+</script>
+<script src="//res.wx.qq.com/open/js/jweixin-1.3.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<!-- 选择时间-->
+<script type="text/javascript" src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+<!-- 选择小时 -->
+<script type="text/javascript" src="{#$templets_skin#}js/mobileSelect_v2.js?v={#$cfg_staticVersion#}" ></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fabu_shop_huodong.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

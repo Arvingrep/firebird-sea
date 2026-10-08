@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>网站附件管理</title>
+{#$cssFile#}
+<script>
+var adminPath = "{#$adminPath#}", token = '{#$token#}', cfg_record_attachment_count = {#$cfg_record_attachment_count#};
+</script>
+<style>
+    .nav-tabs {margin: 10px 10px 0;}
+    .statistics {display: inline-block; margin-left: 10px;}
+    .input-prepend {box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%), 0 1px 2px rgb(0 0 0 / 5%); margin-left: 5px;}
+    .wxScenelist {border-top: 1px solid #eaeaea; padding: 10px;}
+    .wxScenelist .loading {text-align: center; line-height: 300px;}
+    .orderby.curr {color: #cd0200;}
+
+    .wxScenelist .item {position:relative; float:left; width:228px; overflow:hidden; padding:10px; margin:0 12px 12px 0; border:1px solid #ccc;}
+    .wxScenelist .item.selected {background:#ffffd5;}
+    .wxScenelist .item.selected .check {background-position: -144px -74px;}
+    .wxScenelist .item p {white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0; font-size: 12px; line-height: 20px;}
+    .wxScenelist .item span {float: left; font-size: 12px;}
+    .wxScenelist .item em {float: right; font-style: normal; font-size: 12px;}
+    .wxScenelist .item .oper {position: absolute; left: 0; right: 0; top: 0; height: 25px; background: rgba(255, 255, 255, .8); z-index: 2;}
+    .wxScenelist .item .oper .check {float: left; vertical-align: middle; margin: 5px 0 0 5px;}
+    .wxScenelist .item .oper .unexists {float: left; margin-left: 5px; color: #f00;}
+    .wxScenelist .item .oper .del {float: right; width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin: 3px 3px 0 0; text-indent: -999em; background: url(/static/images/admin/pubIcon.png?v=5) no-repeat; background-position: -186px -9px; vertical-align: middle; cursor: pointer;}
+
+    .nickname .userinfo {float: left; max-width: 70%; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+    .nickname .click {float: right!important;}
+
+    /* 图片 */
+    .file_image .item .img {width: 228px; height: 233px; display: block; margin-bottom: 5px; cursor: pointer;}
+    .file_image .item .img img {width: 100%; height: 100%; display: block; object-fit: contain;}
+
+    /* 视频 */
+    .file_video .item .img {position: relative; width: 228px; height: 233px; display: block; margin-bottom: 5px; cursor: pointer;}
+    .file_video .item .img::before {content: ''; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; background-image: url(/static/images/player.png); background-repeat: no-repeat; background-size: cover; z-index: 2;}
+    .file_video .item .img img {width: 100%; height: 100%; display: block; object-fit: contain; position: relative; z-index: 1;}
+    .file_video .item .img .duration {position: absolute; z-index: 3; left: 50%; top: 50%; padding: 0 5px; transform: translateX(-50%); margin-top: 30px; color: #fff; background-color: rgba(0, 0, 0, .4); border-radius: 6px;}
+
+    /* 音频 */    
+    .file_audio .item .img {position: relative; width: 228px; height: 70px; text-align: center; display: block; margin-bottom: 5px; cursor: pointer;}
+    .file_audio .item .img::after {content: ''; width: 40px; height: 40px; display: block; margin: 15px auto 0; background: url(/static/images/audio-player.png) no-repeat center; background-size: cover;}
+    .file_audio .item .img.playing::after {background: url(/static/images/audio-playing.gif) no-repeat center; background-size: cover;}
+    .file_audio .item .glyphicon-download-alt {display: inline-block; margin: 5px 5px 0 0; vertical-align: middle;}
+    .file_audio .item p {line-height: 25px;}
+    .file_audio .item .img .duration {margin-top: 45px; display: block; width: 100%; text-align: center;}
+
+ 
+    /* 文件 */
+    .file_file .item {padding-top: 30px;}
+    .file_file .item .glyphicon-download-alt {display: inline-block; margin: 5px 5px 0 0; vertical-align: middle;}
+    .file_file .item p {line-height: 25px;}
+
+    /* 其他 */
+    .file_ .item {padding-top: 30px;}
+    .file_ .item .glyphicon-download-alt {display: inline-block; margin: 5px 5px 0 0; vertical-align: middle;}
+    .file_ .item p {line-height: 25px;}
+    
+
+    /* 预览图片 */
+    @font-face {
+        font-family: 'Glyphicons Halflings1';
+        src: url('/static/fonts/glyphicons-halflings-regular_1.eot?v=4.2.0');
+        src: url('/static/fonts/glyphicons-halflings-regular_1.eot?#iefix&v=4.2.0') format('embedded-opentype'),url('/static/fonts/glyphicons-halflings-regular_1.woff?v=4.2.0') format('woff'),url('/static/fonts/glyphicons-halflings-regular_1.ttf?v=4.2.0') format('truetype'),url('/static/fonts/glyphicons-halflings-regular_1.svg?v=4.2.0#fontawesomeregular') format('svg');
+        font-weight: normal;
+        font-style: normal
+    }
+
+    .glyphicon {
+        position: relative;
+        top: 1px;
+        display: inline-block;
+        font-family: 'Glyphicons Halflings1';
+        font-style: normal;
+        font-weight: normal;
+        line-height: 1;
+
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    .glyphicon-download-alt:before {content:"\e025"}
+</style>
+</head>
+
+<body>
+<ul class="nav nav-tabs clearfix">
+    <li data-type="image" class="active"><a href="javascript:;">图片</a></li>
+    <li data-type="video"><a href="javascript:;">视频</a></li>
+    <li data-type="audio"><a href="javascript:;">音频</a></li>
+    <li data-type="file"><a href="javascript:;">文件</a></li>
+    <li data-type=""><a href="javascript:;">其他</a></li>
+    <button style="float: right;" type="button" class="btn btn-mini" id="customConfigBtn"><i class="icon-cog" style="vertical-align: bottom;"></i> 自定义配置</button>
+</ul>
+
+<div class="search">
+  <label>搜索：</label>
+  <div class="btn-group" id="cmodule" data-id="">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">所属模块<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li><a href="javascript:;" data-id="">全部</a></li>
+      <li><a href="javascript:;" data-id="siteConfig">系统相关</a></li>
+      <li><a href="javascript:;" data-id="member">会员相关</a></li>
+      <li><a href="javascript:;" data-id="business">商家相关</a></li>
+      {#foreach from=$moduleList item=l#}
+      <li><a href="javascript:;" data-id="{#$l.name#}">{#$l.title#}</a></li>
+      {#/foreach#}
+    </ul>
+  </div>
+  <input class="input-xlarge" type="search" id="keyword" placeholder="请输入关键字，指定用户#123">
+  &nbsp;&nbsp;上传时间&nbsp;&nbsp;<input class="input-small" type="text" id="stime" autocomplete="off" placeholder="开始时间">&nbsp;&nbsp;到&nbsp;&nbsp;<input class="input-small" autocomplete="off" type="text" id="etime" placeholder="结束时间">&nbsp;&nbsp;
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <button type="button" class="btn btn-danger" id="batchDelBtn">批量删除</button>
+</div>
+
+<div class="filter clearfix">
+    <div class="f-left">
+        <div class="btn-group" id="selectBtn">
+            <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+            <ul class="dropdown-menu">
+                <li><a href="javascript:;" data-id="1">全选</a></li>
+                <li><a href="javascript:;" data-id="0">不选</a></li>
+                <li><a href="javascript:;" data-id="2">文件不存在(<span id="totalUnExists">0个</span>)</a></li>
+            </ul>
+        </div>
+        <button class="btn" data-toggle="dropdown" id="delBtn">删除</button>
+
+        <div class="statistics">
+            <div class="input-prepend input-append" style="margin-bottom:0;">
+                <span class="add-on">文件总数&nbsp;</span>
+                <span class="add-on totalCount"><img src="/static/images/loading_16.gif"></span>
+            </div>
+            <div class="input-prepend input-append" style="margin-bottom:0;">
+                <span class="add-on">占用空间&nbsp;</span>
+                <span class="add-on totalSize"><img src="/static/images/loading_16.gif"></span>
+            </div>
+        </div>
+        <a href="javascript:;" class="orderby curr" data-id="" style="margin-left: 20px;">上传时间↓</a>
+        <a href="javascript:;" class="orderby" data-id="size" style="margin-left: 10px;">文件大小↓</a>
+        {#if !$cfg_record_attachment_count#}
+        <a href="javascript:;" class="orderby" data-id="click" style="margin-left: 10px;">使用次数↓</a>
+        {#/if#}
+        <!-- <a href="javascript:;" class="checkUnExistsFiles" style="margin-left: 30px;">选中所有不存在的文件</a> -->
+    </div>
+    <div class="f-right">
+        <div class="btn-group" id="pageBtn" data-id="50">
+            <button class="btn dropdown-toggle" data-toggle="dropdown">每页50条<span class="caret"></span></button>
+            <ul class="dropdown-menu pull-right">
+                <li><a href="javascript:;" data-id="50">每页50条</a></li>
+                <li><a href="javascript:;" data-id="100">每页100条</a></li>
+                <li><a href="javascript:;" data-id="200">每页200条</a></li>
+                <li><a href="javascript:;" data-id="500">每页500条</a></li>
+                <li><a href="javascript:;" data-id="1000">每页1000条</a></li>
+                <li><a href="javascript:;" data-id="2000">每页2000条</a></li>
+            </ul>
+        </div>
+        <button class="btn disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+        <button class="btn disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+        <div class="btn-group" id="paginationBtn">
+            <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+            <ul class="dropdown-menu" style="left:auto; right:0;">
+                <li><a href="javascript:;" data-id="1">第1页</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="wxScenelist clearfix" id="list" data-totalpage="1" data-atpage="1">
+    <div class="loading">加载中...</div>
+</div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<script id="addForm" type="text/html">
+    <form action="###" class="quick-editForm smsForm" name="smsForm" onsubmit="return false;">
+      <dl class="clearfix" style="padding: 50px 0;">
+        <dt>链接地址：</dt>
+        <dd><input class="input-xxlarge" type="text" name="url" id="url" value="" /></dd>
+      </dl>
+    </form>
+</script>
+
+<div class="hide">
+    <span id="mmodule"></span>
+    <span id="sKeyword"></span>
+    <span id="start"></span>
+    <span id="end"></span>
+</div>
+
+<script id="editForm" type="text/html">
+    <form action="" class="quick-editForm" name="editForm">
+        <dl class="clearfix">
+            <dt>指定类型：</dt>
+            <dd>
+                <label><input type="checkbox" name="type[]" value="image" checked />图片</label>&nbsp;
+                <label><input type="checkbox" name="type[]" value="video" checked />视频</label>&nbsp;
+                <label><input type="checkbox" name="type[]" value="audio" checked />音频</label>&nbsp;
+                <label><input type="checkbox" name="type[]" value="file" checked />文件</label>&nbsp;
+                <label><input type="checkbox" name="type[]" value="" checked />其他</label>
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>指定模块：</dt>
+            <dd>
+                <select name="module" id="module" class="input-large">
+                    <option value="">全部</option>
+                    <option value="siteConfig">系统相关</option>
+                    <option value="member">会员相关</option>
+                    <option value="business">商家相关</option>
+                    {#foreach from=$moduleList item=l#}
+                    <option value="{#$l.name#}">{#$l.title#}</option>
+                    {#/foreach#}
+                </select>
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>指定会员：</dt>
+            <dd><input class="input-xlarge" type="text" name="uid" id="uid" placeholder="会员ID，多个用“,”逗号分开" /></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>上传时间：</dt>
+            <dd>
+                <input name="stime" type="datetime-local" id="stime" class="input-medium" placeholder="yyyy-mm-dd hh:ii:ss" />
+                -
+                <input name="etime" type="datetime-local" id="etime" class="input-medium" placeholder="yyyy-mm-dd hh:ii:ss" />
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>使用次数：</dt>
+            <dd>
+                <input class="input-mini" type="number" min="0" name="scount" id="scount" value="" />
+                -
+                <input class="input-mini" type="number" min="0" name="ecount" id="ecount" value="" />
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>其他条件：</dt>
+            <dd>
+                <label title="删除掉文件已经无法打开的数据库记录，此选项由于要判断文件是否真实存在，需要消耗一些时间，所以请耐心等待！"><input type="checkbox" name="else[]" value="1" />文件不存在</label>&nbsp;
+                <label title="用户已经不存在，删除掉这些用户所上传的文件"><input type="checkbox" name="else[]" value="2" checked />用户已删除</label>
+            </dd>
+        </dl>
+    </form>
+</script>
+
+<script id="editForm1" type="text/html">
+    <form action="" class="quick-editForm" name="editForm">
+      <dl class="clearfix">
+        <dt class="statusTips" style="width: 170px;" data-toggle="tooltip" data-placement="bottom" title="" data-original-title="开启后，会对附件表进行频繁写操作，如果服务器配置较低，建议关闭该功能，否则可能会出现表损坏的情况！"><i class="icon-question-sign" style="margin-top: 3px;"></i> 记录附件使用次数：</dt>
+        <dd><label><input type="radio" name="record_attachment_count" value="0"{#if !$cfg_record_attachment_count#} checked{#/if#}>开启</label><label style="margin-left: 15px;"><input type="radio" name="record_attachment_count" value="1"{#if $cfg_record_attachment_count#} checked{#/if#}>关闭</label></dd>
+      </dl>
+    </form>
+  </script>
+
+<script type="text/javascript" src="{#$cfg_basehost#}/templates/member/touch/im/js/BenzAMRRecorder.js?v={#$cfg_staticVersion#}" ></script>
+{#$jsFile#}
+</body>
+</html>

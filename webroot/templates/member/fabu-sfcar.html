@@ -1,0 +1,349 @@
+
+
+
+
+		<script type="text/javascript">
+			var service = "sfcar";
+			var payReturn = "{#getUrlPath service='member' type='user' template='manage' action='sfcar'#}";
+			var geetest = {#$cfg_geetest#};
+			//var customFabuCheckPhone = {#$customFabuCheckPhone#};
+			var customFabuCheckPhone = 1;
+			var userinfo = {
+			  	phone: '{#$userinfo.phone#}',
+			  	phoneCheck: {#$userinfo.phoneCheck#}
+			};
+			var fabuSuccessUrl = '{#getUrlPath service='sfcar' templates='fabusuccess' id='%id%'#}';
+			var st  		   = '{#$insertselect#}';
+			var yt = '{#if $detail_type==0 && $detail_usetype ==0 && $detail_usetype!=''#}1{#elseif $detail_type==0 && $detail_usetype ==1 #}2{#elseif $detail_type==1 && $detail_usetype ==1 #}4{#else#}{#if $do == "edit"#}3{#else#}1{#/if#}{#/if#}'
+			var doEdit ='{#if $do == "edit"#}1{#else#}0{#/if#}'
+			var dotype = {#$smarty.get.type|default:0#}; // 0 => 我是乘客  1 => 我是车主
+			var startType = '{#$smarty.get.startType#}';  //是否是天天发车
+		</script>
+		<ul class="main-tab">
+			<li class="curr">
+				<a href="javascript:;">{#if $do == "edit"#}{#$langData['sfcar'][2][1]#}{#else#}{#$langData['sfcar'][2][0]#}{#/if#}</a>
+				{#* 修改顺风车-发布顺风车 *#}
+			</li>
+			<li><a href="{#getUrlPath service='member' type='user' template='manage-sfcar'#}">{#$langData['siteConfig'][10][11]#}</a></li>{#* 我的全部信息 *#}
+		</ul>
+
+		<div class="w-form">
+			<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=sfcar&action={#if $do == "edit"#}edit&id={#$id#}{#else#}put{#/if#}" data-url="{#getUrlPath service='member' type='user' template='manage' action='sfcar'#}">
+			<input type="hidden" name="cityid" value="{#$siteCityInfo['cityid']#}">
+				<div class="basicInfo">
+					<h2 class="comm-title">{#$langData['siteConfig'][19][22]#}</h2> {#* 基本信息 *#}
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['sfcar'][2][2]#}：</dt>{#* 发布类型 *#}
+						<dd>
+							<div class="radio fabutype" data-title="{#$langData['sfcar'][2][3]#}">{#* 请选择发布类型 *#}
+								<span data-id="1" data-type="owner" {#if $do=="edit" && $detail_type ==0#} style="display: none;" {#/if#}  {#if $detail_type ==1 || $detail_type == "" #} class="curr"{#/if#}>{#$sfcar_displayConfig[1]['title']#}</span>{#* 我是车主 *#}
+								<span data-id="0" data-type="user" {#if $do=="edit" && $detail_type ==1#} style="display: none;" {#/if#}{#if $detail_type ==0 && $detail_type != ""#} class="curr"{#/if#}>{#$sfcar_displayConfig[0]['title']#}</span>{#* 我要用车 *#}
+								<input type="hidden" name="fabutype" id="fabutype" value="{#if $detail_type!=''#}{#$detail_type#}{#else#}0{#/if#}" />{#* 我是车主 *#}
+							</div>
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+
+					{#if $insertselect == 1	#}
+					<!-- 出发地 s-->
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['sfcar'][0][19]#}：</dt>{#* 出发地 *#}
+						<dd id="selAddr1">
+							<div class="sel-group" data-title="{#$langData['sfcar'][0][0]#}">{#* 请选择出发地 *#}
+								<div class="startPlace addrBtn" data-field="addrid" data-type="area" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_startaddrid split=' ' action='area'#}" data-id="{#$detail_startaddrid#}">{#if $detail_startaddr != ""#}{#if  $detail_startaddrid != 0#}{#getPublicParentInfo tab='site_area' id=$detail_startaddrid type='typename' split=' ' action='area'#}{#else#}{#$detail_startaddr#}{#/if#}{#else#}{#$langData['sfcar'][0][0]#}{#/if#}</div>{#* 请选择出发地*#}
+							</div>
+
+							<div class="startAdress fakeTXT inp" {#if $detail_startAdress#} style="display: block;" {#/if#} contenteditable="true" data-placeholder="{#$langData['sfcar'][0][39]#}">{#$detail_startAdress#}</div>{#* 详细地址(选填)*#}
+
+							<input type="hidden" name="startaddrid" id="startaddrid" value="{#$detail_startaddrid#}" />
+							<input type="hidden" name="startaddr" id="startaddr" value="{#$detail_startaddr#}" />
+			                <input type="hidden" name="startAdress" id="startAdress">
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+					<!-- 出发地 e-->
+					<!-- 目的地 s-->
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['sfcar'][0][20]#}：</dt>{#* 目的地 *#}
+						<dd id="selAddr2">
+							<div class="sel-group" data-title="{#$langData['sfcar'][0][1]#}">{#* 请选择目的地 *#}
+								<div class="endPlace addrBtn" data-field="addrid" data-type="area" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_endaddrid split=' ' action='area'#}" data-id="{#$detail_endaddrid#}">{#if $detail_endaddr != ""#}{#if  $detail_endaddrid != 0#}{#getPublicParentInfo tab='site_area' id=$detail_endaddrid type='typename' split=' ' action='area'#}{#else#}{#$detail_endaddr#}{#/if#}{#else#}{#$langData['sfcar'][0][1]#}{#/if#}</div>{#* 请选择目的地*#}
+							</div>
+
+							<div class="endAddress fakeTXT inp" {#if $detail_endAddress#} style="display: block;" {#/if#}  contenteditable="true" data-placeholder="{#$langData['sfcar'][0][39]#}">{#$detail_endAddress#}</div>{#* 详细地址(选填)*#}
+
+							<input type="hidden" name="endaddrid" id="endaddrid" value="{#$detail_endaddrid#}" />
+							<input type="hidden" name="endaddr" id="endaddr" value="{#$detail_endaddr#}" />
+			                <input type="hidden" name="endAddress" id="endAddress">
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+					<!-- 目的地 e-->
+					{#else#}
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['sfcar'][0][19]#}：</dt>{#* 出发地 *#}
+						<dd class="sAddr">
+							<div class="startInput fakeInp inp" contenteditable="true" data-placeholder="{#$langData['sfcar'][2][36]#}" data-title="{#$langData['sfcar'][2][36]#}">{#if $detail_startaddr#}{#$detail_startaddr#} {#$detail_startAdress#}{#/if#}</div>{#* 请填写出发地*#}
+							<span class="tip-inline"></span>
+							<input type="hidden" name="startaddr" id="startaddr" value="{#$detail_startaddr#}" />
+						</dd>
+					</dl>
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['sfcar'][0][20]#}：</dt>{#* 目的地 *#}
+						<dd class="eAddr">
+							<div class="endInput fakeInp inp" contenteditable="true" data-placeholder="{#$langData['sfcar'][2][37]#}" data-title="{#$langData['sfcar'][2][37]#}">{#if $detail_endaddr#}{#$detail_endaddr#} {#$detail_endAddress#}{#/if#}</div>{#* 请填写目的地*#}
+							<span class="tip-inline"></span>
+							<input type="hidden" name="endaddr" id="endaddr" value="{#$detail_endaddr#}" />
+						</dd>
+					</dl>
+					{#/if#}
+
+					<!-- 途经地 s-->
+					<dl class="fn-clear route-wrap" {#if $detail_type == 0  && $detail_type !=''#} style="display: none;" {#/if#}>
+						<dt>{#$langData['sfcar'][2][6]#}：</dt>{#* 途径地 *#}
+						<dd>
+							<div class="route">
+					            {#if $detail_accessaddray#}
+					            {#foreach from=$detail_accessaddray key=k item=i#}
+								<div class="route-div has">
+						            {#* 添加途径地点*#}
+					           		<input type="text" placeholder="{#$langData['sfcar'][0][42]#}" value="{#$i#}" class="inp">
+						           	<i class="del-route" style="display: block;"></i>
+						        </div>
+					        	{#/foreach#}
+						        {#else#}
+						        <div class="route-div">
+						            {#* 添加途径地点*#}
+					           		<input type="text" placeholder="{#$langData['sfcar'][0][42]#}" value="" class="inp">
+						           	<i class="del-route"></i>
+						        </div>
+					        	{#/if#}
+						        <span class="add-route">+{#$langData['siteConfig'][6][18]#}</span> {#* 添加 *#}
+							</div>
+							<p class="route-tip"><i></i>添加途径地点（最多10条），可以让更多顺路乘客看到你的发车信息哦~</p>{#* 添加途径地点（最多10条），可以让更多顺路乘客看到你的发车信息哦~ *#}
+							<input type="hidden" name="route" id="way">
+						</dd>
+					</dl>
+					<!-- 途经地 e-->
+					<!-- 出发时间 s-->
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['sfcar'][0][26]#}：</dt>{#* 出发时间 *#}
+						<dd>
+							<div class="radio startType" {#if $detail_type==0 || $detail_type ==''#} style="display: none;" {#/if#}>
+								<span data-id="0" {#if $detail_missiontype == 0 || $detail_missiontype == ""#} class="curr" {#/if#}  id="dancar">{#$langData['sfcar'][2][5]#}</span>{#* 单次发车 *#}
+								<span data-id="1" {#if $detail_missiontype == 1#} style="display: block;" class="curr"{#/if#}  id="daydaycar">{#$langData['sfcar'][0][16]#}</span>{#* 天天发车 *#}
+
+								<input type="hidden" name="startType" id="startType" value="{#$detail_missiontype#}" />{#* 天天发车 *#}
+							</div>
+							<div class="time-wrap">
+
+								<div class="time-div {#if $detail_missiontype == 1#}fn-hide{#/if#}" >
+									{#* 请选择出发日期 *#}
+									<input type="text" name="startTime" class="inp" id="startTime" size="20" placeholder="{#$langData['sfcar'][0][43]#}" data-title="{#$langData['sfcar'][0][43]#}" value="{#$detail_ymd#}" autocomplete="off" />
+									<span class="tip-inline"></span>
+								</div>
+								<div class="clock-div" {#if $detail_missiontype ==1 || $detail_his#} style="display: block;" {#/if#}>
+									{#* 请选择时间（选填） 请选择出发时间*#}
+									<input type="text" name="startClock" placeholder="{#$langData['sfcar'][2][9]#}" data-title="{#$langData['sfcar'][0][3]#}" id="clockChose" readonly value="{#$detail_his#}" class="clock inp">
+								</div>
+
+							</div>
+
+
+						</dd>
+					</dl>
+					<!-- 出发时间 e-->
+					<!-- 用途 s-->
+					<dl class="fn-clear">
+						<dt><span>*</span>{#$langData['sfcar'][0][45]#}：</dt>{#* 用途 *#}
+						<dd>
+							<div class="radio usetype">
+								<span data-id="0" data-type="people" {#if $detail_usetype ==0 || $detail_usetype == ""#} class="curr"{#/if#}>{#$langData['sfcar'][0][46]#}</span>{#* 载人 *#}
+								<span data-id="1" data-type="goods"{#if $detail_usetype == 1#} class="curr"{#/if#}>{#$langData['sfcar'][0][47]#}</span>{#* 载货 *#}
+
+								<input type="hidden" name="usetype" id="usetype" value="{#$detail_usetype#}" />{#* 载货 *#}
+							</div>
+						</dd>
+					</dl>
+					<!-- 用途 e-->
+					<dl class="fn-clear people-wrap" {#if ($detail_type ==0 || $detail_type =='') && $detail_usetype==0 #}  style="display: block;" {#else#}  style= "display: none;"  {#/if#} data-required="1">
+						<dt><span>*</span>{#$langData['sfcar'][2][4]#}：</dt>{#* 乘坐人数 *#}
+						<dd>
+							<div class="people input-append">
+					            {#* 请填写乘坐人数 -- 人*#}
+					            <input type="text" placeholder="{#$langData['sfcar'][0][4]#}" class="peopleNum" name="number" data-title="{#$langData['sfcar'][0][4]#}" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" value="{#if ($detail_type ==0 || $detail_type =='') && $detail_usetype==0 #}{#$detail_number#}{#/if#}">
+					            <span class="add-aft">{#$langData['siteConfig'][13][32]#}</span>
+					            <span class="tip-inline"></span>
+					        </div>
+						</dd>
+					</dl>
+					<dl class="fn-clear seat-wrap"  {#if ($detail_type ==1 && $detail_usetype==0) #} style="display: block;" {#else#} style="display: none;" {#/if#}   data-required="1">
+						<dt><span>*</span>{#$langData['sfcar'][2][8]#}：</dt>{#* 座位数 *#}
+						<dd>
+							<div class="people input-append">
+					            {#* 请填写座位数 -- 座*#}
+					            <input type="text" placeholder="{#$langData['sfcar'][0][5]#}" class="seatNum" name="carseat" data-title="{#$langData['sfcar'][0][5]#}" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" value="{#if $detail_type ==1 && $detail_usetype==0#}{#$detail_carseat#}{#/if#}">
+					            <span class="add-aft">{#$langData['sfcar'][0][70]#}</span>
+					            <span class="tip-inline"></span>
+					        </div>
+						</dd>
+					</dl>
+					<dl class="fn-clear carType-div" {#if $detail_type ==1 && $detail_usetype==1#} style='display: block;' {#else#} style='display: none;' {#/if#} >
+						<dt><span>*</span>{#$langData['sfcar'][0][62]#}：</dt>{#* 选择车型 *#}
+						<dd>
+							<div class="carType">
+								{#loop service="sfcar" action="item" return="item" type="5" #}
+					            <input type="radio" name="cartype" value="{#$item['id']#}" id="smallCar{#$item['id']#}" {#if (strstr($detail_cartype, "{#$item['id']#}")) && $detail_usetype == 1#} checked{#/if#}><label for="smallCar{#$item['id']#}">{#$item['typename']#}</label>
+					            {#/loop#}
+					        </div>
+					        <span class="tip-inline"></span>
+						</dd>
+					</dl>
+				</div>
+				<div class="contactInfo">
+					<h2 class="comm-title">{#$langData['siteConfig'][19][424]#}</h2> {#* 联系方式 *#}
+
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['siteConfig'][3][6]#}：</dt>{#* 手机号码 *#}
+						<dd class="fn-clear">
+							<span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+							<input type="text" name="tel" class="inp" id="tel" size="20" data-title="{#if $detail_tel == ""&&$userinfo.phone=="" #}{#$langData['siteConfig'][20][463]#}{#else#}{#$langData['siteConfig'][4][9]#}{#/if#}" onkeyup="value=value.replace(/\D+/ig,'')" value="{#if $detail_tel != ""#}{#$detail_tel#}{#else#}{#$userinfo.phone#}{#/if#}" />{#* 请输入手机号码 *#}
+							<div class="areaCode_wrap areaCode_wrap2">
+				              <ul>
+
+				              </ul>
+				            </div>
+							<input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+                    {#if !$sfcar_fabuCheckPhone#}
+					<dl class="fn-clear fn-hide testbox" >
+						<dt><span>*</span>{#$langData['siteConfig'][4][0]#}：</dt>{#* 验证码 *#}
+						<dd>
+							<input type="text" name="vercode" class="inp" id="testcode" size="20" data-title="{#$langData['siteConfig'][20][176]#}"  />{#* 请输入验证码 *#}
+							<a class="codebtn" href="javascript:;">{#$langData['siteConfig'][4][7]#}</a>{#* 发送验证码 *#}
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+                    {#/if#}
+					<dl class="fn-clear">
+						<dt>{#$langData['siteConfig'][19][642]#}：</dt>{#* 联系人*#}
+						<dd>
+							<input type="text" name="person" class="inp" id="person" size="20" data-title="{#$langData['siteConfig'][27][138]#}" value="{#if $detail_person != ""#}{#$detail_person#}{#else#}{#$userinfo.nickname#}{#/if#}" />{#* 请输入联系人 *#}
+						</dd>
+					</dl>
+				</div>
+				<div class="descripInfo">
+					<h2 class="comm-title">{#$langData['sfcar'][2][18]#}</h2> {#* 详细描述*#}
+					<dl class="fn-clear">
+						<dt>{#$langData['sfcar'][0][48]#}：</dt>{#* 标签*#}
+						<!-- 我是乘客 乘车 -->
+						<dd class="mark {#if ($detail_type == 0 && $detail_usetype ==0 && $do=='edit') || $do=='fabu' || $do=='' #} show {#/if#}user-car">
+							<div class="checkbox">
+								{#loop service="sfcar" action="item" return="item" type="1" #}
+								<label><input type="checkbox" name="flag[]" value="{#$item['id']#}"{#if strstr($detail_tag, "{#$item['id']#}")#} checked=""{#/if#}>{#$item['typename']#}</label>{#* 上门接送 *#}
+								{#/loop#}
+						</dd>
+						<!-- 我是乘客 载货 -->
+						<dd class="mark {#if $detail_type == 0 && $detail_usetype ==1 #} show {#/if#} user-goods">
+							<div class="checkbox">
+								{#loop service="sfcar" action="item" return="item" type="2" #}
+								<label><input type="checkbox" name="flag[]" value="{#$item['id']#}"{#if strstr($detail_tag, "{#$item['id']#}")#} checked=""{#/if#}>{#$item['typename']#}</label>{#* 上门接送 *#}
+								{#/loop#}
+							</div>
+						</dd>
+						<!-- 我是车主 找乘客 -->
+						<dd class="mark {#if $detail_type == 1 && $detail_usetype ==0 #} show {#/if#} owner-car">
+							<div class="checkbox">
+								{#loop service="sfcar" action="item" return="item" type="3" #}
+								<label><input type="checkbox" name="flag[]" value="{#$item['id']#}"{#if strstr($detail_tag, "{#$item['id']#}")#} checked=""{#/if#}>{#$item['typename']#}</label>{#* 上门接送 *#}
+								{#/loop#}
+							</div>
+						</dd>
+						<!-- 我是车主 找货物 -->
+						<dd class="mark {#if $detail_type == 1 && $detail_usetype ==1 #} show {#/if#} owner-goods">
+							<div class="checkbox">
+								{#loop service="sfcar" action="item" return="item" type="4" #}
+								<label><input type="checkbox" name="flag[]" value="{#$item['id']#}"{#if strstr($detail_tag, "{#$item['id']#}")#} checked=""{#/if#}>{#$item['typename']#}</label>{#* 上门接送 *#}
+								{#/loop#}
+							</div>
+						</dd>
+					</dl>
+					<dl class="fn-clear">
+						<dt>{#$langData['sfcar'][0][35]#}：</dt>{#* 备注说明*#}
+						<dd>
+							<div class="note">
+				              	<textarea name="note" id="note" placeholder="{#$langData['sfcar'][0][50]#}">{#$detail_note#}</textarea>{#*例如：携带几件行李，最早/最晚出发时间/可随时出发，或其他需要补充说明的情况 *#}
+				          	</div>
+						</dd>
+					</dl>
+					<dl class="fn-clear">
+						<dt>{#$langData['siteConfig'][6][78]#}：</dt>{#* 上传照片 *#}
+						<dd class="listImgBox">
+							<div class="list-holder">
+								<ul id="listSection2" class="fn-clear listSection fn-hide"{#if $detail_piclsit#} style="display: block;"{#/if#}>
+									{#foreach from=$detail_piclsit key=k item=i#}
+									<li class="fn-clear" id="WU_FILE_1_{#$k#}">
+										<span class="li-move" title="{#$langData['siteConfig'][23][42]#}">↕</span>{#* 拖动调整图片顺序 *#}
+										<a class="li-rm" href="javascript:;">×</a>
+										<div class="li-thumb" style="display: block;">
+											<div class="r-progress"><s></s></div>
+											<span class="ibtn">
+												<a href="javascript:;" class="Lrotate" title="{#$langData['siteConfig'][23][43]#}"></a>{#* 逆时针旋转90度 *#}
+												<a href="javascript:;" class="Rrotate" title="{#$langData['siteConfig'][23][44]#}"></a>{#* 顺时针旋转90度 *#}
+												<a href="{#$i.path#}" target="_blank" class="enlarge" title="{#$langData['siteConfig'][23][45]#}"></a>{#* 放大 *#}
+											</span>
+											<span class="ibg"></span>
+											<img data-val="{#$i.pathSource#}" data-url="{#changeFileSize url="{#$i.picpath#}" type="small"#}" src="{#changeFileSize url="{#$i.picpath#}" type="small"#}" />
+										</div>
+										<textarea class="li-desc" placeholder="{#$langData['siteConfig'][20][477]#}" style="display: inline-block;">{#$i.info#}</textarea>{#* 请输入图片描述 *#}
+									</li>
+									{#/foreach#}
+								</ul>
+								<input type="hidden" name="imglist" value="{#$detail_piclsitt#}" class="imglist-hidden">
+							</div>
+							<div class="btn-section fn-clear">
+								<div class="wxUploadObj fn-clear">
+									<div class="uploadinp filePicker" id="filePicker2" data-type="desc" data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][168]#}</span></div>{#* 添加图片 *#}
+									<span class="upload-split fn-hide">{#$langData['siteConfig'][13][0]#}</span>{#* 或 *#}
+									<dl class="wxUpload fn-hide fn-clear">
+										<dt><img id="wxUploadImg" src="{#$templets_skin#}images/qr.jpg" /></dt>
+										<dd>{#$langData['siteConfig'][19][362]#}<em class="wx">{#$langData['siteConfig'][27][139]#}</em>{#$langData['siteConfig'][27][140]#}<br />{#$langData['siteConfig'][19][846]#}{#$cfg_weixinName#}{#$langData['siteConfig'][27][141]#}<br />{#$langData['siteConfig'][27][142]#}<em class="fs">{#$langData['siteConfig'][6][139]#}</em>{#$langData['siteConfig'][27][143]#}</dd>{#* 使用-微信-扫描左侧二维码-关注-公众号后-将图片-发送-给公众号即可传图 *#}
+									</dl>
+								</div>
+								<div class="upload-tip">
+									<p><a href="javascript:;" class="fn-hide deleteAllAtlas"{#if $detail_imglist#} style="display: inline-block;"{#/if#}>{#$langData['siteConfig'][6][79]#}</a>{#* 删除所有 *#}
+										&nbsp;&nbsp;{#$langData['siteConfig'][54][19]|replace:' 1 ':(($atlasSize/1024)|string_format:"%d")|replace:' 2 ':$atlasMax#} <span class="fileerror"></span></p>{#* 单张最大 1 M，最多 2 张 *#}
+								</div>
+							</div>
+						</dd>
+					</dl>
+
+				</div>
+
+				<dl class="fn-clear">
+					<dt>&nbsp;</dt>
+						<dd><button class="submit" id="submit">{#if $id == 0#}{#$langData['siteConfig'][11][19]#}{#else#}{#$langData['siteConfig'][6][122]#}{#/if#}</button></dd>
+						{#* 立即发布 - 提交修改  *#}
+				</dl>
+			</form>
+		</div>
+		<script type="text/javascript">
+			var detail = {
+  				contact: '{#$detail_tel#}'
+  			}
+		</script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.coord.js"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/calendar/WdatePicker.js"></script>
+		<script type="text/javascript" src="{#$templets_skin#}js/sfcarAddr.js?v={#$cfg_staticVersion#}"></script>
+		<!-- <script type="text/javascript" src="{#$cfg_staticPath#}js/publicAddr.js?v={#$cfg_staticVersion#}"></script> -->
+		{#if $cfg_geetest#}
+		{#if $cfg_geetest == 1#}
+		<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+		{#/if#}
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+		{#/if#}
+		<script src="{#$templets_skin#}js/fabu-sfcar-codetest.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$templets_skin#}js/sfcar-pickTime.js?v={#$cfg_staticVersion#}"></script>

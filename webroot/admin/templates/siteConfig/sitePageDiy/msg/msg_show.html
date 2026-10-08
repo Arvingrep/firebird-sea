@@ -1,0 +1,62 @@
+<!-- 消息通知 -->
+<div class="msgConBox"  v-if="modCon.id == 20" :style="'background:'+ checkBgColor(modCon.content.style.bgColor,modCon.content.style.opacity) +'; margin:'+ (modCon.content.style.marginTop / 2 ) + 'px '+(modCon.content.style.marginLeft / 2)+'px 0; border-radius: '+ (modCon.content.style.borderRadius / 2) +'px; '">
+    <div :class="['msgCon','msgCon_style' + modCon.content.styletype]" :style="'height:'+modCon.content.style.height / 2+'px;'">
+        <div :class="['msg_title',{'placeholder':!modCon.content.title.text &&  modCon.content.title.type == 'text'},{'imgTitle': modCon.content.title.type == 'image'}]" :style="'color:'+(modCon.content.title.style.color)+';'">
+            <span v-if="modCon.content.title.type == 'text'">{{modCon.content.title.text ? modCon.content.title.text : '通告标题'}}</span>
+            <span v-else><img crossOrigin='anonymous' v-if="modCon.content.title.image" :src="modCon.content.title.image + '?v=' + randomNum" onerror="this.src='/static/images/404.jpg'"></span>
+        </div>
+        <div class="msgText">
+            <template v-if="modCon.content.styletype == 1 || modCon.content.styletype == 3 ">
+                <el-carousel
+                    :autoplay="true"
+                    :height="modCon.content.style.fontSize > 24 ? '33px' : '28px'"
+                    direction="vertical" :autoplay="true">
+                    <el-carousel-item v-for="(item,ind) in (modCon.content.msgType == 4 ? modCon.content.listArr :  modCon.content.dlistArr)"
+                        :key="ind">
+                        <div class="msg_item" v-if="modCon.content.msgType == 4"
+                            :style="'color:'+(modCon.content.style.textColor)+'; font-size: '+(modCon.content.style.fontSize / 2)+'px;'">
+                            <div class="lab" v-if="modCon.content.labShow && item.lab" :style="getObjStyle(modCon.content,'msglab')"> <span>{{item.lab ? item.lab : '标签'}}</span></div>
+                            <p v-html="item.text ? item.text : '这是一条自定义公告内容标题'"></p>
+                        </div>
+                        <div class="msg_item" v-else :style="'color:'+(modCon.content.style.textColor)+'; font-size: '+(modCon.content.style.fontSize / 2)+'px;'">
+                            <div class="lab" v-if="modCon.content.labShow && modCon.content.msgType == 3 " :style="getObjStyle(modCon.content,'msglab')"> <span>{{Array.isArray(item.typeName) ? item.typeName[item.typeName.length - 1] : (item.typeName ? item.typeName : '标签')}}</span></div>
+                            <p v-html="item.title ? item.title : '这是一条自定义公告内容标题'"></p>
+                        </div>
+                    </el-carousel-item>
+                </el-carousel>
+            </template>
+            <template v-else>
+                <el-carousel v-if="modCon.content.msgType == 4"
+                    :autoplay="false"
+                    :height="modCon.content.style.fontSize > 24 ? '48px' : '43px'"
+                    direction="vertical" :autoplay="true">
+                    <el-carousel-item v-for="(group,ind) in arrToGroup(modCon.content.listArr,(modCon.content.styletype == 4 ? 1 : 2))" :key="ind">
+                        <div class="msgGroup" >
+                            <div class="msg_item" v-if="modCon.content.msgType == 4" v-for="item in group" :style="'color:'+(modCon.content.style.textColor)+'; font-size: '+(modCon.content.style.fontSize / 2)+';'">
+                                <div class="lab" v-if="modCon.content.labShow && (item.lab) " :style="getObjStyle(modCon.content,'msglab')"><span>{{item.lab ? item.lab : '标签'}}</span></div>
+                                {{item.text ? item.text : '这是一条自定义公告内容标题'}}
+                            </div>
+                        </div>
+                    </el-carousel-item>
+                </el-carousel>
+                <el-carousel v-else
+                    :autoplay="false"
+                    :height="modCon.content.style.fontSize > 24 ? '48px' : '43px'"
+                    direction="vertical" :autoplay="true">
+                    <el-carousel-item v-for="(group,ind) in arrToGroup(modCon.content.dlistArr,(modCon.content.styletype == 4 ? 1 : 2))" :key="ind">
+                        <div class="msgGroup" >
+                            <div class="msg_item"  v-for="item in group" :style="'color:'+(modCon.content.style.textColor)+'; font-size: '+(modCon.content.style.fontSize / 2)+'px;'">
+                                <div class="lab" v-if="modCon.content.labShow && modCon.content.msgType == 3" :style="getObjStyle(modCon.content,'msglab')">
+                                    <span>{{Array.isArray(item.typeName) ? item.typeName[item.typeName.length - 1] : (item.typeName ? item.typeName : '标签' )}}</span>
+                                </div>
+                                {{item.title}}
+                            </div>
+                        </div>
+                    </el-carousel-item>
+                </el-carousel>
+                
+            </template>
+            
+        </div>
+    </div>
+</div>

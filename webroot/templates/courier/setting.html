@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#$langData['siteConfig'][26][71]#}</title>  {#* 设置 *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/setting.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobileSelect.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/axios.min.js"></script>
+		<script>
+			var geetest 		= {#$cfg_geetest#};
+			var masterDomain 	= '{#$cfg_basehost#}';
+			var phone   		= '{#$courier_phone#}';
+			var areaCode   		= '{#$courier_areaCode#}';
+			var pass    		= '';
+			var cookiePre = '{#$cfg_cookiePre#}';
+			var referer = '{#$HTTP_REFERER#}';
+			var langList = {#$langList['list']|@json_encode#};
+			var langname = "{#$langList['currName']#}";
+			var wxurl = 'wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}?/pages/bindwx/index?qishouid=';
+		</script>
+	</head>
+	<body>
+		<div class="pagebox" id="page">
+			<div class="page_info" v-show="!page_cphone && !page_testid && !page_cpsd && !consult && !pripolicy">
+				<div class="loading"></div>
+				<div class="top_box">
+					<div class="headbox">
+						<a href="javascript:;" class="back_btn goBack" onclick="history.go(-1)"></a>
+						{#* 设置 *#}
+						<div class="htitle">{#$langData['siteConfig'][26][71]#}</div>
+					</div>
+				</div>
+				<div class="userbox">
+					<dl>
+						<dt>{#$langData['waimai'][10][41]#}</dt>{#* 账户信息 *#}
+						<dd>
+							<span class="info_title">{#$langData['siteConfig'][19][20]#}</span>{#* 用户名 *#}
+							<span class="info_val">{#$courier_username#}</span>
+						</dd>
+						<dd>
+							<span class="info_title">{#$langData['siteConfig'][5][0]#}</span>{#* 密码 *#}
+							<span class="info_val"  @click="bindchage" data-type="psd">{#$langData['siteConfig'][6][7]#}<em></em></span> {#* 修改 *#}
+						</dd>
+						<dd>
+
+							<a href="wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}?/pages/bindwx/index?qishouid=" class="tobind" style="display: flex !important; align-items: center; justify-content: space-between;">
+
+								{#if $courier_openid == ''#}
+								<span class="info_title">绑定微信</span>{#* 绑定微信 *#}
+								<span class="info_val" >去绑定<em></em></span> {#* 去绑定 *#}
+								{#else#}
+								<span class="info_title">变更绑定</span>{#* 变更绑定 *#}
+								<span class="info_val">{#substr_replace($courier_openid, '****', 3, (strlen($courier_openid)-6))#}<em></em></span>
+								{#/if#}
+							</a>
+							<!-- <a href="wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}" class="tobind" style="display: flex !important; align-items: center; justify-content: space-between;">
+
+								{#if $courier_openid == ''#}
+								<span class="info_title">绑定微信</span>{#* 绑定微信 *#}
+								<span class="info_val" >去绑定<em></em></span> {#* 去绑定 *#}
+								{#else#}
+								<span class="info_title">变更绑定</span>{#* 变更绑定 *#}
+								<span class="info_val" >{#substr_replace($courier_openid, '****', 3, 4)#}<em></em></span>
+								{#/if#}
+							</a> -->
+							
+						</dd>
+					</dl>
+					<dl>
+						<dt>{#$langData['siteConfig'][19][829]#}</dt> {#* 个人资料 *#}
+						<dd>
+							<span class="info_title">{#$langData['siteConfig'][19][4]#}</span>{#* 姓名 *#}
+							<span class="info_val">{#$courier_name#}</span>
+						</dd>
+						<dd>
+							<span class="info_title">{#$langData['siteConfig'][19][12]#}</span>{#* 年龄 *#}
+							<span class="info_val">{#$courier_age#}</span>
+						</dd>
+						<dd>
+							<span class="info_title">{#$langData['siteConfig'][37][86]#}</span>{#* 手机号 *#}
+							<span class="info_val" @click="page_cphone = !page_cphone">{#substr_replace($courier_phone,'****',3,4)#}<em></em></span>
+						</dd>
+						{#if $courier_regtime#}
+						<dd>
+							<span class="info_title">{#$langData['siteConfig'][19][28]#}</span>{#* 注册时间 *#}
+							<span class="info_val">{#$courier_regtime|date_format:"%Y-%m-%d %H:%M:%S"#}</span>
+						</dd>
+						{#/if#}
+                        
+                        {#if $cfg_cancellation_state#}
+						<dd class="logOff">
+							<span class="info_title">{#$langData['siteConfig'][0][16]#}</span>{#* 注销账户 *#}
+							<span class="info_val">{#$langData['siteConfig'][54][61]#}<span class="info_val"><em></em></span></span>{#* 注销后无法恢复，请谨慎操作 *#}
+						</dd>
+                        {#/if#}
+
+					</dl>
+					<dl>
+						{#if $is_app#}
+						<dd>
+							<a href="javascript:;" class="msg_tui">
+								<span class="info_title">消息推送</span>{#* 隐私政策 *#}
+								<div class="guan" id="pushStatus"></div>
+							</a>
+							
+						</dd>
+						{#/if#}
+						<dd>
+							<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手隐私政策'#}?from=wmsj">
+								<span class="info_title">{#$langData['siteConfig'][16][185]#}</span>{#* 隐私政策 *#}
+								<span class="info_val"><em></em></span>
+							</a>
+							
+						</dd>
+						<dd >
+							<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手注册协议'#}?from=wmsj">
+								<span class="info_title">{#$langData['siteConfig'][23][57]#}</span>{#* 用户协议 *#}
+								<span class="info_val"><em></em></span>
+							</a>
+						</dd>
+						<dd >
+							<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手端个人信息收集清单'#}?from=wmsj">
+								<span class="info_title">个人信息收集清单</span>
+								<span class="info_val"><em></em></span>
+							</a>
+						</dd>
+						<dd >
+							<a href="{#getUrlPath service='siteConfig' template='protocol' title='第三方信息共享清单'#}?from=wmsj">
+								<span class="info_title">第三方信息共享清单</span>
+								<span class="info_val"><em></em></span>
+							</a>
+						</dd>
+						<dd >
+							<a href="{#getUrlPath service='siteConfig' template='feedback'#}?from=wmsj">
+								<span class="info_title">{#$langData['siteConfig'][16][171]#}</span>{#* 意见反馈 *#}
+								<span class="info_val"><em></em></span>
+							</a>
+						</dd>
+						<dd @click="changeLang = !changeLang" class="changl">
+							<span class="info_title">{#$langData['siteConfig'][0][14]#}</span>{#* 系统语言 *#}
+							<span class="info_val"><span>{#$langList['currName']#}</span><em></em></span>
+						</dd>
+						<dd >
+							<span class="info_title">{#$langData['siteConfig'][16][169]#}</span>{#* 网站客服 *#}
+							<span class="info_val"><a href="tel:{#$cfg_hotline#}">{#$cfg_hotline#}</a></span>
+						</dd>
+					</dl>
+				</div>                
+
+                <div class="copyright">
+                    {#$cfg_app_peisong_copyright#}
+                </div>
+
+			</div>
+			<div class="page_cphone" v-show="!page_testid && page_cphone">
+				<div class="top_box">
+					<div class="headbox">
+						<a href="javascript:;" class="back_btn" @click="page_cphone = !page_cphone"></a>
+						<div class="htitle">{#$langData['siteConfig'][23][27]#}</div>  {#* 手机绑定 *#}
+					</div>
+				</div>
+				<div class="page_con">
+					<p>{#$langData['waimai'][10][42]#}</p>{#* 手机号将用做登录名和联系方式，当前绑定： *#}
+					<h1>{#substr_replace($courier_phone,'****',3,4)#}</h1>
+					<button type="button"   class="bind_tel"  @click="bindchage" data-type="tel">更换手机号</button>
+				</div>
+			</div>
+			<div class="page_cid" v-show="page_testid &&  (!page_bind && !page_cpsd)">
+				<div class="top_box">
+					<div class="headbox">
+						<a href="javascript:;" class="back_btn" @click="page_testid=!page_testid"></a>
+						<div class="htitle">{#$langData['waimai'][10][43]#}</div>{#* 验证身份 *#}
+					</div>
+				</div>
+				
+				<div class="page_con">
+					<p>{#$langData['waimai'][10][44]#}</p>{#* 我们已经发送了验证码到当前绑定的手机号： *#}
+					<h1>{#substr_replace($courier_phone,'****',3,4)#}</h1>
+					<input-txt type="text"  placeholder="{#$langData['siteConfig'][20][176]#}" name="captcha"  id="vercode"  ref="inpbox"></input-txt>{#* 请输入验证码 *#}
+					<button type="button"   class="next_step"  @click="nextPage">{#$langData['siteConfig'][6][32]#}</button>{#* 下一步 *#}
+				</div>
+			</div>
+			<div class="page_ctel" v-show="page_bind">
+				<div class="top_box">
+					<div class="headbox">
+						<a href="javascript:;" class="back_btn" @click="page_cphone = !page_cphone,page_bind=!page_bind"></a>
+						<div class="htitle">{#$langData['waimai'][10][45]#}</div>{#* 更换绑定手机 *#}
+					</div>
+				</div>
+				<input-txt type="text" placeholder="{#$langData['siteConfig'][20][239]#}" name="telphone" id="newphone"></input-txt>{#* 请输入手机号 *#}
+				<input-txt type="text" placeholder="{#$langData['siteConfig'][20][176]#}" name="captcha"  id="code"></input-txt>{#* 请输入验证码 *#}
+				<button type="button"   class="bindtel" @click="savepws"  data-type="bindphone" >绑定手机</button>
+			</div>
+			<div class="page_cpsd" v-show="page_cpsd">
+				<div class="top_box">
+					<div class="headbox">
+						<a href="javascript:;" class="back_btn" @click="page_cpsd=!page_cpsd"></a>
+						<div class="htitle">{#$langData['siteConfig'][5][4]#}</div>{#* 修改密码 *#}
+					</div>
+				</div>
+				<input-txt type="text"  placeholder="{#$langData['siteConfig'][20][84]#}" name="psd" 	id="pws" 	ref="inpbox"></input-txt>{#* 请输入新密码 *#}
+				<input-txt type="text"  placeholder="{#$langData['waimai'][10][46]#}" name="repsd" 	id="repws"  ref="inpbox"></input-txt>{#* 请确认新密码 *#}
+				<button type="button"  class="cpsd_btn" @click="savepws" data-type="bindpws">{#$langData['siteConfig'][41][101]#}</button>{#* 保存修改 *#}
+			</div>
+			
+		</div>
+
+
+        
+
+        
+  <!-- 删除弹出层 s -->
+  <div class="delMask"></div>
+  <div class="delAlert">
+    <div class="delAlertCon">
+      <div>
+        <h2 class="delTile">确定注销吗？</h2>
+        <p>一经注销不可恢复</p>
+      </div>
+      <ul class="fn-clear">
+        <li class="firLi"><a href="javascript:;" class="cancelDel">{#$langData['siteConfig'][6][12]#}</a></li> {#* 取消 *#}
+        <li><a href="javascript:;" class="sureDel">{#$langData['siteConfig'][6][0]#}</a></li> {#* 确认 *#}
+      </ul>
+    </div>
+  </div>
+
+  <!-- 删除弹出层 e -->
+  <!-- 注销账号弹窗 s-->
+  <div class="off-mask"></div>
+  <div class="offWrap">
+    <i class="off-close"></i>
+
+    <div class="off-top">
+      <em class="off-bg"></em>
+      <h3 class="offTitle"><i></i>{#$langData['siteConfig'][0][16]#}</h3> {#*注销账号*#}
+      <p>无法恢复，请谨慎操作</p>
+    </div>
+
+    <div class="off-ts"><span>开始注销前，请确认以下内容</span></div>
+    <div class="offSon">
+      <div class="offcon speOff">
+        <h2 class="offTit">注销账号条件</h2>
+        <p>1.账号处于正常状态，账号没有被盗，被封等风险。<br/>2.请确保账号内账户余额等均为0。<br/>3.没有正在进行中的交易。</p>
+      </div>
+
+      <div class="offcon ">
+        <h2 class="offTit">注销账号须知</h2>
+        <p>1.账号注销后，会清空账号的所有身份信息和账号信息：包括但不限于用户名、认证手机号、邮箱、qq、微博、微信，以及解除该账号对外授权的绑定关系。该操作不可逆，请谨慎操作。<br/>2.账号注销后，优惠券、会员权益、账号余额将被清除且无法恢复。<br/>3.注销账号是不可恢复操作，操作之前，请确认账号内所有服务均已进行妥善处理。如因注销账号造成的损失由用户自行承担。<br/>4.注销账号并不代表本账号注销前的账号行为和相关责任得到豁免或减轻。<br/>5.手机号半年不能在平台内进行二次注销。<br/>6.如果您的账号曾开通了会员自动续费功能，请先确保您已经取消了“自动续费”</p>
+      </div>
+    </div>
+
+    <div class="off-agree"><a href="javascript:;">阅读并同意，申请注销账号</a></div>
+  </div>
+  <!-- 注销账号弹窗 e-->
+
+
+		<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/mobileSelect.js?v={#$cfg_staticVersion#}"></script>
+		{#if $cfg_geetest#}
+		{#if $cfg_geetest == 1#}
+		<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+		{#/if#}
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+		{#/if#}
+		<script src="{#$templets_skin#}js/setting.js?v={#$cfg_staticVersion#}"></script>
+	</body>
+</html>

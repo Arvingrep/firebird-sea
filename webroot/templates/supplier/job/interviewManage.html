@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>招聘系统企业端</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/member/pub_supplier.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/postManage.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+            var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+            var hideFileUrl = '{#$cfg_hideUrl#}';
+            var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+            var templets = '{#$templets_skin#}';
+            var loupanid = '{#$loupanid#}';
+			var certificateState='{#$company_state#}' //企业审核状态
+		</script>
+	</head>
+	<body class="w1200">
+		{#$pageTitle = '招聘系统企业端'#}
+		<!-- 头部 -->
+		{#include file="top.html" pageTitle=$pageTitle module='job' showMap='2'#}
+		<div id="page">
+
+            <div class="conbox" v-cloak>
+                <div class="left_box">
+					<ul v-cloak>
+						<li v-for=" (item,i) in navList" :class="{'curr':i==currid || i === hoverid}"  @mouseover="hoverid = i" @mouseleave="hoverid = ''">
+							<a :href="item.link" @click="currid = i">
+								<s v-if="i!=currid && i !== hoverid"><img :src="'{#$templets_skin#}images/'+(i+1)+'.png'" ></s>
+								<s v-else><img :src="'{#$templets_skin#}images/'+(i+1)+'_on.png'" ></s>
+								<span>{{item.txt}}</span>
+							</a>
+						</li>
+					</ul>
+				</div>
+				<div class="right_box">
+					<div class="rConBox" >
+						<h3>面试日程</h3>
+						<div class="tabBox" >
+							<ul v-cloak class="fn-clear">
+								<li v-for="tab in tabsArr" :class="{'curr':currTab == tab.id}" :data-id="tab.id"  @click="currTab = tab.id">{{tab.text}}<span v-if="tab.count > 0">({{tab.count}})</span></li>
+							</ul>
+							<s></s>
+
+							<div class="searchBox shaiBox">
+								<div class="joinCount" v-if="currTab == 3"><span>已入职{{rz_num}}人</span><em>|</em><span>待入职{{rz_num_1}}人</span></div>
+								<el-checkbox :label="'不看已取消的（'+cancelInterview+'）'" v-if="currTab == 0 && cancelInterview" v-model="cancelFilter"></el-checkbox>
+								<el-select   placeholder="面试职位" v-model="postFor">
+									<el-option key="" label="全部职位" value=""></el-option>
+									<el-option
+										v-for="item in postArr"
+										:key="item.id"
+										:label="item.title"
+										:value="item.id">
+									</el-option>
+								</el-select>
+								<el-input
+									placeholder="请输入内容"
+									suffix-icon="el-icon-search"
+									v-model="keywords" @keyup.enter.native="toSearch">
+								</el-input>
+							</div>
+						</div>
+						<div class="tableBox interviewLits" v-if="currTab != 3">
+							<template>
+								<el-table :data="tableData" style="width: 100%" ref="table" v-loading="isload" >
+									<el-table-column
+									width="30">
+									</el-table-column>
+									<el-table-column prop="date" label="面试时间"min-width="120">
+										<template slot-scope="scope">	
+											<el-popover
+													:ref="scope.row.id"
+													popper-class="optPopover"
+													width="450"
+													@hide="removeActive"
+													trigger="click">
+													<div class="markContainerBox">
+														<h4>修改面试时间</h4>
+														<el-date-picker 
+															:picker-options="interviewPickerOptions"
+															v-model="markinfo.interviewDate"
+															align="right"
+															type="datetime"
+															:disable="false"
+															format="yyyy-MM-dd HH:mm"
+															placeholder="请选择面试时间" class="pickerDate" :clearable="false" prefix-icon="el-icon-date
+															">
+														</el-date-picker>
+														<div class="errorTip" ><s></s>务必与求职者达成一致后才可修改</div>
+														<div class="btns_group">
+															<el-button size="medium" @click="hidePopover(scope.row.id)" class="gray">取消</el-button>
+															<el-button type="primary"  size="medium" @click="updateInterView(scope,'date'); hidePopover(scope.row.id)">确定</el-button>
+														</div>
+													</div>
+													<h3 :class="['interviewTime', {'before': checkDateVal(scope.row.date)}]" slot="reference"  @click="operate(scope.row.date)">
+														<s></s>{{timeTrans(scope.row.date,4)}}
+														<span  class="edit_time"></span>
+													</h3>
+											</el-popover>
+										</template>
+									</el-table-column>
+									<el-table-column prop="name" label="面试职位" min-width="100" >
+										<template slot-scope="scope">
+											<a target="_blank" :class="['posiInfo', {'noFit':scope.row.remark && scope.row.remark.remark_type == 5}]" :href="scope.row.job.url">
+												<h4><span style="color: #1975FF;margin-right: 4px;" v-if="scope.row.company_addr_count>=1">{{scope.row.job.show_salary}}</span>{{scope.row.job.title}}</h4>
+												<p v-if="scope.row.company_addr_count>=1">地点：<span style="color: #737680;font-size: 13px;">{{scope.row.place}}</span></p>
+												<p v-else>{{scope.row.job.nature}}/薪资：<b class="salary">{{salaryChange(scope.row.job)}}</b></p>
+											</a>
+										</template>
+									</el-table-column>
+									<el-table-column prop="address" label="求职者信息" min-width="140"> 
+										<template slot-scope="scope">
+											<a :class="['stuffInfo' , {'noFit':scope.row.remark && scope.row.remark.remark_type == 5}]" :href="scope.row.resume.url" target="_blank">
+												<h4>{{scope.row.resume.name}} <span>期望薪资：<b class="salary">{{salaryChange(scope.row.resume)}}</b></span> </h4>
+												<p><span>{{scope.row.resume.age}}岁</span><em>|</em><span>{{scope.row.resume.edu_tallest_name}}</span><em>|</em><span>{{scope.row.resume.work_jy_name}}</span><em>|</em><span>  {{scope.row.resume.edu_school}}</span></p>
+											</a>
+										</template>
+									</el-table-column>
+									<el-table-column prop="address" label="联系电话" min-width="80">
+										<template slot-scope="scope">
+											<h3 class="tel"><s></s>{{scope.row.resume.phone}}</h3>
+										</template>
+									</el-table-column>
+									<el-table-column prop="address" label="标注" min-width="120"> 
+										<template slot-scope="scope">
+											<!-- 拒绝相关信息 -->
+											<div class="refuseInfo" v-if="scope.row.state == 6 && scope.row.refuse_author">
+												<span>{{scope.row.refuse_author == 'member' ? '对方':'招聘方'}}取消了面试</span><em v-if="scope.row.refuse_author == 'company'">（请务必联系对方达成一致）</em><em v-else>（理由:{{scope.row.refuse_msg}}）</em>
+											</div>
+
+											<!-- 备注相关 -->
+											<div class="stateBox" v-if="scope.row.remark && (scope.row.remark.remark_invitation || scope.row.remark.remark_resume)">
+												<el-popover
+													@hide="editRemark.edit = false;"
+													popper-class="popoverBox "
+													placement="top-start"
+													trigger="hover">
+													<div class="markContainer">
+														<div class="markBox" v-if="scope.row.remark.remark_invitation">
+															<div :class="{'showText':!editRemark.edit}">
+																<h4>{{scope.row.state==1?'简历备注':'面试备注'}}<em>{{timeTrans(scope.row.remark.remark_invitation_time,4)}}</em></h4>
+																<p v-if="!editRemark.edit">{{scope.row.remark.remark_invitation}}</p>
+																<div class="editBtns">
+																	<span class="edit_btn" @click="editReamrk(scope, 1)"><s></s></span>
+																	<span class="del_btn"><s></s></span>
+																</div>
+																<div class="editBox" v-if="editRemark.edit && editRemark.type == 0">
+																	<el-input type="textarea" v-model="editRemark.remark" maxlength="50"
+																	show-word-limit></el-input>
+																	<div class="btns_group">
+																		<el-button class="cancel_btn gray" @click="editRemark.edit = false;">取消</el-button>
+																		<el-button class="changeRemark_btn" type="primary" @click="changeRemark">确定</el-button>
+																	</div>
+																</div>
+															</div>
+														</div>
+														<div class="markBox" v-if="scope.row.remark.remark_resume">
+															<div :class="{'showText':!editRemark.edit}" >
+																<h4>简历备注 <em>{{timeTrans(scope.row.remark.remark_resume_time,4)}}</em></h4>
+																<p v-if="!editRemark.edit">{{scope.row.remark.remark_resume}}</p>
+																<div class="editBtns">
+																	<span class="edit_btn" @click="editReamrk(scope, 0)"><s></s></span>
+																	<span class="del_btn" @click="editReamrk(scope, 0,1)"><s></s></span>
+																</div>
+																<div class="editBox" v-if="editRemark.edit && editRemark.type == 0">
+																	<el-input type="textarea" v-model="editRemark.remark" maxlength="50"
+																	show-word-limit></el-input>
+																	<div class="btns_group">
+																		<el-button class="cancel_btn gray" @click="editRemark.edit = false;">取消</el-button>
+																		<el-button class="changeRemark_btn" type="primary" @click="changeRemark(scope);">确定</el-button>
+																	</div>
+																</div>
+															</div>
+														</div>
+													</div>
+													<span class="mark" slot="reference" v-if="scope.row.state!=6&&scope.row.state!=2">{{scope.row.remark.remark_invitation ? scope.row.remark.remark_invitation : scope.row.remark.remark_resume}}</span>
+													<span class="mark" slot="reference" v-else>查看历史备注</span>
+												</el-popover>
+											</div>
+										</template>
+									</el-table-column>
+									
+									<el-table-column  label="状态/操作" min-width="60" align="center" header-align="center">
+										<template slot-scope="scope">
+
+											
+											<div class="btnbox">
+												<div class="optBtns" >
+													<el-popover
+														:ref="'state_' + scope.row.id"
+														popper-class="optPopover state"
+														@hide="optShow = false;removeActive()"
+														@show="optShow = true;changeData(scope)"
+														width="540"
+														trigger="click"
+														v-if="scope.row.state!=6&&scope.row.state!=2">
+														<div class="markContainerBox">
+															<h4>面试状态{{markinfo.markState==6?'-取消面试':' (仅自己可见)'}}
+																<el-popover
+																	placement="bottom-start"
+																	:offset="-80"
+																	trigger="hover">
+																	<div class="markBox noPadding">
+																		<p><em style="color:#1975FF">面试结果通知：</em>面试结果、入职时间都需招聘方自行通知到位，此处仅为方便招聘人员管理面试进度与入职信息</p>
+																	</div>
+																	<span class="tip_icon" slot="reference"></span>  <!--  问号提醒  --> 
+																</el-popover>
+															</h4>
+															<div class="labs">
+																<span :class="['lab',{'on_chose':markinfo.markState == lab.value},{'cancel':lab.value==6||lab.value==5}]" @click="markinfo.markState = lab.value" v-for="lab in stateArr_1" :data-val="lab.value">{{lab.labText}}</span>
+																<div style="font-size: 13px;color: #FF5039;" v-show="markinfo.markState==6"><i></i>务必与求职者达成一致后才可取消面试</div>
+															</div>
+															<div class="joinUs" v-if="markinfo.markState == 4">
+																<el-date-picker 
+																v-model="markinfo.joinDate"
+																align="right"
+																type="date"
+																:picker-options="pickerOptions"
+																placeholder="请选择入职时间" class="pickerDate">
+																</el-date-picker>
+																<el-button type="text" class="grey addMark plustext" @click="markinfo.showmarkText = true" v-if="!markinfo.showmarkText"><i class="el-icon-plus"></i>添加备注</el-button>
+															</div>
+															<!-- <el-select placeholder="请选择拒绝原因" popper-class="selectBox" v-model="markinfo.markSelect" v-else-if="markinfo.markState == 5">
+																<el-option label="简历与职位匹配度不高" value="简历与职位匹配度不高"> </el-option>
+																<el-option label="职位已停止招聘" value="职位已停止招聘"> </el-option>
+															</el-select> -->
+															<div class="errorTip" v-else-if="markinfo.markState ==2"><s></s>务必与求职者达成一致后才可取消面试</div>
+															<div class="textarea" v-if="markinfo.markState == 1 || markinfo.markState == 3 || (markinfo.showmarkText  && markinfo.markState == 4)||markinfo.markState == 5">
+																<el-input type="textarea" v-model="markinfo.markText" placeholder="添加备注，最多50个字" maxlength="50" show-word-limit rows="3"></el-input>
+															</div>
+															<div class="btns_group">
+																<el-button size="medium" @click="hidePopover('state_' + scope.row.id)" class="gray">取消</el-button>
+																<el-button type="primary"  size="medium" @click="hidePopover('state_' + scope.row.id); updateInterView(scope,'state')">确定</el-button>
+															</div>
+														</div>
+														<el-button slot="reference" type="text" size="small" :class="'off dropDown state' + scope.row.state + (checkDateVal(scope.row.date) && scope.row.state == '1' ? ' grey' : '')" @click="operate">{{checkRemark_type(scope)+(scope.row.state==4?'('+timeTrans(scope.row.rz_date,7)+')':'')}}<s :class="['el-select__caret el-input__icon el-icon-arrow-up',{'is-reverse':optShow && editid == scope.row.id}]"></s></el-button>
+													</el-popover>
+													<div v-else style="padding-right: 26px;color: #C355AA;cursor: default;">已取消</div>
+													
+													
+												</div>
+											</div>
+
+											
+										</template>
+									</el-table-column>
+									<template slot="empty">
+										<div class="noData" v-if="!isload">
+											<img src="{#$templets_skin#}images/noData_interview.png" alt="">
+											<p>暂无相关日程</p>
+										</div>
+										<p v-else>加载中</p>
+									</template>
+								</el-table>
+							</template>
+							<div class="tableBottom fn-clear">
+								<div class="lOptBox">
+									<!-- <el-checkbox label="全选" @change="selectAll()" ></el-checkbox> -->
+									<!-- <el-button round size="small" @click="optSelection()">批量标注</el-button> -->
+								</div>
+								<div class="pageBox">
+									<el-pagination
+									:hide-on-single-page="true"
+									background
+									layout="prev, pager, next"
+									:page-size="5"
+									prev-text="上一页"
+									next-text="下一页"
+									@current-change="changePage"
+									:total="totalCount">
+									</el-pagination>
+								</div>
+							</div>
+						</div>
+						<div class="tableBox interviewLits stuffJoinList" v-else>
+							<template>
+								<el-table :data="tableData" style="width: 100%" ref="table" v-loading="isload">
+									<el-table-column
+									type="selection"
+									width="55">
+									</el-table-column>
+									<el-table-column prop="date" label="基本信息"min-width="200">
+										<template slot-scope="scope">
+											<div class="stuffInfo ">
+												<div class="stuff_photo">
+													<el-avatar :size="70" :src="scope.row.resume.photo"><img src="/static/images/noPhoto_100.jpg" alt=""></el-avatar>
+													<div :class="'sex sex_'+ scope.row.resume.sex"></div>
+												</div>
+												<div class="stuff_info">
+													<h4>{{scope.row.resume.name}} </h4>
+													<p><span>{{scope.row.resume.age}}岁</span><em>|</em><span>{{scope.row.resume.edu_tallest_name}}</span><em>|</em><span>5-10年</span><em>|</em><span>  {{scope.row.resume.edu_school}}</span></p>
+												</div>
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column prop="name" label="入职职位" min-width="120">
+										<template slot-scope="scope">
+											<div class="posiInfo">
+												<h4>{{scope.row.job.title}}<em>/{{scope.row.job.nature}}</em></h4>
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column prop="address" label="入职时间" min-width="80"> 
+										<template slot-scope="scope">
+											<div :class="['joinDate',{'before': !checkDate(scope.row.joinDate)[0]}]">
+												<el-popover
+													popper-class="optPopover"
+													width="500"
+													:ref="scope.row.id"
+													trigger="click">
+													<div class="markContainerBox">
+														<h4>修改入职时间</h4>
+														<el-date-picker 
+														v-model="markinfo.interviewDate"
+														:picker-options="pickerOptions"
+														align="right"
+														type="date"
+														placeholder="请选择入职时间" class="pickerDate">
+														</el-date-picker>
+														<div class="errorTip" ><s></s>务必与求职者达成一致后才可取消面试</div>
+														<div class="btns_group">
+															<el-button size="medium" @click="hidePopover(scope.row.id)" class="gray">取消</el-button>
+															<el-button type="primary"  size="medium" @click="hidePopover(scope.row.id);updateInterView(scope,'rz_date')">确定</el-button>
+														</div>
+													</div>
+													<span slot="reference" class="edit_time"></span>
+												</el-popover>{{checkDate(scope.row.rz_date)[1]}}
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column prop="address" label="联系电话" min-width="80" align="center" header-align="center">
+										<template slot-scope="scope">
+											<h3 class="tel"><s></s>{{scope.row.resume.phone}}</h3>
+										</template>
+									</el-table-column>
+									<el-table-column prop="address" label="状态/操作" min-width="120" align="center" header-align="center"> 
+										<template slot-scope="scope">
+											<el-select v-model="scope.row.rz_state" @change="updateInterView(scope,'rz_state')" size="mini" :class="'noBorde state'+scope.row.rz_state"  popper-class="noBold"  placeholder="标记状态">
+												<el-option v-for="state in stateArr"
+												:key="state.value"
+												:label="state.label"
+												:value="state.value"></el-option>
+											</el-select>
+										</template>
+									</el-table-column>
+									
+									<template slot="empty">
+										<div class="noData" v-if="!isload">
+											<img src="{#$templets_skin#}images/nodata.png" alt="">
+											<p>暂无相关日程</p>
+										</div>
+										<p v-else>加载中</p>
+									</template>
+								</el-table>
+							</template>
+							<div class="tableBottom fn-clear">
+								<!-- <div class="lOptBox">
+									<el-checkbox label="全选" @change="selectAll()" ></el-checkbox>
+									<el-button round size="small" @click="optSelection()">批量标注</el-button>
+								</div> -->
+								<div class="pageBox">
+									<el-pagination
+									:hide-on-single-page="true"
+									background
+									layout="prev, pager, next"
+									:page-size="5"
+									prev-text="上一页"
+									next-text="下一页"
+									@current-change="changePage"
+									:total="totalCount">
+									</el-pagination>
+								</div>
+							</div>
+						</div>
+
+						
+					</div>
+					
+				</div>
+            </div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+		<div>{#$cfg_statisticscode#}</div>
+	</body>
+	<script type="text/javascript" src="{#$templets_skin#}js/interviewManage.js?v={#$cfg_staticVersion#}"></script>
+</html>

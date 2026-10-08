@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>{#$langData['siteConfig'][46][44]#}</title>{#*评论和赞 *#}
+		<meta name="wap-font-scale" content="no">
+		<meta name="format-detection" content="telephone=no">
+		<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no,viewport-fit=cover">
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$templets_skin#}css/commt_list_v2.css?v={#$cfg_staticVersion#}" />
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#getModuleConfig module='article' key='channelDomain'#}';
+			var staticPath = '{#$cfg_staticPath#}',templets_skin = '{#$templets_skin#}';
+			var cookiePre = '{#$cfg_cookiePre#}';
+			var gettype   = '{#$gettype#}';
+			var userInfo = {#if $userinfo#}{#json_encode($userinfo)#}{#else#}''{#/if#};
+			var str = window.location.hash;
+			if(navigator.userAgent.indexOf('huoniao_iOS') > -1){
+				if(str == '#zan'){
+					document.title = '点赞'
+				}else{
+					document.title = '评论'
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<div :class="['page',{'singleShow':!slideChose}]" id="page" >
+
+			<div class="header " v-cloak>
+				<div class="header-l">
+					<a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+				</div>
+				<div class="header-address" @click="slideShow = true">
+					<div class="showType">{{slideList[slideChose].text}}</div>
+				</div>
+				<div class="header-search "></div>
+			</div>
+			<div class="tabList" v-if="slideChose" v-cloak>
+				<ul :class="`lishow${slideChose}`">
+					<li @click="choseSlide(1)">收到评论</li>
+					<li @click="choseSlide(2)">发出评论</li>
+					<s class="bg"></s>
+				</ul>
+			</div>
+			<div :class="['slideConBox',{'show':slideShow}]">
+				<div class="slideMask" @click="slideShow = false"></div>
+				<div class="slideBox">
+					<ul>
+						<li v-for="(item,ind) in slideList" :class="{'on_chose': slideChose == ind}" @click="choseSlide(ind)"><img :src="`{#$templets_skin#}images/zan_v2/${item.code}_icon.png`"   /><span>{{item.text}}</span></li>
+					</ul>
+				</div>
+			</div>
+			<div :class="['slideConBox',{'show':replySlide}]">
+				<div class="replySlideMask" @click="replySlide = false; replyCon = '';"></div>
+				<div class="replySlideBox">
+					<textarea v-if="replyObj" v-model="replyCon" name="" id="reply" enterkeyhint="send" :placeholder="`回复 ${replyObj.user.nickname}：`" @keydown="enterKey" @keyup.enter.prevent.stop="sendReply"></textarea>
+				</div>
+			</div>
+			<!-- <div class="pointPop" v-show="successTip">
+				<h4>评论成功，互动奖励！</h4>
+				<div class="pointShow">
+					<div class="point"><span class="add">+</span><span class="num">1</span>积分</div>
+				</div>
+			</div> -->
+			<div class="listBox"  v-cloak>
+				<template v-for="(slide,ind) in slideList">
+					<div class="listShow" v-show="slideChose == ind">
+						<ul  v-if="slide.list">
+							<li v-for="(item,sind) in slide.list" :data-ind="sind">
+								<a :href="checkInfo(item,'url')" :class="['item_li',{'toMini':['article','info','task','job','shop','tieba','sfcar'].includes(item.module || (item.type.split('-')[0]))}]" :data-id="item.detail ? (item.module == 'live' ? item.detail['0'].id : item.detail.id) : ''" :data-module="item.module || (item.type.split('-')[0])" data-temp="detail">
+									<div class="leftBox">
+										
+										<template v-if="slide.code == 'zan'">
+											<div class="icon"><img :src="item.photo ? item.photo : '/static/images/noPhoto_100.jpg'" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+											<div class="info">
+												<h4 class="nickname">{{item.username ? item.username : '该用户已注销'}}</h4>
+												<p class="ztype">赞了你的{{item.type == '1' ? '评论': (item.module == 'live' ? '视频' : '发布')}} <span class="ztime">{{transTime(item.puctime)}}</span></p>
+												<p class="zan_con" v-if="item.type == '1' && item.detail && item.detail.commentcontent">
+													“<span>{{delHtmlTag(item.detail.commentcontent)}}</span>”
+												</p>
+											</div>
+										</template>
+										<template v-else>
+											<div class="icon" v-if="ind === 1"><img :src="item.user && item.user.photo ? item.user.photo : '/static/images/noPhoto_100.jpg'" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+											<div class="icon" v-else><img :src="userInfo && userInfo.photo ? userInfo.photo : '/static/images/noPhoto_100.jpg'" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+											<div class="info">
+												<h4 class="nickname" v-if="ind === 1">{{item.user && item.user.nickname ? item.user.nickname : '该用户已注销'}}</h4>
+												<h4 class="nickname" v-else>{{userInfo ? userInfo.nickname : '该用户已注销'}}</h4>
+												<!-- <p class="content">{{item.content}}</p> -->
+												<div class="contentBox">
+													<div class="unflod_mask" v-if="item.unflod" @click.stop.prevent="item.unflod = false"></div>
+													<div :class="['content',{'showAll':!item.unflod && item.hasCheck}]" >
+														<div class="unflod"  v-if="item.unflod">展开</div>
+														<div class="cont" ><span v-if="ind == 1 && item.parent">回复：</span>{{delHtmlTag(item.content)}}</div>
+														<!-- <div class="cont" v-html="(item.parent ? `<span>回复：</span>`:'') +item.content"></div> -->
+													</div>
+												</div>
+												<p  class="ptime"><span class="ztime">{{transTime(item.dtime)}}</span></p>
+												<p class="zan_con" v-if="item.parent"> “<span class="ocolor">{{delHtmlTag(item.parent.content)}}</span>” </p>
+												<div class="btns_group" v-if="ind === 1">
+													<div :class="['btn_zan btn',{'has_zan':item.zan_has},{'zanPop':zanPop == item.id}]" @click.prevent.stop="zanComment(item)">赞</div>
+													<div class="btn_reply btn" @click.prevent.stop="replyItem(item)">回复</div>
+												</div>
+											</div>
+										</template>
+									</div>
+									<div class="rightBox" v-if="item.detail && checkInfo(item,'pic') || checkInfo(item,'content')">
+										<img v-if="checkInfo(item,'pic')" :src="checkInfo(item,'pic')" alt="" onerror="this.src='/static/images/404.jpg'">
+										<div class="content" v-else>{{checkInfo(item,'content')}}</div>
+									</div>
+									<div class="rightBox" v-else>
+										<div class="content">信息不存在或已删除</div>
+									</div>
+								</a>
+							</li>
+						</ul>
+						<div class="loadText" v-if="!slide.loadEnd || slide.list.length">{{slide.loadEnd ? '已显示全部~' : (slide.isload ? '加载中~' : '下拉加载更多')}}</div>
+						<div class="noData" v-else>
+							<img :src="`{#$templets_skin#}images/zan_v2/no_${slide.code}.png`" alt="">
+							<p v-if="slide.code == 'zan'">暂时没有人点赞哦~~</p>
+							<p v-else-if="slide.code == 'commt'">暂未收到评论~</p>
+							<p v-if="slide.code == 'commt_from'">暂未发表过评论~~</p>
+						</div>
+
+					</div>
+				</template>
+			</div>
+		</div>
+		<script type="text/javascript" src="{#$templets_skin#}js/commt_list_v2.js?v={#$cfg_staticVersion#}"></script>
+	</body>
+</html>

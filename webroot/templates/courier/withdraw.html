@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<title>{#$langData['siteConfig'][19][716]#} </title>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/money.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/withdraw.css?v={#$cfg_staticVersion#}" media="all" />
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+{#if $quit#}
+{#$courierFree = 0#}
+{#/if#}
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+
+	var wxurl = 'wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}?/pages/redirect/bindwx?qishouid=';
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var money = '{#$couriermoney#}', withdrawLog = '/?service=waimai&do=courier&template=mypocket';
+	var minWithdraw = '{#$minWithdraw#}', maxWithdraw = '{#$maxWithdraw#}', withdrawFee = '{#$withdrawFee#}';
+	var from = '{#$from#}';
+	var memberDomain = '{#$member_userDomain#}';
+	var totalCanWithdrawn = '{#$totalCanWithdrawn#}', moneyRegGivingWithdraw = '{#$cfg_moneyRegGivingWithdraw#}';
+	
+	var miniProgramAppid = '{#$miniProgramAppid#}';
+	var miniProgramId = '{#$miniProgramId#}';
+	var wxurl = 'wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}?/pages/bindwx/index?qishouid=';
+	var tx_num = '{#if $couriermoney > $courierFree#}{#($couriermoney-$courierFree)|string_format:'%.2f'#}{#else#}0.00{#/if#}';
+	var quit = {#$quit#}
+	var wxBind = {#if  $openid==''#}false{#else#}true{#/if#};
+</script>
+</head>
+
+<body>
+	{#if $type == 'weixin' && $app_platform == 'ios'#}
+	{#$type = 'alipay'#}
+	{#/if#}
+	<div class="header-box">
+		<!-- 顶部 s -->
+	  <div class="header"{#if $from == 'wmsj'#} style="display: -webkit-box!important;"{#/if#}>
+	    <div class="header-l"><a href="javascript:;" onclick="history.go(-1)" class="goBack"><img src="{#$templets_skin#}images/arrow.png"></a></div>
+	    <div class="header-c">{#$langData['siteConfig'][19][716]#}</div>
+		{#if $from == 'wmsj'#}
+	    <div class="header-r" style="visibility: visible;"><a href="{#getUrlPath service='member' type='user' template='withdraw_log' param='from=wmsj'#}" class="screen" style="font-size: .24rem;">记录</a></div>
+		{#else#}
+	    <div class="header-r"><a href="javascript:;" class="screen"><img src="{#$templets_skin#}images/screen.png"></a></div>
+		{#/if#}
+	  </div>
+	  <!-- 顶部 e -->
+
+	    {#if $from == 'invite'#}
+	    <div class="txtbox">
+		  <p>可提金额</p>
+		  <p class="account">{#echoCurrency type='symbol'#}<em>{#$totalCanWithdrawn#}</em></p>
+	    </div>
+	  	{#elseif $withdrawCycleState#}
+		<div class="txtbox">
+			<p>{#$langData['siteConfig'][19][295]#}</p>
+			<p class="account">{#echoCurrency type='symbol'#}<em>{#$couriermoney#}</em></p>
+		</div>
+		{#else#}
+		<div class="txtbox">
+			<div class="not"><p>{#$withdrawCycleNote#}</p></div>
+		</div>
+		{#/if#}
+	</div>
+
+	{#if $withdrawCycleState || $from == 'invite'#}
+	<div class="tab">
+		<ul>
+			{#if $withdrawPlatform && in_array('weixin', $withdrawPlatform) && $app_platform != 'ios'#}
+			<li class="tweixin{#if $type == "weixin"#} curr{#/if#}" data-id="weixin"><a href="javascript:;">{#$langData['siteConfig'][19][910]#}</a></li>
+			{#/if#}
+			{#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+			<li class="talipay{#if $type == "alipay"#} curr{#/if#}" data-id="alipay"><a href="javascript:;">{#$langData['siteConfig'][19][718]#}</a></li>
+			{#/if#}
+			{#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+			<li class="tbank{#if $type == "bank"#} curr{#/if#}" data-id="bank"><a href="javascript:;">{#$langData['siteConfig'][19][717]#}</a></li>
+			{#/if#}
+		</ul>
+	</div>
+
+	{#if $withdrawPlatform && in_array('weixin', $withdrawPlatform)&& $app_platform != 'ios'#}
+	<div class="witem weixin{#if $type == 'bank' || $type == 'alipay'#} fn-hide{#/if#}">
+		<input type="hidden" id="bank" value="weixin" />
+		<div class="norecord {#if $openid== ''#}fn-hide{#/if#}">
+			<div class="bgfff">
+				<dl class="inpbox">
+					<dt><span>{#$langData['siteConfig'][19][39]#}</span></dt>
+					<dd><input type="number" placeholder="可提现金额{#if $couriermoney > $courierFree#}{#($couriermoney-$courierFree)|string_format:'%.2f'#}{#else#}0.00{#/if#}" id="amount" class="amount" maxlength="10"></dd>
+				</dl>
+			</div>
+		</div>
+		<!-- wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}?/pages/redirect/bindwx -->
+		<p class="bindtip {#if $openid!= ''#}fn-hide{#/if#}">您还未绑定微信，暂时无法提现，请先<a href="javascript:;" class="tobind" style="display: inline-block !important;">去绑定</a></p>
+	</div>
+	{#/if#}
+
+	{#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+	<div class="witem alipay{#if $type == 'bank' || $type == 'weixin'#} fn-hide{#/if#}">
+		
+		<input type="hidden" id="bank" value="alipay" />
+		<div class="norecord">
+			<div class="bgfff">
+				<dl class="inpbox">
+					<dt><span>{#$langData['siteConfig'][19][40]#}</span></dt>
+					<dd><input type="text" placeholder="{#$langData['siteConfig'][20][208]#}" id="cardnum" maxlength="30"></dd>
+				</dl>
+				<dl class="inpbox">
+					<dt><span>{#$langData['siteConfig'][19][41]#}</span></dt>
+					<dd><input type="text" placeholder="{#$langData['siteConfig'][20][209]#}" id="cardname" maxlength="20"></dd>
+				</dl>
+				<dl class="inpbox">
+					<dt><span>{#$langData['siteConfig'][19][39]#}</span></dt>
+					<dd><input type="number" placeholder="可提现金额{#if $couriermoney > $courierFree#}{#($couriermoney-$courierFree)|string_format:'%.2f'#}{#else#}0.00{#/if#}" id="amount" class="amount" maxlength="10"></dd>
+				</dl>
+			</div>
+		</div>
+		
+	</div>
+	{#/if#}
+
+	{#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+	<div class="witem bank bankbox{#if $type == 'alipay' || $type == 'weixin'#} fn-hide{#/if#}">
+		<div class="norecord">
+			<div class="bgfff">
+				<dl class="inpbox">
+					<dt><span>{#$langData['siteConfig'][19][36]#}</span></dt>
+					<dd><input type="text" placeholder="{#$langData['siteConfig'][20][204]#}" id="bank" maxlength="30"></dd>
+				</dl>
+				<dl class="inpbox">
+					<dt><span>{#$langData['siteConfig'][19][37]#}</span></dt>
+					<dd><input type="text" placeholder="{#$langData['siteConfig'][20][205]#}" id="cardnum" maxlength="23" onkeyup="value=value.replace(/[^\d]/g,'');"></dd>
+				</dl>
+				<dl class="inpbox">
+					<dt><span>{#$langData['siteConfig'][19][38]#}</span></dt>
+					<dd><input type="text" placeholder="{#$langData['siteConfig'][20][206]#}" id="cardname" maxlength="10"></dd>
+				</dl>
+				<dl class="inpbox">
+					<dt><span>{#$langData['siteConfig'][19][39]#}</span></dt>
+					<dd><input type="number" placeholder="可提现金额{#if $couriermoney > $courierFree#}{#($couriermoney-$courierFree)|string_format:'%.2f'#}{#else#}0.00{#/if#}" id="amount" class="amount" maxlength="10"></dd>
+				</dl>
+			</div>
+		</div>
+	</div>
+	{#/if#}
+
+	{#if $withdrawPlatform#}
+	<div class="txBox">
+		<p class="overtip">最多可提现金额{#if $couriermoney > $courierFree#}{#($couriermoney-$courierFree)|string_format:'%.2f'#}{#else#}0.00{#/if#}</p>
+		<a href="javascript:;" id="tj" class="{#if $couriermoney <= $courierFree #}disabled{#/if#}">{#$langData['siteConfig'][19][716]#}</a>
+		<p class="agree">{#$langData['siteConfig'][6][88]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='提现服务协议' param='from=wmsj'#}">《{#$cfg_shortname#}{#$langData['siteConfig'][12][2]#}》</a></p>   {#*  提现服务协议 *#}
+	</div>
+	{#else#}
+	<center><br /><br />{#$langData['siteConfig'][36][9]#}</center>  {#*  暂无可提现的平台！ *#}
+	{#/if#}
+
+	{#/if#}
+
+	<div class="error"><p></p></div>
+
+	{#if $from != 'invite'#}
+	<div class="tips">
+		{#$courierwithdrawNote#}
+	</div>
+	{#/if#}
+
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/withdraw.js?v={#$cfg_staticVersion#}"></script>
+
+</body>
+</html>

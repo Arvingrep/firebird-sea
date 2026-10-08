@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>房产经纪</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all"
+        href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_plus_2.9.0.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/distribution.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/topNav/topNav.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/leftNav/leftNav.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue-3.5.12.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0_zh-cn.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}';
+        var staticVersion = '{#$cfg_staticVersion#}'; //版本号
+        var logoUrl = '{#getModuleConfig module='house' key='logoUrl'#}';
+        var templets_skin = '{#$templets_skin#}';
+        var member_busiDomain = "{#$member_busiDomain#}";
+        var channelDomain = "{#getModuleConfig module='house' key='channelDomain'#}";
+    </script>
+</head>
+
+<body>
+    <div class="navPage Shell" id="distribution" v-cloak>
+        <!-- 顶部导航 -->
+        <top-nav :user-info="userInfo" :company-info="companyInfo"></top-nav>
+        <!-- 左侧导航(bug) -->
+        <template v-if="userInfo.uid">
+            <left-nav type="broker" :active-index="8" :user-info="userInfo" :company-info="companyInfo"
+                v-if="companyInfo.type==0"></left-nav>
+            <left-nav type="distribute" :active-index="3" :user-info="userInfo" :company-info="companyInfo"
+                v-else></left-nav>
+        </template>
+        <!-- 内容 -->
+        <div class="boxContent">
+            <div class="b-main">
+                <div class="bm-report">分销报备</div>
+                <div class="bm-top">
+                    <!-- tab切换 -->
+                    <div class="bmt-tab">
+                        <div v-for="(item,index) in tabConfig.list " :key="item.id" class="item"
+                            :class="{active:index==tabConfig.active}" @click="tabFn(index)">
+                            <span class="title">{{item.title}}</span>
+                            <span class="warn" v-if="item.red==1">0</span>
+                            <span class="statistic" v-else>({{item.num}})</span>
+                        </div>
+                    </div>
+                    <!-- 筛选 -->
+                    <div class="bmt-filter">
+                        <!-- 最新报备 -->
+                        <el-select v-model="filterConfig.report.value" placeholder="跟进情况" class="newReport"
+                            @change="getTableData">
+                            <template v-for="item in filterConfig.report.options" :key="item.id">
+                                <el-option :label="item.name" :value="item.value"
+                                    v-if="item.show.includes(tabConfig.active)">
+                                </el-option>
+                            </template>
+                        </el-select>
+                        <!-- 搜索 -->
+                        <el-input v-model="filterConfig.keywords" placeholder="客户、报备人、楼盘" @change="getTableData()"
+                            class="searchInput">
+                            <template #suffix>
+                                <img src="{#$cfg_staticPath#}images/f_search.png?v={#$cfg_staticVersion#}"
+                                    class="searchIcon" />
+                            </template>
+                        </el-input>
+                    </div>
+                </div>
+                <!-- 表格 -->
+                <div class="bm-table">
+                    <el-table :data="tableConfig.list" header-cell-class-name="bm-header" cell-class-name="bm-cell"
+                        @row-click="detailPop(true,$event)" v-loading="tableConfig.loading">
+                        <template v-for="(item,index) in tableConfig.column" :key="item.id">
+                            <el-table-column :prop="item.prop" :align="item.align" :class="`bmt-item ${item.prop}`"
+                                v-if="item.show.includes(tabConfig.active)">
+                                <template #header>
+                                    <div class="bmti-head">
+                                        <span>{{item.label}}</span>
+                                        <el-popover placement="bottom" :width="340" trigger="hover"
+                                            :content="item.content" v-if="item.icon">
+                                            <template #reference>
+                                                <img :src="item.icon" />
+                                            </template>
+                                        </el-popover>
+                                    </div>
+                                </template>
+                                <template #default="data">
+                                    <!-- 客户 -->
+                                    <div class="bmti-cname" v-if="item.prop=='cname'">{{data.row.cname||'-'}}</div>
+                                    <!-- 联系方式 -->
+                                    <div :class="['bmti-phone',{'invalid':tabConfig.active==7}]"
+                                        v-else-if="item.prop=='phone'">
+                                        <img src="{#$templets_skin#}images/telBlue.png?v={#$cfg_staticVersion#}" />
+                                        <span>{{data.row.phone||'-'}}</span>
+                                    </div>
+                                    <!-- 楼盘 -->
+                                    <div class="bmti-build" v-if="item.prop=='build_name'">{{data.row.build_name||'-'}}
+                                    </div>
+                                    <!-- 备注 -->
+                                    <div class="bmti-mark" v-if="item.prop=='mark'">{{data.row.mark||'-'}}</div>
+                                    <!-- 带看凭证 -->
+                                    <div class="bmti-cert" @click.stop v-if="item.prop=='visitCert'">
+                                        <template v-if="data.row.visitCertStr.length">
+                                            <el-image :src="data.row.visitCertStr[0]" show-progress preview-teleported
+                                                :preview-src-list="data.row.visitCertStr" fit="cover"></el-image>
+                                            <div v-if="data.row.visitCertStr?.length>1">
+                                                {{data.row.visitCertStr.length-1}}+</div>
+                                        </template>
+                                    </div>
+                                    <!-- 成交凭证 -->
+                                    <div class="bmti-deal" @click.stop v-if="item.prop=='dealCert'">
+                                        <template v-if="data.row.dealCertStr.length">
+                                            <el-image :src="data.row.dealCertStr[0]" show-progress preview-teleported
+                                                :preview-src-list="data.row.dealCertStr" fit="cover"></el-image>
+                                            <div v-if="data.row.dealCertStr?.length>1">
+                                                {{data.row.dealCertStr.length-1}}+</div>
+                                        </template>
+                                    </div>
+                                    <!-- 报备人 -->
+                                    <div class="bmti-name" v-if="item.prop=='name'">{{data.row.name||'-'}}</div>
+                                    <!-- 报备时间 -->
+                                    <div class="bmti-report" v-if="item.prop=='report_time'">
+                                        {{timeChange(data.row.report_time)||'-'}}
+                                    </div>
+                                    <!-- 失效原因 -->
+                                    <div class="bmti-invalid" v-if="item.prop=='invalid_type'">
+                                        {{data.row.invalid_type==1?'报备无效':data.row.invalid_type==2?'未带看':data.row.invalid_type==3?'带看未通过':data.row.invalid_type==4?'未成交':'成交核实未通过'}}
+                                    </div>
+                                    <!-- 状态 -->
+                                    <div class="bmti-status" v-if="item.prop=='status'">
+                                        <div class="invalid" v-if="data.row.invalid_type>0">已失效</div>
+                                        <div class="wait" v-else-if="data.row.status==1">待审核</div>
+                                        <div class="doing" v-else-if="data.row.status==2">未带看</div>
+                                        <template v-else-if="data.row.status==3">
+                                            <div class="wait" v-if="data.row.verify_status!=3">带看核实中</div>
+                                            <div class="red" v-else>带看无效，需重新提交</div>
+                                        </template>
+                                        <template
+                                            v-else-if="data.row.status==4&&(data.row.isUpdate!=1||tabConfig.active==0)">
+                                            <div class="doing">待成交</div>
+                                        </template>
+                                        <template v-else-if="data.row.status==5">
+                                            <div class="has" v-if="data.row.verify_status!=3">成交核实中</div>
+                                            <div class="refuse" v-else>
+                                                <div class="red">成交结果驳回</div>
+                                                <div class="submit">查看</div>
+                                            </div>
+                                        </template>
+                                        <div class="has" v-else-if="data.row.status==6||data.row.status==7">已成交</div>
+                                        <div class="grant" v-if="data.row.status==7">佣金已发放</div>
+                                    </div>
+                                    <!-- 操作 -->
+                                    <div class="bmti-operate"
+                                        v-if="item.prop=='operate'&&data.row.status==4&&data.row.isUpdate==1">
+                                        <div class="updateInfo"
+                                            @click="updateConfig.pop=true;updateConfig.item=data.row">更新成交信息</div>
+                                    </div>
+                                </template>
+                            </el-table-column>
+                        </template>
+                    </el-table>
+                    <!-- 分页 -->
+                    <el-pagination background hide-on-single-page layout="prev, pager, next" prev-text="上一页"
+                        next-text="下一页" :page-size="tableConfig.pageSize" :total="tableConfig.pageInfo.totalCount"
+                        @current-change="pagingFn" class="bm-pagination" v-if="tableConfig.pageInfo?.totalCount">
+                    </el-pagination>
+                </div>
+                <!-- 更新成交信息 -->
+                <el-dialog v-model="updateConfig.pop" :show-close="false" :lock-scroll="false" class="bm-update">
+                    <template #header>
+                        <div class="bmu-header" @click="updateConfig.pop=false">
+                            <div>提交成交信息</div>
+                            <img src="{#$templets_skin#}images/close_icon.png?v={#$cfg_staticVersion#}" />
+                        </div>
+                    </template>
+                    <template #default>
+                        <div class="bmu-content">
+                            <div class="card">
+                                <div class="title">
+                                    <div class="label">【客户】</div>
+                                    <div class="text">{{updateConfig.item.cname}} {{updateConfig.item.phone}}</div>
+                                </div>
+                                <div class="items">
+                                    <div class="item">
+                                        <div class="tip">报备人：</div>
+                                        <div style="color: #17171A;">{{updateConfig.item.name||'-'}}</div>
+                                    </div>
+                                    <div class="item">
+                                        <div class="tip">报备时间：</div>
+                                        <div style="color: #17171A;">{{timeChange(updateConfig.item.report_pass_time)}}
+                                        </div>
+                                    </div>
+                                    <div class="item">
+                                        <div class="tip">分销组织：</div>
+                                        <div style="color: #17171A;">{{companyInfo.shorterName}}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <el-form :model="updateConfig.form" :rules="updateConfig.rules" class="form">
+                                <!-- 成交金额 -->
+                                <el-form-item label="成交金额" prop="purchase" style="align-items: center;">
+                                    <div class="purchase">
+                                        <el-input v-model="updateConfig.form.purchase" :validate-event="false"
+                                            placeholder="请准确填写" class="purchaseInput"></el-input>
+                                        <div>元</div>
+                                    </div>
+                                </el-form-item>
+                                <!-- 房号信息 -->
+                                <el-form-item label="房号信息" style="align-items: center;">
+                                    <div class="house">
+                                        <div class="item">
+                                            <el-input v-model="updateConfig.form.build" placeholder="请填写"
+                                                class="itemInput"></el-input>
+                                            <div class="unit">栋</div>
+                                        </div>
+                                        <div class="item">
+                                            <el-input v-model="updateConfig.form.cell" placeholder="请填写"
+                                                class="itemInput"></el-input>
+                                            <div class="unit">单元</div>
+                                        </div>
+                                        <div class="item">
+                                            <el-input v-model="updateConfig.form.number" placeholder="请填写"
+                                                class="itemInput"></el-input>
+                                            <div class="unit">号</div>
+                                            <div class="tip">（没有的项不填）</div>
+                                        </div>
+                                    </div>
+                                </el-form-item>
+                                <!-- 认购证明 -->
+                                <el-form-item label="认购证明" prop="contract">
+                                    <div>
+                                        <el-radio-group v-model="updateConfig.radio" :validate-event="false"
+                                            class="typeRadio">
+                                            <el-radio :value="1">房源认购协议书</el-radio>
+                                            <el-radio :value="2">商品房买卖合同</el-radio>
+                                        </el-radio-group>
+                                        <el-upload class="upload-demo" :ref="res=>{uploadConfig.subscribe.ref=res}"
+                                            :limit="1" :auto-upload="false" :show-file-list="false"
+                                            v-loading="uploadConfig.subscribe.loading"
+                                            :on-change="uploadConfig.subscribe.fn"
+                                            :on-exceed="uploadConfig.subscribe.coverFn" accept="image/*"
+                                            style="margin-top: 1    0px;">
+                                            <div class="bmtiii-logo" v-if="uploadConfig.subscribe.file.turl">
+                                                <img :src="uploadConfig.subscribe.file.turl" />
+                                                <span>重新上传</span>
+                                            </div>
+                                            <div class="bmtiii-upload" v-else>
+                                                <img src="{#$templets_skin#}images/upLoad.png" />
+                                                <span>上传图片</span>
+                                            </div>
+                                        </el-upload>
+                                    </div>
+                                </el-form-item>
+                                <!-- 收款收据 -->
+                                <el-form-item label="收款收据" prop="receipt">
+                                    <el-upload class="upload-demo" :ref="res=>{uploadConfig.receive.ref=res}" :limit="1"
+                                        :auto-upload="false" :show-file-list="false"
+                                        v-loading="uploadConfig.receive.loading" :on-change="uploadConfig.receive.fn"
+                                        :on-exceed="uploadConfig.receive.coverFn" accept="image/*">
+                                        <div class="bmtiii-logo" v-if="uploadConfig.receive.file.turl">
+                                            <img :src="uploadConfig.receive.file.turl" />
+                                            <span>重新上传</span>
+                                        </div>
+                                        <div class="bmtiii-upload" v-else>
+                                            <img src="{#$templets_skin#}images/upLoad.png" />
+                                            <span>上传图片</span>
+                                        </div>
+                                    </el-upload>
+                                </el-form-item>
+                            </el-form>
+                        </div>
+                    </template>
+                    <template #footer>
+                        <div class="bmu-btns">
+                            <div class="cancel" @click="updateConfig.pop=false">取消</div>
+                            <div class="confirm" @click="updateFn">确定</div>
+                        </div>
+                    </template>
+                </el-dialog>
+            </div>
+            <div class="b-copyright">
+                版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.
+            </div>
+        </div>
+        <!-- 详情弹窗 -->
+        <el-dialog v-model="detailConfig.pop" :show-close="false" :lock-scroll="false"
+            :class="`${detailConfig.type==1?'dealHas':detailConfig.type==2?'invalidHas':detailConfig.type==3?'rejectHas':'otherHas'}`">
+            <template #header>
+                <div class="d-header">
+                    <div>{{detailConfig.data?.reportUser?.rname||'-'}}提交的报备</div>
+                    <img src="{#$templets_skin#}images/close_icon.png?v={#$cfg_staticVersion#}" @click="detailConfig.pop=false"/>
+                </div>
+            </template>
+            <!-- 已成交 -->
+            <div class="d-content" v-loading="detailConfig.loading" v-if="detailConfig.type==1">
+                <div class="dc-left">
+                    <!-- 信息卡 -->
+                    <div class="dcl-card">
+                        <div class="label">客户信息</div>
+                        <div class="info">
+                            <div class="title">
+                                <div class="name">{{detailConfig.data?.customer?.cname||'-'}}</div>
+                                <div class="phone">{{detailConfig.data?.customer?.cphone||'-'}}</div>
+                            </div>
+                            <div class="list">
+                                <div class="item">
+                                    <span class="name">到访时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.visitTime||'-'}}</span>
+                                </div>
+                                <div class="item">
+                                    <span class="name">成交时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.dealEndTime||'-'}}</span>
+                                </div>
+                                <div class="item">
+                                    <span class="name">报备时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.reportTime||'-'}}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="note">
+                            <span class="name">报备人备注：</span>
+                            <span class="text">{{detailConfig.data.mark||'-'}}</span>
+                        </div>
+                    </div>
+                    <!-- 分销流程 -->
+                    <div class="dcl-process">
+                        <div class="first">
+                            <div class="title">
+                                <img src="{#$templets_skin#}images/confirmOrange.png?v={#$cfg_staticVersion#}" />
+                                <span>分销成功</span>
+                            </div>
+                            <div class="item">
+                                <div class="count">
+                                    <span style="color: #FF7300;">房源成交，佣金已结算：</span>
+                                    <span style="color: black;">{{detailConfig.data?.report?.commission}}</span>
+                                </div>
+                                <div class="tip">渠道佣金请在公司佣金明细中统一申请提现</div>
+                                <div class="btn"
+                                    v-if="detailConfig.data?.userRole?.companyAdmin==1||detailConfig.data?.userRole?.storeAdmin==1">
+                                    查看佣金
+                                </div>
+                            </div>
+                        </div>
+                        <div class="other">
+                            <template v-for="(item,index) in detailConfig.data?.list" :key="index">
+                                <div v-if="item.type==1">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 审核报备结果 -->
+                                    <div class="item pass" v-if="item.logType==2&&item.markType<=2">
+                                        <div class="text">{{item.markType==1?'报备确认有效，已审核通过':'审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==2">
+                                            原因：{{item.mark.note||''}}
+                                        </div>
+                                    </div>
+                                    <!-- 提交报备 -->
+                                    <div class="item onestep" v-else-if="item.logType==1">
+                                        <img :src="item.avatar" @error="$event.target.src=errorPhoto" />
+                                        <span class="text">{{item.name}}提交报备</span>
+                                        <span class="note">（备注：{{item.mark.note}}）</span>
+                                    </div>
+                                </div>
+                                <!-- 到访记录 -->
+                                <div v-else-if="item.type==3">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 到访记录 -->
+                                    <div class="item history" v-if="item.logType==1">
+                                        <div class="left">
+                                            <div class="title">
+                                                <img :src="item.avatar" />
+                                                <span>{{item.name}}提交带看到访记录</span>
+                                            </div>
+                                            <div class="tip">
+                                                说明：{{item.mark.note||'-'}}
+                                            </div>
+                                        </div>
+                                        <div class="right" v-if="item?.imageUrl?.length>0||item?.videoUrl?.length>0">
+                                            <span class="text">到访视频/照片</span>
+                                            <div class="num">
+                                                {{(item?.imageUrl?.length)+(item?.videoUrl?.length)}}+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 核实到访结果 -->
+                                    <div class="item pass" v-else>
+                                        <div class="text">{{item.markType==1?'已核实到访情况':'审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==5">
+                                            原因：{{item.mark.note||'-'}}
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 认购凭证 -->
+                                <div v-else-if="item.type==5">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 认购凭证 -->
+                                    <div class="item certificate" v-if="item.logType==1">
+                                        <span class="text">
+                                            【{{item.name}}】提交认购凭证
+                                        </span>
+                                        <div class="img">
+                                            <div class="imgItem">
+                                                <img :src="item.mark.contractUrl" />
+                                                <div class="label">{{item.mark.type==1?'认购协议书':'买卖合同'}}</div>
+                                            </div>
+                                            <div class="imgItem">
+                                                <img :src="item.mark.receiptUrl" />
+                                                <div class="label">收款收据</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 核实认购凭证 -->
+                                    <div class="item pass" v-else>
+                                        <div class="text">{{item.markType==1?'已核实认购凭证':'认购结果审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==5">
+                                            原因：{{item.mark.note||'-'}}
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <div class="dc-right">
+                    <div class="dcr-label">报备人</div>
+                    <div class="dcr-info">
+                        <img :src="detailConfig.data?.reportUser?.avatar" @error="$event.target.src=errorPhoto" />
+                        <span>{{detailConfig.data?.reportUser?.rname||'-'}}</span>
+                    </div>
+                    <div class="dcr-contact">
+                        <div class="item">
+                            <span class="name">联系方式：</span>
+                            <span class="text">{{detailConfig.data?.reportUser?.rphone}}</span>
+                        </div>
+                        <div class="item">
+                            <span class="name">分销模式：</span>
+                            <span class="text"
+                                style="color: #1966FF;">{{detailConfig.data?.report?.dcoid==0?'全民分销':'渠道分销'}}</span>
+                        </div>
+                        <div class="item">
+                            <span class="name">分销组织：</span>
+                            <span class="text">{{detailConfig.data?.reportUser?.org||'-'}}</span>
+                        </div>
+                    </div>
+                    <div class="dcr-btn"
+                        v-if="detailConfig.data?.userRole?.companyAdmin==1||detailConfig.data?.userRole?.storeAdmin==1">
+                        查看佣金
+                    </div>
+                </div>
+            </div>
+            <!-- 失效 -->
+            <div class="d-content" v-loading="detailConfig.loading" v-else-if="detailConfig.type==2">
+                <div class="dc-left">
+                    <!-- 信息卡 -->
+                    <div class="dcl-card">
+                        <div class="label">客户信息</div>
+                        <div class="info">
+                            <div class="title">
+                                <div class="name">{{detailConfig.data?.customer?.cname||'-'}}</div>
+                                <div class="phone">{{detailConfig.data?.customer?.cphone||'-'}}</div>
+                            </div>
+                            <div class="list">
+                                <div class="item">
+                                    <span class="name">到访时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.visitTime||'-'}}</span>
+                                </div>
+                                <div class="item">
+                                    <span class="name">成交时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.dealEndTime||'-'}}</span>
+                                </div>
+                                <div class="item">
+                                    <span class="name">报备时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.reportTime||'-'}}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="note">
+                            <span class="name">报备人备注：</span>
+                            <span class="text">{{detailConfig.data.mark||'-'}}</span>
+                        </div>
+                    </div>
+                    <!-- 分销流程 -->
+                    <div class="dcl-process">
+                        <div class="first">
+                            <div class="title">
+                                <img src="{#$templets_skin#}images/closeRed.png?v={#$cfg_staticVersion#}" />
+                                <span>{{detailConfig.data?.report?.invalidTime||'-'}}</span>
+                            </div>
+                            <div class="item">
+                                <div class="count">报备无效</div>
+                                <div class="tip" v-if="detailConfig.data?.report?.invalidType!=1">
+                                    {{detailConfig.data?.report?.invalidType==2?'提前到访':detailConfig.data?.report?.invalidType==3?'未带看':detailConfig.data?.report?.invalidType==4?'带看未通过':detailConfig.data?.report?.invalidType==5?'未成交':detailConfig.data?.report?.invalidType==6?'成交核实未通过':'分销已结束，报备未成交已失效'}}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="other">
+                            <template v-for="(item,index) in detailConfig.data?.list" :key="index">
+                                <div v-if="item.type==1">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 审核报备结果 -->
+                                    <div class="item pass" v-if="item.logType==2&&item.markType<=2">
+                                        <div class="text">{{item.markType==1?'报备确认有效，已审核通过':'审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==2">
+                                            原因：{{item.mark.note||''}}
+                                        </div>
+                                    </div>
+                                    <!-- 提交报备 -->
+                                    <div class="item onestep" v-else-if="item.logType==1">
+                                        <img :src="item.avatar" @error="$event.target.src=errorPhoto" />
+                                        <span class="text">{{item.name}}提交报备</span>
+                                        <span class="note">（备注：{{item.mark.note}}）</span>
+                                    </div>
+                                </div>
+                                <!-- 到访记录 -->
+                                <div v-else-if="item.type==3">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 到访记录 -->
+                                    <div class="item history" v-if="item.logType==1">
+                                        <div class="left">
+                                            <div class="title">
+                                                <img :src="item.avatar" />
+                                                <span>{{item.name}}提交带看到访记录</span>
+                                            </div>
+                                            <div class="tip">
+                                                说明：{{item.mark.note||'-'}}
+                                            </div>
+                                        </div>
+                                        <div class="right" v-if="item?.imageUrl?.length>0||item?.videoUrl?.length>0">
+                                            <span class="text">到访视频/照片</span>
+                                            <div class="num">
+                                                {{(item?.imageUrl?.length)+(item?.videoUrl?.length)}}+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 核实到访结果 -->
+                                    <div class="item pass" v-else>
+                                        <div class="text">{{item.markType==1?'已核实到访情况':'审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==5">
+                                            原因：{{item.mark.note||'-'}}
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 认购凭证 -->
+                                <div v-else-if="item.type==5">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 认购凭证 -->
+                                    <div class="item certificate" v-if="item.logType==1">
+                                        <span class="text">
+                                            【{{item.name}}】提交认购凭证
+                                        </span>
+                                        <div class="img">
+                                            <div class="imgItem">
+                                                <img :src="item.mark.contractUrl" />
+                                                <div class="label">{{item.mark.type==1?'认购协议书':'买卖合同'}}</div>
+                                            </div>
+                                            <div class="imgItem">
+                                                <img :src="item.mark.receiptUrl" />
+                                                <div class="label">收款收据</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 核实认购凭证 -->
+                                    <div class="item pass" v-else>
+                                        <div class="text">{{item.markType==1?'已核实认购凭证':'认购结果审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==5">
+                                            原因：{{item.mark.note||'-'}}
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <div class="dc-right">
+                    <div class="dcr-label">报备人</div>
+                    <div class="dcr-info">
+                        <img :src="detailConfig.data?.reportUser?.avatar" @error="$event.target.src=errorPhoto" />
+                        <span>{{detailConfig.data?.reportUser?.rname||'-'}}</span>
+                    </div>
+                    <div class="dcr-contact">
+                        <div class="item">
+                            <span class="name">联系方式：</span>
+                            <span class="text">{{detailConfig.data?.reportUser?.rphone}}</span>
+                        </div>
+                        <div class="item">
+                            <span class="name">分销模式：</span>
+                            <span class="text">{{detailConfig.data?.report?.dcoid==0?'全民分销':'渠道分销'}}</span>
+                        </div>
+                        <div class="item">
+                            <span class="name">分销组织：</span>
+                            <span class="text">{{detailConfig.data?.reportUser?.org||'-'}}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 驳回 -->
+            <div class="d-content" v-loading="detailConfig.loading" v-else-if="detailConfig.type==3">
+                <div class="dc-left">
+                    <!-- 信息卡 -->
+                    <div class="dcl-card">
+                        <div class="label">客户信息</div>
+                        <div class="info">
+                            <div class="title">
+                                <div class="name">{{detailConfig.data?.customer?.cname||'-'}}</div>
+                                <div class="phone">{{detailConfig.data?.customer?.cphone||'-'}}</div>
+                            </div>
+                            <div class="list">
+                                <div class="item">
+                                    <span class="name">到访时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.visitTime||'-'}}</span>
+                                </div>
+                                <div class="item">
+                                    <span class="name">成交时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.dealEndTime||'-'}}</span>
+                                </div>
+                                <div class="item">
+                                    <span class="name">报备时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.reportTime||'-'}}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="note">
+                            <span class="name">报备人备注：</span>
+                            <span class="text">{{detailConfig.data.mark||'-'}}</span>
+                        </div>
+                    </div>
+                    <!-- 分销流程 -->
+                    <div class="dcl-process">
+                        <div class="first">
+                            <div class="title">
+                                <img src="{#$templets_skin#}images/warnRed.png?v={#$cfg_staticVersion#}" />
+                                <span>当前进度</span>
+                            </div>
+                            <div class="item">
+                                <div class="count">
+                                    <span style="color: black;">
+                                        {{detailConfig.data?.report?.status==5?'成交结果未通过，请重提交':'客户到访审核未通过，待报备人重提交'}}
+                                    </span>
+                                </div>
+                                <div class="tip">原因：{{detailConfig.data?.list[0]?.mark?.note||'-'}}</div>
+                            </div>
+                        </div>
+                        <div class="other">
+                            <template v-for="(item,index) in detailConfig.data?.list.slice(1)" :key="index">
+                                <div v-if="item.type==1">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 审核报备结果 -->
+                                    <div class="item pass" v-if="item.logType==2&&item.markType<=2">
+                                        <div class="text">{{item.markType==1?'报备确认有效，已审核通过':'审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==2">
+                                            原因：{{item.mark.note||''}}
+                                        </div>
+                                    </div>
+                                    <!-- 提交报备 -->
+                                    <div class="item onestep" v-else-if="item.logType==1">
+                                        <img :src="item.avatar" @error="$event.target.src=errorPhoto" />
+                                        <span class="text">{{item.name}}提交报备</span>
+                                        <span class="note">（备注：{{item.mark.note}}）</span>
+                                    </div>
+                                </div>
+                                <!-- 到访记录 -->
+                                <div v-else-if="item.type==3">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 到访记录 -->
+                                    <div class="item history" v-if="item.logType==1">
+                                        <div class="left">
+                                            <div class="title">
+                                                <img :src="item.avatar" />
+                                                <span>{{item.name}}提交带看到访记录</span>
+                                            </div>
+                                            <div class="tip">
+                                                说明：{{item.mark.note||'-'}}
+                                            </div>
+                                        </div>
+                                        <div class="right" v-if="item?.imageUrl?.length>0||item?.videoUrl?.length>0">
+                                            <span class="text">到访视频/照片</span>
+                                            <div class="num">
+                                                {{(item?.imageUrl?.length)+(item?.videoUrl?.length)}}+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 核实到访结果 -->
+                                    <div class="item pass" v-else>
+                                        <div class="text">{{item.markType==1?'已核实到访情况':'审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==5">
+                                            原因：{{item.mark.note||'-'}}
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 认购凭证 -->
+                                <div v-else-if="item.type==5">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 认购凭证 -->
+                                    <div class="item certificate" v-if="item.logType==1">
+                                        <span class="text">
+                                            【{{item.name}}】提交认购凭证
+                                        </span>
+                                        <div class="img">
+                                            <div class="imgItem">
+                                                <img :src="item.mark.contractUrl" />
+                                                <div class="label">{{item.mark.type==1?'认购协议书':'买卖合同'}}</div>
+                                            </div>
+                                            <div class="imgItem">
+                                                <img :src="item.mark.receiptUrl" />
+                                                <div class="label">收款收据</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 核实认购凭证 -->
+                                    <div class="item pass" v-else>
+                                        <div class="text">{{item.markType==1?'已核实认购凭证':'认购结果审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==5">
+                                            原因：{{item.mark.note||'-'}}
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <div class="dc-right">
+                    <div class="dcr-label">报备人</div>
+                    <div class="dcr-info">
+                        <img :src="detailConfig.data?.reportUser?.avatar" @error="$event.target.src=errorPhoto" />
+                        <span>{{detailConfig.data?.reportUser?.rname||'-'}}</span>
+                    </div>
+                    <div class="dcr-contact">
+                        <div class="item">
+                            <span class="name">联系方式：</span>
+                            <span class="text">{{detailConfig.data?.reportUser?.rphone}}</span>
+                        </div>
+                        <div class="item">
+                            <span class="name">分销模式：</span>
+                            <span class="text"
+                                style="color: #1966FF;">{{detailConfig.data?.report?.dcoid==0?'全民分销':'渠道分销'}}</span>
+                        </div>
+                        <div class="item">
+                            <span class="name">分销组织：</span>
+                            <span class="text">{{detailConfig.data?.reportUser?.org||'-'}}</span>
+                        </div>
+                    </div>
+                    <div class="dcr-btn">重提交成交信息 </div>
+                </div>
+            </div>
+            <!-- 其他状态 -->
+            <div class="d-content" v-loading="detailConfig.loading" v-else>
+                <div class="dc-left">
+                    <!-- 信息卡 -->
+                    <div class="dcl-card">
+                        <div class="label">客户信息</div>
+                        <div class="info">
+                            <div class="title">
+                                <div class="name">{{detailConfig.data?.customer?.cname||'-'}}</div>
+                                <div class="phone">{{detailConfig.data?.customer?.cphone||'-'}}</div>
+                            </div>
+                            <div class="list">
+                                <div class="item">
+                                    <span class="name">到访时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.visitTime||'-'}}</span>
+                                </div>
+                                <div class="item">
+                                    <span class="name">成交时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.dealEndTime||'-'}}</span>
+                                </div>
+                                <div class="item">
+                                    <span class="name">报备时间：</span>
+                                    <span class="time">{{detailConfig.data?.customer?.reportTime||'-'}}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="note">
+                            <span class="name">报备人备注：</span>
+                            <span class="text">{{detailConfig.data.mark||'-'}}</span>
+                        </div>
+                    </div>
+                    <!-- 分销流程 -->
+                    <div class="dcl-process">
+                        <div class="first">
+                            <div class="title">
+                                <img src="{#$templets_skin#}images/timeBlue.png?v={#$cfg_staticVersion#}" />
+                                <span>当前进度</span>
+                            </div>
+                            <div class="item">
+                                <div class="count">
+                                    <span style="color: #266EFF;">
+                                        {{detailConfig.data?.report?.status==1?'待审核报备有效性':detailConfig.data?.report?.status==2?'待客户看房':detailConfig.data?.report?.status==3?'待核实到访情况':detailConfig.data?.report?.status==4?'待成交，需提交认购凭证':'待各负责人核实认购结果'}}
+                                    </span>
+                                </div>
+                                <div class="tip"
+                                    v-if="detailConfig.data?.report?.status==2||detailConfig.data?.report?.status==4">
+                                    <span>
+                                        {{detailConfig.data?.report?.status==2?'此房源分销需要报备人带客户前往看房':'如已成交，请及时上传，提交截止'}}
+                                    </span>
+                                    <span style="color: #FF1E00;" v-if="detailConfig.data?.report?.status==4">
+                                        {{detailConfig.data?.customer?.dealEndTime}}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="other">
+                            <template v-for="(item,index) in detailConfig.data?.list" :key="index">
+                                <div v-if="item.type==1">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 审核报备结果 -->
+                                    <div class="item pass" v-if="item.logType==2&&item.markType<=2">
+                                        <div class="text">{{item.markType==1?'报备确认有效，已审核通过':'审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==2">
+                                            原因：{{item.mark.note||''}}
+                                        </div>
+                                    </div>
+                                    <!-- 提交报备 -->
+                                    <div class="item onestep" v-else-if="item.logType==1">
+                                        <img :src="item.avatar" @error="$event.target.src=errorPhoto" />
+                                        <span class="text">{{item.name}}提交报备</span>
+                                        <span class="note">（备注：{{item.mark.note}}）</span>
+                                    </div>
+                                </div>
+                                <!-- 到访记录 -->
+                                <div v-else-if="item.type==3">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 到访记录 -->
+                                    <div class="item history" v-if="item.logType==1">
+                                        <div class="left">
+                                            <div class="title">
+                                                <img :src="item.avatar" />
+                                                <span>{{item.name}}提交带看到访记录</span>
+                                            </div>
+                                            <div class="tip">
+                                                说明：{{item.mark.note||'-'}}
+                                            </div>
+                                        </div>
+                                        <div class="right" v-if="item?.imageUrl?.length>0||item?.videoUrl?.length>0">
+                                            <span class="text">到访视频/照片</span>
+                                            <div class="num">
+                                                {{(item?.imageUrl?.length)+(item.videoUrl?.length)}}+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 核实到访结果 -->
+                                    <div class="item pass" v-else>
+                                        <div class="text">{{item.markType==1?'已核实到访情况':'审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==5">
+                                            原因：{{item.mark.note||'-'}}
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 认购凭证 -->
+                                <div v-else-if="item.type==5">
+                                    <div class="time">{{item.time}}</div>
+                                    <!-- 认购凭证 -->
+                                    <div class="item certificate" v-if="item.logType==1">
+                                        <span class="text">
+                                            【{{item.name}}】提交认购凭证
+                                        </span>
+                                        <div class="img">
+                                            <div class="imgItem">
+                                                <img :src="item.mark.contractUrl" />
+                                                <div class="label">{{item.mark.type==1?'认购协议书':'买卖合同'}}</div>
+                                            </div>
+                                            <div class="imgItem">
+                                                <img :src="item.mark.receiptUrl" />
+                                                <div class="label">收款收据</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 核实认购凭证 -->
+                                    <div class="item pass" v-else>
+                                        <div class="text">{{item.markType==1?'已核实认购凭证':'认购结果审核未通过'}}</div>
+                                        <div class="reason" v-if="item.markType==5">
+                                            原因：{{item.mark.note||'-'}}
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <div class="dc-right">
+                    <div class="dcr-label">报备人</div>
+                    <div class="dcr-info">
+                        <img :src="detailConfig.data?.reportUser?.avatar" @error="$event.target.src=errorPhoto" />
+                        <span>{{detailConfig.data?.reportUser?.rname||'-'}}</span>
+                    </div>
+                    <div class="dcr-contact">
+                        <div class="item">
+                            <span class="name">联系方式：</span>
+                            <span class="text">{{detailConfig.data?.reportUser?.rphone}}</span>
+                        </div>
+                        <div class="item">
+                            <span class="name">分销模式：</span>
+                            <span class="text"
+                                style="color: #1966FF;">{{detailConfig.data?.report?.dcoid==0?'全民分销':'渠道分销'}}</span>
+                        </div>
+                        <div class="item">
+                            <span class="name">分销组织：</span>
+                            <span class="text">{{detailConfig.data?.reportUser?.org||'-'}}</span>
+                        </div>
+                    </div>
+                    <div class="dcr-btn">更新成交信息</div>
+                </div>
+            </div>
+        </el-dialog>
+    </div>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="module" src="{#$templets_skin#}js/distribution.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

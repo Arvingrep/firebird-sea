@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <meta name="wap-font-scale" content="no">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <title>搜索</title>
+    {#if $is_app#}
+    <meta name="apptitle" content="{#$cfg_appname#}">
+    {#elseif $isWxMiniprogram || $isBaiDuMiniprogram || $isQqMiniprogram || $isByteMiniprogram#}
+    <meta name="apptitle" content="{#$cfg_miniProgramName#}">
+    {#/if#}
+    <meta charset="{#$cfg_soft_lang#}">
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <meta name="wap-font-scale" content="no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no,viewport-fit=cover">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/siteSearch_touch.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var cityid = '{#$siteCityInfo["cityid"]#}';
+        var esState =  {#$es_status|default:0#} ;
+        var toSearch = '{#$smarty.get.keyword#}'
+    </script>
+</head>
+<body>
+    <div class="hiddenHead">
+        {#include file="touch_top.html" pageTitle="搜索"#}
+    </div> 
+    
+    <div :class="['page_search',{grayBg:currType == 3 || currType == 2} ,{typePage:currType || !esState}]" id="siteSearch" :style="'padding-top:'+ topHeight +';'">
+        <div class="topFixed">
+            <div :class="['header',{'showHeader' : currType && esState}]" v-show="currType && esState" v-cloak >
+                <div class="header-l">
+                        <a href="javascript:;"  class="backbtn" @click="changeBack"></a>
+                    </div>
+                <div class="header-address">
+                    <span>{{currTitle}}</span>
+                </div>
+                <div class="header-search">
+                    <a href="javascript:;" class="dropnav"><em></em></a>
+                </div>
+            </div>
+            <div class="searchForm">
+                <div :class="['searchInpBox',{noCancel: backbtn && !currType},{onType: currType}]" v-cloak>
+                    <a href="javascript:;" v-if="!is_app" class="backbtn ll" v-show="backbtn && !currType"  @click="toSearchResult = false; focusIn= false; hidePop()"></a>
+                    <a href="javascript:;" v-else class="backbtn goBack" v-show="backbtn && !currType"  @click="backAppSearch()"></a>
+                    <div class="searchInp">
+                        <div class="searchBox">
+                            <span :class="['typename',{choseType:!esState && toSearchResult}]" v-if="(currType || !esState) && toSearchResult" @click="openChoseType">{{currTypename}}<s v-if="!esState"></s>   </span>
+                            <input type="text" class="inpbox" placeholder="输入搜索关键词" @blur="checkInp" enterkeyhint="search" v-model="keywords_search" @keyup="toSearch()" @focus="hidePop(); changeFocus()">
+                            <a href="javascript:;" class="clear_inp" v-if="keywords_search != ''" @click="keywords_search = ''; hidePop(); focusIn = false;"></a>
+                        </div>
+                    </div>
+                    <a href="javascript:;" class="cancel goBack" onclick="history.go(-1)" v-if="!toSearchResult">取消</a>
+                </div>
+                <div class="popup moduleChose">
+                    <h2>在以下模块搜索</h2>
+                    <ul class="fn-clear">
+                        <li v-for="mod in moduleArr" :class="{on_chose:currModule == mod.mod }" :data-code="mod.mod" @click="choseModule(mod)">{{mod.modname}}</li>
+                    </ul>
+                </div>
+                <!-- 筛选条件 -->
+                <div class="shaiContainer" v-if="toSearchResult">
+                    <div class="shaiBox" v-if="currType == 3" v-cloak>
+                        <div class="orderby">
+                            <a href="javascript:;" data-id="" :class="{'curr':orderby == ''}" @click="orderby = ''">综合排序</a>
+                            <a href="javascript:;" data-id="3" :class="{'curr':orderby == 3}" @click="orderby = 3">距离最近</a>
+                            <s class="curr_line"></s>
+                        </div>
+                        <div class="areaBox">
+                            <a href="javascript:;" class="area" @click="showPop('.areaPop')">区域</a>
+                        </div>
+                        <div class="popup areaPop">
+                            <div class="leftAddr">
+                                <ul class="lower1">
+                                    <li @click="noAddrId()" class="curr">全{#$siteCityInfo['name']|default:'国'#}</li>
+                                    <li @click="noAddrId(1)">附近</li>
+                                    <li v-for="addr in areaList" :data-id="addr.id" @click="choseAddr(addr)" >{{addr.typename}}</li>
+                                </ul>
+                            </div>
+                            <div class="rightAddr">
+                                <ul>
+                                    <li v-for="addr in chosedAddr" :data-id="addr.id" @click="choseAddr(addr)">{{addr.typename}}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="popMask" @click="hidePop()"> </div>
+        <!-- 搜索页 -->
+        <div class="focusIn_page" v-if="focusIn" v-cloak>
+            <ul v-if="keywords_search != ''">
+                <li class="store_to" @click="toStore()">搜索“<b>{{keywords_search}}</b>”相关商家</li>
+                <li @click="toSearch(keywords_search)">搜索全部相关结果</li>
+            </ul>
+        </div>
+        <div class="search_page" v-else-if="!toSearchResult"  v-cloak>
+            <!-- 搜索历史 -->
+            <div class="searchConBox"  v-cloak>
+                <dl class="history" v-if="searchHistory && searchHistory.length > 0">
+                    <dt>历史搜索 <a href="javascript:;" class="del_btn" @click="del_history"></a></dt>
+                    <dd v-for="(item, k ) in searchHistory" v-if="item && k < 20" @click="toSearch(item)"><a href="javascript:;">{{item}}</a></dd>
+                </dl>
+                <div class="hotSearch" v-if="searchHot && searchHot.length > 0">
+                    <h4 >热搜</h4>
+                    <ul class="fn-clear">
+                        <li v-for="(keywords,index) in searchHot" v-if="index < 10"><s></s><a :href="keywords.href" v-html="keywords.keyword"></a></li>  
+                        
+                    </ul>
+                </div>
+            </div>
+        </div> 
+
+        <!-- 搜索结果页 -->
+        <div class="searchResult" v-else-if="toSearchResult && esState"  v-cloak>
+
+            <!-- 没有数据 -->
+            <div class="nodata bg_grey" v-if="loadupEnd && search_num == 0">
+                <div class="noData_icon">
+                    <div class="nodataImg">
+                        <img src="/static/images/siteSearch_touch/noData.png" alt="">
+                    </div>
+                    <p>没有相关结果，搜索别的试试吧</p>
+                </div>
+
+                <div class="recListBox">
+                    <h2>优选商家</h2>
+                    <div class="recList">
+                        <ul>
+                            <li v-for="(item,ind) in tjBusinessList" v-if="ind % 2 == 0">
+                                <a :href="item.url">
+                                    <div class="imgbox">
+                                        <img :src="item.logo||imgError" alt="" @error="item.logo=imgError">
+                                        <div class="posi" v-if="computeDistance(item.lng,item.lat)">{{computeDistance(item.lng,item.lat)}}</div>
+                                    </div>
+                                    <div class="store_info">
+                                        <h4>{{item.title}}</h4>
+                                        <p>{{item.address}}</p>
+                                        <!-- <div class="hui"><span><em>惠</em>7折</span>买单立减折扣</div> -->
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                        <ul>
+                            <li v-for="(item,ind) in tjBusinessList" v-if="ind % 2 == 1">
+                                <a :href="item.url">
+                                    <div class="imgbox">
+                                        <img :src="item.logo||imgError" alt="" @error="item.logo=imgError">
+                                        <div class="posi" v-if="computeDistance(item.lng,item.lat)">{{computeDistance(item.lng,item.lat)}}</div>
+                                    </div>
+                                    <div class="store_info">
+                                        <h4>{{item.title}}</h4>
+                                        <p>{{item.address}}</p>
+                                        <!-- <div class="hui"><span><em>惠</em>7折</span>买单立减折扣</div> -->
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                </div>
+            </div>
+
+            <!-- 全概页 -->
+            <div class="noType" v-else-if="!currType ">
+                <p class="search_tip" v-if="loadupEnd && search_num > 0">为您找到相关结果{{search_num}}个</p>
+                <div class="fixTabBox" v-show="fixTop" v-cloak>
+                    <ul class="tabul fn-clear">
+                        <li :class="{'curr':onTab == tab.id}" v-for="tab in tabs" :data-id="tab.id" @click="onTab = tab.id">{{tab.text}}</li>
+                        <s class="tab_bg"></s>
+                    </ul>
+                </div>
+                <!-- 相关商家 -->
+                <div class="storeBox resultBox" data-type="business" data-currType="3"  v-show="searchList.business.length > 0">
+                    <a href="javascript:;" class="title"  @click="currType = 3"><h1>相关商家</h1></a>
+                    <ul class="storeList">
+                        
+                        <template v-for="store in searchList.business">
+                            <li class="fn-clear store_tuan store" v-if="store.module == 'tuan'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3>
+                                            <span class="store_name">{{store.title}}</span>
+                                            <em class="tuanIcon" v-if="store.module == 'tuan' || (store.module == 'shop' && store.columns.shoptype==1)">团</em>
+                                            <span v-if="!store.columns.star || store.columns.star <= 0" class="saleInfo">
+                                                <em v-if="store.children.total > 0">{{store.children.total}}条优惠</em>
+                                                <em v-else-if="store.columns.collectnum && store.columns.collectnum > 0">{{store.columns.collectnum}}收藏</em>
+                                            </span>
+                                        </h3>
+                                        <p class="star_store"  v-if="store.columns.star > 0"><span class="star" v-if="store.columns.star">{{NumFixed(store.columns.star,1)}}</span> <em v-if="store.children.total > 0">{{store.children.total}}条优惠</em><em v-else-if="store.columns.collectnum > 0">{{store.columns.collectnum}}收藏</em></p>
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.typename  ? store.columns.typename : ''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="line_pro" v-if="store.children && store.children.list.length > 0">
+                                        <a :href="pro.url" v-for="(pro,pind) in store.children.list" v-if="pind < 2"><label>团购</label>{{pro.title}}</a>
+                                    </div>
+                                </div> 
+        
+                            </li>
+
+                            <li class="fn-clear store_waimai store"  v-else-if="store.module == 'waimai' || store.module == 'travel' || store.module == 'house'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span><em class="saleInfo" v-if="store.columns.star <= 0">已售{{store.columns.sale}}</em></h3>
+                                        <p class="star_store" v-if="store.columns.star > 0"><span class="star">{{NumFixed(store.columns.star,1)}}</span> <em v-if="store.columns.sale >0">已售{{store.columns.sale}}</em></p>
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.typename ? strToArray(store.columns.typename,'|')[0] : ''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="ImgProBox" :href="store.url" v-if="store.children && store.children.list && store.children.list.length">
+                                        <a class="img_pro"  v-for="(pro,k) in store.children.list" v-if="k <= 2" :href="(pro.url ? pro.url : (store.module == 'waimai' ? (store.url+'?foodid='+pro.columns.foodid+'&typeid='+pro.columns.typeid) : store.url))">
+                                            <div class="proImg"><img :src="pro.picture ? imgSize(pro.picture,268,220) : '/static/images/404.jpg'" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                            <p class="img_tit">{{pro.title}}</p>  
+                                            <p class="img_price" v-if="pro.columns && pro.columns.price">
+                                                <span v-if="store.module != 'house'">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></span> 
+                                                <span v-else>
+                                                    <template v-if="pro.second == 'zu'">
+                                                        <b v-html="priceChange(pro.columns.price)"></b>{#echoCurrency type="short"#}/月
+                                                    </template>
+                                                    <template v-else>
+                                                        <b v-html="priceChange(pro.columns.price)"></b>万
+                                                    </template>
+                                                </span> 
+                                            </p>
+                                        </a>
+                                    </div>
+                                </div> 
+                            </li>
+                            
+                            <!-- 婚嫁酒店 -->
+                            <template  v-else-if="store.module == 'marry'">
+
+                                <li class="fn-clear store_marry store">
+                                    <a :href="store.url" class="leftPic">
+                                        <div class="imgBox">
+                                            <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                            <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        </div>
+                                    </a>
+                                    <div class="storeInfo">
+                                        <a :href="store.url" class="storeDetail">
+                                            <h3><span class="store_name">{{store.title}}</span><span class="saleInfo" v-if="!store.columns.star || store.columns.star <= 0">{{store.columns.taoxi && store.columns.taoxi > 0 ? ('套系 ' + store.columns.taoxi ):(store.columns.anli && store.columns.anli > 0 ? ('案例 ' + store.columns.anli ) : '')}}</span></h3>
+                                            <p class="star_store" v-if="store.columns.star  && store.columns.star > 0"><span class="star">{{store.columns.star}}</span> <em>{{store.columns.taoxi && store.columns.taoxi > 0 ? ('套系 ' + store.columns.taoxi ):(store.columns.anli && store.columns.anli > 0 ? ('案例 ' + store.columns.anli ) : '')}}</em></p>
+                                            <p class="store_posi"><span class="addr_text" v-if="store.columns.addrName">{{addrName(store.columns.addrName,2)}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                        </a>
+                                        <div class="ImgProBox" v-if="store.children && store.children.list&& store.children.list.length > 0">
+                                            <a class="img_pro" v-for="(pro,pind) in store.children.list" v-if="pind < 3" :href="(pro.url ? pro.url : store.url)"> 
+                                                <div class="proImg"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div> 
+                                                <p class="img_tit" v-if="store.second == 'nhstore'">{{pro.title}}</p>  
+                                                <p class="img_price" v-if="store.second == 'nhstore' && pro.columns && pro.columns.price">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></p>
+                                            </a>  
+                                        </div>
+                                        <div class="line_pro price_line" v-if="store.children && store.second == 'hstore' && store.children.list && store.children.list.length > 0">
+                                            <a v-for="(pro,pind) in store.children.list" v-if="pind < 2" :href="pro.url" v-if="pro.second == 'hotelfield'"><span class="left_text"><label>宴会厅</label><em class="pro_name">{{pro.title}}</em></span><span class="right_price"><b>6-88</b>桌</span></a>
+                                            <!-- <a href="#"><span class="left_text"><label>宴会厅</label><em class="pro_name">2人团更优惠全年洁牙卡套餐</em></span><span class="right_price"><b>6-88</b>桌</span></a> -->
+                                        </div>
+                                    </div> 
+            
+                                </li>
+                            </template>
+
+                            <li class="fn-clear store_waimai store" v-else-if="store.module == 'education'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span><em class="saleInfo"></em></h3>
+                                        <!-- <p class="star_store"><span class="star">4.9</span> <em>235条优惠</em></p> -->
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.tag && store.columns.tag.length > 0 ? store.columns.tag[0] :''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="ImgProBox" v-if="store.children && store.children.list&& store.children.list.length > 0">
+                                        <a  class="img_pro" v-for="(pro,pind) in store.children.list" v-if="pind < 3" :href="pro.url"> 
+                                            <div class="proImg"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div> 
+                                            <p class="img_tit">{{pro.title}}</p>  
+                                            <p class="img_price" v-if="pro.columns && pro.columns.price">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></p>
+                                        </a>  
+                                    </div>
+                                </div> 
+        
+                            </li>
+
+                            <!-- 装修 -->
+                            <li class="fn-clear store_renovation store"  v-else-if="store.module == 'renovation' || store.module == 'pension' || store.module == 'dating'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span></h3>
+                                        <p class="star_store" v-if="store.columns.star > 0"><span class="star">{{NumFixed(store.columns.star,1)}}</span> <em class="fn-hide">235条优惠</em></p>
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.typename? store.columns.typename : ''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <a class="ImgProBox"  :href="store.url" v-if="store.children && store.children.list && store.children.list.length">
+                                        <div class="img_pro" v-for="(pro,pind) in store.children.list" v-if="pind < 3">
+                                            <div class="proImg"><img :src="pro.picture" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                                        </div>
+                                        
+                                    </a>
+                                    <div class="line_pro" v-if="store.module == 'renovation' && store.children && store.children.list && store.children.list.length">
+                                        <a v-for="(pro,pind) in store.children.list" v-if="pind < 3" :href="pro.url"><label>{{pro.second == 'albums' ? '效果图' : '案例'}}</label>{{pro.title}}</a>
+                                    
+                                    </div>
+                                    <div class="line_pro" v-if="store.module == 'pension'">
+                                        <a href="javascript:;" v-if="store.columns.visitday == '1'"><label>预约参观</label>{{store.columns.type}}</a>
+                                        <a href="javascript:;" v-if="store.columns.award == '1'"><label>入住有奖</label>{{store.columns.awarddesc}}</a>
+                                    </div>
+                                    <div class="line_pro" v-if="store.module == 'dating'">
+                                        <a href="javascript:;"><label>优质会员</label>超多优质会员等待结缘</a>
+                                        <a href="javascript:;" v-if="store.columns.profile "><label>专业团队</label>{{store.columns.profile}}</a>
+                                    </div>
+                                </div> 
+        
+                            </li>
+                        
+                            <!-- 商城 -->
+                            <li class="fn-clear store_shop store" v-else-if="store.module=='shop'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span><em class="tuanIcon" v-if="store.columns.shotype == 1">团</em><span class="saleInfo" v-if="store.columns.star <= 0" >{{store.columns.collectnum}}关注</span></h3>
+                                        <p class="star_store"  v-if="store.columns.star > 0"><span class="star">{{NumFixed(store.columns.star,1)}}</span> <em v-if="store.columns.collectnum">{{store.columns.collectnum}}关注</em></p>
+                                        <p class="store_posi"><span class="addr_text"><em class="tc" v-if="store.columns.shotype == 1">同城配送</em> {{addrName(store.columns.addrName,2)}} {{store.columns.typename}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="ImgProBox">
+                                        <a class="img_pro" v-if="store.children && store.children.list && store.children.list.length && index < 3" v-for="(pro,index) in store.children.list" :href="pro.url">
+                                            <div class="proImg"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                            <p class="img_tit">{{pro.title}}</p>  
+                                            <p class="img_price">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></p>
+                                        </a>
+                                    </div>
+                                    
+                                </div> 
+        
+                            </li>
+
+                            <li class="fn-clear store_waimai store"  v-else>
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span><em class="saleInfo" v-if="store.columns.star <= 0">已售{{store.columns.sale}}</em></h3>
+                                        <p class="star_store" v-if="store.columns.star > 0"><span class="star">{{NumFixed(store.columns.star,1)}}</span> <em v-if="store.columns.sale >0">已售{{store.columns.sale}}</em></p>
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.typename ? strToArray(store.columns.typename,'|')[0] : ''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="ImgProBox" :href="store.url" v-if="store.children && store.children.list && store.children.list.length">
+                                        <a class="img_pro" v-for="(pro,k) in store.children.list" v-if="k <= 2" :href="(pro.url ? pro.url : store.url)">
+                                            <div class="proImg"><img :src="pro.picture ? imgSize(pro.picture,268,220) : '/static/images/404.jpg'" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                            <p class="img_tit">{{pro.title}}</p>  
+                                            <p class="img_price" v-if="pro.columns && pro.columns.price">
+                                                <span>{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></span> 
+                                            </p>
+                                        </a>
+                                    </div>
+                                </div> 
+                            </li>
+                        </template>
+                    </ul>
+                    <a href="javascript:;" class="all_store all_btn" @click="currType = 3">全部相关商家</a>
+                </div>  
+                <!-- 相关优惠 -->
+                <div class="youhuiBox resultBox" data-type="youhui"  data-currType="1" v-show="searchList.youhui.length > 0">
+                    <a href="javascript:;" class="title"  @click="currType = 1"><h1>相关优惠</h1></a>
+                    <div class="youhuiList">
+                        <template v-for="store in searchList.youhui">
+                            <dl class="youhui_store"  v-if="store.module == 'shop'">
+                                <dt>
+                                    <a :href="store.url">
+                                        <h5>{{store.title}}</h5>
+                                        <p><span>{{addrName(store.columns.addrName,2)}} {{store.columns.typename}}</span><span class="distance">{{getDistance(store.columns.location)}}</span></p>
+                                    </a>
+                                </dt>
+                                <template v-if="store.children && store.children.list" v-for="(pro,pindex) in store.children.list">
+    
+                                    <dd class="youhui_pro fn-clear" >
+                                        <a :href="pro.url" class="leftPic"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></a>
+                                        <a :href="pro.url" class="proInfo">
+                                            <h3>{{pro.title}}</h3>
+                                            <p class="youhui_tip" >{{pro.columns.typename}}</p>
+                                            <div class="info_bottom">
+                                                <p class="pro_label">
+                                                    <span v-if="pro.columns.pintuantype == '1'">拼团</span>
+                                                    <span v-else-if="pro.columns.moduletype == '1'">团购</span>
+                                                </p>
+                                                <div class="price_pro">
+                                                    <span class="currPrice" v-if="pro.columns.price && pro.columns.price > 0">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price?pro.columns.price:0)"></b></span> 
+                                                    <span class="free" v-else>免费</span>
+                                                </div>
+                                            </div>
+                                            <div class="btnBox">
+                                                <button>立即抢</button>
+                                                <p><span v-if="pro.columns.sales">{{pro.columns.sales}}已售</span></p>
+                                            </div>
+                                        </a>
+                                    </dd>
+                                </template>
+                            </dl>
+                            <dl class="youhui_store"  v-else-if="store.module == 'travel'">
+                                <dt>
+                                    <a :href="store.url">
+                                        <h5>{{store.title}}</h5>
+                                        <p><span>{{addrName(store.columns.addrName,2)}} {{store.columns.typename}}</span><span class="distance">{{getDistance(store.columns.location)}}</span></p>
+                                    </a>
+                                </dt>
+                                <template v-if="store.children && store.children.list && store.children.list.length > 0"  v-for="(pro,index) in store.children.list" >
+                                    
+                                    <dd class="youhui_pro fn-clear" >
+                                        <a :href="pro.url" class="leftPic"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></a>
+                                        <a :href="pro.url" class="proInfo">
+                                            <h3>{{pro.title}}</h3>
+                                            <p class="youhui_tip" >{{pro.columns.typename}}</p>
+                                            <div class="info_bottom">
+                                                <p class="pro_label">
+                                                    <span v-if="pro.second == 'daytravel'">一日游</span>
+                                                    <span v-else-if="pro.second == 'grouptravel'">跟团游</span>
+                                                    <span v-else-if="pro.second == 'ticket'">景点</span>
+                                                    <span v-else-if="pro.second == 'rentcar'">租车</span>
+                                                </p>
+                                                <div class="price_pro">
+                                                    <span class="currPrice" v-if="pro.columns.price && pro.columns.price > 0">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price?pro.columns.price:0)"></b></span> 
+                                                    <span class="free" v-else>免费</span>
+                                                </div>
+                                            </div>
+                                            <div class="btnBox">
+                                                <button>立即抢</button>
+                                                <p><span v-if="pro.columns.sales">{{pro.columns.sales}}已售</span></p>
+                                            </div>
+                                        </a>
+                                    </dd>
+                                </template>
+                            </dl>
+                            <dl class="youhui_store" v-else>
+                                <dt>
+                                    <a :href="store.url">
+                                        <h5>{{store.title}}</h5>
+                                        <p><span>{{addrName(store.columns.addrName,2)}} {{store.columns.industry}}</span><span class="distance">{{getDistance(store.columns.location)}}</span></p>
+                                    </a>
+                                </dt>
+                                <template v-if="store.children && store.children.list && store.children.list.length > 0"  v-for="(pro,index) in store.children.list" >
+                                    <dd class="youhui_pro fn-clear" >
+                                        <a :href="pro.url" class="leftPic"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></a>
+                                        <a :href="pro.url" class="proInfo">
+                                            <h3>{{pro.title}}</h3>
+                                            <p class="youhui_tip" >{{pro.columns.typename}}</p>
+                                            <div class="info_bottom">
+                                                <!-- <p class="pro_label">
+                                                    <span v-if="pro.columns.typename">{{pro.columns.typename}}</span>
+                                                </p> -->
+                                                <div class="price_pro">
+                                                    <span class="currPrice" v-if="pro.columns.price && pro.columns.price > 0">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price?pro.columns.price:0)"></b></span> 
+                                                    <span class="free" v-else>免费</span>
+                                                </div>
+                                            </div>
+                                            <div class="btnBox">
+                                                <button>立即抢</button>
+                                                <p><span v-if="pro.columns.sales">{{pro.columns.sales}}已售</span></p>
+                                            </div>
+                                        </a>
+                                    </dd>
+                                </template>
+                            </dl>
+                        </template>
+                    </div>
+                <a href="javascript:;" class="all_youhui all_btn" @click="currType = 1">查看更多优惠</a>
+                </div>
+    
+                <!-- 去商城逛逛 -->
+                <div class="shopBox resultBox" data-type="shop" v-show="searchList.shop.length > 0">
+                    <a :href="'{#getUrlPath service='shop' template='search_list'#}?keywords='+keywords_search"  class="title"><h1>去商城逛逛</h1></a>
+                    <div class="shopList">
+                        <ul class="fn-clear">
+                            <li v-for="item in searchList.shop">
+                                <a :href="item.url">
+                                    <div class="shop_img"><img :src="imgSize(item.picture,440,440)" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                                    <h4>{{item.title}}</h4>
+                                    <div class="shop_price">
+                                        <span class="currPrice">{#echoCurrency type="symbol"#}<b v-html="priceChange(item.columns.price)"></b></span><s class="oldPrice">{#echoCurrency type="symbol"#}{{item.columns.mprice}}</s>
+                                    </div>
+                                </a>
+                            </li>
+                            
+                        </ul>
+                    </div>
+                </div>
+    
+                <!-- 相关资讯 -->
+                <div class="articleBox resultBox" data-type="articleList"  data-currType="4" v-show="searchList.article.length > 0">
+                    <a href="javascript:;" class="title" @click="currType = 4"><h1><b>{{keywords}}</b>相关资讯</h1></a>
+                    <div class="articleList">
+                        <ul class="fn-clear">
+                            <li class="media_user" v-for="(article,index) in searchList.article" v-if="article.ss =='article_selfmedia' && index == 0">
+                                <a :href="article.url" class="fn-clear">
+                                    <div class="media_img"><img :src="imgSize(article.picture,220,220)" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                                    <div class="media_info">
+                                        <h4><span class="media_title article_title" v-html="redTitleKeywords(article.title)"></span><span class="media_label">媒体号</span></h4>
+                                        <p>{{article.columns.description}}</p>
+                                    </div>
+                                </a>
+                            </li>
+                            <li :class="['article',{video_li:article.video_pic}]" v-for="article in searchList.article" v-if="article.ss !='article_selfmedia'">
+                                <a :href="article.url" class="fn-clear">
+                                    <div class="article_text">
+                                        <h4 v-html="redTitleKeywords(article.title)"></h4>
+                                        <p><span class="media_name">{{article.columns.author ? article.columns.author : '管理员'}}</span><span class="pubdate">{{changeTimeStr(article.time)}}</span></p>
+                                    </div>
+                                    <div class="article_img" v-if="article.picture"><img :src="imgSize(article.picture,320,240)" onerror="this.src='/static/images/404.jpg'"></div>
+                                </a>
+                            </li>
+                            
+                        </ul>
+                    </div>
+                    <a href="javascript:;" class="all_article all_btn" @click="currType = 4">更多相关资讯</a>
+                </div>
+    
+    
+                <!-- 相关招聘 -->
+                <div class="jobBox resultBox" data-type="job"  v-show="searchList.job.length > 0">
+                    <a :href="'{#getUrlPath service='job' template='index'#}?keywords='+keywords_search"  class="title"><h1><b>{{keywords}}</b>相关招聘</h1></a>
+    
+                    <div class="jobListBox">
+                        <ul class="jcList">
+                            <li class="job_company" v-for="job in searchList.job" v-if="job.second == 'company'">
+                                <a :href="job.url" class="jcBox">
+                                    <div class="company_img"><img :src="job.picture" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                                    <div class="company_info">
+                                        <div class="comdetail">
+                                            <h4>{{job.title}}</h4>
+                                            <p><span>{{addrName(job.columns.addrName)}}</span><span> {{job.columns.typename}}</span></p>
+                                        </div>
+                                        <p class="num_posi">{{job.columns.jobs}}个在招职位</p>
+                                    </div>
+                                </a>
+                            </li>
+                            
+                        </ul>
+                        <ul class="jobList" >
+                            <li class="job" v-for="job in searchList.job" v-if="job.second == 'post'">
+                                <a :href="job.url" class="job_posi">
+                                    <div class="jdetail">
+                                        <h4>{{job.title}}</h4>
+                                        <p>{{job.columns.company}}</p>
+                                    </div>
+                                    <p class="num_salary">{{job.columns.salary}}</p>
+                                </a>
+                            </li>
+                            
+                        </ul>
+                    </div>
+                    <a :href="'{#getUrlPath service='job' template='index'#}?keywords='+keywords_search" class="all_job all_btn">更多相关职位</a>
+                </div>
+    
+    
+                <!-- 相关用户 -->
+                <div class="userBox resultBox" data-type="member"  data-currType="2" v-show="searchList.member.length > 0">
+                    <a href="javascript:;" class="title" @click="currType = 2"><h1><b>{{keywords}}</b>相关用户</h1></a>
+                    <div class="userListBox">
+                        <ul>
+                            <li v-for="user in searchList.member">
+                                <a :href="user.url" class="link_flex">
+                                    <div class="userPhoto"><img :src="user.picture" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'"></div>
+                                    <div class="right_info">
+                                        <div class="leftInfo">
+                                            <h4>{{user.title}}</h4>
+                                            <p><span>发布 {{user.columns.fabuCount}}</span><em>|</em><span>粉丝 {{user.columns.fans}}</span></p>
+                                        </div>
+                                        <button :class="['gz_btn',{'is_follow':user.columns.is_follow}]" @click="guanzhu(user)">{{user.columns.is_follow ? '已关注' :'关注Ta'}}</button>
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <a href="javascript:;" class="all_user all_btn" @click="currType = 2">更多相关用户</a>
+                </div>
+    
+                <!-- 相关活动s -->
+                <div class="hodongBox resultBox"  data-type="huodong" v-show="searchList.huodong.length > 0">
+                    <a :href="'{#getUrlPath service='huodong' template='index'#}?keywords='+keywords_search"  class="title"><h1>相关活动</h1></a>
+                    <div class="hodongListBox">
+                        <ul>
+                            <li :class="['huodong_li',{noImg : !huodong.picture || huodong.picture==''}]" v-for="huodong in searchList.huodong">
+                                <a :href="huodong.url" class="huodong">
+                                    <div class="hd_img"><img :src="huodong.picture" alt="" onerror="this.src='/static/imags/404.jpg'"></div>
+                                    <div class="hd_info">
+                                        <h4>{{huodong.title}}</h4>
+                                        <p>{{checkTimeStr(huodong)}}</p>
+                                        <p class="labels"><span>{{huodong.columns.typename}}</span></p>
+                                        <div class="hd_price" v-if="huodong.columns.price"><span class="price">{#echoCurrency type="symbol"#}<b v-html="priceChange(huodong.columns.price)"></b></span><span class="has_bm">{{huodong.columns.baoming}}已报名</span></div>
+                                        <div class="hd_price" v-else><span class="free price">免费</span><span class="has_bm">{{huodong.columns.is_baoming}}已报名</span></div>
+                                        <button class="baoming_btn" @click="huodongBaoming(huodong)">报名</button>
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+    
+                    <a :href="'{#getUrlPath service='huodong' template='index'#}?keywords='+keywords_search" class="all_huodong all_btn">更多热门活动</a>
+    
+                </div>
+    
+                <!-- 二手小区 -->
+                <div class="house_saleList resultBox" data-type="house_community" v-show="searchList.house_community.length > 0">
+                    <a :href="'{#getUrlPath service='house' template='sale'#}?keywords='+keywords_search"  class="title"><h1>二手小区</h1></a>
+                    <div class="houseSaleListBox">
+                        <ul>
+                            <li class="house_li" v-for="house in searchList.house_community">
+                                <a :href="house.url" class="house">
+                                    <div class="leftPic"><label>小区</label><img :src="house.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                    <div class="sale_info">
+                                        <h4>{{house.title}}</h4>
+                                        <p class="posi">{{addrName(house.columns.addrName,2)}}/{{house.columns.protype && house.columns.protype.length > 0 ? house.columns.protype.join(',') + '/': ''}}{{changeTimeStr(house.columns.opendate,1)}}年建成</p>
+                                        <p class="priceInfo"><span class="price"><b>{{house.columns.price}}</b>{#echoCurrency type="short"#}/{#echoCurrency type='areasymbol'#}</span></p>
+                                    </div>
+                                </a>   
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- 楼盘 -->
+                <div class="house_saleList house_loupanList resultBox" data-type="house_loupan" v-show="searchList.house_loupan.length > 0">
+                    <a :href="'{#getUrlPath service='house' template='sale'#}?keywords='+keywords_search"  class="title"><h1>新房楼盘</h1></a>
+                    <div class="houseSaleListBox">
+                        <ul>
+                            <li class="house_li" v-for="house in searchList.house_loupan">
+                                <a :href="house.url" class="house">
+                                    <div class="leftPic">
+                                        <img :src="house.picture" alt="" onerror="this.src='/static/images/404.jpg'">
+                                        <label class="lab1" v-if="house.columns.salestate == '1'">在售</label>
+                                        <label class="lab0" v-if="house.columns.salestate == '0'">即将开盘</label>
+                                        <label class="lab3"  v-if="house.columns.salestate == '3'">售罄</label>
+                                    </div>
+                                    <div class="sale_info">
+                                        <h4>{{house.title}}</h4>
+                                        <p class="posi" v-if="house.columns.hx_area.length > 0">{{addrName(house.columns.addrName,2,2,' · ')}}/{{house.columns.hx_area[0]}}-{{house.columns.hx_area[house.columns.hx_area.length - 1]}}{#echoCurrency type='areasymbol'#}/{{house.columns.hx_room.join(',')}}居室</p>
+                                        <p class="posi" v-else>{{addrName(house.columns.addrName,2,2,' · ')}}</p>
+                                        <p class="priceInfo">
+                                            <span class="price" v-if="house.columns.price > 0"><b>{{house.columns.price}}</b>
+                                            <em v-if="house.columns.ptype != '1'">万/套</em> <em v-else>{#echoCurrency type='short'#}/{#echoCurrency type='areasymbol'#}</em> </span>
+                                            <span v-else  class="price"><b>价格待定</b></span>
+                                            <span class="lab" v-for="lab in strToArray(house.columns.buildtype,' ')">{{lab}}</span>
+                                        </p>
+                                    </div>
+                                </a>   
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+        
+                <!-- 去房产频道看看 -->
+                <div class="houseBox resultBox" data-type="house"  v-show="searchList.house.length > 0">
+                    <a :href="'{#getUrlPath service='house' template='index'#}?keywords='+keywords_search"  class="title"><h1>去房产频道看看</h1></a>
+                    <div class="houseListBox">
+                        <ul>
+                            <li class="house_li" v-for="house in searchList.house">
+                                <a :href="house.url" class="house">
+                                    <div class="house_img">
+                                        <label v-if="house.second == 'sale'">二手房</label>
+                                        <img :src="house.picture" alt="" onerror="this.src='/static/images/404.jpg'">
+                                    </div>
+                                    <div class="house_info">
+                                        <h4 v-if="house.second !='zu'"><span v-if="house.second != 'sale'">[<span v-if="house.second == 'cw'">车位</span><span v-else-if="house.second == 'xzl'">写字楼</span><span v-else-if="house.second == 'cf'">{{house.columns.protype}}</span>{{house.columns.type=='0' ? '出租' : (house.columns.type=='1' ? '出售' : '转让')}}]</span>{{house.title}}</h4>
+                                        <h4 v-else>[整租]{{house.title}}</h4>
+                                        <p>{{house.columns.address ? changeAddress(house.columns.address) : addrName(house.columns.addrName,2)}}/{{parseFloat(house.columns.area)}}{#echoCurrency type='areasymbol'#}</p>
+                                        <div class="house_price">
+                                            <span class=" price" v-if="house.columns.type == '0'"><b>{{parseFloat(house.columns.price)}}</b>{#echoCurrency type="short"#}/月</span>
+                                            <span class=" price" v-else-if="house.columns.type == '1'"><b>{{parseFloat(house.columns.price)}}</b>万</span>
+                                            <span class=" price" v-else><b>{{parseFloat(house.columns.price)}}</b>{#echoCurrency type="short"#}/月</span>
+                                        </div>
+                                        <button class="baoming_btn">去看看</button>
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <a :href="'{#getUrlPath service='house' template='index'#}?keywords='+keywords_search" class="all_house all_btn">更多房源租售</a>
+                </div>
+    
+    
+                <!-- 去汽车市场看看 -->
+                <div class="carBox resultBox"  data-type="car" v-show="searchList.car.length > 0">
+                    <a :href="'{#getUrlPath service='car' template='index'#}?keywords='+keywords_search" class="title"><h1>去汽车市场看看</h1></a>
+                    <div class="houseListBox">
+                        <ul>
+                            <li :class="['house_li',{noImg: !car.picture|| car.picture == ''}]" v-for="car in searchList.car">
+                                <a :href="car.url" class="house">
+                                    <div class="house_img" v-if="car.picture"><img :src="car.picture" alt="" onerror="this.src='/static/images/404.jpg'"><span class="picsNum" v-if="car.pic_num > 1">{{car.pic_num}}</span></div>
+                                    <div class="house_info">
+                                        <h4>{{car.title}}</h4>
+                                        <p>{{changeTimeStr(car.columns.cardtime,1)}}年  {{parseFloat(car.columns.mileage)}}万公里</p>
+                                        <div class="house_price"><span class=" price"><b>{{parseFloat(car.columns.price)}}</b>万</span><span class="lab" v-if="car.columns.shoufu">首付{{parseFloat(car.columns.shoufu)}}万</span><span class="lab" v-if="car.columns.tax == '1'">含税</span></div>
+                                        <button class="baoming_btn">去看看</button>
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <a :href="'{#getUrlPath service='car' template='index'#}?keywords='+keywords_search" class="all_house all_btn">去汽车市场看看</a>
+                </div>
+                
+                <div class="loadIcon" v-show="loading && !loadupEnd"></div>
+
+
+
+                <!-- 其他相关内容 -->
+                <div class="otherBox resultBox" v-if="tabs[0].list && tabs[0].list.length > 0">
+                    <a href="javascript:;" class="title"><h1><b>{{keywords}}</b>相关内容</h1></a>
+                    <div class="tabsBox">
+                        <ul class="tabul fn-clear">
+                            <li :class="{'curr':onTab == tab.id}" v-for="tab in tabs" :data-id="tab.id" @click="onTab = tab.id">{{tab.text}}</li>
+                            <s class="tab_bg"></s>
+                        </ul>
+                    </div>
+                    <div class="tabsConBox" >
+                        <div class="tabsCon" v-for="item in tabs" v-show="item.id == onTab">
+                            <ul class="horizontal_ul" v-if="item.id == 0 || item.id == 1">
+                                <li :class="['other_li', {'video_li' : (li.hasVideo || li.module == 'live')},{'noImg':!li.picture ||li.picture== '' }]" v-for="li in item.list">
+                                    <a :href="li.url">
+                                        <div class="other_info">
+                                            <h4 v-html="li.title"></h4>
+                                            <div class="pubInfo">
+                                                <div class="other_writer" v-if="li.columns">
+                                                    <div class="writer_photo"><img :src="li.columns.user_pic ? li.columns.user_pic : ''" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                                    <p class="writer_name">{{li.columns.user_name?li.columns.user_name:'佚名'}}</p>
+                                                </div>
+                                                <div class="pubdate">{{changeTimeStr(li.time)}}</div>
+                                            </div>
+                                        </div>
+                                        <div class="other_img" v-if="li.picture"><img :src="li.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                    </a>
+                                </li>
+                                
+                            </ul>
+                            <div class="flowBox fn-clear" v-else>
+                                <ul class="flowUl">
+                                    <li :class="['other_li', {'video_li':li.hasVideo || li.module == 'live'}]" v-for="(li,ind) in item.list" v-if="ind % 2 == 0">
+                                        <a :href="li.url">
+                                            <div class="info_img">
+                                                <img :src="li.picture" alt="" onerror="this.src='/static/images/404.jpg'">
+                                                <div class="posi" v-if="li.address"><span>{{li.address}}</span><em>|</em><span>{{getDistance(store.columns.location)}}</span></div>
+                                            </div>
+                                            <div class="info_detail">
+                                                <h4 v-html="li.title"></h4>
+                                                <div class="other_writer" v-if="li.columns">
+                                                    <div class="writer_photo"><img :src="li.columns.user_pic ? li.columns.user_pic : ''" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                                    <p class="writer_name">{{li.columns.user_name?li.columns.user_name:'佚名'}}</p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    </li>
+                                </ul>
+                                <ul class="flowUl">
+                                    <li :class="['other_li', {'video_li':li.hasVideo || li.module == 'live'}]" v-for="(li,ind) in item.list" v-if="ind % 2 == 1">
+                                        <a :href="li.url">
+                                            <div class="info_img">
+                                                <img :src="li.picture" alt="" onerror="this.src='/static/images/404.jpg'">
+                                                <div class="posi" v-if="li.address"><span>{{li.address}}</span><em>|</em><span>{{getDistance(store.columns.location)}}</span></div>
+                                            </div>
+                                            <div class="info_detail">
+                                                <h4 v-html="li.title"></h4>
+                                                <div class="other_writer" v-if="li.columns">
+                                                    <div class="writer_photo"><img :src="li.columns.user_pic ? li.columns.user_pic : ''" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                                    <p class="writer_name">{{li.columns.user_name?li.columns.user_name:'佚名'}}</p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    </li>
+                                    
+                                </ul>
+                            </div>
+                            <div class="loadIcon" v-if="loadupEnd && loading"></div>
+                        </div>
+                    </div>
+                    <div class="nodata" v-show="tabs[onTab].list.length == 0 && tabs[onTab].isload && searchEnd" >
+                        <div class="nodataImg">
+                            <img src="/static/images/siteSearch_touch/noData.png" alt="">
+                        </div>
+                        <p>暂无数据</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 更多 -->
+            <div class="moreSearchPage" v-else>
+                <div class="storeBox" v-if="currType==3">
+                    <ul class="storeList" v-if="types[2].list.length > 0">
+                        <template v-for="store in types[2].list" >
+                            <li class="fn-clear store_tuan store" v-if="store.module == 'tuan'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3>
+                                            <span class="store_name">{{store.title}}</span>
+                                            <em class="tuanIcon" v-if="store.module == 'tuan' || (store.module == 'shop' && store.columns.shoptype==1)">团</em>
+                                            <span v-if="!store.columns.star || store.columns.star <= 0" class="saleInfo">
+                                                <em v-if="store.children.total > 0">{{store.children.total}}条优惠</em>
+                                                <em v-else-if="store.columns.collectnum > 0">{{store.columns.collectnum}}收藏</em>
+                                            </span>
+                                        </h3>
+                                        <p class="star_store"  v-if="store.columns.star > 0"><span class="star" v-if="store.columns.star">{{NumFixed(store.columns.star,1)}}</span> <em v-if="store.children.total > 0">{{store.children.total}}条优惠</em><em v-else-if="store.columns.collectnum > 0">{{store.columns.collectnum}}收藏</em></p>
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.typename  ? store.columns.typename : ''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="line_pro" v-if="store.children && store.children.list.length > 0">
+                                        <a :href="pro.url" v-for="(pro,pind) in store.children.list" v-if="pind < 2"><label>团购</label>{{pro.title}}</a>
+                                    </div>
+                                </div> 
+        
+                            </li>
+
+                            <li class="fn-clear store_waimai store"  v-else-if="store.module == 'waimai' || store.module == 'travel' || store.module == 'house'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span><em class="saleInfo" v-if="store.columns.star <= 0">已售{{store.columns.sale}}</em></h3>
+                                        <p class="star_store" v-if="store.columns.star > 0"><span class="star">{{NumFixed(store.columns.star,1)}}</span> <em v-if="store.columns.sale >0">已售{{store.columns.sale}}</em></p>
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.typename ? strToArray(store.columns.typename,'|')[0] : ''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="ImgProBox"  v-if="store.children && store.children.list && store.children.list.length">
+                                        <a class="img_pro" v-for="(pro,k) in store.children.list" v-if="k <= 2" :href="(pro.url ? pro.url : (store.module == 'waimai' ? (store.url+'?foodid='+pro.columns.foodid+'&typeid='+pro.columns.typeid) : store.url))">
+                                            <div class="proImg"><img :src="pro.picture ? imgSize(pro.picture,268,220) : '/static/images/404.jpg'" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                            <p class="img_tit">{{pro.title}}</p>  
+                                            <p class="img_price" v-if="pro.columns && pro.columns.price">
+                                                <span v-if="store.module != 'house'">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></span> 
+                                                <span v-else>
+                                                    <template v-if="pro.second == 'zu'">
+                                                        <b v-html="priceChange(pro.columns.price)"></b>{#echoCurrency type="short"#}/月
+                                                    </template>
+                                                    <template v-else>
+                                                        <b v-html="priceChange(pro.columns.price)"></b>万
+                                                    </template>
+                                                </span> 
+                                            </p>
+                                        </a>
+                                    </a>
+                                </div> 
+                            </li>
+                            
+                            <!-- 婚嫁酒店 -->
+                            <template  v-else-if="store.module == 'marry'">
+
+                                <li class="fn-clear store_marry store">
+                                    <a :href="store.url" class="leftPic">
+                                        <div class="imgBox">
+                                            <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                            <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        </div>
+                                    </a>
+                                    <div class="storeInfo">
+                                        <a :href="store.url" class="storeDetail">
+                                            <h3><span class="store_name">{{store.title}}</span><span class="saleInfo" v-if="!store.columns.star || store.columns.star <= 0">{{store.columns.taoxi && store.columns.taoxi > 0 ? ('套系 ' + store.columns.taoxi ):(store.columns.anli && store.columns.anli > 0 ? ('案例 ' + store.columns.anli ) : '')}}</span></h3>
+                                            <p class="star_store" v-if="store.columns.star  && store.columns.star > 0"><span class="star">{{store.columns.star}}</span> <em>{{store.columns.taoxi && store.columns.taoxi > 0 ? ('套系 ' + store.columns.taoxi ):(store.columns.anli && store.columns.anli > 0 ? ('案例 ' + store.columns.anli ) : '')}}</em></p>
+                                            <p class="store_posi"><span class="addr_text" v-if="store.columns.addrName">{{addrName(store.columns.addrName,2)}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                        </a>
+                                        <div class="ImgProBox" v-if="store.children && store.children.list&& store.children.list.length > 0">
+                                            <a class="img_pro" v-for="(pro,pind) in store.children.list" v-if="pind < 3" :href="(pro.url ? pro.url : store.url)"> 
+                                                <div class="proImg"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div> 
+                                                <p class="img_tit" v-if="store.second == 'nhstore'">{{pro.title}}</p>  
+                                                <p class="img_price" v-if="store.second == 'nhstore' && pro.columns && pro.columns.price">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></p>
+                                            </a>  
+                                        </div>
+                                        <div class="line_pro price_line" v-if="store.children && store.second == 'hstore' && store.children.list && store.children.list.length > 0">
+                                            <a v-for="(pro,pind) in store.children.list" v-if="pind < 2" :href="pro.url" v-if="pro.second == 'hotelfield'"><span class="left_text"><label>宴会厅</label><em class="pro_name">{{pro.title}}</em></span><span class="right_price"><b>6-88</b>桌</span></a>
+                                            <!-- <a href="#"><span class="left_text"><label>宴会厅</label><em class="pro_name">2人团更优惠全年洁牙卡套餐</em></span><span class="right_price"><b>6-88</b>桌</span></a> -->
+                                        </div>
+                                    </div> 
+            
+                                </li>
+                            </template>
+
+                            <li class="fn-clear store_waimai store" v-else-if="store.module == 'education'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span><em class="saleInfo"></em></h3>
+                                        <!-- <p class="star_store"><span class="star">4.9</span> <em>235条优惠</em></p> -->
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.tag && store.columns.tag.length > 0 ? store.columns.tag[0] :''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="ImgProBox" v-if="store.children && store.children.list&& store.children.list.length > 0">
+                                        <a class="img_pro" v-for="(pro,pind) in store.children.list" v-if="pind < 3" :href="(pro.url ? pro.url : store.url)"> 
+                                            <div class="proImg"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div> 
+                                            <p class="img_tit">{{pro.title}}</p>  
+                                            <p class="img_price" v-if="pro.columns && pro.columns.price">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></p>
+                                        </a>  
+                                    </div>
+                                </div> 
+        
+                            </li>
+
+                            <!-- 装修 -->
+                            <li class="fn-clear store_renovation store"  v-else-if="store.module == 'renovation' || store.module == 'pension' || store.module == 'dating'">
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span></h3>
+                                        <p class="star_store" v-if="store.columns.star > 0"><span class="star">{{NumFixed(store.columns.star,1)}}</span> <em class="fn-hide">235条优惠</em></p>
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.typename? store.columns.typename : ''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <a class="ImgProBox"  :href="store.url" v-if="store.children && store.children.list && store.children.list.length">
+                                        <div class="img_pro" v-for="(pro,pind) in store.children.list" v-if="pind < 3">
+                                            <div class="proImg"><img :src="pro.picture" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                                        </div>
+                                        
+                                    </a>
+                                    <div class="line_pro" v-if="store.module == 'renovation' && store.children && store.children.list && store.children.list.length">
+                                        <a v-for="(pro,pind) in store.children.list" v-if="pind < 3" :href="pro.url"><label>{{pro.second == 'albums' ? '效果图' : '案例'}}</label>{{pro.title}}</a>
+                                    
+                                    </div>
+                                    <div class="line_pro" v-if="store.module == 'pension'">
+                                        <a href="javascript:;" v-if="store.columns.visitday == '1'"><label>预约参观</label>{{store.columns.type}}</a>
+                                        <a href="javascript:;" v-if="store.columns.award == '1'"><label>入住有奖</label>{{store.columns.awarddesc}}</a>
+                                    </div>
+                                    <div class="line_pro" v-if="store.module == 'dating'">
+                                        <a href="javascript:;"><label>优质会员</label>超多优质会员等待结缘</a>
+                                        <a href="javascript:;" v-if="store.columns.profile"><label>专业团队</label>{{store.columns.profile}}</a>
+                                    </div>
+                                </div> 
+        
+                            </li>
+                        
+                            <!-- 商城 -->
+                            <li class="fn-clear store_shop store" v-else-if="store.module=='shop'">
+                                <a href="javascript:;" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span><em class="tuanIcon" v-if="store.columns.shotype == 1">团</em><span class="saleInfo" v-if="store.columns.star <= 0">{{store.columns.collectnum}}关注</span></h3>
+                                        <p class="star_store"  v-if="store.columns.star > 0"><span class="star">{{NumFixed(store.columns.star,1)}}</span> <em v-if="store.columns.collectnum">{{store.columns.collectnum}}关注</em></p>
+                                        <p class="store_posi"><span class="addr_text"><em class="tc" v-if="store.columns.shotype == 1">同城配送</em> {{addrName(store.columns.addrName,2)}} {{store.columns.typename}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="ImgProBox">
+                                        <a class="img_pro" v-if="store.children && store.children.list && store.children.list.length && index < 3" v-for="(pro,index) in store.children.list" :href="pro.url">
+                                            <div class="proImg"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                            <p class="img_tit">{{pro.title}}</p>  
+                                            <p class="img_price">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></p>
+                                        </a>
+                                    </div>
+                                    
+                                </div> 
+        
+                            </li>
+
+                            <li class="fn-clear store_waimai store"  v-else>
+                                <a :href="store.url" class="leftPic">
+                                    <div class="imgBox">
+                                        <span class="picsNum" v-if="store.pic_num > 1">{{store.pic_num}}</span>
+                                        <img :src="imgSize(store.picture,420,420)" alt="" onerror="this.src='/static/images/404.jpg'" />
+                                    </div>
+                                </a>
+                                <div class="storeInfo">
+                                    <a :href="store.url" class="storeDetail">
+                                        <h3><span class="store_name">{{store.title}}</span><em class="saleInfo" v-if="store.columns.star <= 0">已售{{store.columns.sale}}</em></h3>
+                                        <p class="star_store" v-if="store.columns.star > 0"><span class="star">{{NumFixed(store.columns.star,1)}}</span> <em v-if="store.columns.sale >0">已售{{store.columns.sale}}</em></p>
+                                        <p class="store_posi"><span class="addr_text">{{addrName(store.columns.addrName,2)}} {{store.columns.typename ? strToArray(store.columns.typename,'|')[0] : ''}}</span>  <span class="distance">{{getDistance(store.columns.location)}}</span>    </p>
+                                    </a>
+                                    <div class="ImgProBox" v-if="store.children && store.children.list && store.children.list.length">
+                                        <a class="img_pro" v-for="(pro,k) in store.children.list" v-if="k <= 2" :href="(pro.url ? pro.url : store.url)">
+                                            <div class="proImg"><img :src="pro.picture ? imgSize(pro.picture,268,220) : '/static/images/404.jpg'" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                            <p class="img_tit">{{pro.title}}</p>  
+                                            <p class="img_price" v-if="pro.columns && pro.columns.price">
+                                                <span>{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price)"></b></span> 
+                                            </p>
+                                        </a>
+                                    </div>
+                                </div> 
+                            </li>
+                        </template>
+                    </ul>
+                    <div class="loadIcon" v-if="loading && currType==3"></div>
+                </div>
+
+                <div class="youhuiBox" v-if="currType == 1">
+                    <ul class="yhList" v-if="types[0].list.length > 0">
+                    
+                        <template v-for="pro in types[0].list">
+                            <li class="youhui_pro fn-clear" >
+                                <a :href="pro.url" class="leftPic"><img :src="pro.picture" alt="" onerror="this.src='/static/images/404.jpg'"></a>
+                                <a :href="pro.url" class="proInfo">
+                                    <h3>{{pro.title}}</h3>
+                                    <p class="youhui_tip" >{{pro.columns.tag}}</p>
+                                    <div class="info_bottom">
+                                        <p class="pro_label">
+                                            <span v-if="pro.columns.typename">{{pro.columns.typename}}</span>
+                                        </p>
+                                        <div class="price_pro">
+                                            <span class="currPrice" v-if="pro.columns.price && pro.columns.price > 0">{#echoCurrency type="symbol"#}<b v-html="priceChange(pro.columns.price?pro.columns.price:0)"></b></span> 
+                                            <span class="free" v-else>免费</span>
+                                        </div>
+                                    </div>
+                                    <div class="btnBox">
+                                        <button>立即抢</button>
+                                        <p><span v-if="pro.columns.sales">{{pro.columns.sales}}已售</span></p>
+                                    </div>
+                                </a>
+                            </li>
+                        </template>
+                        <!-- <li class="youhui_pro fn-clear">
+                            <a href="#" class="leftPic"></a>
+                            <a href="#" class="proInfo">
+                                <h3>瑞尔齿科洁牙卡套餐</h3>
+                                <p class="youhui_tip">仅售190元，价值699元全年洁牙套餐          ，免费WiFi！空调开放！可免费续水！</p>
+                                <div class="info_bottom">
+
+                                    <p class="pro_label"><span>拼团</span></p>
+                                    <div class="price_pro">
+                                        <span class="currPrice">{#echoCurrency type="symbol"#}<b>189<em></em>.8</b></span> <span class="oldPrice">单买价￥699</span>
+                                    </div>
+                                </div>
+                                <div class="btnBox">
+                                    <button>立即抢</button>
+                                    <p>135已售</p>
+                                </div>
+                            </a>
+                        </li> -->
+                    </ul>
+                    <div class="loadIcon" v-if="loading"></div> 
+                </div>
+
+                <div class="userBox" v-if="currType == 2">
+                    <div class="userListBox">
+                        <ul  v-if="types[1].list.length > 0">
+                            <li v-for="user in types[1].list ">
+                                <a :href="user.url" class="userPhoto"><img :src="user.picture" onerror="this.src='/static/images/404.jpg'" /></a>
+                                <a  :href="user.url" class="right_info">
+                                    <div class="leftInfo">
+                                        <h4>{{user.title}}</h4>
+                                        <p><span>发布 {{user.columns.fabuCount}}</span><em>|</em><span>粉丝 {{user.columns.fans}}</span></p>
+                                    </div>
+                                    <button :class="['gz_btn',{'is_follow':user.columns.is_follow}]" @click="guanzhu(user)">{{user.columns.is_follow ? '已关注' :'关注Ta'}}</button>
+                                </a>
+                            </li>
+                            
+                        </ul>
+                    </div>
+                    <div class="loadIcon" v-if="loading && currType==2"></div>
+                </div>
+
+                <div class="articleBox" v-if="currType == 4">
+                    <div class="articleList" >
+                        <ul :class="['mediaList', {hasOpen:mediahasOpen}]" v-if="mediaList.length > 0">
+                            <li class="media_user" v-for="item in (mediahasOpen || mediahasOpen.length <= 5 ? mediaList : mediaList.slice(0,3))">
+                                <a :href="item.url" class="fn-clear">
+                                    <div class="media_img"> <img :src="item.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                    <div class="media_info">
+                                        <h4><span class="media_title article_title">{{item.title}}</span><span class="media_label">媒体号</span></h4>
+                                        <p>{{item.columns.description}}</p>
+                                    </div>
+                                </a>
+                            </li>
+                            
+                            <a href="javascript:;" class="openMedia" @click="openMediaList" v-if="mediaList.length >= 5">查看更多</a>
+                        </ul>
+                        <ul class="fn-clear" v-if="types[3].list.length > 0">
+                            
+                            <li :class="['article',{'noImg': article.picture == ''},{'video_li': article.hasVideo}]" v-for="article in types[3].list">
+                                <a :href="article.url" class="fn-clear">
+                                    <div class="article_text">
+                                        <h4>{{article.title}}</h4>
+                                        <p><span class="media_name">{{article.columns.author}}</span><span class="pubdate">{{changeTimeStr(article.time)}}</span></p>
+                                    </div>
+                                    <div class="article_img" v-if="article.picture && article.picture != ''"><img :src="article.picture" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                </a>
+                            </li>
+                            
+                            
+                        </ul>
+                    </div>
+
+                    <div class="loadIcon" v-if="loading && currType==4"></div>
+                </div>
+            </div>
+
+    
+
+        </div> 
+
+
+        <!-- 关闭全站搜索 -->
+        <div class="searchResultAll" v-else v-cloak>
+            
+            <div class="searchList">
+                <!-- 样式 -->
+                <ul v-if="currDataList.length > 0 || !searchEnd">
+                    <!-- business -->
+                    <li class="item_li store_li" v-if="currModule == 'business'" v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>{{item.title}}</h4>
+                                <p class="posi"><span class="area">{{addrName(item.addrName,2)}}</span><span class="address">{{item.address}}</span></p>  
+                                <p class="typename">{{item.typename[0]}}</p>   
+                            </div> 
+                            <div class="item_img"><img :src="imgSize(item.logo,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        </a>
+                    </li>
+                    <!-- circle/tieba -->
+                    <!-- 圈子需要新增搜索功能 -->
+                    <li :class="['item_li blog_li',{video_li:item.media.length==0 && item.videoadr != ''},{noImg: item.media.length==0 && item.videoadr == '' && item.thumbnail == ''}]" v-if="currModule == 'circle' " v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>{{item.content ? item.content : (item.title ? item.title : '暂无标题') }}</h4>
+                                <div class="pubBox">
+                                    <div class="publisher">
+                                        <div class="headIcon"><img :src="item.photo" alt=""  onerror="this.src='/static/images/noPhoto_100.jpg'"></div>
+                                        <p class="nickname">{{item.username}}</p>   
+                                        <span class="pubdate">{{item.pubdate1}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="item_img" v-if="item.media.length > 0"><img :src="imgSize(item.media[0],440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                            <div class="item_img" v-else-if="item.thumbnail"><img :src="imgSize(item.thumbnail,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        </a>
+                    </li>
+                    <li :class="['item_li blog_li',{video_li:item.video},{noImg: item.imgGroup.length==0 }]" v-if="currModule == 'tieba' " v-for="item in currDataList">
+                        <a :href="item.url" class="item toMini" data-temp="detail" data-module="tieba" :data-id="item.id">
+                            <div class="item_detail">
+                                <h4>{{item.content ? item.content : (item.title ? item.title : '暂无标题') }}</h4>
+                                <div class="pubBox">
+                                    <div class="publisher">
+                                        <div class="headIcon"><img :src="item.photo" alt=""  onerror="this.src='/static/images/noPhoto_100.jpg'"></div>
+                                        <p class="nickname">{{item.username}}</p>   
+                                        <span class="pubdate">{{item.pubdate1}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="item_img" v-if="item.imgGroup.length > 0"><img :src="imgSize(item.imgGroup[0],440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        
+                        </a>
+                    </li>
+                    <li :class="['item_li blog_li',{video_li:item.mold == 2 || item.mold == 3 },{noImg: !item.litpic || item.litpic == '' }]" v-if="currModule == 'article'" v-for="item in currDataList">
+                        <a :href="item.url" class="item toMini" data-temp="detail" data-module="article" :data-id="item.id">
+                            <div class="item_detail">
+                                <h4 v-html="item.title"></h4>
+                                <div class="pubBox">
+                                    <div class="publisher">
+                                        <!-- <div class="headIcon"><img :src="item.photo" alt=""  onerror="this.src='/static/images/noPhoto_100.jpg'"></div> -->
+                                        <p class="nickname">{{item.source}}</p>   
+                                        <span class="pubdate">{{changeTimeStr(item.pubdate)}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="item_img" v-if="item.litpic"><img :src="imgSize(item.litpic,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        
+                        </a>
+                    </li>
+                    
+                    <!-- 装修案例 -->
+                    <li :class="['item_li blog_li',{noImg: !item.litpic }]" v-if="currModule == 'renovation' " v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>{{item.title}}</h4>
+                                <p class="posi"><span class="address">装修案例</span> <span class="address"></span></p>
+                                <div class="pubBox">
+                                    <div class="publisher" v-if="item.designer && item.designer.company">
+                                        <div class="headIcon"><img :src="item.designer.company.logo" alt=""  onerror="this.src='/static/images/404.jpg'"></div>
+                                        <p class="nickname">{{item.designer.company.company}}</p>   
+                                    </div>
+                                    <div class="publisher" v-else-if="item.designer ">
+                                        <div class="headIcon"><img :src="item.designer.photo" alt=""  onerror="this.src='/static/images/noPhoto_100.jpg'"></div>
+                                        <p class="nickname">{{item.designer.name}}</p>   
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="item_img" v-if="item.litpic > 0"><img :src="imgSize(item.litpic,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        
+                        </a>
+                    </li>
+
+
+                    <!-- job -->
+                    <!-- <li v-if="currModule == 'job'" v-for="item in currDataList" class="item_li job_store">
+                        <a href="javascript:;"  class="item">
+                            <div class="item_detail">
+                                <h4>旭辉信息技术有限公司</h4>
+                                <p class="posi"><span class="area">互联网/电商</span><span class="address">园区</span></p>  
+                                <p class="typename"><b>8</b>个职位在招</p>  
+                            </div>
+                            <div class="item_img"></div>
+                        </a>
+                    </li> -->
+                    
+                    <li v-if="currModule == 'job'" v-for="item in currDataList" class="item_li job_li noImg">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>[招聘]{{item.title}}</h4>
+                                <div class="jobInfo">
+                                    <span class="salary"><b>{{item.show_salary}}</b></span>
+                                    <div class="company">
+                                        <div class="clogo"><img :src="item.companyDetail ? imgSize(item.companyDetail.logo,64,64): ''" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                        <p class="cname">{{item.companyDetail ? item.companyDetail.title : ''}}</p>  
+                                        <p class="pubdate">{{changeTimeStr(item.update_time)}}</p> 
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </li>
+
+                    <!-- waimai -->
+                    <template v-for="item in currDataList" v-if="currModule == 'waimai'">
+                        <li class="item_li store_li"  >
+                            <a :href="item.url" class="item">
+                                <div class="item_detail">
+                                    <h4>{{item.shopname}}</h4>
+                                    <p class="posi"><span class="area">已售 {{item.sale}}</span><span class="address">{{item.delivery_time}}分钟  {{item.juli}}</span></p>  
+                                    <p class="typename numberText"><span>{#echoCurrency type="symbol"#}<b>{{item.minPrice}}</b>起</p>   
+                                </div> 
+                                <div class="item_img"><img :src="imgSize(item.pic,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                            </a>
+                        </li>
+                        <li class="item_li" v-if="item.foodList.length > 0" v-for="food in item.foodList" >
+                            <a :href="item.url+'?foodid='+food.id+'&typeid='+food.typeid" class="item">
+                                <div class="item_detail">
+                                    <h4>{{food.title}}</h4>
+                                    <p class="posi"></p>  
+                                    <p class="typename numberText"><span>{#echoCurrency type="symbol"#}<b>{{food.price}}</b>起</p>   
+                                </div> 
+                                <div class="item_img"><img :src="imgSize(food.pics[0],440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                            </a>
+                        </li>
+
+                    </template>
+
+                    <!-- huodong -->
+                    <li :class="['item_li',{noImg:item.litpic}] " v-if="currModule == 'huodong'"  v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>{{item.title}}</h4>
+                                
+                                <p :class="['typename', {'numberText':item.feetype == '1'}]">
+                                    <template v-if="item.feetype == '1'">
+                                        <span >{#echoCurrency type="symbol"#}<b>{{item.mprice}}</b>起
+                                    </template>
+                                    <span v-else class="redText">免费报名</span>
+                                    <span class="address">{{item.username}}</span>
+                                </p>   
+                                
+                            </div> 
+                            <div class="item_img"><img :src="imgSize(item.litpic,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        </a>
+                    </li>
+
+
+                    <!-- 分类信息 -->
+                    <li :class="['item_li', {noImg : !item.litpic || item.litpic == ''}]"  v-if="currModule == 'info'" v-for="item in currDataList">
+                        <a :href="item.url" class="item toMini" data-temp="detail" data-module="info" :data-id="item.id">
+                            <div class="item_detail">
+                                <h4>[{{item.typename}}]{{item.title}}</h4>
+                                <div class="pubBox">
+                                    <div class="publisher">
+                                        <div class="headIcon"><img :src="(item.member && item.member.photo ? item.member.photo : '')" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                        <p class="nickname">{{item.member && item.member.nickname ? item.member.nickname : '佚名'}}</p>   
+                                        <span class="pubdate">{{changeTimeStr(item.pubdate)}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="item_img" v-if="item.litpic"><img :src="imgSize(item.litpic,440,360)" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                        </a>
+                    </li>
+                    <!-- sfcar -->
+                    <li :class="['item_li', {noImg : !item.litpic || item.litpic == ''}]"  v-if="currModule == 'sfcar'" v-for="item in currDataList">
+                        <a :href="item.url" class="item toMini" data-temp="detail" data-module="sfcar" :data-id="item.id">
+                            <div class="item_detail">
+                                <h4>[{{item.type == '1' ? (item.usetype == '1' ?'货车':'顺风车') : (item.usertype == '0' ? '乘客' : '货物')}}]{{item.startaddr}} {{item.endaddr}} {{item.accessaddr ? '途径'+ item.accessaddr : ''}}</h4>
+                                <div class="pubBox">
+                                    <div class="publisher">
+                                        <div class="headIcon"><img :src="(item.member && item.member.photo ? item.member.photo : '')" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                        <p class="nickname">{{item.member && item.member.nickname ? item.member.nickname : '佚名'}}</p>     
+                                        <span class="pubdate">{{changeTimeStr(item.pubdate)}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="item_img" v-if="item.litpic"><img :src="imgSize(item.litpic,440,360)" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                        </a>
+                    </li>
+
+                    <!-- pension -->
+                    <li :class="['item_li store_li',{noImg: item.litpic == ''}]" v-if="currModule == 'pension'" v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>{{item.title}}</h4>
+                                <p class="posi"><span class="area">{{addrName(item.addrName,2)}}</span><span class="address">{{item.address}}</span></p>  
+                                <p class="typename">{{item.catidArr.length ? item.catidArr[0].val : ''}}</p>   
+                            </div> 
+                            <div class="item_img"><img :src="imgSize(item.litpic,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        </a>
+                    </li>
+                    <!-- house loupan -->
+                    <li :class="['item_li',{noImg: item.litpic == ''}]" v-if="currModule == 'house'" v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>[新盘]{{item.title}}</h4>
+                                <!-- <p class="posi"><span class="area">{{addrName(item.addrName,2)}}</span><span class="address">{{item.address}}</span></p>   -->
+                                <p class="typename numberText"><span><b>{{item.price}}</b>{{item.ptype != 1 ? '万' : '{#echoCurrency type="short"#}/{#echoCurrency type="areaname"#}'}}</span> <span class="address">{{item.investor}}</span> <span class="time">{{addrName(item.addr,1)}}</span></p>   
+                            </div> 
+                            <div class="item_img"><img :src="imgSize(item.litpic,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        </a>
+                    </li>
+                    <!-- car -->
+                    <li :class="['item_li',{noImg: item.litpic == ''}]" v-if="currModule == 'car'" v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>{{item.title}}</h4>
+                                <div class="jobInfo">
+                                    <span class="salary"><b>{{item.price}}</b>万</span>
+                                    <!-- <div class="company">
+                                        <div class="clogo"><img :src="item.company ? imgSize(item.company.logo,64,64): ''" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                                        <p class="cname">{{item.company ? item.company.title : ''}}</p>  
+                                    </div> -->
+                                </div>  
+                            </div> 
+                            <div class="item_img"  v-if="item.litpic"><img :src="imgSize(item.litpic,440,360)"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                        </a>
+                    </li>
+
+                    <li :class="['item_li',{noImg: item.litpic == ''}]" v-if="currModule == 'shop'" v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>{{item.title}}</h4>
+                                <p class="typename numberText"><span>{#echoCurrency type="symbol"#}<b>{{item.price}}</b></span><span class="address">{{item.storeTitle}}</span></p>   
+                            </div>
+                            <div class="item_img"><img :src="item.litpic" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                        </a>
+                    </li>
+                    <li :class="['item_li',{noImg: !item.litpic || item.litpic ==''}]" v-if="currModule == 'homemaking'" v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>[{{item.typename}}]{{item.title}}</h4>
+                                <p class="typename numberText"><span>{#echoCurrency type="symbol"#}<b>{{item.price}}</b></span><span class="address">{{item.store.title}}</span></p>   
+                            </div>
+                            <div class="item_img" v-if="item.litpic != ''"><img :src="item.litpic" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                        </a>
+                    </li>
+
+                    <template v-for="item in currDataList" v-if="currModule == 'travel'">
+                        <li :class="['item_li', {'store_li': item.searchtype == 3}]" v-if="item.searchtype == 3">
+                            <a :href="item.url" class="item">
+                                <div class="item_detail">
+                                    <h4>{{item.title}}</h4>
+                                    <p class="posi"><span class="area">{{item.typeid == 2 ? '民宿' : '星级酒店'}}</span><span class="address">{{item.address}}</span></p>  
+                                    <p class="typename numberText"><span class="redText">住宿</span><span>{#echoCurrency type="symbol"#}<b>{{item.price}}</b>起</span></p>   
+                                </div>
+                                <div class="item_img" v-if="item.litpic"><img :src="item.litpic" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                            </a>
+                        </li>
+                        <li :class="['item_li', {'store_li': item.searchtype == 2}]" v-if="item.searchtype == 2">
+                            <a :href="item.url" class="item">
+                                <div class="item_detail">
+                                    <h4>{{item.title}}</h4>
+                                    <p class="posi"><span class="address">{{item.address}}</span></p>  
+                                    <p class="typename ">旅行社</p>   
+                                </div>
+                                <div class="item_img" v-if="item.litpic"><img :src="item.litpic" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                            </a>
+                        </li>
+                        <li :class="['item_li',{noImg: item.litpic == ''}]"  v-if="item.searchtype != 2 && item.searchtype != 3">
+                            <a :href="item.url" class="item">
+                                <div class="item_detail">
+                                    <h4>[<span v-if="item.searchtype == 1">景点门票</span><span v-else-if="item.searchtype == 4">一日游</span><span v-else-if="item.searchtype == 5">跟团游</span><span v-else-if="item.searchtype == 6">租车</span><span v-else>签证</span>]{{item.title}}</h4>
+                                    <p class="typename numberText"><span>{#echoCurrency type="symbol"#}<b>{{item.price}}</b>起</span><span class="address">{{item.travelname}}</span></p>   
+                                </div>
+                                <div class="item_img" v-if="item.litpic"><img :src="item.litpic" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                            </a>
+                        </li>
+                    </template>
+
+
+                    <li :class="['item_li video_li',{noImg: item.litpic == ''}]" v-if="currModule == 'live' " v-for="item in currDataList">
+                        <a :href="item.url" class="item">
+                            <div class="item_detail">
+                                <h4>{{item.title}}</h4>
+                                <p class="typename numberText">{{item.typename}}<span class="time">{{item.state == '0' ? '直播预告' : (item.state == '1' ? '' : '回放')}}</span></p>   
+                            </div>
+                            <div class="item_img" v-if="item.litpic"><img :src="item.litpic" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                        </a>
+                    </li>
+                </ul>
+                <div class="nodata" v-else>
+                    <div class="nodata bg_grey" >
+                        <div class="noData_icon">
+                            <div class="nodataImg">
+                                <img src="/static/images/siteSearch_touch/noData.png" alt="">
+                            </div>
+                            <p>没有相关结果，搜索别的试试吧</p>
+                        </div>
+        
+                        <div class="recListBox">
+                            <h2>优选商家</h2>
+                            <div class="recList">
+                                <ul>
+                                    <li v-for="(item,ind) in tjBusinessList" v-if="ind % 2 == 0">
+                                        <a :href="item.url">
+                                            <div class="imgbox">
+                                                <img :src="item.logo||imgError" alt="" @error="item.logo=imgError">
+                                                <div class="posi" v-if="computeDistance(item.lng,item.lat)">{{computeDistance(item.lng,item.lat)}}</div>
+                                            </div>
+                                            <div class="store_info">
+                                                <h4>{{item.title}}</h4>
+                                                <p>{{item.address}}</p>
+                                                <!-- <div class="hui"><span><em>惠</em>7折</span>买单立减折扣</div> -->
+                                            </div>
+                                        </a>
+                                    </li>
+                                </ul>
+                                <ul>
+                                    <li v-for="(item,ind) in tjBusinessList" v-if="ind % 2 == 1">
+                                        <a :href="item.url">
+                                            <div class="imgbox">
+                                                <img :src="item.logo||imgError" alt="" @error="item.logo=imgError">
+                                                <div class="posi" v-if="computeDistance(item.lng,item.lat)">{{computeDistance(item.lng,item.lat)}}</div>
+                                            </div>
+                                            <div class="store_info">
+                                                <h4>{{item.title}}</h4>
+                                                <p>{{item.address}}</p>
+                                                <!-- <div class="hui"><span><em>惠</em>7折</span>买单立减折扣</div> -->
+                                            </div>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                        </div>
+                    </div>
+                </div>
+                <div class="loadIcon" v-if="loading"></div>
+                
+            </div> 
+            
+        </div>
+    </div>
+</body>
+<script>
+    var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$Share_description#}',
+		"title": '{#$Share_title#}',
+		"imgUrl":'{#$Share_img#}',
+		"link": '{#$Share_url#}',
+	};
+</script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/siteSearch_touch.js?v={#$cfg_staticVersion#}"></script>
+</html>

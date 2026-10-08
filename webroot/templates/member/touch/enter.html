@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="{#$cfg_soft_lang#}">
+		<title>{#$langData['business'][0][0]#}</title>{#* 商家入驻 *#}
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/enter_v2.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+		<script>
+		var masterDomain = '{#$cfg_basehost#}', busiDomain = '{#$member_busiDomain#}', staticPath = '{#$cfg_staticPath#}', templets_skin = '{#$templets_skin#}';
+		var hideFileUrl = {#$cfg_hideUrl#};
+		var cookiePre = '{#$cfg_cookiePre#}';
+		var phone = '{#if $userinfo.phone && $userinfo.phoneCheck == 1#}{#$userinfo.phone#}{#/if#}'
+		var idcardBack = '{#$userinfo.idcardBack#}'
+		var idcardBackUrl = '{#$userinfo.idcardBackSource#}'
+		var idcardFront = '{#$userinfo.idcardFront#}'
+		var idcardFrontUrl = '{#$userinfo.idcardFrontSource#}'
+		var people = '{#$userinfo.realname#}'
+		</script>
+	</head>
+	<body>
+		<div class="page" id="page">
+			<div class="loading" v-if="loading" v-cloak></div>
+			<div class="header transparent">
+				<div class="header-l">
+					<a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+				</div>
+			</div>
+			<div class="rzTitleBox">
+				<h2>快速拥有自己的线上店铺</h2>
+				<div class="txt">
+					<div class="p"><p>轻松经营，助力生意新增长</p></div>
+				</div>
+				<div class="stepBox" v-cloak>
+					<ul>
+						<template v-for="(item,ind) in steps">
+							<li :class="['step',{'active': currStep == ind},{'rz_success':ind == (steps.length - 1)}]" >
+								<label>{{ind < (steps.length - 1) ? ind + 1 : ''}}</label>
+								<span>{{item}}</span>
+							</li>
+							<li class="line" v-if="ind < (steps.length - 1)"></li>
+						</template>
+						
+					</ul>
+				</div>
+			</div>
+			<div class="stateCon" v-show="currStep == 0" v-cloak>
+				<div class="formBox">
+					<dl class="form">
+						<dt>店铺信息</dt>	
+						<dd class="formItem">
+							<label for="">店铺名称</label>
+							<input type="text" placeholder="请输入店铺名称" name="title"  v-model="formData.title">
+						</dd>
+						<dd class="formItem">
+							<label for="">联系人</label>
+							<input type="text" placeholder="请输入联系人" name="contact"  v-model="formData.people">
+						</dd>
+						<dd class="formItem">
+							<label for="">联系电话</label>
+							<input placeholder="请输入联系电话" type="tel" name="tel" v-model="formData.tel">
+						</dd>
+						<dd class="formItem">
+							<label for="">所在地区</label>
+							<div class="flex_r" @click="changeAddr">
+								<input type="text" placeholder="请选择区域" v-model="prevFormData.addrname.join(' ')" readonly>
+							</div>
+						</dd>
+						<dd class="formItem">
+							<label for="">详细地址</label>
+							<input placeholder="请输入详细地址" type="text" name="address" v-model="formData.address">
+							<input type="hidden" name="lnglat" v-model="formData.lnglat">
+						</dd>
+					</dl>
+					<div class="form" v-if="busiConfig.joinCheckMaterial && busiConfig.joinCheckMaterial.length">
+						<div class="tabBox" v-if="busiConfig.joinCheckMaterial.length > 1">
+							<ul>
+								<li :class="{'on_chose':uploadType == ind}" v-for="(item,ind) in 2" @click="uploadType = ind">
+									<span>{{ind == 0 ? '我有营业执照' : '暂无营业执照'}}</span>
+									<div class="bg_on"></div>
+								</li>
+							</ul>
+						</div>
+						<div class="tabConBox">
+							<div class="tabCon" v-show="uploadType == ind" v-for="(item,ind) in 2">
+								<template v-if="ind == 1">
+									<h3>身份认证</h3>
+									<div class="tip_txt">
+										<h4>证件照片<span>请拍摄并上传你的身份证照片</span></h4>
+										<a href="javascript:;" class="tipShow" @click="showPop = true">提示</a>
+									</div>
+									<div class="fileUpload">
+										
+										<!-- <img :src="prevFormData[item == 1 ? 'idcardBackUrl' : 'idcardFrontUrl']" alt="" v-if="prevFormData[item == 1 ? 'idcardBackUrl' : 'idcardFrontUrl']"> -->
+										<div class="uploadBox" v-for="item in 2">
+											<div class="preview" v-if="prevFormData[item == 1 ? 'idcard_backUrl' : 'idcard_frontUrl']">
+												<img :src="prevFormData[item == 1 ? 'idcard_backUrl' : 'idcard_frontUrl']" alt="" onerror="this.src='/static/images/404.jpg'">
+												<div class="upload_tip">{{item == 1 ? '身份证人像面' : '身份证国徽面'}}</div>
+												<div class="load_icon" v-if="isUpload && (uploadId == (item == 1 ? 'idcard_back' : 'idcard_front'))"></div>
+											</div>
+											<div :class="['upload ' + (item == 1 ? 'idBackPic' : 'idFrontPic')]" >
+												<input type="file" name="file" :id="item == 1 ? 'idcard_back' : 'idcard_front'" @change="fileInpChange" accept="image/*" >
+											</div>
+										</div>
+									</div>
+								</template>
+								<template v-else>
+									<h3>执照认证</h3>
+									<div class="tip_txt">
+										<h4>营业执照<span>请拍摄并上传你的营业执照</span></h4>
+										<a href="javascript:;" class="tipShow" @click="showPop = true">示例</a>
+									</div>
+									<div class="fileUpload licenseUpload">
+										<div class="preview" v-if="prevFormData['licenseUrl']">
+											<img :src="prevFormData['licenseUrl']" alt="" onerror="this.src='/static/images/404.jpg'">
+											<div class="load_icon" v-if="isUpload && (uploadId == 'license')"></div>
+										</div>
+										<div class="upload">
+											<input type="file" @change="fileInpChange" name="file" id="license"  accept="image/*">
+										</div>
+										<p>点击上传营业执照原件</p>
+									</div>
+								</template>
+								
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="bottomBox">
+					<div :class="['tip p',{'agree':agree}]"><span @click="agree = !agree">阅读并同意</span><a href="{#getUrlPath service='siteConfig' template='protocol' title='商家入驻服务协议'#}">《商家入驻服务协议》</a></div>
+					<div class="btn_submit" @click="submitData">提交审核</div>
+				</div>
+			</div>
+			<div class="stateCon" v-show="currStep == 1 || currStep == 3" v-cloak>
+				<div :class="'inCheckBox conBox state' + currStep">
+					<div class="txt_tip">
+						<div class="imgIcon"></div>
+						<h4>{{currStep == 1 ? '提交成功' : '抱歉，审核未通过'}}</h4>
+						<p v-if="currStep == 1 || reason">{{currStep == 1 ? '您的信息已提交，等待平台审核' : '未通过原因：' + reason}}</p>
+					</div>
+					<a href="{#$cfg_basehost#}" class="btn" v-if="currStep == 1 ">返回首页</a>
+					<div class="btn" v-else @click="currStep = 0 ">重新提交</div>
+				</div>
+			</div>
+
+			<div class="popBox" >
+				<div class="popMask" v-if="showPop || agreePop " @click="showPop = false; agreePop = false;"></div>
+				<div v-cloak >
+					<div :class="['popConBox',{'show':showPop}]">
+						<div class="popHeader">
+							<h3>{{uploadType == 0 ? '营业执照' : '身份证照片'}}</h3>
+							<a href="javascript:;" class="closePop" @click="showPop = false"></a>
+						</div>
+						<div class="popCon">
+							<template v-if="uploadType == 1">
+								<div class="txtCon">
+									<h6>拍摄要求</h6>
+									大陆公民持有的本人有效二代身份证<br/>
+									拍摄时确保身份证<span>边框完整，字体清晰，亮度均匀</span>
+								</div>
+								<div class="idCardShow"><img src="{#$templets_skin#}images/enter/idCard.png" alt=""></div>
+							</template>
+							<template v-else>
+								<div class="imgShow"><img src="{#$templets_skin#}images/enter/yyzz.png" alt=""></div>
+								<div class="txtCon">
+									<p>1.请参考图示提供营业执照，确保证件内容文字清晰可见，证件本身无残缺 </p>
+									<p>2.仅支持中国大陆工商局或市场监督管理局登记的个体工商户，需确保有效期至今不少于6个月</p>
+								</div>
+							</template>
+						</div>
+					</div>
+				</div>
+
+				<div class="popCenter" v-if="agreePop ">
+					<div :class="['popCon',{'show':agreePop}]">
+						<h4>商家入驻服务协议</h4>
+						<p>请阅读并同意《商家入驻服务协议》</p>
+						<div class="btnsGroup">
+							<a href="javascript:;" class="agree_btn" @click="agree = true;agreePop = false;submitData()">同意并继续</a>
+							<a href="javascript:;" class="refuse_btn" @click="agreePop = false">不同意</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		{#include file="{#$HUONIAOROOT#}/templates/member/touch/cityChose.html" action="addr" noLimit=1#}
+	</body>
+	<script type="text/javascript" src="{#$templets_skin#}js/enter_v2.js?v={#$cfg_staticVersion#}"></script>
+</html>

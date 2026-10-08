@@ -1,0 +1,173 @@
+<!-- 分销公司管理 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>分销公司管理</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/salesBranchManage.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+        var memberDomain = '{#$member_userDomain#}'
+        var hideFileUrl = '{#$cfg_hideUrl#}';
+        var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+        var templets = '{#$templets_skin#}';
+        var atpage = 1, totalCount = 1, pageSize = 15;
+        var loupanid = '{#$loupanid#}';
+        var modelType = 'house';
+        var currid = 84;
+    </script>
+</head>
+<body class="w1200">
+    <div id="page">
+         <!-- 头部 -->
+        {#include file="top.html"#}
+        <div class="conbox">
+            <!-- 左侧导航 -->
+            {#include file="left.html"#}
+            <div class="right_box">
+                <div class="rConBox">
+                    <div class="rHeadBox disflex a-c j-b">
+                        <div class="titBox disflex a-c">
+                            <h2>分销公司管理</h2>
+                            <ul>
+                                <li v-for="(item,ind) in statusList" @click="onStatus_ind = ind; reGetList()" :class="`${onStatus_ind == ind ? 'on_chose' : ''}`">{{item.name}}<span v-if="item.count">({{item.count}})</span></li>
+                            </ul>
+                        </div>
+                        <div class="rightSearch disflex a-c">
+                            <el-input placeholder="组织名称、负责人、电话" @change="reGetList()" v-model="keyword">
+                                <div icon="el-icon-search" slot="suffix" class="el-icon el-icon-search" @click="reGetList()"></div>
+                            </el-input>
+                            <a href="javascript:;" @click="newBranch" class="btn addBtn disflex a-c j-c" ><i class="icon add_icon"></i><span>新增公司</span></a>
+                            <!-- @click="changePsd" -->
+                        </div>
+                    </div>
+                    <div class="warning" v-if="!fxConfig.status" style="height:40px;margin-top: 12px;" v-cloak>
+                        <div class="tip"><s></s><span>温馨提示</span>分销功能未开启，已停止提交新报备</div>
+                        <a href="config.html" class="btn_link">前往设置></a>
+                    </div>
+                    <div class="listbox"  v-if="list.length">
+                        <template>
+                            <div class="li company_li" v-for="(item,ind) in list" @click="linkTo(`/supplier/loupan/branchDetail.html?id=${item.dcoid}`,1)">
+                                <div class="cinfo disflex a-c">
+                                    <div class="logo"><img :src="item.logo" onerror="this.src='/static/images/shop.png'" alt=""></div>
+                                    <div class="tit">
+                                        <h3><span>{{item.name}}</span><label :class="`${item.status == 0 ? 'status1' : item.status == 1 ? '' : 'status2'}`">{{item.status == 0 ? '待完善分销方案' : item.status == 1 ? '合作中' : '暂停合作'}}</label></h3>
+                                        <p>{{item.shortName}}</p>
+                                    </div>
+                                </div>
+                                <div class="cdetail disflex j-b a-s" >
+                                    <div class="l_text">
+                                        <ul>
+                                            <li>负责人：<span class="name">{{item.people}}</span></li>
+                                            <li>联系电话：<span>{{item.phone}}</span></li>
+                                            <li v-if="item.status == 1">分销截止：<span>{{item.endTime.replace(/-/g,'.')}}</span></li>
+                                        </ul>
+                                    </div>
+                                    <div class="r_count disflex a-c">
+                                        <div :class="`allbb count_num ${item.total1 == 0 ? 'none_count' : ''}`" @click.stop="linkTo(`/supplier/loupan/reportList.html?type=&id=${item.dcoid}`,1)">
+                                            <h5>{{item.total1}}</h5>
+                                            <p>总报备</p>
+                                        </div>
+                                        <div :class="`allcj count_num  ${item.total2 == 0 ? 'none_count' : ''}`" @click.stop="linkTo(`/supplier/loupan/reportList.html?type=16&id=${item.dcoid}`,1)">
+                                            <h5>{{item.total2}}</h5>
+                                            <p>总成交/套</p>
+                                        </div>
+                                        <div :class="`dsh count_num  ${item.total3 == 0 ? 'none_count' : ''}`" @click.stop="linkTo(`/supplier/loupan/reportList.html?type=&id=${item.dcoid}`,1)">
+                                            <h5>{{item.total3}}</h5>
+                                            <p>待审核</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="btns disflex j-e" v-if="item.status == 1" @click.stop="">
+                                    <a :href="`reportList.html?id=${item.dcoid}`" target="_blank"  class="btn disflex a-c j-b "><i class="icon edit_icon"></i><span>报备记录</span></a>
+                                    <a :href="`branchDetail.html?id=${item.dcoid}`" target="_blank"  class="btn  disflex a-c j-b btn_primary"><i class="icon list_icon"></i><span>分销管理</span></a>
+                                </div>
+                                <div class="btns disflex j-e" v-else-if="item.status == 0"  @click.stop="">
+                                    <a :href="`branchDetail.html?id=${item.dcoid}`" target="_blank" target="_blank" class="btn  disflex a-c j-c btn_primary"><span>设置方案</span></a>
+                                </div>
+                                <div class="btns disflex j-e" v-else  @click.stop="">
+                                    <a :href="`branchDetail.html?id=${item.dcoid}`" target="_blank"  class="btn  disflex a-c j-b "><i class="icon list_icon1"></i><span>分销管理</span></a>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="emptyBox" v-else>
+                        <el-empty description="暂无相关数据" ></el-empty>
+                    </div>
+                    <div class="pagination"></div>
+                </div>
+            </div>
+        </div>
+        <div class="foot">
+            <div class="foot-bottom">
+                <div class="bottom wrap">
+                    版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+                </div>
+            </div>
+        </div>
+        <div class="allPopContainer">
+            <div :class="['pop_mask',{'show':showPop}]"></div>
+            <div class="popBox">
+                <div :class="['createFXPop Popbox',{'show':showPop},{'showPover':showPover}]">
+                    <div class="pop_head disflex a-c j-b">
+                        <h2>新建分销公司</h2>
+                        <a href="javascript:;" class="el-icon-close closePop" @click="showPop = false"></a>
+                    </div>
+                    <div class="pop_con">
+                        <h1>快速创建你的分销渠道商</h1>
+                        <div class="pop_search_box  disflex a-c">
+                            <div class="inpBox">
+                                <el-input  placeholder="输入对方公司名、手机号" v-model="c_keyword" @input="keyChange"></el-input>
+                                <div class="resultBox" v-if="showPover" v-loading="c_load"
+                                element-loading-text="拼命加载中">
+                                    <template v-if="c_list.length">
+                                        <h5>查询到相关账号</h5>
+                                        <ul>
+                                            <li class="disflex a-c j-b" v-for="item in c_list">
+                                                <div class="cinfo disflex a-c">
+                                                    <div class="logo"><img :src="item.logo" alt=""></div>
+                                                    <div class="info">
+                                                        <h4>{{item.name}}</h4>
+                                                        <p>电话：{{item.phone}}</p>
+                                                    </div>
+                                                </div>
+                                                <a href="javascript:;" class="btn_chose" @click="handleSelect(item)">选择</a>
+                                            </li>
+                                        </ul>
+                                    </template>
+                                    <template v-else>
+                                        <h5>未查询到相关账号</h5>
+                                        <a class="createBox disflex a-c j-c" href="addBranch.html" target="_blank">
+                                            <i class="el-icon blue_add el-icon-plus"></i>
+                                            <span>直接帮对方创建账号</span>
+                                        </a>
+                                    </template>
+                                </div>
+                            </div>
+                            
+                            <el-button type="primary" class="createBtn">确定创建</el-button>
+                        </div>
+
+                        <div class="linBox" v-if="!showPover">
+                            <div class="dot" v-for="item in 4">
+                                <div class="txt">{{item == 1 ? '创建分销公司' : item == 2 ? '开启分销' : item == 3 ? '接收客户' : '成交，新房大卖！'}}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/salesBranchManage.js?v={#$cfg_staticVersion#}"></script>
+</html>

@@ -1,0 +1,317 @@
+<!-- 招聘管理 s-->
+<div :class="['rightCon',{'show':currEditPart === 36}] " v-cloak>
+    <div class="modBox">
+        <div class="title">招聘管理
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 36 && showResetPop" @show="showResetPop = true" v-if="!checkHasIn('jobMan',36)">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('jobMan',0)"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop"  v-if="checkHasIn('jobMan',36)" :value="currEditPart === 36 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('jobMan',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference" @click="">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 36 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end" >
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('jobMan',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+            
+        </div>
+
+        <div class="modInfoStyle">
+            <div class="modstyleBox">
+                <h2 class="stitle">组件设置</h2>
+                <div class="sContent" >
+                    <div class="columbox">
+                        <div class="checkBox" style="margin-left: 0;">
+                            <el-checkbox v-model="jobManFormData.title.show"@change="value => showMoreBtn(value,'jobManFormData.more.show','title')">显示标题</el-checkbox>
+                            <el-checkbox :class="{'checkbox disabled':!jobManFormData.title.show}" v-model="jobManFormData.more.show" @change="value => showMoreBtn(value,'jobManFormData.title.show','more')">显示查看更多</el-checkbox>
+                        </div>
+                    </div>
+                    <div class="inpbox" v-show="jobManFormData.title.show">
+                        <el-input class="bgColorInp" v-model="jobManFormData.title.text" placeholder="请输入标题"></el-input>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 内容设置 -->
+            <div class="modstyleBox contentSetBox">
+                <h2 class="stitle">内容设置</h2>
+                <div class="sContent ">
+                    <dl class="setbox">
+                        <dt><h5>数字区</h5></dt>
+                        <dd>
+                            <div class="style_options">
+                                <el-checkbox v-for="item in jobNumOptions" :class="{'disabled':jobManFormData.numShow.length >= 4 && !checkValIn(jobManFormData.numShow,item.id)}" :value="checkValIn(jobManFormData.numShow,item.id)" :key="item.id" @change="pullIn(item,jobManFormData)">{{item.text}}</el-checkbox>
+                            </div>
+                            <div class="style_item "  v-if="jobManFormData.numShow && jobManFormData.numShow.length">
+                                <div class="style_options flexStart">
+                                    <label for="">文本自定义：</label>
+                                    <div class="split_options">
+                                        <div class="inpBox" style="width: 100%;">
+                                            <ul class="textCon">
+                                                <li class="inpbox" v-for="item in jobManFormData.numShow">
+                                                    <el-input v-model="item.showText">
+                                                        <template slot="prepend">{{item.text}}</template>
+                                                    </el-input>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+
+                    <dl class="setbox">
+                        <dt><h5>按钮区</h5></dt>
+                        <dd>
+                            <div  class="btnsBox btn_item sortBox"  data-drag=".item" data-sort="jobManFormData.btns" data-filter="input">
+                                <div class="option_item item" v-for="(btn,ind) in jobManFormData.btns" :data-id="ind" :key="btn.image">
+                                    <s class="del_item" @click="delTopBtns('jobManFormData',ind)"></s>
+                                    <s class="left_icon"><img src="{#$cfg_basehost#}/static/images/admin/order_icon.png" alt=""></s>
+                                    <div class="item_con">
+                                        <div class="img_up fn-clear">
+                                            <div :class="['upbtn fullW',{'hasup':btn.icon}]">
+                                                <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" @change="fileInpChange(`jobManFormData.btns.${ind}.icon`)" class="fileUp"  :id="'adv_'+ind+'_filedata'" :data-type="'adv_'+ind" >
+                                                <img v-show="btn.icon" :src="btn.icon" alt="">
+                                                <span>更换图片</span>
+                                            </div>
+                                            <div class="imgText">
+                                                <h4>按钮图标</h4>
+                                                <p>建议尺寸100x100</p>
+                                            </div>
+                                        </div>
+                                        <div class="inpbox">
+                                            <el-input   show-word-limit maxlength="5"  placeholder="请输入文字内容" class="iconName" v-model="btn.text" ></el-input>
+                                        </div>
+                                        <div class="inpbox linkbox linkChose" style="margin-top: 10px;">
+                                            <s><img :src="'{#$cfg_basehost#}/static/images/admin/'+(btn.linkInfo && btn.linkInfo.selfSetTel ? '/siteMemberPage/tel' : 'link')+'.png'" alt=""></s>
+                                            <input type="text" placeholder="请选择链接" class="iconLink"  :value="solveShowtext(btn.linkInfo,btn.link)" readonly @click="changeLink('jobManFormData.btns.' + ind +'.link' )">
+                                        </div>
+                                    </div>
+                                </div>
+                                <a href="javascript:;" class="add_more" v-show="jobManFormData.btns && jobManFormData.btns.length < 4" @click="addNewTopBtns('jobManFormData')" ><s></s>添加按钮</a>
+                            </div>
+                        </dd>
+                    </dl>
+            
+                </div>
+            </div>
+
+            <!-- 组件样式 -->
+            <div class="modstyleBox contentSetBox">
+                <h2 class="stitle">组件样式</h2>
+                <div class="sContent ">
+                    <div class="style_item">
+                        <div class="style_options" v-if="jobManFormData.title.show">
+                            <label for="">标题颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="jobManFormData.title.style.color" @active-change="value => activeChangeColor(value,'jobManFormData.title.style.color')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="jobManFormData.title.style.color.replace('#','')" @change="changeColor('jobManFormData.title.style.color')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('jobManFormData.title.style.color')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">数字颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="jobManFormData.style.numColor" @active-change="value => activeChangeColor(value,'jobManFormData.style.numColor')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="jobManFormData.style.numColor.replace('#','')" @change="changeColor('jobManFormData.style.numColor')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('jobManFormData.style.numColor')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">按钮文本1：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="jobManFormData.style.numTextColor" @active-change="value => activeChangeColor(value,'jobManFormData.style.numTextColor')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="jobManFormData.style.numTextColor.replace('#','')" @change="changeColor('jobManFormData.style.numTextColor')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('jobManFormData.style.numTextColor')">重置</button>
+                            </div>
+                            <div class="opciatyBox">
+                                <input type="text" class="opciatySet" v-model="jobManFormData.style.numText_opacity">
+                                <span  class="single back">%</span>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">按钮文本2：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="jobManFormData.style.btnTextColor" @active-change="value => activeChangeColor(value,'jobManFormData.style.btnTextColor')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="jobManFormData.style.btnTextColor.replace('#','')" @change="changeColor('jobManFormData.style.btnTextColor')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('jobManFormData.style.btnTextColor')">重置</button>
+                            </div>
+                            <div class="opciatyBox">
+                                <input type="text" class="opciatySet" v-model="jobManFormData.style.btnText_opacity">
+                                <span  class="single back">%</span>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">标签颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="jobManFormData.style.labBgColor" @active-change="value => activeChangeColor(value,'jobManFormData.style.labBgColor')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="jobManFormData.style.labBgColor.replace('#','')" @change="changeColor('jobManFormData.style.labBgColor')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('jobManFormData.style.labBgColor')">重置</button>
+                            </div>
+                            <div class="opciatyBox">
+                                <input type="text" class="opciatySet" v-model="jobManFormData.style.labBg_opacity">
+                                <span  class="single back">%</span>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">标签文本：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="jobManFormData.style.labColor" @active-change="value => activeChangeColor(value,'jobManFormData.style.labColor')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="jobManFormData.style.labColor.replace('#','')" @change="changeColor('jobManFormData.style.labColor')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('jobManFormData.style.labColor')">重置</button>
+                            </div>
+                           
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modstyleBox contentSetBox" v-show="jobManFormData.more.show">
+                <h2 class="stitle">查看更多</h2>
+                <div class="sContent">
+                    <div class="item style_item ">
+                        <div class="style_options" >
+                            <label for="">显示文本：</label>
+                            <div class="textSetBox">
+                                <el-input placeholder="请输入文本" maxlength="8" show-word-limit v-model="jobManFormData.more.text"></el-input>
+                            </div>
+                            <span :class="['showArr',{'noColor':!jobManFormData.more.arr}] " @click="jobManFormData.more.arr = !jobManFormData.more.arr"></span>
+                        </div>
+                        <div class="style_options" @click="changeLink('jobManFormData.more.link')">
+                            <label for="">链接：</label>
+                            <div class="inpbox linkbox">
+                                <s><img src="/static/images/admin/link.png" alt=""></s>
+                                <input type="text" placeholder="请选择链接" class="iconLink" readonly :value="jobManFormData.more.linkInfo.linkText ? jobManFormData.more.linkInfo.linkText : jobManFormData.more.link ">
+                            </div>
+                        </div>
+
+                        <div class="style_options" >
+                            <label for="">文本颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" v-model="jobManFormData.more.style.color" @active-change="(value) => activeChangeColor(value,'jobManFormData.more.style.color')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="(jobManFormData.more.style.color).replace('#','')" @change="changeColor('jobManFormData.more.style.color')" maxlength="6">
+                                <button @click="resetColor('jobManFormData.more.style.color')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 间距设置 -->
+            <div class="marginSetBox modstyleBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" v-show="showMarginSet">
+                        <div class="sContent">
+                            <div class="style_options">
+                                <label for="">图标大小：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="64" :max="108" v-model="jobManFormData.style.btnSize"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="jobManFormData.style.btnSize"  @change="checkMax(64,108,'jobManFormData.style.btnSize')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">上圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="50" v-model="jobManFormData.style.borderRadiusTop"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="jobManFormData.style.borderRadiusTop"  @input="checkMax(0,50,'jobManFormData.style.borderRadiusTop')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">下圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="jobManFormData.style.borderRadiusBottom"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="jobManFormData.style.borderRadiusBottom"  @input="checkMax(0,40,'jobManFormData.style.borderRadiusBottom')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">上间距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="jobManFormData.style.marginTop"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="jobManFormData.style.marginTop"  @input="checkMax(0,40,'jobManFormData.style.marginTop')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="jobManFormData.style.marginLeft"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="jobManFormData.style.marginLeft"  @input="checkMax(0,40,'jobManFormData.style.marginLeft')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options"  :style="jobManFormData.style.marginLeft ? 'visibility:hidden; opacity:0;':''">
+                                <label for="">内边距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="jobManFormData.style.paddingLeft"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="jobManFormData.style.paddingLeft"  @input="checkMax(0,40,'jobManFormData.style.marginLeft')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+        </div>
+
+
+
+
+
+        
+    </div>
+
+
+</div>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+	<title>分销报备</title>
+	<meta name="keywords" content="{#$cfg_keywords#}">
+	<meta name="description" content="{#$cfg_description#}">
+	<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+	<!-- <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}"> -->
+	<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$templets_skin#}css/article.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}',
+			staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = '{#$cfg_hideUrl#}';
+		var cookiePre = '{#$cfg_cookiePre#}',
+			cfg_clihost = '{#$cfg_clihost#}';
+		var templets = '{#$templets_skin#}';
+		var loupanid = '{#$loupanid#}'
+		var atpage = 1, totalCount = 0, pageSize = 8;
+		var currid = 11;
+
+	</script>
+</head>
+
+<body class="w1200">
+	<div id="page">
+		<!-- 头部 -->
+		{#include file="top.html"#}
+		<div class="conbox">
+			{#include file="left.html"#}
+			<!-- 右侧 -->
+			<div class="right_box">
+				<div class="rConBox">
+					<h3>分销报备{#if $fenxiaotitle && $fenxiaotime#}<span>{#$fenxiaotitle#},<em>{#$fenxiaotime#}</em>之前成交有效</span>{#/if#}</h3>
+					<div class="ListContainer">
+						<div class="headbox">
+							<div class="shaixuan" >
+								<span data-id="99" class="curr">全部<s></s></span>
+								<span data-id="0">待核实<s></s></span>
+								<span data-id="1">报备有效<s></s></span>
+								<span data-id="2">报备无效<s></s></span>
+								<span data-id="3">已成交<s></s></span>
+								<span data-id="4">佣金已发放<s></s></span>
+								<span data-id="5">已失效<s></s></span>
+							</div>
+							<div class="right" >
+								<div class="searchBox bg_grey">
+									<div class="inpbox "><input type="search" id="search" placeholder="输入搜索内容"></div>
+									<a href="javascript:;" class="search_btn" @click="search"><i></i></a>
+								</div>
+								<a href="javascript:;" class="btn_opt" @click="toExcel()" title="下载excel">导出Excel</a>
+							</div>
+						</div>
+						<div class="listbox tablebox" >
+							<div class="titlebox">
+								<div class="col2_ cell alignRight">报备人</div>
+								<div class="col1 cell alignRight">报备时间</div>
+								<div class="col15_ cell">报备客户</div>
+								<div class="col3 cell alignRight">情况说明</div>
+								<div class="col15_ cell">状态</div>
+								<div class="col1 cell alignRight">操作</div>
+							</div>
+							<ul v-cloak v-if="list.length > 0">
+								<li class="table_row " v-for="(item,i) in list" :data-id="item.id" :data-index="i">
+									<div class="col2_ cell alignRight">{{item.bbusername}}<em>（手机：{{item.bbphone}}）</em>
+									</div>
+									<div class="col1 cell  date alignRight">{{item.pubdate.split(' ')[0]}}</div>
+									<div class="col15_ cell ">{{item.username}}<em>（手机：18605222935）
+</em></div>
+									<div class="col3 cell alignRight">{{item.note}}</div>
+									<!-- 报备状态 -->
+									<div v-if="item.state==0" class="col15_ cell blue">待核实</div>
+									<div v-if="item.state==1" class="col15_ cell blue">报备有效</div>
+									<div v-if="item.state==2" class="col15_ cell blue">报备无效</div>
+									<div v-if="item.state==3" class="col15_ cell blue">已成交</div>
+									<div v-if="item.state==4" class="col15_ cell blue">佣金已发放</div>
+									<div v-if="item.state==5" class="col15_ cell grey">已失效</div>
+									<!-- <div :class="['col15_ cell',{'hding':item.state>=3}]">报备有效</div> -->
+									<!-- 报备状态 -->
+									<div class="col1 cell opt alignRight">
+										<a href="javascript:;" class="edit_btn" >
+											<s></s><span>变更状态</span>
+											<div class="btngroup">
+												<span data-id="0" @click="changeState('0',item.id,i)">待核实</span>
+												<span data-id="1" @click="changeState('1',item.id,i)">报备有效</span>
+												<span data-id="2" @click="changeState('2',item.id,i)">报备无效</span>
+												<span data-id="3" @click="changeState('3',item.id,i)">已成交</span>
+												<span data-id="4" @click="changeState('4',item.id,i)">佣金已发放</span>
+												<span data-id="5" @click="changeState('5',item.id,i)">已失效</span>
+											</div>
+										</a>
+									</div>
+								</li>
+							</ul>
+							<div v-else class="noData" v-cloak>暂无数据</div>
+						</div>
+
+						<div class="pagination fn-clear"></div>
+
+					</div>
+
+				</div>
+			</div>
+			<div class="loading" v-show="loading"><s></s></div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div>{#$cfg_statisticscode#}</div>
+</body>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fenxiaobaobei.js?v={#$cfg_staticVersion#}"></script>
+</html>

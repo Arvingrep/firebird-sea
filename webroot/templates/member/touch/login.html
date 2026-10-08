@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<title>{#$langData['siteConfig'][2][9]#}</title>
+<meta name="apptitle" content="{#$langData['siteConfig'][2][9]#}">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/login_v2.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+  var masterDomain = '{#$cfg_basehost#}', redirectUrl = '{#$redirectUrl#}', site = '{#$site#}', staticPath = '{#$cfg_staticPath#}';
+  var geetest = {#$cfg_geetest#};
+  var alipay_app_login = {#$alipay_app_login#};
+  var consult = '0'; // 协议勾选
+  var areacode = '{#$internationalPhoneSection[0]['code']#}'; //区号
+  var isWxMiniprogram = {#if $isWxMiniprogram#}1{#else#}0{#/if#};
+  var cfg_useWxMiniProgramLogin = {#$useWxMiniProgramLogin#};
+  var cookiePre = '{#$cfg_cookiePre|default:"HN_"#}';
+</script>
+{#* 微信分享 *#}
+{#$Share_description = {#$cfg_description#}#}
+{#$Share_title = {#$cfg_webname#}#}
+{#$Share_img = {#$cfg_weblogo#}#}
+{#$Share_url = {#$cfg_basehost#}#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+</head>
+
+<body>
+<div class="loginPage{#if $isWxMiniprogram#} fn-hide{#/if#}" id="login_page" v-cloak>
+	<!-- 普通登录 s -->
+	<div class="loginbox psdlogin" v-show="!codeLogin">
+		<div class="header">
+			<a href="javascript:;" class="goBack" onclick="history.go(-1)"></a>
+		</div>
+		<div class="logobox">
+			<img src="{#if $cfg_touchlogo#}{#$cfg_touchlogo#}{#else#}{#if $cfg_app_logo#}{#$cfg_app_logo#}{#else#}{#$cfg_weblogo#}{#/if#}{#/if#}" alt="">
+		</div>
+
+		<div class="formbox" v-if="!qqMiniprogram" v-cloak>
+			<div class="inputbox">
+				<input type="text" placeholder="{#$langData['siteConfig'][55][1]#}" name="account" autocomplete="off" id="account">  {#*   手机号/用户名/邮箱   *#}
+			</div>
+
+			<div class="inputbox psdinp">
+				<input v-bind:type="psdshow?'text':'password'" placeholder="{#$langData['siteConfig'][20][164]#}" name="password"  autocomplete="off" id="password">  {#*  请输入密码  *#}
+				<a href="javascript:;" :class="['eyeshow',{eyeclose:psdshow}]" @click="psdshow = !psdshow"></a>
+			</div>
+			<div class="linkbox"><a href="{#$cfg_basehost#}/fpwd.html" class="fpwd">{#$langData['siteConfig'][5][2]#}</a>  {#*  忘记密码？  *#}</div>
+
+			<a href="javascript:;" v-if="noagree" class="toagree" @click="showPop()">{#$langData['siteConfig'][2][0]#}</a>  {#*  登录  *#}
+			<a href="javascript:;" v-else class="btn_login" @click="login_by_psd()">{#$langData['siteConfig'][2][0]#}</a>  {#*  登录  *#}
+			<div class="link_group">
+                {#*  注册账号  *#}
+				{#if $cfg_regstatus#}<a href="{#$cfg_basehost#}/register.html?furl={#$redirectUrl#}">{#$langData['siteConfig'][55][2]#}</a>{#/if#}
+                {#if $cfg_regstatus && $cfg_smsLoginState#}<s></s>{#/if#}
+                {#*  验证码登录  *#}
+                {#if $cfg_smsLoginState#}<a href="javascript:;" class="code_login_btn" @click="codeLogin = !codeLogin">{#$langData['siteConfig'][55][3]#}</a>{#/if#}
+			</div>
+		</div>
+
+	</div>
+	<!-- 普通登录 e -->
+
+	<!-- 验证码登录 s -->
+	<div class="codelogin loginbox" v-show="codeLogin" v-cloak>
+		<div class="header">
+			<a href="javascript:;" class="goBack" @click="codeLogin = !codeLogin"></a>
+		</div>
+		<div class="formbox">
+			<h2 class="title">{#$langData['siteConfig'][55][4]#}</h2>  {#*  手机验证码登录  *#}
+			<div class="inputbox telinp">
+				<div class="telCode" @click="showAreacode()">
+					<span class="codeChoose">+{{areacode}}</span><a href="javascript:;" class="showCode"></a>
+					<input type="hidden" name="areacode" :value="areacode" id="codeChoose" >
+				</div>
+				<input type="tel" placeholder="{#$langData['siteConfig'][20][239]#}" name="phone" id="phone" autocomplete="off">{#*  请输入手机号  *#}
+			</div>
+			<div class="inputbox codeinp">
+				<input type="tel" maxlength="6" placeholder="{#$langData['siteConfig'][20][176]#}" name="vercode" autocomplete="off" id="vercode"> {#* 请输入验证码 *#}
+				<a href="javascript:;" class="getCode" @click="getPhoneMsg()">{#$langData['siteConfig'][4][1]#}</a>   {#*  获取验证码  *#}
+			</div>
+			<a href="javascript:;" v-if="noagree" class="toagree"  @click="showPop()">{#$langData['siteConfig'][2][0]#}</a>   {#*  登录  *#}
+			<a href="javascript:;" v-else class="btn_login" @click="lohin_by_msg()">{#$langData['siteConfig'][2][0]#}</a>   {#*  登录  *#}
+			<div class="link_group">
+                {#*  注册账号 *#}
+				{#if $cfg_regstatus#}<a href="{#$cfg_basehost#}/register.html?furl={#$redirectUrl#}">{#$langData['siteConfig'][55][2]#}</a>
+                <s></s>
+                {#/if#}
+                {#*  其他方式登录 *#}
+                <a href="javascript:;" class="code_login_btn" @click="codeLogin = !codeLogin">{#$langData['siteConfig'][55][5]#}</a>
+			</div>
+		</div>
+	</div>
+	<!-- 验证码登录 e -->
+
+	<div :class="['bottombox',{qqMiniprogram:'toCenter'}]">
+		<!-- 快捷登录 -->
+		{#* 如果是上架中状态或者抖音小程序则不显示快捷登录，如果在QQ小程序中，只显示QQ登录 *#}
+		{#if !$isByteMiniprogram && !$is_harmony_app#}
+		{#if !$cfg_ios_shelf || $isQqMiniprogram#}
+		{#if strstr($redirectUrl, "wmsj") === false#}
+		<div class="othertype" v-show="!codeLogin" style="display: block;">
+		  <div class="other_tit" v-if="!qqMiniprogram"><span>{#$langData['siteConfig'][2][1]#}</span></div>
+		  <div class="other_login">
+		    <ul>
+		      {#siteConfig action="getLoginConnect" return="login"#}
+		      {#if $login.code == "qq"#}
+		      <li class="qq"><a href="{#$cfg_basehost#}/api/login.php?type={#$login.code#}"><img src="{#$cfg_basehost#}/api/login/{#$login.code#}/img/100.png?v={#$cfg_staticVersion#}" alt=""></a></li>
+		      {#elseif $login.code == "wechat"#}
+		      <li class="wechat"><a href="{#$cfg_basehost#}/api/login.php?type={#$login.code#}" class="wechat"><img src="{#$cfg_basehost#}/api/login/{#$login.code#}/img/100.png?v={#$cfg_staticVersion#}" alt=""></a></li>
+		      {#elseif $login.code == "sina"#}
+		      <li class="sina"><a href="{#$cfg_basehost#}/api/login.php?type={#$login.code#}"><img src="{#$cfg_basehost#}/api/login/{#$login.code#}/img/100.png?v={#$cfg_staticVersion#}" alt=""></a></li>
+		      {#elseif $login.code == "alipay"#}
+		      <li class="alipay"><a href="{#$cfg_basehost#}/api/login.php?type={#$login.code#}"><img src="{#$cfg_basehost#}/api/login/{#$login.code#}/img/100.png?v={#$cfg_staticVersion#}" alt=""></a></li>
+		      {#elseif $login.code == "facebook"#}
+		      <li class="facebook"><a href="{#$cfg_basehost#}/api/login.php?type={#$login.code#}"><img src="{#$cfg_basehost#}/api/login/{#$login.code#}/img/100.png?v={#$cfg_staticVersion#}" alt=""></a></li>
+		      {#/if#}
+		      {#/siteConfig#}
+			  {#if $is_app && $umeng_phoneLoginState#}
+			  <li @click="oneKeyLogin"><a href="javascript:;" class="oneKeyLogin"><span class="ftip">{#$langData['siteConfig'][55][6]#}</span><img src="{#$templets_skin#}/images/flogin.png?v={#$cfg_staticVersion#}" alt=""></a></li> {#* 一键登录 *#}
+		      {#/if#}
+		    </ul>
+		  </div>
+		  <div class="other_tit" v-if="qqMiniprogram" style="margin-top: .5rem"><span>{#$langData['siteConfig'][2][1]#}</span></div>
+		</div>
+		{#/if#}
+		{#/if#}
+		{#/if#}
+
+		<!-- 隐私协议 -->
+		{#if $cfg_agreeProtocol #}
+		<div class="box" v-if="!qqMiniprogram"  v-cloak>
+			<p>
+			  {#$langData['siteConfig'][55][7]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='隐私政策'#}" target="_blank">《隐私政策》</a>及<a href="{#getUrlPath service='siteConfig' template='protocol' title='会员注册协议'#}" target="_blank">《会员注册协议》</a>
+			</p>
+		</div>
+		{#else#}
+		<div class="box" v-if="!qqMiniprogram" v-cloak>
+			<p :class="['agree',{'gou':!noagree}]" >
+			  <s @click="noagree = !noagree"></s>
+			  {#$langData['siteConfig'][6][2]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='隐私政策'#}" target="_blank">《隐私政策》</a>及<a href="{#getUrlPath service='siteConfig' template='protocol' title='会员注册协议'#}" target="_blank">《会员注册协议》</a>
+			</p>
+		</div>
+		{#/if#}
+	</div>
+
+	<!-- 区号选择 -->
+	<div class="popl_mask" @click="hideAreaCode()"></div>
+	<div class="popl_box anum_box">
+		<h2>{#$langData['siteConfig'][40][1]#}   <a href="javascript:;" class="back" @click="hideAreaCode()">{#$langData['siteConfig'][6][117]#}</a></h2>     {#* 选择地区----返回 *#}
+		<div class="areaList" id="areaList">
+			<ul>
+				{#siteConfig action='internationalPhoneSection' return="item"#}
+				<li data-cn="{#$item.name#}" data-code="{#$item.code#}" @click="getAreaCode()"><span>{#$item.name#}<span><em class="fn-right">+{#$item.code#}</em></li>
+				{#/siteConfig#}
+			</ul>
+		</div>
+	</div>
+
+
+
+	<!-- 协议弹窗 -->
+	<div class="pop_mask"></div>
+	<div class="pop_agree">
+		<div class="box">
+			<p class="agree">
+			  {#$langData['siteConfig'][55][7]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='隐私政策'#}" target="_blank">《隐私政策》</a>及<a href="{#getUrlPath service='siteConfig' template='protocol' title='会员注册协议'#}" target="_blank">《会员注册协议》</a>
+			</p>
+		</div>
+		<div class="btn_group">
+			<a href="javascript:;" class="cancel" @click="hidePop()">{#$langData['siteConfig'][9][3]#}</a> {#* 拒绝 *#}
+			<a href="javascript:;" class="keep_login" @click="sureClick()">{#$langData['siteConfig'][6][2]#}</a> {#*  同意  *#}
+		</div>
+	</div>
+
+	<div class="loadIcon" v-show="loading"></div>
+</div>
+
+
+
+
+
+
+{#$rsaScript#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+{#if $cfg_geetest#}
+{#if $cfg_geetest == 1#}
+<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/login_v2.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

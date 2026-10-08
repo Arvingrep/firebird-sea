@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/core/base.css">
+    <link rel="stylesheet" href="/static/css/ui/element_ui_index.css">  
+    <link rel="stylesheet" href="/static/css/admin/pageDiy.css?v={#$cfg_staticVersion#}">
+    <script src="/static/js/core/jquery-1.9.0.min.js"></script>
+    <title>DIY页面管理</title>
+    <script>
+        var staticPath = '{#$cfg_staticPath#}';
+        var userCenterTouchTemplateType = {#$userCenterTouchTemplateType|default:0#}
+        var busiCenterTouchTemplateType = {#$busiCenterTouchTemplateType|default:0#}
+        var pagetype = '{#$smarty.get.type|default:index#}'
+        var indexPageCount = {#$indexPageCount|default:0#}
+        var memberPageCount = {#$memberPageCount|default:0#}
+        var businessPageCount = {#$businessPageCount|default:0#}
+        var token = '{#$token#}';
+        var platformList = '{#json_encode($platformList)|default:"[]"#}'
+    </script>
+</head>
+<body>
+    <div class="pageCon" id="page">
+        <div class="leftCon" v-cloak>
+            <h4>页面管理</h4>
+            <ul>
+                <li @click="currPage = 'index'; getModelList();changeUrl()" :class="{'on_chose': currPage == 'index'}">首页</li>
+                <li  @click="currPage = 'member'; getModelList();changeUrl()" :class="{'on_chose': currPage == 'member'}">个人中心</li>
+                <li  @click="currPage = 'business'; getModelList();changeUrl()" :class="{'on_chose': currPage == 'business'}">商家中心</li>
+                <li><a href="siteFabuPages.php" target="_blank">移动端发布页</a></li>
+                <li><a href="sitePcFabuPages.php" target="_blank">电脑端发布页</a></li>
+            </ul>
+            
+        </div>
+        <div class="rightCon" v-cloak>
+            <div class="manageBox" v-if="currPage == 'index'">
+                <div class="manageHeader">
+                    <div class="left_h">
+                        <h2>首页管理</h2>
+                        <div class="tip">
+                            *未单独设置的终端将使用默认模板
+                            <el-popover
+                                placement="bottom"
+                                width="380"
+                                trigger="hover"
+                                :visible-arrow="true"
+                                content="如苏州App未单独设置，则默认使用App默认模板；App默认模板也未设置时，则使用系统默认模板">
+                                <span class="tip_icon" slot="reference"></span>
+                            </el-popover>
+                        </div>
+                    </div>
+                    <div class="right_h">
+                        <!-- 状态 -->
+                        <el-select class="smSelect" v-model="formData.state" @change="getModelList(1)" placeholder="状态">
+                            <el-option value="" label="">全部</el-option>
+                            <el-option v-for="item in stateList" :key="item.val" :label="item.text" :value="item.val"> </el-option>
+                        </el-select>
+
+                        <!-- 终端 -->
+                        <el-select class="smSelect" v-model="formData.platform"  @change="getModelList(1)" placeholder="终端">
+                            <el-option value="" label="">全部</el-option>
+                            <el-option v-for="item in terminalList" v-show="item.id == 'h5' || platformList[item.id] == 1" :key="item.id" :label="item.name" :value="item.id"></el-option>
+                        </el-select>
+
+                        <!-- 搜索 -->
+                        <div class="searchBox" >
+                            <el-input v-model="formData.keyword" prefix-icon="el-icon-search" placeholder="搜索分站/终端"></el-input>
+                            <el-button @click="getModelList(1)">搜索</el-button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- noList 表示没有创建模板 -->
+                <div :class="['manageCon',{'noList':indexPageCount == 0}] ">
+                    <div class="addNewMod" v-if="indexPageCount == 0">
+                        <h5>创建自定义首页</h5>
+                        <a href="sitePageDiy.php"  target="_blank" class="addNew">开始编辑</a>
+                    </div>
+                    <div class="modListBox" v-else>
+                        <ul class="modList" >
+                            <li class="addNewMod">
+                                <a href="sitePageDiy.php"  target="_blank">
+                                    <h5>新建模板</h5>
+                                    <p>设置其他分站、终端</p>
+                                </a>
+                            </li>
+                            <li class="mod_li" v-for="item in indexList">
+                                <div class="mod_img">
+                                    <div :class="['useState', {'state1':item.state == 1}]" v-if="item.cityid != 0 || item.key != 'h5' || item.state == 0">{{item.state == 1 ? '应用中' : '未应用'}}</div>
+                                    <el-popover
+                                        placement="bottom"
+                                        width="380"
+                                        trigger="hover"
+                                        :visible-arrow="true">
+                                        <div class="tip">如需取消系统默认模板应用，请在<a class="toPage" href="javascript:;" @click.prevent="toPage('siteConfig.php')"  style="text-decoration: underline; color: #1975FF;">系统基本参数的风格管理</a>中选择其他模板</div>
+                                        <div :class="['useState', {'state1':item.state == 1}]" slot="reference" v-if="item.cityid == 0 && item.key == 'h5' && item.state == 1">
+                                            {{item.state == 1 ? '应用中 ' : '未应用 '}} 
+                                            <i class="el-icon-warning-outline el-icon" style="margin-left:4px ;"></i>
+                                        </div>
+                                    </el-popover>
+                                    <img :src="`/include/attachment.php?f=${item.cover}`" onerror="this.src='/static/images/admin/siteConfigPage/defaultImg/default_mod.png'" alt="">
+                                    <div class="mod_opt">
+                                        <a href="javascript:;" class="userModel" v-if="item.state == 0" @click="updateState(item,'state')">{{item.state == 0 ? '开启' : '取消'}}应用</a>
+                                        <a :href="`sitePageDiy.php?cityid=${item.cityid}&platform=${item.key}` " target="_blank" class="edit_page">编辑页面</a>
+                                    </div>
+                                </div>
+                                <div class="mod_info">
+                                    <div class="mod_text">
+                                        <h4>{{item.title}}</h4>
+                                        <p>{{item.platorm}}<span v-if="item.subtitle">已使用{{item.subtitle}}</span></p>
+                                    </div>
+                                    <el-popover
+                                        placement="bottom-start"
+                                        width="120"
+                                        popper-class="optionBoxPop"
+                                        trigger="hover">
+                                        <ul class="option_ul">
+                                            <li v-if="item.state == 1"  @click="updateState(item,'state')">取消应用</li>
+                                            <li class="del" @click="showDialog(item,'del')">删除</li>
+                                        </ul>
+                                        <div slot="reference" class="opt"  v-if="item.cityid || item.key != 'h5'">
+                                            <em v-for="item in 3"></em>
+                                        </div>
+                                    </el-popover>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="manageBox" v-else-if="currPage == 'member'">
+                <div class="manageHeader">
+                    <div class="left_h">
+                        <h2>个人中心管理</h2>
+                        <div :class="['toggleSwitch',{'noUse':!useDiy}]" @click="toNextStep()"><span ><em></em></span>{{useDiy ? 'DIY模式已开启' : '点击开启DIY模式'}}</div>
+                        <div class="tip" v-if="useDiy">*未单独设置的终端将默认使用H5版本 </div>
+                    </div>
+                   
+                </div>
+
+                <!-- noList 表示没有创建模板 -->
+                <div :class="['manageCon memberPage' ,{'noList':memberPageCount == 0 },{'noUseModel':!useDiy}] ">
+                    <div class="addNewMod" v-if="memberPageCount == 0">
+                        <h5>创建自定义个人中心</h5>
+                        <a href="userCenterDiy.php" class="addNew">开始编辑</a>
+                    </div>
+                    <div class="modListBox"  v-else>
+                        <div class="diy_mask" v-if="!useDiy">
+                            <div class="mask_tip">DIY模式已关闭</div>
+                        </div>
+                        <ul :class="['modList',{'flowhidden':!useDiy}]">
+                            
+                            <li class="mod_li" v-for="item in memberList">
+                                <div class="mod_img">
+                                    <div :class="['useState' ,{'state1': item.state == 1}]">{{item.state == 1 ? '应用中' : '未应用'}}</div>
+                                    <img :src="`/include/attachment.php?f=${item.cover}`" onerror="this.src='/static/images/admin/siteConfigPage/defaultImg/default_mod.png'" alt="">
+                                    <div class="mod_opt">
+                                        <a href="javascript:;" class="userModel" v-if="item.state != 1" @click="updateState(item,'state')">开启应用</a>
+                                        <a :href="`userCenterDiy.php?platform=${item.key}`" target="_blank" class="edit_page">编辑页面</a>
+                                    </div>
+                                </div>
+                                <div class="mod_info">
+                                    <div class="mod_text">
+                                        <h4>{{item.platorm}}</h4>
+                                        <p>{{transTimes(item.pubdate,4)}}更新</p>
+                                    </div>
+                                    <el-popover
+                                        placement="bottom-start"
+                                        width="120"
+                                        popper-class="optionBoxPop"
+                                        trigger="hover">
+                                        <ul class="option_ul">
+                                            <li v-if="item.state == 1"  @click="updateState(item,'state')">取消应用</li>
+                                            <li class="del" @click="showDialog(item,'del')">删除</li>
+                                        </ul>
+                                        <div slot="reference" class="opt" v-if="item.key != 'h5'">
+                                            <em v-for="item in 3"></em>
+                                        </div>
+                                    </el-popover>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="terminalList" v-if="memberPageCount > 0 ">
+                        <ul>
+                            <template v-for="item in terminalList" :key="item.id">
+                                <li v-if="!useDiy || !item.hasSet" v-show="item.id == 'h5' || platformList[item.id] == 1">
+                                    <a :href="`userCenterDiy.php?platform=${item.id}`" target="_blank"><s></s><span>{{item.name}}</span></a>
+                                    <template v-if="!useDiy">
+                                        <p v-if="item.id == 'h5'">默认模板，未单独设置的终端将默认使用此版本</p>
+                                        <p v-else-if="item.hasSet == 1">已设置，可<span @click="showDialog(item.obj,'del')">删除</span></p>
+                                    </template>
+                                </li>
+                            </template>
+                            
+                            
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="manageBox" v-else-if="currPage == 'business'">
+                <div class="manageHeader">
+                    <div class="left_h">
+                        <h2>商家中心管理</h2>
+                        <div :class="['toggleSwitch',{'noUse':!busiDiy}]" @click="toNextStep()"><span ><em></em></span>{{busiDiy ? 'DIY模式已开启' : '点击开启DIY模式'}}</div>
+                        <div class="tip" v-if="busiDiy">*未单独设置的终端将默认使用H5版本 </div>
+                    </div>
+                   
+                </div>
+
+                <!-- noList 表示没有创建模板 -->
+                <div :class="['manageCon memberPage' ,{'noList':businessPageCount == 0 },{'noUseModel':!busiDiy}] ">
+                    <div class="addNewMod" v-if="businessPageCount == 0">
+                        <h5>创建自定义商家中心</h5>
+                        <a href="userCenterDiy.php" class="addNew">开始编辑</a>
+                    </div>
+                    <div class="modListBox" v-else>
+                        <div class="diy_mask" v-if="!busiDiy">
+                            <div class="mask_tip">DIY模式已关闭</div>
+                        </div>
+                        <ul :class="['modList',{'flowhidden':!busiDiy}]" >
+                            <li class="mod_li" v-for="item in businessList">
+                                <div class="mod_img">
+                                    <div :class="['useState' ,{'state1': item.state == 1}]">{{item.state == 1 ? '应用中' : '未应用'}}</div>
+                                    <img :src="`/include/attachment.php?f=${item.cover}`" onerror="this.src='/static/images/admin/siteConfigPage/defaultImg/default_mod.png'" alt="">
+                                    <div class="mod_opt">
+                                        <a href="javascript:;" class="userModel" v-if="item.state != 1" @click="updateState(item,'state')">开启应用</a>
+                                        <a :href="`busiCenterDiy.php?platform=${item.key}`" target="_blank" class="edit_page">编辑页面</a>
+                                    </div>
+                                </div>
+                                <div class="mod_info">
+                                    <div class="mod_text">
+                                        <h4>{{item.platorm}}</h4>
+                                        <p>{{transTimes(item.pubdate,4)}}更新</p>
+                                    </div>
+                                    <el-popover
+                                        placement="bottom-start"
+                                        width="120"
+                                        popper-class="optionBoxPop"
+                                        trigger="hover">
+                                        <ul class="option_ul">
+                                            <li v-if="item.state == 1"  @click="updateState(item,'state')">取消应用</li>
+                                            <li class="del" @click="showDialog(item,'del')">删除</li>
+                                        </ul>
+                                        <div slot="reference" class="opt" v-if="item.key != 'h5'">
+                                            <em v-for="item in 3"></em>
+                                        </div>
+                                    </el-popover>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="terminalList" v-if="businessPageCount > 0 ">
+                        <ul>
+                            <template v-for="item in terminalList" :key="item.id">
+                                <li v-if="!busiDiy || !item.busiHasSet" v-show="item.id == 'h5' || platformList[item.id] == 1">
+                                    <a :href="`busiCenterDiy.php?platform=${item.id}`" target="_blank"><s></s><span>{{item.name}}</span></a>
+                                    <template v-if="!busiDiy">
+                                        <p v-if="item.id == 'h5'">默认模板，未单独设置的终端将默认使用此版本</p>
+                                        <p v-else-if="item.busiHasSet == 1">已设置，可<span @click="showDialog(item.busiObj,'del')">删除</span></p>
+                                    </template>
+                                </li>
+                            </template>
+                            
+                            
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <el-dialog
+            :title="`确定要删除${delObj.title ? delObj.title : delObj.platorm}`"
+            :visible.sync="dialogVisible"
+            custom-class="delModBox"
+            top="20vh"
+            width="500px">
+            <span style="color: #f00;">模板删除后将无法恢复</span>
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="dialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="dialogVisible = false;updateState(delObj,'del')">确 定</el-button>
+            </span>
+            </el-dialog>
+        </div>
+    </div>
+</body>
+<!-- <script>var adminPath = "", subdomain = '{#$basehost#}', token = '{#$token#}';</script> -->
+<script src="/static/js/vue/vue.js"></script>
+<script src="/static/js/ui/element_ui_index.js"></script>
+<script src="/static/js/admin/common.js?v={#$cfg_staticVersion#}"></script>
+<script src="/static/js/admin/pageDiy.js?v={#$cfg_staticVersion#}"></script>
+</html>

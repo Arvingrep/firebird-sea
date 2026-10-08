@@ -1,0 +1,379 @@
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<title>{#$langData['siteConfig'][0][7]#} </title>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mcenter/index_info.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mcenter/index_job.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script type="text/javascript">
+  var masterDomain = '{#$cfg_basehost#}', cookiePre = '{#$cfg_cookiePre#}';
+  var joinBusiUrl = '{#getUrlPath service='member' type='user' template='enter'#}';
+  var userinfo = {#json_encode($userinfo)#};
+
+  var mdList = {#json_encode($memberModule.userModuleList)#};
+  var identify = '{#$detail_identify#}'; //身份
+  var memberDomain  = '{#$member_userDomain#}';
+  var freshNext = '{#$detail_refreshNext#}'
+  var bid_end = '{#$detail_bid_end#}'; //置顶结束
+  var bid_start = '{#$detail_bid_start#}'; //置顶开始
+  var cityid = '{#$siteCityInfo.cityid#}'
+  var jobResume = '{#getUrlPath service='member' type='user' template='job-resume'#}';
+  var need_complete = {#$detail_need_complete|default:0#}; //简历必填项是否完善 默认未完善
+  var resume_aid = '{#$detail_id#}'
+  var refreshSmart = {#$detail_refreshSmart|default:0#}; //是否智能刷新
+</script>
+</head>
+
+<body>
+	
+
+
+	<div class="page_job">
+		<div class="gray_bg">
+			<div class="bgbox" {#if $isminiprogram#} style="padding-top: .1rem; min-height: auto;"{#/if#}>
+
+                {#if !$isminiprogram#}
+				<div class=" tbox">
+					{#if $userinfo.userid#}
+					{#*个人升级到商家*#}
+					{#if $userinfo.userType == 1#}
+					{#if !$is_ios_app || !$cfg_ios_shelf#}
+					<a class="left_link" href="{#$cfg_basehost#}/supplier/job{#if $is_app#}?appFullScreen{#/if#}"><s></s>我要招人</a>
+					{#*  切换商家版  *#}
+					{#/if#}
+					{#else#}
+					<a class="left_link"
+						href="{#$cfg_basehost#}/supplier/job{#if $is_app#}?appFullScreen{#/if#}"><s></s>我要招人</a>
+					{#*  切换商家版  *#}
+					{#/if#}
+					{#else#}
+					<a class="left_link"
+						href="{#$cfg_basehost#}/supplier/job{#if $is_app#}?appFullScreen{#/if#}"><s></s>我要招人</a>
+					{#*  切换商家版  *#}
+					{#/if#}
+					<a class="right_link" href="{#getUrlPath service='member' type='user' template='setting' param='module=job'#}"></a>
+				</div>
+                {#/if#}
+
+				<!-- 用户信息 -->
+				<div class="userinfo_box">
+					<div class="uhead_box">
+						<a class="uheadImg" href="{#getUrlPath service='member' type='user' template='job-resume'#}{#if $is_app#}?appFullScreen{#/if#}">
+							<img src="{#$detail_photo_url|default:'/static/images/noPhoto_60.jpg'#}"
+								onerror="this.src='/static/images/noPhoto_60.jpg'" alt="">
+							{#if $detail_bid_end >= $smarty.now#}<span class="top {#if $detail_state != 1#}stopTop{#/if#}" >{#if $detail_state != 1#}待置顶{#else#}已置顶{#/if#}</span>{#/if#}
+						</a>
+						{#if $userinfo.userid#}
+						<a class="uinfo" href="{#getUrlPath service='member' type='user' template='job-resume'#}{#if $is_app#}?appFullScreen{#/if#}">
+							<h3><b>{#$detail_name|default:'姓名待填写'#}</b>{#if $detail_alias#}<span>{#$detail_alias#}</span>{#/if#}
+							</h3>
+							{#if $detail_id#}
+							<p>{#if $detail_age#}<span>{#$detail_age#}岁</span>{#/if#}{#if $detail_age && $detail_work_jy_name#}<em>|</em>{#/if#}{#if $detail_work_jy_name#}<span>{#if strpos($detail_work_jy_name,'工作经验')#}{#$detail_work_jy_name#}{#else#}{#$detail_work_jy_name#}工作经验{#/if#}</span>{#/if#}{#if $detail_edu_tallest_name#}<em>|</em><span>{#$detail_edu_tallest_name#}</span>{#/if#}
+							</p>
+							{#else#}
+							<p>信息待完善</p>
+							{#/if#}
+						</a>
+						{#else#}
+						<a class="uinfo" href="{#getUrlPath service='member' type='user' template='login'#}">
+							<h3>登录/注册</h3>
+							<p>Hi，欢迎使用{#$cfg_shortname#}{#getModuleConfig module='job' key='channelName'#}</p>
+						</a>
+						{#/if#}
+					</div>
+
+					{#if $userinfo.userid #}
+						{#if $detail_completion < 50#}
+						<a href="{#$member_userDomain#}/job-resume.html{#if $is_app#}?appFullScreen{#/if#}" class="resume_btn complete_btn">完善简历</a>
+						{#elseif $detail_state == 0#}
+						<a href="{#$member_userDomain#}/job-resume.html{#if $is_app#}?appFullScreen{#/if#}" class="rstate_btn">简历审核中</a>
+						{#elseif $detail_state == 2#}
+						<a href="{#$member_userDomain#}/job-resume.html{#if $is_app#}?appFullScreen{#/if#}" class="rstate_btn">修改简历</a>
+						{#else#}
+						<a href="javascript:;" class="resume_btn refresh_btn {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}">刷新简历</a>
+						{#/if#}
+					{#/if#}
+
+
+				</div>
+				<!-- 简历审核拒绝 -->
+				{#if $detail_id && $detail_state == 2#}
+				<a class="resume_state" href="{#$member_userDomain#}/job-resume.html{#if $is_app#}?appFullScreen{#/if#}">
+					<div class="refuseText">
+						<s></s>简历审核未通过：{#$detail_refuse#}
+					</div>
+				</a>
+				{#/if#}
+
+				<!-- 简历完成度 -->
+				{#if  $userinfo.userid &&  $detail_state != 2#}
+					{#if  $detail_completion< 50#}
+					<a class="resume_complete_box" href="{#$member_userDomain#}/job-resume.html{#if $is_app#}?appFullScreen{#/if#}">
+						<h4>完善简历，才可投递心仪职位！</h4>
+						<div class="complete_num_box">
+							<div class="complete_num"><span class="finished" style="width: {#$detail_completion#}%;"></span>
+							</div>
+							<p>简历完整度较低哦</p>
+						</div>
+					</a>
+					{#else if $detail_completion< 80#}
+					<a class="resume_complete_box" href="{#$member_userDomain#}/job-resume.html{#if $is_app#}?appFullScreen{#/if#}">
+						<h4>完善简历，提高竞争优势！</h4>
+						<div class="complete_num_box">
+							<div class="complete_num"><span class="finished" style="width: {#$detail_completion#}%;"></span>
+							</div>
+							<p>简历还有提升空间！</p>
+						</div>
+					</a>
+
+					{#/if#}
+				{#/if#}
+
+
+				<!-- 智能刷新 -->
+				{#if $detail_refreshSmart == 1 &&  $detail_state != 2 #}
+				{#if $detail_state == 1#}
+				<div class="refreshBox"><span>智能刷新</span> 稳定曝光中，下次刷新<em></em> </div>
+				{#else#}
+				<div class="refreshBox"><span>智能刷新</span> 简历审核通过后继续刷新<em></em> </div>
+				{#/if#}
+				{#/if#}
+
+				<div class="module_data">
+					<ul>
+						<li>
+							<a href="{#$member_userDomain#}/collection.html?module=job">
+								<h4>{#if $userinfo.userid#}{#$collectJobCount|default:0#}{#else#}0{#/if#}</h4>
+								<p>收藏职位</p>
+							</a>
+						</li>
+						<!-- <li>
+							<a href="{#$member_userDomain#}/job-delivery.html">
+								<h4>{#if $userinfo#}{#$jobcount|default:0#}{#else#}0{#/if#}</h4>
+								<p>已投职位</p>
+							</a>
+						</li> -->
+
+						<li>
+							<a href="{#$member_userDomain#}/job-collections.html?company=1">
+								<h4>{#$collectCompany#}</h4>
+								<p>关注公司</p>
+							</a>
+						</li>
+						<li>
+							<a href="{#$member_userDomain#}/history?module=job">
+								<h4>{#$todayzjcount|default:0#}</h4>
+								<p>足迹</p>
+							</a>
+						</li>
+					</ul>
+				</div>
+
+				<!-- 实名认证提示 -->
+				{#if $userinfo && !$userinfo.certifyState && $detail_completion >= 80 && $detail_need_complete == 1 &&  $detail_state != 2#}
+				<div class="idCheckBox">
+					<a href="javascript:;" class="close_btn"></a>
+					<div class="fn-left">
+						<h4>您还未实名认证</h4>
+						<p>提高简历可信度，更容易得到招聘方关注</p>
+					</div>
+					<a href="{#$member_userDomain#}/security-shCertify.html" class="btn_idCheck">去认证</a>
+				</div>
+				{#/if#}
+			</div>
+			<div class="content_box">
+				
+				<div class="moduleBox {#if !$detail_name && $userinfo.userid#}goLink{#/if#} {#if $detail_need_complete == '0'#}goLink2{#/if#} {#if !$detail_name && $userinfo.userid#}goLink{#/if#}">
+					<!-- 我的投递 -->
+					<dl class="con link_con deliveryBox fn-clear">
+						<dt>
+							<h5>我的投递</h5><a href="{#$member_userDomain#}/job-delivery.html{#if $is_app#}?appFullScreen{#/if#}" class="edit_btn">查看全部</a>
+						</dt>
+						<dd>
+							<a href="{#$member_userDomain#}/job-delivery.html?{#if $is_app#}appFullScreen&{#/if#}state=1" {#if $detail_delivery1#}class="new"{#/if#}>
+								<div class="icon"><img src="{#$templets_skin#}images/mcenter/read_icon.png" alt=""></div>
+								<p>被查看</p>
+							</a>
+						</dd>
+						<dd>
+							<a href="{#$member_userDomain#}/job-delivery.html?{#if $is_app#}appFullScreen&{#/if#}state=2" {#if $detail_delivery2#}class="new"{#/if#}>
+								<div class="icon"><img src="{#$templets_skin#}images/mcenter/like.png" alt=""></div>
+								<p>有意向</p>
+							</a>
+						</dd>
+						<dd>
+							<a href="{#$member_userDomain#}/job-delivery.html?{#if $is_app#}appFullScreen&{#/if#}state=3" >
+								<div class="icon"><img src="{#$templets_skin#}images/mcenter/invitate.png"
+										alt="">{#if $detail_delivery3#}<span>新邀请</span>{#/if#}</div>
+								<p>邀面试</p>
+							</a>
+						</dd>
+						<dd>
+							<a href="{#$member_userDomain#}/job-delivery.html?{#if $is_app#}appFullScreen&{#/if#}state=4" {#if $detail_delivery4#}class="new"{#/if#}>
+								<div class="icon"><img src="{#$templets_skin#}images/mcenter/noFit.png" alt=""></div>
+								<p>不合适</p>
+							</a>
+						</dd>
+					</dl>
+	
+					<!-- 感兴趣/面试 -->
+					<div class="postInfoBox">
+						<a class="interested_post" href="{#$member_userDomain#}/job-interested.html{#if $is_app#}?appFullScreen{#/if#}">
+							<h4><b>{#$interestMe|default:0#}</b> 条</h4>
+							<span>对我感兴趣</span>
+						</a>
+						<a class="intereview_post {#if $invitationNotice#}new{#/if#}"
+							href="{#$member_userDomain#}/job-invitation.html">
+							<h4><b>{#$invitationCount|default:0#}</b> 场</h4>
+							<span>我的面试</span>
+						</a>
+					</div>
+	
+					<!-- 简历升级 -->
+					{#if $detail_id && $detail_completion >= 60 &&  $detail_state != 2#}
+					<div class="levelResumeBox {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}">
+						<h4><b>简历升级服务</b><em>求职快人一步！</em></h4>
+						<div class="levelUp">
+							<ul>
+								<li class="smartRefresh">
+									<a href="javascript:;">
+										<div class="icon"><img src="{#$templets_skin#}images/job/resume_refresh.png" alt="">
+										</div>
+										<p>智能刷新</p>
+									</a>
+								</li>
+								<li class="topResume">
+									<a href="javascript:;">
+										<div class="icon"><img src="{#$templets_skin#}images/job/resume_top.png" alt=""></div>
+										<p>置顶简历</p>
+									</a>
+								</li>
+								<!-- <li class="deliveryRight">
+									<a href="javascript:;">
+										<div class="icon"><img src="{#$templets_skin#}images/job/delver_tq.png" alt=""></div>
+										<p>投递特权</p>
+									</a>
+								</li> -->
+							</ul>
+						</div>
+					</div>
+					{#/if#}
+	
+					<!-- 求职意向 -->
+					{#if $userinfo.userid#}
+					<ul class="link_con postLike">
+						<li class="intention"><a href="javascript:;">
+								<h5>求职意向</h5><span>请选择求职意向</span>
+							</a></li>
+						<li class="resume_pub"><a href="javascript:;">
+								<h5>简历公开</h5><span>请先完善简历</span>
+							</a></li>
+	
+					</ul>
+					{#/if#}
+				</div>
+
+				<!-- 我要招人 -->
+				<!-- 招聘求职_会员中心_移动端_广告一 -->
+				<div class="advBg">
+					{#myad title="招聘求职_会员中心_移动端_广告一" #}
+				</div>
+
+				
+				<div class="bg_gray_white"></div>
+			</div>
+		</div>
+		<div class="white_bg">
+			<!-- 常用功能 -->
+			<div class="commonFunc">
+				<h2>常用功能</h2>
+				<ul>
+					<li>
+						<a href="{#$member_userDomain#}/job-resume.html?pageShow=9{#if $is_app#}&appFullScreen{#/if#}" class="resume_preview">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_1.png" alt=""></div>
+							<p>简历预览</p>
+						</a>
+					</li>
+					<li>
+						<a href="{#$member_userDomain#}/security-shCertify.html">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_2.png" alt=""></div>
+							<p>实名认证</p>
+						</a>
+					</li>
+					<li class="general">
+						<a href="{#getModuleConfig module='job' key='channelDomain'#}/general.html" class="toMini" data-temp="general" data-module="job">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_3.png"
+									alt=""><span>极速招聘</span></div>
+							<p>{#$customPgCustomName#}</p>
+						</a>
+					</li>
+					<li>
+						<a href="{#getModuleConfig module='job' key='channelDomain'#}/job-list?nature=3" class="toMini" data-temp="jobList" data-module="job" data-param="?nature=3">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_5.png" alt=""></div>
+							<p>校招实习</p>
+						</a>
+					</li>
+					<!-- <li>
+						<a href="#">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_4.png" alt=""></div>
+							<p>屏蔽公司</p>
+						</a>
+					</li> -->
+					<li>
+						<a href="{#getUrlPath service='siteConfig' template='protocol' title='求职安全防范指南'#}">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_6.png" alt=""></div>
+							<p>防骗指南</p>
+						</a>
+					</li>
+					<li>
+						<a href="{#$member_userDomain#}/qiandao.html">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_7.png" alt=""></div>
+							<p>签到领积分</p>
+						</a>
+					</li>
+					<li>
+						<a href="tel:{#$job_hotline#}">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_8.png" alt=""></div>
+							<p>客服中心</p>
+						</a>
+					</li>
+
+                    {#if $isminiprogram#}
+					<li>
+						<a href="/supplier/job{#if $is_app#}?appFullScreen{#/if#}">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_9.png" alt=""></div>
+							<p>我要招人</p>
+						</a>
+					</li>
+					<li>
+						<a href="{#$member_userDomain#}/setting.html?module=job">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/job_10.png" alt=""></div>
+							<p>账号设置</p>
+						</a>
+					</li>
+                    {#/if#}
+
+					<li>
+						<a href="{#getUrlPath service='siteConfig' template='protocol' title='服务资质'#}">
+							<div class="icon"><img src="{#$templets_skin#}images/mcenter/zizhi_1.png" alt=""></div>
+							<p>服务资质</p>
+						</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+
+		{#include file='public_intention_pop.html' noDeirectShow="0" has_tip='，将同步到简历' #}
+
+	</div>
+	
+	{#include file="../../siteConfig/touch_bottom_5.0.html" active="fifthicon" bottom_module="job"#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/mcenter/index_job.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

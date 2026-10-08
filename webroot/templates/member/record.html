@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#$langData['siteConfig'][43][74]#} - {#$cfg_webname#}</title>{#* 我的账户 *#}
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/record.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/element_ui_index.css" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var atpage = 1, totalCount = 0, pageSize = 15;
+	var moduleList={#$moduleList|json_encode#};
+	var leimuarr={#$leimuarr|json_encode#};
+</script>
+</head>
+
+<body>
+	{#$pageTitle = $langData['siteConfig'][43][74]#}{#* 我的账户 *#}
+{#include file="top.html"#}
+
+<div class="wrap">
+	<div class="container fn-clear">
+
+		{#include file="sidebar.html"#}
+
+		<div class="main" id="main">
+
+			<ul class="main-tab">
+				<li class="curr"><a href="{#getUrlPath service='member' type='user' template='record'#}">{#$langData['siteConfig'][43][74]#}</a></li>{#* 我的账户 *#}
+                {#if 'deposit'|in_array:$cfg_ucenterLinks#}
+                <li><a href="{#getUrlPath service='member' type='user' template='deposit'#}">{#$langData['siteConfig'][19][292]#}</a></li>{#* 在线充值 *#}
+                {#/if#}
+                {#if 'withdraw'|in_array:$cfg_ucenterLinks#}
+				<li><a href="{#getUrlPath service='member' type='user' template='withdraw'#}">{#$langData['siteConfig'][19][293]#}</a></li>{#* 我要提现 *#}
+				<li><a href="{#getUrlPath service='member' type='user' template='withdraw_log'#}">{#$langData['siteConfig'][19][294]#}</a></li>{#* 提现记录 *#}
+                {#/if#}
+			</ul>
+			</ul>
+					<div id="app" class="contain" v-cloak>
+						<div class="topBar">
+							<div class="moneyInfo">
+								<div class="amount">
+									<span>{#$userinfo.money#}</span>
+									<span>可用余额({#echoCurrency type='short'#})</span>
+								</div>
+								<div class="line"></div>
+								<div class="allAmount">
+									<span>{{allIncome}}</span>
+									<span>总收入({#echoCurrency type='short'#})</span>
+								</div>
+							</div>
+							<div class="moneyButton">
+                                {#if 'deposit'|in_array:$cfg_ucenterLinks#}
+								<a href="deposit.html">
+									<div class="deposit">充值</div>
+								</a>
+                                {#/if#}
+                                {#if 'withdraw'|in_array:$cfg_ucenterLinks#}
+								<a href="withdraw.html">
+									<div class="withdraw">提现</div>
+								</a>
+                                {#/if#}
+							</div>
+						</div>
+						<div class="content fn-clear">
+							<div class="filterTab fn-clear">
+								<div class="left">
+									<span :class="{filterCurr:filterCurrBill==1}" @click='allBill'>全部</span>
+									<span :class="{filterCurr:filterCurrBill==2}" @click='incomeBill'>收入</span>
+									<span :class="{filterCurr:filterCurrBill==3}" @click='expenseBill'>支出</span>
+								</div>
+								<div class="right">
+									<div class="sj dateContentBox"
+										:class={filterRotate:isDateBoxCurr,filterCurrColor:isDateBoxCurr} @click='showDateDiv' ref="refDateBox">
+										<el-date-picker type="month" v-model='currDate' :default-value='currDate'
+											:editable='dateFlag' :clearable='dateFlag' placeholder="选择月份"
+											:picker-options="pickerOptions" ref="datePickerRef" @change='showDateBox'>
+										</el-date-picker>
+									</div>
+									<!-- 账单类型 CType-->
+									<div class="sj typeContentBox" @click='showCTypeBox' ref="refCTypeBox"
+										:class={filterRotate:isCTypeBoxCurr}>
+										<span :class={filterCurrColor:isCTypeBoxCurr}><em>{{currCType}}</em></span>
+										<transition name="fade">
+										<ul class="typeBox ctypeBox" v-show='isCTypeBox' ref='popupCTypeBox'>
+											<li v-for="(item,index) in cTypeData" @click='filterCType(item,index)'
+												:class="{filterCurrColor:index == cTypeColor}">{{item}}</li>
+										</ul>
+									</transition>
+									</div>
+									<!-- 账单来源 OrderType -->
+									<div class="sj typeContentBox" @click='showOrderTypeBox' ref="refOrderTypeBox"
+									:class={filterRotate:isOrderTypeBoxCurr}>
+									<span :class={filterCurrColor:isOrderTypeBoxCurr}><em>{{currOrderType}}</em></span>
+									<transition name="fade">
+									<ul class="typeBox orderTypeBox" v-show='isOrderTypeBox' ref='popupOrderTypeBox'>
+										<li v-for="(item,index) in orderTypeData" @click='filterOrderType(item,index)'
+											:class="{filterCurrColor:index == orderTypeColor}">{{item}}</li>
+									</ul>
+								</transition>
+									</div>
+									<div class="amountContentBox">
+										<div class="sj"
+											:class={filterRotate:isAmountBoxCurr,filterCurrColor:isAmountBoxCurr}
+											@click='showAmountBox' ref="refAmountBox">
+											<span>
+												<em v-show='!this.isDateFilter'>金额</em>
+												<em v-show='this.isDateFilter'>{#echoCurrency type='symbol'#}{{bottomAmount}}~{#echoCurrency type='symbol'#}{{topAmount}}</em>
+											</span>
+										</div>
+										<transition name="fade">
+										<div class="amountBox" v-show='isAmountBox' ref='popupAmountBox'>
+											<div class="tAmount">
+												<span>{#echoCurrency type='symbol'#}</span>
+												<input type="text" placeholder="最低金额" v-model='bottomAmount'
+													@focus='bottomAmountFocus'>
+											</div>
+											<div><span>-</span></div>
+											<div class="bAmount">
+												<span>{#echoCurrency type='symbol'#}</span>
+												<input type="text" placeholder="最高金额" v-model='topAmount'
+													@focus='topAmountFocus'>
+											</div>
+											<div class="submitAmount" @click='submitAmount'>
+												<span>{{this.isDateFilter?'取消筛选':'确定'}}</span>
+											</div>
+										</div>
+									</transition>
+									</div>
+								</div>
+							</div>
+							<div class="filterList fn-clear" v-loading="loading">
+								<div class="billTitle">
+									<div class="billDetaiTitle"><span>账单明细/来源</span></div>
+									<div class="billDateTitle"><span>时间</span></div>
+									<div class="billAmountTitle"><span>余额变化</span></div>
+									<div class="billBalanceTitle"><span>交易后余额</span></div>
+								</div>
+								<div class="billData" v-for="yearMonth in yearMonths" >
+									<div class="billTab fn-clear">
+										<div class="billDetaiTab">
+											<span>{{ formatYearMonth(yearMonth.month) }}</span>
+										</div>
+										<div class="billDateTab"></div>
+										<div class="billAmountTab">
+											<span>
+												<em>收入{#echoCurrency type='symbol'#}{{ yearMonth.totalIncome.toFixed(2) }}</em>
+												<em>&nbsp;|&nbsp;</em>
+												<em>支出{#echoCurrency type='symbol'#}{{ yearMonth.totalExpense.toFixed(2) }}</em>
+											</span>
+										</div>
+									</div>
+									<div class="billList fn-clear" v-for="item in yearMonth.items">
+										<div class="billDetailList">
+											<span :class="{nbspSpan:!formatOrderType(item)}" :title="item.info">{{formatOrderType(item)}}{{item.info}}</span>
+										</div>
+										<div class="billDateList">
+											<span>{{formatDate(item)}}</span>
+										</div>
+										<div class="billAmountList">
+											<span
+												:class="{'incomeColor':item.type==1}">{{formatType(item)}}{{item.amount}}</span>
+										</div>
+										<div class="billBalanceList">
+											<span>{{item.balance}}</span>
+										</div>
+									</div>
+								</div>
+								<div class="noData" v-show='isNoData'>暂无数据~</div>
+							</div>
+							<div class="paging" v-show='isPageNoData'>
+								<el-pagination
+									prev-text="上一页"
+									next-text="下一页"
+  									layout="prev, pager, next"
+  									:page-count="pageInfo.totalPage"
+									pager-count="5"
+									:current-page="pageInfo.page"
+									@current-change="pagingChange"
+									>
+								</el-pagination>
+							</div>
+						</div>
+					</div>
+
+		</div>
+	</div>
+</div>
+
+{#include file="footer.html"#}
+<script type="text/javascript" src="{#$templets_skin#}js/record.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

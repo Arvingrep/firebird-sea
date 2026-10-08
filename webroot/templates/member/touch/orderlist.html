@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+
+{#$pageTitle = $langData['siteConfig'][10][4]#}
+{#if $module == ''#}
+    {#if $state == '1'#}
+        {#$pageTitle = '待付款订单'#}
+    {#elseif $state == '2'#}
+        {#$pageTitle = '待消费订单'#}
+    {#elseif $state == '3'#}
+        {#$pageTitle = '待发货订单'#}
+    {#elseif $state == '4'#}
+        {#$pageTitle = '待收货订单'#}
+    {#elseif $state == '5'#}
+        {#$pageTitle = '待评价订单'#}
+    {#elseif $state == '6'#}
+        {#$pageTitle = '待分享订单'#}
+    {#elseif $state == '7'#}
+        {#$pageTitle = '退款售后订单'#}
+    {#/if#}
+{#/if#}
+
+<title>{#$pageTitle#}</title>
+<meta name="apptitle" content="{#$pageTitle#}">
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/order.css?v={#$cfg_staticVersion#}" media="all" />
+{#if $module=='integral'#}
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/order_integral.css?v={#$cfg_staticVersion#}" media="all" />
+{#/if#}
+{#if $module=='homemaking' || $module=='travel' || $module=='education' || $module=='awardlegou'#}
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/order-{#$module#}.css?v={#$cfg_staticVersion#}" media="all" />
+{#/if#}
+
+{#if $module=='waimai'#}
+<link rel="stylesheet" href="{#$templets_skin#}css/order-wamai_2.css?v={#$cfg_staticVersion#}">
+{#/if#}
+{#if $state == ''#}{#$state = $smarty.get.state#}{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}', templateSkin = '{#$templets_skin#}';
+	var hideFileUrl = {#$cfg_hideUrl#}, state = '{#$state#}';
+	var atpage = 1, totalCount = 0, pageSize = 15;
+	var cookiePre = '{#$cfg_cookiePre#}';
+	var module = '{#$module#}';
+	var type = '{#$type#}';
+	var pointName = '{#$cfg_pointName#}';
+	var tuanQR = '{#$cfg_basehost#}/include/qrcode.php?data=';
+
+    {#if $module=='homemaking' || !$module#}
+	var homemakingEditUrl = '{#getUrlPath service="member" type="user" template="orderdetail" action="homemaking" id="%id%"#}';
+	var homemakingcancelUrl = '{#getUrlPath service="member" type="user" template="homemaking-cancel" id="%id%"#}';
+	var homemakingRepairUrl = '{#getUrlPath service="member" type="user" template="homemaking-repair" id="%id%"#}';
+    var dispatchid={#$personalId|default:0#};
+    {#else#}
+    var dispatchid=0;
+    {#/if#}
+</script>
+</head>
+<body>
+ 
+  <!-- 头部 s -->
+  <div class="header">
+    <div class="header-l">
+      <a href="javascript:;" onclick="history.go(-1)" class="goBack"><img src="{#$templets_skin#}images/header_back.png"></a>
+    </div>
+    <div class="header-c">
+    	{#if $module == 'business'#}
+    	{#if $type == 'diancan'#}
+    	{#$typename = $langData['siteConfig'][16][5]#}
+    	{#elseif $type == 'dingzuo'#}
+    	{#$typename = $langData['siteConfig'][16][6]#}
+    	
+    	{#elseif $type == 'paidui'#}
+    	{#$typename = $langData['siteConfig'][16][7]#}
+    	{#elseif $type == 'maidan'#}
+		{#$typename = $langData['siteConfig'][16][8]#}
+    	{#/if#}
+		
+    	<!--改动1-->
+    	<span class="orderbtn">{#$typename#}{#$langData['siteConfig'][19][690]#}</span>
+    	{#else#}
+
+		<span class="orderbtn">
+            {#if $module == ""#}
+                {#$langData['siteConfig'][10][0]#}{#$langData['siteConfig'][19][359]#}
+            {#else#}
+                {#getModuleTitle name=$module#}
+            {#/if#}
+        </span>
+
+    	{#/if#}
+    </div>
+    <div class="header-r"></div>
+  </div>
+  <!-- 头部 e -->
+
+	{#if $module == ""#}
+	<div class="tabList">
+		<ul class="tab-ul order">
+
+            {#loop service="siteConfig" action="siteModule" return="mod"#}
+                
+                {#if $mod.code == "tuan"#}
+                <li class="tab-li tuan-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='tuan'#}" data-module="mcenter" data-temp="order" data-param="mod=tuan" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+
+                {#if $mod.code == "shop"#}
+                <li class="tab-li shop-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='shop'#}" {#if $state != 7#}data-module="mcenter" data-temp="order" data-param="mod=shop" class="toMini"{#/if#}> 
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+
+                {#if $mod.code == "waimai"#}
+                <li class="tab-li waimai-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='waimai'#}" data-module="mcenter" data-temp="order" data-param="mod=waimai" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                <li class="tab-li paotui-li">
+
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='paotui'#}" data-module="mcenter" data-temp="order" data-param="mod=paotui" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$templets_skin#}images/orderimag/paotui.png"></span>
+                            <span>{#$langData['siteConfig'][16][49]#}{#$langData['siteConfig'][19][359]#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+
+                {#if $mod.code == "integral"#}
+                <li class="tab-li integral-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='integral'#}" data-module="mcenter" data-temp="order" data-param="mod=integral" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+
+                {#if $mod.code == "homemaking"#}
+                <li class="tab-li homemaking-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='homemaking'#}" data-module="mcenter" data-temp="order" data-param="mod=homemaking" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+
+                {#if $mod.code == "travel"#}
+                <li class="tab-li travel-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='travel'#}" data-module="mcenter" data-temp="order" data-param="mod=travel" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+
+                {#if $mod.code == "paimai"#}
+                <li class="tab-li paimai-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='paimai'#}" data-module="mcenter" data-temp="order" data-param="mod=paimai" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+
+                {#if $mod.code == "education"#}
+                <li class="tab-li education-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='education'#}" data-module="mcenter" data-temp="order" data-param="mod=education" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+                
+                {#if $mod.code == "awardlegou"#}
+                <li class="tab-li awardlegou-li">
+                    <a href="{#getUrlPath service='member' type='user' template='order' module='awardlegou'#}" data-module="mcenter" data-temp="order" data-param="mod=awardlegou" class="toMini">
+                        <div class="left_tab">
+                            <span class="li-icon"><img src="{#$mod.icon#}"></span>
+                            <span>{#getModuleTitle name=$mod.code#}</span>
+                        </div>
+                        <div class="right_tab">
+                            <i class="r-arrow"></i>
+                        </div>
+                        <div class="right_number">0</div>
+                    </a>
+                </li>
+                {#/if#}
+
+            {#/loop#}
+
+			{#if 'food'|in_array:$cfg_ucenterLinks#}
+            <li class="tab-li business-order">
+				<a href="{#getUrlPath service='member' type='user' template='order' module='business' param='type=paidui'#}">
+					<div class="left_tab">
+						<span class="li-icon"><img src="/static/images/business/paidui.png"></span>
+						<span>{#$langData['siteConfig'][16][7]#}{#$langData['siteConfig'][19][690]#}</span>
+					</div>
+					<div class="right_tab">
+						<i class="r-arrow"></i>
+					</div>
+				</a>
+			</li>
+            <li class="tab-li business-order">
+				<a href="{#getUrlPath service='member' type='user' template='order' module='business' param='type=maidan'#}">
+					<div class="left_tab">
+						<span class="li-icon"><img src="/static/images/business/maidan.png"></span>
+						<span>{#$langData['siteConfig'][16][8]#}{#$langData['siteConfig'][19][690]#}</span>
+					</div>
+					<div class="right_tab">
+						<i class="r-arrow"></i>
+					</div>
+				</a>
+			</li>
+			<li class="tab-li business-order">
+				<a href="{#getUrlPath service='member' type='user' template='order' module='business' param='type=diancan'#}">
+					<div class="left_tab">
+						<span class="li-icon"><img src="/static/images/business/diancan.png"></span>
+						<span>{#$langData['siteConfig'][16][5]#}{#$langData['siteConfig'][19][690]#}</span>
+					</div>
+					<div class="right_tab">
+						<i class="r-arrow"></i>
+					</div>
+				</a>
+			</li>
+			<li class="tab-li business-order">
+				<a href="{#getUrlPath service='member' type='user' template='order' module='business' param='type=dingzuo'#}">
+					<div class="left_tab">
+						<span class="li-icon"><img src="/static/images/business/dingzuo.png"></span>
+						<span>{#$langData['siteConfig'][16][6]#}{#$langData['siteConfig'][19][690]#}</span>
+					</div>
+					<div class="right_tab">
+						<i class="r-arrow"></i>
+					</div>
+				</a>
+			</li>
+			{#/if#}
+		</ul>
+        {#if $personalId#}
+        <a href="{#getUrlPath service='member' type='user' template='homemaking-courierorder' param="state=10"#}" class="t-service">
+            <div class="ts-left">
+                <img src="{#$templets_skin#}images/orderimag/waimai.png">
+                <span>我的服务单</span>
+            </div>
+            <div class="ts-right">
+                <span>0</span>
+            </div>
+        </a>
+        {#/if#}
+	</div>
+	{#else if $module != waimai && $module !='shop'#}
+	{#if $type=='out'#}
+	{#include file="order-infoout.html"#}
+	{#else#}
+	{#include file="order-$module.html"#}
+	{#/if#}
+	<div class="no-data">
+		<img src="{#$templets_skin#}images/orderimag/nodata.jpg" />
+		<p class="msg">{#$langData['siteConfig'][41][32]#}~</p> {#* 这里空空如也  *#}
+	</div>
+	<div class="list {#$module#} {#if !$proquanres && $module == shop#}shopNoquanlist {#/if#}" id="list" >
+
+
+	</div>
+	{#else if $module == 'waimai'#}
+	{#include file="order-waimai.html"#}
+	{#else#}
+	{#include file="order-shop.html"#}
+	{#/if#}
+
+
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+{#if $module != 'business' && $module != 'waimai' && $module != 'homemaking' && $module != 'travel' && $module != 'education'#}
+<script type="text/javascript" src="{#$templets_skin#}js/order.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+{#if $module != ""#}
+{#if $module == "business"#}
+<script type="text/javascript" src="{#$templets_skin#}js/order-{#$module#}.js?v={#$cfg_staticVersion#}"></script>
+{#else#}
+<script type="text/javascript" src="{#$templets_skin#}js/order-{#$module#}{#$type#}.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+{#/if#}
+</body>
+</html>

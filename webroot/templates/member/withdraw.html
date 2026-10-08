@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#$langData['siteConfig'][19][716]#} - {#$cfg_webname#}</title>{#* 申请提现 *#}
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/withdraw.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/element_ui_index.css" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var money = {#$userinfo.money#}, withdrawLog = '{#getUrlPath service="member" type="user" template="withdraw_log_detail" id="%id%"#}';
+	var minWithdraw = {#$minWithdraw#}, maxWithdraw = {#$maxWithdraw#}, withdrawFee = {#$withdrawFee#};
+	var from = '{#$from#}';
+	var memberDomain = '{#$member_userDomain#}';
+	var totalCanWithdrawn = {#$totalCanWithdrawn#}, moneyRegGivingWithdraw = {#$cfg_moneyRegGivingWithdraw#};
+
+	var withdrawJfFee = {#$cfg_withdrawJfFee|default:0#};  //提现扣除积分比例
+	var BindWeixin='{#$alreadyBindWeixin#}';
+	var bankConfig={#$bankConfig|json_encode#};
+
+    var currType = {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform)#}2{#elseif $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}0{#elseif $withdrawPlatform && in_array('bank', $withdrawPlatform)#}1{#else#}''{#/if#};
+</script>
+</head>
+
+<body>
+{#$pageTitle = $langData['siteConfig'][19][716]#}{#* 申请提现 *#}
+{#include file="top.html"#}
+
+<div class="wrap">
+	<div class="container fn-clear">
+
+		{#include file="sidebar.html"#}
+
+		<div class="main">
+
+			<ul class="main-tab">
+				<li><a href="{#getUrlPath service='member' type='user' template='record'#}">{#$langData['siteConfig'][43][74]#}</a></li>{#* 我的账户 *#}
+				<li><a href="{#getUrlPath service='member' type='user' template='deposit'#}">{#$langData['siteConfig'][19][292]#}</a></li>{#* 在线充值 *#}
+				<li class="curr"><a href="{#getUrlPath service='member' type='user' template='withdraw'#}">{#$langData['siteConfig'][19][293]#}</a></li>{#* 我要提现 *#}
+				<li><a href="{#getUrlPath service='member' type='user' template='withdraw_log'#}">{#$langData['siteConfig'][19][294]#}</a></li>{#* 提现记录 *#}
+			</ul>
+					<div id="app" class="contain" v-cloak>
+						<div class="tip">
+                            {#$withdrawNote#}
+						</div>
+						<dl class="fn-clear">
+							<dt>我的余额：</dt>
+							<dd class="price">{#echoCurrency type='symbol'#}<em>{{allAmount}}</em></dd>
+						</dl>
+						<dl class="fn-clear">
+							<dt>提现金额：</dt>
+							<dd class="amount">
+								<div>
+									<span>{#echoCurrency type='symbol'#}</span>
+									<input type="number" :placeholder="placeholderText" v-model='amountNum'
+										@input="changeAmount">
+								</div>
+								<span class="allWithdraw" @click='allWithdraw'>全部提现</span>
+							</dd>
+						</dl>
+						<dl class="fn-clear">
+							<dt>&nbsp;</dt>
+							<dd class="rate">
+								<em v-show='!changeRateColor'>提现手续费{{withdrawFee}}%</em>
+								<span v-show='changeRateColor'>提现手续费<em class='rateColor'>{#echoCurrency type='symbol'#}{{rate}}</em></span>
+							</dd>
+						</dl>
+						<dl class="fn-clear">
+							<dt>提现至：</dt>
+							<dd class="withdrawWay" style="overflow:unset;margin-left: 95px;">
+                                {#if $withdrawPlatform && in_array('weixin', $withdrawPlatform)#}
+								<span :class="{curr: curr== 2}" @click='selectWithdrawWay(2)'>微信</span>
+                                {#/if#}
+                                {#if $withdrawPlatform && in_array('alipay', $withdrawPlatform)#}
+								<span :class="{curr: curr== 0}" @click='selectWithdrawWay(0)'>支付宝</span>
+                                {#/if#}
+                                {#if $withdrawPlatform && in_array('bank', $withdrawPlatform)#}
+								<span :class="{curr: curr== 1}" @click='selectWithdrawWay(1)'>银行卡</span>
+                                {#/if#}
+								<span v-show='withdrawWay ==0 || withdrawWay==1' class="record" ref="historyButton"
+									@click="historyClick"><em>历史记录</em></span>
+								<!-- 历史记录弹出框 -->
+								<div class="historyList" v-show='showHistory && (withdrawWay ==0 || withdrawWay ==1)'
+									@mouseover='showHistory=true' @mouseout='showHistory=false' ref="historyPopup">
+									<!-- 支付宝账号历史记录 -->
+									<ul v-if='withdrawWay==0'>
+										<li v-for="(item,index) in historyData.alipay">
+											<div @click='selectAccount(item)'>
+												<span>{{formatWithdrawWay(item)}}</span>
+												<span>{{item.cardname}}({{item.cardnum}})</span>
+											</div>
+											<span class="deleteAccount" @click='deleteAccount(item)'></span>
+										</li>
+										<span class="noData" v-show='isAlipayNoData'>没有更多数据~</span>
+									</ul>
+									<!-- 银行卡账号历史记录 -->
+									<ul v-if='withdrawWay==1'>
+										<li v-for="(item,index) in historyData.bank">
+											<div @click='selectAccount(item)'>
+												<span>{{formatWithdrawWay(item)}}</span>
+												<span>{{item.cardname}}({{item.cardnum.slice(-4)}})</span>
+											</div>
+											<span class="deleteAccount" @click='deleteAccount(item)'></span>
+										</li>
+										<span class="noData" v-show='isBankNoData'>没有更多数据~</span>
+									</ul>
+								</div>
+							</dd>
+						</dl>
+						<!-- <dl class="weixin fn-clear" v-show='withdrawWay ==2 '>
+							<dt>绑定微信：</dt>
+							<dd>
+								<input type="text" value="{#$userinfo.nickname#}" disabled>
+							</dd>
+						</dl> -->
+						<dl class="alipay fn-clear" v-show='withdrawWay ==0'>
+							<dt>支付宝账号：</dt>
+							<dd>
+								<input type="text" v-model='alipayData.cardnum' maxlength='20'>
+							</dd>
+							<dt>收款人姓名：</dt>
+							<dd>
+								<input type="text" v-model='alipayData.cardname' maxlength='8'>
+							</dd>
+						</dl>
+						<dl class="bank fn-clear" v-show='withdrawWay ==1'>
+							<dt>选择银行：</dt>
+							<dd style="overflow:unset;margin-left: 95px;">
+								<div class="selectBank" ref="bankContentButton" @click="bankContentClick">
+									<span :class="{noBank:bankData.bank=='请选择'}">{{bankData.bank}}</span>
+								</div>
+								<!-- 选择银行弹出框 -->
+								<div class="selectBankContent" v-show='showBankContent && withdrawWay ==1'
+									@mouseover='showBankContent=true' @mouseout='showBankContent=false'
+									ref="bankContentPopup">
+									<ul>
+										<li v-for="(name,code) in bankNameData" @click='selectBankName(name,code)'>
+											<img :src=`/static/images/bank/${code}.png` alt="">
+											<span>{{name}}</span>
+										</li>
+									</ul>
+								</div>
+							</dd>
+							<dt>开户行：</dt>
+							<dd>
+								<input type="text" v-model='bankData.bankName' maxlength='20'>
+							</dd>
+							<dt>银行卡号：</dt>
+							<dd>
+								<input type="text" v-model='bankData.cardnum' maxlength='20'>
+							</dd>
+							<dt>开户人姓名：</dt>
+							<dd>
+								<input type="text" v-model='bankData.cardname' maxlength='8'>
+							</dd>
+						</dl>
+						<dl class="fn-clear">
+							<dt>&nbsp;</dt>
+							<dd>
+								<label>
+									<input type="checkbox" v-model='isChecked'>
+									<span>同意并接受</span>
+								</label>
+								<a href="{#getUrlPath service='siteConfig' template='protocol' title='提现服务协议'#}" target="_blank">《{#$cfg_shortname#}{#$langData['siteConfig'][12][2]#}》</a>
+							</dd>
+						</dl>
+						<dl class="fn-clear">
+							<dt>&nbsp;</dt>
+							<dd>
+								<button class="submit" @click=submitBtn :disabled="isBtnDisabled">{{btnText}}</button>
+							</dd>
+						</dl>
+
+						<div class="wxQrPopBox">
+							<div class="wxQrMask" v-if="withdrawPop"></div>
+							<div :class="`wxQrPop ${withdrawPop ? 'show' : ''}`">
+								<div class="close_pop" @click="withdrawPop = false"></div>
+								<div class="pop_header">请使用微信扫码提现</div>
+								<div class="pop_con">
+									<div class="qrBox">
+										<img :src="`/include/qrcode.php?data=${encodeURIComponent(withdrawUrl)}`" alt="">
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+		</div>
+
+
+		
+	</div>
+</div>
+
+{#include file="footer.html"#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.inputmask.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/inputmask.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/withdraw.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

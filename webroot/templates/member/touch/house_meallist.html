@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{#$langData['siteConfig'][41][6]#}</title>   {#*套餐服务 *#}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/house_meallist.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+  var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+  var hideFileUrl = 0;
+  var module = 'house', atpage = 1, totalCount = 0, pageSize = 10, state = '', type = 'sale';
+  var totalBalance = {#$userinfo.money|string_format:"%.2f"#};
+  var service = 'house';
+  var type_ = '{#$type#}', item_ = '{#$item#}', upgrade = {#$upgrade#};
+</script>
+</head>
+
+<body>
+{#$pageTitle = "{#$langData['siteConfig'][41][6]#}"#}   {#*套餐服务 *#}
+{#$pageRight = '<a href="javascript:;" class="notMenu"> </a>'#}
+{#include file="top.html"#}
+
+<ul class="type">
+  {#$n = 0#}
+  {#foreach from=$zjuserPriceCost item=cost key=key#}
+  <li{#if $n == 0#} class="active"{#/if#} data-type="{#$key#}">{#$cost.name#}</li>
+  {#$n = $n + 1#}
+  {#/foreach#}
+</ul>
+<div class="listWrap">
+  {#$n = 0#}
+  {#foreach from=$zjuserPriceCost item=cost key=key#}
+  <ul class="listbox fn-clear{#if $n == 0#} active{#/if#}">
+    {#$s = 0#}
+    {#foreach from=$cost.list item=item key=k#}
+    <li class="item item_{#$k#}{#if $s == 0#} active{#/if#}" data-price="{#$item.price#}" data-item="{#$k#}">
+      <div class="con">
+        <p class="time">{#$item.time#}{#$langData['siteConfig'][40][96]|replace:'1':''#}</p> {#*1个月 *#}
+        {#*房源   刷新   置顶*#}
+        <p class="des"><span>{#$langData['siteConfig'][16][26]#}：<font>{#$item.house#}</font></span><span>{#$langData['siteConfig'][16][70]#}：<font>{#$item.refresh#}</font></span><span>{#$langData['siteConfig'][19][762]#}：<font>{#$item.settop#}</font></span></p>
+
+        <p class="price">{#echoCurrency type='symbol'#}<font>{#$item.price#}</font></p>
+      </div>
+      <span class="selected"><i></i></span>
+    </li>
+    {#$s = $s + 1#}
+    {#/foreach#}
+  </ul>
+  {#$n = $n + 1#}
+  {#/foreach#}
+</div>
+
+<!-- 支付 -->
+<dl class="rtSett fn-clear">
+  {#if $userinfo.money > 0#}
+  <dd class="fn-clear">
+    <div class="rtPay">{#$langData['siteConfig'][19][329]#}：<small>￥</small><strong class="pay-total">0.00</strong></div>{#*实际支付*#}
+  </dd>
+  {#/if#}
+</dl>
+
+<!-- 选择支付方式 s -->
+<div class="refreshTopPaybox">
+  <div class="tit">{#$langData['siteConfig'][6][93]#}</div>
+  <ul>
+    {#$paytype = ""#}
+    {#siteConfig action="payment"#}
+    {#if $_bindex.row == 1#}
+    {#$paytype = {#$row.pay_code#}#}
+    {#/if#}
+    {#if $row.pay_code == "wxpay"#}
+    <li id="wxpay" class="wxpay{#if $_bindex.row == 1#} on{#/if#}" data-type="wxpay">{#$row.pay_name#} <i class="radio"></i></li>
+    {#elseif $row.pay_code == "globalalipay"#}
+    <li id="globalalipay" class="alipay{#if $_bindex.row == 1#} on{#/if#}" data-type="globalalipay">{#$row.pay_name#} <i class="radio"></i></li>
+    {#elseif $row.pay_code == "alipay"#}
+    <li id="alipay" class="alipay{#if $_bindex.row == 1#} on{#/if#}" data-type="alipay">{#$row.pay_name#} <i class="radio"></i></li>
+    {#elseif $row.pay_code == "paypal"#}
+    <li id="paypal" class="paypal{#if $_bindex.row == 1#} on{#/if#}" data-type="paypal">{#$row.pay_name#} <i class="radio"></i></li>
+    {#/if#}
+    {#/siteConfig#}
+  </ul>
+  <a href="javascript:;" class="paybtn">{#$langData['siteConfig'][6][42]#}</a>{#*确认支付*#}
+</div>
+<div class="refreshTopMask"></div>
+<!-- 选择支付方式 e -->
+
+<form action="/include/ajax.php" id="payForm" method="get">
+  <input type="hidden" name="service" id="service" value="house">
+  <input type="hidden" name="action" id="action" value="buyZjuserMeal">
+  <input type="hidden" name="paytype" id="paytype" value="{#$paytype#}">
+  <input type="hidden" name="type" id="type" value="0">
+  <input type="hidden" name="item" id="item" value="0">
+  <input type="hidden" name="ordernum" id="ordernum" value="">
+  <input type="hidden" name="useBalance" id="useBalance" value="1">
+  <a href="javascript:;" class="buy {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}">{#$langData['siteConfig'][18][35]#}</a>{#*立即购买*#}
+</form>
+
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script src="{#$templets_skin#}js/house_meallist.js?{#$cfg_staticVersion#}"></script>
+</body>
+</html>

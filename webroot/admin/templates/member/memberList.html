@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>会员列表</title>
+{#$cssFile#}
+<style>
+.list td {font-size: 15px;}
+.list td small {font-size: 90%;}
+.thead li{font-size: 14px;}
+.thead li .moneyA,.thead li .pointA,.thead li .bonusA,.thead li .recomdA{color: #999;text-decoration: none;}
+.thead li .moneyA.curr,.thead li .pointA.curr,.thead li .bonusA.curr,.thead li .recomdA.curr{color: #2672ec;}
+.thead li .moneyA i,.thead li .pointA i,.thead li .bonusA i,.thead li .recomdA i{display: inline-block;width: 18px;height: 20px;background: url(/static/images/ui/chosen-sprite.png) no-repeat -2px 3px;margin-left: 2px;}
+.thead li .moneyA.up i,.thead li .pointA.up i,.thead li .bonusA.up i,.thead li .recomdA.up i{background: url(/static/images/ui/chosen-sprite.png) no-repeat -20px 3px;}
+.uaccount {padding: 0px 4px; margin-right: 3px; display: inline-block; line-height: 16px; vertical-align: middle; margin-top: -1px; color: #b1b1b1; width: 35px; text-align-last: justify;}
+</style>
+</head>
+<body>
+<div class="search">
+  <label>搜索：</label>
+   <div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value=""></div>
+  <select class="chosen-select" id="ctype" style="width: 95px;">
+    <option value="">会员类型</option>
+    <option value="">全部</option>
+    <option value="1">个人</option>
+    <option value="2">企业</option>
+  </select>
+  <select class="chosen-select" id="clevel" style="width: 110px;">
+    <option value="">会员等级</option>
+    <option value="">所有等级</option>
+    <option value="0">普通会员</option>
+    {#foreach from=$levelList item=level#}
+    <option value="{#$level.id#}">{#$level.name#}</option>
+    {#/foreach#}
+  </select>
+  <select class="chosen-select" id="regfrom" style="width: 110px;">
+    <option value="">注册来源</option>
+    <option value="">全部来源</option>
+    {#foreach from=$regFromList key=code item=name#}
+    <option value="{#$code#}">{#$name#}</option>
+    {#/foreach#}
+  </select>
+  &nbsp;&nbsp;注册日期&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期">&nbsp;&nbsp;到&nbsp;&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期">&nbsp;&nbsp;
+  <div style="display: inline-flex; align-items: center; width: auto;">
+    <select style="width: auto; border-right: 0; border-radius: 4px 0 0 4px; border-color: #dcdfe6;" name="searchType" id="searchType">
+      <option value="uid">用户ID</option>
+      <option value="uname">用户名</option>
+      <option value="nickname">昵称</option>
+      <option value="realname">真实姓名</option>
+      <option value="idcard">身份证号</option>
+      <option value="email">Email</option>
+      <option value="phone">手机号</option>
+      <option value="regip">注册ip</option>
+      <option value="company">公司名称</option>
+    </select>
+    <input class="input-large" style="border-radius: 0 4px 4px 0!important;" type="search" id="keyword" placeholder="请输入关键字" title="输入关键词进行搜索">
+  </div>
+
+  <!-- <input class="input-large" type="search" id="keyword" placeholder="请输入关键字，指定用户#123" title="输入#用户ID，可以快速搜索"> -->
+  <div style="padding-top: 5px;">
+      <label>余额：</label> <input class="input-mini" type="text" id="samount" placeholder="金额">&nbsp;&nbsp;-&nbsp;&nbsp;<input class="input-mini" type="text" id="eamount" placeholder="金额">&nbsp;&nbsp;
+      &nbsp;&nbsp;积分：<input class="input-mini" type="text" id="spoint" placeholder="数值">&nbsp;&nbsp;-&nbsp;&nbsp;<input class="input-mini" type="text" id="epoint" placeholder="数值">&nbsp;&nbsp;
+      &nbsp;&nbsp;{#$payname#}：<input class="input-mini" type="text" id="sbonus" placeholder="数值">&nbsp;&nbsp;-&nbsp;&nbsp;<input class="input-mini" type="text" id="ebonus" placeholder="数值">&nbsp;&nbsp;
+      <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>&nbsp;&nbsp;
+      <a href="memberList.php?dopost=getList&do=export" id="export" class="btn btn-warning">导出会员数据</a>
+  </div>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="selectBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="1">全选</a></li>
+        <li><a href="javascript:;" data-id="0">不选</a></li>
+      </ul>
+    </div>
+    <button class="btn" id="delBtn">删除</button>
+    <div class="btn-group" id="stateBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="totalCount">...</span>)<span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="0">未审核(<span class="totalGray">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="1">正常(<span class="normal">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="2">审核拒绝(<span class="lock">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="online">在线(<span class="online">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="qiyeweikt">企业未开店铺(<span class="qiyeweikt">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="3">已关注微信公众号(<span class="wechat_subscribe">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="4">未关注微信公众号(<span class="nowechat_subscribe">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="5">机器人(<span class="totalRobot">...</span>)</a></li>
+        <li class="divider"></li>
+        <li><a href="javascript:;" data-id="noopr">余额统计(<span class="allmoney">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="noopr">积分统计(<span class="allPoint">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="noopr">{#$payname#}统计(<span class="allBonus">...</span>)</a></li>
+      </ul>
+    </div>
+    <div class="btn-group" id="pendBtn"{#if $notice && !$off && !$nicknameAudit && !$photoAudit && !$personalAuth && !$companyAuth#} data-id="0"{#/if#}{#if $personalAuth#} data-id="1"{#/if#}{#if $companyAuth#} data-id="2"{#/if#}{#if $off#} data-id="3"{#/if#}{#if $nicknameAudit#} data-id="4"{#/if#}{#if $photoAudit#} data-id="5"{#/if#}>
+      <button class="btn dropdown-toggle" data-toggle="dropdown">{#if $personalAuth#}个人实名待认证{#elseif $companyAuth#}公司待认证{#elseif $off#}账户注销{#elseif $nicknameAudit#}昵称审核{#elseif $photoAudit#}头像审核{#else#}待办事项{#/if#}(<span class="{#if $off#}cancellation{#elseif $personalAuth#}pendPerson{#elseif $companyAuth#}pendCompany{#elseif $nicknameAudit#}nicknameAudit{#elseif $photoAudit#}photoAudit{#else#}totalPend{#/if#}">...</span>)<span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="0">全部待办信息(<span class="totalPend">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="1">个人实名待认证(<span class="pendPerson">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="2">公司待认证(<span class="pendCompany">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="3">账户注销(<span class="cancellation">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="4">昵称审核(<span class="nicknameAudit">...</span>)</a></li>
+        <li><a href="javascript:;" data-id="5">头像审核(<span class="photoAudit">...</span>)</a></li>
+      </ul>
+    </div>
+    <a href="javascript:;" id="updateAccount" class="btn">更新账户余额</a>
+    <a href="memberList.php?dopost=Add" class="btn btn-primary" id="addNew">添加会员</a>
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row3">&nbsp;</li>
+  <li class="row6 left">类型</li>
+  <li class="row20 left">用户名/昵称</li>
+  <li class="row15 left">真名/公司名/<a href="javascript:;" class="recomdA" title="按推荐人数从多到少排序">推荐人数<i></i></a></li>
+  <li class="row13 left">邮箱/电话</li>
+  <li class="row13 left"><a href="javascript:;" class="moneyA">余额<i></i></a>/&nbsp;<a href="javascript:;" class="pointA">积分<i></i></a>/&nbsp;<a href="javascript:;" class="bonusA">{#$payname#}<i></i></a></li>
+  <li class="row12 left">注册/上次登录</li>
+  <li class="row10">状态</li>
+  <li class="row8">操作</li>
+</ul>
+
+<div class="list common mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<script id="updateAccountHtml" type="text/html">
+    <form action="" class="quick-editForm" name="editForm">
+      <dl class="clearfix">
+        <dt>操作范围：</dt>
+        <dd class="clearfix">
+            <label><input type="radio" name="fanwei" value="0" checked />系统所有会员&nbsp;&nbsp;<small style="color: red;" title="容易造成超时，导致一部分成功，一部分失败，操作前先设置好PHP的超时时间为不限制！">会员多时不建议使用！</small></label><br />
+            <label><input type="radio" name="fanwei" value="1" />符合筛选条件的会员</label><br />
+            <label><input type="radio" name="fanwei" value="2" />已选择的会员</label>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>操作账户：</dt>
+        <dd class="clearfix">
+            <label><input type="radio" name="account" value="money" checked />余额</label>&nbsp;&nbsp;
+            <label><input type="radio" name="account" value="point" />积分</label>&nbsp;&nbsp;
+            <label><input type="radio" name="account" value="bonus" />{#$payname#}</label>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>操作内容：</dt>
+        <dd class="clearfix">
+            <label><input type="radio" name="oper" value="1" checked />增加</label>&nbsp;&nbsp;
+            <label><input type="radio" name="oper" value="0" />减少</label>
+            <input type="number" min="0" class="input-mini" id="updateAccountAmount" name="amount" placeholder="金额" />
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>操作说明：</dt>
+        <dd><input type="text" id="updateAccountNote" name="note" placeholder="" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>变动提醒：</dt>
+        <dd class="clearfix">
+            <label><input type="radio" name="notify" value="1" checked />发送</label>&nbsp;&nbsp;
+            <label><input type="radio" name="notify" value="0" />不发送</label>
+        </dd>
+      </dl>
+    </form>
+</script>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="stype"></span>
+  <span id="start"></span>
+  <span id="end"></span>
+  <span id="startmoney"></span>
+  <span id="endmoney"></span>
+  <span id="startpoint"></span>
+  <span id="endpoint"></span>
+  <span id="startbonus"></span>
+  <span id="endbonus"></span>
+  <span id="orderMoney"></span>
+  <span id="orderPoint"></span>
+  <span id="orderBonus"></span>
+  <span id="recomdOrder"></span>
+</div>
+
+<script>
+var adminPath = "{#$adminPath#}";
+var is_cancellation = '{#$is_cancellation#}';
+var cityList = {#json_encode($cityArr)#};
+var pointname = '{#$cfg_pointName#}', payname = '{#$payname#}';
+var fenxiaoName = '{#$cfg_fenxiaoName#}';
+</script>
+
+{#$jsFile#}
+</body>
+</html>

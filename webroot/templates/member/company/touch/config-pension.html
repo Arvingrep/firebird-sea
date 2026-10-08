@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>{#$langData['siteConfig'][19][443]|cat:" - "|cat:$cfg_webname#}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+<link href="{#$templets_skin#}css/mobiscroll.css" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}../../touch/css/gz-fabu.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/config-pension.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.deferred.js" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+  var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+  var hideFileUrl = {#$cfg_hideUrl#};
+  var modelType = '{#$module#}', state = '{#$state#}', type = '{#$type#}';
+  var service = '{#$module#}';
+  var thumbSize = {#$thumbSize#}, thumbType = '{#$thumbType#}', atlasSize = {#$atlasSize*1024*1024#}, atlasType = '{#$atlasType#}', atlasMax = {#$storeatlasMax#};
+    var siteCityInfo_lng = "{#$siteCityInfo['lng']#}";
+    var siteCityInfo_lat = "{#$siteCityInfo['lat']#}";
+    var cfg_cityInfo = '{#$siteCityInfoArr#}';
+	var addAddress = `{#getUrlPath service='member' type="user" template='mapPosi'#}`; //2023.12.21修改
+</script>
+<style>
+	html, body {height: 100%;}
+	#fabuForm {padding-bottom: 1rem; padding-bottom: calc(1rem + constant(safe-area-inset-bottom));}
+	.tjBtn {position: fixed; left: 0; bottom: 0; width: 100%; height: 1rem; z-index: 9999;}
+	.tjBtn a {display: block; line-height: 1rem; background: #129bf0; text-align: center; font-size: .4rem; color: #fff;}
+</style>
+</head>
+<body>
+{#$pageTitle = $langData['siteConfig'][19][443]#}
+<div class="gz-address">
+	<div class="gz-addr-wrap mask_box" id="gzAddNewObj">
+		{#if $do == "edit"#}
+		{#$pageRight_ = "<a href='javascript:;'>"|cat:$langData['siteConfig'][6][151]|cat:"</a>"#}
+		{#else#}
+		{#$pageRight_ = "<a href='javascript:;'>"|cat:$langData['siteConfig'][6][151]|cat:"</a>"#}
+		{#/if#}
+		{#$pageRight = "<a href='javascript:;' class='notMenu'></a>"#}
+		{#include file="../../../siteConfig/touch_top.html"#}
+
+		<link rel="stylesheet" href="{#$templets_skin#}css/mobiscroll.css">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+		<script type="text/javascript" src="{#$templets_skin#}js/mobiscroll.js"></script>
+        {#if $storeState#}
+            {#if $detail_state == 0#}
+            <p class="state0">{#$langData['siteConfig'][27][25]#}</p>
+            {#elseif $detail_state == 2#}
+            <p class="state0">{#$langData['siteConfig'][16][164]#}：{#$detail_refuse#}</p>
+            {#/if#}
+        {#/if#}
+		<div class="nav_tab fn-clear">
+			<ul>
+				<li class="navBC">{#$langData['siteConfig'][19][22]#}</li>
+				<li>{#$langData['siteConfig'][42][46]#}</li>  {#* 费用详细 *#}
+				<li>{#$langData['siteConfig'][42][73]#}</li>  {#* 机构信息 *#}
+			</ul>
+		</div>
+		<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=pension&action=storeConfig">
+			<div class="navList">
+				<div class="navBox">
+					<!-- 图集 s-->
+					<div class="img-box">
+					<ul class="uploader-list fn-clear" id="fileList1" >
+						<li class="uploadbtn">
+						<div id="filePicker1" class="webuploader-container filePicker" data-type="atlas" data-amount="10">
+							<div class="webuploader-pick">+</div>
+							<div id="rt_rt_1b5mb0qo71j791ejf1ilj2mt1ie81" style="position: absolute; top: 0px; left: 0px; overflow: hidden; bottom: 0px; right: 0px;">
+							<input type="file" name="file" class="webuploader-element-invisible" multiple="multiple" accept="image/jpeg,image/png,image/gif">
+							<label style="opacity: 0; width: 100%; height: 100%; display: block; cursor: pointer; background: rgb(255, 255, 255);"></label>
+							</div>
+						</div>
+						</li>
+                        {#if $detail_pics#}
+						{#foreach from=$detail_pics key=k item=i#}
+						<li class="thumbnail" id="WU_FILE_1_{#$k#}"><img data-val="{#$i.pathSource#}" data-url="{#changeFileSize url="{#$i.path#}" type="small"#}" src="{#changeFileSize url="{#$i.path#}" type="small"#}" /><div class="file-panel"><span class="cancel"></span></div></li>
+						{#/foreach#}
+                        {#elseif $businessDetail_banner#}
+    					{#$bannerArr = ','|explode:$businessDetail_banner#}
+    					{#foreach from=$bannerArr key=k item=i#}
+    					<li class="thumbnail" id="WU_FILE_2_{#$k#}"><img data-val="{#$i#}" data-url="/include/attachment.php?f={#$i#}" src="/include/attachment.php?f={#$i#}" data-des="" /><div class="file-panel"><span class="cancel"></span></li>
+    					{#/foreach#}
+    					{#/if#}
+					</ul>
+					<input type="hidden" name="pics" id="imglist" value="" class="imglist-hidden">
+					</div>
+					<!-- 图集 e-->
+					{#*请输入标题 *#}
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][19][0]#}</em><span><input id="title" name="title" type="text" size="20" placeholder="{#$langData['siteConfig'][20][26]#}" value="{#if $detail_title#}{#$detail_title#}{#else#}{#$businessDetail_title#}{#/if#}" /></span></div>
+					<div class="money fn-clear">
+						<em>{#$langData['siteConfig'][42][30]#}</em> {#*价格 *#}
+						<span><input id="price" name="price" type="text" size="8" maxlength="7" placeholder="{#$langData['siteConfig'][42][31]#}" value="{#$detail_price#}" />{#echoCurrency type="short"#}</span> {#*请输入价格 *#}
+					</div>
+                    {#if !$detail_addrid#}
+                    {#$detail_addrid = $businessDetail_addrid#}
+                    {#/if#}
+					<!-- 选择区域 s-->
+					<div class="selAddr ChoiceBox">
+						<span>{#$langData['siteConfig'][19][27]#}</span><div class="addr ChoiceBox_input" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_addrid split=' '#}" data-id="{#$detail_addrid#}">
+							{#if $detail_addrid#}
+								{#getPublicParentInfo tab='site_area' id=$detail_addrid type='typename' split=' '#}
+							{#else#}
+								<em>{#$langData['siteConfig'][7][2]#}</em>
+							{#/if#}</div>
+						<input type="hidden" name="addrid" id="addrid" value="{#$detail_addrid#}">
+						<input type="hidden" name="cityid" id="cityid" value="{#$detail_cityid#}">
+					</div>
+					<!-- 选择区域 e-->
+					 {#*详细地址 *#}
+					<div class="money fn-clear"><em class="LoTitle">{#$langData['siteConfig'][19][35]#}</em><span><input id="address" name="address" type="text" size="20" placeholder="{#$langData['siteConfig'][20][69]#}" value="{#if $detail_address#}{#$detail_address#}{#else#}{#$businessDetail_address#}{#/if#}" /></span><input type="hidden" id="lnglat" name="lnglat" value="{#$lnglat#}"></div>
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][42][32]#}：</em><span><input name="station" type="text" size="20" value="{#$detail_station#}" /></span></div> {#*最近车站 *#}
+
+
+					<div class="TuanTitle">{#$langData['siteConfig'][42][33]#}：</div>{#*交通方式 *#}
+					<div class="TuanInput" style="border-bottom: 0.02rem solid #ebebeb;"><textarea class="inp text" name="trans" rows="3" cols="60">{#$detail_trans#}</textarea></div>
+
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][19][56]#}：</em><span><input id="phone" name="tel" type="text" size="20" value="{#if $detail_tel#}{#$detail_tel#}{#else#}{#$businessDetail_phone#}{#/if#}" /></span></div>
+					<!-- <div class="money fn-clear"><em>微信：</em><span><input name="wx" type="text" size="20" value="{#$detail_wx#}" /></span></div>
+					<div class="money fn-clear"><em>邮箱：</em><span><input name="email" type="text" size="20" value="{#$detail_email#}" /></span></div> -->
+					<div class="TuanTitle">{#$langData['siteConfig'][28][30]#}：</div> {#*机构类型 *#}
+					<div class="TuanCheckboxInput">
+						{#foreach from=$jglx_type item=type#}
+						<div class="onClock"><label><input {#if $detail_typeid && $type.id|in_array:$detail_typeid#} checked{#/if#} type="checkbox" name="typeid[]" value="{#$type.id#}"><i class="check"></i>{#$type.typename#}</label></div>
+						{#/foreach#}
+					</div>
+					<div class="TuanTitle">{#$langData['siteConfig'][42][34]#}：</div> {#*服务内容 *#}
+					<div class="TuanCheckboxInput">
+						{#foreach from=$fwnr_type item=type#}
+						<div class="onClock"><label><input {#if $detail_servicecontent && $type.id|in_array:$detail_servicecontent#} checked{#/if#} type="checkbox" name="servicecontent[]" value="{#$type.id#}"><i class="check"></i>{#$type.typename#}</label></div>
+						{#/foreach#}
+					</div>
+					<div class="TuanTitle">{#$langData['siteConfig'][42][35]#}：</div> {#*照顾对象 *#}
+					<div class="TuanCheckboxInput">
+						{#foreach from=$zgdx_type item=type#}
+						<div class="onClock"><label><input {#if $detail_targetcare && $type.id|in_array:$detail_targetcare#} checked{#/if#} type="checkbox" name="targetcare[]" value="{#$type.id#}"><i class="check"></i>{#$type.typename#}</label></div>
+						{#/foreach#}
+					</div>
+					<div class="TuanTitle">{#$langData['siteConfig'][40][0]#}：</div> {#*房间类型 *#}
+					<div class="TuanCheckboxInput">
+						{#foreach from=$fjlx_type item=type#}
+						<div class="onClock"><label><input {#if $detail_roomtype && $type.id|in_array:$detail_roomtype#} checked{#/if#} type="checkbox" name="roomtype[]" value="{#$type.id#}"><i class="check"></i>{#$type.typename#}</label></div>
+						{#/foreach#}
+					</div>
+					<div class="TuanTitle">{#$langData['siteConfig'][42][36]#}：</div> {#*特殊服务 *#}
+					<div class="TuanCheckboxInput">
+						{#foreach from=$tsfw_type item=type#}
+						<div class="onClock"><label><input {#if $detail_tag && $type.id|in_array:$detail_tag#} checked{#/if#} type="checkbox" name="tag[]" value="{#$type.id#}"><i class="check"></i>{#$type.typename#}</label></div>
+						{#/foreach#}
+					</div>
+					<div class="TuanTitle">{#$langData['siteConfig'][42][38]#}：</div> {#* 说明 *#}
+					<div class="TuanInput"><textarea class="inp text" name="explains" rows="3" cols="60">{#$detail_explains#}</textarea></div>
+					<div class="TuanTitle">{#$langData['siteConfig'][26][36]#}：</div> {#* 详细介绍 *#}
+					<div class="TuanInput"><textarea class="inp text" name="desc" rows="10" cols="60">{#if $detail_desc#}{#$detail_desc#}{#else#}{#$businessDetail_body#}{#/if#}</textarea></div>
+					<div class="TuanTitle">{#$langData['siteConfig'][42][39]#}：</div> {#* 其他设置 *#}
+					<div class="TuanCheckboxInput">
+						<div class="onClock"><label><input {#if $detail_visitday==1#} checked{#/if#} type="checkbox" name="visitday" value="1"><i class="check"></i>{#$langData['siteConfig'][42][41]#}</label></div>  {#* 参观日 *#}
+						<div class="onClock"><label><input {#if $detail_flag==1#} checked{#/if#} type="checkbox" name="flag" value="1"><i class="check"></i>{#$langData['siteConfig'][42][42]#}</label></div>  {#* 提供试住 *#}
+						<div class="onClock"><label><input {#if $detail_award==1#} checked{#/if#} type="checkbox" name="award" value="1"><i class="check"></i>{#$langData['siteConfig'][42][43]#}</label></div>  {#* 入住有奖 *#}
+					</div>
+					<div class="TuanTitle">{#$langData['siteConfig'][42][40]#}：</div>  {#* 参观说明 *#}
+					<div class="TuanInput"><textarea class="inp text" name="visitdaydesc" rows="3" cols="60">{#$detail_visitdaydesc#}</textarea></div>
+					<div class="TuanTitle">{#$langData['siteConfig'][42][44]#}：</div>  {#* 入住有奖说明 *#}
+					<div class="TuanInput" style="border-bottom: 0.02rem solid #ebebeb;"><textarea class="inp text" name="awarddesc" rows="3" cols="60">{#$detail_awarddesc#}</textarea></div>
+					  {#* 入住奖励 *#}
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][42][45]#}</em><span><input id="rzprice" name="rzprice" type="text" size="8" maxlength="7" placeholder="{#$langData['siteConfig'][42][31]#}" value="{#$detail_rzprice#}" />{#echoCurrency type="short"#}</span></div>  {#* 请输入价格 *#}
+
+
+				</div>
+				<div class="navBox fn-hide">
+					<div class="TuanTitle">{#$langData['siteConfig'][19][84]#}：</div> {#* 类型 *#}
+					<div class="TuanCheckboxInput">
+						{#loop service="pension" action='catid_type' return='type'#}
+						<div class="onClock"><label><input {#if $detail_catid && $type.id|in_array:$detail_catid#} checked{#/if#} type="checkbox" name="catid[]" value="{#$type.id#}"><i class="check"></i>{#$type.typename#}</label></div>
+						{#/loop#}
+					</div>
+					<div class="catid1 {#if '1'|in_array:$detail_catid#}{#else#}fn-hide{#/if#}">
+						<div class="TuanTitle">{#$langData['siteConfig'][42][48]#}：</div> {#* 机构养老公告 *#}
+						<div class="TuanInput"><textarea class="inp text" name="institutionadesc" rows="3" cols="60">{#$detail_institutionadesc#}</textarea></div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][49]#}：</div> {#* 长住说明 *#}
+						<div class="TuanInput"><textarea class="inp text" name="longinstitutionadesc" rows="3" cols="60">{#$detail_longinstitutionadesc#}</textarea></div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][50]#}：</div> {#* 入住费用 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox longexpenses">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_longexpensesArr)#}
+												{#foreach from=$detail_longexpensesArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="1" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][51]#}：</div> {#* 每月床位费 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox longmouthfee">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_longbedfeeArr)#}
+												{#foreach from=$detail_longbedfeeArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="1" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][53]#}：</div>  {#* 其它月费 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox longother">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_longotherfeesArr)#}
+												{#foreach from=$detail_longotherfeesArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="1" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][54]#}：</div>  {#* 短住说明 *#}
+						<div class="TuanInput"><textarea class="inp text" name="shortinstitutionadesc" rows="3" cols="60">{#$detail_shortinstitutionadesc#}</textarea></div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][50]#}：</div>  {#* 入住费用 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox shortrzfee">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_shortexpensesArr)#}
+												{#foreach from=$detail_shortexpensesArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="1" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][51]#}：</div>  {#* 每月床位费 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox shortmouthfee">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_shortbedfeeArr)#}
+												{#foreach from=$detail_shortbedfeeArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="1" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][53]#}：</div>  {#* 其它月费 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox shortother">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_shortotherfeesArr)#}
+												{#foreach from=$detail_shortotherfeesArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="1" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="catid2 {#if '2'|in_array:$detail_catid#}{#else#}fn-hide{#/if#}">
+						<div class="TuanTitle">{#$langData['siteConfig'][42][55]#}：</div>  {#* 居家养老公告 *#}
+						<div class="TuanInput"><textarea class="inp text" name="homecaredesc" rows="3" cols="60">{#$detail_homecaredesc#}</textarea></div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][56]#}：</div>  {#* 居家养老说明 *#}
+						<div class="TuanInput"><textarea class="inp text" name="homecareagedesc" rows="3" cols="60">{#$detail_homecareagedesc#}</textarea></div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][57]#}：</div>  {#* 餐饮服务 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox homecyfw">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_homecyfwArr)#}
+												{#foreach from=$detail_homecyfwArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="2" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][58]#}：</div>  {#* 照料护理 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox homezlhl">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_homezlhlArr)#}
+												{#foreach from=$detail_homezlhlArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="2" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][59]#}：</div>  {#* 家政服务 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox homejzfw">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_homejzfwArr)#}
+												{#foreach from=$detail_homejzfwArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="2" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][60]#}：</div>  {#* 精神关爱 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox homejsga">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_homejsgaArr)#}
+												{#foreach from=$detail_homejsgaArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="2" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][61]#}：</div>  {#* 集体活动 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox homejthd">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_homejthdArr)#}
+												{#foreach from=$detail_homejthdArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="2" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][62]#}：</div>  {#* 托老服务 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox hometlfw">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_hometlfwArr)#}
+												{#foreach from=$detail_hometlfwArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="2" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="catid3 {#if '3'|in_array:$detail_catid#}{#else#}fn-hide{#/if#}">
+						<div class="TuanTitle">{#$langData['siteConfig'][42][63]#}：</div>  {#* 旅居养老公告 *#}
+						<div class="TuanInput"><textarea class="inp text" name="residentialdesc" rows="3" cols="60">{#$detail_residentialdesc#}</textarea></div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][64]#}：</div>  {#* 旅居养老说明 *#}
+						<div class="TuanInput"><textarea class="inp text" name="residentialagedesc" rows="3" cols="60">{#$detail_residentialagedesc#}</textarea></div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][65]#}：</div>  {#* 每日床位费 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox residentialbedfee">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_residentialbedfeeArr)#}
+												{#foreach from=$detail_residentialbedfeeArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][42][52]#}</em>{#* 服务类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][30]#}</em>{#* 价格 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][16][74]#}</em>{#* 备注 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="2" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][42][66]#}：</div>  {#* 其它费用/天 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox residentialoother">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_residentialotherfeesArr)#}
+												{#foreach from=$detail_residentialotherfeesArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][67]#}</em>{#* 完全自理 *#}<input class="pric1" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][42][68]#}</em>{#* 轻度失能 *#}<input class="pric2" type="text" value="{#$tr[2]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][69]#}</em>{#* 中度失能 *#}<input class="pric3" type="text" value="{#$tr[3]#}"><em>{#$langData['siteConfig'][42][70]#}</em>{#* 重度失能 *#}<input class="pric4" type="text" value="{#$tr[4]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][71]#}</em>{#* 失智长者 *#}<input class="pric5" type="text" value="{#$tr[5]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][67]#}</em>{#* 完全自理 *#}<input class="pric1" type="text" value=""><em>{#$langData['siteConfig'][42][68]#}</em>{#* 轻度失能 *#}<input class="pric2" type="text" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][69]#}</em>{#* 中度失能 *#}<input class="pric3" type="text" value=""><em>{#$langData['siteConfig'][42][70]#}</em>{#* 重度失能 *#}<input class="pric4" type="text" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][71]#}</em>{#* 失智长者 *#}<input class="pric5" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="3" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="TuanTitle">{#$langData['siteConfig'][41][45]#}：</div>  {#* 会员卡 *#}
+						<div class="TC_Box" >
+							<div class="Package">
+								<div class="PackageList">
+									<div class="PackageBox residentialcard">
+										<div class="PackageBox_List">
+											<div class="PackageBox_LL">
+												{#if !empty($detail_residentialcardArr)#}
+												{#foreach from=$detail_residentialcardArr item=tr#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value="{#$tr[0]#}"></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value="{#$tr[1]#}"><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value="{#$tr[2]#}"></div>
+												</div>
+												{#/foreach#}
+												{#else#}
+												<div class="PackageBox_de">
+													<div class="PackageBox_littledel"></div>
+													<div class="PL_Name fn-clear"><em>{#$langData['siteConfig'][19][84]#}</em>{#* 类型 *#}<input type="text" class="tit" value=""></div>
+													<div class="PL_number"><em>{#$langData['siteConfig'][42][38]#}</em>{#* 说明 *#}<input class="desc" type="text" value=""><em>{#$langData['siteConfig'][23][122]#}</em>{#* 费用 *#}<input class="pric" type="text" value=""></div>
+												</div>
+												{#/if#}
+											</div>
+											<div data-id="1" class="PackageBox_ADD"><i></i>{#$langData['siteConfig'][19][550]#}</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="navBox fn-hide">
+					{#* 注册时间 *#}
+					<div class="TimeChoice">
+						<span style="margin-left: .2rem;">{#$langData['siteConfig'][19][28]#}：</span><div class="starttime"><input id="registration" name="registration" size="18" type="text" placeholder="{#$langData['siteConfig'][19][28]#}" value="2018-01-05 18:00:02" readonly></div>
+					</div>
+
+					{#* 建筑数量 *#}
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][42][75]#}</em><span><input name="buildings" type="number" size="8" maxlength="7" value="{#$detail_buildings#}" />{#$langData['siteConfig'][42][76]|replace:'1':''#}</span></div>  {#* 栋 *#}
+
+					{#* 土地面积 *#}
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][42][77]#}</em><span><input name="landarea" type="text" size="8" maxlength="7" value="{#$detail_landarea#}" />{#echoCurrency type='areasymbol'#}</span></div>
+
+					{#* 房间面积 *#}
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][42][79]#}</em><span><input name="roomarea" type="text" size="8" value="{#$detail_roomarea#}" /></span></div>
+
+					{#* 房间数量 *#}
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][42][80]#}</em><span><input name="rooms" type="number" size="8" maxlength="7" value="{#$detail_rooms#}" />{#$langData['siteConfig'][42][83]|replace:'1':''#}</span></div>  {#* 间 *#}
+
+					{#* 床位数量 *#}
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][42][81]#}</em><span><input name="bednums" type="number" size="8" maxlength="7" value="{#$detail_bednums#}" />{#$langData['siteConfig'][42][84]|replace:'1':''#}</span></div>  {#* 张 *#}
+
+					{#* 从业人数 *#}
+					<div class="money fn-clear"><em>{#$langData['siteConfig'][42][82]#}</em><span><input name="peoplenums" type="number" size="8" maxlength="7" value="{#$detail_peoplenums#}" />{#echoCurrency type='areasymbol'#}</span></div>
+
+					{#* 自有医疗机构 *#}
+					<div class="TuanTitle">{#$langData['siteConfig'][42][86]#}：</div>
+
+
+					<div class="TuanInput"><textarea class="inp text" name="ownedinstitutions" rows="3" cols="60">{#$detail_ownedinstitutions#}</textarea></div>
+
+					{#* 合作医疗机构 *#}
+					<div class="TuanTitle">{#$langData['siteConfig'][42][87]#}：</div>
+
+
+					<div class="TuanInput"><textarea class="inp text" name="cooperativeinstitutions" rows="3" cols="60">{#$detail_cooperativeinstitutions#}</textarea></div>
+
+					{#* 是否接收特殊疾病长者 *#}
+					<div class="TuanTitle">{#$langData['siteConfig'][42][88]#}：</div>
+
+
+					<div class="TuanInput"><textarea class="inp text" name="diseases" rows="3" cols="60">{#$detail_diseases#}</textarea></div>
+
+					{#* 照护服务 *#}
+					<div class="TuanTitle">{#$langData['siteConfig'][42][89]#}：</div>
+
+					<div class="TuanInput"><textarea class="inp text" name="careservices" rows="3" cols="60">{#$detail_careservices#}</textarea></div>
+
+					{#* 生活服务 *#}
+					<div class="TuanTitle">{#$langData['siteConfig'][42][90]#}：</div>
+
+					<div class="TuanInput"><textarea class="inp text" name="lifeservice" rows="3" cols="60">{#$detail_lifeservice#}</textarea></div>
+
+					{#* 伙食情况 *#}
+					<div class="TuanTitle">{#$langData['siteConfig'][42][91]#}：</div>
+
+					<div class="TuanInput"><textarea class="inp text" name="foodsituation" rows="3" cols="60">{#$detail_foodsituation#}</textarea></div>
+
+					{#* 其他说明 *#}
+					<div class="TuanTitle">{#$langData['siteConfig'][42][92]#}：</div>
+
+					<div class="TuanInput"><textarea class="inp text" name="othernotes" rows="3" cols="60">{#$detail_othernotes#}</textarea></div>
+				</div>
+			</div>
+			<div class="tjBtn">{#$pageRight_#}</div>
+		</form>
+
+	</div>
+
+	<div class="gz-sel-addr gz-sel-addr-hide"id="gzSelAddr" >
+			<div class="gz-sel-addr-header">
+				<h3>{#$langData['siteConfig'][6][73]#}</h3>
+				<p class="gz-sel-addr-close"id="gzSelAddrCloseBtn"></p>
+			</div>
+			<ul class="gz-sel-addr-nav"></ul>
+			<div class="gz-sel-addr-list"></div>
+		</div>
+		<div class="gz-sel-addr-mask"></div>
+	</div>
+
+	<!--地图-->
+	<div class="pageitem" id="map">
+		<div class="lead">
+			<p></p>
+			<input type="text" id="searchAddr" placeholder="{#$langData['siteConfig'][20][411]#}">
+		</div>
+		<div class="map">
+			<div id="mapdiv"></div>
+			<span class="mapcenter"></span>
+		</div>
+		<div class="mapresults">
+			<ul></ul>
+		</div>
+	</div>
+
+
+
+<div class="error"></div>
+
+ <script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '',
+        "title": '',
+        "imgUrl":'',
+        "link": '',
+    };
+
+</script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script src="//res.wx.qq.com/open/js/jweixin-1.3.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script src="{#$cfg_staticPath#}js/webuploader/webuploader.js" type="text/javascript"></script>
+<script src="{#$templets_skin#}../../touch/js/common_2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type="text/javascript" src="{#$templets_skin#}../../touch/js/mobileSelect.js?v={#$cfg_staticVersion#}" ></script>
+<script type="text/javascript" src="{#$templets_skin#}js/mobiscroll.datetime.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/mobiscroll.select.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}../../touch/js/upload.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}../../touch/js/upload-img.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}../../touch/js/upload-sigle-img.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/config-pension.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

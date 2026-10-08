@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>修改会员</title>
+{#$cssFile#}
+<script>
+var photoSize = {#$photoSize#}, photoType = "{#$photoType#}", adminPath = "{#$adminPath#}", cityList = {#$cityList#};
+</script>
+<style>
+.sourceclienthide{display: none;}
+.listImgBox img {max-height: 200px;}
+.wechat_subscribe .input-prepend {display: inline-block;}
+.wechat_subscribe .add-on {min-width: 70px;}
+.wechat_subscribe .input-medium {width: 55px; text-align: center;}
+</style>
+</head>
+
+<body class="editform">
+
+  <dl class="clearfix">
+    <dt><label>用户名：</label></dt>
+    <dd class="singel-line">
+      {#$username#}&nbsp;&nbsp;【ID：{#$id#}】{#if $robot==1#}<code style="padding: 0px 4px; display: inline-block; vertical-align: bottom; line-height: 25px;">机器人</code>{#/if#}（注册来源：【{#$from#}】，共登录：【{#$logincount#}次】，当前状态：【{#$online#}】）&nbsp;<a href="/?action=authorizedLogin&id={#$id#}" target="_blank">授权登录此账号=></a>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>帐户信息：</label></dt>
+    <dd class="singel-line">
+      余额：<strong class="text-success" style="font-size:18px;">{#echoCurrency type="symbol"#}<span id="moneyObj">{#$money#}</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      <!-- 冻结：<strong class="text-success" style="font-size:18px;">{#echoCurrency type="symbol"#}<span id="freezeObj">{#$freeze#}</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -->
+      保障金：<strong class="text-success" style="font-size:18px;">{#echoCurrency type="symbol"#}<span id="promotionObj">{#$promotion#}</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      积分：<strong class="text-success" style="font-size:18px;"><span id="pointObj">{#$point#}</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      {#$payname#}：<strong class="text-success" style="font-size:18px;">{#echoCurrency type="symbol"#}<span id="bonusObj">{#$bonus#}</span></strong>
+    </dd>
+  </dl>
+  <div class="btn-group config-nav" data-toggle="buttons-radio" style="margin-bottom:15px;">
+    <button type="button" class="btn active" data-type="info">基本信息</button>
+    <button type="button" class="btn" data-type="money">余额记录</button>
+    <button type="button" class="btn" data-type="promotion">保障金记录</button>
+    <button type="button" class="btn" data-type="point">积分记录</button>
+    <button type="button" class="btn" data-type="bonus">{#$payname#}记录</button>
+    <button type="button" class="btn" data-type="invite">推荐会员记录</button>
+  </div>
+  <div class="item">
+    <form action="" method="post" name="editform" id="editform">      <input type="hidden" name="id" id="id" value="{#$id#}" />
+
+      <input type="hidden" name="token" id="token" value="{#$token#}" />
+    <dl class="clearfix">
+      <dt><label>会员类型：</label></dt>
+      <dd class="radio">
+        {#html_radios name="mtype" values=$mtype checked=$mtypeChecked output=$mtypeNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>会员等级：</label><input type="hidden" name="level" id="level" value="{#$level#}" /></dt>
+      <dd class="radio" style="overflow: inherit; padding-left: 140px;">
+        <div class="btn-group" id="clevel">
+          <button type="button" class="btn dropdown-toggle" data-toggle="dropdown">{#$levelName#}<span class="caret"></span></button>
+          <ul class="dropdown-menu">
+            <li><a href="javascript:;" data-id="0">普通会员</a></li>
+            {#foreach from=$levelList item=level#}
+            <li><a href="javascript:;" data-id="{#$level.id#}">{#$level.name#}</a></li>
+            {#/foreach#}
+          </ul>
+        </div>
+        <div class="input-prepend" style="margin-left:5px; margin-bottom: 0;">
+          <span class="add-on">过期时间</span>
+          <input class="input-medium" type="text" name="expired" id="expired" value="{#if $expired#}{#$expired|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}">
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="password">新密码：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="password" id="password" data-regex=".{5,}" maxlength="60" value="" />
+        <a href="javascript:;" class="autoPassword" data-id="password" style="display: inline;">随机生成</a>
+        <p style="padding-left: 0; font-size: 12px; padding-top: 10px; color: #999;">如不更改密码，留空即可！</p>
+      </dd>
+    </dl>
+    {#*
+    <dl class="clearfix">
+      <dt><label for="discount">打折卡号：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="discount" id="discount" data-regex=".*" maxlength="60" value="{#$discount#}" />
+        <span class="input-tips"><s></s>请输入打折卡号。</span>
+      </dd>
+    </dl>
+    *#}
+    <dl class="clearfix">
+      <dt><label for="nickname">昵称：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="nickname" id="nickname" data-regex=".{1,35}" maxlength="35" value="{#$nickname#}" />
+        <span class="input-tips"><s></s>请输入会员昵称，1-10个字符。</span>
+      </dd>
+    </dl>
+    {#if $nickname_state || $nickname_audit#}
+    <dl class="clearfix">
+        <dt><label>新昵称：</label></dt>
+        <dd>
+          {#$nickname_audit#}&nbsp;&nbsp;<small><a href="javascript:;" class="nickname_audit">审核通过</a> | <a href="javascript:;" class="nickname_audit1">取消修改</a></small><br />
+          <input type="hidden" name="nickname_audit" id="nickname_audit" value="{#$nickname_audit#}" />
+          <input class="input-large" type="text" name="nickname_state" id="nickname_state" data-regex=".{1,35}" maxlength="35" placeholder="审核状态" value="{#$nickname_state#}" />          
+        </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt><label for="email">邮箱：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="email" id="email" data-regex="\w+((-w+)|(\.\w+))*\@[A-Za-z0-9]+((\.|-)[A-Za-z0-9]+)*\.[A-Za-z0-9]+" maxlength="60" value="{#$email#}" />
+        <label><input type="checkbox" name="emailCheck" id="emailCheck" value="1"{#if $emailCheck ==1 #}checked="checked"{#/if#} />已验证</label>
+        <span class="input-tips"><s></s>请正确输入邮箱地址。</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="phone">手机：</label><input type="hidden" name="areaCode" id="areaCode" value="{#$areaCode#}" /></dt>
+      <dd style="overflow: inherit; padding-left: 140px;" id="phoneArea">
+        <button type="button" class="btn dropdown-toggle" data-toggle="dropdown">{#if $areaCode#}+{#$areaCode#}{#else#}区号{#/if#}<span class="caret"></span></button>
+        <ul class="dropdown-menu" style="left: 140px; max-height: 300px; overflow-y: auto;">
+          {#foreach from=$internationalPhoneCode item=p#}
+	      <li><a href="javascript:;" data-id="+{#$p.code#}">{#$p.name#}&nbsp;&nbsp;+{#$p.code#}</a></li>
+          {#/foreach#}
+        </ul>
+        <input class="input-medium" type="text" name="phone" id="phone" style="width: 142px;" maxlength="60" value="{#$phone#}" />
+        <label><input type="checkbox" name="phoneCheck" id="phoneCheck" value="1"{#if $phoneCheck ==1 #}checked="checked"{#/if#} />已验证</label>
+        <span class="input-tips"><s></s>请输入手机号码。</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="paypwd">支付密码：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="paypwd" id="paypwd" data-regex="\d{6}" maxlength="6" value="" />
+        <span class="input-tips" style="display:inline-block;"><s></s>6位数字，如不更改密码，留空即可！</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="qq">QQ：</label></dt>
+      <dd>
+        <input class="input-large" type="number" name="qq" id="qq" data-regex="[1-9]*[1-9][0-9]*" maxlength="11" value="{#$qq#}" />
+        <span class="input-tips"><s></s>请输入联系QQ，数字型。</span>
+      </dd>
+    </dl>
+    <dl class="clearfix hide">
+        <dt><label for="freeze">冻结金额：</label></dt>
+        <dd>
+            <input class="input-large" type="text" name="freeze" id="freeze" value="{#$freeze#}" />
+        </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>头像：</dt>
+      <dd class="thumb fn-clear listImgBox">
+  			<div class="uploadinp filePicker thumbtn{#if $photo != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+  			{#if $photo != ""#}
+  			<ul id="listSection1" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#if strstr($photo, 'http')#}{#$photo#}{#else#}{#$cfg_attachment#}{#$photo#}{#/if#}' target="_blank" title=""><img style="width: 150px!important; height: 150px!important; object-fit: cover;" alt="" src="{#if strstr($photo, 'http')#}{#$photo#}{#else#}{#$cfg_attachment#}{#$photo#}{#/if#}" data-val="{#$photo#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+  			{#else#}
+  			<ul id="listSection1" class="listSection thumblist fn-clear"></ul>
+  			{#/if#}
+  			<input type="hidden" name="litpic" value="{#$photo#}" class="imglist-hidden" id="litpic">
+  		</dd>
+    </dl>
+    {#if $photo_state || $photo_audit#}
+    <dl class="clearfix">
+        <dt><label>新头像：</label></dt>
+        <dd>
+            <a href='{#if strstr($photo, 'http')#}{#$photo_audit#}{#else#}{#$cfg_attachment#}{#$photo_audit#}{#/if#}' target="_blank" title=""><img style="width: 150px; height: 150px; margin-bottom: 5px; object-fit: cover;" alt="" src="{#if strstr($photo_audit, 'http')#}{#$photo_audit#}{#else#}{#$cfg_attachment#}{#$photo_audit#}{#/if#}" /></a>&nbsp;&nbsp;<small><a href="javascript:;" class="photo_audit">审核通过</a> | <a href="javascript:;" class="photo_audit1">取消修改</a></small><br />
+          <input type="hidden" name="photo_audit" id="photo_audit" value="{#$photo_audit#}" />
+          <input class="input-large" type="text" name="photo_state" id="photo_state" data-regex=".{1,35}" maxlength="35" placeholder="审核状态" value="{#$photo_state#}" />          
+        </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt><label>性别：</label></dt>
+      <dd class="radio">
+        {#html_radios name="sex" values=$sex checked=$sexChecked output=$sexNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="birthday">出生日期：</label></dt>
+      <dd><input class="input-small" type="text" name="birthday" id="birthday" value="{#$birthday#}" /></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="nation">民族：</label></dt>
+      <dd><input class="input-small" type="text" name="nation" id="nation" value="{#$nation#}" /></dd>
+    </dl>
+	<dl class="clearfix">
+      <dt><label>所在分站：</label></dt>
+      <dd class="singel-line" style="overflow: visible; padding-left: 140px;">
+          <p>
+              <label><input type="checkbox" name="lock_cityid" id="lock_cityid" value="1"{#if $lock_cityid == 1#} checked{#/if#} />锁定</label>
+              <span class="input-tips" style="display:inline-block;"><s></s>注意：锁定后，此会员所在分站将不参与系统更新规则，此处主要应对分销商入驻时绑定分站功能，分销商入驻时选择分站后，与之关联的会员将自动锁定分站！</span>
+          </p>
+          <div class="choseCity">
+              <input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}">
+          </div>
+          <span class="input-tips" style="display:inline-block;"><s></s>注意：如果系统基本参数的【会员所属分站更新规则】为【自动更新】，此处将与会员设置的所在区域不同！</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>所在区域：</label></dt>
+      <dd style="overflow:visible;" id="addrList">
+        <div class="btn-group" style="margin-left:10px;">
+          <div class="cityName addrBtn" data-type="area" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addr split=' '#}" data-id="{#$addr#}">{#if $addr#}{#getPublicParentInfo tab='site_area' id=$addr type='typename' split='/'#}{#else#}请选择{#/if#}</div>
+        </div>
+        <input type="hidden" name="addr" id="addr" value="{#$addr#}" />
+        <span class="input-tips"><s></s>请选择所在区域</span>
+      </dd>
+    </dl>
+  <dl class="clearfix">
+    <dt><label for="description">个人简介：</label></dt>
+    <dd>
+      <textarea name="description" style="height: 150px; resize: auto;" id="description" placeholder="10~200汉字之内" data-regex=".{0,200}">{#$description#}</textarea>
+      <span class="input-tips"><s></s>10~200汉字之内</span>
+    </dd>
+  </dl>
+    <dl class="clearfix">
+      <dt><label for="realname">真实姓名：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="realname" id="realname" data-regex=".{2,16}" maxlength="16" value="{#$realname#}" />
+        <span class="input-tips"><s></s>请输入真实姓名，2-16个字符。</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="idcard">身份证号码：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="idcard" id="idcard" data-regex=".*" maxlength="18" value="{#$idcard#}" />
+        <span class="input-tips"><s></s>请输入身份证号码。</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>身份证正面：</label></dt>
+      <dd class="thumb fn-clear listImgBox">
+  			<div class="uploadinp filePicker thumbtn{#if $idcardFront != ""#} hide{#/if#}" id="filePicker2" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+  			{#if $idcardFront != ""#}
+  			<ul id="listSection2" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_1_1"><a href='{#$cfg_attachment#}{#$idcardFront#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$idcardFront#}&type=middle" data-val="{#$idcardFront#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+  			{#else#}
+  			<ul id="listSection2" class="listSection thumblist fn-clear"></ul>
+  			{#/if#}
+  			<input type="hidden" name="idcardFront" value="{#$idcardFront#}" class="imglist-hidden" id="idcardFrontObj">
+  		</dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>身份证反面：</label></dt>
+      <dd class="thumb fn-clear listImgBox">
+  			<div class="uploadinp filePicker thumbtn{#if $idcardBack != ""#} hide{#/if#}" id="filePicker3" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+  			{#if $idcardBack != ""#}
+  			<ul id="listSection3" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_2_1"><a href='{#$cfg_attachment#}{#$idcardBack#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$idcardBack#}&type=middle" data-val="{#$idcardBack#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+  			{#else#}
+  			<ul id="listSection3" class="listSection thumblist fn-clear"></ul>
+  			{#/if#}
+  			<input type="hidden" name="idcardBack" value="{#$idcardBack#}" class="imglist-hidden" id="idcardBackObj">
+  		</dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>实名认证：</label></dt>
+      <dd class="radio">
+        {#html_radios name="certifyState" values=$certifyState checked=$certifyStateChecked output=$certifyStateNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    {#if $certifyStateChecked == 2#}
+    <dl class="clearfix">
+    {#else#}
+    <dl class="clearfix hide">
+    {#/if#}
+      <dt><label for="certifyInfo">审核备注：</label></dt>
+      <dd>
+        <textarea name="certifyInfo" id="certifyInfo" class="input-xxlarge" data-regex=".*" rows="2">{#$certifyInfo#}</textarea>
+        <span class="input-tips"><s></s>请输入认证失败的原因。</span>
+      </dd>
+    </dl>
+    {#if $mtypeChecked == 2#}
+    <div id="companyobj" style="background:#f5f5f5; padding:5px 0;">
+    {#else#}
+    <div id="companyobj" class="hide" style="background:#f5f5f5; padding:5px 0;">
+    {#/if#}
+      <dl class="clearfix">
+        <dt><label for="company">公司名称：</label></dt>
+        <dd>
+          <input class="input-xlarge" type="text" name="company" id="company" data-regex=".{0,100}" maxlength="100" value="{#$company#}" />
+          <span class="input-tips"><s></s>请输入公司名称。</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="address">详细地址：</label></dt>
+        <dd>
+          <input class="input-xlarge" type="text" name="address" id="address" data-regex=".*" maxlength="100" value="{#$address#}" />
+          <span class="input-tips"><s></s>请输入公司详细地址。</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label>营业执照：</label></dt>
+        <dd class="thumb fn-clear listImgBox">
+    			<div class="uploadinp filePicker thumbtn{#if $license != ""#} hide{#/if#}" id="filePicker4" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+    			{#if $license != ""#}
+    			<ul id="listSection4" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_3_1"><a href='{#$cfg_attachment#}{#$license#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$license#}&type=middle" data-val="{#$license#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+    			{#else#}
+    			<ul id="listSection4" class="listSection thumblist fn-clear"></ul>
+    			{#/if#}
+    			<input type="hidden" name="license" value="{#$license#}" class="imglist-hidden" id="licenseObj">
+    		</dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label>审核状态：</label></dt>
+        <dd class="radio">
+          {#html_radios name="licenseState" values=$licenseState checked=$licenseStateChecked output=$licenseStateNames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      {#if $licenseStateChecked == 2#}
+      <dl class="clearfix">
+      {#else#}
+      <dl class="clearfix hide">
+      {#/if#}
+        <dt><label for="licenseInfo">审核备注：</label></dt>
+        <dd>
+          <textarea name="licenseInfo" id="licenseInfo" class="input-xxlarge" data-regex=".*" rows="2">{#$licenseInfo#}</textarea>
+          <span class="input-tips"><s></s>请输入认证失败的原因。</span>
+        </dd>
+      </dl>
+    </div>
+
+    <dl class="clearfix">
+      <dt><label>会员状态：</label></dt>
+      <dd class="radio">
+        {#html_radios name="state" values=$state checked=$stateChecked output=$stateNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    {#if $stateChecked == 2#}
+    <dl class="clearfix">
+    {#else#}
+    <dl class="clearfix hide">
+    {#/if#}
+      <dt><label for="stateinfo">审核备注：</label></dt>
+      <dd>
+        <textarea name="stateinfo" id="stateinfo" class="input-xxlarge" data-regex=".*" rows="2">{#$stateinfo#}</textarea>
+        <span class="input-tips"><s></s>请输入审核拒绝的原因。</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>推荐会员：</label></dt>
+      <dd class="singel-line">
+        {#if $from_uid != 0#}
+        <a href="javascript:;" class="userinfo" data-id={#$from_uid#}>{#$from_name#}</a>
+        <button class="btn btn-mini btn-danger" type="button" id="unlink" style="margin-left: 10px;">取消关联</button>
+        {#else#}
+        <button class="btn btn-mini btn-primary" type="button" id="bindlink">添加关联</button>
+        {#/if#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>第三方绑定信息：</label></dt>
+      <dd class="singel-line">
+        <div class="input-prepend">
+          <span class="add-on">微信unionid：</span>
+          <input class="input-xlarge" type="text" name="wechat_conn" id="wechat_conn" value="{#$wechat_conn#}" autocomplete="off">
+        </div><br />
+        <div class="input-prepend">
+          <span class="add-on">微信openid：</span>
+          <input class="input-xlarge" type="text" name="wechat_openid" id="wechat_openid" value="{#$wechat_openid#}" autocomplete="off">
+        </div><br />
+        <div class="input-prepend">
+          <span class="add-on">微信小程序openid：</span>
+          <input class="input-xlarge" type="text" name="wechat_mini_openid" id="wechat_mini_openid" value="{#$wechat_mini_openid#}" autocomplete="off">
+        </div>
+        <br/>
+        <div class="input-prepend">
+          <span class="add-on">APP端微信openid：</span>
+          <input class="input-xlarge" type="text" name="wechat_app_openid" id="wechat_app_openid" value="{#$wechat_app_openid#}" autocomplete="off">
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>是否关注公众号：</label></dt>
+      <dd class="radio wechat_subscribe">
+        <div class="input-prepend">
+          <span class="add-on">主站</span>
+          <input class="input-medium" type="text" {#if $wechat_subscribe ==1#} style="color: green!important;" {#else#} style="color: #FF4C6A!important;" {#/if#} value="{#if $wechat_subscribe ==1#}已关注{#else#}未关注{#/if#}" readonly>
+        </div>
+        {#if $wechat_subscribe_city#}
+            {#foreach from=$wechat_subscribe_city item=item key=key#}
+            <div class="input-prepend">
+                <span class="add-on">{#$item.cityname#}</span>
+                <input class="input-medium" type="text" {#if isset($item.subscribe) && $item.subscribe ==1#} style="color: green!important;" {#else#} style="color: #FF4C6A!important;" {#/if#} value="{#if isset($item.subscribe) && $item.subscribe ==1#}已关注{#else#}未关注{#/if#}" readonly>
+            </div>
+            {#/foreach#}
+        {#/if#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>注册信息：</label></dt>
+      <dd class="singel-line">
+        <div class="input-prepend">
+          <span class="add-on">注册时间：</span>
+          <input class="input-large" type="text" readonly value="{#$regtime#}" autocomplete="off">
+        </div><br />
+        <div class="input-prepend">
+          <span class="add-on">注册IP：</span>
+          <input class="input-large" type="text" readonly value="{#$regip#}" autocomplete="off">
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>最后登录信息：</label></dt>
+      <dd class="singel-line">
+        {#if $lastlogintime == "" && $lastloginip == ""#}
+        还未登录
+        {#else#}
+        登录时间：{#$lastlogintime#}&nbsp;&nbsp;登录IP：{#$lastloginip#}
+        {#/if#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>登录设备信息：</label></dt>
+      <dd class="singel-line">
+        {#$n=1#}
+        {#foreach from=$sourceclient item=val#}
+        <div {#if $n>2#}class="sourceclienthide"{#/if#}>设备名称：{#$val['title']#}&nbsp;&nbsp;设备类型：{#$val['type']#}&nbsp;&nbsp;序列号：{#$val['serial']#}&nbsp;&nbsp;登录时间：{#$val.pudate|date_format:'%Y-%m-%d %H:%M:%S'#}&nbsp;&nbsp;{#if $n==1#}<a href="javascript:;" class="btn btn-primary sourceSee">查看全部</a>{#/if#}</div>
+        {#$n=$n+1#}
+        {#/foreach#}
+      </dd>
+    </dl>
+    <dl class="clearfix formbtn">
+      <dt>&nbsp;</dt>
+      <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+    </dl>
+  </form>
+  </div>
+  <div class="item hide" style="padding-left:40px;">
+    <dl style="margin:0 20px 15px 10px; padding-top:5px; background:#f5f5f5">
+      <dd>
+        <label><input type="radio" name="moneyOpera" value="1" checked="true" />增加</label>&nbsp;&nbsp;
+        <label><input type="radio" name="moneyOpera" value="0" />减少</label>&nbsp;&nbsp;
+        <input type="text" class="input-mini" onkeyup="value=value.replace('-','')" name="operaMoney" />{#echoCurrency type="short"#}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <label>操作原因：<input type="text" class="input-xlarge" name="operaMoneyInfo" /></label>
+        <input type="button" class="btn btn-success" id="operaMoney" value="提交" />
+      </dd>
+    </dl>
+    <div class="filter clearfix" style="padding-left:10px!important;">
+      <div class="btn-group" id="selectBtn">
+        <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="1">全选</a></li>
+          <li><a href="javascript:;" data-id="0">不选</a></li>
+
+        </ul>
+      </div>&nbsp;&nbsp;
+      <div class="btn-group" id="stateBtn">
+        <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="totalCount"></span>)<span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>
+          <li class="divider"></li>
+          <li><a href="javascript:;" data-id="1">收入(<span class="allInmoney">0</span>)</a></li>
+          <li><a href="javascript:;" data-id="2">支出(<span class="allOutmoney">0</span>)</a></li>
+        </ul>
+      </div>
+      <a href="javascript:;" class="btn btn-primary" id="delMoney">删除选定</a>&nbsp;
+      <a href="javascript:;" class="btn btn-danger" id="ClearMoney">清空记录</a>
+      <span class="help-inline">总收入：<span id="totalInmoney">0.00</span>&nbsp;&nbsp;&nbsp;&nbsp;总支出：<span id="totalOutmoney">0.00</span></span>
+      <div class="sousDiv" style="float: right;">
+        <input class="input-large" type="search" id="keyword" placeholder="请输入要搜索的关键字">
+        <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+        <a href="memberList.php?dopost=amountList&do=export" class="btn btn-primary" id="export">导出</a>
+      </div>
+    </div>
+    <ul class="thead clearfix" style="margin-right:20px; margin-left: 10px!important;">
+      <li class="row3">&nbsp;</li>
+      <li class="row15 left">收支</li>
+      <li class="row15 left">金额</li>
+      <li class="row15 left">账户余额</li>
+      <li class="row25 left">原因</li>
+      <li class="row20 left">时间</li>
+      <li class="row7">操作</li>
+    </ul>
+    <div class="list common mt124" id="list" data-totalpage="1" data-atpage="1" style="padding:0 20px 10px 10px!important;"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+    <div id="pageInfo" class="pagination pagination-centered" style="margin-right:20px;"></div>
+  </div>
+
+  <div class="item hide" style="padding-left:40px;">
+    
+    <dl style="margin:0 20px 15px 10px; padding-top:5px; background:#f5f5f5">
+        <dd>
+          <label><input type="radio" name="promotionOpera" value="1" checked="true" />增加</label>&nbsp;&nbsp;
+          <label><input type="radio" name="promotionOpera" value="0" />减少</label>&nbsp;&nbsp;
+          <input type="text" class="input-mini" onkeyup="value=value.replace('-','')" name="operaPromotion" />元&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+          <label>操作原因：<input type="text" class="input-xlarge" name="operaPromotionInfo" /></label>
+          <input type="button" class="btn btn-success" id="operaPromotion" value="提交" />
+        </dd>
+    </dl>
+
+    <div class="filter clearfix" style="padding-left:10px!important;">
+    
+      <div class="btn-group" id="stateBtn">
+        <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="promotiontotalCount"></span>)<span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="">全部信息(<span class="promotiontotalCount"></span>)</a></li>
+          <li class="divider"></li>
+          <li><a href="javascript:;" data-id="1">缴纳(<span class="allInpromotion">0</span>)</a></li>
+          <li><a href="javascript:;" data-id="2">提取(<span class="allOutpromotion">0</span>)</a></li>
+        </ul>
+      </div>
+     
+      <span class="help-inline">缴纳：<span id="totalPayPrice">0.00</span>&nbsp;&nbsp;&nbsp;&nbsp;提取：<span id="totalOutPayPrice">0.00</span>&nbsp;&nbsp;&nbsp;&nbsp;可提取：<span id="totalUseablePrice">0.00</span></span>
+      <div class="sousDiv" style="float: right;">
+        <input class="input-large" type="search" id="promotionkeyword" placeholder="请输入要搜索的关键字">
+        <button type="button" class="btn btn-success" id="promotionsearchBtn">立即搜索</button>
+        <a href="memberList.php?dopost=amountList&do=export" class="btn btn-primary" id="promotionexport">导出</a>
+      </div>
+    </div>
+    <ul class="thead clearfix" style="margin-right:20px; margin-left: 10px!important;">
+      <li class="row3">&nbsp;</li>
+      <li class="row12 left">类型</li>
+      <li class="row30 left">订单编号</li>
+      <li class="row20 left">金额</li>
+      <li class="row20 left">时间</li>
+      <li class="row15 left">状态</li>
+    </ul>
+    <div class="list common mt124" id="list_3" data-totalpage="1" data-atpage="1" style="padding:0 20px 10px 10px!important;"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+    <div id="pageInfo_3" class="pagination pagination-centered" style="margin-right:20px;"></div>
+  </div>
+  <div class="item hide" style="padding-left:40px;">
+    <dl style="margin:0 20px 15px 10px; padding-top:5px; background:#f5f5f5">
+      <dd>
+        <label><input type="radio" name="pointOpera" value="1" checked="true" />增加</label>&nbsp;&nbsp;
+        <label><input type="radio" name="pointOpera" value="0" />减少</label>&nbsp;&nbsp;
+        <input type="text" class="input-mini" onkeyup="value=value.replace('-','')" name="operaPoint" />分&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <label>操作原因：<input type="text" class="input-xlarge" name="operaPointInfo" /></label>
+        <input type="button" class="btn btn-success" id="operaPoint" value="提交" />
+      </dd>
+    </dl>
+    <div class="filter clearfix" style="padding-left:10px!important;">
+      <div class="btn-group" id="selectBtn_">
+        <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="1">全选</a></li>
+          <li><a href="javascript:;" data-id="0">不选</a></li>
+        </ul>
+      </div>&nbsp;&nbsp;
+      <div class="btn-group" id="stateBtn_">
+        <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="pointtotalCount"></span>)<span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="">全部信息(<span class="pointtotalCount"></span>)</a></li>
+          <li class="divider"></li>
+          <li><a href="javascript:;" data-id="1">收入(<span class="allInpoint">0</span>)</a></li>
+          <li><a href="javascript:;" data-id="2">支出(<span class="allOutpoint">0</span>)</a></li>
+        </ul>
+      </div>
+      <a href="javascript:;" class="btn btn-primary" id="delPoint">删除选定</a>&nbsp;
+      <a href="javascript:;" class="btn btn-danger" id="ClearPoint">清空记录</a>
+      <span class="help-inline">总收入：<span id="totalInpoint">0.00</span>&nbsp;&nbsp;&nbsp;&nbsp;总支出：<span id="totalOutpoint">0.00</span></span>
+      <div class="sousDiv" style="float: right;">
+        <input class="input-large" type="search" id="pointkeyword" placeholder="请输入要搜索的关键字">
+        <button type="button" class="btn btn-success" id="pointsearchBtn">立即搜索</button>
+        <a href="memberList.php?dopost=amountList&do=export" class="btn btn-primary" id="pointexport">导出</a>
+      </div>
+    </div>
+    <ul class="thead clearfix" style="margin-right:20px; margin-left: 10px!important;">
+      <li class="row3">&nbsp;</li>
+      <li class="row15 left">收支</li>
+      <li class="row15 left">积分</li>
+      <li class="row15 left">账户积分</li>
+      <li class="row25 left">原因</li>
+      <li class="row20 left">时间</li>
+      <li class="row7">操作</li>
+    </ul>
+    <div class="list common mt124" id="list_" data-totalpage="1" data-atpage="1" style="padding:0 20px 10px 10px!important;"><table><tbody></tbody></table><div id="loading_" class="loading hide"></div></div>
+    <div id="pageInfo_" class="pagination pagination-centered" style="margin-right:20px;"></div>
+  </div>
+      <div class="item hide" style="padding-left:40px;">
+        <dl style="margin:0 20px 15px 10px; padding-top:5px; background:#f5f5f5">
+          <dd>
+            <label><input type="radio" name="bonusOpera" value="1" checked="true" />增加</label>&nbsp;&nbsp;
+            <label><input type="radio" name="bonusOpera" value="0" />减少</label>&nbsp;&nbsp;
+            <input type="text" class="input-mini" onkeyup="value=value.replace('-','')" name="operaBonus" />元&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <label>操作原因：<input type="text" class="input-xlarge" name="operaBonusInfo" /></label>
+            <input type="button" class="btn btn-success" id="operaBonus" value="提交" />
+          </dd>
+        </dl>
+        <div class="filter clearfix" style="padding-left:10px!important;">
+          <div class="btn-group" id="selectBtn_2">
+            <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+            <ul class="dropdown-menu">
+              <li><a href="javascript:;" data-id="1">全选</a></li>
+              <li><a href="javascript:;" data-id="0">不选</a></li>
+            </ul>
+          </div>&nbsp;&nbsp;
+          <div class="btn-group" id="stateBtn_2">
+            <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="bonustotalCount"></span>)<span class="caret"></span></button>
+            <ul class="dropdown-menu">
+              <li><a href="javascript:;" data-id="">全部信息(<span class="bonustotalCount"></span>)</a></li>
+              <li class="divider"></li>
+              <li><a href="javascript:;" data-id="1">收入(<span class="allInbonus">0</span>)</a></li>
+              <li><a href="javascript:;" data-id="2">支出(<span class="allOutbonus">0</span>)</a></li>
+            </ul>
+          </div>
+          <a href="javascript:;" class="btn btn-primary" id="delBonus">删除选定</a>&nbsp;
+          <a href="javascript:;" class="btn btn-danger" id="ClearBonus">清空记录</a>
+          <span class="help-inline">总收入：<span id="totalInbonus">0.00</span>&nbsp;&nbsp;&nbsp;&nbsp;总支出：<span id="totalOutbonus">0.00</span></span>
+          <div class="sousDiv" style="float: right;">
+            <input class="input-large" type="search" id="bonuskeyword" placeholder="请输入要搜索的关键字">
+            <button type="button" class="btn btn-success" id="bonussearchBtn">立即搜索</button>
+            <a href="memberList.php?dopost=amountList&do=export" class="btn btn-primary" id="bonusexport">导出</a>
+          </div>
+        </div>
+        <ul class="thead clearfix" style="margin-right:20px; margin-left: 10px!important;">
+          <li class="row3">&nbsp;</li>
+          <li class="row15 left">收支</li>
+          <li class="row15 left">{#$payname#}</li>
+          <li class="row15 left">账户{#$payname#}</li>
+          <li class="row25 left">原因</li>
+          <li class="row20 left">时间</li>
+          <li class="row7">操作</li>
+        </ul>
+        <div class="list common mt124" id="list_2" data-totalpage="1" data-atpage="1" style="padding:0 20px 10px 10px!important;"><table><tbody></tbody></table><div id="loading_2" class="loading hide"></div></div>
+        <div id="pageInfo_2" class="pagination pagination-centered" style="margin-right:20px;"></div>
+      </div>
+  <div class="item hide" style="padding-left:40px;">
+    <dl style="margin:0 20px 15px 10px; padding-top:5px; background:#f5f5f5">
+      <dd>
+        <label><input type="text" class="input-xlarge" name="keywords" /></label>
+        <input type="button" class="btn btn-success" id="operaSearch" value="搜索" />
+		<span id="totalInvite" style="margin-left: 20px; font-size: 14px;">共0人，奖金0元</span>
+        <span style="margin-left: 20px; font-size: 14px; color: #666;" title="此处的奖金汇总代表此会员一共得到的奖金，如果提现账户余额显示的和此处不一致，请检查会员身份是否发生过变化，这里是包含普通会员身份时推荐的会员，以及成为分销商后推荐的会员，如果奖金为0，需要核实积分设置中，【推荐注册送现金】是否配置奖金额度">分销商身份的用户奖金直接到账户余额，普通用户送至专有账户，只可用于提现！</span>
+      </dd>
+    </dl>
+    <ul class="thead clearfix" style="margin-right:20px; margin-left: 10px!important;">
+      <li class="row3">&nbsp;</li>
+      <li class="row20 left">昵称</li>
+      <li class="row17 left">手机</li>
+      <li class="row20 left">时间</li>
+      <li class="row40 left">奖金</li>
+    </ul>
+    <div class="list common mt124 o-wrap" id="list_1" data-totalpage="1" data-atpage="1" style="padding:0 20px 10px 10px!important;"><table><tbody></tbody></table><div id="loading_1" class="loading hide"></div></div>
+    <div id="pageInfo_1" class="pagination pagination-centered" style="margin-right:20px;"></div>
+  </div>
+  <div class="hide">
+    <span id="sKeyword"></span>
+    <span id="pointsKeyword"></span>
+    <span id="promotionsKeyword"></span>
+    <span id="bonussKeyword"></span>
+    <span id="filtertype"></span>
+  </div>
+{#$jsFile#}
+</body>
+</html>

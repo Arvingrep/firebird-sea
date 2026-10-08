@@ -1,0 +1,519 @@
+<!-- 搜索栏 s -->
+<div :class="['rightCon',{'show':currEditPart == 1}]">
+    <div class="modBox searchColContainer">
+        <div class="title" v-if="currEditPart == 1">搜索栏
+
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 1 && showResetPop" @show="showResetPop = true" v-if="checkHasIn('search',1) && !checkModelHasIn() ">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('search')"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 1 && showResetPop" v-if="!checkHasIn('search',1)" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('search',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 1 && showResetPop" v-if="checkModelHasIn()" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认将该组件恢复成模板样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="reChangeToModel('search',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置模板样式</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 1 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('search',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+        <div class="modInfoStyle">
+            <div class="modstyleBox" >
+                <h2 class="stitle">组件设置</h2>
+                <el-checkbox-group v-model="searchColFormData.showMods" @change="searchConChange">
+                    <template v-for="item in searchColConfig.searchMods" >
+                        <el-checkbox v-if="item.id != 1 || currPlatform != 'dymini'" :key="item.id" :label="item.id" @change="val => choseMods(val,item.id)">{{item.text}}</el-checkbox>
+                    </template>
+                </el-checkbox-group>
+                <div class="style_options flexItem">
+                    <label for="">背景遮罩：</label>
+                    <div class="split_options radioBox">
+                        <span v-for="item in searchColConfig.bgStyle" :class="{'onChose':searchColFormData.bgMask == item.id}" @click="searchColFormData.bgMask = item.id; searchColFormData.style.borderRadius = (item.id == 0 ? 0 : 20 )"><s></s>{{item.text}}</span>
+                    </div>
+                </div>
+                <div class="flexItem style_options">
+                    <div class="column_chose">
+                        <s :class="{'layout2':searchColFormData.layout !== 2}"></s>
+                        <span @click="searchColFormData.layout = 2; styleChange('search',2)"><em>2行</em></span>
+                        <span @click="searchColFormData.layout = 1; styleChange('search',1)"><em>1行</em></span>
+                    </div>
+                    <div class="colorPickerBox" v-show="!checkSwiperTop()">
+                        <div class="colorPicker">
+                            <!-- <div class="imgShow" v-show="searchColFormData.bgType == 'image'"><img v-if="searchColFormData.style.bgImage" :src="searchColFormData.style.bgImage" alt=""></div> -->
+                            <div class="color_picker"  data-type="1">
+                                <div class="color bgimg" v-show="searchColFormData.bgType == 'image' ">
+                                    <div class="imgShow" v-if="searchColFormData.bgType == 'image'"><img  :src="searchColFormData.style.bgImage" alt=""></div>
+                                    <div class="imgShow" v-else :style="'background:'+ searchColFormData.style.bgColor +';'"></div>
+                                </div>
+                                <!-- <div class="color" id="colorPicker1"></div> -->
+                                <el-color-picker v-model="searchColFormData.style.bgColor" popper-class="borderColorPicker"  @active-change="value => {activeChangeColor(value,'searchColFormData.style.bgColor'); searchColFormData.bgType = 'color'}" @change="value => {resetColor('searchColFormData.style.bgColor',value); searchColFormData.bgType = 'color';}"></el-color-picker>
+                            </div>
+                        </div>
+                        <a href="javascript:;" class="uploadBtn"> <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" id="searchBg_filedata" data-type="searchBg"></a>
+                    </div>
+                </div>
+            </div>
+            <div class="modstyleBox contentSetBox">
+                <h2 class="stitle">标题栏设置</h2>
+                <div class="sContent">
+                    <dl class="setbox"  v-if="currPlatform == 'h5' || currPlatform == 'dymini'">
+                        <dt>
+                            <h5>{{currPlatform == 'dymini' ? 'Logo/标题' : '标题'}}</h5>
+                        </dt>
+                        <dd>
+                            <div class="style_item ">
+                                <div class="style_options ">
+                                    <label for="" style="align-self: flex-start;">网站标题：</label>
+                                    <div class="inpbox">
+                                        <el-input value="{#$cfg_shortname#}" readonly class="single_inp unEdit">
+                                            <template slot="prepend">网站简称</template>
+                                        </el-input>
+                                        <p class="title_tip">*网站简称可在<span @click="titleSetPop = true">网站管理平台-系统-站点信息</span>中设置</p>
+                                        <p class="title_tip" v-if="currPlatform == 'dymini'">*Logo可在<span @click="dyLogoSetPop = true">抖音开发平台-小程序基本信息</span>中设置</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+                    <dl class="setbox" v-if="searchColFormData.showMods.includes(1)">
+                        <dt>
+                            <h5>Logo</h5>
+                        </dt>
+                        <dd>
+                            <div class="style_item ">
+                                <div class="style_options">
+                                    <label for="">Logo位置：</label>
+                                    <div class="split_options radioBox">
+                                        <span :class="{'onChose':searchColFormData.logo.position == 'left'}" @click="searchColFormData.logo.position = 'left'"><s></s>居左</span>
+                                        <span :class="{'onChose':searchColFormData.logo.position == 'right'}" @click="searchColFormData.logo.position = 'right'"><s></s>居右</span>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for=""
+                                        style="align-self:flex-start; padding-top:6px;">设置图片：</label>
+                                    <div class="img_up fn-clear">
+                                        <div :class="['upbtn vip_icon fullW', {'hasup':searchColFormData.logo.path}]  ">
+                                            <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" id="logo_filedata" data-type="logo">
+                                            <img :src="searchColFormData.logo.path"  alt="" v-if="searchColFormData.logo.path">
+                                            <span>更换图片</span>
+                                        </div>
+                                        <div class="imgText">
+                                            <p>建议logo高度100px，宽度100-400px</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+                    <dl class="setbox" v-if="searchColFormData.showMods.includes(5)">
+                        <dt>
+                            <h5>选择城市</h5>
+                        </dt>
+                        <dd>
+                            <div class="style_item ">
+                                <div class="style_options">
+                                    <label for="">选择样式：</label>
+                                    <div class="split_options radioBox">
+                                        <span :class="{'onChose':searchColFormData.city.styletype === 1}" @click="searchColFormData.city.styletype = 1;searchColFormData.city.iconColor = '#ffffff'"><s></s>样式一</span>
+                                        <span  :class="{'onChose':searchColFormData.city.styletype === 2}" @click="searchColFormData.city.styletype = 2;searchColFormData.city.iconColor = '#ffffff'"><s></s>样式二</span>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">图标颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  popper-class="borderColorPicker" @change="value => pickerChangeColor(value,'searchColFormData.city.iconColor')" class="colorpicker" @active-change="(value) => activeChangeColor(value,'searchColFormData.city.iconColor')" v-model="searchColFormData.city.iconColor" ></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" class="colorShow"  @change="changeColor('searchColFormData.city.iconColor')"  :value="searchColFormData.city.iconColor ? searchColFormData.city.iconColor.replace('#','') : ''" spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('searchColFormData.city.iconColor')" >重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">文字颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'searchColFormData.city.textColor')" v-model="searchColFormData.city.textColor"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @click="changeColor('searchColFormData.city.textColor')" class="colorShow" v-model="searchColFormData.city.textColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                        <button >重置</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+                    <dl class="setbox">
+                        <dt>
+                            <h5>{{currPlatform != 'dymini' ? '右上区域' : '右侧区域'}}</h5>
+                        </dt>
+                        <dd>
+                            <div class="style_options">
+                                <label for="">快捷操作：</label>
+                                <el-checkbox v-model="addDropMenu" @change="val => quickOption(val,'dropMenu')">添加下拉选项按钮</el-checkbox>
+                                <el-checkbox v-model="addScan"  @change="val => quickOption(val,'scan')">添加扫码</el-checkbox>
+                            </div>
+                            <div class="style_item " v-if="searchColFormData.rtBtns.btns && searchColFormData.rtBtns.btns.length">
+                                <div class="style_options">
+                                    <label for="">按钮文本：</label>
+                                    <div class="split_options radioBox">
+                                        <span :class="{'onChose':searchColFormData.rtBtns.txtStyle === 0}" @click="searchColFormData.rtBtns.txtStyle = 0"><s></s>无(默认)</span>
+                                        <span :class="{'onChose':searchColFormData.rtBtns.txtStyle === 1}" @click="searchColFormData.rtBtns.txtStyle = 1"><s></s>文本(小)</span>
+                                        <span :class="{'onChose':searchColFormData.rtBtns.txtStyle === 2}" @click="searchColFormData.rtBtns.txtStyle = 2"><s></s>文本(大)</span>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">图标颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  popper-class="borderColorPicker" @change="value => pickerChangeColor(value,'searchColFormData.rtBtns.iconColor')" class="colorpicker"  @active-change="(value) => activeChangeColor(value,'searchColFormData.rtBtns.iconColor')" v-model="searchColFormData.rtBtns.iconColor" ></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" class="colorShow" :value="searchColFormData.rtBtns.iconColor  ? searchColFormData.rtBtns.iconColor.replace('#','') : ''" spellcheck="false" @change="changeColor('searchColFormData.rtBtns.iconColor')"  maxlength="6">
+                                        <button @click="resetColor('searchColFormData.rtBtns.iconColor')">重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">文本颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker"  @active-change="(value) => activeChangeColor(value,'searchColFormData.rtBtns.textColor')" v-model="searchColFormData.rtBtns.textColor"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" class="colorShow" :value="searchColFormData.rtBtns.textColor.replace('#','')" spellcheck="false"  maxlength="6" @change="changeColor('searchColFormData.rtBtns.textColor')" >
+                                        <button @click="resetColor('searchColFormData.rtBtns.textColor')" >重置</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </dd>
+                        <dd class="marginTopSetBox">
+                            <div  class="btnsBox btn_item btnsSort sortBox" data-sort="searchColFormData.rtBtns.btns"  data-drag=".item">
+                                <div :class="['option_item item',{'hasBorder':btn.linkInfo.type == 3}]" v-for="(btn,ind) in searchColFormData.rtBtns.btns" :key="'rtBtns_'+ btn.id" :data-id="ind">
+                                    <s class="del_item" @click="delBtn(ind)"></s>
+                                    <s class="left_icon"><img  src="/static/images/admin/order_icon.png" alt=""></s>
+                                    <div class="item_con flex_r">
+                                        <div class="img_up fn-clear">
+                                            <div :class="['upbtn',{'hasup':btn.icon}]">
+                                                <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp"  class="fileUp" :id="'rtBtns_' + ind + '_filedata'" :data-type="'rtBtns_' + ind">
+                                                <img v-if="btn.icon" :src="btn.icon"  alt="">
+                                                <span>更换图片</span>
+                                            </div>
+                                            <div :class="['imgText',{'noBorder':!searchColFormData.rtBtns.txtStyle || btn.linkInfo.type == 3}]">
+                                                <div class="inpbox" v-show="searchColFormData.rtBtns.txtStyle != 0">
+                                                    <el-input maxlength="5"  show-word-limit  placeholder="请输入按钮名称" class="iconName" v-model="btn.text" ></el-input>
+                                                </div>
+                                                <template v-if="">
+                                                    <div :class="[{'inpbox': btn.linkInfo.type != 3} ,{'editbox': btn.linkInfo.type == 3},{'marginTop': searchColFormData.rtBtns.txtStyle === 0},'linkbox linkChose']" @click="changeLink('searchColFormData.rtBtns.btns.' + ind + '.link',btn.linkInfo.type == 3)"  :style="searchColFormData.rtBtns.txtStyle ? '' : 'padding-top:0;'">
+                                                        <s>
+                                                            <img v-if="btn.linkInfo.type == 1"  src="/static/images/admin/link.png">
+                                                            <img v-else-if="btn.linkInfo.type == 2"  src="/static/images/admin/siteConfigPage/scan_icon.png?v=1">
+                                                            <img v-else-if="btn.linkInfo.type == 3"  src="/static/images/admin/siteConfigPage/editlink_icon.png?v=1">
+                                                            <img v-else-if="btn.linkInfo.type == 4"  src="/static/images/admin/siteMemberPage/tel.png">
+                                                        </s>
+                                                        <input type="text" placeholder="请选择链接" class="iconLink" v-if="btn.linkInfo.type != 3" readonly :value="btn.linkInfo.linkText ? btn.linkInfo.linkText : btn.link " >
+                                                        <h6 v-else>编辑下拉选项</h6>
+                                                    </div>
+                                                    
+                                                    <p v-show="!searchColFormData.rtBtns.txtStyle && btn.linkInfo.type !== 3">建议图标尺寸100*100px</p>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        
+                                    </div>
+                                </div>
+                                <a href="javascript:;" class="add_more" @click="addNewBtn();"  v-show="!searchColFormData.rtBtns.btns || searchColFormData.rtBtns.btns.length < 3 "><s></s>添加按钮</a>
+                            </div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            <div class="modstyleBox">
+                <h2 class="stitle">搜索栏设置</h2>
+                <div class="sContent">
+                    <div class="setbox">
+                        <div class="style_item xl_item">
+                            <div class="style_options flexStart">
+                                <label for="" style="padding-top:10px;">搜索框文本：</label>
+                                <div class="inpBox" style="width: 100%;">
+                                    <ul class="textCon" v-show="searchColFormData.searchCon.keysArr && searchColFormData.searchCon.keysArr.length > 0">
+                                        <li v-for="(item,ind) in searchColFormData.searchCon.keysArr">
+                                            <div class="inpbox">
+                                                <el-input v-model="item.key">
+                                                    <template slot="prepend">{{item.type ? '推荐词' : '默认'}}</template>
+                                                </el-input>
+                                            </div>
+                                            <el-popover
+                                                v-if="item.type"
+                                                popper-class="linkFormBox"
+                                                trigger="hover"
+                                                width="362">
+                                                <div class="linkForm">
+                                                    <h6>链接地址<span>*留空表示站内搜索</span></h6>
+                                                    <el-input v-model="item.link" class="linkInp"></el-input>
+                                                </div>
+                                                <i  slot="reference" :class="['link_icon',{'hasSetLink':item.link}]"></i>
+                                            </el-popover>
+                                            <a href="javascript:;" class="delBtn" @click="delSearchKey(ind)"></a>
+                                        </li>
+                                    </ul>
+                                    <a href="javascript:;" class="add_key" @click="trggleAddKey" v-show="searchKeysNum < 5  && ( !searchColFormData.searchCon.keysArr || searchColFormData.searchCon.keysArr.length < 6) ">
+                                        <span>添加</span>
+                                        <div class="smPop" v-show="!searchPlace && searchKeysNum < 5 ">
+                                            <ul class="subtit_options">
+                                                <li  @click.stop="addSearchKey(0)"><s></s>默认提示</li>
+                                                <li class="text"  @click.stop="addSearchKey(1)"><s></s>推荐词<em>(跳词搜索)</em></li>
+                                            </ul>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="style_options" >
+                                <label for="">图标颜色：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker  popper-class="borderColorPicker"  @change="value => pickerChangeColor(value,'searchColFormData.searchCon.style.iconColor')" @active-change="(value) => activeChangeColor(value,'searchColFormData.searchCon.style.iconColor')"  class="colorpicker" v-model="searchColFormData.searchCon.style.iconColor"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" spellcheck="false"  @change="changeColor('searchColFormData.searchCon.style.iconColor')"  maxlength="6" :value="searchColFormData.searchCon.style.iconColor ? searchColFormData.searchCon.style.iconColor.replace('#','') : ''" >
+                                    <button @click="resetColor('searchColFormData.searchCon.style.iconColor')" >重置</button>
+                                </div>
+                            </div>
+                            <div class="style_options" >
+                                <label for="">文本颜色：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'searchColFormData.searchCon.style.color')"  v-model="searchColFormData.searchCon.style.color" ></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" :value="searchColFormData.searchCon.style.color.replace('#','')" spellcheck="false"  maxlength="6" @change="changeColor('searchColFormData.searchCon.style.color')">
+                                    <button @click="resetColor('searchColFormData.searchCon.style.color')">重置</button>
+                                </div>
+                            </div>
+                            <div class="style_options" >
+                                <label for="">搜索框：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'searchColFormData.searchCon.style.background')" v-model="searchColFormData.searchCon.style.background"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" :value="searchColFormData.searchCon.style.background.replace('#','')" spellcheck="false" maxlength="6"  @change="changeColor('searchColFormData.searchCon.style.background')">
+                                    <button @click="resetColor('searchColFormData.searchCon.style.background')">重置</button>
+                                </div>
+                                <div class="opciatyBox">
+                                    <input type="text" class="opciatySet" v-model="searchColFormData.searchCon.style.opacity">
+                                    <span  class="single back">%</span>
+                                </div>
+                            </div>
+                            <div class="style_options flexItem">
+                                <label for="">搜索框高度：</label>
+                                <div class="split_options radioBox">
+                                    <span :class="{'onChose': searchColFormData.searchCon.style.height == 64}" @click="searchColFormData.searchCon.style.height = 64"><s></s>常规</span>
+                                    <span :class="{'onChose': searchColFormData.searchCon.style.height == 72}" @click="searchColFormData.searchCon.style.height = 72"><s></s>加高</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">搜索框圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" v-model="searchColFormData.searchCon.style.borderRadius"  :min="0" :max="36"></el-slider>
+                                <div class="colorShowBox sminp" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow sminp" @input="checkMax(0,36,'searchColFormData.searchCon.style.borderRadius')" :value="searchColFormData.searchCon.style.borderRadius"  >
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                    <dl class="setbox" v-if="searchColFormData.showMods.includes(2)">
+                        <dt>
+                            <h5>商品搜图</h5>
+                        </dt>
+                        <dd>
+                            <div class="style_item ">
+                                <div class="style_options">
+                                    <label for="">搜图图标：</label>
+                                    <div class="img_up fn-clear">
+                                        <div :class="['upbtn vip_icon',{'hasup':searchColFormData.searchImg.path}]">
+                                            <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" id="searchImg_filedata" data-type="searchImg">
+                                            <img v-if="searchColFormData.searchImg.path" :src="searchColFormData.searchImg.path" alt="" >
+                                            <span>更换图片</span>
+                                        </div>
+                                        <div class="imgText">
+                                            <p>建议尺寸70x70px</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">图标颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  popper-class="borderColorPicker"  @change="value => pickerChangeColor(value,'searchColFormData.searchImg.iconColor')" @active-change="(value) => activeChangeColor(value,'searchColFormData.searchImg.iconColor')" v-model="searchColFormData.searchImg.iconColor" class="colorpicker" ></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" class="colorShow" @change="changeColor(value,'searchColFormData.searchImg.iconColor')" :value="searchColFormData.searchImg.iconColor ? searchColFormData.searchImg.iconColor.replace('#','') : ''" spellcheck="false"  maxlength="6">
+                                        <button >重置</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+                    <dl class="setbox" v-if="searchColFormData.showMods.includes(4)">
+                        <dt>
+                            <h5>搜索按钮</h5>
+                        </dt>
+                        <dd>
+                            <div class="style_item ">
+                                <div class="style_options">
+                                    <label for="">选择样式：</label>
+                                    <div class="split_options radioBox">
+                                        <span :class="{'onChose':searchColFormData.searchBtn.styletype === 1}" @click="searchColFormData.searchBtn.styletype = 1"><s></s>样式一</span>
+                                        <span :class="{'onChose':searchColFormData.searchBtn.styletype === 2}" @click="searchColFormData.searchBtn.styletype = 2"><s></s>样式二</span>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">按钮颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" v-model="searchColFormData.searchBtn.style.background" @active-change="(value) => activeChangeColor(value,'searchColFormData.searchBtn.style.background')"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" class="colorShow" :value="searchColFormData.searchBtn.style.background ? searchColFormData.searchBtn.style.background.replace('#','') : ''"  @change="changeColor('searchColFormData.searchBtn.style.background')"  spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('searchColFormData.searchBtn.style.background')">重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" v-if="searchColFormData.searchBtn.styletype == 1">
+                                    <label for="">文字颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" v-model="searchColFormData.searchBtn.style.color"  @active-change="(value) => activeChangeColor(value,'searchColFormData.searchBtn.style.color')"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" class="colorShow" :value="searchColFormData.searchBtn.style.color.replace('#','')" @change="changeColor('searchColFormData.searchBtn.style.color')"  spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('searchColFormData.searchBtn.style.color')">重置</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="modstyleBox" v-if="searchColFormData.showMods.includes(3)">
+                <h2 class="stitle">搜索热词</h2>
+                <div class="sContent">
+                    <div class="style_options flexItem">
+                        <label for="">搜索热词：</label>
+                        <div class="split_options radioBox">
+                            <span :class="{'onChose':searchColFormData.hotKeysConfig.show}" @click="searchColFormData.hotKeysConfig.show = 1,searchConChange(1,1)"><s></s>显示</span>
+                            <span :class="{'onChose':!searchColFormData.hotKeysConfig.show}" @click="searchColFormData.hotKeysConfig.show = 0,searchConChange(0,1)" ><s></s>不显示</span>
+                        </div>
+                    </div>
+                    
+                    <!-- hasBox_item表示内有特殊div -->
+                    <div class="style_item hasBox_item">
+                        <a class="editHotkeyBox" href="hotKeywords.php" target="_blank">
+                            <h6>编辑热门搜索词</h6>
+                            <p>当前可预览样式，热词内容请在新窗口编辑</p>
+                        </a>
+                        <div class="editConBox">
+                            <div class="style_options" >
+                                <label for="">热词文本：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker @active-change="(value) => activeChangeColor(value,'searchColFormData.hotKeysConfig.style.color')" v-model="searchColFormData.hotKeysConfig.style.color" class="colorpicker"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" @change="changeColor('searchColFormData.hotKeysConfig.style.color')" spellcheck="false" :value="searchColFormData.hotKeysConfig.style.color.replace('#','')" maxlength="6">
+                                    <button  @click="resetColor('searchColFormData.hotKeysConfig.style.color')">重置</button>
+                                </div>
+                            </div>
+                            <div class="style_options" >
+                                <label for="">背景：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'searchColFormData.hotKeysConfig.style.background')"  v-model="searchColFormData.hotKeysConfig.style.background"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" @change="changeColor('searchColFormData.hotKeysConfig.style.background')"  :value="searchColFormData.hotKeysConfig.style.background.replace('#','')" spellcheck="false" maxlength="6">
+                                    <button  @click="resetColor('searchColFormData.hotKeysConfig.style.background')">重置</button>
+                                </div>
+                                <div class="opciatyBox">
+                                    <input type="text" class="opciatySet" v-model="searchColFormData.hotKeysConfig.style.opacity">
+                                    <span  class="single back">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 间距设置 -->
+            <div class="marginSetBox modstyleBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" >
+                        <div class="sContent">
+                            <div class="style_options">
+                                <label for="">背景高度：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :step="8" :min="searchColFormData.layout == 1 ? 88 : 176" :max="searchColFormData.layout == 1 ? 504 : 600" v-model="searchColFormData.style.bgHeight"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="checkMax((searchColFormData.layout == 1 ? 88 : 176),(searchColFormData.layout == 1 ? 504 : 600),'searchColFormData.style.bgHeight')" :value="searchColFormData.style.bgHeight">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options" v-show="searchColFormData.bgMask > 2 ||searchColFormData.bgMask == 0">
+                                <label for="">背景圆角：</label>
+                                <el-slider tooltip-class="tooltip_show"  v-model="searchColFormData.style.borderRadius" :show-tooltip="showTooltip"  :min="0" :max="50"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow"  @input="checkMax(0,50,'searchColFormData.style.borderRadius')" :value="searchColFormData.style.borderRadius">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="searchColFormData.style.marginLeft" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,40,'searchColFormData.style.marginLeft')" :value="searchColFormData.style.marginLeft">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- 搜索栏 e -->

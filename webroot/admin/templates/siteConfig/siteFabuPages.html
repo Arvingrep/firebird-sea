@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>发布页自定义</title>
+<link rel="stylesheet" href="/static/css/core/base.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="/static/css/ui/pickr.min.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="/static/css/admin/siteFabuPages.css?v={#$cfg_staticVersion#}">
+<script language="javascript" type="text/javascript">
+    var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}", adminPath = "{#$adminPath#}", modelType = action = "{#$action#}", cfg_staticVersion = '{#$cfg_staticVersion#}';
+
+    var infoArr = {#json_encode($infoarr)#}
+   var masterDomain = '{#$cfg_basehost#}';
+   var memberDomain = '{#$member_userDomain#}';
+   var optAction = false;
+   var headtitle = '{#json_encode($title)#}';
+   headtitle = JSON.parse(headtitle)
+   window.onbeforeunload = function(){
+     if(optAction){
+       return ("还没有完成,确认退出吗?");
+     }
+   }
+</script>
+</head>
+
+<body>
+  <div class="headBox">
+    <h3><a href="javascript:;" target="_blank" class="backHome"></a> <s class="line1"></s>快捷发布设置</h3>
+    <div class="btnsGroup">
+      <a href="javascript:;" class="preview"><s></s>预览</a>
+      <a href="javascript:;" class="save">保存</a>
+      <div class="success_tip"><s></s><p>保存成功</p></div>
+      <div class="error_tip"><s></s><p>请补全未完善信息！</p></div>
+      <div class="previewBox">
+        <div class="qrBox"><img src="/static/images/ajax-loader.gif?v={#$cfg_staticVersion#}" alt=""></div>
+        <h5>扫描二维码预览</h5>
+        <p>已同步至最新</p>
+      </div>
+    </div>
+  </div>
+  <div class="containBox">
+    <!-- 左侧数据 -->
+    <div class="leftCon">
+      <dl class="modbox  fn-clear bujutype" data-type="bjtype">
+        <dt>选择布局方式</dt>
+        <dd data-val="1" class="{#if $infoarr.customConfig == '' && $infoarr.customChildren ==''#}on_chose{#/if#}">平台默认</dd>
+        <dd data-val="2" class="{#if $infoarr.customConfig != '' || $infoarr.customChildren !=''#}on_chose{#/if#}">自定义发布</dd>
+      </dl>
+      <div class="customBox {#if $infoarr.customConfig == '' && $infoarr.customChildren ==''#}fn-hide{#/if#}">
+        <dl class="modbox fn-clear" data-type="showMod">
+          <dt>已设置发布分类</dt>
+          {#if $infoarr.customConfig#}
+          {#$showCount = 0#}
+          {#$showCount1 = 0#}
+          {#foreach from=$infoarr.customConfig key='i' item="info" #}
+          {#if $info.state == 1 && $info.code#}
+          {#foreach from=$infoarr.config key='i' item="infos" #}
+          {#if $infos.code == $info.code#}
+          {#$showCount = $showCount + 1#}
+          <dd data-code="{#$info.code#}" data-url="{#$info.url#}" data-icon="{#$info.icon#}" data-name="{#$infos.name#}" class="config">{#$infos.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+          {#/if#}
+          {#/foreach#}
+          {#else#}
+          {#$showCount = 0#}
+          {#$showCount1 = 0#}
+          {#foreach from=$infoarr.config key='i' item="info" #}
+          {#if $info.state == 1 #}
+          {#$showCount = $showCount + 1#}
+          <dd data-code="{#$info.code#}" data-url="{#$info.url#}" data-icon="{#$info.icon#}" data-name="{#$info.name#}" class="config">{#$info.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+          {#/if#}
+          {#if $infoarr.customChildren#}
+          {#foreach from=$infoarr.customChildren key='i' item="info" #}
+          {#if $info.state == 1 && $info.code#}
+          {#foreach from=$infoarr.children key='i' item="infos" #}
+          {#if $info.code == $infos.code#}
+          {#$showCount1 = $showCount1 + 1#}
+          <dd data-code="{#$info.code#}" data-color="{#$info.color#}" data-column="{#$info.column#}" data-name="{#$infos.name#}"  data-content='{#json_encode($infos.content)#}' class="child">{#$infos.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+          {#/if#}
+          {#/foreach#}
+          {#else#}
+          {#foreach from=$infoarr.children key='i' item="info" #}
+          {#if $info.state == 1 && $info.code#}
+          {#$showCount1 = $showCount1 + 1#}
+          <dd data-code="{#$info.code#}" data-color="{#$info.color#}" data-column="{#$info.column#}" data-name="{#$info.name#}"  data-content='{#json_encode($info.content)#}' class="child">{#$info.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+          {#/if#}
+        </dl>
+
+        <dl class="modbox fn-clear {#if $showCount == count($infoarr.config) && $showCount1 == count($infoarr.children)#}fn-hide{#/if#}" data-type="hideMod">
+          <dt>已关闭快捷发布</dt>
+          {#if $infoarr.customConfig#}
+          {#foreach from=$infoarr.customConfig key='i' item="info" #}
+          {#if $info.state != 1 && $info.code#}
+          {#foreach from=$infoarr.config key='i' item="infos" #}
+          {#if $infos.code == $info.code#}
+          <dd data-code="{#$info.code#}" data-url="{#$info.url#}" data-icon="{#$info.icon#}" data-name="{#$infos.name#}" class="config">{#$infos.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+          {#/if#}
+          {#/foreach#}
+          {#else#}
+          {#foreach from=$infoarr.config key='i' item="info" #}
+          {#if $info.state != 1#}
+          <dd data-code="{#$info.code#}" data-url="{#$info.url#}" data-icon="{#$info.icon#}" class="config" data-name="{#$info.name#}">{#$info.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+          {#/if#}
+          {#if $infoarr.customChildren#}
+          {#foreach from=$infoarr.customChildren key='i' item="info" #}
+          {#if $info.state != 1 && $info.code#}
+          {#foreach from=$infoarr.children key='i' item="infos" #}
+          {#if $infos.code == $info.code#}
+          <dd data-code="{#$info.code#}" data-color="{#$info.color#}" data-column="{#$info.column#}" data-name="{#$infos.name#}"  data-content='{#json_encode($infos.content)#}' class="child">{#$infos.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+          {#/if#}
+          {#/foreach#}
+          {#else#}
+          {#foreach from=$infoarr.children key='i' item="info" #}
+          {#if $info.state != 1#}
+          <dd data-code="{#$info.code#}" data-color="{#$info.color#}" data-column="{#$info.column#}" data-name="{#$infos.name#}"  data-content='{#json_encode($info.content)#}' class="child">{#$info.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+          {#/if#}
+        </dl>
+      </div>
+      <div class="originBox {#if $infoarr.customConfig != '' || $infoarr.customChildren !=''#}fn-hide{#/if#}">
+        <dl class="modbox fn-clear" data-type="showMod">
+          <dt>已设置发布分类</dt>
+          {#$showCount = 0#}
+          {#$showCount1 = 0#}
+          {#foreach from=$infoarr.config key='i' item="info" #}
+          {#if $info.state == 1 #}
+          {#$showCount = $showCount + 1#}
+          <dd data-code="{#$info.code#}" data-url="{#$info.url#}" data-icon="{#$info.icon#}"  data-name="{#$info.name#}" class="config">{#$info.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+
+          {#foreach from=$infoarr.children key='i' item="info" #}
+          {#if $info.state == 1 && $info.code#}
+          {#$showCount1 = $showCount1 + 1#}
+          <dd data-code="{#$info.code#}" data-color="{#$info.color#}" data-column="{#$info.column#}" data-name="{#$info.name#}"  data-content='{#json_encode($info.content)#}' class="child">{#$info.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+
+        </dl>
+
+        <dl class="modbox fn-clear fn-hide" data-type="hideMod">
+          <dt>已关闭快捷发布</dt>
+
+          {#foreach from=$infoarr.config key='i' item="info" #}
+          {#if $info.state != 1#}
+          <dd data-code="{#$info.code#}" data-url="{#$info.url#}" data-icon="{#$info.icon#}" class="config">{#$info.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+
+          {#foreach from=$infoarr.children key='i' item="info" #}
+          {#if $info.state != 1#}
+          <dd data-code="{#$info.code#}" data-color="{#$info.color#}" data-column="{#$info.column#}" data-name="{#$info.name#}"  data-content='{#json_encode($info.content)#}' class="child">{#$info.name#}</dd>
+          {#/if#}
+          {#/foreach#}
+
+        </dl>
+
+      </div>
+
+    </div>
+    <div class="midContainer {#if $infoarr.customConfig != '' || $infoarr.customChildren !=''#}transLeft{#/if#}">
+      <a href="javascript:;" class="btn initBtn"><s></s>重置初始值</a>
+      <div class="changeLayout" data-val="1"><s></s><p>已切换至默认布局，如需设置生效请及时保存</p></div>
+      <div class="changeLayout" data-val="2"><s></s><p>已切换至自定义发布设置，修改后请及时保存</p></div>
+      <!-- <div class="failTip"><s></s><p>已切换至默认布局，如需设置生效请及时保存</p></div> -->
+      <div class="pageShow">
+        <div class="pagebox">
+          <div class="pageCon customCon {#if $infoarr.customConfig == '' && $infoarr.customChildren ==''#}fn-hide{#/if#}">
+            <div class="truePage">
+              <div class="pagetop"><img src="/static/images/admin/phone_head.png" alt=""></div>
+              <div class="fastFb">
+                <div class="page_title">
+                  <span class="noTit">添加标题</span>
+                  <h2 title="修改标题" class="{#if $title && $title.state == 0#}opacity{#/if#}">{#$title.title|default:'快捷发布'#} </h2>
+                  <a href="javascript:;" class="del_title"><s></s>删除</a>
+                  <div class="line"></div>
+                </div>
+
+                <ul class="fn-clear">
+                  {#if $infoarr.customConfig == ''#}
+                  {#foreach from=$infoarr.config key='i' item="info" #}
+                  {#if $info.state == 1#}
+                  {#$showCount = $showCount + 1#}
+                  <li data-code="{#$info.code#}" data-name="{#$info.name#}" data-icon="{#$info.icon#}" data-url="{#$info.url#}" class="hasShow">
+                    <div class="icon"><img src="{#$info.icon#}" alt=""></div>
+                    <p>{#$info.name#}</p>
+                    <s class="line"></s>
+                    <a href="javascript:;" class="del_btn"><s></s>删除</a>
+                  </li>
+                  {#/if#}
+                  {#/foreach#}
+                  {#else#}
+                  {#foreach from=$infoarr.customConfig key='i' item="info" #}
+                  {#if $info.state == 1#}
+                  {#$showCount = $showCount + 1#}
+                  <li data-code="{#$info.code#}" data-name="{#$info.name#}" data-icon="{#$info.icon#}" data-url="{#$info.url#}" class="hasShow {#if !$info.code || $info.selfDefine#}selfAdd{#/if#}">
+                    <div class="icon"><img src="{#$info.icon#}" alt=""></div>
+                    <p>{#$info.name#}</p>
+                    <s class="line"></s>
+                    <a href="javascript:;" class="del_btn"><s></s>删除</a>
+                  </li>
+                  {#/if#}
+                  {#/foreach#}
+                  {#/if#}
+                  <li class="add_btn"><s></s></li>
+                </ul>
+              </div>
+              <div class="fbListbox">
+                <div class="fbList">
+                {#if $infoarr.customChildren == ''#}
+                {#foreach from=$infoarr.children key='i' item="info" #}
+                {#if $info.state == 1#}
+                <div class="fbItem" data-code="{#$info.code#}" data-name="{#$info.name#}" data-content='{#json_encode($info.content)#}' data-column="{#$info.column#}" data-color="{#$info.color#}">
+                  <dl>
+                    <dt style="background:{#$info.color#}"><s></s><span>{#$info.name|default:"分组名称"#}</span></dt>
+                    <dd >
+                      <ul>
+                        {#foreach from=$info.content item="con"#}
+                        {#if $con.state == 1#}
+                        <li style="width:{#(100/$info.column)#}%;" data-url="{#$con.url#}" data-icon="{#$con.icon#}" data-name='{#$con.name#}'>
+                          <div class="icon"><img src="{#$con.icon#}" alt=""></div>
+                          <p>{#$con.name#}</p>
+                        </li>
+                        {#/if#}
+                        {#/foreach#}
+                      </ul>
+                    </dd>
+                  </dl>
+                  <div class="line"></div>
+                  <a href="javascript:;" class="del_btn"><s></s>删除</a>
+                </div>
+                {#/if#}
+                {#/foreach#}
+                {#else#}
+                {#foreach from=$infoarr.customChildren key='i' item="info" #}
+                {#if $info.state == 1#}
+                <div class="fbItem" data-code="{#$info.code#}" data-name="{#$info.name#}" data-content='{#json_encode($info.content)#}' data-column="{#$info.column#}" data-color="{#$info.color#}" class="{#if !$info.code || $info.selfDefine#}selfAdd{#/if#}">
+                  <dl>
+                    <dt style="background:{#$info.color#}"><s></s><span>{#$info.name|default:"分组名称"#}</span></dt>
+                    <dd >
+                      <ul>
+                        {#foreach from=$info.content item="con"#}
+                        {#if $con.state == 1#}
+                        <li style="width:{#(100/$info.column)#}%;" data-url="{#$con.url#}" data-self="{#$con.selfDefine#}" data-icon="{#$con.icon#}" data-name='{#$con.name#}'>
+                          <div class="icon"><img src="{#$con.icon#}" alt=""></div>
+                          <p>{#$con.name#}</p>
+                        </li>
+                        {#/if#}
+                        {#/foreach#}
+                      </ul>
+                    </dd>
+                  </dl>
+                  <div class="line"></div>
+                  <a href="javascript:;" class="del_btn"><s></s>删除</a>
+                </div>
+                {#/if#}
+                {#/foreach#}
+                {#/if#}
+                <div class="add_btn"></div>
+              </div>
+              </div>
+            </div>
+            <a href="javascript:;" class="close_btn"></a>
+          </div>
+          <div class="pageCon originCon {#if $infoarr.customConfig != '' || $infoarr.customChildren !=''#}fn-hide{#/if#}">
+            <div class="truePage">
+              <div class="pagetop"><img src="/static/images/admin/phone_head.png" alt=""></div>
+              <div class="fastFb">
+                <h2>快捷发布</h2>
+                <ul class="fn-clear">
+
+                  {#foreach from=$infoarr.config key='i' item="info" #}
+                  {#if $info.state == 1#}
+                  {#$showCount = $showCount + 1#}
+                  <li data-code="{#$info.code#}" data-name="{#$info.name#}" data-icon="{#$info.icon#}" data-url="{#$info.url#}" class="hasShow ">
+                    <div class="icon"><img src="{#$info.icon#}" alt=""></div>
+                    <p>{#$info.name#}</p>
+                    <s class="line"></s>
+                    <a href="javascript:;" class="del_btn"><s></s>删除</a>
+                  </li>
+                  {#/if#}
+                  {#/foreach#}
+
+                  <li class="add_btn"><s></s></li>
+                </ul>
+              </div>
+              <div class="fbListbox">
+                <div class="fbList">
+
+                {#foreach from=$infoarr.children key='i' item="info" #}
+                {#if $info.state == 1#}
+                <div class="fbItem" data-code="{#$info.code#}" data-name="{#$info.name#}" data-content='{#json_encode($info.content)#}' data-column="{#$info.column#}" data-color="{#$info.color#}">
+                  <dl>
+                    <dt style="background:{#$info.color#}"><s></s><span>{#$info.name#}</span></dt>
+                    <dd >
+                      <ul>
+                        {#foreach from=$info.content item="con"#}
+                        {#if $con.state == 1#}
+                        <li style="width:{#(100/$info.column)#}%;" data-url="{#$con.url#}" data-code="{#$con.code#}" data-icon="{#$con.icon#}" data-name='{#$con.name#}'>
+                          <div class="icon"><img src="{#$con.icon#}" alt=""></div>
+                          <p>{#$con.name#}</p>
+                        </li>
+                        {#/if#}
+                        {#/foreach#}
+                      </ul>
+                    </dd>
+                  </dl>
+                  <div class="line"></div>
+                  <a href="javascript:;" class="del_btn"><s></s>删除</a>
+                </div>
+                {#/if#}
+                {#/foreach#}
+
+                <div class="add_btn"></div>
+              </div>
+              </div>
+            </div>
+            <a href="javascript:;" class="close_btn"></a>
+          </div>
+        </div>
+        <div class="pageDec">
+          <a href="javascript:;" class="hidebtn">
+            <span class="hideLine">隐藏辅助线</span>
+            <span class="showLine">显示辅助线</span>
+          </a>
+          <p class="bottom_tip">提示：标准屏参考机型为iPhone6-8，全面屏为iPhoneX及以上</p>
+          <div class="line">
+            <span>全面屏</span>
+          </div>
+          <div class="line normal">
+            <span>标准屏</span>
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+
+    <div class="rightCon {#if $infoarr.customConfig != '' || $infoarr.customChildren !=''#}show{#/if#}">
+      <div class="modBox fn-hide">
+        <div class="title">自定义发布设置<span class="chose_tip">如需修改请切换至自定义发布</span> </div>
+        <!-- 初始化，重置 -->
+        <div class="initBox">
+          <h3>自定义标题</h3>
+          <div class="switchbox">
+            <span>{#if $title.state == 0#}无标题{#else#}有标题{#/if#}</span>
+            <div class="btn {#if $title.state != 0#}open{#/if#}"><s></s></div>
+            <input type="hidden" value="{#$title.state|default:1#}" name="state" id="titleShow">
+          </div>
+          <div class="inpbox">
+            <input type="text" value="{#$title.title|default:'快捷发布'#}" class="headTitle" placeholder="请输入标题">
+          </div>
+        </div>
+      </div>
+      <div class="modBox config ">
+        <div class="title">发布项设置 <span class="chose_tip">如需修改请切换至自定义发布</span> <a href="javascript:;" class="reset_btn"><s></s>重置此项</a><a href="javascript:;" class="delbtn fn-hide"><s></s>删除此项<div class="del_tip"><i></i>一经删除不可恢复</div></a></div>
+
+        <!-- 初始化，重置 -->
+        <div class="optBox">
+          <div class="bg"></div>
+          <!-- 是否开启 -->
+          <dl class="tip_sure">
+            <dt>是否开启快捷发布
+              <p class="closetip fn-hide">可点击开启，将其添加至页面</p>
+              <p class="errtip fn-hide">可点击开启，将其添加至页面</p>
+              <p class="tip fn-hide">关闭后将删除此项，可恢复</p>
+            </dt>
+            <dd>
+              <span>开启</span>
+              <div class="switch open"><s></s></div>
+            </dd>
+          </dl>
+
+          <div class="fbBox">
+            <div class="bg"></div>
+            <h2>发布内容</h2>
+            <ul class="list">
+              <li class="item">
+                <s class="left_icon"><img src="/static/images/admin/order_icon.png" alt=""></s>
+                <div class="item_con">
+                  <div class="img_up fn-clear">
+                    <div class="upbtn hasup">
+                      
+                      <span>更换图片</span>
+                      <input type="file" name="Filedata" id="Filedata" accept="png,jpg,jpeg" class="fileUp">
+                    </div>
+                    <div class="imgText">
+                      <h4>分类图标</h4>
+                      <p>建议图标尺寸100*100px</p>
+                    </div>
+                  </div>
+                  <div class="inpbox">
+                    <input type="text" placeholder="请输入分类名称" class="iconName">
+                    <div class="count"><span>0</span>/5</div>
+                  </div>
+                  <div class="inpbox linkbox">
+                    <s><img src="/static/images/admin/link.png" alt=""></s>
+                    <input type="text" placeholder="请输入链接" class="iconLink">
+                  </div>
+                </div>
+              </li>
+              <!-- <li class="item">
+                <s class="left_icon"><img src="/static/images/admin/order_icon.png" alt=""></s>
+                <div class="item_con">
+                  <div class="img_up fn-clear">
+                    <div class="upbtn">
+                      <span>更换图片</span>
+                    </div>
+                    <div class="imgText">
+                      <h4>分类图标</h4>
+                      <p>建议图标尺寸100*100px</p>
+                    </div>
+                  </div>
+                  <div class="inpbox">
+                    <input type="text" placeholder="请输入分类名称" class="iconName">
+                    <div class="count"><span>0</span>/5</div>
+                  </div>
+                  <div class="inpbox linkbox">
+                    <s><img src="/static/images/admin/link.png" alt=""></s>
+                    <input type="text" placeholder="请输入分类链接" class="iconLink">
+                  </div>
+                </div>
+              </li> -->
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="modBox children fn-hide">
+        <div class="title">发布项设置 <span class="chose_tip">如需修改请切换至自定义发布</span><a href="javascript:;" class="reset_btn"><s></s>重置此项</a><a href="javascript:;" class="delbtn"><s></s>删除此项<div class="del_tip"><i></i>一经删除不可恢复</div></a></div>
+        <!-- 初始化，重置 -->
+        <div class="optBox">
+          <div class="bg"></div>
+          <!-- 是否开启 -->
+          <dl class="tip_sure">
+            <dt>是否开启快捷发布
+              <p class="closetip fn-hide">可点击开启，将其添加至页面</p>
+              <p class="errtip fn-hide">请先开启此分类</p>
+              <p class="tip fn-hide">关闭后将删除此项，可恢复</p>
+            </dt>
+            <dd>
+              <span>开启</span>
+              <div class="switch open"><s></s></div>
+            </dd>
+          </dl>
+          <div class="modstyle">
+            <h2>组件样式</h2>
+            <div class="inpbox">
+              <input type="text" class="modName" placeholder="请输入分组名称">
+            </div>
+            <div class="otherbox">
+              <div class="column_chose">
+                <s></s>
+                <span data-col="5">每行5个</span>
+                <span data-col="4">每行4个</span>
+              </div>
+              <div class="color_picker"><div class="color" id="colorPicker"></div></div>
+            </div>
+          </div>
+
+          <div class="fbBox">
+            <div class="bg"></div>
+            <h2>发布内容</h2>
+            <ul class="list">
+              <li class="item">
+                <s class="left_icon"><img src="/static/images/admin/order_icon.png" alt=""></s>
+                <div class="item_con">
+                  <div class="img_up fn-clear">
+                    <div class="upbtn hasup">
+                      <span>更换图片</span>
+                    </div>
+                    <div class="imgText">
+                      <h4>分类图标</h4>
+                      <p>建议图标尺寸100*100px</p>
+                    </div>
+                  </div>
+                  <div class="inpbox">
+                    <input type="text" placeholder="请输入分类名称" class="iconName">
+                    <div class="count"><span>0</span>/5</div>
+                  </div>
+                  <div class="inpbox linkbox">
+                    <s><img src="/static/images/admin/link.png" alt=""></s>
+                    <input type="text" placeholder="请输入分类链接" class="iconLink">
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="btngroup">
+            <div class="bg"></div>
+            <a href="javascript:;" class="add_more"><s></s>添加发布项</a>
+            <div class="other_item fn-hide">
+              <h3>可添加的发布项</h3>
+              <ul>
+
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alertBox">
+      <div class="alertPop">
+        <div class="text_con">
+          <h4>确定删除该发布项？</h4>
+          <p>不可恢复，请谨慎操作</p>
+        </div>
+        <div class="alertBtn"><a href="javascript:;" class="cancel"><s></s><span>取消</span></a><a href="javascript:;" class="sure"><s></s><span>确定</span></a></div>
+      </div>
+    </div>
+    <div class="popMask"></div>
+    <div class="popbox">
+      <h2>重置发布页所有设置？</h2>
+      <p>不可恢复，请谨慎操作</p>
+      <a href="javascript:;" class="close_pop"></a>
+      <div class="btn_group">
+        <a href="javascript:;" class="cancel"><s></s><span>取消</span></a><a href="javascript:;" class="sure"><s></s><span>确定</span></a>
+      </div>
+    </div>
+  </div>
+</body>
+<script src="/static/js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="/static/js/ui/jquery-ui-sortable.js?v={#$cfg_staticVersion#}"></script>
+<script src="/static/js/ui/pickr.min.js?v={#$cfg_staticVersion#}"></script>
+<!-- <script src="/static/js/ui/ewPlugins.min.js?v={#$cfg_staticVersion#}"></script> -->
+<script src="/static/js/ui/jquery.ajaxFileUpload.js?v={#$cfg_staticVersion#}"></script>
+<script src="/static/js/admin/siteFabuPages.js?v={#$cfg_staticVersion#}"></script>
+</html>

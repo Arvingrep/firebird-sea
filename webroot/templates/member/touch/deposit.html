@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<title>{#if $paytype=='deposit'#}余额充值{#else#}{#$cfg_pointName#}{#$langData['siteConfig'][15][0]#}{#/if#} </title>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/money.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/deposit.css?v={#$cfg_staticVersion#}" media="all" />
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var pointRatio = {#$cfg_pointRatio#}, pointName = '{#$cfg_pointName#}';
+	var type =  "{#$paytype#}";
+
+	var ordertype = "{#if $paytype==deposit#}deposit{#else#}recharge{#/if#}";
+
+	var chongzhiSongJiFen =  {#$cfg_chongzhiSongJiFen|default:0#};  //送积分开关
+	var chongzhijfFee =  {#$cfg_chongzhijfFee|default:0#};  //送积分比例
+	var chongzhiJfLimit =  {#$cfg_chongzhiJfLimit|default:0#}; //大于等于n元限制
+</script>
+
+</head>
+<body>
+	{#if $paytype=='deposit'#}
+	<div class="page yue_page {#$paytype#}">
+		{#* 充值余额 *#}
+		{#include file="top.html" pageTitle="{#$langData['siteConfig'][19][363]#}{#$langData['siteConfig'][15][0]#}"#}
+		<div class="topCon">
+		  <h3>{#$langData['siteConfig'][10][10]#}</h3>{#* 我的余额 *#}
+		  <p>{#$totalMoney#}</p>
+		</div>
+
+		<div class="mainWrap">
+
+			<div class="depositCon deshow">
+				<h2 class="tit"><strong>{#$langData['siteConfig'][19][363]#}{#$langData['siteConfig'][15][0]#}</strong>限时好礼 多充多送!</h2>{#* 限时好礼 多充多送! *#}
+			  	<ul class="fn-clear mainUl">
+
+					{#foreach from=$moneryvarr item=money#}
+						<li data-id="{#$money#}">
+							<h3><strong>{#$money#}</strong>{#echoCurrency type='short'#}</h3>
+							{#if $cfg_chongzhiCheckType && $cfg_chongzhilimit <= $money && $cfg_chongzhiyhFee#}
+								<span class="curr">送{#$money*$cfg_chongzhiyhFee/100#}{#echoCurrency type='short'#}</span>
+							{#/if#}
+						</li>
+					{#/foreach#}
+			  	</ul>
+			  	<div class="inpBox" id="selfNumBox" @click=" ds_inp = true;">
+					<label for="selfNum">{#$langData['siteConfig'][54][153]#}</label>{#* 自定义充值金额 *#}
+					<!-- <input type="number" name="" onkeyup="this.value=this.value.replace(/[^0-9\.]/g,'')" id="selfNum" autocomplete="off"> -->
+					<div class="right_inp">
+					  <b :class="['selfNum',{'focus':ds_inp}]">{{dsNum}}</b>
+					  <span>{#echoCurrency type='short'#}</span>
+					</div>
+
+					{#include file="../../siteConfig/public_number_keyboard.html"#}
+				</div>
+
+
+			</div>
+		</div>
+		<div class="depositConbot show">
+		  <p class="depositTip">我已阅读并同意<a href="{#getUrlPath service='siteConfig' template='protocol' title='充值服务协议'#}" target="_blank"><span>《充值服务协议》</span></a></p>
+		  <a href="javascript:;" id="tj" class="publicpaybtn {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}">{#$langData['siteConfig'][15][0]#}</a> {#* 充值 *#}
+		</div>
+
+		<input type="hidden" id="price">
+
+		<!-- 选择支付方式 s -->
+		<div class="paybox">
+			<div class="tit">{#$langData['siteConfig'][6][93]#}</div>
+			<ul>
+				{#siteConfig action="payment"#}
+				{#if $row.pay_code == "wxpay"#}
+				<li class="pay1 wxpay" id="wxpay" data-type="wxpay">{#$langData['siteConfig'][19][712]#} <i class="radio"></i></li>
+				{#elseif $row.pay_code == "globalalipay"#}
+				<li class="pay2 alipay" id="globalalipay" data-type="globalalipay">{#$langData['siteConfig'][19][713]#} <i class="radio"></i></li>
+				{#elseif $row.pay_code == "alipay"#}
+				<li class="pay2 alipay" id="alipay" data-type="alipay">{#$langData['siteConfig'][19][713]#} <i class="radio"></i></li>
+				{#elseif $row.pay_code == "paypal"#}
+				  <li class="pay4 paypal" id="paypal" data-type="paypal">{#$langData['siteConfig'][19][714]#} <i class="radio"></i></li>
+				{#/if#}
+				{#/siteConfig#}
+			</ul>
+			<a href="javascript:;" class="paybtn">{#$langData['siteConfig'][6][42]#}</a>
+		</div>
+		<!-- 选择支付方式 e -->
+
+		<form action="/include/ajax.php" method="get" id="payform" class="fn-hide">
+		  <input type="hidden" name="service" id="service" value="member">
+		  <input type="hidden" name="action" id="action" value="deposit">
+		  <input type="hidden" name="paytype" id="paytype" value="wxpay">
+		  <input type="hidden" name="amount" id="amount" value="0" />
+		  <input type="checkbox" name="agree" id="agree" checked />
+		  <button type="submit" id="submit">{#$langData['siteConfig'][6][151]#}</button> {#*提交 *#}
+		</form>
+	</div>
+   {#else#}
+	<div class="page">
+		{#* 充值积分 *#}
+		{#include file="top.html" pageTitle="{#$cfg_pointName#}{#$langData['siteConfig'][15][0]#}"#}
+		<div class="topCon">
+		  <h3>{#$langData['siteConfig'][10][0]#}{#$cfg_pointName#}</h3>{#* 我的积分 *#}
+		  <p>{#$userinfo.point#}</p>
+		</div>
+		<div class="mainWrap">
+		  <h2 class="tit"><strong>充值{#$cfg_pointName#}</strong>充值比例 (现金 : {#$cfg_pointName#} = 1 : {#$cfg_pointRatio#}）</h2>
+		  <ul class="fn-clear mainUl">
+			<li data-id="100">
+			  <h3><strong>100</strong>{#$cfg_pointName#}</h3>
+			  <p>需{#(100/$cfg_pointRatio)|string_format:"%.2f"#}{#echoCurrency type='short'#}</p>
+			</li>
+			<li data-id="500">
+			  <h3><strong>500</strong>{#$cfg_pointName#}</h3>
+			  <p>需{#(500/$cfg_pointRatio)|string_format:"%.2f"#}{#echoCurrency type='short'#}</p>
+			</li>
+			<li data-id="1000">
+			  <h3><strong>1000</strong>{#$cfg_pointName#}</h3>
+			  <p>需{#(1000/$cfg_pointRatio)|string_format:"%.2f"#}{#echoCurrency type='short'#}</p>
+			</li>
+			<li data-id="1500">
+			  <h3><strong>1500</strong>{#$cfg_pointName#}</h3>
+			  <p>需{#(1500/$cfg_pointRatio)|string_format:"%.2f"#}{#echoCurrency type='short'#}</p>
+			</li>
+			<li data-id="2000">
+			  <h3><strong>2000</strong>{#$cfg_pointName#}</h3>
+			  <p>需{#(2000/$cfg_pointRatio)|string_format:"%.2f"#}{#echoCurrency type='short'#}</p>
+			</li>
+			<li data-id="5000">
+			  <h3><strong>5000</strong>{#$cfg_pointName#}</h3>
+			  <p>需{#(5000/$cfg_pointRatio)|string_format:"%.2f"#}{#echoCurrency type='short'#}</p>
+			</li>
+		  </ul>
+		  <div class="inpBox" id="selfNumBox" @click="ds_inp = true;">
+			<label for="selfNum">自定义充值数量</label>
+			<!-- <input type="number" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" data-type="deposit" id="selfNum"> -->
+				<b :class="['selfNum',{'focus':ds_inp}]" style=" padding-right:.85rem;">{{dsNum}}</b>
+			<span>{#$cfg_pointName#}</span>
+			{#include file="../../siteConfig/public_number_keyboard.html"#}
+		  </div>
+		</div>
+        <p class="depositTip pointTip">我已阅读并同意<a href="{#getUrlPath service='siteConfig' template='protocol' title='积分充值协议'#}" target="_blank"><span>《{#$cfg_pointName#}充值协议》</span></a></p>
+		<div class="botPrice">
+		  <div class="leftCon">
+			<h2>{#echoCurrency type='symbol'#}<strong id="allPrice">0.00</strong></h2>
+			<p>所需金额</p>
+		  </div>
+		  <a href="javascript:;" id="tj" class="publicpaybtn {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}">{#$langData['siteConfig'][54][122]#}</a> {#* 确认充值 *#}
+		</div>
+		<input type="hidden" id="price">
+
+		<!-- 选择支付方式 s -->
+		<div class="paybox">
+			<div class="tit">{#$langData['siteConfig'][6][93]#}</div>
+			<ul>
+				{#siteConfig action="payment"#}
+				{#if $row.pay_code == "wxpay"#}
+				<li class="pay1 wxpay" id="wxpay" data-type="wxpay">{#$langData['siteConfig'][19][712]#} <i class="radio"></i></li>
+				{#elseif $row.pay_code == "globalalipay"#}
+				<li class="pay2 alipay" id="globalalipay" data-type="globalalipay">{#$langData['siteConfig'][19][713]#} <i class="radio"></i></li>
+				{#elseif $row.pay_code == "alipay"#}
+				<li class="pay2 alipay" id="alipay" data-type="alipay">{#$langData['siteConfig'][19][713]#} <i class="radio"></i></li>
+				{#elseif $row.pay_code == "paypal"#}
+				  <li class="pay4 paypal" id="paypal" data-type="paypal">{#$langData['siteConfig'][19][714]#} <i class="radio"></i></li>
+				{#/if#}
+				{#/siteConfig#}
+			</ul>
+			<a href="javascript:;" class="paybtn">{#$langData['siteConfig'][6][42]#}</a>
+		</div>
+		<!-- 选择支付方式 e -->
+
+		<form action="/include/ajax.php" method="get" id="payform" class="fn-hide">
+		  <input type="hidden" name="service" id="service" value="member">
+		  <input type="hidden" name="action" id="action" value="recharge">
+		  <input type="hidden" name="paytype" id="paytype" value="wxpay">
+		  <input type="hidden" name="amount" id="amount" value="0" />
+		  <input type="checkbox" name="agree" id="agree" checked />
+		  <button type="submit" id="submit">{#$langData['siteConfig'][6][151]#}</button> {#*提交 *#}
+		</form>
+	</div>
+
+ {#/if#}
+
+  <div class="bg"></div>
+	<div class="error"></div>
+	{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/deposit.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

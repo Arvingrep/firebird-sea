@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}">
+<title>{#$cfg_softname#}{#$cfg_version#}</title>
+{#$cssFile#}
+<link rel="stylesheet" type="text/css" href="{#$cfg_basehost#}/static/css/ui/morris.css?v={#$cfg_staticVersion#}" />
+<link  type="text/css" href="{#$cfg_basehost#}/static/css/ui/bootstrap.min.css?v={#$cfg_staticVersion#}" rel="stylesheet">
+<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_basehost#}/static/css/admin/daterangepicker.css?v={#$cfg_staticVersion#}" />
+<style>
+body,html{background: #f5f5f5; padding: 0; margin: 0; min-width: 1200px;}
+html.huoniao_mobile, .huoniao_mobile body {min-width: 100%;}
+dl {padding:10px; margin:0; border-bottom:1px solid #eee; font-size:16px;}
+dt {float:left; width:145px; text-align:right; font-weight:500;}
+dd {position:relative; overflow:hidden; padding-left:25px; font-weight:500;}
+dd span {font-size:12px; color:#f00;}
+dd a {font-size:12px;}
+dd span {margin-left: 2px;}
+.wrap.body#body{background-color: #f3f3f3;}
+.icon {width: 16px; display: inline-block; vertical-align: middle; margin: -2px 3px 0 0;}
+#hasNewVersion {display: none; background-image: linear-gradient(to right, red, orange, green, orange, red, orange, green, orange, red); -webkit-background-clip: text; -webkit-text-fill-color: transparent; -webkit-background-size: 200% 100%; animation: bgp 5s infinite linear; font-weight: 700;}
+@-webkit-keyframes bgp {0%  {background-position: 0 0;} 100% {background-position: -100% 0;}}
+
+.member_box{padding: 20px 8px;}
+.member_box ul{overflow: hidden; margin: 0;}
+.member_box li{width: 25%; float: left;   list-style: none; }
+.member_box li .c_box{margin: 0 12px; height: 128px; background: #fff;border:1px solid rgba(233, 236, 241, 1);box-shadow:0px 3px 8px 0px rgba(113,113,113,0.09);border-radius:4px; box-sizing: border-box;overflow: hidden; padding: 30px 22px; position: relative;}
+.member_box li .c_box .l_info{float: left;}
+.member_box li .c_box .l_info h2{font-size:18px;font-family:Microsoft YaHei;font-weight:400;color:rgba(102,102,102,1); line-height: 1em; margin: 0;}
+.member_box li .c_box .l_info p{font-size:30px;font-family:PingFang SC;font-weight:bold;color:rgba(51,51,51,1); margin-top: 20px;}
+.member_box li .c_box .r_icon{float: right; width: 64px; height: 64px; position: absolute; right: 25px; top: 35px;}
+.member_box li .c_box .r_icon img{display: block; width: 100%;}
+
+/* 待办事项 */
+.bg_line{background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAC0CAIAAADacNEYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyFpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuNi1jMTQyIDc5LjE2MDkyNCwgMjAxNy8wNy8xMy0wMTowNjozOSAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENDIChXaW5kb3dzKSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozQjk4NzYwOEY3MDMxMUU5OEE2NEQyMzNBRUI4RjE5RCIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozQjk4NzYwOUY3MDMxMUU5OEE2NEQyMzNBRUI4RjE5RCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOjNCOTg3NjA2RjcwMzExRTk4QTY0RDIzM0FFQjhGMTlEIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjNCOTg3NjA3RjcwMzExRTk4QTY0RDIzM0FFQjhGMTlEIi8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+EqzwcwAAACJJREFUeNpi+P//PxMDA8MopjF+9fYTw8+fP0fDgrYYIMAASCAKFsd8aNMAAAAASUVORK5CYII=) repeat ;}
+.notice_box{margin: 0 20px; border:1px solid rgba(233, 236, 241, 1);box-shadow:0px 3px 8px 0px rgba(113,113,113,0.09);border-radius:4px; overflow: hidden; margin-bottom: 24px;}
+.notice_box h2{font-size:20px; font-family:Microsoft YaHei; color:rgba(51,51,51,1);line-height:60px; box-sizing: border-box; border-bottom: solid 1px #E9ECF1; padding-left: 23px; background: #fff; margin: 0;}
+.notice_box{display: none;}
+.classfy_box .con{overflow: hidden; margin: 0; }
+.classfy_box .con li{float: left; position: relative; width: 144px; height: 90px; list-style: none; text-align: center;}
+.classfy_box .con li span{font-size:20px;font-family:Microsoft YaHei;font-weight:400;color:rgba(51,51,51,1);line-height:1em; padding-top: 20px; display: block;}
+.classfy_box .con li p{margin-top: 10px;  font-size:14px; font-family:Microsoft YaHei; color:rgba(136,136,136,1); line-height: 1em;}
+.classfy_box .con li i{display: block; position: absolute; width: 1px; height: 36px; background: #E9ECF1; left: -1px; top:  26px; }
+.classfy_box .con li a{display: block; text-decoration: none; height: 100%;}
+.classfy_box .con li:hover{background: #E9ECF1;}
+
+.part_show>ul{overflow: hidden; margin: 0 10px; }
+.part_show .li_box{width: 50%; list-style: none; float: left; margin-bottom: 20px;}
+.part_show .li_box>div{background: #fff; margin:0 10px;  border:1px solid rgba(233, 236, 241, 1);box-shadow:0px 3px 8px 0px rgba(113,113,113,0.09);border-radius:4px;}
+.part_show .li_box>div h2{position: relative;font-size:20px;font-family:Microsoft YaHei;font-weight:bold;color:rgba(51,51,51,1); line-height: 60px; padding-left: 22px; border-bottom: solid 1px #E9ECF1; margin: 0;}
+.part_show .li_box>div .go_link{display: block; width: 30px; height: 30px; background: url(data:image/png;base64,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) no-repeat center; background-size: cover; position: absolute; right: 20px; top: 18px;}
+
+.lidiv>p{line-height: 48px; border-bottom: solid 1px #E9ECF1; margin-bottom: 0; overflow: hidden;}
+.lidiv>p:hover{background: #F4F5F8;}
+.lidiv label{width: 162px; float: left; text-align: center; line-height: 48px;font-size:14px;font-family:Microsoft YaHei;font-weight:400;color:rgba(136,136,136,1); margin-bottom: 0;}
+.lidiv span{display: block; margin-left: 162px; line-height: 22px; padding: 13px 10px 13px 20px; border-left: solid 1px #E9ECF1;}
+.lidiv.link_box p{height: 78px; padding:23px 0 21px 34px ; line-height: 34px; box-sizing: border-box; position: relative; }
+.lidiv.link_box p img{width: 34px; height: 34px; float: left; }
+.lidiv.link_box p span{float: left; margin-left: 16px; padding-top: 7px;}
+.lidiv.link_box p a{display: block; width: 110px; height: 40px; line-height: 40px; color: #999; border:1px solid rgba(226,228,234,1); position: absolute; right: 18px; top: 19px; text-align: center; border-radius: 3px; text-decoration: none; cursor: pointer;}
+.lidiv.link_box p a:hover{background: #558AEF; color: #fff; border: 1px solid #558AEF;}
+.time_chose {float: right; margin-right: 21px; border:solid 1px #D5D5D5; border-radius: 3px; margin-top: 20px;}
+.time_chose span{cursor: pointer;}
+.li_box .chart_allin,.li_box .chart_allout{padding-bottom: 20px;}
+.time_box{overflow: hidden;}
+.time_chose span{display: inline-block; color: #999; font-size: 14px; line-height: 30px; text-align: center;}
+.time_chose span.month,.time_chose span.week{width: 50px;}
+.time_chose span.month{border-left:solid 1px  #D5D5D5;border-right:solid 1px  #D5D5D5;}
+.time_chose span.self_define{min-width: 72px;padding-left: 8px; cursor: pointer;}
+/* .time_chose span.on_chose{box-shadow:0px 2px 4px 0px rgba(0, 0, 0, 0.11);} */
+.time_chose span.self_define i{display: inline-block; width: 17px; height: 17px; background: url(/static/images/admin/date_chose.png) no-repeat center; background-size: cover; vertical-align: middle; margin-bottom: 4px; margin-left: 5px;margin-right: 5px;}
+
+.data_text{text-align: center; margin-top: 20px;}
+.data_text>span{display: inline-block; margin: 0 40px;}
+.data_text>span h3{margin: 0; line-height: 1em; font-size: 24px;}
+.data_text>span h3 em{font-size: 18px; font-style: normal;}
+.data_text>span p{color: #999; font-size: 14px;}
+
+.week.on_chose,.month.on_chose{box-shadow:0px 2px 4px 0px inset rgba(0, 0, 0, 0.11) !important;}
+
+.morris-charts text {
+  font-family: "Poppins", sans-serif !important;
+}
+
+.morris-hover.morris-default-style {
+  border-radius: 5px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: none;
+  -webkit-box-shadow: 0 5px 25px 5px rgba(0, 0, 0, 0.14);
+          box-shadow: 0 5px 25px 5px rgba(0, 0, 0, 0.14);
+}
+
+.morris-hover.morris-default-style .morris-hover-point {
+  font-weight: 500;
+  font-size: 14px;
+  color: #354558 !important;
+}
+
+.morris-hover.morris-default-style .morris-hover-row-label {
+  background-color: #354558;
+  color: #ffffff;
+  padding: 4px;
+  border-radius: 5px 5px 0 0;
+  margin: -10px -12px 10px;
+}
+.glyphicon-arrow-left:before,.glyphicon-arrow-right:before{content: ''; display: none;}
+</style>
+<script>var adminPath = "{#$adminPath#}";</script>
+</head>
+
+<body>
+
+{#if $pruview#}
+<!-- 会员数据统计s -->
+<div class="member_box">
+	<ul>
+		<li>
+			<div class="c_box">
+				<div class="l_info">
+					<h2>今日新增会员</h2>
+					<p id="newadd">0</p>
+				</div>
+				<div class="r_icon"><img src="/static/images/admin/add_member.png"></div>
+			</div>
+		</li>
+		<li>
+			<div class="c_box">
+				<div class="l_info">
+					<h2>今日总收益</h2>
+					<p id="allin">0</p>
+				</div>
+				<div class="r_icon"><img src="/static/images/admin/shouyi.png"></div>
+			</div>
+		</li>
+		<li>
+			<div class="c_box">
+				<div class="l_info">
+					<h2>会员总计</h2>
+					<p id="mcount">0</p>
+				</div>
+				<div class="r_icon"><img src="/static/images/admin/member_count.png"></div>
+			</div>
+		</li>
+		<li>
+			<div class="c_box">
+				<div class="l_info">
+					<h2 class="tips" data-toggle="tooltip" data-placement="bottom" title="" data-original-title="5分钟以内的活跃人数">当前在线<i class="icon-question-sign" style="margin: 5px 0 0 3px;"></i></h2>
+					<p id="online">0</p>
+				</div>
+				<div class="r_icon"><img src="/static/images/admin/online.png"></div>
+			</div>
+		</li>
+	</ul>
+</div>
+<!--会员 数据统计e -->
+
+<!-- 待办事项s -->
+<div class="notice_box">
+	<h2>待办事项</h2>
+	<div class="bg_line classfy_box">
+		<ul class="con">
+			<li>
+				<i></i>
+				<span>50</span>
+				<p>提现申请</p>
+			</li>
+
+		</ul>
+	</div>
+</div>
+<!-- 待办事项e -->
+
+<div class="part_show">
+	<ul>
+		<li class="li_box">
+			<div class="chart_allin">
+				<h2>平台收入 <a class="go_link" id="shouru" href="member/platForm.php"></a></h2>
+				<div class="time_box">
+					<div class="time_chose " data-type="1"><span class="week on_chose">周</span><span class="month">月</span><span class="self_define" id="reportrange2"><span class="time_in">自定义</span><i class="self_chose"></i></span></div>
+				</div>
+				<div class="data_text">
+					<span class="yj">
+						<h3><em>{#echoCurrency type='symbol'#}</em>0.00</h3>
+						<p>佣金</p>
+					</span>
+					<span class="cz">
+						<h3><em>{#echoCurrency type='symbol'#}</em>0.00</h3>
+						<p>充值</p>
+					</span>
+				</div>
+				<div class="date_show">
+					 <div id="morris-line-yj" class="morris-chart" style="height: 200px"></div>
+				</div>
+			</div>
+		</li>
+		<li class="li_box">
+			<div class="chart_allin">
+				<h2>分站收入 <a class="go_link" id="fzyongjin" href="member/commissionCount.php?gettype=substation"></a></h2>
+				<div class="time_box">
+					<div class="time_chose " data-type="2"><span class="week on_chose">周</span><span class="month">月</span><span class="self_define" id="reportrange3"><span class="time_in">自定义</span><i class="self_chose"></i></span></div>
+				</div>
+				<div class="data_text">
+					<span class="fzyj">
+						<h3><em>{#echoCurrency type='symbol'#}</em>0.00</h3>
+						<p>佣金</p>
+					</span>
+
+				</div>
+				<div class="date_show">
+					 <div id="morris-line-fzyj" class="morris-chart" style="height: 200px"></div>
+				</div>
+			</div>
+		</li>
+		<li class="li_box">
+			<div class="chart_allin">
+				<h2>分销商收入 <a class="go_link" id="fxyongjin" href="member/fenxiaoList.php"></a></h2>
+				<div class="time_box">
+					<div class="time_chose " data-type="3"><span class="week on_chose">周</span><span class="month">月</span><span class="self_define" id="reportrange4"><span class="time_in">自定义</span><i class="self_chose"></i></span></div>
+				</div>
+				<div class="data_text">
+					<span class="fxyj">
+						<h3><em>{#echoCurrency type='symbol'#}</em>0.00</h3>
+						<p>佣金</p>
+					</span>
+
+				</div>
+				<div class="date_show">
+					 <div id="morris-line-fxyj" class="morris-chart" style="height: 200px"></div>
+				</div>
+			</div>
+		</li>
+		<li class="li_box">
+			<div class="chart_allout">
+				<h2>平台支出   <a class="go_link" id="zhichu" href="member/withdraw.php"></a></h2>
+				<div class="time_box">
+					<div class="time_chose"  data-type="0"><span class="week on_chose">周</span><span class="month">月</span><span class="self_define" id="reportrange1"><span class="time_out">自定义</span><i class="self_chose"></i></span></div>
+				</div>
+				<div class="data_text">
+					<span class="zc">
+						<h3><em>{#echoCurrency type='symbol'#}</em>0</h3>
+						<p>支出</p>
+					</span>
+
+				</div>
+				<div class="date_show">
+					 <div id="morris-line-zc" class="morris-chart" style="height: 200px"></div>
+				</div>
+			</div>
+		</li>
+		<li class="li_box">
+			<div class="lidiv">
+				<h2>系统基本参数</h2>
+				<p><label>火鸟系统程序版本</label><span>{#$cfg_softenname#} {#$update_version#} Release {#$cfg_soft_lang#}&nbsp;&nbsp;&nbsp;&nbsp;</span></p>
+				<p><label>操作系统软件信息</label><span>{#$php_uname_s#} {#$php_uname_r#}/{#$server_software#}</span></p>
+				<p><label>PHP解析引擎版本</label><span>{#$PHP_VERSION#}</span></p>
+				<p><label>MySql数据库版本</label><span>{#$mysqlinfo#}</span></p>
+				<p><label>最大附件上传大小</label><span>{#$max_upload#}</span></p>
+				<p><label>当前数据库大小</label><span id="mysqlsize"><a href="javascript:;" id="getMysqlSize">点击获取</a></span></p>
+				<p><label>服务器当前时间</label><span id="serverTime1" data-val="{#$server_time#}">{#$server_time#}</span></p>
+				<p><label>网站所在目录</label><span>{#$server_dir#}</span></p>
+			</div>
+		</li>
+
+		{#if $huoniaoOfficial#}
+		<li class="li_box">
+			<div class="lidiv link_box">
+				<h2>官网链接</h2>
+				<p class="gw"><img src="/static/images/admin/gw.png" /><span>官方网站</span>   <a href="https://www.kumanyun.com" target="_blank">立即前往</a></p>
+				<p class="gl"><img src="/static/images/admin/gl.png" /><span>官方论坛</span>   <a href="http://bbs.kumanyun.com" target="_blank">立即前往</a></p>
+				<p class="bz"><img src="/static/images/admin/bz.png" /><span>帮助中心</span>   <a href="http://help.kumanyun.com" target="_blank">立即前往</a></p>
+				<p class="kj"><img src="/static/images/admin/kj.png" /><span>升级日志</span>   <a href="https://bbs.kumanyun.com/log.html" target="_blank">立即前往</a></p>
+				<p class="tg"><img src="/static/images/admin/tg.png" /><span>提交工单</span>   <a href="https://www.kumanyun.com/my/ticketList.html" target="_blank">立即前往</a></p>
+			</div>
+		</li>
+		{#/if#}
+	</ul>
+</div>
+{#else#}
+<p style="margin-top: 150px;"><center>欢迎进入管理系统，请点击顶部菜单进行操作！</center></p>
+<script>
+ function getAdminNoticeA(data){}
+</script>
+{#/if#}
+
+{#$jsFile#}
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/core/jquery-1.11.0.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/ui/morris.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/ui/raphael.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/ui/countUp.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/ui/bootstrap.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/admin/moment.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/admin/daterangepicker.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/admin/morris.init.js?v={#$cfg_staticVersion#}"></script>
+
+
+{#if $pruview#}
+<script>
+$(function(){
+    $('.tips').tooltip();
+
+	//移动端增加标识
+	if(isMobile()){
+		var bodyEle = document.getElementsByTagName('html')[0];
+    	bodyEle.className += " huoniao_mobile";
+	}
+
+	// 页面跳转
+	 $("#shouru").bind("click", function(){
+	    var href = $(this).attr("href");
+	      try {
+	        event.preventDefault();
+	        parent.addPage("platForm", "member", "平台总收入",href);
+	      } catch(e) {}
+	  });
+	   $("#zhichu").bind("click", function(){
+	    var href = $(this).attr("href");
+	      try {
+	        event.preventDefault();
+	        parent.addPage("withdraw", "member", "提现管理",href);
+	      } catch(e) {}
+	  });
+	   $("#fzyongjin").bind("click", function(){
+	    var href = $(this).attr("href");
+	      try {
+	        event.preventDefault();
+	        parent.addPage("fenzhan", "member", "分站收入",href);
+	      } catch(e) {}
+	  });
+	   $("#fxyongjin").bind("click", function(){
+	    var href = $(this).attr("href");
+	      try {
+	        event.preventDefault();
+	        parent.addPage("fenxiaoList", "member", "分销商收入",href);
+	      } catch(e) {}
+	  });
+	  $('.classfy_box .con').delegate('li','click',function(event){
+		  	var t = $(this), module = t.attr("data-module"), id = t.attr("data-id"), name = t.attr("data-name"), url = t.attr("data-url");
+		  	if(name == '电信专区' && module =='plugins'){
+				try {
+		            event.preventDefault();
+		            parent.addPage("plugins12", "plugins", name, url);
+		        } catch(e) {}
+			}else{
+				event.preventDefault();
+				parent.$(".h-nav a").each(function(index, element) {
+					console.log($(this).attr("href"));
+					var _url = url + (url.indexOf('?') > -1 ? '&' : '?') + "notice=1";
+					if($(this).attr("href") == url){
+						if (name == '外卖出餐超时') {
+							_url  = url + "?state=3";
+						} else if(name == '外卖配送超时') {
+							_url = url + "?state=5";
+						}
+						else if(name == "商城配送审核"){
+							_url = url + "?sCerti=3";
+						}
+						if(name == '会员注销'){
+						    _url = _url + "&off=1";
+						}
+						if(name == '昵称审核'){
+						    _url = _url + "&nicknameAudit=1";
+						}
+						if(name == '头像审核'){
+						    _url = _url + "&photoAudit=1";
+						}
+						$(this).attr("href", _url);
+						parent.$(this).click();
+						$(".notice .noticify").hide();
+						$(this).attr("href", url);
+						$("#welcome .on").attr("href", url);
+						return false;
+					}
+				});
+			}
+	  })
+  //配置
+  $("#BBSConfig, #paymentConfig, #loginConfig").bind("click", function(event){
+  	var href = $(this).attr("href");
+
+  	try {
+  		event.preventDefault();
+  		parent.$(".h-nav a").each(function(index, element) {
+        if($(this).attr("href") == href){
+  				parent.$(this).click();
+  				return false;
+  			}
+  		});
+  	} catch(e) {}
+  });
+
+
+
+
+  //检查最新版本
+  $("#checkUpdate").bind("click", function(){
+    var href = $(this).attr("href");
+
+  	try {
+  		event.preventDefault();
+  		parent.$(".h-nav a").each(function(index, element) {
+        if($(this).attr("href") == href){
+  				parent.$(this).click();
+  				return false;
+  			}
+  		});
+  	} catch(e) {}
+  });
+
+  //获取mysqlsize
+  $("#getMysqlSize").bind("click", function(){
+    $("#mysqlsize").html("正在获取，请稍候...");
+    huoniao.operaJson("index_body.php", "dopost=getMysqlSize", function(data){
+      $("#mysqlsize").html(data.state == 100 ? data.mysqlSize : "获取失败！");
+    })
+  });
+
+  // var serverTime = $("#serverTime").data("val");
+  // var serverTime = $("#serverTime1").data("val");
+  // $("#serverTime").html(huoniao.transTimes(serverTime, 1));
+  //  $("#serverTime1").html(huoniao.transTimes(serverTime, 1));
+  // window.setInterval(function(){
+  //   serverTime++;
+  //   $("#serverTime").html(huoniao.transTimes(serverTime, 1));
+	// $("#serverTime1").html(huoniao.transTimes(serverTime, 1));
+  // }, 1000);
+
+});
+
+
+$(function(){
+
+
+
+  var q = {
+          useEasing: true,
+          easingFn: function(a, b, e, d) {
+              d = (a /= d) * a;
+              return b + e * (d * a + -3 * d + 3 * a)
+          },
+          useGrouping: true,
+          separator: ",",
+          decimal: ".",
+          prefix: "",
+          suffix: ""
+      };
+
+	// 更新四条数据
+	 updateData();
+	 setInterval(updateData,10000);
+	 var count = new CountUp("mcount", 0, 0, 0, 3, q);
+	 var online = new CountUp("online", 0, 0, 0, 3, q);
+	 var allin =  new CountUp("allin", 0, 0, 2, 3, q);
+	 var newadd =  new CountUp("newadd", 0, 0, 0, 3, q);
+	function updateData(){
+		  $.ajax({
+		      url: 'index_body.php?dopost=realtimedata',
+		      data: '',
+		      type: "GET",
+		      dataType: "json",
+		      success: function (data) {
+		          if(data.state == 100){
+		             count.update(data.info.total);
+		             online.update(data.info.online);
+					 allin.update(data.info.allincome);
+					 newadd.update(data.info.newadd);
+		          }
+		      }
+		  });
+	}
+
+
+  getallmoney();
+
+  // 收入和支出
+  function getallmoney(){
+     $.ajax({
+        url: './member/commissionCount.php?dopost=getallmoney',
+        data: '',
+        type: "GET",
+        dataType: "json",
+        success: function (data) {
+            if(data.state == 100){
+                $('#expenditure').text(data.info.allzhichu+'元');
+                $('#allincome').text(data.info.allshouru+'元');
+				// $('.zc h3').html('<em>'+echoCurrency('symbol')+'</em>'+data.info.allshouru);
+            }
+        }
+    });
+  }
+
+
+  $("#platform").bind("click", function(){
+    var href = $(this).attr("href");
+      try {
+        event.preventDefault();
+        parent.addPage("platForm", "member", "平台总收入",href);
+      } catch(e) {}
+  });
+   $("#withdraw").bind("click", function(){
+    var href = $(this).attr("href");
+      try {
+        event.preventDefault();
+        parent.addPage("withdraw", "member", "提现管理",href);
+      } catch(e) {}
+  });
+
+
+
+});
+
+ function getAdminNoticeA(data){
+	 if(data.length > 0){
+	 	var list = [];
+	     var totalCount = 0;
+	 	$('.notice_box').show()
+	 	for(var i=0; i<data.length; i++){
+	 		list.push('<li  data-module="'+data[i].module+'" data-id="'+data[i].id+'" data-name="'+data[i].name+'" data-url="'+data[i].url+'"><a href="javascript:;"><i></i><span>'+data[i].count+'</span><p>'+data[i].name+'</p></a></li>');
+	         totalCount += Number(data[i].count);
+	 	}
+	 	$('.bg_line.classfy_box ul.con').html(list.join(''));
+	     $('.notice_box h2').html('待办事项（'+totalCount+'）');
+	 }else{
+	 	$('.notice_box').hide()
+	 }
+  }
+
+  //是否移动端
+  function isMobile(){
+  	if((navigator.userAgent.match(/(phone|pad|pod|iPhone|iPod|ios|iPad|Android|Mobile|BlackBerry|IEMobile|MQQBrowser|JUC|Fennec|wOSBrowser|BrowserNG|WebOS|Symbian|Windows Phone)/i))) {
+  		return true;
+  	}
+  }
+
+
+
+</script>
+
+{#/if#}
+</body>
+</html>

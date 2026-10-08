@@ -1,0 +1,230 @@
+{#if $module == ""#}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="{#$cfg_soft_lang#}">
+    <title>{#$langData['marry'][2][0]#}</title>{#*婚嫁频道 *#}
+    <meta name="wap-font-scale" content="no">
+    <meta name="viewport"
+        content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/marry.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = '{#$cfg_hideUrl#}';
+        var userId = `{#$userinfo.userid#}`;
+        var companyDomain = `{#getUrlPath service='member'#}`;
+        var imgError = `{#$cfg_staticPath#}images/404.jpg?v={#$cfg_staticVersion#}`; //图片404地址
+        var memberUrl = `{#getUrlPath service='member'#}`; //店铺配置页面
+        if (!userId) {
+            location.href = `${masterDomain}/login.html`;
+        }
+    </script>
+</head>
+
+<body>
+    <div id="vue" v-cloak>
+        <!-- 页面载入loading -->
+        <div class="loading" v-if="false">页面加载中...</div>
+        <!-- 页面内容 -->
+        <div :class="['Shell',{'app':appBoolean}]" v-if="detail.id">
+            <!-- 商家信息 -->
+            <div class="companyDetail">
+                <div class="c-nav">
+                    <img src="{#$templets_skin#}images/back-r.png?v={#$cfg_staticVersion#}" class="cn-left"
+                        @click="backFn">
+                    <img src="{#$templets_skin#}images/shop/set-icon.png?v={#$cfg_staticVersion#}" class="cn-right"
+                        @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+                </div>
+                <div class="c-info">
+                    <div class="ci-left">
+                        <img :src="detail.logo||imgError" class="cil-logo" @error="detail.logo=imgError">
+                        <div class="cil-info">
+                            <div class="title">{{detail.name}}</div>
+                            <!-- 审核中 -->
+                            <div class="aduit"
+                                @click="linkTo(`{#getUrlPath service='member' template='config-marry'#}`)"
+                                v-if="detail.state==0">商家资料审核中</div>
+                            <!-- 审核拒绝 -->
+                            <div class="refuse"
+                                @click="linkTo(`{#getUrlPath service='member' template='config-marry'#}`)"
+                                v-else-if="detail.state==2">商家资料审核未通过</div>
+                            <!-- 审核通过 -->
+                            <div class="tip" v-else>
+                                <span>商家版到期 {{detail.endTime}}</span>
+                                <div @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">续费
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ci-right" @click="linkTo(detail.homepage)">
+                        <img src="{#$templets_skin#}images/houseWhite.png?v={#$cfg_staticVersion#}">
+                        <span>我的主页</span>
+                    </div>
+                </div>
+                <div class="c-data" v-if="false">
+                    <div class="cd-item">
+                        <div class="cdi-time">昨日0</div>
+                        <div class="cdi-number">0</div>
+                        <div class="cdi-text">今日预约(人)</div>
+                    </div>
+                    <div class="cd-item">
+                        <div class="cdi-time">昨日0</div>
+                        <div class="cdi-number">0</div>
+                        <div class="cdi-text">今日咨询(人)</div>
+                    </div>
+                    <div class="cd-item">
+                        <div class="cdi-time">昨日0</div>
+                        <div class="cdi-number">0</div>
+                        <div class="cdi-text">今日客流(人)</div>
+                    </div>
+                </div>
+            </div>
+            <!-- 客户管理 -->
+            <div class="clientManage" @click="linkTo(`{#getUrlPath service='member' template='marry-customer'#}`)">
+                <div class="c-left">
+                    <div :class="['cl-title',{'dot':clientInfo>0}]">客户管理</div>
+                    <div class="cl-tip" v-if="false">门店预约(15)/套餐咨询(23)</div>
+                </div>
+                <div class="c-right">去查看</div>
+            </div>
+            <!-- 订单管理 -->
+            <div class="orderNav" v-if="selectType.length>1||selectType[0]!=8">
+                <div class="o-title" @click="linkTo(`{#getUrlPath service='member' template='marry-manage'#}`,true)">
+                    <div class="ot-left">套餐/案例管理</div>
+                    <div class="ot-right">
+                        管理经营类别
+                    </div>
+                </div>
+                <div class="o-list">
+                    <div class="ol-item" v-for="(item,index) in mealList" :key="index"
+                        @click="popFn(1,'select');mealActive=index" v-if="item.show">
+                        <img :src="`{#$templets_skin#}images/marry/${item.img}.png?v={#$cfg_staticVersion#}`">
+                        <span>{{item.title}}</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 装修管理 -->
+            <div :class="['decorationManage',{'only':selectType.length==1}]" v-if="selectType.includes('8')">
+                <div class="d-title">
+                    <div class="dt-left">宴会酒店</div>
+                    <div class="dt-right">无此业务？<span @click="popFn(1,'warn')">可关闭组件</span></div>
+                    <div class="dt-right manage"
+                        @click="linkTo(`{#getUrlPath service='member' template='marry-manage'#}`,true)">
+                        管理经营类别</div>
+                </div>
+                <div class="d-list">
+                    <div class="dl-item"
+                        @click="linkTo(`{#getUrlPath service='member' template='config_marry_hotel'#}`)">
+                        <img src="{#$templets_skin#}images/marry/newBlock.png?v={#$cfg_staticVersion#}">
+                        <span>酒店资料</span>
+                    </div>
+                    <div class="dl-item"
+                        @click="locationFn(`{#getUrlPath service='member' template='marry-hotelfield'#}`,`{#getUrlPath service='member' template='config_marry_hotel'#}`)">
+                        <img src="{#$templets_skin#}images/marry/newFloor.png?v={#$cfg_staticVersion#}">
+                        <span>宴会场地</span>
+                    </div>
+                    <div class="dl-item"
+                        @click="locationFn(`{#getUrlPath service='member' template='marry-hotelmenu'#}`,`{#getUrlPath service='member' template='config_marry_hotel'#}`)">
+                        <img src="{#$templets_skin#}images/marry/newFork.png?v={#$cfg_staticVersion#}">
+                        <span>婚宴菜单</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 续费标签 -->
+            <div class="continueLabel" v-if="detail.continue">
+                <div class="c-left">
+                    <div class="title">商家版即将到期</div>
+                    <div class="tip">续费套餐，续享全部商家服务</div>
+                </div>
+                <div class="c-btn" @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">
+                    <span>查看/续费</span>
+                    <img src="{#$templets_skin#}images/newRight.png?v={#$cfg_staticVersion#}">
+                </div>
+            </div>
+            <!-- 家政管理项 -->
+            <div class="orderList">
+                <div class="l-title">常用功能</div>
+                <div class="l-list">
+                    <div class="ll-item" @click="linkTo(`{#getUrlPath service='member' template='config-marry'#}`)">
+                        <img src="{#$templets_skin#}images/newConfig.png?v={#$cfg_staticVersion#}">
+                        <div>公司信息</div>
+                    </div>
+                    <div class="ll-item" @click="popFn(1,'open')" v-if="!selectType.includes('8')">
+                        <img src="{#$templets_skin#}images/marry/newBuild.png?v={#$cfg_staticVersion#}">
+                        <div>宴会酒店</div>
+                    </div>
+                    <div class="ll-item" @click="linkTo(`{#$cfg_basehost#}/mobile.html`)" v-if="!appBoolean">
+                        <img src="{#$templets_skin#}images/newShield.png?v={#$cfg_staticVersion#}">
+                        <div>下载APP</div>
+                    </div>
+                    <div class="ll-item" @click="linkTo(`tel:${detail.hotline}`)">
+                        <img src="{#$templets_skin#}images/newHeadset.png?v={#$cfg_staticVersion#}">
+                        <div>客服帮助</div>
+                    </div>
+                    <div class="ll-item app_show" @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+                        <img src="{#$templets_skin#}images/set_icon_red.png?v={#$cfg_staticVersion#}" onerror="this.src='/static/images/404.jpg'" />
+                        <div>系统设置</div>
+                    </div>
+                </div>
+            </div>
+            <!-- 弹窗提示 -->
+            <div class="warnPop" @click="popFn(0)" v-if="popb">
+                <div class="w-content" @click.stop v-if="popType=='warn'">
+                    <div class="wc-title">
+                        <div class="title">确定停止经营婚宴酒店？</div>
+                        <div class="tip">此操作将下架所有相关信息</div>
+                    </div>
+                    <div class="wc-btn">
+                        <div class="cancel" @click="popFn(0)">取消</div>
+                        <div class="confirm" @click="openFn(0)">停止经营</div>
+                    </div>
+                </div>
+                <div class="w-content" @click.stop v-if="popType=='open'">
+                    <div class="wc-title">
+                        <div class="title">确定开启经营婚宴酒店？</div>
+                    </div>
+                    <div class="wc-btn">
+                        <div class="cancel" @click="popFn(0)">取消</div>
+                        <div class="confirm" @click="openFn(1)">确定</div>
+                    </div>
+                </div>
+                <div class="w-select" @click.stop v-else-if="popType=='select'">
+                    <div class="ws-item" @click="selectMealFn(0)">
+                        <div class="title">套餐</div>
+                        <div class="tip">服务介绍与价格</div>
+                    </div>
+                    <div class="ws-item" @click="selectMealFn(1)">
+                        <div class="title">案例</div>
+                        <div class="tip">客户案例展示</div>
+                    </div>
+                </div>
+            </div>
+            <div class="popTip" v-if="warnb">{{infoError}}</div>
+            <template v-if="!appBoolean">
+                {#include file="../../../siteConfig/touch_bottom_5.0.html" active="thirdicon"
+                bottom_module="marry"#}
+            </template>
+        </div>
+        <!-- 页面载入失败提示 -->
+        <div class="Warn" v-else-if="!loadingb">
+            <div class="w-tip">
+                <img src="{#$cfg_staticPath#}images/notfindempty.png?v={#$cfg_staticVersion#}" class="wt-pic">
+                <div class="wt-title">{{info}}</div>
+                <div class="wt-btn"
+                    @click="linkTo(`{#getUrlPath service='member' type='user' template='enter_contrast'#}`)">确定
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/marry.js?v={#$cfg_staticVersion#}"></script>
+
+</html>
+{#else#}
+{#include file="marry-$module.html"#}
+{#/if#}

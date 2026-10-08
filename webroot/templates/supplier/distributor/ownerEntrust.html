@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>房产经纪</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all"
+        href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_plus_2.9.0.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/ownerEntrust.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/topNav/topNav.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/leftNav/leftNav.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue-3.5.12.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0_zh-cn.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}';
+        var staticVersion = '{#$cfg_staticVersion#}'; //版本号
+        var logoUrl = '{#getModuleConfig module='house' key='logoUrl'#}';
+        var templets_skin = '{#$templets_skin#}';
+        var member_busiDomain = "{#$member_busiDomain#}";
+        var channelDomain = "{#getModuleConfig module='house' key='channelDomain'#}";
+    </script>
+</head>
+
+<body>
+    <div class="navPage Shell" id="ownerEntrust" v-cloak>
+        <!-- 顶部导航 -->
+        <top-nav :user-info="userInfo" :company-info="companyInfo"></top-nav>
+        <!-- 左侧导航 -->
+        <left-nav type="broker" :active-index="5" :user-info="userInfo" :company-info="companyInfo"></left-nav>
+        <!-- 内容区域 -->
+        <div class="boxContent">
+            <div class="b-main">
+                <!-- 顶部操作区 -->
+                <div class="bm-header">
+                    <!-- tab切换 -->
+                    <div class="bmh-tab">
+                        <div :class="['bmht-item',{active:tabConfig.active==index},{'red':item.red==1}]"
+                            v-for="(item,index) in tabConfig.list" :key="item.id" @click="tabFn(index)">
+                            <span class="text">{{item.name}}</span>
+                            <span class="number">{{item.red==1?item.num:`(${item.num})`}}</span>
+                        </div>
+                    </div>
+                    <!-- 过滤筛选 -->
+                    <div class="bmh-operate">
+                        <!-- 委托类型 -->
+                        <!-- <el-select v-model="filterConfig.type" placeholder="委托类型" clearable @change="getTableData"
+                            class="bmho-type">
+                            <el-option v-for="item in filterConfig.typeOption" :key="item.value" :label="item.label"
+                                :value="item.value"></el-option>
+                        </el-select> -->
+                        <!-- 委托类型 -->
+                        <el-select v-model="filterConfig.origin" placeholder="委托类型" clearable @change="getTableData"
+                            class="bmho-follow">
+                            <el-option v-for="item in filterConfig.originOption" :key="item.value" :label="item.label"
+                                :value="item.value"></el-option>
+                        </el-select>
+                        <!-- 跟进状态 -->
+                        <el-select v-model="filterConfig.follow" placeholder="跟进状态" clearable @change="getTableData"
+                            class="bmho-follow">
+                            <el-option v-for="item in filterConfig.followOption" :key="item.value" :label="item.label"
+                                :value="item.value"></el-option>
+                        </el-select>
+                        <!-- 搜索 -->
+                        <el-input v-model="filterConfig.keywords" placeholder="客户、电话" clearable @change="getTableData"
+                            class="bmho-phone">
+                            <template #suffix>
+                                <img src="{#$cfg_staticPath#}images/f_search.png?v={#$cfg_staticVersion#}"
+                                    class="bmhop-icon" />
+                            </template>
+                        </el-input>
+                        <!-- 导出名单 -->
+                        <div class="bmho-export" @click="exportFn">
+                            <img src="{#$templets_skin#}images/upload_3.png?v={#$cfg_staticVersion#}" />
+                            <span>导出名单</span>
+                        </div>
+                        <!-- 录房源 -->
+                        <el-popover :ref="el=>{filterConfig.recordRef=el}" placement="bottom-end" width="620px"
+                            height="420px" trigger="click" popper-class="bmho-record">
+                            <template #reference>
+                                <div class="bmho-import">
+                                    <img src="{#$templets_skin#}images/editWhite.png?v={#$cfg_staticVersion#}" />
+                                    <span>录房源</span>
+                                </div>
+                            </template>
+                            <template #default>
+                                <div class="bmho-content">
+                                    <img src="{#$templets_skin#}images/close_icon.png?v={#$cfg_staticVersion#}"
+                                        class="close" @click="filterConfig.recordRef.hide" />
+                                    <div class="top">
+                                        <div class="title">请使用移动端录房源</div>
+                                        <div class="tip">
+                                            请使用<text>微信/{#$cfg_shortname#}</text>扫码录房源、管理、跟进我的房源
+                                        </div>
+                                    </div>
+                                    <div class="center">
+                                        <img src="{#$cfg_basehost#}/include/qrcode.php?data={#getModuleConfig module='house' key='channelDomain'#}broker/house_manage" />
+                                        <div @click="filterConfig.recordRef.hide">取消</div>
+                                    </div>
+                                </div>
+                            </template>
+                        </el-popover>
+                        <!-- 过滤无效信息 -->
+                        <el-checkbox v-model="filterConfig.invalid" label="过滤无效信息" @change="getTableData"></el-checkbox>
+                    </div>
+                </div>
+                <!-- 表格区域 -->
+                <el-table :ref="res=>{selectConfig.ref=res}" :data="tableConfig.list" header-cell-class-name="bm-top"
+                    cell-class-name="bm-cell" @selection-change="selectChangeFn" v-loading="tableConfig.loading"
+                    class="bm-table">
+                    <el-table-column type="selection" class="bmt-select">
+                    </el-table-column>
+                    <el-table-column :align="item.align" :min-width="item.width||''" :class="`bmt-item ${item.prop}`"
+                        v-for="(item,index) in currTableColum" :key="item.id">
+                        <template #header>
+                            <div class="bmti-head">{{item.label}}</div>
+                        </template>
+                        <template #default="data">
+                            <!-- 客户 -->
+                            <div :class="['bmti-client',{'invalid':data.row.concat_status==4}]"
+                                v-if="item.prop=='client'">
+                                <div class="username">{{data.row.cname}}</div>
+                                <div style="display: flex;justify-content: space-between;">
+                                    <div class="phone">
+                                        <img src="{#$templets_skin#}images/telBlue.png?v={#$cfg_staticVersion#}" />
+                                        <span>{{data.row.phone}}</span>
+                                    </div>
+                                    <div class="wx" v-if="data.row.wechat">
+                                        <div style="color: #9598A6;">微信：</div>
+                                        <div style="color: #5C5E66;">{{data.row.wechat}}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 委托说明 -->
+                            <div :class="['bmti-history',{'invalid':data.row.concat_status==4}]"
+                                v-else-if="item.prop=='history'">
+                                <div class="type">【{{data.row.houseTypeName}}】</div>
+                                <div class="title">{{data.row.houseTitle}}</div>
+                            </div>
+                            <!-- 报价 -->
+                            <div :class="['bmti-price',{'invalid':data.row.concat_status==4}]"
+                                v-else-if="item.prop=='price'">
+                                {{data.row.entrustPrice}}
+                            </div>
+                            <!-- 委托时间 -->
+                            <div :class="['bmti-time',{'invalid':data.row.concat_status==4}]"
+                                v-else-if="item.prop=='time'">
+                                {{data.row.entrustDate}}
+                            </div>
+                            <!-- 状态 -->
+                            <div class="bmti-state" v-else-if="item.prop=='state'">
+                                <!-- 已联系 -->
+                                <div class="contact" v-if="data.row.concat_status==2">已联系</div>
+                                <!-- 已委托 -->
+                                <div class="entrust" v-else-if="data.row.concat_status==3">已委托</div>
+                                <!-- 标记无效 -->
+                                <div class="invalid" v-else-if="data.row.concat_status==4">标记无效</div>
+                                <!-- 未处理 -->
+                                <div class="unoperate" v-else>未联系</div>
+                            </div>
+                            <!-- 跟进人 -->
+                            <div class="bmti-follow" v-else-if="item.prop=='follow'">{{data.row.follow_name}}</div>
+                            <!-- 操作 -->
+                            <div class="bmti-operate" v-else>
+                                <template v-if="!userInfo.leaderName">
+                                    <el-popover placement="bottom" :width="540" trigger="click" v-for="index in 2"
+                                        :key="index">
+                                        <template #reference>
+                                            <div class="reassign" @click="markConfig.type=2" v-if="index==1">标记处理</div>
+                                            <div class="delete" @click="markConfig.type=3" v-else>无效</div>
+                                        </template>
+                                        <template #default>
+                                            <div class="setMark">
+                                                <div class="title">
+                                                    <div class="left">
+                                                        <span>标记客户</span>
+                                                        <el-popover placement="bottom" width="340px" height="80px">
+                                                            <template #reference>
+                                                                <img
+                                                                    src="{#$templets_skin#}images/question.png?v={#$cfg_staticVersion#}" />
+                                                            </template>
+                                                            <template #default>
+                                                                <div style="font-size: 13px;color: #333333;">
+                                                                    客户信息、标记现阶段仅维护人及上级可见，掉客后下任维护人也可见
+                                                                </div>
+                                                            </template>
+                                                        </el-popover>
+                                                    </div>
+                                                    <div class="right">
+                                                        <div :class="{'active':markConfig.type==2}"
+                                                            @click="markConfig.type=2">
+                                                            已联系
+                                                        </div>
+                                                        <div :class="{'active':markConfig.type==4}"
+                                                            @click="markConfig.type=4">
+                                                            已委托
+                                                        </div>
+                                                        <div :class="{'invalid':true,'active':markConfig.type==3}"
+                                                            @click="markConfig.type=3">
+                                                            委托无效
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <el-input :rows="2" maxlength="50" :autosize="{minRows:5}" resize="none"
+                                                    show-word-limit type="textarea" v-model="markConfig.note"
+                                                    placeholder="可添加备注…"></el-input>
+                                                <div class="warn" v-if="markConfig.type==3">
+                                                    <img
+                                                        src="{#$templets_skin#}images/warnIcon.png?v={#$cfg_staticVersion#}" />
+                                                    <span>无效线索将掉落至共享池</span>
+                                                </div>
+                                                <div class="btns">
+                                                    <div class="cancel" @click="data.row.visiable=false">取消</div>
+                                                    <div class="confirm" v-loading="markConfig.loading"
+                                                        @click="addMarkFn(data.row)" v-if="markConfig.type!=3">确定</div>
+                                                    <div class="invalidConfirm" v-loading="markConfig.loading"
+                                                        @click="addMarkFn(data.row)" v-else>
+                                                        确定无效
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </el-popover>
+                                </template>
+                                <template v-else>
+                                    <div class="reassign" @click="assignPop(data.row)" v-if="data.row.concat_status!=4">
+                                        重新指派</div>
+                                    <el-popover placement="bottom" v-model:visible="data.row.visiable" :width="540"
+                                        trigger="click">
+                                        <template #reference>
+                                            <div @click="markConfig.id=data.row.id" style="cursor: pointer;">标记</div>
+                                        </template>
+                                        <template #default>
+                                            <div class="setMark">
+                                                <div class="title">
+                                                    <div class="left">
+                                                        <span>标记客户</span>
+                                                        <el-popover placement="bottom" width="340px" height="80px">
+                                                            <template #reference>
+                                                                <img
+                                                                    src="{#$templets_skin#}images/question.png?v={#$cfg_staticVersion#}" />
+                                                            </template>
+                                                            <template #default>
+                                                                <div style="font-size: 13px;color: #333333;">
+                                                                    客户信息、标记现阶段仅维护人及上级可见，掉客后下任维护人也可见
+                                                                </div>
+                                                            </template>
+                                                        </el-popover>
+                                                    </div>
+                                                    <div class="right">
+                                                        <div :class="{'active':markConfig.type==2}"
+                                                            @click="markConfig.type=2">
+                                                            已联系
+                                                        </div>
+                                                        <div :class="{'active':markConfig.type==4}"
+                                                            @click="markConfig.type=4">
+                                                            已委托
+                                                        </div>
+                                                        <div :class="{'invalid':true,'active':markConfig.type==3}"
+                                                            @click="markConfig.type=3">
+                                                            委托无效
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <el-input :rows="2" maxlength="50" :autosize="{minRows:5}" resize="none"
+                                                    show-word-limit type="textarea" v-model="markConfig.note"
+                                                    placeholder="可添加备注…"></el-input>
+                                                <div class="warn" v-if="markConfig.type==3">
+                                                    <img
+                                                        src="{#$templets_skin#}images/warnIcon.png?v={#$cfg_staticVersion#}" />
+                                                    <span>无效线索将掉落至共享池</span>
+                                                </div>
+                                                <div class="btns">
+                                                    <div class="cancel" @click="data.row.visiable=false">取消</div>
+                                                    <div class="confirm" v-loading="markConfig.loading"
+                                                        @click="addMarkFn(data.row)" v-if="markConfig.type!=3">
+                                                        确定
+                                                    </div>
+                                                    <div class="invalidConfirm" v-loading="markConfig.loading"
+                                                        @click="addMarkFn(data.row)" v-else>
+                                                        确定无效
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </el-popover>
+                                    <el-popconfirm icon-color="red" title="确定删除" @confirm="deleteFn(data.row.id)">
+                                        <template #reference>
+                                            <div class="delete">删除</div>
+                                        </template>
+                                    </el-popconfirm>
+                                </template>
+                            </div>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <!-- 全选 -->
+                <div class="bm-select">
+                    <el-checkbox v-model="selectConfig.all" @click="selectAllFn">全选</el-checkbox>
+                    <div class="bms-group" @click="dialogFn(true,'store')">转店组共享</div>
+                    <div class="bms-door" @click="dialogFn(true,'door')">转门店共享</div>
+                </div>
+                <!-- 分页 -->
+                <el-pagination background hide-on-single-page layout="prev, pager, next" prev-text="上一页" next-text="下一页"
+                    :page-size="tableConfig.pageSize" :total="tableConfig.pageInfo.totalCount"
+                    @current-change="pagingFn" class="bm-pagination">
+                </el-pagination>
+                <!-- 二次提醒弹窗 -->
+                <el-dialog v-model="dialogConfig.pop" :show-close="false" :lock-scroll="false"
+                    :close-on-click-modal="false" center class="bm-pop">
+                    <template #header>
+                        <div class="bmp-close">
+                            <div class="bmp-title">{{dialogConfig.title}}</div>
+                            <img src="{#$templets_skin#}images/close_icon.png?v={#$cfg_staticVersion#}"
+                                @click="dialogConfig.pop=false" />
+                        </div>
+                    </template>
+                    <template #default>
+                        <div class="bmp-tip">{{dialogConfig.tip}}</div>
+                    </template>
+                    <template #footer>
+                        <div class="bmp-btns">
+                            <div class="cancel" @click="dialogConfig.pop=false">取消</div>
+                            <div class="confirm" v-loading="dialogConfig.loading" @click="transferFn">确定</div>
+                        </div>
+                    </template>
+                </el-dialog>
+                <!-- 指派弹窗 -->
+                <el-dialog v-model="assignConfig.pop" :show-close="false" :lock-scroll="false" class="bm-assign">
+                    <template #header>
+                        <div class="bma-header">
+                            <div>客户指派</div>
+                            <img src="{#$templets_skin#}images/close_icon.png?v={#$cfg_staticVersion#}"
+                                @click="assignConfig.pop = false" />
+                        </div>
+                    </template>
+                    <template #default>
+                        <div class="bma-content">
+                            <div class="left">
+                                <div class="filter">
+                                    <div class="title">选择成员</div>
+                                    <div class="search">
+                                        <img src="{#$cfg_staticPath#}images/f_search.png?v={#$cfg_staticVersion#}" />
+                                        <input type="text" v-model="assignConfig.keywords" placeholder="搜索成员"
+                                            @keyup.enter="borkerFn" class="search_input" />
+                                        <el-select class="select" v-model="assignConfig.filter" @change="borkerFn">
+                                            <el-option v-for="item in assignConfig.options" :key="item.value"
+                                                :label="item.label" :value="item.value" />
+                                        </el-select>
+                                    </div>
+                                </div>
+                                <div class="list">
+                                    <div class="thead">
+                                        <div class="name">姓名</div>
+                                        <div class="post">职务</div>
+                                    </div>
+                                    <div style="display: flex;flex-direction: column;gap: 10px;overflow-y: auto;max-height: 400px;"
+                                        v-loading="brokerConfig.loading">
+                                        <div class="item" v-for="(item,index) in brokerConfig.list" :key="item.id">
+                                            <div class="info">
+                                                <img :src="item.photo" @error="$event.target.src=errorPhoto" />
+                                                <span>{{item.name}}</span>
+                                            </div>
+                                            <div class="job">{{item.leaderName}}</div>
+                                            <div :class="['select',{'active':item.id==brokerConfig.id}]"
+                                                @clicK="brokerConfig.id=item.id">{{brokerConfig.id==item.id?'已选择':'选择'}}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="right">
+                                <div class="current">
+                                    <div class="title">当前指派</div>
+                                    <div class="list">
+                                        <template v-for="(item,index) in brokerConfig.list" :key="item.id">
+                                            <div class="item" v-if="brokerConfig.id==item.id">
+                                                <div class="photo">
+                                                    <img :src="item.photo||errorPhoto"
+                                                        @error="$event.target.src=errorPhoto" />
+                                                    <span>{{item.name}}</span>
+                                                </div>
+                                                <div class="close" @click="brokerConfig.id=''">
+                                                    <img
+                                                        src="{#$templets_skin#}images/close_icon.png?v={#$cfg_staticVersion#}" />
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div class="log" v-if="wanderConfig.pageInfo.totalCount">
+                                    <div class="sum">流转记录{{wanderConfig.pageInfo.totalCount}}条</div>
+                                    <div class="list">
+                                        <div class="item" v-for="(item,index) in wanderConfig.list" :key="item.id">
+                                            <div class="time">{{timeChange(item.update_time||item.create_time)}}</div>
+                                            <div class="photo">
+                                                <img :src="item.photo||errorPhoto"
+                                                    @error="$event.target.src=errorPhoto" />
+                                                <span>{{item.name}}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <template #footer>
+                        <div class="bma-btns">
+                            <div class="cancel" @click="assignConfig.pop = false">取消</div>
+                            <div class="confirm" v-loading="assignConfig.loading" @click="assignConfirm">确定</div>
+                        </div>
+                    </template>
+                </el-dialog>
+            </div>
+            <div class="b-copyright">
+                版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="module" src="{#$templets_skin#}js/ownerEntrust.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

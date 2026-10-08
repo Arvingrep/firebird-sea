@@ -1,0 +1,922 @@
+
+<script>
+	//联系商家
+	var imconfig = {
+	    'mod':'shop',
+	    'chatid':"{#$detail_store['userid']#}",
+	  }
+	//倒计时
+	var serviceTime = "{#$smarty.now#}";
+  	var jsTime = parseInt((new Date()).valueOf()/1000);
+	var timeOffset = parseInt(jsTime - serviceTime);
+	//画商家地址的地图
+	var sqLng = "{#$detail_store['lng']#}",sqLat = "{#$detail_store['lat']#}";
+	//再次购买 加入购物车
+	var cartUrl = '{#getUrlPath service='shop' template='cart'#}';     //购物车链接
+	var confirmtype='{#$detail_confirmtype#}';
+	var pageData = {
+	    id: '{#$detail_id#}',
+		title: '{#if !$detail_storeBranch#}{#$detail_store['title']#}{#else#}{#$detail_storeBranch['title']#}{#/if#}',
+		address: '{#if !$detail_storeBranch#}{#$detail_store['address']#}{#else#}{#$detail_storeBranch['address']#}{#/if#}',
+		lat: '{#if !$detail_storeBranch#}{#$detail_store['lat']#}{#else#}{#$detail_storeBranch['lat']#}{#/if#}',
+		lng: '{#if !$detail_storeBranch#}{#$detail_store['lng']#}{#else#}{#$detail_storeBranch['lng']#}{#/if#}',
+		mapType: '{#$site_map#}',
+		cityName: '{#$siteCityInfo['name']#}',
+		mapKey: '{#$site_map_key#}'
+	}
+
+	var orderstate = '{#$detail_orderstate#}'; // 订单状态
+	var ordernum = '{#$detail_ordernum#}'
+	var wxminiPayment = {#$detail_wxminiPayment|default:0#};
+	var transactionId = '{#$detail_transactionId#}';
+	var miniProgramShippingManage = {#$cfg_miniProgramShippingManage|default:0#}
+</script>
+{#$stateInfo = ""#}
+{#if $detail_orderstate == 0#}
+	{#$stateInfo = $langData['siteConfig'][9][53]#} {#* 等待买家付款 *#}
+{#elseif $detail_orderstate == 1 || $detail_orderstate == 11#}
+	{#if ($detail_orderstate == 1 && $detail_pinstate == 1 && $detail_huodongtype == 4 && $detail_protype!=1) ||  $detail_orderstate == 11#}
+		{#$stateInfo = $langData['siteConfig'][9][25]#} {#* 待发货 *#}
+	{#elseif $detail_orderstate == 1 && $detail_pinstate == 0 && $detail_huodongtype == 4 #}
+		{#if $detail_pinarr.enddate < $smarty.now#}
+			{#$stateInfo = '拼团已失效'#} {#* 拼团已失效 *#}
+		{#else#}
+			{#$stateInfo = "拼团中，还差{#$detail_pinarr['chanum']#}人"#} {#* 拼团中 *#}
+		{#/if#}
+	{#elseif $detail_protype ==1#}
+		{#if $detail_proquanarr[0]['expireddatestr'] < $smarty.now#}
+			{#$stateInfo = '已过期'#}
+		{#elseif $detail_proquanarr[0]['usedate'] ==0#}
+			{#$stateInfo = '已付款，待使用'#}
+		{#else#}
+			{#$stateInfo = '已使用'#}
+		{#/if#}
+	{#else#}
+		{#$stateInfo = $langData['siteConfig'][9][25]#} {#* 待发货 *#}
+	{#/if#}
+{#elseif $detail_orderstate == 3#}
+	{#$stateInfo = $langData['siteConfig'][16][116]#} {#* 已完成 *#}
+{#elseif $detail_orderstate == 6#}
+	{#if $detail_retState == 1#}
+		{#if $detail_expDate == 0#}
+			{#if $detail_protype ==1#}
+				{#$stateInfo = '申请退款中'#}
+			{#else#}
+				{#$stateInfo = $langData['siteConfig'][57][24]#} {#* 未发货，申请退款中 *#}
+			{#/if#}
+		{#else#}
+			{#$stateInfo = $langData['siteConfig'][57][25]#} {#* 已发货，申请退款中 *#}
+		{#/if#}
+	{#else#}
+        {#if $detail_expDate == 0#}
+            {#$stateInfo = $langData['siteConfig'][9][25]#} {#* 待发货 *#}
+        {#else#}
+            {#$stateInfo = $langData['siteConfig'][9][41]#}{#* 已发货，等待收货  *#}
+        {#/if#}
+	{#/if#}
+	<!-- 退款成功 -->
+{#elseif $detail_orderstate == 7#}
+	{#$stateInfo = $langData['siteConfig'][57][19]#} {#* 订单关闭 *#}
+{#elseif $detail_orderstate == 10#}
+	{#$stateInfo = $langData['siteConfig'][9][13]#} {#* 已取消 *#}
+{#/if#}
+
+
+    <div class="topState">
+    	<span class="topIcon topIcon-{#$detail_orderstate#}"></span>
+    	<div class="topInfo">
+    		<h2>{#$stateInfo#}</h2>
+    		<div class="topOther">
+    			{#if $detail_orderstate == 0#}
+    			<div class="jsTime nopay fn-clear" data-time="{#$detail_cancletime#}">
+					<div>
+						<i>请您尽快付款，剩</i>
+						<span class="day">00</span><em class="speDot">天</em>
+						<span class="hour">00</span><em>时</em>
+						<span class="minute">00</span><em>分</em>
+						<!-- <span class="second">00</span><em>秒</em> -->
+						<i>自动关闭</i>
+					</div>
+				</div>
+    			{#elseif $detail_orderstate == 1#}
+					{#if $detail_pinstate == 0 && $detail_huodongtype == 4 #}
+						<p>快邀请小伙伴们来拼单吧~</p>
+					{#/if#}
+				{#elseif $detail_orderstate == 6#}
+					{#if $detail_retState == 1#}
+                        {#if $detail_ret_audittype == 1#}
+                        <p>卖家已拒绝退款</p>
+                        {#else#}
+					    <p>{#$langData['siteConfig'][57][23]#}</p> {#* 等待商家处理退款 *#}
+                        {#/if#}
+					{#elseif $detail_expDate != 0#}
+	    			<div class="jsTime hasfa fn-clear" data-time="{#$detail_autodate#}">
+						<div>
+							<i>还剩</i>
+							<span class="day">00</span><em class="speDot">天</em>
+							<span class="hour">00</span><em>时</em>
+							<span class="minute">00</span><em>分</em>
+							<!-- <span class="second">00</span><em>秒</em> -->
+							<i>自动确认</i>
+						</div>
+					</div>
+					{#/if#}
+				{#elseif $detail_orderstate == 7#}
+				<p>{#$langData['siteConfig'][9][34]#}</p> {#* 退款成功 *#}
+
+				{#elseif $detail_orderstate == 3#}
+				<p>{#$langData['siteConfig'][57][20]#}</p> {#* 订单完成，感谢您的支持 *#}
+
+				{#elseif $detail_orderstate == 10#}
+				<p>{#$langData['siteConfig'][57][21]#}</p> {#* 超时未支付，订单自动取消 *#}
+				<!-- <p>{#$langData['siteConfig'][57][22]#}</p> {#* 买家取消订单 *#} -->
+    			{#/if#}
+    		</div>
+
+    	</div>
+    </div>
+	<dl class="info-section" style="display: none;">
+		<dt>
+			<span class="info-title">{#$langData['siteConfig'][19][318]#}：</span><em class="info-text">{#$stateInfo#}</em>
+			{#if $detail_orderstate == 7#}
+			&nbsp;&nbsp;{#$langData['siteConfig'][19][42]#}：{#$detail_retOkdate|date_format:"%Y-%m-%d %H:%M:%S"#}
+			{#/if#}
+		</dt>
+
+		{#* {#$langData['siteConfig'][9][22]#} *#}
+		{#if $detail_orderstate == 0#}
+		<dd class="last">
+			<p>{#$langData['siteConfig'][20][61]#}</p>   {#* 请您尽快付款，若未及时付款，系统将自动取消订单！ *#}
+		</dd>
+		{#/if#}
+
+		{#* {#$langData['siteConfig'][9][24]#} *#}
+		{#if $detail_orderstate == 1 #}
+		<dd class="last">
+			<p>{#$langData['siteConfig'][20][62]#}</p>  {#* 卖家发货前，您支付的钱款不会被打给卖家，请耐心等待卖家发货！ *#}
+		</dd>
+		{#/if#}
+
+
+		{#* {#$langData['siteConfig'][6][45]#} || 退款成功 *#}
+		{#if $detail_orderstate == 6 || ($detail_orderstate == 7 && $detail_paydate != 0)#}
+		<dd class="last">
+
+			{#if ($detail_orderstate == 7 && $detail_paydate != 0) || $detail_retState == 1#}
+			<ul class="retUl">
+				<li><label>{#$langData['siteConfig'][19][43]#}：</label>{#$detail_retType#}</li>
+				<li><label>{#$langData['siteConfig'][19][44]#}：</label>{#$detail_retNote#}</li>
+				{#if $detail_retPics|@count > 0#}
+				<li class="retPics"><label>{#$langData['siteConfig'][19][45]#}：</label>
+					<div class="picbox">
+						{#foreach from=$detail_retPics item=pics key=k#}
+						<a href="{#$pics.path#}" target="_blank"><img src="{#changeFileSize url="{#$pics.path#}" type="small"#}" /></a>
+						{#/foreach#}
+					</div>
+				</li>
+				{#/if#}
+				<li><label>{#$langData['siteConfig'][19][46]#}：</label>{#$detail_retDate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>
+			</ul>
+			{#/if#}
+
+			{#if $detail_retSnote != ""#}
+			<ul class="retUl store">
+				<li><label>{#$langData['siteConfig'][19][47]#}：</label>{#$detail_retSnote#}</li>
+				{#if $detail_retSpics|@count > 0#}
+				<li class="retPics"><label>{#$langData['siteConfig'][19][48]#}：</label>
+					{#foreach from=$detail_retSpics item=pics key=k#}
+					<a href="{#$pics.path#}" target="_blank"><img src="{#changeFileSize url="{#$pics.path#}" type="small"#}" /></a>
+					{#/foreach#}
+				</li>
+				{#/if#}
+				<li><label>{#$langData['siteConfig'][19][49]#}：</label>{#$detail_retSdate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>
+			</ul>
+			{#/if#}
+
+			<div class="operation">
+				{#if $detail_orderstate == 6 && $detail_expDate != 0#}
+				<small>{#$langData['siteConfig'][19][707]#}：</small><a class="btn sh" href="javascript:;">{#$langData['siteConfig'][6][45]#}</a> {#* 确认收货 *#}
+				{#elseif $detail_retOkdate != 0#}
+				<!-- <a class="btn" href="javascript:;">退款去向</a> -->
+				{#/if#}
+			</div>
+		</dd>
+		{#/if#}
+
+	</dl>
+
+
+<div class="blockWrap">
+
+
+	<!-- 砍价成功 s -->
+<!--	<div class="info-block kanSuc">-->
+<!--		<div class="kanTop">-->
+<!--			<span class="kanIcon"></span>-->
+<!--			<div class="kanTxt">-->
+<!--				<span>砍价成功</span>-->
+<!--				<a href="" class="kanDet">砍价详情</a>-->
+<!--			</div>-->
+<!--		</div>-->
+<!--		<div class="kanBot">-->
+<!--			<div class="kanImg">-->
+<!--				<div><img src="{#$templets_skin#}images/mcenter/female.png" alt=""></div>-->
+<!--				<div><img src="{#$templets_skin#}images/mcenter/male.png" alt=""></div>-->
+<!--				<div><img src="{#$templets_skin#}images/mcenter/female.png" alt=""></div>-->
+<!--				<div><img src="{#$templets_skin#}images/mcenter/male.png" alt=""></div>-->
+<!--				<div><img src="{#$templets_skin#}images/mcenter/female.png" alt=""></div>-->
+<!--			</div>-->
+<!--			<p class="kanTip">好友助力榜</p>-->
+<!--		</div>-->
+<!--	</div>-->
+	<!-- 砍价成功 e -->
+
+
+
+	<!-- 团购券码 s-->
+	<!-- detail_orderstate 10 表示订单未支付自动取消 0 未支付-->
+	{#if $detail_protype == 1 &&  $detail_orderstate != 10 && $detail_orderstate != 0#}
+
+	{#if $detail_pinstate ==0 && !$detail_pinid && $detail_huodongtype ==4#}
+	{#else#}
+
+		{#if $detail_refrunddate#}
+		<!-- 券码全部退款成功 s-->
+		<div class="info-block refundSuc">
+			<div class="quanRefund">
+				<div class="quanreTit"><span class="quanIcon"></span><strong>电子券码</strong><a href="{#getUrlPath service='member' type='user' template='refunddetail-shop' id=$detail_id#}">查看退款详情</a></div>
+				<div class="quanreInfo">
+					<div class="quanreTop">
+						<h3>退款成功（{#count($detail_proquanarr)#}张）</h3>
+						<p>有效期至 {#$detail_proquanarr[0]['expireddate']#}</p>
+					</div>
+					<div class="quanreBot">
+						{#foreach from=$detail_proquanarr item = quan key = k#}
+						<p>券码: <span>{#$quan.cardnum#}</span></p>
+						{#/foreach#}
+					</div>
+
+				</div>
+
+			</div>
+		</div>
+		<!-- 券码全部退款成功 e-->
+		{#elseif $detail_orderstate != 7#}
+			<div class="info-block">
+				<!-- 未退款 -->
+				{#if $detail_ret_state ==0#}
+				{#$cank = 0#}
+				{#foreach from=$detail_proquanarr key=k item=quan#}
+					{#if $quan.usedate == 0 && $quan.ret_state == 0#}
+					{#$cank = $cank+1#}
+					{#/if#}
+				{#/foreach#}
+				{#if $cank > 0#}
+				<div class="quanTop">
+					<span class="quanIcon"></span>
+					<div class="quanTxt">
+						<h2>电子券码</h2>
+						<p>可使用({#$cank#}张) 有效期至 {#$detail_proquanarr[0]['expireddate']#}</p>
+					</div>
+					{#if $detail_orderstate !=7 && $detail_product[0]['is_tuikuan'] == '0' && $detail_product|count == 1#}
+					<a href="{#getUrlPath service='member' type='user' template='refund-shop' id=$detail_id#}" class="alppy apply-refund-link">申请退款</a>
+					{#/if#}
+				</div>
+				<div class="quanBot">
+					<div class="codeImg"><img src="{#$cfg_basehost#}/include/qrcode.php?data={#$detail_cardnumUrl#}" alt=""></div>
+					<ul>
+						{#foreach from=$detail_proquanarr item = quan key = k#}
+						<li {#if $quan.usedate != 0 || $quan.ret_state == 1#}class="invalid"{#/if#}><a href="javascript:;">{#if $quan.usedate == 0#}<span>团购券码{#$k+1#}</span>{#/if#}<strong>{#$quan.cardnum#}</strong>{#if $quan.usedate != 0#}<em>已使用</em>{#/if#}</a></li>
+						{#/foreach#}
+					</ul>
+					<p class="quanTip">为保障您的权益，未到店消费前请不要将券号出示给商家</p>
+				</div>
+				{#/if#}
+				{#else#}
+
+				{#$tuik = 0#}
+				{#foreach from=$detail_proquanarr key=k item=quan#}
+					{#if $quan.usedate == 0#}
+					{#$tuik = $tuik+1#}
+					{#/if#}
+				{#/foreach#}
+				<!-- 退款中 -->
+				<div class="quanRefund">
+					<div class="quanreTit"><strong>电子券码</strong><a href="{#getUrlPath service='member' type='user' template='refunddetail-shop' param="id=$detail_id"#}">查看退款详情</a></div>
+					<div class="quanreInfo">
+						<div class="quanreTop">
+							<h3>退款中（{#$tuik#}张）</h3>
+							<p>有效期至 {#$detail_proquanarr[0]['expireddate']#}</p>
+						</div>
+						<div class="quanreBot">
+							{#foreach from=$detail_proquanarr item = quan key = k#}
+							<p>券码: <span>{#$quan.cardnum#}{#if $quan.usedate != 0#}&nbsp;&nbsp;已使用{#/if#}</span></p>
+							{#/foreach#}
+						</div>
+
+					</div>
+
+				</div>
+				{#/if#}
+			</div>
+
+		{#/if#}
+
+	{#/if#}
+	{#/if#}
+
+	<!-- 团购券码 e-->
+	<!-- 商家地址 s-->
+	{#if $detail_protype ==1#}
+	<div class="info-block busInfo">
+		<h2 class="busTit">商家地址</h2>
+		<div class="busTop">
+			<span class="busIcon"></span>
+			<a href="javascript:;" class="busTxt appMapBtn">
+				<h3>{#if !$detail_storeBranch#}{#$detail_store['address']#}{#else#}{#$detail_storeBranch['address']#}{#/if#}</h3>
+				<p>据您<em class="busjuli"></em></p>
+			</a>
+			<div class="busOper">
+				<a href="javascript:;" class="chat_to-Link busIm" data-type="user"></a>
+				<a href="tel:{#if !$detail_storeBranch#}{#$detail_store['tel']#}{#else#}{#$detail_storeBranch['tel']#}{#/if#}" class="busTel"></a>
+			</div>
+		</div>
+		<div class="busmap" id="orderMap">
+
+		</div>
+	</div>
+	{#/if#}
+	<!-- 商家地址 e-->
+
+
+
+	<!-- 配送状态 以及收货人信息 s-->
+	{#if $detail_confirmtype#}
+	<div class="info-block">
+		<!-- 下单还未配送 s-->
+		{#if $detail_orderstate == 1 || ($detail_orderstate == 6 && $detail_retState == 1 && $detail_expDate == 0)#}
+		{#if $detail_protype == 0#}
+
+			<!-- 拼团中的  还没到发货阶段 成功之后才可发货 -->
+			{#if $detail_huodongtype == 4 && $detail_pinarr && $detail_pinarr['state'] ==1#}
+
+			{#else#}
+		<div class="psTit">已下单成功</div>
+		<div class="psInfo">
+			<a href="{#getUrlPath service='member' type='user' template='logistics' param="oid=$detail_id"#}">
+				<span class="psIcon"></span>
+				<div class="psTxt">
+					<p class="waitTxt">等待商家发货</p>
+				</div>
+			</a>
+		</div>
+		{#/if#}
+		{#/if#}
+		{#/if#}
+		<!-- 下单还未配送 e-->
+
+		<!-- 物流公司 -->
+
+		{#if $cfg_juhe && ($cfg_juhe['express'] || $cfg_juhe['aliyun'])#}
+
+		{#if ($detail_orderstate == 3 || $detail_orderstate == 4 || $detail_orderstate == 6 || $detail_orderstate == 7) && $detail_expNumber != '' && $detail_expDate != 0#}
+			<!-- 快递公司以及单号 -->
+		<div class="psTit">{#$juhe_express_company[$detail_expCompany]#}<span>{#$detail_expNumber#}</span></div>
+		<div class="psInfo">
+			<a class="link" href="{#getUrlPath service='member' type='user' template='logistics' param="oid=$detail_id"#}">
+				<span class="psIcon"></span>
+				<div class="psTxt">
+					{#if $detail_expTrack#}
+					<p class="pspro">{#$detail_expTrack[0].remark#}</p>
+					<p class="psTime">{#$detail_expTrack[0].datetime#}</p>
+					{#else#}
+					<p class="pspro nopro">暂未查到相关的物流信息，请稍后再尝试。</p>
+					<p class="psTime">{#date('m-d H:i:s',$detail_orderdate)#}</p>
+					{#/if#}
+				</div>
+			</a>
+
+		</div>
+			{#/if#}
+		{#/if#}
+
+		<!-- 骑手配送 s-->
+		{#if $detail_peisongid#}
+			{#if ($detail_orderstate == 3 || $detail_orderstate == 4 || $detail_orderstate == 7) || ($detail_retState == 1 && $detail_expDate != 0 && $detail_orderstate == 6)#}
+		<div class="qsTit"><strong>平台配送</strong>服务保障·极速到家</div>
+		<div class="psInfo qsInfo">
+			<!-- href="{#getUrlPath service='member' type='user' template='logistics' param="oid=$detail_id"#}" -->
+			<a href="javascript:;">
+				<span class="psIcon"></span>
+				<div class="psTxt">
+					<p class="pspro nopro">
+						{#if $detail_okdate#}骑手已配送完成
+						{#elseif $detail_songdate#}骑手已取货，请耐心等待配送
+						{#elseif $detail_peidate#}骑手已接单，请耐心等待配送{#/if#}
+					</p>
+					<p class="psTime">{#if $detail_okdate#}{#$detail_okdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#elseif $detail_songdate#}{#$detail_songdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#elseif $detail_peidate#}{#$detail_peidate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</p>
+				</div>
+			</a>
+		</div>
+			{#/if#}
+		{#/if#}
+
+		<!-- 骑手配送 e-->
+		<!-- 商家自己配送 s-->
+		{#if $detail_shipping ==2#}
+		<div class="qsTit"><strong>商家配送</strong>安心送到家</div>
+		<div class="psInfo qsInfo">
+			<!-- {#getUrlPath service='member' type='user' template='logistics' param="oid=$detail_id"#} -->
+			<a href="javascript:;">
+				<span class="psIcon"></span>
+				<div class="psTxt">
+					<p class="pspro nopro">
+						{#if $detail_songdatime#}已配送完成
+						{#elseif $detail_confirmdate#}配送中{#/if#}
+					</p>
+					<p class="psTime">{#if $detail_okdate#}{#$detail_okdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#elseif $detail_confirmdate#}{#$detail_confirmdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</p>
+				</div>
+			</a>
+		</div>
+		{#/if#}
+		<!-- 商家自己配送 e-->
+		<!-- 收货人信息 s-->
+		
+		{#if $detail_protype != 1#}
+		<div class="shInfo">
+			<span class="shIcon"></span>
+			<div class="shTxt">
+				<div class="shName"><strong>{#$detail_username#}</strong><span>{#$detail_usercontact#}</span></div>
+				<p class="shAddr">{#$detail_useraddr#}</p>
+			</div>
+		</div>
+		{#/if#}
+		<!-- 收货人信息 e-->
+	</div>
+	{#/if#}
+	<!-- 物流信息 以及收货人信息 e-->
+
+	<!-- 拼团中 还未成功 s-->
+	{#if $detail_huodongtype == 4 && $detail_pinarr#}
+
+	{#if $detail_pinarr['state'] ==1#}
+	<div class="info-block tuanIng">
+		<div class="tuanInTop">
+			<span class="tuanIcon"></span>
+			<div class="tuaninTxt">
+				待分享，还差{#$detail_pinarr['chanum']#}人，
+				<div class="jsTime2 tuanIn fn-clear" data-time="{#$detail_pinarr['enddate']#}">
+					<div>
+						<i>剩余</i>
+						<span class="day">00</span><em class="speDot">:</em>
+						<span class="hour">00</span><em>:</em>
+						<span class="minute">00</span><em>:</em>
+						<span class="second">00</span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="tuanInBot fn-clear">
+			<div class="tuanInimg fn-left">
+				{#foreach from=$detail_pinarr['userarr'] item = user key = k#}
+				<div><img onerror="this.src='/static/images/noPhoto_60.jpg'" src="{#$user.photo#}" alt="">{#if $detail_pinarr['userid'] == $user.userid#}<span>团长</span>{#/if#}</div>
+				{#/foreach#}
+				<div class="nopeo"></div>
+			</div>
+			<a href="javascript:;" class="inviteTuan fn-right">邀请好友拼团</a>
+		</div>
+	</div>
+	{#else#}
+	<!-- 拼团中 还未成功 e-->
+	<!-- 拼团成功 s-->
+	<div class="info-block tuanSuc">
+		<div class="tuanInTop">
+			<span class="tuanIcon"></span>
+			<div class="tuaninTxt">拼团成员</div>
+		</div>
+		<div class="tuanInBot">
+			<div class="tuanInimg">
+				{#foreach from=$detail_pinarr['userarr'] item = user key = k#}
+				<div><img src="{#$user.photo#}" alt="">{#if $detail_pinarr['userid'] == $user.userid#}<span>团长</span>{#/if#}</div>
+				{#/foreach#}
+			</div>
+		</div>
+	</div>
+	{#/if#}
+	{#/if#}
+	<!-- 拼团成功 e-->
+
+	<!-- 商品以及付款信息 s-->
+  	<div class="info-block">
+  		<div class="storeInfo">
+  			<a href="{#$detail_store['domain']#}" class="toMini" data-temp="store-detail" data-module="shop" data-id="{#$detail_store['id']#}">
+	  			<span class="shopIcon"></span>
+	  			<h3 class="shopTit">{#$detail_store['title']#}</h3>
+	  			<i></i>
+  			</a>
+  		</div>
+
+	  	<div class="shop-pro">
+	  		{#$allProprice = 0#}
+	  		{#$allPropoint = 0#}
+	  		{#$allProdiscount = 0#}
+	  		{#foreach from=$detail_product item="product"#}
+	      	<div class="item" data-id="{#$product.id#}"  data-maxcount="100" data-title="{#$product.title#}" data-url="{#getUrlPath service='shop' template='detail' id={#$product.id#}#}" data-inventory="100" data-hid="" data-speid="{#$product.speid#}" data-specation="{#$product.specation#}" data-litpic="{#$product.litpic#}">
+	        	<div class="info fn-clear">
+		          	<div class="imgbox fn-left">
+		            	<a href="{#getUrlPath service='shop' template='detail' id={#$product.id#}#}" class="toMini" data-temp="detail" data-module="shop" data-id="{#$product.id#}"><img src="{#$product.litpic#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/good_default.png';this.onerror=this.src='{#$cfg_staticPath#}images/good_default.png';"></a>
+		          	</div>
+		          	<a class="txtbox toMini" href="{#getUrlPath service='shop' template='detail' id={#$product.id#}#}" data-temp="detail" data-module="shop" data-id="{#$product.id#}" style="display: block;">
+		            	<div class="title fn-clear">
+		            		<h3>{#$product.title#}</h3>
+		            		<p>
+		            			<span>{#echoCurrency type='symbol'#} <strong>{#$product.price#}</strong></span>
+		            			<em>x{#$product.count#}</em>
+		            		</p>
+
+		            	</div>
+		            	<p class="chosed">{#$product.specation|replace:"$$$":"、"#}</p>
+		         	</a>
+		        </div>
+
+				{#if $product.retState == 0 #}
+                    {#if ($detail_orderstate == 1 && $detail_paytypeold!='delivery') || ($detail_orderstate == 2 && $detail_paydate != 0 && $detail_paytypeold!='delivery') || ($detail_orderstate == 6 && $product.ret_ok_date == 0  && $detail_paytypeold!='delivery')#}
+                    <!-- <div class="opbtn">
+                        <a href="{#getUrlPath service='member' type='user' template='refund-shop' id=$detail_id param="proid={#$product.id#}"#}" class="gray apply-refund-link">{#$langData['siteConfig'][6][66]#}</a> {#* 申请退款 *#}
+                    </div> -->
+                    {#/if#}
+				{#/if#}
+				<!-- {#if $detail_orderstate == 1 ||($detail_orderstate == 6 && $detail_retState == 0)#}
+					<div class="opbtn">
+		            	<a href="{#getUrlPath service='member' type='user' template='refund-shop' id=$detail_id#}" class="gray apply-refund-link">{#$langData['siteConfig'][6][66]#}</a>  {#* 申请退款 *#}
+		          	</div>
+				{#/if#} -->
+				{#if $product.retState == 1 && $detail_orderstate == 6#}
+					<div class="opbtn">
+		            	<a href="{#getUrlPath service='member' type='user' template='refunddetail-shop' id=$detail_id#}" class="gray">{#$langData['siteConfig'][9][27]#}</a>  {#* 退款中 *#}
+		          	</div>
+		        {#/if#}
+
+		        <!-- 已完成 || 超时未支付，订单自动取消	 -->
+				{#if ($detail_orderstate == 3 || $detail_orderstate == 10) && $product.ret_ok_date == 0#}
+					<div class="opbtn">
+			            <a href="javascript:;" class="gray againaddcart">{#$langData['siteConfig'][57][17]#}</a> {#* 加购物车 *#}
+			        </div>
+				{#/if#}
+
+				<!-- 退款成功 -->
+				{#if $product.ret_ok_date != 0#}
+					<div class="opbtn">
+		            	<a href="{#getUrlPath service='member' type='user' template='refunddetail-shop' id=$detail_id#}" class="gray">{#$langData['siteConfig'][9][34]#}</a>  {#* 退款成功 *#}
+		          	</div>
+		        {#/if#}
+
+		    </div>
+			{#$allProprice = $allProprice + $product.price * $product.count#}
+			{#$allPropoint = $allPropoint + $product.point#}
+			{#$allProdiscount = $allProdiscount + $product.discount#}
+	  		{#/foreach#}
+
+	  		<div class="calcDiv">
+		        <ul class="calculate">
+
+		          <li><em>商品总价</em><span><i>{#echoCurrency type='symbol'#}</i><strong>{#$allProprice#}</strong></span></li>
+		          <!-- <li><em>商品总价</em><span><i>{#echoCurrency type='symbol'#}</i><strong>{#$allProprice-$detail_logistic#}</strong></span></li> -->
+		          {#if $detail_logistic#}
+		          <li><em>运费</em><span><i>{#echoCurrency type='symbol'#}</i><strong>{#$detail_logistic#}</strong></span></li>
+		          {#/if#}
+                  {#if $detail_changetype  == 1#}
+                  <li><em>改价后总额</em><span class="priceS red2"><i>{#echoCurrency type='symbol'#}</i><strong>{#$detail_pricechange#}</strong></span></li>
+                  {#/if#}
+		          {#if $allProdiscount != 0#}
+		          <li><em>会员折扣</em><span class="priceS red"><strong>-</strong><i>{#echoCurrency type='symbol'#}</i><strong>{#$allProdiscount#}</strong></span></li>
+		          {#/if#}
+					{#if $detail_usequan!=0#}
+		          	<!-- <li><em>优惠券</em><span class="priceS red"><strong>-</strong><i>{#echoCurrency type='symbol'#}</i><strong>{#$detail_allquanmoney#}</strong></span></li> -->
+					{#/if#}
+		          {#foreach from=$detail_priceinfo item=p#}
+					<li><em>{#$p.body#}</em>{#if $p.type == "youhui" || $p.type == "manjian" || $p.type == "shoudan" || $p.type == "auth_shop"#}<span class="priceS red"><strong>-</strong>{#else#}<span class="priceS red"><strong>-</strong>{#/if#}<i>{#echoCurrency type='symbol'#}</i><strong>{#$p.amount#}</strong></span></li>
+					{#/foreach#}
+
+                    {#if $detail_pointprice > 0#}
+                    <li><em>{#$cfg_pointName#}抵扣</em><span class="priceS red"><strong>-</strong><i>{#echoCurrency type='symbol'#}</i><strong>{#$detail_pointprice#}</strong></span></li>
+                    {#/if#}
+		        </ul>
+	        </div>
+
+	  		<div class="sum">
+	  			<div class="fn-right">{#$langData['siteConfig'][19][316]#}：<span><i>{#echoCurrency type='symbol'#}</i><strong>{#$detail_totalPayPrice#}</strong></span></div>
+	  		</div>
+	  		<div class="contactStore">
+	  			<ul class="fn-clear">
+	  				<li class="lianxi"><a href="javascript:;" class="chat_to-Link" data-type="user"><i></i>联系商家</a></li>
+	  				<li class="totel"><a href="tel:{#if !$detail_storeBranch#}{#$detail_store['tel']#}{#else#}{#$detail_storeBranch['tel']#}{#/if#}"><i></i>拨打电话</a></li>
+	  			</ul>
+	  		</div>
+	  	</div>
+  	</div>
+  	<!-- 商品以及付款信息 e-->
+
+  	<!-- 团购订单的 套餐详情 s-->
+	{#if $detail_protype == 1#}
+  	<div class="mealWrap">
+		{#foreach from=$detail_product item="product"#}
+  		<div class="mealBox">
+		  	<div class="mealCon">
+				<!-- <h1 class="mealH1">【{#$product.title#}】套餐详情</h1> -->
+				<h1 class="mealH1">套餐详情</h1>
+				<!-- 如果套餐内容大于1的时候 标题展示 -->
+					{#foreach from=$product.packagearr item=p#}
+						<dl>
+							{#if count($p) > 0#}
+								<dt>{#$p.title#}</dt>
+							{#/if#}
+							<dd>
+								{#foreach from=$p.param item=v#}
+								<div>
+									<span class="mealname">{#$v[0]#}</span>
+									<em>（{#$v[2]#}）</em>
+									<span class="mealPrice">{#echoCurrency type='symbol'#}<strong>{#$v[1]#}</strong></span>
+								</div>
+								{#/foreach#}
+
+							</dd>
+						</dl>
+					{#/foreach#}
+			</div>
+			<div class="buynoteCon">
+				<h1 class="buyH1">购买须知</h1>
+				<div>
+					<dl>
+						<dt>有  &nbsp;效  &nbsp;期：</dt>
+						<dd><p>购买后# {#if $product.qtimetype == 1#}{#$product.quantime#}天{#else#}{#date("Y-m-d",$product.quantime)#}前{#/if#}内有效</p></dd>
+					</dl>
+					<dl>
+						<dt>可用时间：</dt>
+						<dd><p>{#$product.daystr#} {#join(',',$product.availabletimearr)#}</p></dd>
+					</dl>
+
+					<dl>
+						<dt>使用规则</dt>
+						<dd>
+							<div class="useRules">
+								<ul class="fn-clear">
+									<li><span><img src="{#$templets_skin#}images/rule1.png" alt=""></span><p>线上购买</p></li>
+									<li><span><img src="{#$templets_skin#}images/rule2.png" alt=""></span><p>去线下门店</p></li>
+									<li><span><img src="{#$templets_skin#}images/rule3.png" alt=""></span><p>出示券码</p></li>
+								</ul>
+							</div>
+						</dd>
+					</dl>
+					{#foreach from=$product.noticearr item=no#}
+					<dl class="useMust">
+						<dt>{#$no.title#}：</dt>
+						<dd>
+							<div class="otNote">
+								
+								<p>{#$no.note#}</p>
+								
+							</div>
+						</dd>
+					</dl>
+					{#/foreach#}
+				</div>
+			</div>
+			<div class="detailBox">
+				<h3 class="detIt">内容详情</h3>
+				<div class="det-con picshow">
+					<p>{#$product.body#}</p>
+				</div>
+			</div>
+  		</div>
+		{#/foreach#}
+  		<a href="javascript:;" class="seeOtnote">更多详情<i></i></a>
+  	</div>
+	{#/if#}
+	<!-- 团购订单的 套餐详情 e-->
+
+	<!-- 订单信息 s-->
+	<div class="info-block">
+		<div class="info-content">
+			<dl><dt>{#$langData['siteConfig'][19][50]#}：</dt><dd>{#$detail_ordernum#}</dd></dl>
+			<dl><dt>{#$langData['siteConfig'][19][51]#}：</dt><dd>{#$detail_orderdate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>
+			{#if $detail_paydate != 0#}
+			<dl><dt>{#$langData['siteConfig'][19][52]#}：</dt><dd>{#$detail_paytype#}</dd></dl>
+			<dl><dt>{#$langData['siteConfig'][19][53]#}：</dt><dd>{#$detail_paydate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>
+			{#/if#}
+		</div>
+	</div>
+	<!-- 订单信息 e-->
+</div>
+{#* 拼团和砍价商品不能再次加购 *#}
+<div class="bottomOper">
+
+    {#if $detail_orderstate == 1 || $detail_orderstate == 11 || ($detail_orderstate == 2 && $detail_paydate != 0) || ($detail_orderstate == 6 && $detail_retState == 0)#}
+    <a href="{#getUrlPath service='member' type='user' template='refund-shop' id=$detail_id#}">申请退款</a>
+    {#/if#}
+
+    {#if $detail_orderstate == 4 || ($detail_orderstate == 6 && $detail_retState == 1)#}
+    {#if $detail_ret_audittype == 1#}
+    <a href="{#getUrlPath service='member' type='user' template='refunddetail-shop' id=$detail_id#}">退款详情</a>
+    {#else#}
+    <a href="{#getUrlPath service='member' type='user' template='refunddetail-shop' id=$detail_id#}">退款中</a>
+    {#/if#}
+    {#/if#}
+
+    {#if $detail_orderstate == 7#}
+    <a href="{#getUrlPath service='member' type='user' template='refunddetail-shop' id=$detail_id#}">退款成功</a>
+    {#/if#}
+
+	{#if $detail_orderstate == 0#}
+		<!-- 等待买家付款 -->
+	<a href="javascript:;" class="cancelOrder btn-cancel">取消订单</a>
+	{#if $peerpayState && !$peerpay && $detail_huodongtype!=3 && $detail_huodongtype!=4 #} 				 
+	<a href="{#getUrlPath service='member' type='user' template='daipay' param="module=shop&ordernum=$detail_ordernum"#}" class="shareTo" data-paytype="1">找人付</a> 				
+	{#/if#}
+	<a href="javascript:;" class="hasbg popPay" data-ordernum= "{#$detail_ordernum#}">去付款</a>
+	{#elseif $detail_orderstate == 1 || ($detail_orderstate == 6 && $detail_retState == 1 && $detail_expDate == 0)#}
+	{#if $detail_pinstate == 0 && $detail_huodongtype == 4#}
+	<a href="javascript:;" class="cancelOrder btn-cancel">取消订单</a>
+    {#if $detail_pinarr#}
+	<a href="javascript:;" class="hasbg inviteTuan ">邀请好友拼团</a>
+    {#/if#}
+	{#else#}
+
+		<!-- 待发货/未发货申请退款 -->
+	{#if $detail_paytypeold == 'delivery'#}
+	<a href="javascript:;" class="cancelOrder btn-cancel">取消订单</a>
+	{#else#}
+	<a href="javascript:;" class="buyAgain">再次购买</a>
+	{#/if#}
+	{#if $detail_protype !=1 && $detail_orderstate == 6 #}
+	<a href="javascript:;" class="hasbg sh">确认收货</a>
+	{#/if#}
+	{#/if#}
+
+	{#elseif $detail_orderstate == 6 && $detail_expDate != 0#}
+		<!-- 商家已发货 -->
+		{#if $detail_shipping == 1 #}
+		<a href="{#getUrlPath service='member' type='user' template='logistics' param="oid=$detail_id"#}">查看物流</a>
+		{#/if#}
+		<a href="javascript:;" class="hasbg sh">确认收货</a>
+	{#elseif $detail_orderstate == 3#}
+	
+		<a href="javascript:;" class="buyAgain">再次购买</a>
+		{#if $detail_common == 1#}
+		<!-- 已经评价过 -->
+		<a href="{#getUrlPath service='member' type='user' template='commentdetail_shop' id={#$id#}#}">查看评价</a>
+		{#else#}
+		<a href="{#getUrlPath service='member' type='user' template='write-comment' module='shop' id={#$id#}#}" class="hasbg">去评价</a>
+		{#/if#}
+	{#elseif $detail_orderstate == 10 || $detail_orderstate == 7#}
+		<!-- <a href="javascript:;" class="delOrder">删除订单</a> -->
+		<a href="javascript:;" class="buyAgain">再次购买</a>
+	{#/if#}
+</div>
+<!-- 退款弹出层 s-->
+{#if $detail_orderstate == 1 || $detail_orderstate == 11 || ($detail_orderstate == 2 && $detail_paydate != 0) || ($detail_orderstate == 6 && $detail_retState == 0)#}
+<div class="layer">
+	<div class="top fn-clear">
+  		<div class="top-l" id="typeback"><a href="javascript:;">{#$langData['siteConfig'][6][117]#}</a></div>
+		<div class="top-c">{#$langData['siteConfig'][6][66]#}</div>
+		<div class="top-r"></div>
+		</div>
+	<div class="fn-clear">
+	    <div class="imgbox">
+	      <div class="addimg">
+	        <ul class="fileList fn-clear noimg" id="fileList">
+	          <li class="add uploadbtn"><div id="filePicker" class="btn"></div></li>
+	        </ul>
+	      </div>
+	    </div>
+    	<p class="uploader-btn"></p>
+  	</div>
+
+    <dl class="inpbox">
+      <dt><span>{#$langData['siteConfig'][19][43]#}</span></dt>
+      <dd class="selgroup">
+        <select id="type" name="type">
+					<option value="">{#$langData['siteConfig'][7][2]#}</option>
+					<option value="{#$langData['siteConfig'][19][197]#}">{#$langData['siteConfig'][19][197]#}</option>
+					<option value="{#$langData['siteConfig'][19][198]#}">{#$langData['siteConfig'][19][198]#}</option>
+					<option value="{#$langData['siteConfig'][19][199]#}">{#$langData['siteConfig'][19][199]#}</option>
+					<option value="{#$langData['siteConfig'][19][200]#}">{#$langData['siteConfig'][19][200]#}</option>
+					<option value="{#$langData['siteConfig'][19][201]#}">{#$langData['siteConfig'][19][201]#}</option>
+        </select>
+      </dd>
+      <input type="hidden" name="typeid" id="typeid" value="">
+    </dl>
+    <dl class="inpbox">
+      <dt><span>{#$langData['siteConfig'][19][44]#}</span></dt>
+      <dd><textarea placeholder="" name="" class="textarea" id="textarea"></textarea></dd>
+    </dl>
+	<div class="submit">
+		<a href="javascript:;" id="submit">{#$langData['siteConfig'][6][68]#}</a>
+	</div>
+	<div class="error"></div>
+</div>
+{#/if#}
+<!-- 退款弹出层 e-->
+<!-- 邀请好友弹窗 s-->
+<div class="modal-public in_friends HN_PublicShare_shearBox " tabindex="-1" role="dialog">
+	<div class="bgCover"></div>
+	<div class="inviting_friends">
+        <p class="inviting_txt">还差<em>{#$detail_rest#}</em>人，赶快邀请好友来拼单吧</p>
+        <p class="inviting_title">拼单已发起，人满后立即发货</p>
+        <div class="inviting_img">
+        	<ul class="fn-clear">
+        		<li><a class="HN_button_tweixin"><img src="{#$templets_skin#}images/shop/wx.png"><p>微信</p></a></li>
+        		<li><a class="HN_button_ttqq"><img src="{#$templets_skin#}images/shop/qq.png"><p>QQ</p></a></li>
+        		<li><a class="HN_button_tsina" href="http://service.weibo.com/share/share.php?url='+window.location+'&desc='+document.title+'"><img src="{#$templets_skin#}images/shop/wb.png"><p>微博</p></a></li>
+        		<li><a class="HN_button_code"><img src="{#$templets_skin#}images/shop/sm.png"><p>当面扫码</p></a></li>
+        		<li><a href="javascript:;" data-clipboard-action="copy" data-clipboard-text='{#getUrlPath service="shop" template="dindan" id=$detail_pinid#}' class="HN_button_link1"><img src="/static/images/HN_Public_share8.png"><p>复制链接</p></a></li>
+
+        	</ul>
+        </div>
+	</div>
+
+	<div class="HN_PublicShare_bg" id="HN_PublicShare_shearBg"></div>
+</div>
+<!-- 邀请好友弹窗 e-->
+
+<!-- 加入购物车专用 -->
+<div class="topcart" style="display:none;"><div class="cart-con"><div class="cartlist"><ul></ul></div></div></div>
+
+<!-- 加购时 商品卖光弹窗 -->
+<div class="nobuymask comshopmask"></div>
+<div class="nobuyAlert comshopAlert">
+  <h2 class="haspro">以下商品卖光啦，先将其他有货商品加入购物车？</h2>
+  <h2 class="nopro">以下商品均卖光啦，暂无商品可加购物车！</h2>
+  <div class="nobuyPro">
+
+  </div>
+  <div class="noproUl haspro">
+    <ul>
+      <li><a href="javascript:;" class="think">我再想想</a></li>
+      <li><a href="javascript:;" class="addCart">加购物车</a></li>
+    </ul>
+  </div>
+  <div class="noproUl nopro">
+    <ul>
+      <li><a href="javascript:;" class="think">我知道了</a></li>
+    </ul>
+  </div>
+</div>
+<!-- 确认收货弹窗 -->
+<div class="sureshmask comshopmask"></div>
+<div class="sureshAlert comshopAlert">
+  <h2 class="haspro">{#$langData['siteConfig'][20][188]#}</h2>
+  <div class="noproUl">
+    <ul>
+      <li><a href="javascript:;" class="cancelsh">取消</a></li>
+      <li><a href="javascript:;" class="suresh" data-id="">确定</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- 取消订单弹窗 -->
+<div class="cancelOrmask comshopmask"></div>
+<div class="surecanOrAlert comshopAlert">
+  <h2 class="haspro">确定取消订单?取消后将不可恢复！</h2>
+  <div class="noproUl">
+    <ul>
+      <li><a href="javascript:;" class="cancelOr">暂不取消</a></li>
+      <li><a href="javascript:;" class="surecanOr" data-id="">确定取消</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- 删除订单弹窗 -->
+<div class="delOrmask comshopmask"></div>
+<div class="suredelOrAlert comshopAlert">
+  <h2 class="haspro">{#$langData['siteConfig'][20][182]#}</h2>
+  <div class="noproUl">
+    <ul>
+      <li><a href="javascript:;" class="nodelOr">取消</a></li>
+      <li><a href="javascript:;" class="suredelOr" data-id="">确定</a></li>
+    </ul>
+  </div>
+</div>
+
+<script type="text/javascript">
+  var site_map = "{#$site_map#}",mapCity = '{#$cfg_mapCity#}';
+</script>
+
+
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+<!-- 路径地图 -->
+<script src="{#$cfg_staticPath#}js/publicOpenMap.js?v={#$cfg_staticVersion#}"></script>
+
+{#if $site_map=="baidu"#}
+<script src="https://api.map.baidu.com/getscript?v=3.0&ak={#$site_map_baidu#}=&t=20200914160603"></script>
+{#else if $site_map=="amap"#}
+<script src="https://webapi.amap.com/maps?v=1.4.15&key={#$site_map_amap#}&plugin=AMap.Riding"></script>
+{#else if $site_map == 'google'#}
+<script src="{#$templets_skin#}js/markerwithlabel.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+{#if $detail_protype ==1#}
+<script type="text/javascript" src="{#$templets_skin#}js/shop_map_path.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script src="{#$templets_skin#}js/jquery.smartScroll.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/shop_cart.js?v={#$cfg_staticVersion#}"></script>

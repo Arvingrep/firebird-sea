@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>{#if $do == 'edit'#}修改退款申请{#else#}{#$langData['siteConfig'][6][66]#}{#/if#}</title>   {#* 申请退款 *#}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobileSelect.css?v={#$cfg_staticVersion#}" />
+
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/refund.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+ <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.deferred.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';templatePath = '{#$templets_skin#}';
+	var hideFileUrl = {#$cfg_hideUrl#};
+
+  var thumbSize = {#$thumbSize#}, thumbType = '{#$thumbType#}', atlasSize = {#$atlasSize*1024*1024#}, atlasType = '{#$atlasType#}', atlasMax = 5;
+  var module = '{#$module#}', modelType = '{#$module#}';
+  var numArr = {#if $refundReason#}{#$refundReason#} {#else#} '' {#/if#};
+  var orderdetailUrl = '{#getUrlPath service="member" type="user" template="orderdetail-{#$module#}" id={#$id#}#}';
+  //退款详情
+  var refunddetailUrl = '{#getUrlPath service="member" type="user" template="refunddetail-{#$module#}" id={#$id#} param="proid={#$proid#}"#}';
+
+  var tuikType = 1;//需要判断 1申请退款 2退货退款
+  var proid = '{#$proid#}';
+  var confirmtype = '{#$detail_confirmtype#}';
+
+  {#if $module =='shop'#}
+  var procount = {#$detail_product[0]['count']#};
+  var quancount = {#$detail_quancount_normal|default:0#};
+  {#/if#}
+</script>
+</head>
+
+<body>
+
+  {#* 需要判断是申请退款 还是退货退款 *#}
+  {#if $do == 'edit'#}
+    {#$pageTitle = "修改退款申请"#}   {#* 修改退款申请 *#}
+  {#elseif ($module =='awardlegou' && $detail_orderstate==5) || $module =='shop'#}
+    {#$pageTitle = $langData['siteConfig'][6][66]#}   {#* 申请退款 *#}
+  {#else#}
+       {#$pageTitle = $langData['siteConfig'][55][34]#}   {#* 申请退货退款 *#}
+  {#/if#}
+
+{#include file="top.html"#}
+
+<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service={#$module#}&action=refund" >
+  <input type="hidden" name="id" id="sid" value="{#$id#}">
+  {#if $module =='shop'#}
+  <input type="hidden" name="proid" value="{#$proid#}">
+  {#/if#}
+  <div class="wrap">
+  	<div class="wrap_content2">
+      {#*商城的一个订单多个商品时  只退款其中一个 *#}
+      {#if $module =='shop'#}
+       {#$count = 0#}
+        {#foreach from=$detail_product item="pro"#}
+        {#if ($pro.id == $proid && $proid) || !$proid#}
+         {#$count = $count + $pro.count #}
+      <div class="content_top fn-clear">
+        <a href="javascript:;" class="fn-clear">
+        <div class="left_b"><img src="{#$pro['litpic']#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/good_default.png';"></div>
+        <div class="right_b">
+          <p class="jz_order_title">{#$pro['title']#}</p>
+        </div>
+        </a>
+
+        <!-- 退款个数 -->
+        {#if $detail_quancount_normal > 0#}
+        <div class="tui_num" data-count="{#$detail_quancount_normal#}">
+          <div class="left_tit">商品件数 <span>最多可退{#$detail_quancount_normal#}件</span></div>
+          <div class="shop-info-num" >
+            <span class="rec {#if $detail_quancount_normal <= 1#}disabled{#/if#}"></span><span class="num"><em>{#$detail_quancount_normal#}</em></span><span class="append disabled"></span>
+          </div>
+        </div>
+        {#/if#}
+      </div>
+      {#/if#}
+      {#/foreach#}
+      {#else#}
+      <div class="content_top fn-clear">
+        <a href="{#$detail_product['url']#}">
+        <div class="left_b"><img src="{#if $module =='awardlegou'#}{#$detail_product['litpicpath']#} {#else#} {#$detail_product['litpic']#} {#/if#}" alt=""></div>
+        <div class="right_b">
+          <p class="jz_order_title">{#$detail_product['title']#}</p>
+          
+        </div>
+        </a>
+      </div>
+      {#/if#}
+  	</div>
+    {#if $module =='shop'#}
+    <div class="tktype {#if $do == 'edit'#}fn-hide{#/if#}">
+      <div class="tkcon" data-type="0">
+        <h2>仅退款</h2>
+        <p>没收到货，或与卖家协商不用退货只退款</p>
+        <i></i>
+      </div>
+      <div class="tkcon" data-type="1">
+        <h2>我要退货退款</h2>
+        <p>已收到货，需要退还收到的货物</p>
+        <i></i>
+      </div>
+    </div>
+    {#/if#}
+    <div class="resonWrap {#if $module =='shop' && !$do#}reson-hide{#/if#}">
+      <div class="wrap_content3">
+        <ul class="cancel_info">
+          {#if $module =='shop' && $do == 'edit'#}
+          <li class="fn-clear oneheight">
+              <div class="com-box">
+                  <div class="tk_typeW fn-clear">
+                    {#*退款类型 *#}   {#*请选择 *#}
+
+                      <span class="name">退款类型</span>
+                      <div class="fakeDiv">
+                        <input id="tk_type" type="text" readonly value="{#if $detail_user_refundtype==1#}退货退款{#else#}仅退款{#/if#}">
+                        <span class="choose"><span class="text"  {#if $type==''#}style="display:none;"{#/if#}>{#$langData['homemaking'][2][28]#}</span><i></i></span>
+                    </div>
+              </div>
+          </li>
+          {#/if#}
+          {#* 退款类型-- 退货退款还是仅退款 *#}
+          <input type="hidden" name="refundtype" id="refundtype" value="{#if $type==1#}1{#else#}0{#/if#}">
+
+          <li class="fn-clear oneheight">
+              <div class="com-box">
+                  <div class="cancel_reason fn-clear">
+                    {#*退款原因 *#}   {#*请选择 *#}
+                      <span class="name">{#$langData['homemaking'][4][31]#}</span>
+                      <div class="fakeDiv">                     
+                        <input id="reason" type="text" name="{#if $module =="shop"#}type{#else#}rettype{#/if#}" readonly value="{#if $module == 'shop'#}{#$detail_retType#}{#else#}{#$detail_rettype#}{#/if#}">
+                        <span class="choose"><span class="text {#if $do == 'edit'#}fn-hide{#/if#}">{#$langData['homemaking'][2][28]#}</span><i></i></span>
+                    </div>
+              </div>
+           </li>
+           <li class="fn-clear">
+              <div>
+                {#*退款金额 *#}
+                <span class="name">{#$langData['siteConfig'][55][25]#}</span>  
+                <em class="sym">{#echoCurrency type='symbol'#}</em>
+                  <!-- 乐购--退款金额不可编辑 readonly-->
+                  {#if $module == 'awardlegou'#}
+                  <input type="text" id="cancel_price" class="cancelprice" name="retmoney"readonly value="{#$detail_balance#} {#if $detail_point#}+ {#$detail_point#}{#$cfg_pointName#}{#/if#}" >
+                  {#else#}
+                  <input type="number" id="cancel_price" class="cancelprice" name="retmoney"  value="{#if $module == 'shop'#}{#$detail_totalPayPrice#}{#else#}{#$detail_totalmoney#}{#/if#}" />
+                  {#/if#}
+              </div>
+                  {#if $module!= 'awardlegou'#}
+              <p class="maxMoney">{#$langData['siteConfig'][55][27]#}{#echoCurrency type='symbol'#}{#if $module == 'shop'#}{#$detail_totalPayPrice#}{#else#}{#$detail_totalmoney#}{#/if#}</p>  {#*退款金额 *#}
+                  {#/if#}
+              <input type="hidden" name="oldprice" id="oldprice" value="{#$detail_totalmoney#}">
+              
+          </li>
+          
+        </ul>
+        <div class="cancel_desc">
+
+          <h3 class="comTitle">{#$langData['homemaking'][4][32]#}</h3> {#*退款说明 *#}
+          <textarea  name="{#if $module =="shop"#}content{#else#}retnote{#/if#}" id="cancel_desc" placeholder="在这里输入，选填">{#if $module == 'shop'#}{#$detail_retNote#}{#else#}{#$detail_retnote#}{#/if#}</textarea>
+        </div>  {#*在这里输入，选填 *#}
+      </div>
+
+      {#* 有奖乐购-- 已发货时申请退货退款 *#}
+      {#if $module== 'awardlegou' || $module== 'shop'#}
+      <div class="wrap_content4">
+        <div class="store-imgs img_box">
+              <h3  class="comTitle">{#$langData['siteConfig'][6][50]#}</h3>   {#*上传图片 *#}
+              <ul class="uploader-list fn-clear" id="fileList">
+                  {#if $detail_retPics|@count > 0#}
+                  {#foreach from=$detail_retPics item=pics key=k#}
+                  <li id="WU_FILE_pic_{#$k#}" class="thumbnail imgshow_box"><div class="img_show"><img src="{#$pics.path#}" data-val="{#$pics.val#}" data-url="{#$pics.path#}"></div><i class="del_btn">+</i></li>
+                  {#/foreach#}
+                  {#/if#}
+                  <li class="upload_btn" id="uploadbtn">
+                      <div id="filePicker" class="webuploader-container">
+                          <img src="{#$templets_skin#}images/refund/add.png" />
+                          <p>{#$langData['siteConfig'][6][67]#}</p>   {#*上传凭证 *#}
+                          <p>({#$langData['siteConfig'][39][9]|replace:'1':'5'#})</p>   {#*最多1张 *#}
+                      </div>
+                  </li>
+                  <div class="kong"></div>
+                  <input type="hidden" id="retpics" name="{#if $module =="shop"#}pics{#else#}retpics{#/if#}">
+              </ul>
+          </div>
+      </div>
+      {#/if#}
+      <div class="cancel_submit">
+        <a href="javascript:;">{#$langData['siteConfig'][6][151]#}</a>   {#*提交 *#}
+      </div>
+    </div>
+  	
+
+  </div>
+
+    
+
+  </div>
+
+  
+
+</form>
+<!-- 错误弹窗 -->
+<div class="error"></div>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+
+{#* 微信分享 *#}
+{#$Share_description = {#$cfg_description#}#}
+{#$Share_title = {#$langData['siteConfig'][0][7]#}#}
+{#$Share_img = {#$cfg_weblogo#}#}
+{#$Share_url = {#$member_userDomain#}#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+
+<script src="{#$cfg_staticPath#}js/webuploader/webuploader.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/mobileSelect.js?v={#$cfg_staticVersion#}" ></script>
+<script type="text/javascript" src="{#$templets_skin#}js/upload.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/upload-img.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/refund-{#$module#}.js?v={#$cfg_staticVersion#}"></script>
+
+</body>
+</html>

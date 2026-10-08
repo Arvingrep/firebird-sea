@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>发布职位</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/add_post.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var id = '{#$smarty.get.id#}';
+        var city = '{#$siteCityInfo.name#}';
+        var customAgentCheck = {#$customAgentCheck|default:0#}; //发布信息是否需要审核
+        var busi_state = {#$company_state|default:0#} ;  //公司的审核状态 ，1表示审核通过， 0是待审核  2是拒绝 
+        var masterDomain  = '{#$cfg_basehost#}';
+        var package_job = '{#$company_package_job|default:0#}'; //增值包
+        var canJobs = '{#if $company_combo_job == -1#}999999{#else#}{#$company_canJobs#}{#/if#}'; //可以上架的职位
+        var combo_id = '{#$company_combo_id#}'; //套餐id
+        var combo_job = '{#if $company_combo_job == -1#}999999{#else#}{#$company_combo_job#}{#/if#}'; //套餐上架次数
+        var combo_job_real = '{#if $company_combo_job == -1#}999999{#else#}{#$company_combo_job#}{#/if#}'
+        var combo_enddate = '{#$company_combo_enddate#}'; //套餐到期时间
+        var pcount = '{#$company_pcount#}'
+        var changeCheck = {#$company_state|default:1#}; //商家是否正在审核 0正在审核 1审核通过
+        var state = '{#$detail_state#}';
+        var cityid = '{#$siteCityInfo.cityid#}';
+        var city_lng = '{#$siteCityInfo.lng#}';
+        var city_lat = '{#$siteCityInfo.lat#}';
+        var city_name = '{#$siteCityInfo.name#}'
+        var jobChannel = '{#getModuleConfig module='job' key='channelDomain'#}';
+
+
+
+    </script>
+</head>
+<body>
+    <div class="pagebox" id="page" v-cloak>
+     
+        <div class="header alignLeft" v-if="!id">
+            <div class="header-l">
+                <!--  onclick="history.go(-1)" -->
+                <a href="javascript:;" class="goBack" @click="confirmBackPop"></a>
+            </div>
+            <div class="header-address" >
+                <ul class="step_ul">
+                    <li :class="['step',{'has_chose':currStep >= ind}]" v-for="(item,ind) in steps" @click="currStep = ((ind <= optStep || id > 0) && ind < (steps.length -1)) ? ind : currStep"><s :class="{'gou' : ind >= steps.length }">{{(ind + 1) < steps.length ? (ind + 1) : ''}}</s>{{item}}</li>
+                </ul>
+            </div>
+            
+        </div>
+        <div class="header alignLeft" v-else>
+            <div class="header-l">
+                <a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+            </div>
+            <div class="header-address tabBox">
+                <span :class="{'on_chose':currStep === 0 }" @click="currStep = 0">基本信息</span>
+                <span :class="{'on_chose':currStep === 1 }" @click="currStep = 1">职位要求</span>
+                <s></s>
+            </div>
+            <div class="header-search"><s></s></div>
+        </div>
+
+        <div class="formPage">
+            <!-- 基础信息 -->
+            <dl v-if="currStep === 0">
+                <dt v-if="!id">职位基本信息</dt>
+                <dd class="formPart" >
+                    <div class="form_item" data-require="1">
+                        <div class="labelBox flexBox">
+                            <label for="">职位类别</label>
+                            <div class="tip">确认发布后将无法修改</div>
+                        </div>
+                        <div class="inpBox selectBox" @click="showPostPop = (id ? false : true);">
+                            <input type="text" readonly placeholder="请选择"  :value="choseTypeObj.length ? choseTypeObj[choseTypeObj.length - 1].typename : ''">
+                        </div>
+                    </div>
+                    <div class="form_item" data-require="1">
+                        <div class="labelBox flexBox">
+                            <label for="">职位名称</label>
+                            <div class="tip">确认发布后将无法修改</div>
+                        </div>
+                        <div class="inpBox " >
+                            <input type="text" placeholder="请填写"  :readonly="(id?true:false)" v-model="formData.title" maxlength="30">
+                        </div>
+                    </div>
+                    <div class="form_item flexBox" data-require="1">
+                        <div class="labelBox flexBox">
+                            <label for="">职位性质</label>
+                            <div class="tip"></div>
+                        </div>
+                        <!-- <div class="inpBox selectBox" @click="showPop = true; popType = 'jobNature'">
+                            <input type="text" readonly placeholder="请选择" :value="checkValue(formData.nature,'nature')">
+                        </div> -->
+                        <div class="labBox">
+                            <span :class="['lab',{'on_chose':formData.nature == item.id}]" v-for="item in baseConfig.jobNature" @click="formData.nature = item.id">{{item.typename}}</span>
+                        </div>
+                    </div>
+                    <div class="form_item" data-require="1">
+                        <div class="labelBox flexBox">
+                            <label for="">工作地点</label>
+                            <div class="tip"></div>
+                        </div>
+                        <div class="inpBox selectBox"  @click="showAddrList">
+                            <input type="text" placeholder="请选择" readonly :value="checkAddress()">
+                        </div>
+                    </div>
+                    <div class="form_item" :data-require="formData.nature !== 2 ? 1 : 0">
+                        <div class="labelBox flexBox" v-if="formData.nature !== 2">
+                            <label for="">薪资待遇</label>
+                            <div class="tip">请取整填写，如4500,12000</div>
+                        </div>
+                        <div class="labelBox flexBox" v-else>
+                            <label for="">
+                                <a href="javascript:;" class="changeType" v-show="formData.nature == 2" @click="formData.salary_type = (formData.salary_type == 1 ? 2 : 1)">
+                                    <span>{{formData.salary_type=== 1 ? '月薪' : '时薪'}}</span><span class="tabChange">(<s></s>{{formData.salary_type=== 1 ? '时薪' : '月薪'}})</span>
+                                </a>
+                            </label>
+                        </div>
+                        <!-- <div class="inpBox selectBox" @click="showPop = true; popType = 'salary'">
+                            <input type="text" placeholder="请选择" readonly :value="formData.min_salary ? (formData.min_salary == formData.max_salary ? formData.max_salary : formData.min_salary + '-' +formData.max_salary) : ''">
+                        </div> -->
+                        <div :class="['inpBox moreInp',{'noChangeInp':formData.mianyi}]" v-if="formData.salary_type=== 1">
+                            <div class="smInp">
+                                <input type="number" :disabled="formData.mianyi ? true : false" oninput ="value = value.replace(/[^\d]/g,''); " placeholder="请填写" v-model="formData.min_salary" @change="checkNumber('min')" >
+                            </div>
+                            <span>-</span>
+                            <div class="smInp">
+                                <input type="number" :disabled="formData.mianyi ? true : false" oninput ="value = value.replace(/[^\d]/g,''); " placeholder="请填写" v-model="formData.max_salary" @change="checkNumber('max')" >
+                            </div>
+                            <span>（{#echoCurrency type="short"#}/{{formData.salary_type=== 1 ? '月' : '小时'}}）</span>
+                            <div :class="['checkBox',{'chosed':formData.mianyi}]" @click="changeMy()">面议</div>
+                        </div>
+                        <div :class="['inpBox moreInp',{'noChangeInp':formData.mianyi}]" v-else>
+                            <div class="smInp">
+                                <input type="text" :disabled="formData.mianyi ? true : false" oninput ="value=value.replace(/^\D*(\d*(?:\.\d{0,1})?).*$/g, '$1')"  placeholder="请填写" v-model="formData.min_salary" @change="checkNumber('min')" >
+                            </div>
+                            <span>-</span>
+                            <div class="smInp">
+                                <input type="text" :disabled="formData.mianyi ? true : false" oninput ="value=value.replace(/^\D*(\d*(?:\.\d{0,1})?).*$/g, '$1')" placeholder="请填写" v-model="formData.max_salary" @change="checkNumber('max')" >
+                            </div>
+                            <span>（{#echoCurrency type="short"#}/{{formData.salary_type=== 1 ? '月' : '小时'}}）</span>
+                            <div :class="['checkBox',{'chosed':formData.mianyi}]" @click="changeMy()">面议</div>
+                        </div>
+                    </div>
+
+                    <div class="form_item" v-if="formData.nature == 1 && !formData.mianyi" data-require="1">
+                        <div class="labelBox flexBox">
+                            <label for="">年底n薪</label>
+                            <div class="tip"></div>
+                        </div>
+                        <div class="inpBox selectBox"  @click="showPop = true; popType = 'dy_salary'">
+                            <input type="text" placeholder="选填" readonly :value="checkValue(formData.dy_salary,'dy_salary')">
+                        </div>
+                    </div>
+                </dd>
+                <dd class="formPart" >
+                    <div class="form_item">
+                        <div class="labelBox flexBox">
+                            <label for="">招聘人数</label>
+                            <div class="tip"></div>
+                        </div>
+                        <div class="inpBox ">
+                            <input type="number" placeholder="选填" oninput="value = value.replace(/[^\d]/g,''); if(value.length>5)value=value.slice(0,5)" v-model="formData.number"  maxlength="4">
+                            <span class="unit">(人)</span>
+                        </div>
+                    </div>
+                    <div class="form_item" data-require="1">
+                        <div class="labelBox flexBox">
+                            <label for="">有效期</label>
+                            <div class="tip"></div>
+                        </div>
+                        <div class="inpBox selectBox" @click="showPop = true; popType = 'valid'">
+                            <input type="text" placeholder="请选择" readonly :value="formData.long_valid ? '长期有效' : (formData.valid  ? transTimes(formData.valid,2).replace(/-/g,'/') : '')"  >
+                        </div>
+                    </div>
+                </dd>
+            </dl>
+
+            <dl v-else>
+                <dt v-if="!id">职位类别</dt>
+                <dd class="formPart">
+                    <div class="form_item" data-require="1">
+                        <div class="labelBox flexBox" >
+                            <label for="">学历要求</label>
+                            <div class="tip"></div>
+                        </div>
+                        <div class="inpBox selectBox" @click="showPop = true; popType ='education'">
+                            <input type="text" readonly placeholder="请选择" :value="checkValue(formData.educational,'education')">
+                        </div>
+                    </div>
+                    <div class="form_item" data-require="1">
+                        <div class="labelBox flexBox">
+                            <label for="">经验要求</label>
+                            <div class="tip"></div>
+                        </div>
+                        <div class="inpBox selectBox"  @click="showPop = true; popType ='experience'">
+                            <input type="text" readonly placeholder="请选择" :value="checkValue(formData.experience,'experience')">
+                        </div>
+                    </div>
+                    <div class="form_item">
+                        <div class="labelBox flexBox">
+                            <label for="">职位标签</label>
+                            <div class="tip"></div>
+                        </div>
+                        <div class="inpBox selectBox" @click="showPop = true; popType = 'label'">
+                            <input type="text" readonly placeholder="请选择" :value="formData.tag ? removeNull : ''">
+                        </div>
+                    </div>
+                </dd>
+                <dd class="">
+                    <div class="form_item" data-require="1">
+                        <div class="disflex a-c j-b h3box">
+                            <h3 > 职位描述 </h3>
+
+                        </div>
+                        <div class="warning">
+                            请勿输入公司邮箱、联系电话及外链、严禁包含民族、性别等歧视语。<!-- <a href="#">查看职位发布规范</a> -->
+                        </div>
+                        <div class="aiBtnPlaceBox">
+                            <div class="textareaBox">
+                                <div class="placeHolder" v-if="!formData.note && !focusIn">
+                                    请输入工作内容<br/>
+                                    1…<br/>
+                                    2...<br/>
+    
+                                </div>
+                                <van-field  @focus="focusIn = true" type="textarea" maxlength="800" @blur="focusIn = false" autosize v-model="formData.note"  show-word-limit/>
+    
+                            </div>
+                            <div class="aiBtnBox"></div>
+
+                        </div>
+                    </div>
+                </dd>
+                <dd class="">
+                    <div class="form_item" >
+                        <h3>任职要求</h3>
+                        
+                        <div class="textareaBox">
+                            <div class="placeHolder" v-if="!formData.claim && !focusIn_1">
+                                请输入岗位职责<br/>
+                                1…<br/>
+                                2...<br/>
+                            </div>
+                            <van-field @focus="focusIn_1 = true" @blur="focusIn_1 = false" type="textarea" maxlength="800"  autosize v-model="formData.claim"  show-word-limit/>
+                        </div>
+                    </div>
+                </dd>
+            </dl>
+
+            <div class="bottomBox">
+                <a href="javascript:;" :class="['submit_btn',{'noClick':checkFormData(currStep,1) && currStep == 1}]"@click="nextToStep" v-if="!id">{{currStep < 1  ? '继续' : '立即发布'}}</a>
+                <a href="javascript:;" :class="['submit_btn',{'noClick':checkFormData(currStep,1)}]" @click="nextToStep" v-else>保存</a>
+            </div>
+        </div>
+
+
+        <!-- 各种相关弹窗 -->
+        <div class="popContainerBox">
+            <!-- 选择意向职位 -->
+            <div :class="['intention_mask mask_pop', {'showMask':showPostPop}]" @click="showPostPop = false"></div>
+            <div :class="['intention_pop pubPopBox', {'showPop':showPostPop}]">
+                <div class="headTit">
+                    <h3>请选择职位类别</h3>
+                    <span class="feedBack" @click="showFeedBack = true">职位反馈</span>
+                </div>
+                <div class="pop_con">
+                    <ul class="categoryList_ul root_ul" v-if="postList">
+                        <li v-for="item in postList" @click="chosePostType(item)"
+                            :class="[{'on_chose':item.id == currChoseType.id   },{'curr_chose':item.id == currChoseType.id }]">
+                            {{item.typename}}</li>
+                    </ul>
+                    <!-- showLeftPop -->
+                    <div v-if="currChoseType && currChoseType.lower && currChoseType.lower.length "
+                        :class="['parentContainer' ,{'showLeftPop':currChoseType && currChoseType.lower && currChoseType.lower.length && showLeftPop}]">
+                        <div class="parent_mask" @click="showLeftPop = false" v-if="showLeftPop"></div>
+                        <div :class="['parentBox',{'open':showRightPop}]">
+                            <ul class="categoryList_ul parent_ul">
+                                <li v-for="item in currChoseType.lower"
+                                    :class="[{'on_chose':currChoseStype.id == item.id },{'curr_chose':currChoseStype.id && currChoseStype.id == item.id}]"
+                                    @click="chosePostType(item,1)">{{item.typename}}</li>
+                            </ul>
+                            <div :class="['childrenBox']"
+                                v-if="currChoseStype && currChoseStype.lower  && currChoseStype.lower.length">
+                                <ul class="categoryList_ul children_ul">
+                                    <li v-for="(item ,ind) in currChoseStype.lower" @click="chosePostType(item,2)"
+                                        :class="{'on_chose': formData.type == item.id}">
+                                        <h4>{{item.typename}}</h4>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            
+            </div>
+
+            <!-- 其他弹窗 -->
+            <div :class="['mask_pop' ,{'showMask':showPop}]" @click="showPop = false"></div>
+            <div :class="['pubPopBox', {'showPop':showPop}]">
+
+                <!-- 有效期 -->
+                <div class="validPop popBox" v-if="popType == 'valid'">
+                    <div class="popHeader">
+                        <a href="javascript:;" class="btn_cancel" @click="hidePop">取消</a>
+                        <h4>职位有效期</h4>
+                        <a href="javascript:;" class="btn_sure" @click="popConfirm('valid')">确定</a>
+                    </div>
+                    <div class="shortCutOptions">
+                        <ul>
+                            <li @click="formData.long_valid = 1; formData.valid = ''; validDays = '';hidePop()" :class="{'on_chose':formData.long_valid == 1}" >长期有效</li>
+                            <li v-for="item in shortCutOptions" @click="choseDays(item)" :class='{"on_chose":validDays == item.value}'>{{item.title}}</li>
+                        </ul>
+                    </div>
+                    <van-datetime-picker
+                        :show-toolbar="false"
+                        v-model="validShow"
+                        visible-item-count="5"
+                        type="date"
+                        :min-date="minDate"
+                        title="选择年月日"
+                    ></van-datetime-picker>
+                </div>
+
+
+                <!-- 职位标签 -->
+                <div class="labelPop popBox" v-if="popType == 'label'">
+                    <div class="popHeader">
+                        <a href="javascript:;" class="close_pop" @click="hidePop"></a>
+                        <h4>职位标签</h4>
+                        <p>请选择职位类别，最多选3个</p>
+                    </div>
+                    <div class="popCon">
+                        <div class="defaultLabBox">
+                            <ul>
+                                <li v-for="item in baseConfig['jobTag']" @click="choseDefaultTag(item)" :class="{'on_chose':editTag.defaultTag.includes(item.typename)}">{{item.typename}}</li>
+                            </ul>
+                        </div>
+                        <div class="selfDefine">
+                            <div :class="['inputBox',{'on_edit':editTag.editInd == ind && editTag.onEdit}]" v-for="(item,ind) in editTag.selfTag">
+                                <div class="inputbox"  v-show="editTag.editInd == ind && editTag.onEdit">
+                                    <input type="text" v-model="editTag.tag" maxlength="8" @blur="sureEdit()" @keydown="enterEdit">
+                                    <span class="limit"><em>{{editTag.tag.length}}</em>/8</span>
+                                </div>
+                                
+                                <div class="inputbox" v-show="editTag.editInd !== ind || !editTag.onEdit">
+                                    <span class="selftag" @click="editTag.tag = item; editTag.editInd = ind; editTag.onEdit = true">{{item}}</span>
+                                    <a href="javascript:;" class="del" @click="delSelfTag(ind)" ></a>
+                                </div>
+                            </div>
+                            <a href="javascript:;" class="add_lab" @click="AddPostTag">自定义</a>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- 选择工作地点 -->
+                <div class="choseWorkPosiPop popBox" v-if="popType == 'choseWorkPosi'">
+                    <div class="popHeader">
+                        <h4>选择工作地点</h4>
+                        <a href="javascript:;" class="close_pop" @click="hidePop"></a>
+                    </div>
+                    <div class="popCon">
+                        <ul class="addrList">
+                            <li v-for="addr in jobAddrList" v-if="addr.address" :class="[{'on_chose':formData.job_addr_id == addr.id},{'edit_item':addr.id == 0}]" >
+                                <div v-if="addr.id"  @click="formData.job_addr_id = addr.id ; hidePop()">{{addr.addrName && addr.addrName.length ? addr.addrName.join('') : ''}}{{addr.address}}</div>
+                                <div v-else class="editAddrCon" @click="choseNewAddr">
+                                    <div class="editAddr">
+                                        <div class="h4"><van-field
+                                            v-model="addr.address"
+                                            rows="1"
+                                            autosize
+                                            type="textarea"
+                                            placeholder="请输入地址"
+                                        /></div>
+                                        <div class="addr_btns" v-show="addr.id ==formData.job_addr_id ">
+                                            <span>已选择新地址，可编辑</span>
+                                            <a href="javascript:;" class="btn_posi" v-if="site_map != 'tmap'" @click.stop="showMapCurr()">查看定位</a>
+                                        </div>
+                                        <div class="addr_btns" v-show="addr.id !== formData.job_addr_id">
+                                            <span>刚刚添加</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="popFoot">
+                        <a href="javascript:;" class="add_addr" @click="addWorkPosi = true">新增地址</a>
+                    </div>
+                </div>
+
+                <!-- 职位性质 -->
+                <!-- <div class="pickerPop" v-if="popType == 'jobNature'">
+                    <van-picker 
+                        :value="checkValue(formData.nature,'nature')"
+                        :loading="!baseConfig"
+                        :default-index="checkIndex(formData.nature,'nature')"
+                        title="公司性质"
+                        show-toolbar
+                        value-key="typename"
+                        :columns="baseConfig.jobNature"
+                        @confirm="confirmChose"
+                        @cancel="hidePop"
+                    ></van-picker>
+
+                </div> -->
+
+                <!-- 学历教育 -->
+                <div class="pickerPop" v-if="popType == 'education'">
+                    <van-picker 
+                        :value="checkValue(formData.nature,'education')"
+                        :loading="!baseConfig"
+                        :default-index="checkIndex(formData.educational,'education')"
+                        title="学历教育"
+                        show-toolbar
+                        value-key="typename"
+                        :columns="baseConfig.education"
+                        @confirm="confirmChose"
+                        @cancel="hidePop"
+                    ></van-picker>
+
+                </div>
+                <!-- 经验要求 -->
+                <div class="pickerPop" v-if="popType == 'experience'">
+                    <van-picker 
+                        :value="checkValue(formData.experience,'experience')"
+                        :loading="!baseConfig"
+                        :default-index="checkIndex(formData.experience,'experience')"
+                        title="学历教育"
+                        show-toolbar
+                        value-key="typename"
+                        :columns="baseConfig.experience"
+                        @confirm="confirmChose"
+                        @cancel="hidePop"
+                    ></van-picker>
+
+                </div>
+
+                <!-- 薪资待遇 -->
+                <!-- <div class="pickerPop salaryPop" v-if="popType == 'salary'">
+                    <div class="popHeader">
+                        <a href="javascript:;" class="btn_cancel" @click="hidePop">取消</a>
+                        <h4>薪资待遇</h4>
+                        <a href="javascript:;" class="btn_sure" @click="popConfirm('salary')">确定</a>
+                    </div>
+                    <div class="popCon">
+                        <van-picker 
+                        ref="min_salary"
+                        :show-toolbar="false"
+                        :columns="salarObjArr_min"
+                        @confirm="confirmChose"
+                        :default-index="checkSalaryIndex('min_salary')"
+                        @cancel="hidePop"
+                        @change="salaryChange(1)"
+                    ></van-picker>
+                    <van-picker 
+                        ref="max_salary"
+                        :show-toolbar="false"
+                        :default-index="checkSalaryIndex('max_salary')"
+                        :columns="salarObjArr_max"
+                        @confirm="confirmChose"
+                        @cancel="hidePop"
+                        @change="salaryChange(2)"
+                    ></van-picker>
+                    </div>
+                </div> -->
+
+
+                <!-- 年底n薪 -->
+                <div class="pickerPop" v-show="popType == 'dy_salary'">
+                    <van-picker 
+                    title="年底N薪"
+                    show-toolbar
+                    :columns="dySalaryArr"
+                    @confirm="confirmChose"
+                    @cancel="hidePop"
+                ></van-picker>
+                
+                <!-- :default-index="checkSalaryIndex('min_salary')" -->
+                </div>
+
+
+
+            </div>
+
+            <!-- 添加地址 -->
+            <div :class="['mask_pop addWorkPosiMask' ,{'showMask':addWorkPosi}]"></div>
+            <div :class="['pubPopBox addWorkPosiPopBox', {'showPop':addWorkPosi}]">
+                <!-- 新增 工作地 -->
+                <div class="addWorkPosiPop popBox" >
+                    <div class="popHeader">
+                        <div class="btnsGroup">
+                            <a href="javascript:;" class="cancel_btn" @click="hideAddPosiPop">取消</a>
+                            <a href="javascript:;" class="sure_btn" @click="confirmAddr">确定</a>
+                        </div>
+                        <div class="searchBox">
+                            <input type="text" placeholder="搜索位置" v-model="addrKeywords" @input="searchKey" @focus="showSearchPage" @blur="hideSearchPage" id="searchInp">
+                        </div>
+                    </div>
+                    <div class="popCon">
+                        <div class="searchPage" v-show="showSearch || site_map == 'tmap'">
+                            <ul>
+                                <li v-for="(item,ind) in searchList" :class="{'on_chose':ind == currInd}" @click="chosePosi(item,'',ind)">
+                                    <h4>{{item.name}}</h4>
+                                    <p>{{item.address}}</p>
+                                </li>
+                                <li class="toDefine" v-show="loadEnd && addrKeywords">
+                                    <a :href="'{#$member_userDomain#}/mapDefine.html?cityid='+cityid+'&city='+city+'&currentPageOpen=1'" @click="toMapDefine">
+                                        <div class="addrInfo" >
+                                            <h3>{{searchList.length ? '以上都不是' : '暂无相关地址'}}</h3>
+                                            <p>点击添加自定义位置</p>
+                                        </div>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="showPage" v-show="!showSearch &&  site_map != 'tmap'">
+                            <div class="mapBox">
+                                <div class="mapdiv" id="mapdiv"></div>
+                                <div class="mapCenter"></div>
+                            </div>
+                            <div class="suggestList">
+                                <ul>
+                                    <li v-for="(item,ind) in surroundingPois"  @click="chosePosi(item,1,ind)" :class="{'on_chose':ind === currInd}">
+                                        <h4>{{item.title}}</h4>
+                                        <p>{{item.address}}</p>
+                                    </li>
+                                    <li class="toDefine" v-show="loadEnd">
+                                        <a :href="'{#$member_userDomain#}/mapDefine.html?cityid='+cityid+'&city='+city+'&currentPageOpen=1'"  @click="toMapDefine">
+                                            <div class="addrInfo">
+                                                <h3>以上都不是</h3>
+                                                <p>点击添加自定义位置</p>
+                                            </div>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 职位反馈 -->
+            <div class="feedBack_mask" v-show="showFeedBack" @click="showFeedBack = false"></div>
+            <div class="feedBack_pop" v-show="showFeedBack">
+                <h4>找不到合适的职位选项，希望添加：</h4>
+                <div class="textareaBox">
+                    <textarea name="" id="" placeholder="我想发布的职位是…" maxlength="30" v-model="postTypename"></textarea>
+                </div>
+                <div class="btnsGroup">
+                    <span class="cancel" @click="showFeedBack = false">取消</span>
+                    <span class="sureBtn" @click="feedBackPost">确定反馈</span>
+                </div>
+            </div>
+
+
+            
+        </div>
+    </div>
+    
+    {#include file="public_pop.html"  noVue=1 swiper='1'#}
+    {#include file="{#$HUONIAOROOT#}/templates/member/touch/ai2Con.html"#}
+    {#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+</body>
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}'
+	};
+</script>
+<script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/add_post.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+</html>

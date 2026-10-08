@@ -1,0 +1,147 @@
+{#$pageTitle = '简历管理'#}
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#$pageTitle#} - {#$langData['siteConfig'][19][765]#} - {#$cfg_webname#}</title>
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/job_sideBar.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/invitation_detail.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var cookiePre = '{#$cfg_cookiePre#}';
+	var service = 'job';
+    var pageData = {};
+    var staticPath  = '{#$cfg_staticPath#}'
+</script>
+</head>
+<body>
+{#include file="top.html"#}
+
+<div class="wrap contentWrap fn-clear">
+	{#include file="job_sideBar.html" module='invitation'#}
+	<div class="midContent">
+		<div class="detailBoxWrap whiteBGWrap" id="detailPage" v-cloak>
+            <div class="wrap_title">
+                <h3>投递详情</h3>
+            </div>
+
+            <div :class="['wrap_con', 'pass_invitation']" v-loading="!invitationDetail.deliveryDetailPost" >
+                <div class="wrapBox" v-if="invitationDetail.deliveryDetailPost" v-cloak>
+
+                  
+                    <div class="invitation_state fn-clear">
+                        <div class="fn-left">
+                            <h3>{{stateArr[0]}}</h3>
+                            <p>{{invitationDetail.state == 2 ? invitationDetail.refuse_msg : '该面试时间已过，祝你早日找到好工作！'}}</p>
+                        </div>
+                        <span class="fn-right update_time" v-if="invitationDetail.refuse_time">{{transTimes(invitationDetail.refuse_time)}}</span>
+                        <span class="fn-right update_time" v-else>{{transTimes(invitationDetail.pass_time ? invitationDetail.pass_time : invitationDetail.date )}}</span>
+                    </div>
+                    <div class="invitationPostInfo" v-if="invitationDetail.company">
+                        <div class="companyInfo fn-clear">
+                            <div class="clogo"><img :src="invitationDetail.company.logo_url" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                            <div class="cinfo">
+                                <h4>{{invitationDetail.company.title}}</h4>
+                                <p><span>{{invitationDetail.company.nature}}</span><em v-if="invitationDetail.company.nature">|</em><span>{{invitationDetail.company.scale}}</span><em v-if="invitationDetail.company.scale">|</em><span>{{invitationDetail.company.industry[invitationDetail.company.industry.length - 1]}}</span></p>
+                            </div>
+                        </div>
+                        <div class="invitationCon">
+                            <ul>
+                                <li>
+                                    <label for="">投递岗位：</label>
+                                    <div class="info">
+                                        <div class="salary_show">{{invitationDetail.job.show_salary}}<span v-if="invitationDetail.job.dy_slary > 12">· {{invitationDetail.job.dy_slary}}<b>薪</b></span></div>
+                                        <h4>{{invitationDetail.job.title}}</h4>
+                                    </div>
+                                </li>
+                            
+                            </ul>
+                        
+                        </div>
+
+                    </div>
+                    <div class="deliverySteps">
+                        <ul>
+                            <li>
+                                <s></s>
+                                <div class="textCon">
+                                    <h4>已查阅</h4>
+                                    <p>02/16 12:25</p>
+                                </div>
+                            </li>
+                            <li>
+                                <s></s>
+                                <div class="textCon">
+                                    <h4>投递成功！</h4>
+                                    <p>02/16 12:25 <span>等待招聘方查收</span></p>
+                                </div>
+                            </li>
+                            
+                        </ul>
+                    </div>
+
+                </div>
+            </div>
+            <!-- 职位推荐 -->
+            <div class="postResBox" v-if="postList.length">
+                <div class="wrap_title">职位推荐</div>
+                <ul class="postList fn-clear">
+                    <li class="post" v-for="item in postList">
+                        <a :href="item.url">
+                            <div class="pInfo fn-clear">
+                                <h3 class="fn-left">{{item.title}}</h3>
+                                <span class="pSalary fn-right">{{item.show_salary}} <em v-if="item.dy_salary > 12">·{{item.dy_salary}}<b>薪</b></em></span>
+                            </div>
+                            <div class="pdetail fn-clear">
+                                <p class="pRequire fn-left">
+                                    <span>{{item.experience}}</span><em v-if="item.experience">|</em><span>{{item.educational}}</span><em v-if="item.educational">|</em><span>{{item.nature}}</span>
+                                </p> 
+                                <p class="paddr fn-right">{{item.job_addr_detail ? item.job_addr_detail.addrName.join(' ') : ''}}</p>
+                            </div>
+                            <p class="p_company">{{item.companyDetail.title}}</p>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+
+
+            
+
+
+
+        </div>
+	</div>
+</div>
+
+{#include file="footer.html"#}
+<script>
+    var site_map = "{#$site_map#}", site_map_key = '{#$site_map_key#}';
+    var site_map_apiFile = '{#$site_map_apiFile#}'
+</script>
+
+<script type="text/javascript" src="{#$site_map_apiFile#}"></script>
+{#if $site_map == "qq"#}
+<script type="text/javascript" src="https://3gimg.qq.com/lightmap/components/geolocation/geolocation.min.js" charset="utf-8"></script>
+{#/if#}
+{#if $site_map != "amap"#}
+<script type="text/javascript" src="{#$site_map_amap_apiFile#}" charset="utf-8"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/invitation_detail.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

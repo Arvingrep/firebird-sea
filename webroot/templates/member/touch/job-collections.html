@@ -1,0 +1,113 @@
+{#*{#$pageTit = "collections"#}
+
+<div class="title fn-clear">
+	<span class="fn-left inp" id="selectAll">{#$langData['siteConfig'][6][28]#}</span>
+	<span class="fn-right delSelect">{#$langData['siteConfig'][6][8]#}</span>
+</div>
+<div class="list"></div>
+*#}
+
+
+{#$pageTitle = '我的收藏'#}
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$pageTitle#}</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/job-collections.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+</head>
+<body>
+	<div class="header alignLeft">
+		<div class="header-l">
+			<a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+		</div>
+		<div class="header-address">
+			<span>收藏/关注</span>
+		</div>
+		<div class="header-search"><s></s></div>
+	</div>
+
+    <div class="page" id="page">
+        <div class="container" v-cloak>
+			<div class="tabBox">
+				<ul>
+					<li :data-id="item.id" v-for="item in tabList" :class="{'on_chose':currOnTab == item.id} " @click="currOnTab = item.id">{{item.tit}}</li>
+				</ul>
+				<span class="manage_btn" @click="onManage = !onManage" v-if="collectList.length">{{onManage?'退出管理':'管理'}}</span>
+				<i class="line" :style="'left:'+tabOffLeft+'px;'"></i>
+			</div>
+			<div class="tabCon">
+				<div :class="['listBox',{'on_manage':onManage}]" >
+					
+					<ul class="postList"  v-if="currOnTab === 1">
+						<li :class="['jobLi ',{'disabled':item.detail && (item.detail.del || item.detail.state === 2 || item.detail.off)},{'state0':item.detail && !item.detail.state},{'on_chose':onChoseArr.indexOf(item.id) > -1}]" :data-id="item.id" data-module="job" v-for=" item in collectList" v-if="item.detail" @click="choseItem(item)" :key="item.id">	
+							<a :href="item.detail.url" :data-id="item.detail.id" data-module="job" data-temp="job" class="toMini">
+								<div class="rInfo">
+									<p class="jobPrice">{{item.detail.show_salary}}</p>	
+									<h2 class="comTitle comTitle3">{{item.detail.title}}</h2>
+									<p class="comDetp" v-if="item.detail.job_addr_detail">{{item.detail.job_addr_detail.addrName[[item.detail.job_addr_detail.addrName.length - 1]]}}<em></em>{{item.detail.experience}}<em></em>{{item.detail.educational}}</p>	
+									<div class="place" v-else style="height: .6rem;"></div>
+									<div class="comStoreInfo">		
+										<div class="storeImg">
+											<img :src="item.detail.companyDetail.logo_url" onerror="this.src='/static/images/404.jpg'" alt="">
+										</div>		
+										<div class="rStoreinfo">			
+											<h3>{{item.detail.companyDetail.title}}</h3>		
+										</div>	
+									</div>	
+								</div>	
+							</a>
+							<span class="noFind" v-if="item.detail && (item.detail.del || item.detail.state === 2 || item.detail.off)">已失效</span>
+						</li>
+					</ul>
+					<ul class="companyList" v-else>
+						<li :class="['companyLi',{'disabled':item.detail && item.detail.del},{'on_chose':onChoseArr.indexOf(item.id) > -1}]" v-for="item in collectList" @click="choseItem(item)" v-if="item.detail">
+							<a :href="item.detail.url" :data-id="item.detail.id" data-module="job" data-temp="company" class="toMini">
+								<div class="clogo"><img :src="item.detail.logo_url"  onerror="this.src='/static/images/404.jpg'" alt=""></div>
+								<div class="cinfo">
+									<h4>{{item.detail.title}}</h4>
+									<p class="cinfo_detail"><span v-if="item.detail.addr && item.detail.addr.length">{{item.detail.addr[item.detail.addr.length - 1]}}</span><em>|</em><span>{{item.detail.scale}}</span><em>|</em><span>{{item.detail.nature}}</span></p>
+									<p class="cjob">
+										<span>{{item.detail.first_ptitle}}</span>等<em>{{item.detail.pcount}}</em>个职位在招
+									</p>
+								</div>
+							</a>
+						</li>
+					</ul>
+					<div class="loadingText" v-if="isload && !loadEnd">加载中~</div>
+					<div class="loadingText" v-if="!loadEnd && collectList.length && !isload">下拉加载更多</div>
+					<div class="loadingText" v-if="loadEnd && collectList.length">没有更多了~</div>
+				</div>
+				<div class="noData" v-if="!collectList.length && loadEnd">
+					<div class="noDataImg"><img src="{#$templets_skin#}images/job/noData.png" alt=""></div>
+					<div class="hasResume">
+						<h4>暂无记录</h4>
+						<p>快去投递心仪的职位吧</p>
+					</div>
+					
+				</div>
+			</div>
+        </div>
+		<div :class="['manageBox',{'slide-in-bottom':onManage}]">
+			<div class="btns_group">
+				<div :class="['btn_clear',{'click':onChoseArr.length == collectList.length}]" @click="choseAll()"><i></i>全选</div>
+				<div class="btn_cancel" @click="confirmCancel">取消收藏<em v-if="onChoseArr.length">({{onChoseArr.length}})</em></div>
+			</div>
+			
+		</div>
+    </div>
+
+
+<script src="{#$templets_skin#}js/job-collections.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

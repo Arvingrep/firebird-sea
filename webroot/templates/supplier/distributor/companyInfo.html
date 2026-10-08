@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>房产经纪</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all"
+        href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_plus_2.9.0.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/companyInfo.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/topNav/topNav.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/leftNav/leftNav.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue-3.5.12.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0_zh-cn.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}';
+        var staticVersion = '{#$cfg_staticVersion#}'; //版本号
+        var logoUrl = '{#getModuleConfig module='house' key='logoUrl'#}';
+        var templets_skin = '{#$templets_skin#}';
+        var member_busiDomain = "{#$member_busiDomain#}";
+        var channelDomain = "{#getModuleConfig module='house' key='channelDomain'#}";
+        var bankConfig = JSON.parse('{#json_encode($bankConfig)#}');
+        var site_map = "{#$site_map#}", site_map_key = '{#$site_map_key#}';
+        var site_map_apiFile = '{#$site_map_apiFile#}';
+    </script>
+</head>
+
+<body>
+    <div class="navPage Shell" id="companyInfo" v-cloak>
+        <!-- 顶部导航 -->
+        <top-nav :user-info="userInfo" :company-info="companyDetails"></top-nav>
+        <!-- 左侧导航 -->
+        <template v-if="userInfo.uid">
+            <left-nav type="broker" :active-index="1" :user-info="userInfo" :company-info="companyDetails"
+                v-if="companyDetails.type==0"></left-nav>
+            <left-nav type="distribute" :active-index="1" :user-info="userInfo" :company-info="companyDetails"
+                v-else></left-nav>
+        </template>
+        <!-- 内容 -->
+        <div class="boxContent">
+            <div class="b-main">
+                <el-tabs v-model="tabConfig.active" :before-leave="tabConfig.tabCheck" class="bm-tabs"
+                    @tab-click="tabFn">
+                    <template v-if="companyDetails.type==0">
+                        <el-tab-pane :label="item.title" :name="index" class="bmt-item"
+                            v-for="(item,index) in tabConfig.broker" :key="item.id">
+                            <!-- 顶部标签 -->
+                            <template #label>
+                                <div class="bmti-label">{{item.title}}</div>
+                            </template>
+                            <!-- 公司信息 -->
+                            <template #default v-if="item.id==1">
+                                <div class="bmti-info">
+                                    <!-- 基本信息标题 -->
+                                    <div class="bmtii-title">
+                                        <div class="bmtiit-name">基本信息</div>
+                                        <!-- 审核结果 -->
+                                    </div>
+                                    <!-- 表单 -->
+                                    <el-form :ref="res=>{companyInfoConfig.ref=res}" :model="companyInfoConfig.form"
+                                        :rules="companyInfoConfig.rules" class="bmtii-form">
+                                        <!-- 公司名称 -->
+                                        <el-form-item label="公司名称" prop="shorterName" class="bmtii-item">
+                                            <el-input v-model="companyInfoConfig.form.shorterName" placeholder="请填写"
+                                                class="bmtiii-input" />
+                                        </el-form-item>
+                                        <!-- 公司地址 -->
+                                        <el-form-item label="公司地址" prop="area" class="bmtii-item">
+                                            <el-cascader :props="areaConfig.props" v-model="companyInfoConfig.form.area"
+                                                :options="areaConfig.list" placeholder="请选择地区" collapse collapse-tags
+                                                collapse-tags-tooltip clearable class="bmtii-cascader"
+                                                @change="console.log($event)">
+                                            </el-cascader>
+                                            <el-input v-model="companyInfoConfig.form.address" placeholder="详细地址"
+                                                :validate-event="false" class="bmtiii-input">
+                                            </el-input>
+                                            <img src="{#$templets_skin#}images/mapLocation.png" class="bmtiii-icon"
+                                                @click="mapConfig.popFn(true)" />
+                                        </el-form-item>
+                                        <!-- 联系电话 -->
+                                        <el-form-item label="联系电话" prop="phone" class="bmtii-item">
+                                            <el-input v-model="companyInfoConfig.form.phone" placeholder="请填写"
+                                                class="bmtiii-input">
+                                            </el-input>
+                                        </el-form-item>
+                                        <!-- logo上传 -->
+                                        <el-form-item label="公司LOGO" prop="logo" class="bmtii-item start">
+                                            <el-upload class="upload-demo" :ref="res=>{logoUploadConfig.ref=res}"
+                                                :limit="1" :auto-upload="false" :show-file-list="false"
+                                                v-loading="logoUploadConfig.loading" :on-change="logoUploadConfig.fn"
+                                                :on-exceed="logoUploadConfig.coverFn" accept="image/*">
+                                                <div class="bmtiii-logo" v-if="logoUploadConfig.file.turl">
+                                                    <img :src="logoUploadConfig.file.turl" />
+                                                    <span>重新上传</span>
+                                                </div>
+                                                <div class="bmtiii-upload" v-else>
+                                                    <img src="{#$templets_skin#}images/upLoad.png" />
+                                                    <span>上传图片</span>
+                                                </div>
+                                            </el-upload>
+                                        </el-form-item>
+                                        <!-- 公司介绍 -->
+                                        <el-form-item label="公司介绍" prop="info" class="bmtii-item start">
+                                            <el-input v-model="companyInfoConfig.form.info" :autosize="{ minRows: 6}"
+                                                type="textarea" resize="none" placeholder="如：业务范围、服务优势…"
+                                                class="bmtiii-area">
+                                            </el-input>
+                                        </el-form-item>
+                                    </el-form>
+                                    <!-- 资质认证 -->
+                                    <div class="bmtii-title">
+                                        <div class="bmtiit-name">资质认证</div>
+                                        <span style="margin-left: 20px; color: red;" v-if="companyDetails.examine && companyDetails.examine_status==2">审核失败：{{companyDetails.examine_reason}}</span>
+                                        <!-- 审核结果 -->
+                                    </div>
+                                    <!-- 资质认证（编辑状态） -->
+                                    <el-form :ref="res=>{certificationConfig.ref=res}" :model="certificationConfig.form"
+                                        :rules="certificationConfig.rules" class="bmtii-form license"
+                                        v-if="certificationConfig.edit">
+                                        <!-- 企业全称 -->
+                                        <el-form-item label="企业全称" prop="name" class="bmtii-item">
+                                            <el-input v-model="certificationConfig.form.name" placeholder="请填写"
+                                                class="bmtiii-input" />
+                                        </el-form-item>
+                                        <!-- 营业执照 -->
+                                        <el-form-item label="营业执照" prop="licensePics" class="bmtii-item start">
+                                            <el-upload class="upload-demo" :ref="res=>{licenseUploadConfig.ref=res}"
+                                                :limit="1" :auto-upload="false" :show-file-list="false"
+                                                v-loading="licenseUploadConfig.loading"
+                                                :on-change="licenseUploadConfig.fn"
+                                                :on-exceed="licenseUploadConfig.coverFn" accept="image/*">
+                                                <div class="bmtiai-logo" v-if="licenseUploadConfig.file.turl">
+                                                    <img :src="licenseUploadConfig.file.turl" />
+                                                    <span>重新上传</span>
+                                                </div>
+                                                <div class="bmtiai-upload" v-else>
+                                                    <img src="{#$templets_skin#}images/upLoad.png" />
+                                                    <span>上传复印件</span>
+                                                </div>
+                                                <div class="bmtiai-tip">仅用于平台验证企业资质，请放心上传</div>
+                                            </el-upload>
+                                        </el-form-item>
+                                        <!-- 房地产经纪机构备案证明 -->
+                                        <el-form-item prop="certification" class="bmtii-item start">
+                                            <template #label>
+                                                <div class="bmtiii-label">
+                                                    <div>房地产经纪机构</div>
+                                                    <div>备案证明</div>
+                                                </div>
+                                            </template>
+                                            <el-upload class="upload-demo" :ref="res=>{recordUploadConfig.ref=res}"
+                                                :limit="1" :auto-upload="false" :show-file-list="false"
+                                                v-loading="recordUploadConfig.loading"
+                                                :on-change="recordUploadConfig.fn"
+                                                :on-exceed="recordUploadConfig.coverFn" accept="image/*">
+                                                <div class="bmtiai-logo" v-if="recordUploadConfig.file.turl">
+                                                    <img :src="recordUploadConfig.file.turl" />
+                                                    <span>重新上传</span>
+                                                </div>
+                                                <div class="bmtiai-upload" v-else>
+                                                    <img src="{#$templets_skin#}images/upLoad.png" />
+                                                    <span>上传图片</span>
+                                                </div>
+                                            </el-upload>
+                                        </el-form-item>
+                                    </el-form>
+                                    <!-- 资质认证（展示状态） -->
+                                    <el-form disabled :model="certificationConfig.form"
+                                        :rules="certificationConfig.rules" class="bmtii-form" v-else>
+                                        <!-- 企业全称 -->
+                                        <el-form-item label="企业全称" prop="name" class="bmtii-item">
+                                            <input type="text" :value="certificationConfig.form.name" disabled
+                                                class="bmtiii-name" />
+                                            <span class="bmtiii-change"
+                                                @click="certificationConfig.edit=true">修改信息</span>
+                                        </el-form-item>
+                                        <!-- 营业执照 -->
+                                        <el-form-item label="营业执照" prop="licensePics" class="bmtii-item start">
+                                            <div :class="['bmtiii-license',{'has':companyDetails.status==1}]">
+                                                <img :src="licenseUploadConfig.file.turl" />
+                                                <span v-if="companyDetails.examine">{{companyDetails.examine_status==1?'已认证':companyDetails.examine_status==2?'未通过':'审核中'}}</span>
+                                                <span v-else>{{companyDetails.status==1?'已认证':companyDetails.status==2?'未通过':'未认证'}}</span>
+                                            </div>
+                                        </el-form-item>
+                                        <!-- 房地产经纪机构备案证明 -->
+                                        <el-form-item prop="certification" class="bmtii-item start">
+                                            <template #label>
+                                                <div class="bmtiii-label">
+                                                    <div>房地产经纪机构</div>
+                                                    <div>备案证明</div>
+                                                </div>
+                                            </template>
+                                            <div :class="['bmtiii-license',{'has':companyDetails.status==1}]">
+                                                <img :src="recordUploadConfig.file.turl" />
+                                                <span v-if="companyDetails.examine">{{companyDetails.examine_status==1?'已认证':companyDetails.examine_status==2?'未通过':'审核中'}}</span>
+                                                <span v-else>{{companyDetails.status==1?'已认证':companyDetails.status==2?'未通过':'未认证'}}</span>
+                                            </div>
+                                        </el-form-item>
+                                    </el-form>
+                                    <el-button class="bmtii-btn" color="#266EFF" :loading="submitConfig.loading"
+                                        @click="submitFn">
+                                        <div>确认</div>
+                                    </el-button>
+                                </div>
+                                <!-- 地图弹窗 -->
+                                <div class="mapContainerBox" v-if="mapConfig.pop">
+                                    <div :class="['mask_map',{'showPop':mapConfig.pop}]"></div>
+                                    <div :class="['mapAreaBox',{'showPop':mapConfig.pop}]">
+                                        <h3>
+                                            添加工作地址、定位
+                                            <a href="javascript:;" class="close_btn" @click="mapConfig.pop=false"></a>
+                                        </h3>
+                                        <div class="mapContainer">
+                                            <div class="mapSearch">
+                                                <div class="mapSearchInp">
+                                                    <!-- 区域选择 -->
+                                                    <div class="addridBox">
+                                                        <el-cascader :ref="res=>{mapConfig.areaRef=res}"
+                                                            v-model="mapConfig.areaValue" :props="mapConfig.areaProps"
+                                                            :options="mapConfig.areaOptions" collapse-tags>
+                                                        </el-cascader>
+                                                    </div>
+                                                    <!-- 搜索功能 -->
+                                                    <div class="inputBox">
+                                                        <input type="text" id="address_detail" placeholder="请输入详细地址"
+                                                            v-model="mapConfig.addressValue" />
+                                                        <div class="suggestionList">
+                                                            <ul>
+                                                                <li v-for="item in mapConfig.addressList">
+                                                                    {{item.name}}
+                                                                </li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                    <el-button type="primary" class="btn_posi"
+                                                        @click="mapConfig.autoSet">自动定位</el-button>
+                                                </div>
+                                            </div>
+                                            <div id="map"></div>
+                                            <div class="moveBtn" @click="mapConfig.moveMap" title="回到坐标点">
+                                            </div>
+                                        </div>
+                                        <div class="btns_tips">
+                                            <p>请确保详细地址和定位无误 <em>(可点击地图手动调整定位)</em></p>
+                                            <el-button class="btn_sure" type="primary"
+                                                :disabled="!mapConfig.addressValue"
+                                                @click="mapConfig.confirmFn">确认</el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <!-- 公司相册 -->
+                            <template #default v-else-if="item.id==2">
+                                <div class="bmti-albums">
+                                    <!-- 基本信息标题 -->
+                                    <div class="bmtia-title">
+                                        <div class="bmtiat-name">企业相册</div>
+                                    </div>
+                                    <el-form :ref="res=>{albumsConfig.ref=res}" :model="albumsConfig.form"
+                                        :rules="albumsConfig.rules" class="bmtia-form">
+                                        <el-form-item label="企业相册" prop="album" class="bmtia-item album">
+                                            <div class="bmtiai-pic" v-for="(item,index) in albumUploadConfig.file"
+                                                :key="index">
+                                                <img :src="item.turl" />
+                                                <span @click="albumUploadConfig.file.splice(index,1)">删除</span>
+                                            </div>
+                                            <el-upload class="upload-demo" :ref="res=>{albumUploadConfig.ref=res}"
+                                                :limit="albumUploadConfig.maxSize" :multiple="true" :auto-upload="false"
+                                                :show-file-list="false" v-loading="albumUploadConfig.loading"
+                                                :on-change="albumUploadConfig.fn" :on-exceed="albumUploadConfig.coverFn"
+                                                accept="image/*" :before-upload="res=>{console.log(res)}">
+                                                <div class="bmtiai-upload"
+                                                    v-if="albumUploadConfig.file.length < albumUploadConfig.maxSize">
+                                                    <img src="{#$templets_skin#}images/upLoad.png" />
+                                                    <span>上传图片</span>
+                                                </div>
+                                            </el-upload>
+                                            <div class="bmtia-tip">
+                                                图片比例4:3，推荐尺寸960*720像素、1200*900像素，最多上传{{albumUploadConfig.maxSize}}张
+                                            </div>
+                                        </el-form-item>
+                                    </el-form>
+                                    <!-- 表单 -->
+                                    <el-button class="bmtii-btn" color="#266EFF" :loading="submitConfig.loading"
+                                        @click="submitFn">
+                                        <div>确认</div>
+                                    </el-button>
+                                </div>
+                            </template>
+                            <!-- 我的账户 -->
+                            <template #default v-else-if="item.id==3">
+                                <div class="bmti-account">
+                                    <!-- 基本信息标题 -->
+                                    <div class="bmtia-title">
+                                        <div class="bmtiat-name">提现账户</div>
+                                        <!-- 轻提示 -->
+                                        <div class="bmtiat-tip">提现账户用于新房分销佣金提现</div>
+                                    </div>
+                                    <!-- 表单 -->
+                                    <el-form :ref="res=>{accountConfig.ref=res}" :model="accountConfig.form"
+                                        :rules="accountConfig.rules" class="bmtia-form">
+                                        <!-- 选择银行 -->
+                                        <el-form-item label="选择银行" prop="bank" class="bmtia-item">
+                                            <el-select v-model="accountConfig.form.bank" filterable placeholder="请选择"
+                                                class="bmtiai-input">
+                                                <el-option v-for="(item,index) in accountConfig.bankList" :key="item.id"
+                                                    :label="item.label" :value="item.value">
+                                                </el-option>
+                                            </el-select>
+                                        </el-form-item>
+                                        <!-- 开户行 -->
+                                        <el-form-item label="开户行" prop="opening_bank" class="bmtia-item">
+                                            <el-input v-model="accountConfig.form.opening_bank" placeholder="请填写"
+                                                class="bmtiai-input">
+                                            </el-input>
+                                        </el-form-item>
+                                        <!-- 银行卡号 -->
+                                        <el-form-item label="银行卡号" prop="card_number" class="bmtia-item">
+                                            <el-input v-model="accountConfig.form.card_number" placeholder="请填写"
+                                                class="bmtiai-input">
+                                            </el-input>
+                                        </el-form-item>
+                                        <!-- 开户人姓名 -->
+                                        <el-form-item label="开户人姓名" prop="opening_name" class="bmtia-item">
+                                            <el-input v-model="accountConfig.form.opening_name" placeholder="请填写"
+                                                class="bmtiai-input">
+                                            </el-input>
+                                        </el-form-item>
+                                        <el-button class="bmtii-btn" color="#266EFF" :loading="submitConfig.loading"
+                                            @click="submitFn">
+                                            <div>确认</div>
+                                        </el-button>
+                                    </el-form>
+                                </div>
+                            </template>
+                        </el-tab-pane>
+                    </template>
+                    <template v-else>
+                        <el-tab-pane :label="item.title" :name="index" class="bmt-item"
+                            v-for="(item,index) in tabConfig.distribute" :key="item.id">
+                            <!-- 顶部标签 -->
+                            <template #label>
+                                <div class="bmti-label">{{item.title}}</div>
+                            </template>
+                            <!-- 公司信息 -->
+                            <template #default v-if="item.id==1">
+                                <div class="bmti-info">
+                                    <!-- 基本信息标题 -->
+                                    <div class="bmtii-title">
+                                        <div class="bmtiit-name">基本信息</div>
+                                        <!-- 审核结果 -->
+                                    </div>
+                                    <!-- 表单 -->
+                                    <el-form :ref="res=>{companyInfoConfig.ref=res}" :model="companyInfoConfig.form"
+                                        :rules="companyInfoConfig.rules" class="bmtii-form">
+                                        <!-- 公司/团队名称 -->
+                                        <el-form-item label="公司/团队名称" prop="shorterName" class="bmtii-item">
+                                            <el-input v-model="companyInfoConfig.form.shorterName" placeholder="请填写"
+                                                class="bmtiii-input" />
+                                        </el-form-item>
+                                        <!-- 联系电话 -->
+                                        <el-form-item label="联系电话" prop="phone" class="bmtii-item">
+                                            <el-input v-model="companyInfoConfig.form.phone" placeholder="请填写"
+                                                class="bmtiii-input">
+                                            </el-input>
+                                        </el-form-item>
+                                        <!-- logo上传 -->
+                                        <el-form-item label="LOGO/头像" prop="logo" class="bmtii-item start">
+                                            <el-upload class="upload-demo" :ref="res=>{logoUploadConfig.ref=res}"
+                                                :limit="1" :auto-upload="false" :show-file-list="false"
+                                                v-loading="logoUploadConfig.loading" :on-change="logoUploadConfig.fn"
+                                                :on-exceed="logoUploadConfig.coverFn" accept="image/*">
+                                                <div class="bmtiii-logo" v-if="logoUploadConfig.file.turl">
+                                                    <img :src="logoUploadConfig.file.turl" />
+                                                    <span>重新上传</span>
+                                                </div>
+                                                <div class="bmtiii-upload" v-else>
+                                                    <img src="{#$templets_skin#}images/upLoad.png" />
+                                                    <span>上传图片</span>
+                                                </div>
+                                            </el-upload>
+                                        </el-form-item>
+                                        <!-- 公司地址 -->
+                                        <el-form-item label="公司地址" prop="area" class="bmtii-item">
+                                            <el-cascader :props="areaConfig.props" v-model="companyInfoConfig.form.area"
+                                                :options="areaConfig.list" placeholder="请选择地区" collapse collapse-tags
+                                                collapse-tags-tooltip clearable class="bmtii-cascader"
+                                                @change="console.log($event)">
+                                            </el-cascader>
+                                            <el-input v-model="companyInfoConfig.form.address" placeholder="详细地址"
+                                                :validate-event="false" class="bmtiii-input">
+                                            </el-input>
+                                            <img src="{#$templets_skin#}images/mapLocation.png" class="bmtiii-icon"
+                                                @click="mapConfig.popFn(true)" />
+                                        </el-form-item>
+                                    </el-form>
+                                    <el-button class="bmtii-btn" color="#266EFF" :loading="submitConfig.loading"
+                                        @click="submitFn">
+                                        <div>确认</div>
+                                    </el-button>
+                                </div>
+                                <!-- 地图弹窗 -->
+                                <div class="mapContainerBox" v-if="mapConfig.pop">
+                                    <div :class="['mask_map',{'showPop':mapConfig.pop}]"></div>
+                                    <div :class="['mapAreaBox',{'showPop':mapConfig.pop}]">
+                                        <h3>
+                                            添加工作地址、定位
+                                            <a href="javascript:;" class="close_btn" @click="mapConfig.pop=false"></a>
+                                        </h3>
+                                        <div class="mapContainer">
+                                            <div class="mapSearch">
+                                                <div class="mapSearchInp">
+                                                    <!-- 区域选择 -->
+                                                    <div class="addridBox">
+                                                        <el-cascader :ref="res=>{mapConfig.areaRef=res}"
+                                                            v-model="mapConfig.areaValue" :props="mapConfig.areaProps"
+                                                            :options="mapConfig.areaOptions" collapse-tags>
+                                                        </el-cascader>
+                                                    </div>
+                                                    <!-- 搜索功能 -->
+                                                    <div class="inputBox">
+                                                        <input type="text" id="address_detail" placeholder="请输入详细地址"
+                                                            v-model="mapConfig.addressValue" />
+                                                        <div class="suggestionList">
+                                                            <ul>
+                                                                <li v-for="item in mapConfig.addressList">
+                                                                    {{item.name}}
+                                                                </li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                    <el-button type="primary" class="btn_posi"
+                                                        @click="mapConfig.autoSet">自动定位</el-button>
+                                                </div>
+                                            </div>
+                                            <div id="map"></div>
+                                            <div class="moveBtn" @click="mapConfig.moveMap" title="回到坐标点">
+                                            </div>
+                                        </div>
+                                        <div class="btns_tips">
+                                            <p>请确保详细地址和定位无误 <em>(可点击地图手动调整定位)</em></p>
+                                            <el-button class="btn_sure" type="primary"
+                                                :disabled="!mapConfig.addressValue"
+                                                @click="mapConfig.confirmFn">确认</el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <!-- 我的账户 -->
+                            <template #default v-else-if="item.id==3">
+                                <div class="bmti-account">
+                                    <!-- 基本信息标题 -->
+                                    <div class="bmtia-title">
+                                        <div class="bmtiat-name">提现账户</div>
+                                        <!-- 轻提示 -->
+                                        <div class="bmtiat-tip">提现账户用于新房分销佣金提现</div>
+                                    </div>
+                                    <!-- 表单 -->
+                                    <el-form :ref="res=>{accountConfig.ref=res}" :model="accountConfig.form"
+                                        :rules="accountConfig.rules" class="bmtia-form">
+                                        <!-- 选择银行 -->
+                                        <el-form-item label="选择银行" prop="bank" class="bmtia-item">
+                                            <el-select v-model="accountConfig.form.bank" filterable placeholder="请选择"
+                                                class="bmtiai-input">
+                                                <el-option v-for="(item,index) in accountConfig.bankList" :key="item.id"
+                                                    :label="item.label" :value="item.value">
+                                                </el-option>
+                                            </el-select>
+                                        </el-form-item>
+                                        <!-- 开户行 -->
+                                        <el-form-item label="开户行" prop="opening_bank" class="bmtia-item">
+                                            <el-input v-model="accountConfig.form.opening_bank" placeholder="请填写"
+                                                class="bmtiai-input">
+                                            </el-input>
+                                        </el-form-item>
+                                        <!-- 银行卡号 -->
+                                        <el-form-item label="银行卡号" prop="card_number" class="bmtia-item">
+                                            <el-input v-model="accountConfig.form.card_number" placeholder="请填写"
+                                                class="bmtiai-input">
+                                            </el-input>
+                                        </el-form-item>
+                                        <!-- 开户人姓名 -->
+                                        <el-form-item label="开户人姓名" prop="opening_name" class="bmtia-item">
+                                            <el-input v-model="accountConfig.form.opening_name" placeholder="请填写"
+                                                class="bmtiai-input">
+                                            </el-input>
+                                        </el-form-item>
+                                        <el-button class="bmtii-btn" color="#266EFF" :loading="submitConfig.loading"
+                                            @click="submitFn">
+                                            <div>确认</div>
+                                        </el-button>
+                                    </el-form>
+                                </div>
+                            </template>
+                        </el-tab-pane>
+                    </template>
+                </el-tabs>
+            </div>
+            <div class="b-copyright">版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+{#if $site_map == "amap"#}
+{#$amap_jscode#} {#* 高德地图安全密钥 *#}
+{#/if#}
+<script type="text/javascript" src="{#$site_map_apiFile#}{#if $site_map == 'amap'#}&plugin=AMap.AutoComplete{#/if#}"
+    charset="utf-8"></script>
+<script type="module" src="{#$templets_skin#}js/companyInfo.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

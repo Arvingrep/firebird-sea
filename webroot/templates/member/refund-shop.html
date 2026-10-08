@@ -1,0 +1,288 @@
+<script>
+	var orderState = '{#$detail_orderstate#}';
+</script>
+
+<div class="refundLeft">
+	<!-- 申请退款 第一次申请/第二次申请/无数次修改申请 s-->
+	<div id="cancelApplay" class="fn-hide refundPro">
+		<form id="fabuForm" action="/include/ajax.php?service=shop&action=refund">
+			<input type="hidden" name="id" id="sid" value="{#$id#}">
+			<input type="hidden" name="proid" value="{#$proid#}" id="proid">		
+			<dl class="fn-clear spedl1">
+				<dt>退款商品：</dt>
+				<dd>
+					{#*商城的一个订单多个商品时  只退款其中一个 *#}
+					{#foreach from=$detail_product item="pro"#}
+        			{#if $pro.id == $proid#}
+					<div class="proimg"><img src="{#$pro['litpic']#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/good_default.png';"></div>
+					<div class="proInfo">
+						<h3>{#$pro['title']#}</h3>
+						<p style="color: #999">{#$pro['specation']#}</p>
+					</div>
+					{#/if#}
+      				{#/foreach#}
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt><span class="star">*</span>退款类型：</dt> {#*退款类型 *#}
+				<dd class="typeDd">
+					<div>
+						<label><input type="radio" name="refundtype" value="0" class="refundtype" checked="">仅退款</label>
+						<label><input type="radio" name="refundtype" value="1" class="refundtype">退货退款</label>
+					</div>
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt><span class="star">*</span>{#$langData['homemaking'][4][31]#}：</dt> {#*退款原因 *#}
+				<dd>
+					<div class="down-div firstDown">
+						<div class="time-div">						
+		                    <input type="text" id="reason" name="type" class="inp" autocomplete="off" placeholder="请选择" value="{#$detail_rettype#}" readonly="">
+		                    <span class="choseIcon"></span>
+		                </div>
+		                <div class="time_choose fn-clear">
+		                	<div class="pro-choose">
+								<p><a href="javascript:;">决定选择其他商家</a></p>
+								<p><a href="javascript:;">计划时间有变</a></p>
+								<p><a href="javascript:;">买错了/买多了</a></p>
+								<p><a href="javascript:;">协商一致退款</a></p>
+		                	</div>
+		                </div>
+					</div>
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt><span class="star">*</span>{#$langData['homemaking'][4][30]#}：</dt> {#*退款金额 *#}
+				<dd>
+					<span class="carsym">{#echoCurrency type='symbol'#}</span>
+					<input type="text" id="cancel_price" class="cancelprice inp" name="retmoney" value="{#$detail_totalPayPrice#}" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+	                <input type="hidden" name="oldprice" id="oldprice" value="{#$detail_totalPayPrice#}">
+	                <p class="maxMoney">最多可退{#echoCurrency type='symbol'#}{#$detail_totalPayPrice#}</p>
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt><span class="star">*</span>{#$langData['homemaking'][4][32]#}：</dt> {#* 退款说明 *#}
+				<dd>
+					<div class="cancel_desc">
+						<textarea  name="retnote" id="cancel_desc">{#$detail_retnote#}</textarea>
+					</div>  {#*退款说明 *#}
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt>上传图片：</dt>
+				<dd>
+					<div class="imgList fn-clear">
+						<ul id="listSection2" class="listSection thumblist fn-clear"></ul>
+						<div class="btn-section">
+							<div class="uploadinp filePicker" id="filePicker2" data-type="album"  data-count="5" data-size="{#$thumbSize#}" data-imglist="">
+								<img src="{#$templets_skin#}images/add.png" alt="">
+								<p>上传凭证<br/>最多传5张</p>
+							</div>
+							
+						</div>						
+					</div>
+					<p class="stxt4" style="font-size: 12px;color: #999;">* 请上传原创、真实、合法的图片，如果发现用户上传的图片有侵权内容，网站有权先行删除</p>
+					<input type="hidden" name="pics" value="" class="imglist-hidden" id="retpics">
+				</dd>
+			</dl>
+			<dl>
+				<dt></dt>
+				<dd><a href="javascript:;" class="tjbtn">提交申请</a></dd>
+			</dl>
+		</form>
+	</div>
+	<!-- 申请退款 第一次申请/第二次申请/无数次修改申请 e-->
+
+	<!-- 商家处理退款中 仅退款时--等待/拒绝 s-->
+	<div id="cancelIng" class="refundPro">
+
+		<div class="ingTop">
+			<div>
+				<!-- <strong class="stxt1 firstApply">请等待商家处理</strong> -->
+
+				<!-- <strong class="stxt1 refuseApply">商家拒绝退款申请</strong> -->
+
+				<!-- <strong class="stxt1 agreeThApply">商家同意退款</strong> -->
+
+				<!-- <strong class="stxt1 hasTuihuo">买家自行退货，待送达</strong> -->
+
+				<strong class="stxt1 hasThArrive">买家自行退货，商品已送达</strong>
+
+				<!-- <strong class="stxt1 hasKuaidi">快递已寄出，待商家确认</strong> -->
+
+				<!-- <strong class="stxt1 refuseKuaidi">快递已寄出，商家拒绝退款申请</strong> -->
+
+				
+				<i></i>
+				<div class="time-item">
+                     <strong id="day_show">0</strong><span>天</span>
+                     <strong id="hour_show">0</strong><span>时</span>
+                     <strong id="minute_show">0</strong><span>分</span>
+                     <strong id="second_show">0</strong><span>秒</span>
+                    
+                     <span class="firstApply">自动同意退款</span>
+                    
+                     <!-- <span class="refuseApply">自动关闭退款</span> -->
+                     
+                </div>
+			</div>
+			
+            <!-- <p class="firstApply">您已成功发起退款申请，请耐心等待商家处理</p> -->
+            <!-- <p class="refuseApply">拒绝原因：{#$detail_retnote#}</p> -->
+			
+			<!-- 修改完申请之后 这个要展示 -->
+			<!-- <p class="hasChangeApply fn-hide">您已重新修改退款申请，请耐心等待商家处理</p> -->
+
+			<!-- <p class="agreeThApply">商家已同意退款，请尽快退回商品</p> -->
+
+			<!-- <p class="hasTuihuo">您选择自行退货，请尽快与商家联系送达商品</p> -->
+			
+			<p class="hasThArrive">商品已送达，待商家处理退款</p>
+
+			<!-- <p class="hasKuaidi">商品已寄出，待商家收货后处理退款</p> -->
+
+			<!-- <p class="refuseKuaidi">拒绝原因：收到货物有缺少，请重新寄回</p> -->
+
+			
+
+		</div>
+		<div class="ingMiddle">
+			
+			<!-- <div class="firstApply">
+				<p>· 商家同意或者超时未处理，系统将退款给您</p>
+				<p>· 如果商家拒绝，您可以修改退款申请后再次发起，商家会重新处理</p>
+			</div> -->
+
+			<!-- <div class="refuseApply">
+				<p>· 商家已拒绝，您可以修改退款申请后再次发起，商家会重新处理</p>
+				<p>· 如果您逾期未处理，本次申请将自动关闭</p>
+			</div>
+			<div class="hasChangeApply fn-hide">
+				<p>· 商家同意或者超时未处理，系统将退款给您</p>
+				<p>· 如果商家再次拒绝，您可以申请平台申诉</p>
+			</div> -->
+
+			<!-- <div class="agreeThApply">
+				<p>商家收货地址：林剑瀚， 15626496092， 广东省东莞市 虎门镇银龙路东方国际天秤座20G。</p>
+				<p>· 如果您逾期未处理，本次申请将自动关闭</p>
+			</div> -->
+
+			<div class="hasTuihuo">
+				<p>商家收货地址：林剑瀚， 15626496092， 广东省东莞市 虎门镇银龙路东方国际天秤座20G。</p>
+				<p>· 如果您逾期未处理，本次申请将自动关闭</p>
+				<p>· 请尽量与商家当面在平台操作完成退款，避免发生财产损失！</p>
+			</div>
+	
+			<div class="th_express fn-hide">
+				<h3>填写物流信息：</h3>
+				<div class="thType">
+					<em>退货方式：</em>
+					<div>
+						<label><input type="radio" name="tuihuotype" value="0" class="refundtype" checked="">自行退货</label>
+						<label><input type="radio" name="tuihuotype" value="1" class="refundtype">快递寄回</label>
+					</div>
+				</div>
+				<div class="kuaidi fn-hide">
+					<em>选择快递：</em>
+					<select name="exp-company" id="exp-company">
+						<option value="">请选择快递公司</option>
+						{#foreach from=$juhe_express_company key=k item=exp#}
+						<option value="{#$k#}">{#$exp#}</option>
+						{#/foreach#}
+					</select>
+					<span class="input-tips"><s></s>{#$langData['siteConfig'][27][60]#}</span>
+				</div>
+				<div class="kuaidi fn-hide">
+					<em>物流单号：</em>
+					<input type="text" name="exp-number" id="exp-number" size="25" maxlength="20" placeholder="填写物流单号" />
+					<span class="input-tips"><s></s>请填写物流单号</span>
+				</div>
+				<div class="selfArr"><i></i>自行退货请尽量与商家当面在平台操作完成退款，避免发生财产损失！</div>
+				<a href="javascript:;" class="sureTh">确认提交</a>
+			</div>
+			
+
+
+
+			{#* 修改申请可以无数次 但是重新申请 只有两次*#}
+			<!-- <a href="javascript:;" class="changeAply ingApply">确认提交</a> -->
+			
+			{#*被拒绝一次后可以重新申请  第二次申请之后 不可以重新申请了*#}
+			<!-- <a href="javascript:;" class="changeAply refuseApply">重新申请</a> -->
+			
+
+			<!-- 买家自行退货，待送达时 -->
+			<a href="javascript:;" class="hasArrive">我已送达</a>
+
+			<!-- 买家退货时 添加类名 speLeft -->
+			<p class="stxt2"><em>您还可以： </em><a href="javascript:;" class="cancelApply">撤销申请</a></p>
+		
+		</div>
+		
+
+	</div>
+	<!-- 商家处理退款中 等待/拒绝 e-->
+
+	<!-- 商家处理结果 退款成功/退款失败/平台介入成功/平台介入失败 s-->
+	<div id="cancelFinish" class="fn-hide refundPro">
+		<div class="successApply fn-hide">
+		
+			<div class="finishTop">
+				<h4>退款成功</h4>
+				<p>退款成功时间：{#$detail_retOkdate|date_format:"%Y-%m-%d %H:%M:%S"#}</p>
+			</div>
+			<div class="finishMid">
+				<h4>退款总金额：<span>{#echoCurrency type='symbol'#}{#$detail_totalPayPrice#}</span></h4>
+				<p>退回至您的支付宝账户</p>
+				<a href="{#getUrlPath service="member" type="user" template="orderdetail-homemaking" id={#$id#}#}" class="fanhui">返回订单详情</a>
+			</div>
+		
+		<!-- 平台处理结果 成功 s-->
+			
+			<!-- <div class="successJoin">
+			<h4>申请客服介入处理完成：已退款<span>{#echoCurrency type='symbol'#}{#$detail_totalPayPrice#}</span></h4>
+			<p>退回至您的支付宝账户</p>
+			</div> -->
+		
+		<!-- 平台处理结果 成功 e-->
+		</div>
+		<div class="failedApply fn-hide">
+			<div class="finishTop">
+				<h4>退款失败</h4>
+				<p>商家拒绝此次退款申请</p>
+			</div>
+
+			<div class="finishBot ">
+				<h4 class="stxt3">· 拒绝原因，{#$detail_retNote#}</h4>
+				<div class="faildResult">
+					<p class="stxt2"><em>您还可以： </em><a href="javascript:;" class="kefuJoin">申请客服介入</a></p>
+					<p class="fn-hide waitTxt">您已申请客服介入处理，请耐心等待平台处理结果。</p>
+				</div>
+
+				<!-- 平台处理结果 失败 s-->
+				
+				<!-- <div class="failedJoin ">
+					<h4>申请客服介入处理完成：此次不予退款</h4>
+					<p>因商品不支持无理由退货，协商完成，不予退款</p>
+				</div> -->
+		
+				<!-- 平台处理结果 失败 e-->
+
+
+			</div>
+
+		</div>
+		
+		
+	</div>
+	<!-- 商家处理结果 退款成功/退款失败/平台介入成功/平台介入失败e-->
+	<!-- 协商历史 s-->
+	<div class="talkList">
+		<h2>协商历史</h2>
+		<ul>
+
+		</ul>
+		<div class="pagination fn-clear"></div>
+	</div>
+	<!-- 协商历史 e-->
+</div>

@@ -1,0 +1,256 @@
+<div :class="['rightCon',{'show':currEditPart === 31}] " v-cloak>
+    <div class="modBox">
+        <div class="title">订单管理
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 31 && showResetPop" @show="showResetPop = true" v-if="!checkHasIn('order',31)">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('order',0)"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 31 && showResetPop" v-if="checkHasIn('order',31)" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('order',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference" @click="">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 31 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end" >
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('order',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+            
+        </div>
+
+        <div class="modInfoStyle">
+            <div class="modstyleBox">
+                <h2 class="stitle">组件设置</h2>
+                <div class="sContent ">
+                    <div class="box">
+                        <el-checkbox class="checkbox"  :value="orderFormData.title.show" @change="orderFormData.title.show = !orderFormData.title.show">显示标题</el-checkbox>
+                        <el-checkbox  :class="['checkbox',{'disabled':!orderFormData.title.show}]" :value="orderFormData.more.show" @change="orderFormData.more.show = !orderFormData.more.show">显示查看更多</el-checkbox>
+                    </div>
+                    <div class="inpbox" v-show="orderFormData.title.show">
+                        <el-input class="bgColorInp" v-model="orderFormData.title.text" placeholder="请输入标题"></el-input>
+                    </div>
+                    <div class="inpbox bgColorInp marginTopSetBox" v-if="orderConfig">
+                        <el-select class="selectItem" v-model="orderFormData.orderInfo.code" @change="val => changeOrderInfo(val)"  placeholder="请选择订单来源">
+                            <i class="selectIcon" slot="prefix"> </i>
+                            <el-option v-for="(item,key) in orderConfig" :value="key" :label="item.title"></el-option>
+                        </el-select>
+                    </div>
+                </div>
+            </div>
+            <div class="contentSetBox modstyleBox" v-if="orderFormData.orderInfo.code">
+                <h2 :class="['stitle']" >内容设置</h2>
+                <div class="sContent ">
+                    <div class="style_options">
+                        <el-checkbox :class="{'disabled':orderFormData.orderInfo && orderFormData.orderInfo.showData && orderFormData.orderInfo.showData.length >=5 && !checkValIn(orderFormData.orderInfo.showData,item.id) }" :value="checkValIn(orderFormData.orderInfo.showData,item.id)" v-for="item in orderConfig[orderFormData.orderInfo.code].options" @change="val => changeOrderShow(val,item)">{{item.text}}</el-checkbox>
+                    </div>
+                    <template v-if="orderFormData.orderInfo.code && orderFormData.orderInfo.showData && orderFormData.orderInfo.showData.length">
+
+                        <div class="column_chose fullwidth">
+                            <s :style="'left:' +(orderFormData.styletype > 1 ? ((orderFormData.styletype - 1) * 33.33 + '%') : '2px') + ';width:calc(33.33% - 2px);'"></s>
+                            <span v-for="item in 3" @click="orderFormData.styletype = item" class="slide3">{{item == 3 ? '角标样式' : (item == 2 ? '数字样式' : '常规样式')}}</span>
+                        </div>
+    
+                        <div  class="btnsBox btn_item sortBox marginTopSetBox"  data-drag=".item" data-sort="orderFormData.orderInfo.showData" data-filter="input" >
+                            <template v-if="orderFormData.orderInfo && orderFormData.orderInfo.showData && orderFormData.orderInfo.showData.length">
+    
+                                <div class="option_item item" v-for="(btn,ind) in orderFormData.orderInfo.showData" :data-id="ind" :key="'showData_' + btn.id">
+                                    <s class="del_item" @click="orderFormData.orderInfo.showData.splice(ind,1)"></s>
+                                    <s class="left_icon"><img src="{#$cfg_basehost#}/static/images/admin/order_icon.png" alt=""></s>
+                                    <div class="item_con">
+                                        <div class="img_up fn-clear" v-if="orderFormData.styletype != 2">
+                                            <div :class="['upbtn fullW',{'hasup':btn.icon}]">
+                                                <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" @change="fileInpChange(`orderFormData.orderInfo.showData.${ind}.icon`)" class="fileUp"  :id="'adv_'+ind+'_filedata'" :data-type="'adv_'+ind" >
+                                                <img v-show="btn.icon" :src="btn.icon" alt="">
+                                                <span>更换图片</span>
+                                            </div>
+                                            <div class="imgText">
+                                                <h4>{{btn.linkInfo.linkText}}</h4>
+                                                <p>建议尺寸100x100</p>
+                                            </div>
+                                        </div>
+                                        <div v-else class="linktext" style="color:#333; font-size: 14px; padding-top: 6px; padding-bottom: 6px;">{{btn.linkInfo.linkText}}</div> 
+                                        <div class="inpbox">
+                                            <el-input  maxlength="5"  placeholder="请输入文字内容" class="iconName" v-model="btn.text" >
+                                                <div class="inpSuffix"  slot="suffix">
+                                                    <span class="el-input__count">
+                                                        <span class="el-input__count-inner">{{btn.text.length}}/5</span>
+            
+                                                    </span>
+                                                    <el-color-picker class="colorpicker" v-model="btn.style.color" @active-change="value => activeChangeColor(value,`orderFormData.orderInfo.showData.${ind}.style.color`)" v-show="orderFormData.styletype == 2"></el-color-picker>
+                                                </div>
+                                            </el-input>
+                                        </div>
+                                        <div class="inpbox linkbox linkChose" style="margin-top: 10px;">
+                                            <s><img :src="'{#$cfg_basehost#}/static/images/admin/'+(btn.linkInfo && btn.linkInfo.selfSetTel ? '/siteMemberPage/tel' : 'link')+'.png'" alt=""></s>
+                                            <input type="text" placeholder="请选择链接" class="iconLink disabled" readonly :value="btn.linkInfo.linkText + '订单'" readonly @click="changeLink('orderFormData.orderInfo.showData.' + ind +'.link' )">
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div class="contentSetBox modstyleBox"  v-if="orderFormData.orderInfo.code && orderFormData.orderInfo.showData && orderFormData.orderInfo.showData.length || orderFormData.title.show">
+                <h2 :class="['stitle']" >组件样式</h2>
+                <div class="sContent ">
+                    <div class="style_item">
+                        <div class="style_options" v-if="orderFormData.title.show">
+                            <label for="">标题颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="orderFormData.title.style.color" @active-change="value => activeChangeColor(value,'orderFormData.title.style.color')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="orderFormData.title.style.color.replace('#','')" @change="changeColor('orderFormData.title.style.color')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('orderFormData.title.style.color')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options"  v-if="orderFormData.orderInfo.code && orderFormData.orderInfo.showData && orderFormData.orderInfo.showData.length">
+                            <label for="">按钮文本：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="orderFormData.style.textColor" @active-change="value => activeChangeColor(value,'orderFormData.style.textColor')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="orderFormData.style.textColor.replace('#','')" @change="changeColor('orderFormData.style.textColor')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('orderFormData.style.textColor')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options" v-if="orderFormData.styletype == 3">
+                            <label for="">角标颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" v-model="orderFormData.style.labColor" @active-change="value => activeChangeColor(value,'orderFormData.style.labColor')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="orderFormData.style.labColor.replace('#','')" @change="changeColor('orderFormData.style.labColor')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('orderFormData.style.labColor')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="modstyleBox contentSetBox" v-show="orderFormData.more.show">
+                <h2 class="stitle">查看更多</h2>
+                <div class="sContent">
+                    <div class="item style_item ">
+                        <div class="style_options" >
+                            <label for="">显示文本：</label>
+                            <div class="textSetBox">
+                                <el-input placeholder="请输入文本" maxlength="8" show-word-limit v-model="orderFormData.more.text"></el-input>
+                            </div>
+                            <span :class="['showArr',{'noColor':!orderFormData.more.arr}] " @click="orderFormData.more.arr = !orderFormData.more.arr"></span>
+                        </div>
+                        <div class="style_options" @click="changeLink('orderFormData.more.link')">
+                            <label for="">链接：</label>
+                            <div class="inpbox linkbox">
+                                <s><img src="/static/images/admin/link.png" alt=""></s>
+                                <input type="text" placeholder="请选择链接" class="iconLink" readonly :value="orderFormData.more.linkInfo.linkText ? orderFormData.more.linkInfo.linkText : orderFormData.more.link ">
+                            </div>
+                        </div>
+
+                        <div class="style_options" >
+                            <label for="">文本颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" v-model="orderFormData.more.style.color" @active-change="(value) => activeChangeColor(value,'orderFormData.more.style.color')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="(orderFormData.more.style.color).replace('#','')" @change="changeColor('orderFormData.more.style.color')" maxlength="6">
+                                <button @click="resetColor('orderFormData.more.style.color')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 间距设置 -->
+            <div class="marginSetBox modstyleBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" >
+                        <div class="sContent">
+                            <div class="style_options">
+                                <label for="">图标大小：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="64" :max="108" v-model="orderFormData.style.iconSize"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="orderFormData.style.iconSize"  @change="checkMax(64,108,'orderFormData.style.iconSize')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">上圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="50" v-model="orderFormData.style.borderRadiusTop"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="orderFormData.style.borderRadiusTop"  @input="checkMax(0,50,'orderFormData.style.borderRadiusTop')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">下圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="orderFormData.style.borderRadiusBottom"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="orderFormData.style.borderRadiusBottom"  @input="checkMax(0,40,'orderFormData.style.borderRadiusBottom')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">上间距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="orderFormData.style.marginTop"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="orderFormData.style.marginTop"  @input="checkMax(0,40,'orderFormData.style.marginTop')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="orderFormData.style.marginLeft"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="orderFormData.style.marginLeft"  @input="checkMax(0,40,'orderFormData.style.marginLeft')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options"  :style="orderFormData.style.marginLeft != 0 ? 'visibility:hidden; opacity:0;':''">
+                                <label for="">内边距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="orderFormData.style.paddingLeft"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="orderFormData.style.paddingLeft"  @input="checkMax(0,40,'orderFormData.style.marginLeft')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+
+        </div>
+    </div>
+</div>

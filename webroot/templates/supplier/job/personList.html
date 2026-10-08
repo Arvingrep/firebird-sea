@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>招聘系统企业端</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/member/pub_supplier.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/personList.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+            var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+            var hideFileUrl = '{#$cfg_hideUrl#}';
+            var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+            var templets = '{#$templets_skin#}';
+            var loupanid = '{#$loupanid#}';
+			var baseInfo = '{#json_encode($jobItems)#}'
+			var jobNature = '{#json_encode($jobItems['jobNature'])#}'
+		</script>
+	</head>
+	<body class="w1200">
+		{#$pageTitle = '招聘系统企业端'#}
+		<!-- 头部 -->
+		{#include file="top.html" pageTitle=$pageTitle module='job' showMap=2#}
+		<div id="page">
+
+            <div class="conbox">
+                <div class="left_box">
+					<ul v-cloak>
+						<li v-for=" (item,i) in navList" :class="{'curr':i==currid || i === hoverid}"  @mouseover="hoverid = i" @mouseleave="hoverid = ''" @click.prevent="checkConfig(item,i)">
+							<a :href="item.link">
+								<s v-if="i!=currid && i !== hoverid"><img :src="'{#$templets_skin#}images/'+(i+1)+'.png'" ></s>
+								<s v-else><img :src="'{#$templets_skin#}images/'+(i+1)+'_on.png'" ></s>
+								<span>{{item.txt}}</span>
+							</a>
+						</li>
+					</ul>
+				</div>
+				<div class="right_box">
+					<div class="rConBox">
+						<h3>人才库</h3>
+						<div class="scrollBox">
+							<el-collapse-transition>
+								<div class="fixedTop shaiCon" v-show="openSlide">
+									<div class="shaiBox">
+										<el-input class="post" placeholder="应聘职位" readonly v-model="currChosePostText"  @click.native="postCategoryPop = true">
+										<i slot="suffix" class="icon_list" @click="postCategoryPop = true"></i>
+										</el-input>
+										<el-select placeholder="学历要求" popper-class="selectBox" v-model="form.education" >
+											<el-option label="" value="">学历要求不限</el-option>
+											{#foreach from=$jobItems['education'] item="item"#}
+											<el-option value="{#$item.id#}" label="{#$item.typename#}"></el-option>
+											{#/foreach#}
+										</el-select>
+										<el-select placeholder="工作年限"  popper-class="selectBox" v-model='form.experience'>
+											<el-option label="" value="">工作年限不限</el-option>
+											{#foreach from=$jobItems['experience'] item="item"#}
+											<el-option value="{#$item.id#}" label="{#$item.typename#}" ></el-option>
+											{#/foreach#}
+										</el-select>
+	
+										<!-- 年龄要求 -->
+										<el-popover
+										placement="bottom-start"
+										width="160"
+										v-model="agePopper"
+										ref="agePopper"
+										popper-class="popoverBox_age">
+										<div class="popover_age">
+											<div class="chose_age">
+												<span :class="age == ''" @click="changeItem('','age')">不限</span>
+												<span v-for="item in ageArr" :class="{'on_chose':age == item.value }" @click="changeItem(item,'age')">{{item.title}}</span>
+											</div>
+											<div class="self_defined ">
+												<el-input type="text" size="mini" class="inp" v-model="min_age"></el-input> -
+												<el-input type="text" size="mini" class="inp" v-mode="max_age"></el-input> 岁
+												<el-button size="mini" class="btn_sure" @click="changeItem('self','age')">确定</el-button>
+											</div>
+										</div>
+										<div class="inpbox" slot="reference">
+											<el-input  placeholder="年龄要求" readonly v-model="ageText" suffix-icon='el-icon-arrow-down
+	'										></el-input>
+										</div>
+										</el-popover>
+	
+										<!-- 月薪要求 -->
+										<el-popover
+										ref="salaryPopper"
+										placement="bottom-start"
+										width="160"
+										v-model="salaryPopper"
+										popper-class="popoverBox_salary">
+										<div class="popover_salary" >
+											<div class="chose_salary">
+												<span :class="salary == ''"  @click="changeItem('','salary')">不限</span>
+												<span v-for="item in salaryArr"  :class="{'on_chose':salary == item.value }" @click="changeItem(item,'salary')">{{item.title}}</span>
+												
+											</div>
+											<div class="self_defined ">
+												<el-input type="text" size="mini" class="inp" v-model="min_salary"></el-input> -
+												<el-input type="text" size="mini" class="inp" v-model="max_salary"></el-input>
+												<el-button size="mini" class="btn_sure" @click="changeItem('self','salary')">确定</el-button>
+											</div>
+										</div>
+										<div class="inpbox" slot="reference">
+											<el-input  placeholder="月薪要求" v-model="salaryText" readonly suffix-icon='el-icon-arrow-down
+	'										></el-input>
+										</div>
+										</el-popover>
+	
+										<!-- 入职时间 -->
+										<el-select placeholder="入职时间" popper-class="selectBox" v-model="form.startWork">
+											<el-option label="" value="">入职时间</el-option>
+											{#foreach from=$jobItems['startWork'] item="item"#}
+											<el-option value="{#$item.id#}" label="{#$item.typename#}" ></el-option>
+											{#/foreach#}
+											
+										</el-select>
+										<!-- 性别 -->
+										<el-select placeholder="性别" popper-class="selectBox" v-model="form.sex">
+											<el-option label="" value="">性别不限</el-option>
+											<el-option :value="0" label="男" ></el-option>
+											<el-option :value="1" label="女" ></el-option>
+										</el-select>
+										<!-- 职位性质 -->
+										<el-select placeholder="职位性质" popper-class="selectBox" v-model="form.nature">
+											<el-option label="" value="">职位不限</el-option>
+											{#foreach from=$jobItems['jobNature'] item="item"#}
+											<el-option value="{#$item.id#}" label="{#$item.typename#}" ></el-option>
+											{#/foreach#}
+										</el-select>
+									</div>
+									<div class="shaiResultBox">
+										<div class="search_inp ">
+											<el-input
+												placeholder="当前条件下搜索"
+												suffix-icon="el-icon-search"
+												v-model="form.key">
+												<i class="clear_icon" v-if="form.key" slot="prefix" @click="form.key = ''"></i>
+											</el-input>
+										</div>
+										<el-button type="text" class="clearAll " @click="clearAll" v-if="shaiResult && shaiResult.length">清空筛选条件<em>({{shaiResult.length}})</em></el-button>
+									</div>
+									
+									<div class="orderCon fn-clear">
+										<div class="orderLeft fn-left">
+											<div class="order"><span :class="{'on':orderby==''}" @click="orderby = ''">智能排序</span><span @click="orderby = '2'" :class="{'on': orderby=='2'}">更新时间</span></div>
+											<div class="filter">
+												过滤：	<el-checkbox label="不合适" v-model="form.pass_unSuit"></el-checkbox>
+														<el-checkbox label="已购买" v-model="form.pass_buy"></el-checkbox>
+														<el-checkbox label="简历完整度低于" v-model="form.finshed"></el-checkbox>
+														<el-dropdown @command="handleCommand">
+															<span class="el-dropdown-link">
+																{{form.pass_completion}}%<i class="el-icon-arrow-down el-icon--right"></i>
+															</span>
+															<el-dropdown-menu slot="dropdown">
+																<el-dropdown-item :command="item" v-for="item in percentArr">
+																	<h4>{{item.id}}%</h4>
+																	<p>{{item.tip}}</p>
+																</el-dropdown-item>
+															</el-dropdown-menu>
+														</el-dropdown>
+											</div>
+										</div>
+										<div class="fn-right layout">
+											<span :class="['layout1',{'on_chose': brief == 1}]" @click="brief = 1"></span>
+											<span :class="['layout2',{'on_chose': brief == 0}]" @click="brief = 0"></span>
+										</div>
+									</div>
+									{#if $company_combo_id#}
+									<div class="btnTipBox" >
+										<div class="tip">
+											<el-popover
+												pop-class="popover_tip"
+												placement="top-start"
+												width="440"
+												trigger="hover">
+												<div class="markBox">
+													<div><b class="blue">{#if $company_can_resume_down==-1#}不限次数{#else#}{#$company_can_resume_down#}{#/if#}</b>：招聘套餐内剩余次数，今日有效 </div>
+													<p><b>{#$company_package_resume#}</b>：增值包补充次数，永久有效，套餐用光后开始使用</p>
+												</div>
+												<span class="tip_icon" slot="reference"></span>
+											</el-popover>
+	
+											今日剩余下载次数：<b class="blue">{#if $company_can_resume_down==-1#}不限次数{#else#}{#$company_can_resume_down#}{#/if#}</b> + <b>{#$company_package_resume#}</b></div>
+										<el-button class="toBuy" @click="showpopularPop()">购买增值包</el-button>
+									</div>
+									{#else#}
+									<div class="btnTipBox" >
+										<el-button class="toBuy" @click="goLink()" data-url="{#$cfg_basehost#}/supplier/job/jobmeal.html">开通套餐</el-button>
+									</div>
+									{#/if#}
+								</div>
+							</el-collapse-transition>
+							<div class="scrollCon" @scroll="scrollTO">
+								<div class="shaiCon">
+									<!-- 筛选条件 -->
+									<div class="shaiBox" v-cloak>
+										<div class="shai_item fn-clear">
+											<label for="" class="fn-left">职位：</label>
+											<div class="chose_box ">
+												<div class="tagBox">
+													<el-tag v-for="(item,ind) in postArr.slice(0, 15)"  :class="['tag',{'on_chose' : form.postid  == item.id }]"   @click="postShow(item,1)">{{item.typename||item.type}}</el-tag>
+													<el-button class="chose_btn" @click="postCategoryPop = true">选择其他职位</el-button>
+												</div>
+											</div>
+										</div>
+										<div class="shai_item fn-clear">
+											<label for="" class="fn-left">学历：</label>
+											<div class="chose_box ">
+												<div class="labBox">
+													<span :class="['lab',{'on_chose': form.education == ''}]" @click="form.education = ''">不限</span>
+													{#foreach from=$jobItems['education'] item="item"#}
+													<span :class="['lab',{'on_chose': form.education == '{#$item.id#}'}]" @click="form.education = '{#$item.id#}'"  >{#$item.typename#}</span>
+													{#/foreach#}
+												</div>
+											</div>
+										</div>
+										<div class="shai_item fn-clear">
+											<label for="" class="fn-left">经验：</label>
+											<div class="chose_box ">
+												<div class="labBox">
+													<span :class="['lab',{'on_chose': form.experience == ''}]" @click="form.experience = ''">不限</span>
+													{#foreach from=$jobItems['experience'] item="item"#}
+													<span :class="['lab',{'on_chose': form.experience == '{#$item.id#}'}]" @click="form.experience = '{#$item.id#}'"  >{#$item.typename#}</span>
+													{#/foreach#}
+												</div>
+											</div>
+										</div>
+										<div class="shai_item fn-clear">
+											<label  class="fn-left">年龄：</label>
+											<div class="chose_box ">
+												<div class="labBox">
+													<span :class="['lab',{'on_chose': age == ''}]" @click="changeItem('','age')">不限</span>
+													<span  :class="['lab',{'on_chose': age == item.value}]" @click="changeItem(item,'age')" @click="age = item.value" v-for="item in ageArr" >{{item.title}}</span>
+													<div class="self_defined">
+														<label for="">自定义</label>
+														<el-input type="text" size="mini" class="inp" v-model="min_age"></el-input> -
+														<el-input type="text" size="mini" class="inp" v-model="max_age"></el-input> 岁
+														<el-button size="mini" round class="btn_sure" @click="changeItem('self','age');age=''">确定</el-button>
+													</div>
+												</div>
+											</div>
+										</div>
+										<div class="shai_item fn-clear">
+											<label for="" class="fn-left">薪资：</label>
+											<div class="chose_box ">
+												<div class="labBox">
+													<span :class="['lab', {'on_chose': salary == '' }]" @click="changeItem('','salary')">不限</span>
+													<span :class="['lab',{'on_chose':item.value == salary}] " @click="changeItem(item,'salary')" v-for="item in salaryArr"  >{{item.title}}</span>
+													<div class="self_defined">
+														<label for="">自定义</label>
+														<el-input type="text" size="mini" class="inp" v-model="min_salary"><em slot="prefix">{#echoCurrency type='symbol'#}</em></el-input> -
+														<el-input type="text" size="mini" class="inp" v-model="max_salary"><em slot="prefix">{#echoCurrency type='symbol'#}</em></el-input>
+														<el-button size="mini" round class="btn_sure" @click="changeItem('self','salary');salary=''">确定</el-button>
+													</div>
+												</div>
+											</div>
+										</div>
+										<div class="shai_item fn-clear">
+											<label for="" class="fn-left">其他：</label>
+											<div class="chose_box ">
+												<div class="selectBox">
+													<el-select label="入职时间" placeholder="入职时间" v-model="form.startWork" popper-class="selectBox">
+														<el-option value="" label="">入职时间不限</el-option>
+														{#foreach from=$jobItems['startWork'] item="item"#}
+														<el-option value="{#$item.id#}" label="{#$item.typename#}" ></el-option>
+														{#/foreach#}
+													</el-select>
+													<el-select label="性别" placeholder="性别" v-model="form.sex" popper-class="selectBox">
+														<el-option label="" value="">性别不限</el-option>
+														<el-option label="男" :value="0"> </el-option>
+														<el-option label="女" :value="1"> </el-option>
+													</el-select>
+													<el-select placeholder="职位性质" popper-class="selectBox" v-model="form.nature" popper-class="selectBox">
+														<el-option value="" label="">职位性质不限</el-option>
+														{#foreach from=$jobItems['jobNature'] item="item"#}
+														<el-option value="{#$item.id#}" label="{#$item.typename#}" ></el-option>
+														{#/foreach#}
+													</el-select>
+												</div>
+											</div>
+										</div>
+									</div>
+									
+			
+									<!-- 筛选条件的结果 -->
+									<div class="shaiResultBox fn-clear" >
+										<div class="search_inp fn-right">
+											<el-input
+												placeholder="当前条件下搜索"
+												suffix-icon="el-icon-search"
+												v-model="form.key">
+												<i class="clear_icon" v-if="form.key" slot="prefix" @click="form.key = ''"></i>
+											</el-input>
+										</div>
+										<template v-show="shaiResult && shaiResult.length > 0">
+
+											<div class="shaiResult" >
+												<span class="lab" v-for="(item,ind) in shaiResult" @click="removeShai(ind)"><s></s>{{item.value}}</span>
+											</div>
+											<el-button type="text" class="clearAll " @click="clearAll" v-if="shaiResult && shaiResult.length">清空筛选条件<em>({{shaiResult.length}})</em></el-button>
+										</template>
+									</div>
+									{#if $company_combo_id#}
+									<div class="btnTipBox" >
+										{#if $company_can_resume_down==-1#}
+										<div class="tip">
+											套餐剩余下载次数：<b class="blue">不限</b>
+										</div>
+										{#else#}
+										<div class="tip">
+											{#if $company_package_resume#}
+											<el-popover
+												pop-class="popover_tip"
+												placement="top-start"
+												width="440"
+												trigger="hover">
+												<div class="markBox">
+													<div><b class="blue">{#$company_can_resume_down#}</b>：招聘套餐内剩余次数，今日有效 </div>
+													<p><b>{#$company_package_resume#}</b>：增值包补充次数，永久有效，套餐用光后开始使用</p>
+												</div>
+												<span class="tip_icon" slot="reference"></span>
+											</el-popover>
+											{#/if#}
+											今日剩余下载次数：<b class="blue">{#$company_can_resume_down#}</b> {#if $company_package_resume#}+ <b>{#$company_package_resume#}</b>{#/if#}
+											<el-button class="toBuy" @click="showpopularPop()">购买增值包</el-button>
+										</div>
+										{#/if#}
+									</div>
+									{#else#}
+									<div class="btnTipBox" >
+										<el-button class="toBuy" @click="goLink()" data-url="{#$cfg_basehost#}/supplier/job/jobmeal.html">开通套餐</el-button>
+									</div>
+									{#/if#}
+	
+									<div class="orderCon fn-clear">
+										<div class="orderLeft fn-left">
+											<div class="order"><span :class="{'on':orderby==''}" @click="orderby = ''">智能排序</span><span @click="orderby = '2'" :class="{'on': orderby=='2'}">更新时间</span></div>
+											<div class="filter">
+												过滤：	<el-checkbox label="不合适" v-model="form.pass_unSuit"></el-checkbox>
+														<el-checkbox label="已购买" v-model="form.pass_buy"></el-checkbox>
+														<el-checkbox label="简历完整度低于" v-model="form.finshed"></el-checkbox>
+														<el-dropdown @command="handleCommand">
+															<span class="el-dropdown-link">
+																{{form.pass_completion}}%<i class="el-icon-arrow-down el-icon--right"></i>
+															</span>
+															<el-dropdown-menu slot="dropdown" >
+																<el-dropdown-item :command="item" v-for="item in percentArr">
+																	<h4>{{item.id}}%</h4>
+																	<p>{{item.tip}}</p>
+																</el-dropdown-item>
+															</el-dropdown-menu>
+														</el-dropdown>
+											</div>
+										</div>
+										<div class="fn-right layout">
+											<span :class="['layout1',{'on_chose': brief == 1}]" @click="brief = 1"></span>
+											<span :class="['layout2',{'on_chose': brief == 0}]" @click="brief = 0"></span>
+										</div>
+									</div>
+								</div>
+								<div class="listConBox">
+									
+									<div :class="['listCon' ,{'briefStyle': brief}]" >
+										<ul v-loading="isload">
+											<li v-for="(item,ind) in personList" :class="{'unsuit':item.unSuit}">
+												<!-- notFit -->
+												<a :href="item.url" class="fn-clear linkbox " target="_blank">
+													<!-- 求职者信息 -->
+													<div class="appliyInfoBox fn-clear fn-left">
+														<div class="photo fn-left"><el-avatar shape="circle" :size="(brief ? 80 : 100)" :src="item.photo_url"><img src="/static/images/noPhoto_100.jpg" alt=""></el-avatar></div>
+														<div class="appliyInfo">
+															<!-- <h3>{{item.name}}<el-tag size="mini">急求职</el-tag></h3> -->
+															<h3>{{item.name}}</h3>
+															<p><span>{{item.age}}岁</span><em></em><span v-if="item.edu_tallest_name">{{item.edu_tallest_name}}</span><em  v-if="item.edu_tallest_name"></em><span v-if="item.work_jy_name">{{item.work_jy_name}}</span><em v-if="item.work_jy_name"></em><span>{{item.workState_name}}</span></p>
+															<p><span class="salary">{{salaryChange(item)}}</span><span class="post">{{item.job_name.join('、')}}</span></p>
+															<p v-if="!brief"><el-tag class="joinDate" size="medium" v-for="(tag,tagind) in item.ad_tag" v-if="tagind < 3">{{tag}}</el-tag></p>
+															<p v-if="item.advantage && !brief" class="advantage">{{item.advantage}}</p>
+														</div>
+													</div>
+													<!-- 求职者教育/工作信息 -->
+													<div class="eduInfoBox fn-left">
+														<div class="job_item">
+															<h5 v-if="item.work_jy==0 && item.work_jl && item.work_jl.length==0"><s></s>暂无工作经验</h5>
+															<h5 v-else-if="item.work_jy==0 && item.work_jl && item.work_jl.length>0"><s></s>{{'做过'+item.work_jl.length+'份工作'}}</h5>
+															<h5 v-else-if="item.work_jy!=0 && item.work_jl && item.work_jl.length==0"><s></s>工作{{item.work_jy_name}}</h5>
+															<h5 v-else><s></s>工作{{item.work_time_count?item.work_time_count+'年':'1月'}}{{item.work_jl && item.work_jl && item.work_jl.length ?'，做过份'+item.work_jl.length+'工作' : ''}}</h5>
+															<p v-if="item.work_jy!=0 && item.work_jl &&  item.work_jl.length>0"><span v-for="(job,job_ind) in item.work_jl">{{job.company}} <em v-if="job_ind == 0"> {{job.job}}</em>({{job.work_time_count.replace('0年','')}})</span>
+															</p>
+														</div>
+														<div class="edu_item" v-if="item.education[0]">
+															<h5><s></s>{{item.education[0].school}} · {{item.education[0].xl}} <em v-if="brief"> · {{item.education[0].zy}}</em></h5>
+															<p v-if="!brief">{{item.education[0].zy}}</p>
+														</div>
+													</div>
+													<!-- 操作按钮 -->
+													<div class="optBox fn-right" v-if="!item.unSuit">
+														<el-button type="text" :class="['collect', {'collected':item.collect}]" @click.prevent="collectResume(item,ind)"><i></i>{{item.collect ? '已收藏':'收藏'}}</el-button>
+														<el-button type="primary" round class="download_btn" v-if="!item.download" @click.prevent="downloadResume(item,ind)" >下载简历</el-button>
+														<el-button  round size="medium" class="hasDown" type="info" v-else>已下载</el-button>
+													</div>
+													<div class="labRight" v-if="item.unSuit">不合适</div>
+													<div class="labRight" v-else-if="item.download">已购买</div>
+												</a>
+											</li>
+										</ul>
+									</div>
+									<div class="empty">
+										<div class="noData" v-if="!isload && (!personList || !personList.length)">
+											<img src="{#$templets_skin#}images/noData_post.png" alt="">
+											<p>暂无相关简历</p>
+										</div>
+									</div>
+								</div>
+							</div>
+							
+						</div>
+						<div class="dataPage" v-show="total">
+							<el-pagination
+							@current-change="changePage"
+							background
+							:page-size="20"
+							layout="prev, pager, next"
+							prev-text="上一页"
+							next-text="下一页"
+							:total="total">
+							</el-pagination>
+						</div>
+					</div>
+					
+				</div>
+            </div>
+
+			<!-- 行业职位弹窗 -->
+			<div :class="['industryMask',{'showPop':postCategoryPop}]"></div>
+			<div :class="['industryPop',{'showPop':postCategoryPop}]">
+				<div class="industry_head">
+					<h3>选择职位</h3>
+					<a href="javascript:;" class="close_btn" @click="closepop"></a>
+				</div>
+				<div class="industry_content ">
+					<div class="industry_list">
+						<ul>
+							<li :class="{'on_chose': currCategory == ''}" v-if="postArr && postArr.length > 0" @click="currCategory = ''">我的招聘</li>
+							<li :class="{'on_chose': currCategory && currCategory.id == item.id}" v-for="item in categoryList" @click="currCategory = item"> {{item.typename}}</li>
+						</ul>
+					</div>
+					<div class="postArr" >
+						<!-- 类别 -->
+						<div class="postArrList" v-if="currCategory" @scroll="cateScroll">
+							<template v-if="categoryShow">
+								<dl v-if="currCategory.noLower && currCategory.noLower.length">
+									<dt>{{currCategory.typename}}</dt>
+									<dd>
+										<ul class="fn-clear" >
+											<li v-for="item in currCategory.noLower" :class="{'on_chose' : currChosePost && currChosePost.id == item.id}" @click="postShow(item)">{{item.typename}} </li>
+										</ul>
+									</dd>
+								</dl>
+								<dl v-for="item in currCategory.lower" v-if="item.lower && item.lower.length" >
+									<dt>{{item.typename}}</dt>
+									<dd>
+										<ul class="fn-clear" >
+											<li v-for="lower in item.lower" :title="lower.typename" :class="{'on_chose' : currChosePost && currChosePost.id == lower.id}" @click="postShow(lower)">{{lower.typename}}</li>
+										</ul>
+									</dd>
+								</dl>
+							</template>
+
+							<template v-else>
+								<dl v-for="item in categoryList" :data-id="item.id">
+									<dt>{{item.typename}}</dt>
+									<dd >
+										<ul class="fn-clear"  >
+											<li v-for="lower in item.lower" :class="{'on_chose' : currChosePost && currChosePost.id == lower.id}" @click="postShow(lower)">{{lower.typename}}</li>
+										</ul>
+									</dd>
+								</dl>
+							</template>
+						</div>
+
+						<!-- 我发布的职位 -->
+						<div class="postArrList myPostList" v-else>
+							<dl>
+								<dt>我的发布</dt>
+								<dd>
+									<!-- <ul class="fn-clear" >
+										<li v-for="item in postArr" :class="{'on_chose' : form.postid.indexOf(item.id) > -1}" @click="postShow(item)">{{item.typename}} </li>
+									</ul> -->
+									<div class="tagBox">
+										<el-tag v-for="(item,ind) in postArr"  :class="['tag',{'on_chose' : currChosePost && currChosePost.id == item.id }]"   @click="postShow(item)">{{item.typename}}</el-tag>
+									</div>
+								</dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+				<div class="industry_bottom">
+					<div class="hasChosed">
+						<p>提示:请选择筛选职位</p>
+						<!-- <label for="">已选<em>3</em>/5</label>
+						<el-tag closable>计算机软件</el-tag> -->
+					</div>
+					<div class="btn_box">
+						<el-button type="primary" class="cancel_btn" @click="postCategoryPop = false;">取消</el-button>
+						<el-button type="primary" class="sure_btn"  @click="sureChose" :style="currChosePost?'':'opacity:0.3;background-color: #3F7EFC !important;border-color: #3F7EFC !important;'">确定</el-button>
+					</div>
+				</div>
+			</div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+		<div>{#$cfg_statisticscode#}</div>
+	</body>
+	<!-- <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script> -->
+	<script type="text/javascript" src="{#$templets_skin#}js/personList.js?v={#$cfg_staticVersion#}"></script>
+</html>

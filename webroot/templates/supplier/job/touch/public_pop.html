@@ -1,0 +1,312 @@
+{#if  $swiper#}
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js"></script>
+{#/if#}
+<link rel="stylesheet" href="{#$templets_skin#}css/public_pop.css?v={#$cfg_staticVersion#}">
+<script>
+    var cookiePre  = '{#$cfg_cookiePre#}'
+    var job_cid  = {#$job_cid|default:0#}
+    var userid = '{#$userinfo.userid#}'
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '',
+        "title": '',
+        "imgUrl": '',
+        "link": '',
+    };
+    var combo_id = {#$company_combo_id|default:0#}; //套餐id
+    var combo_enddate =  {#$company_combo_enddate|default:0#}; //会员结束时间
+</script>
+<div class="publicPopBox" id="pubPop" v-cloak>
+    <div class="mask_package" v-show="showPackagePop" @click="showPackagePop = false;"></div>
+    <!-- 职位刷新包 -->
+    <div :class="['packageBoxPop freshPackagePop',{'showPop':showPackagePop && showType == 'package'}, (packagePopType == 2 || packagePopType ==3 ?'bluePop' : '')]">
+        <div class="bg_package"></div>
+        <div class="packageBox">
+            <div class="popHeader">
+                <h4 v-if="packagePopType == 5">职位刷新包<span>更新职位，稳定曝光</span></h4>
+                <h4 v-else-if="packagePopType == 4">职位置顶包<span>占据置顶位，稳定曝光</span></h4>
+                <h4 v-else-if="packagePopType == 3">简历增值包<span>解锁更多人才</span></h4>
+                <h4 v-else-if="packagePopType == 2">职位增值包<span>有效期跟随当前套餐({{transTimes('{#$company_combo_enddate|default:0#}',2).replace(/-/g,'/')}})</span></h4>
+            </div>
+            
+            <div class="popCon">
+                <div class="itemWrap" v-show="packagePopType == 2" data-type="2">
+                    <ul class="itemUl fn-clear">
+                        {#loop service='job' action='packageList' type="2" pageSize='100' page='1' return='item'#}
+                        <li :class="{'on_chose' : chosePopular.id == '{#$item.id#}'}" @click='choseCurrItem()' data-price="{#$item.price#}" data-id="{#$item.id#}" data-type="{#$item.type#}" data-refresh="{#$item.refresh#}" data-resume="{#$item.resume#}" data-top="{#$item.top#}"  data-job="{#$item.job#}" data-buy="{#$item.buy#}" data-mprice="{#$item.mprice#}" data-title="{#$item.title#}" data-recommand="{#$item.recommand#}">
+                            <p>{#$item.job#}个职位</p>
+                            <div class="price">
+                                <h5>{#echoCurrency type="symbol"#}<b>{#$item.price#}</b></h5>
+                                <p class="oprice">{#echoCurrency type="symbol"#}{#$item.mprice#}</p>
+                            </div>
+                            {#if $item.mprice > $item.price#}<p class="save">节省{#$item.mprice - $item.price#}{#echoCurrency type='short'#}</p>{#/if#}
+                        </li>
+                        {#/loop#}
+                        
+                    </ul>
+                </div>
+                <div class="itemWrap"  v-show="packagePopType == 3" data-type="3">
+                    <ul class="itemUl fn-clear">
+                        {#loop service='job' action='packageList' type="3" pageSize='100' page='1' return='item'#}
+                        <li :class="{'on_chose' : chosePopular.id == '{#$item.id#}'}" @click='choseCurrItem()' data-price="{#$item.price#}" data-id="{#$item.id#}" data-type="{#$item.type#}" data-refresh="{#$item.refresh#}" data-resume="{#$item.resume#}" data-top="{#$item.top#}"  data-job="{#$item.job#}" data-buy="{#$item.buy#}" data-mprice="{#$item.mprice#}" data-title="{#$item.title#}" data-recommand="{#$item.recommand#}">
+                            <p>{#$item.resume#}份简历</p>
+                            <div class="price">
+                                <h5>{#echoCurrency type="symbol"#}<b>{#$item.price#}</b></h5>
+                                <p class="oprice" >{#if $item.price < $item.mprice#}{#echoCurrency type="symbol"#}{#$item.mprice#}{#/if#}</p>
+                            </div>
+                            {#if $item.mprice > $item.price#}<p class="save">节省{#$item.mprice - $item.price#}{#echoCurrency type='short'#}</p>{#/if#}
+                        </li>
+                        {#/loop#}
+                        
+                    </ul>
+                </div>
+                <div class="itemWrap" v-show="packagePopType == 4" data-type="4">
+                    <ul class="itemUl fn-clear">
+                        {#loop service='job' action='packageList' type="4" pageSize='100' page='1' return='item'#}
+                        <li :class="{'on_chose' : chosePopular.id == '{#$item.id#}'}" @click='choseCurrItem()' data-price="{#$item.price#}" data-id="{#$item.id#}" data-type="{#$item.type#}" data-refresh="{#$item.refresh#}" data-resume="{#$item.resume#}" data-top="{#$item.top#}"  data-job="{#$item.job#}" data-buy="{#$item.buy#}" data-mprice="{#$item.mprice#}" data-title="{#$item.title#}" data-recommand="{#$item.recommand#}">
+                            <p>{#$item.top#}天置顶</p>
+                            <div class="price">
+                                <h5>{#echoCurrency type="symbol"#}<b>{#$item.price#}</b></h5>
+                                <p class="oprice">{#echoCurrency type="symbol"#}{#$item.mprice#}</p>
+                            </div>
+                            {#if $item.mprice > $item.price#}<p class="save">节省{#$item.mprice - $item.price#}{#echoCurrency type='short'#}</p>{#/if#}
+                        </li>
+                        {#/loop#}
+                        
+                    </ul>
+                </div>
+                <div class="itemWrap" v-show="packagePopType == 5" data-type="5">
+                    <ul class="itemUl fn-clear">
+                        {#loop service='job' action='packageList' type="5" pageSize='100' page='1' return='item'#}
+                        <li :class="{'on_chose' : chosePopular.id == '{#$item.id#}'}" @click='choseCurrItem()' data-price="{#$item.price#}" data-id="{#$item.id#}" data-type="{#$item.type#}" data-refresh="{#$item.refresh#}" data-resume="{#$item.resume#}" data-top="{#$item.top#}"  data-job="{#$item.job#}" data-buy="{#$item.buy#}" data-mprice="{#$item.mprice#}" data-title="{#$item.title#}" data-recommand="{#$item.recommand#}">
+                            <p>{#$item.refresh#}次刷新</p>
+                            <div class="price">
+                                <h5>{#echoCurrency type="symbol"#}<b>{#$item.price#}</b></h5>
+                                <p class="oprice">{#echoCurrency type="symbol"#}{#$item.mprice#}</p>
+                            </div>
+                            {#if $item.mprice > $item.price#}<p class="save">节省{#$item.mprice - $item.price#}{#echoCurrency type='short'#}</p>{#/if#}
+                        </li>
+                        {#/loop#}
+                        
+                    </ul>
+                </div>
+            </div>
+            <div class="popFooter">
+                <p class="pay_amount"v-show='chosePopular.id && chosePopular.price'>需付金额：<span>{#echoCurrency type="symbol"#}<b>{{chosePopular.price}}</b></span></p>
+                <a href="javascript:;" class="btn btn_buy" @click="renewFee(chosePopular.id,2)">立即购买</a>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 套餐购买弹窗 -->
+    <div :class="['taocanBox',{'showPop':showPackagePop && showType == 'buymeal'}] ">
+        <a href="javascript:;" class="close_btn" @click="showPackagePop = false"></a>
+        <div class="pop_header">
+            <p>尊敬的企业用户您好</p>
+            <h4>请开通招聘套餐</h4>
+        </div>
+        <div class="pop_con">
+            <ul>
+                <li>
+                    <div class="text">
+                        <h5>海量人才极速招聘</h5>
+                        <p>专业招聘平台</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="text">
+                        <h5>高效曝光坐收简历</h5>
+                        <p>职位推广、招聘会</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="text">
+                        <h5>主动出击在线畅聊</h5>
+                        <p>职位在线畅聊</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        <div class="pop_footer">
+            <a href="{#$cfg_basehost#}/supplier/job/jobmeal?appFullScreen">立即开通</a>
+        </div>
+    </div>
+    <!-- 套餐购买弹窗 -->
+    <div :class="['taocanKeepBox',{'showPop':showPackagePop && showType == 'keepmeal'}] ">
+        <a href="javascript:;" class="close_btn" @click="showPackagePop = false"></a>
+        <div class="pop_header">
+            <h4>您的招聘套餐<span v-if="expired > 0"><b>{{expired}}</b>天后即将到期</span><span v-else>已到期</span></h4>
+            <p>立即续费，享VIP招聘服务</p>
+        </div>
+        <div class="pop_con">
+            <ul>
+                <li>
+                    <div class="text">
+                        <h5>海量人才极速招聘</h5>
+                        <p>专业招聘平台</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="text">
+                        <h5>高效曝光坐收简历</h5>
+                        <p>职位推广、招聘会</p>
+                    </div>
+                </li>
+                <li>
+                    <div class="text">
+                        <h5>主动出击在线畅聊</h5>
+                        <p>职位在线畅聊</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        <div class="pop_footer">
+            <a href="{#$cfg_basehost#}/supplier/job/jobmeal?appFullScreen">立即续费</a>
+        </div>
+    </div>
+
+
+
+    <!-- 分享弹窗 -->
+    <div class="sharePopConBox">
+        <div class="share_mask" v-show="sharePop" @click="sharePop = false"></div>
+        <div :class="['sharePopBox',{'showPop':sharePop && shareType == ''}]">
+            <div class="pop_header">
+                <h5>分享至</h5>
+            </div>
+            <div class="pop_con">
+                <div class="share_btns">
+                    <ul>
+                        {#if !$showType #}
+                        <li @click="shareType = 'poster'; posterType = 'post'">
+                            <div class="icon"><img src="{#$templets_skin#}images/poster_icon.png" alt=""></div>
+                            <p>生成海报</p>
+                        </li>
+                        {#/if#}
+                        <li  @click="shareType = 'tencent';">
+                            <div class="icon"><img src="{#$templets_skin#}images/wechat_icon.png" alt=""></div>
+                            <p>微信好友</p>
+                        </li>
+                        <li @click="shareType = 'tencent';">
+                            <div class="icon"><img src="{#$templets_skin#}images/wechat1_icon.png" alt=""></div>
+                            <p>朋友圈</p>
+                        </li>
+                        <li @click="shareType = 'tencent';">
+                            <div class="icon"><img src="{#$templets_skin#}images/qq_icon.png" alt=""></div>
+                            <p>QQ好友</p>
+                        </li>
+                    </ul>
+                </div> 
+                <div class="share_btns">
+                    <ul>
+                        <li class="HN_button_link " v-show="shareObj.id" data-clipboard-action="copy" :data-clipboard-text="shareObj.url">
+                            <div class="icon"><img src="{#$templets_skin#}images/link_icon.png" alt=""></div>
+                            <p>复制链接</p>
+                        </li>
+                        <li @click="shareType = 'qrCode'">
+                            <div class="icon"><img src="{#$templets_skin#}images/qr_icon.png" alt=""></div>
+                            <p>当面扫码</p>
+                        </li>
+                    </ul>
+                </div> 
+            </div>
+        </div>
+        <!-- 微信、qq。朋友圈 -->
+        <div class="tencentShare" v-show="sharePop && shareType == 'tencent'"><img src="{#$cfg_staticPath#}images/HN_Public_sharezhi.png" alt=""></div>
+        <!-- 二维码 -->
+        <div :class="['qrCodePopBox',{'showPop':sharePop && shareType == 'qrCode'}]">
+    
+            <div class="pop_con">
+                <div class="qrBox" v-if="shareObj && shareObj.id">
+                    <img :src="'/include/qrcode.php?data=' + shareObj.url " alt="">
+                </div>
+                <p>让朋友扫一扫访问当前网页</p>
+            </div>
+            <div class="pop_footer">
+                <a href="javascript:;" class="cancel_share" @click="shareType = '';sharePop = false">取消</a>
+            </div>
+        </div>
+    
+        <!-- 选择海报 -->
+        <div :class="['posterPopBox',{'showPop':sharePop && shareType == 'poster'}]">
+            <div class="popConBox">
+                <a href="javascript:;" class="btn_close" @click="(sharePop = false)"></a>
+                <div class="popHead">
+                    <h4>生成企业微海报</h4>
+                    <p>让移动招聘更有效<br/> ★转发朋友圈、员工内推、打印张贴★</p>
+                </div>
+                <div class="popCon">
+                    <div class="posterShowJobsBox" v-if="posterType != 'post'">
+                        <div class="jobChosed">{{getPostTit()}}</div>
+                        <div class="btn_change" @click="(choseJobPop = true)">已选职位({{postidArr.length}})</div>
+                    </div>
+                    <div class="posterModelBox">
+                        <h4>选择模板</h4>
+                        <div class="posterModel">
+                            <div class="swiper-container">
+                                <ul class="model_ul swiper-wrapper">
+                                    <li :class="['model_li swiper-slide',{'on_chose':posterChosed == item.id}]"  v-if="(item.type=='post'  && (postidArr.length == 1 || posterType == 'post')) || (postidArr.length > 1 && item.type == 'company')"  v-for="item in posterData " :key="item.id" @click="(posterChosed = item.id)">
+                                        <div class="posterImg"><img :src="item.litpic" onerror="this.src='/static/images/404.jpg'" /></div>
+                                        <div class="choseBox"><button class="btn_show" @click="showPoster(item)">生成海报</button></div>
+                                    </li>
+                                </ul>
+                            </div>
+    
+                        </div>
+                    </div>
+                </div>
+    
+                <!-- <div class="btnBox">
+                    <button class="btn_poster" @click="toPoster">生成海报</button>
+                </div> -->
+            </div>
+        </div>
+        <!-- 生成海报展示 -->
+        <div class="postShowMask" v-show="posterShowPop" @click="closePoster">
+            <div class="postLoading">
+                <s></s>
+                <p>图片生成中</p>
+            </div>
+        </div>
+        <div class="postShowPop html2canvas_fixed"  v-show="posterShowPop && !postLoading && posterUrl" @touchstart="touchstartFn" @touchend="touchendFn">
+            <div class="postShow html2_img">
+                <img :src="changeFileSize(posterUrl,500,1000)" alt="" v-if="posterUrl">
+            </div>
+            <div class="posterText">
+                <a href="javascript:;" class="close_btn" @click="closePoster"></a>
+                <p>长按保存图片，分享给朋友！</p>
+            </div>
+        </div>
+    
+        <!-- 选中职位 -->
+        <div class="postShowMask" v-show="choseJobPop"></div>
+        <div :class="['posterShowJobsConBox', {'showPop':choseJobPop}]">
+            <a href="javascript:;" class="btn_close" @click="(choseJobPop = false)"></a>
+            <div class="popHead">
+                <h1>选择展示职位</h1>
+                <p>模板支持展示的职位数略有不同，超出的职位将隐藏 </p>
+            </div>
+            <div class="popCon">
+                <ul>
+                    <li v-for="item in postList" :key="item.id" :class="{'on_chose':checkChosed(item.id)}" @click="choseJobToPoster(item)">
+                        <div class="leftCon">{{item.show_salary}} <span v-if="(item.dy_salary > 12)">· {{item.dy_salary }}薪</span> {{item.title}}</div>
+                        <a href="javascript:;" class="chose_btn"></a>
+                    </li>
+                </ul>
+            </div>
+            <div class="btnBox">
+                <button class="btn_chose" @click="(postChosedArr = currChosedJobs,choseJobPop = false)">确定 {{(currChosedJobs.length > 0 ? currChosedJobs.length : '')}}</button>
+            </div>
+        </div>
+    </div>
+
+
+
+</div>
+<script src="{#$cfg_staticPath#}js/ui/clipboard.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public_pop.js?v={#$cfg_staticVersion#}"></script>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>修改用户名</title>
+		<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+		<link href="{#$templets_skin#}css/mobiscroll.css" rel="stylesheet" type="text/css" />
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/change-username.css?v={#$cfg_staticVersion#}" media="all" />
+		<script src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			masterDomain  = '{#$cfg_basehost#}'
+		</script>
+	</head>
+	<body>
+		{#include file="../../siteConfig/touch_top.html" pageTitle='修改用户名'#}
+		<div class="conbox">
+			<h1> 当前用户名： <b>{#$userinfo.username#}</b> </h1>
+			<p class="tip">用户名是账号的唯一凭证，仅可修改一次</p>
+			<div class="formBox"> 
+				<div class="inpbox">
+					<input type="text" name="username" id="username" placeholder="输入新用户名(2~30个字符，支持英文、数字)" />
+				</div>
+				<a href="javascript:;" class=" submit">确定修改</a>
+			</div>
+		</div>
+        {#$rsaScript#}
+        <script>
+            $(function(){
+                var userid = '{#$userinfo.userid#}'
+                $(".submit").click(function(){
+                    var username = $("#username").val();
+                    var zg = /^[a-zA-Z]{1}[0-9a-zA-Z_]{4,15}$/iu;
+                    if(username == ''){
+                        showErrAlert('请输入用户名')
+                        return false;
+                    }else if(username.length<2){
+                        showErrAlert('输入新用户名2~30个字符');
+                        return false;
+                    }else if (!zg.test(username)) {
+                        showErrAlert('用户名只支持数字、英文')
+                        return false;
+                    }
+
+                    $.ajax({
+                        url: "/include/ajax.php?service=member&action=editusername&rsaEncrypt=1&username="+rsaEncrypt(username),
+                        type: "POST",
+                        dataType: "json",
+                        success: function (data) {
+                            if(data && data.state == 100){
+                                showErrAlert("修改成功");
+                                window.location.href = '{#$member_userDomain#}';
+                            }else{
+                                showErrAlert(data.info);
+                            }
+                        },
+                        error:function () {
+                            showErrAlert("网络错误")
+                        }
+                    });
+
+                })
+            })
+        </script>
+</body>
+</html>

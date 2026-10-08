@@ -1,0 +1,124 @@
+
+  <!DOCTYPE html>
+  <html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+      content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+    <title>{#$langData['siteConfig'][2][9]#}</title>
+    <meta name="apptitle" content="{#$langData['siteConfig'][2][9]#}">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/login_v2.css?v={#$cfg_staticVersion#}">
+    <script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript">
+      var masterDomain = '{#$cfg_basehost#}', redirectUrl = '{#$redirectUrl#}', site = '{#$site#}', staticPath = '{#$cfg_staticPath#}';
+    var geetest = {#$cfg_geetest#};
+    var alipay_app_login = '{#$alipay_app_login#}';
+    var consult = '1'; // 协议勾选
+    var areacode = '{#$internationalPhoneSection[0]['code']#}'; //区号
+    var emailCheck = '{#$userinfo.emailCheck#}';
+    var phoneCheck = '{#$userinfo.phoneCheck#}';
+    var oldPhone = '{#$userinfo.phone#}'
+    </script>
+    {#* 微信分享 *#}
+    {#$Share_description = {#$cfg_description#}#}
+    {#$Share_title = {#$cfg_webname#}#}
+    {#$Share_img = {#$cfg_weblogo#}#}
+    {#$Share_url = {#$cfg_basehost#}#}
+    {#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+  </head>
+  <style>
+    .inputbox.telinp .telCode.labelText::after{display: none;}
+    .tab_ul{display: flex; align-items: center; justify-content: center; margin-top: 7vh; font-size: .32rem; color: #999; margin-bottom: .5rem;}
+    .tab_ul s{display: block; width: 1px; height: 0.25rem; background-color: #eee; margin: 0 0.4rem;}
+    .tab_ul li.curr{    font-weight: bold; color: #212121; position: relative;}
+    .tab_ul li.curr:before{content: ''; display: block; width: 0.42rem; height: 0.06rem; background-color: #FF4421; border-radius: 0.03rem; position: absolute; left: 0; right: 0; bottom: -0.26rem; margin: auto;}
+  </style>
+  <body>
+    <div class="chPhone loginPage" id="login_page" v-cloak>
+      <div class="codelogin loginbox"  v-cloak v-if="!emailCheck">
+        <div class="header">
+          {#if !$userinfo.emailCheck#}
+          <a href="javascript:;" class="goBack" onClick="history.go(-1)"></a>
+          {#else#}
+          <a href="javascript:;" class="backBtn" @click="emailCheck = true"></a>
+          {#/if#}
+        </div>
+        <div class="formbox">
+          <h2 class="title">绑定邮箱账号</h2> 
+          <div class="inputbox">
+            <input type="email" placeholder="输入邮箱账号" name="email" id="email"
+              autocomplete="off" v-model="email">
+          </div>
+          
+          <a href="javascript:;" class="btn_login" @click="bindEmail('chemail')" >立即绑定</a>
+          
+        </div>
+      </div>
+      <div class="codelogin loginbox"  v-cloak v-else>
+        <div class="header">
+          <a href="javascript:;" class="goBack" onClick="history.go(-1)"></a>
+        </div>
+        <div class="formbox">
+          <h2 class="title">更换邮箱账号</h2> 
+          {#if $userinfo.phoneCheck &&  $userinfo.emailCheck #}
+          <ul class="tab_ul"> <li :class="{'curr' : checkby == 1}" @click="checkby=1">邮箱认证</li><s></s><li @click="checkby = 2" :class="{'curr' : checkby == 2}">手机验证</li> </ul>
+          {#/if#}
+          <div class="byEmail" v-if="checkby == 1">
+            <div class="inputbox telinp">
+              <div class="telCode labelText" >
+                <label>邮箱账号</label>
+             </div>
+              <input type="email" style="text-align: right;" placeholder="请输入邮箱账号" name="oldemail" id="oldemail"
+                autocomplete="off" value="{#$userinfo.emailEncrypt#}" readonly>{#* 请输入邮箱账号 *#}
+            </div>
+            <div class="inputbox codeinp">
+              <input type="tel" maxlength="6" placeholder="{#$langData['siteConfig'][20][176]#}" name="checkVerCode"
+                autocomplete="off" id="vercode" v-model="checkVerCode"> {#* 请输入验证码 *#}
+              <a href="javascript:;" class="getCode" @click="getEmailMsg('checkInfo')">{#$langData['siteConfig'][4][1]#}</a> {#*
+              获取验证码 *#}
+            </div>
+          </div>
+          <div class="byPhone" v-else>
+            <div class="inputbox telinp">
+              <div class="telCode labelText" >
+                <label>手机账号</label>
+             </div>
+              <input type="email" style="text-align: right;" placeholder="请输入手机账号" name="oldphone" id="oldphone"
+                autocomplete="off" value="{#$userinfo.phoneEncrypt#}" readonly>{#* 请输入邮箱账号 *#}
+            </div>
+            <div class="inputbox codeinp">
+              <input type="tel" maxlength="6" placeholder="{#$langData['siteConfig'][20][176]#}" name="checkVerCode"
+                autocomplete="off" id="vercode" v-model="checkVerCode"> {#* 请输入验证码 *#}
+              <a href="javascript:;" class="getCode" @click="getPhoneMsg('checkInfo')">{#$langData['siteConfig'][4][1]#}</a> {#*
+              获取验证码 *#}
+            </div>
+          </div>
+        
+          <a href="javascript:;" class="btn_login" @click="checkUserInfo('authEmail')" >下一步</a>
+          
+        </div>
+      </div>
+
+      
+
+      
+    </div>
+
+
+  </body>
+  <script type='text/javascript'
+    src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+    {#if $cfg_geetest#}
+    {#if $cfg_geetest == 1#}
+    <script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+    {#/if#}
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+    {#/if#}
+  <script src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+  <script src="{#$templets_skin#}js/chEmail.js?v={#$cfg_staticVersion#}"></script>
+
+  </html>

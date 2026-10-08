@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>新增地址</title>{#* 新闻投稿 *#}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/newWaimaiAddress.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script src="{#$cfg_staticPath#}js/vue/vue.js"></script>
+<script type="text/javascript">
+  var staticPath = '{#$cfg_staticPath#}';
+  var memberUrl = '{#$member_userDomain#}/mapPosi_waimai.html?currentPageOpen=1';
+  var waimaiAddress = '{#$member_userDomain#}/address_waimai.html?from=user&currentPageOpen=1';
+  var waimaiIndex = '{#getModuleConfig module='waimai' key='channelDomain'#}?currentPageOpen=1';
+  var hasDefault = '{#$hasDefault#}';
+  var siteCityInfoCurr = '{#json_encode($siteCityInfo)#}';
+</script>
+</head>
+<body>
+
+  {#$pageTitle = "新增地址"#}{#* 新增地址 *#}
+  <!-- 这个判断是为修复从店铺下单月新建地址时，在当前页点击返回 无法返回到下单页 -->
+  {#if !$smarty.get.shopid#}
+  {#$selBackUrl = "{#getUrlPath service='member' type='user' template='address_waimai'#}"#}
+  {#/if#}
+  {#include file="top.html"#}
+  <div class="page" id="page" v-cloak>
+    <form class="formBox box" v-cloak>
+      <input type="hidden" name="id" id="addressid" :value="addressid">
+      <div :class="['fItem', {'hasSet':addrArr && addrArr.addr }]" @click="toMapPosi_waimai">
+        <div class="fLeft " ><label for="">收货地址</label></div>
+        <div class="fRight addrChose"  >
+          <div class="addrChosed" v-if="addrArr && addrArr.addr">
+            <h2>{{addrArr.addr}}</h2>
+            <p>{{addrArr.detailAddr}}</p>
+          </div>
+          <div class="addr_placeholder" v-else>请选择收货地址</div>
+          <input type="hidden" name="addr" id="addr" :value="addrArr.addr">
+          <input type="hidden" name="street" id="street" :value="addrArr.addr">
+          <input type="hidden" name="detailAddr" id="detailAddr" :value="addrArr.detailAddr">
+          <input type="hidden" name="lnglat" id="lnglat" :value="addrArr.lnglat">
+          <template v-if="addrArr.lnglat">
+            <input type="hidden" name="lng"  :value="lnglat(addrArr.lnglat)[0]">
+            <input type="hidden" name="lat"  :value="lnglat(addrArr.lnglat)[1]">
+          </template>
+
+        </div>
+      </div>
+      <div class="fItem">
+        <div class="fLeft"><label for="address">门牌号</label></div>
+        <div class="fRight">
+          <input type="text" name="address" id="address" placeholder="(选填) 例1层101室" v-model="address">
+        </div>
+      </div>
+      <div class="fItem">
+        <div class="fLeft"><label for="person">联系人</label></div>
+        <div class="fRight">
+          <input type="text" name="people"  placeholder="请填写联系人" v-model="people" maxlength="50">
+        </div>
+      </div>
+      <div class="fItem">
+        <div class="fLeft"><label for="tel">手机号</label></div>
+        <div class="fRight pCode">
+          <div class="phoneCode" @click="showPhoneCode"><span>{{areaCode}}</span></div>
+          <input type="tel" name="mobile" id="mobile"  placeholder="请填写手机号" v-model="mobile">
+          <input type="hidden" name="areaCode" id="areaCode"  :value="areaCode">
+        </div>
+      </div>
+      <input type="hidden" name="default" :value="swicthVal">
+    </form>
+    <div class="box">
+      <div class="fItem switchItem">
+        <div class="leftTxt">
+          <h2>设为默认地址</h2>
+          <p>设置后每次下单会默认推荐使用该地址</p>
+        </div>
+        <div :class="['switch',{'open':swicthVal == '1'}]" @click="swicthVal = (swicthVal == '1' ? 0 : 1)"><s></s></div>
+      </div>
+    </div>
+    <a href="javascript:;" class="saveBtn" @click="saveData">{{from == 'index' || addressid==0  ? '保存并使用' : '保存'}}</a>
+    <a href="javascript:;" class="delAddr" @click="sureDelAddr(addressid)" v-if="addressid">删除地址</a>
+  </div>
+
+{#* 微信分享 *#}
+{#$Share_description = {#$waimai_description#}#}
+{#$Share_title = {#$waimai_title#}#}
+{#$Share_img = {#getModuleConfig module='waimai' key='logoUrl'#}#}
+{#$Share_url = {#getModuleConfig module='waimai' key='channelDomain'#}#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script src="{#$templets_skin#}js/newWaimaiAddress.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

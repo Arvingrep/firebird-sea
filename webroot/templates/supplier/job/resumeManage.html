@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>招聘系统企业端</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/member/pub_supplier.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/postManage.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+		
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+            var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+            var hideFileUrl = '{#$cfg_hideUrl#}';
+            var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+            var templets = '{#$templets_skin#}';
+			var channelDomain = '{#getModuleConfig module='job' key='channelDomain'#}';
+			var certificateState='{#$company_state#}' //企业审核状态
+		</script>
+	</head>
+	<body class="w1200">
+		{#$pageTitle = '招聘系统企业端'#}
+		<!-- 头部 -->
+		{#include file="top.html" pageTitle=$pageTitle module='job' showMap=1#}
+
+		<div id="page">
+
+            <div class="conbox" v-cloak>
+                <div class="left_box">
+					<ul v-cloak>
+						<li v-for=" (item,i) in navList" :class="{'curr':i==currid || i === hoverid}"  @mouseover="hoverid = i" @mouseleave="hoverid = ''">
+							<a :href="item.link" @click="currid = i">
+								<s v-if="i!=currid && i !== hoverid"><img :src="'{#$templets_skin#}images/'+(i+1)+'.png'" ></s>
+								<s v-else><img :src="'{#$templets_skin#}images/'+(i+1)+'_on.png'" ></s>
+								<span>{{item.txt}}</span>
+							</a>
+						</li>
+					</ul>
+				</div>
+				<div class="right_box">
+					<div class="rConBox" >
+						<div class="tabsBox bold">
+							<span v-for="tab in tabsArr" :class="{'onTab':currPage == tab.id}" @click="tabchange(tab.id);"> {{tab.text}}</span>
+						</div>
+						<div class="tips_resume" v-if="currPage == 2">
+							<h4><s></s>温馨提示</h4>
+							<p>您已下载 <em>{{currPage == 2 ? totalCount : ''}}</em> 份简历，如遇虚假简历，可举报给平台，平台将对违规简历进行严肃处理</p>	
+						</div>
+						<div :class="'tabBox tabBox_' + currPage" >
+							<div class="tabCon" v-if="currPage == 0">
+								<ul v-cloak class="fn-clear">
+									<li v-for="tab in tabsArrList" :class="{'curr':currTab == tab.id }" :data-id="tab.id"  @click="currTab = tab.id">{{tab.text}}<span v-if="tab.count > 0">({{tab.count}})</span></li>
+								</ul>
+								<s></s>
+							</div>
+
+							<div class="searchBox shaiBox">
+							
+								<el-checkbox label="过滤失效简历" v-model="invalid" :class="[{'rightPosition':currPage == 2},{'rightPosi':currPage == 1}]"></el-checkbox>
+								<el-checkbox label="过滤不合适" v-model="noFit" v-if="currPage != 1 && (currTab =='' || currTab == 3)" :class="{'rightPosi':currPage == 2}"></el-checkbox>
+								<el-select v-model="postSelect" class="selectItem" placeholder="筛选职位" popper-class="selectBox" v-if="postArr.length">
+									<el-option key="" label="全部职位" value=" " style="text-align: left;"><span>全部职位</span></el-option>
+									<el-option
+										v-for="item in postArr"
+										:key="item.id"
+										:label="item.title"
+										:value="item.id"
+										style="text-align: left;">
+									</el-option>
+								</el-select>
+								<el-select v-model="resumeState" class="selectItem"  placeholder="沟通进度" v-if="currPage == 2" popper-class="selectBox">
+									<el-option label="全部职位" value=" "><span>全部职位</span></el-option>
+									<el-option v-for="item in communication" :key="item.value" :label="item.label" :value="item.value"></el-option>
+								</el-select>
+								<el-input
+									@keyup.enter.native="searchKey"
+									placeholder="搜索简历"
+									suffix-icon="el-icon-search"
+									v-model="keywords">
+								</el-input>
+
+								<!-- 高级筛选 -->
+								<el-popover
+									v-model="filterPop"
+									placement="bottom"
+									width="800"
+									popper-class="filterContainer"
+									trigger="click">
+									<!-- 高级筛选的内容 -->
+									<div class="filterConBox">
+										<div class="filterHead">
+											<h4>简历高级筛选</h4><span>快速筛选合适的求职者！</span> 
+											<a href="javascript:;" class="closeIcon" @click="filterPop = false;"></a>
+										</div>
+										<div class="filterCon ">
+											<div class="shaiBox">
+
+												<el-select v-model="filterForm.sex"  class="smInp inpbox">
+													<el-option label="性别不限" value=""></el-option>
+													<el-option label="男" value="0"></el-option>
+													<el-option label="女" value="1"></el-option>
+												</el-select>
+												<!-- 年龄要求 -->
+												<el-popover
+													placement="bottom-start"
+													width="160"
+													v-model="agePopper"
+													ref="agePopper"
+													popper-class="popoverBox_age">
+												<div class="popover_age">
+													<div class="chose_age">
+														<span :class="age == ''" @click="changeItem('','age')">不限</span>
+														<span v-for="item in ageArr" :class="{'on_chose':age == item.value }" @click="changeItem(item,'age')">{{item.title}}</span>
+													</div>
+													<div class="self_defined ">
+														<el-input type="text" size="mini" class="inp" v-model="min_age" @focus="agePopper = true" @blur="agePopper = false"></el-input> -
+														<el-input type="text" size="mini" class="inp" v-model="max_age" @focus="agePopper = true" @blur="agePopper = false"></el-input> 岁
+														<el-button size="mini" class="btn_sure" @click="changeItem('self','age')">确定</el-button>
+													</div>
+												</div>
+												<div class="inpbox" slot="reference">
+													<el-input  placeholder="年龄要求" @blur="agePopper = false" readonly v-model="ageText" suffix-icon='el-icon-arrow-down
+			'										></el-input>
+												</div>
+												</el-popover>
+												<el-select v-model="filterForm.education"  placeholder="请选择" class="xlInp inpbox" popper-class="classify">
+													<el-option label="学历不限" value=""></el-option>
+													<el-option :label="item.typename" :key="item.id" :value="item.id" v-for="item in baseConfig.education"></el-option>
+												</el-select>
+												<el-input v-model="filterForm.edu_profession" class="zyInp" placeholder="所学专业"></el-input>
+												<div class="datePickerBox">
+													<el-date-picker
+													v-model="filterForm.start_time"
+													align="right"
+													type="date"
+													:editable="false"
+													value-format="yyyy-MM-dd"
+													placeholder="投递时间"
+													:picker-options="pickerOptions">
+													</el-date-picker>
+													<span>-</span>
+													<el-date-picker
+													:editable="false"
+													v-model="filterForm.end_time"
+													align="right"
+													type="date"
+													value-format="yyyy-MM-dd"
+													placeholder="投递时间"
+													:picker-options="pickerOptions">
+													</el-date-picker>
+												</div>
+											</div>
+											<div class="filterBtns">
+												<a href="javascript:;" class="reset_filter" @click="resetFilter">重置</a>
+												<a href="javascript:;" class="confirm_filter" @click="confirmFilter">确定</a>
+											</div>
+										</div>
+									</div>
+									<a  href="javascript:;" slot="reference" class="btnToFilter " >高级筛选</a>
+								</el-popover>
+								<!-- 导出Excel -->
+								<a href="javascript:;" class="btnToExcel " @click="toGetExcel()"><em v-show="isLoadExcel" class="el-icon-loading"></em>{{isLoadExcel ? '正在导出...':(loadExcel ? '重新导出数据' : '导出数据')}}</a>
+							</div>
+						</div>
+						<div class="tableBox resumeListBox">
+							<template>
+								<el-table :data="tableData" style="width: 100%" ref="table" v-loading="isload" @selection-change="selectionChange" @row-click="rowClick" :row-class-name="tableRowClassName">
+									<el-table-column
+									type="selection"
+									width="55px"
+									style="margin-bottom: 16px;">
+									</el-table-column>
+									<el-table-column prop="member" label="基础信息"min-width="300">
+										<template slot-scope="scope">
+											<div class="resumeMemberInfoBox" >
+												<div :class="['mphoto',{'noFit':scope.row.state == 2 || scope.row.resume.del || (currPage == 2 && scope.row.delivery && scope.row.remark && scope.row.remark.remark_type && scope.row.remark.remark_type == 5 )}]">
+													<div class="photo_mask"></div>
+													<img :src="scope.row.resume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" style="width: 70px;border-radius: 50%;height: 70px;object-fit: cover;">
+													<div :class="['sex',{'sex_1':scope.row.resume.sex == 0}] "></div>
+												</div>
+												<div class="mInfo">
+													<!-- 投递的并且未读的 -->
+													<!-- <h3 v-if="currPage == 0 && !scope.row.read">{{scope.row.resume && scope.row.resume.name ?scope.row.resume.name : '-'}}<el-badge is-dot class="item"></el-badge></h3> -->
+
+													<h3 >{{scope.row.resume && scope.row.resume.name ?scope.row.resume.name : '-'}}
+														<el-tag v-if="scope.row.resume.del" size="mini" class="tag marktag hasDel" >已失效</el-tag>
+														<template v-else>
+															<el-popover v-if="currPage && scope.row.delivery "
+																placement="bottom-start"
+																:offset="-80"
+																trigger="hover">
+																<div class="markBox">
+																	<p><em style="color:#1975FF">投递标识：</em>该求职者已投递过简历，如选择不合适将通知对方，且无法撤回，请谨慎操作</p>
+																</div>
+																<el-tag size="mini" class="tag" slot="reference" >投递</el-tag>
+															</el-popover>
+															<el-popover  v-if="currPage == 0 &&  scope.row.remark "
+																popper-class="remarkPop"
+																placement="bottom-start"
+																:offset="-80"
+																trigger="hover">
+																<div class="markBox">
+																	<p><em style="color:#1975FF">备注：</em>{{scope.row.remark}}</p>
+																</div>
+																<el-tag size="mini" class="tag marktag" slot="reference" ><i></i>标记过</el-tag>
+															</el-popover>
+															<el-popover  v-if="currPage != 0 && !scope.row.resume.del && scope.row.resume.private" 
+																popper-class="remarkPop"
+																placement="bottom-start"
+																:offset="-80"
+																trigger="hover">
+																<div class="markBox">
+																	<p><em style="color:#1975FF">暂不公开：</em>该求职者当前选择不将简历展示在公开简历库中，<a href="javascript:;" class="chat_to" @click="chatWith(scope.row)">询问对方查阅简历</a></p>
+																</div>
+																<el-tag  size="mini" class="tag marktag private" slot="reference">暂不公开</el-tag>
+															</el-popover>
+															<el-popover  v-if="currPage == 0 &&  scope.row.deliveryCount > 1 "
+																popper-class="remarkPop"
+																placement="bottom-start"
+																:offset="-80"
+																trigger="hover">
+																<div class="markBox tdInfo">
+																	<ul>
+																		<li>该求职者曾投递过职位：<span style="color:#333;">{{scope.row.post_last.title}}</span></li>
+																		<li>投递时间：<span>{{timeTrans(scope.row.post_last.post_date,4)}}</span></li>
+																		<li>结果：<span style="color:#1975FF">{{scope.row.post_last.result}}</span></li>
+																	</ul>
+																</div>
+																<el-tag size="mini" class="tag marktag tdtag" slot="reference" v-if="scope.row.deliveryCount > 1 && scope.row.post_last && scope.row.post_last.id">投递过</el-tag>
+															</el-popover>
+															<el-badge is-dot class="item" v-if="currPage == 0 && !scope.row.u_read"></el-badge>
+														</template>
+													</h3>
+													<p><span>{{scope.row.resume && scope.row.resume.age ? scope.row.resume.age + '岁' : '-'}}</span><em></em><span>{{scope.row.resume && scope.row.resume.edu_tallest_name ?scope.row.resume.edu_tallest_name : '' }}</span><em></em><span>{{scope.row.resume && scope.row.resume.work_jy_name ? scope.row.resume.work_jy_name: '-'}}</span><em></em><span>{{scope.row.resume && scope.row.resume.edu_school ? scope.row.resume.edu_school : ''}}</span></p>
+												</div>
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column prop="post" :label="(currPage != 0 ? '期望职位' : '投递职位')" min-width="200">
+										<template slot-scope="scope" >
+											<div class="postInfo " >
+												<h3 :class="['postTitle', {'noFit':scope.row.state == 2 || scope.row.resume.del}]" v-if="currPage == 0">{{scope.row.post && scope.row.post.title ? scope.row.post.title :''}}</h3>
+												<h3 :class="['postTitle', {'noFit': (currPage == 2 && scope.row.delivery && scope.row.remark && scope.row.remark.remark_type && scope.row.remark.remark_type == 5 ) || scope.row.resume.del }]" v-else>{{joinArr(scope.row.resume.job_name,'、')}}</h3>
+												<p :class="['salary',{'noFit':scope.row.state == 2 || (currPage == 2 && scope.row.delivery && scope.row.remark && scope.row.remark.remark_type && scope.row.remark.remark_type == 5 ) ||  scope.row.resume.del}]">{{scope.row.resume && scope.row.resume.nature_name ? scope.row.resume.nature_name : '全职'}}/期望薪资：<b>{{salaryChange(scope.row.resume)}}</b></p>
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column prop="post" label="优势" min-width="300" v-if="currPage == 1" >
+										<template slot-scope="scope" >
+											<p class="textCon" >{{scope.row.resume.advantage}}</p>
+										</template>
+									</el-table-column>
+									<template v-else-if="currPage == 0 && currTab != 3">
+										<el-table-column prop="date" label="投递时间" min-width="120">
+											<template slot-scope="scope"> {{timeTrans(scope.row.date,4)}} </template>
+										</el-table-column>
+										<el-table-column prop="state" label="状态" min-width="120" header-align="center" align="center">
+											<template slot-scope="scope"> 
+												<span v-if="scope.row.resume.del" class="state2 postState">已失效</span>
+												<span v-else :class="'state'+scope.row.state+' postState'">{{scope.row.state == 0 ? '待处理' : scope.row.state == 2 ? '不合适' :'通过初筛'}}</span> 
+											</template>
+										</el-table-column>
+									</template>
+
+									<el-table-column prop="post" label="联系电话" min-width="300" v-if="currPage == 2 || (currPage == 0 && currTab == 3)" >
+										<template slot-scope="scope">
+											<div class="tel">
+												<s class="tel_icon"></s>
+												<span>{{scope.row.resume.phone}}</span>
+												<em :class="'mark'+scope.row.remark.remark_type" v-if="scope.row.remark && scope.row.remark.remark_type">({{checkRemark_type(scope.row.remark.remark_type)}}) </em>
+												<el-popover
+													@hide="editRemark.edit = false"
+													placement="top-start"
+													trigger="hover"
+													popper-class="popoverBox">
+													<div class="markContainer">
+														<div class="markBox" v-if="scope.row.remark.remark_invitation">
+															<div :class="{'showText':!editRemark.edit}">
+																<h4>面试备注 <em>{{timeTrans(scope.row.remark.remark_invitation_time,4)}}</em></h4>
+																<p>{{scope.row.remark.remark_invitation}}</p>
+																<div class="editBtns">
+																	<span class="edit_btn" @click.stop="editReamrk(scope, 1)"><s></s></span>
+																	<span class="del_btn"><s></s></span>
+																</div>
+																<div class="editBox" v-if="editRemark.edit && editRemark.type == 0">
+																	<el-input type="textarea" v-model="editRemark.remark" maxlength="50"
+																	show-word-limit></el-input>
+																	<div class="btns_group">
+																		<el-button class="cancel_btn gray" @click.stop="editRemark.edit = false;">取消</el-button>
+																		<el-button class="changeRemark_btn" type="primary" @click.stop="changeRemark">确定</el-button>
+																	</div>
+																</div>
+															</div>
+														</div>
+														<div class="markBox" v-if="scope.row.remark.remark_resume">
+															<div :class="{'showText':!editRemark.edit}" >
+																<h4>简历备注 <em>{{timeTrans(scope.row.remark.remark_resume_time,4)}}</em></h4>
+																<p>{{scope.row.remark.remark_resume}}</p>
+																<div class="editBtns">
+																	<span class="edit_btn" @click.stop="editReamrk(scope, 0)"><s></s></span>
+																	<span class="del_btn" @click.stop="editReamrk(scope, 0,1)"><s></s></span>
+																</div>
+																<div class="editBox" v-if="editRemark.edit && editRemark.type == 0">
+																	<el-input type="textarea" v-model="editRemark.remark" maxlength="50"
+																	show-word-limit></el-input>
+																	<div class="btns_group">
+																		<el-button class="cancel_btn gray" @click.stop="editRemark.edit = false;">取消</el-button>
+																		<el-button class="changeRemark_btn" type="primary" @click.stop="changeRemark(scope);">确定</el-button>
+																	</div>
+																</div>
+															</div>
+														</div>
+													</div>
+													<span class="mark" slot="reference">{{scope.row.remark.remark_resume}}</span>
+												</el-popover>
+											</div>
+										</template>
+									</el-table-column>
+
+									<el-table-column prop="download" label="下载简历" min-width="120" v-if="currPage != 2 && !(currPage == 0 && currTab == 3)" header-align="center" align="center">
+										<template slot-scope="scope">
+											<div class="btn_download" v-if="!scope.row.resume.del">
+												<el-button @click.stop="downloadResume(scope.row,scope.$index)" round size="medium" class="download" type="primary" v-if="!scope.row.download">下载简历</el-button>
+												<el-button  round size="medium" class="hasDown" type="info" v-else>已下载<div><i></i>{{scope.row.resume.phone}}</div></el-button>
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column prop="download" label="面试邀请" min-width="120" v-else header-align="center" align="center">
+										<template slot-scope="scope" v-if="scope.row.remark.remark_type != 5">
+											<el-button  round size="medium" class="download" type="primary" v-if="!scope.row.resume.remark || (scope.row.resume.remark && scope.row.resume.remark.remark_type != 1)" @click.stop="showInvitePop(scope)">邀请面试</el-button>
+											<el-button  round size="medium" class="hasDown" type="info" v-else>已约面<div>{{interviewTime(scope.row.interview_time||scope.row.resume.invitation_time)}}</div></el-button>
+										</template>
+									</el-table-column>
+									
+									<el-table-column prop="address" label="操作" width="278" header-align="center" :align="(currPage==2 || (currPage == 0 && currTab == 3))?'right':'center'" :label-class-name="(currPage== 2 || (currPage == 0 && currTab == 3))?'downloadTab':''">
+										<template slot-scope="scope">
+											<div class="btnbox" v-if="scope.row.resume.del">
+												<el-button type="text" slot="reference" size="small" v-if="currPage == 1" class="grey off" @click.stop="delCollectResume(scope)">删除</el-button>
+												<el-button type="text" slot="reference" size="small" v-else class="grey off" style="margin-left:10px;" @click.stop="delResume(scope)">删除</el-button>
+												<el-popover :ref="'opt_'+scope.row.id" popper-class="optPopover optGroupPopover" placement="bottom" width="170"
+													trigger="hover" v-if="currPage==2|| (currPage == 0 && currTab == 3)">
+													<div class="optbtnGroup">
+														<ul>
+															<li class="jubao" @click="jubaoResume(scope.row.rid)"><s></s>举报</li>
+														</ul>
+													</div>
+													<el-button slot="reference" type="text" size="small" class="btn_dot"> </el-button>
+												</el-popover>
+											</div>
+											<div class="btnbox" v-else-if="currPage == 0 && currTab != 3">
+												<div class="optBtns" v-if="scope.row.state == 0">
+													<el-button @click.stop="changeResumeState(scope,1)" type="text" size="small" class="btn_blue" v-if="scope.row.state == 0">通过初筛</el-button>
+													<el-popover 
+														popper-class="optPopover"
+														width="380"
+														:ref="scope.row.id"
+														trigger="click">
+														<div class="markContainerBox">
+															<h4 style="font-size:16px; margin-bottom:10px;">请选择拒绝原因<span>(将通知求职者)</span></h4>
+															<el-select placeholder="请选择拒绝原因" popper-class="selectBox" v-model="markSelect">
+																<el-option label="简历与职位匹配度不高" value="简历与职位匹配度不高"> </el-option>
+																<el-option label="职位已停止招聘" value="职位已停止招聘"> </el-option>
+															</el-select>
+															<div class="btns_group">
+																<el-button size="medium" @click.stop="hidePopover(scope.row.id)" class="gray">取消</el-button>
+																<el-button type="primary"  size="medium" @click.stop="refuseResume(scope,1);hidePopover(scope.row.id)">确定拒绝</el-button>
+															</div>
+														</div>
+														<el-button slot="reference" type="text" size="small" class="grey off" @click.stop="">不合适</el-button>
+													</el-popover>
+												</div>
+												<div class="btnbox" v-else-if="scope.row.state == 2">
+													<el-popconfirm title="确定要删除这份简历？" class="confirmTip" @confirm="delResume(scope)" >
+														<el-button type="text" slot="reference" size="small" class="grey off" @click.stop="">删除</el-button>
+													</el-popconfirm>
+												</div>
+												<div class="optBtns" v-else>
+													<el-button style="margin:0 10px;" type="text" slot="reference" size="small" class="grey off" @click.stop="changeResumeState(scope,0)" v-if="scope.row.state!=1||scope.row.download!=1">取消通过</el-button>
+													<el-popover
+														popper-class="optPopover"
+														width="380"
+														:ref="scope.row.id"
+														trigger="click">
+														<div class="markContainerBox">
+															<h4 style="font-size:16px; margin-bottom:10px;">请选择拒绝原因</h4>
+															<el-select placeholder="请选择拒绝原因" popper-class="selectBox" v-model="markSelect">
+																<el-option label="简历与职位匹配度不高" value="简历与职位匹配度不高"> </el-option>
+																<el-option label="职位已停止招聘" value="职位已停止招聘"> </el-option>
+															</el-select>
+															<div class="btns_group">
+																<el-button size="medium" @click.stop="hidePopover(scope.row.id)" class="gray">取消</el-button>
+																<el-button type="primary"  size="medium"  @click.stop="refuseResume(scope,1);hidePopover(scope.row.id)">确定拒绝</el-button>
+															</div>
+														</div>
+														<el-button slot="reference" type="text" size="small" class="grey off" @click.stop="">不合适</el-button>
+													</el-popover>
+													
+												</div>
+											</div>
+											<div class="btnbox" v-else-if="currPage == 1">
+												<el-popconfirm title="确定要取消收藏这份简历？" class="confirmTip" @confirm="delCollectResume(scope)">
+													<el-button type="text" slot="reference" size="small" class="grey off" @click.stop="">删除</el-button>
+												</el-popconfirm>
+											</div>
+											<div class="btnbox" v-else>
+												<div class="optBtns" v-if="!scope.row.remark.remark_type || (scope.row.remark.remark_type && scope.row.remark.remark_type != 5)">
+													<el-popover
+														:ref="'mark_'+scope.row.id"
+														popper-class="optPopover"
+														width="540"
+														trigger="click">
+														<div class="markContainerBox">
+															<h4 v-if="editRemark.onChose==1&&scope.row.resume.remark && scope.row.resume.remark.remark_type != 1" class="addInvite">
+																添加面试信息
+																<s>
+																	<div>
+																		<span>面试通知注意：</span>请使用电话、短信等确认求职者收到面试通知，线上信息可能存在通知不到位
+																	</div>
+																</s>
+															</h4>
+															<h4 v-else-if='editRemark.onChose != 5 || (scope.row.delivery != 1&&scope.row.deliveryCount != 1)'>添加标注(仅自己可见)</h4>
+															<h4 v-else>请选择原因 <span>(将通知求职者)</span></h4>
+															<div class="labs">
+																<!-- ||(currPage!=2 && !(currPage == 0 && currTab == 3)) -->
+																<span :class="'lab lab'+item.value +' ' + (editRemark.onChose == item.value ? 'on_chose' : '') " v-for="(item,index) in communication" v-if="(scope.row.resume.remark && scope.row.resume.remark.remark_type != 1 || index <= 2 ) " @click.stop="editRemark.onChose = item.value;">{{item.label}}</span>
+															</div>
+															<div v-if="editRemark.onChose==1&&scope.row.resume.remark && scope.row.resume.remark.remark_type != 1">
+																<div class="sendInvite" @click="showInvitePop(scope)">
+																	<div>
+																		<i></i>线上发送面试信息后，标记为已约面
+																	</div>
+																	<span>立即发送></span>
+																</div>
+																<div class="addTip" @click="addTip=true;editRemark.onChose=0"><i class="el-icon-plus"></i>添加备注（仅自己可见）</div>
+															</div>
+															<div class="textarea" v-if='(editRemark.onChose != 5 || (scope.row.deliveryCount != 1&&scope.row.delivery!=1))&&editRemark.onChose != 1'>
+																<el-input type="textarea" v-model="markText" placeholder="添加备注，最多50个字" maxlength="50" resize="none" show-word-limit rows="3"></el-input>
+															</div>
+															<el-select placeholder="请选择拒绝原因" popper-class="selectBox" v-model="markSelect" v-if="(scope.row.deliveryCount == 1||scope.row.delivery==1)&&editRemark.onChose==5">
+																<el-option label="简历与职位匹配度不高" value="简历与职位匹配度不高"> </el-option>
+																<el-option label="职位已停止招聘" value="职位已停止招聘"> </el-option>
+															</el-select>
+															<div class="btns_group">
+																<el-button size="medium" @click.stop="hidePopover('mark_'+scope.row.id)" class="gray">取消</el-button>
+																<el-button type="primary"  size="medium" @click.stop="changeResumeProgress(scope,editRemark.onChose);hidePopover('mark_'+scope.row.id)">确定</el-button>
+															</div>
+														</div>
+														<el-button slot="reference" type="text" size="small" :class="'btn_blue '+scope.row.id" @click.stop=" showPopover(scope)">标注</el-button>
+													</el-popover>
+													<el-popover
+														popper-class="optPopover"
+														width="540"
+														v-if="scope.row.delivery"
+														:ref="scope.row.id"
+														trigger="click">
+														<div class="markContainerBox">
+															<h4>请选择原因 <span>(将通知求职者)</span></h4>
+															<el-select placeholder="请选择拒绝原因" popper-class="selectBox" v-model="markSelect">
+																<el-option label="简历与职位匹配度不高" value="简历与职位匹配度不高"> </el-option>
+																<el-option label="职位已停止招聘" value="职位已停止招聘"> </el-option>
+															</el-select>
+															<div class="btns_group">
+																<el-button size="medium" @click.stop="hidePopover(scope.row.id)" class="gray">取消</el-button>
+																<el-button type="primary"  size="medium" @click.stop="changeResumeProgress(scope,5,1);hidePopover(scope.row.id)">确定拒绝</el-button>
+															</div>
+														</div>
+														<el-button slot="reference" style="margin:0 10px;" type="text" size="small" class="grey off" @click.stop="">不合适</el-button>
+													</el-popover>
+													<el-popconfirm v-else title="确定要将这份简历设置成不合适？" class="confirmTip2" @confirm="changeResumeProgress(scope,5,1)" >
+														<el-button type="text" slot="reference" size="small" class="grey off" @click.stop="">不合适</el-button>
+													</el-popconfirm>
+
+													<el-popover
+														:ref="'opt_'+scope.row.id"
+														popper-class="optPopover optGroupPopover"
+														placement="bottom"
+														width="170"
+														trigger="hover">
+														<div class="optbtnGroup">
+															<ul>
+																<li class="download" @click="saveResume(scope.row.rid,1)"><s></s>保存至本地</li>
+																<li class="sendEmail" @click="saveResume(scope.row.rid)"><s></s>发送至邮箱</li>
+																<li class="jubao" @click="jubaoResume(scope.row.rid)"><s></s>举报</li>
+															</ul>
+														</div>
+														<el-button slot="reference" type="text" size="small" class="btn_dot" @click.stop="" > </el-button>
+													</el-popover>
+												</div>
+												<div class="optBtns" v-else>
+													<el-button style="margin:0 10px;" type="text" slot="reference" size="small" class="grey off" @click.stop="changeResumeProgress(scope,0,0)"  v-if="!scope.row.delivery">取消不合适</el-button>
+													<el-popconfirm title="确定要删除这份简历？" class="confirmTip"  @confirm="delResume(scope)">
+														<el-button style="margin:0 10px;" type="text" slot="reference" size="small" class="grey off" @click.stop="">删除</el-button>
+													</el-popconfirm>
+
+													<el-popover
+														:ref="'opt_'+scope.row.id"
+														popper-class="optPopover optGroupPopover"
+														placement="bottom"
+														width="170"
+														trigger="hover">
+														<div class="optbtnGroup">
+															<ul>
+																<li class="download" @click="saveResume(scope.row.rid,1)"><s></s>保存至本地</li>
+																<li class="sendEmail" @click="saveResume(scope.row.rid)"><s></s>发送至邮箱</li>
+																<li class="jubao" @click="jubaoResume(scope.row.rid)"><s></s>举报</li>
+															</ul>
+														</div>
+														<el-button slot="reference" type="text" size="small" class="btn_dot" > </el-button>
+													</el-popover>
+												</div>
+											</div>
+										</template>
+									</el-table-column>
+
+									<template slot="empty" >
+										<div class="noData" v-if="!isload && !tableData.length">
+											<img src="{#$templets_skin#}images/noData_resume.png" alt="">
+											<p v-if="currPage == 0">暂未接收到简历</p>
+											<p v-else>暂未{{currPage === 1 ? "收藏" :"下载"}}相关简历，立即前往<a href="{#$cfg_basehost#}/supplier/job/personList.html" class="link">人才库</a></p>
+										</div>
+										<p v-else>加载中</p>
+									</template>
+								</el-table>
+							</template>
+							<div class="tableBottom fn-clear">
+								<div class="lOptBox">
+									<el-checkbox label="全选" @change="selectAll()" :value="optbultArr.length !== tableData.length ? false : true" :disabled="tableData.length==0?true:false"></el-checkbox>
+									<el-button round size="small" @click="changeResumeState()" v-if="currPage == 0" :class="passbtn_disabled||optbultArr.length==0? 'disables_btn' : ''" :disabled="optbultArr.length==0?true:false">批量通过</el-button>
+									<el-button round size="small" @click="saveResumeToLocal()" v-if="currPage == 2" :disabled="optbultArr.length==0?true:false" :class="optbultArr.length==0? 'disables_btn' : ''">批量存至本地</el-button>
+									<el-button round size="small" @click="sendResumeToEmail()" v-if="currPage == 2" :disabled="optbultArr.length==0?true:false" :class="optbultArr.length==0? 'disables_btn' : ''">批量发送至邮箱</el-button>
+									<el-button round size="small" @click="confirmDelPost()" :class="delbtn_disabled||optbultArr.length==0 ? 'disables_btn' : ''" :disabled="optbultArr.length==0?true:false">批量删除</el-button>
+								</div>
+								<div class="pageBox">
+									<el-pagination
+									:hide-on-single-page="true"
+									background
+									layout="prev, pager, next"
+									:page-size="20"
+									prev-text="上一页"
+									next-text="下一页"
+									@current-change="changePage"
+									:total="totalCount">
+									</el-pagination>
+								</div>
+							</div>
+						</div>
+					</div>
+					
+				</div>
+            </div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+		<div>{#$cfg_statisticscode#}</div>
+	</body>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.dialog-4.2.0.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/echarts/echarts.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/resumeManage.js?v={#$cfg_staticVersion#}"></script>
+</html>

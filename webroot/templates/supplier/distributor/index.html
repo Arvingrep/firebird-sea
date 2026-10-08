@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>加载中...</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+</head>
+
+<body></body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+    let member_userDomain = "{#$member_userDomain#}";
+    let masterDomain = '{#$cfg_basehost#}';
+    let selfIdentity = localStorage.getItem('house_identity');
+    let getMyData = async () => {
+        let data = {
+            service: 'house',
+            action: 'route',
+            route: 'distributor/getNowCompanyUser'
+        }
+        let result = await request.post(data);
+        if (result.data.state == 100) {
+            let info = result.data.info;
+            if (info.status == 2) { //被禁
+                alert("此身份已被禁用！");
+                location.href = masterDomain;
+            } else if (typeof selfIdentity != undefined) {
+                if (selfIdentity == 1) { //经纪人
+                    location.href = `${masterDomain}/supplier/distributor/clientManage`; //客源管理
+                } else { //店长
+                    location.href = `${masterDomain}/supplier/distributor/companyInfo`; //公司信息
+                }
+            } else if (info.storeMaster == 1) { //店长
+                location.href = `${masterDomain}/supplier/distributor/companyInfo`; //公司信息
+            } else { //经纪人
+                location.href = `${masterDomain}/supplier/distributor/clientManage`; //客源管理
+            }
+        } else { //没有经纪人身份或者数据获取失败
+            alert(result.data.info);
+            location.href = `${member_userDomain}/enter_house`;
+        }
+    }
+    getMyData();
+</script>
+
+</html>

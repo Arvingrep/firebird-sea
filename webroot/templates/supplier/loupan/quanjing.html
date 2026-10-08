@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+	<title>全景看房</title>
+	<meta name="keywords" content="{#$cfg_keywords#}">
+	<meta name="description" content="{#$cfg_description#}">
+	<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+	<!-- <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}"> -->
+	<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$templets_skin#}css/albums.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}',
+			staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = '{#$cfg_hideUrl#}';
+		var cookiePre = '{#$cfg_cookiePre#}',
+			cfg_clihost = '{#$cfg_clihost#}';
+		var templets = '{#$templets_skin#}';
+
+		var currid = 4;
+		var uptype = 0; //上传视频类型  本地还是url
+
+		var atpage = 1, totalCount = 20, pageSize = 8;
+
+		var loupanid = '{#$loupanid#}';
+
+	</script>
+	<style type="texts">
+		#filePicker2{display: block !important;}
+	</style>
+</head>
+
+<body class="w1200">
+	<div id="page">
+		<!-- 头部 -->
+		{#include file="top.html"#}
+		<div class="conbox">
+			{#include file="left.html"#}
+			<!-- 右侧 -->
+			<div class="right_box">
+				<div class="rConBox">
+					<h3>全景看房</h3>
+					<div class="ListContainer">
+
+						<div class="listbox">
+							<ul class="video_ul quanjing_ul fn-clear" v-cloak >
+								<li class="upvideo" @click="showPop('.pop_videos','add')">
+										<s></s>
+										<p>上传全景</p>
+								</li>
+
+								<li class="video" v-for="(quanjing,i) in quanjingList">
+									<div class="vimg">
+										<s></s>
+										<img :src="quanjing.litpicpath" alt="">
+									</div>
+									<div class="vinfo">
+										<h5>{{quanjing.title}}</h5>
+										<p>{{quanjing.pubdate}}上传</p>
+									</div>
+									<div class="opt_btn">
+										<div class="opbox">
+											<a href="javascipt:;" class="edit_btn" @click="showPop('.pop_videos','edit',i,quanjingList)"><s></s>编辑全景</a>
+											<a href="javascipt:;" class="del_btn" @click="del_quanjing(quanjing.id,i)"><s></s>删除</a>
+										</div>
+									</div>
+								</li>
+							</ul>
+						</div>
+							<div class="pagination fn-clear"></div>
+					</div>
+				</div>
+			</div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 弹窗 -->
+		<div class="pop_mask" @click="close_pop"></div>
+
+		<!-- 全景弹窗 -->
+		<div :class="['Popbox pop_videos pop_quanjing',{'localVR':!videotype}]"  v-cloak>
+			<a href="javascript:;" class="close_pop" @click="close_pop"></a>
+			<h2>上传全景</h2>
+			<form action="" class="formbox">
+				<input type="hidden" name="aid" :value="editArr.id">
+				<div class="videoinp">
+					<label for="title"><em>*</em>全景标题</label>
+					<div class="inp">
+						<p class="err_tip">请输入全景标题</p>
+						<input type="text" name="title" :value="editArr.title" placeholder="请输入全景标题">
+					</div>
+				</div>
+				<div class="videoinp">
+					<label for="title"><em>*</em>全景缩略图</label>
+					<div class="inp_div img_upload listImgBox">
+						<input type="hidden" name="litpic" :value="editArr.litpic" class="imglist-hidden" placeholder="请上传楼盘图片"/>
+						<div class="imgbox">
+							<div :class="['upload_btn filePicker uploadinp',{'hide':editArr.litpic}]" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist="">
+								<s></s>
+								<p>上传图片</p>
+							</div>
+							<div class="imgShow">
+								<ul id="listSection1" class="listSection thumblist">
+									<li v-if="editArr.litpic" id="WU_FILE_aaaa" class="pubitem">
+										<img :src="editArr.litpicpath" :data-val="editArr.litpic" :data-url="editArr.litpicpath">
+										<a class="reupload li-rm" href="javascript:;">重新上传</a>
+									</li>
+								</ul>
+								<!-- <div class="reupload">重新上传</div> -->
+							</div>
+						</div>
+						<p class="tip">全景封面图片，推荐尺寸500像素*360像素</p>
+					</div>
+				</div>
+
+				<div class="videoinp qjimglist">
+					<label for="title"><em>*</em>全景类型</label>
+					<div class="inp_div radiobox">
+						<ul >
+							<li :class="{'chose':videotype==0}"  @click="videotype = 0">
+								 <input type="radio" name="qjtype" value="0" :checked="videotype==0"><s></s>图片
+							</li>
+							<li :class="{'chose':videotype==2}"  @click="videotype = 2">
+								 <input type="radio" name="qjtype" value="2" :checked="videotype==2"><s></s>Url
+							</li>
+						</ul>
+					</div>
+				</div>
+
+				<div class="videoinp" v-show="videotype==2">
+					<label for="title"><em>*</em>全景地址</label>
+					<div class="inp">
+						<input type="text" name="url" :value="editArr.file" placeholder="请填写远程地址链接">
+					</div>
+				</div>
+
+				<div v-show="videotype==0" class="videoinp fn-clear">
+					<label for="title"><em>*</em>上传图片</label>
+					<div class="inp_div img_upload  video_upload">
+<!--						<input type="hidden" name="imglist" class="imglist-hidden" :value="editArr.file" placeholder="请上传楼盘图片"/>-->
+						<div class="imgbox">
+							<div class="upload_btn filePicker uploadinp" id="filePicker2"  data-type="quanj"  data-count="6" data-size="{#$quanjingSize#}" data-imglist="" >
+								<s></s>
+								<p>上传图片</p>
+							</div>
+							<div class="vrShow">
+								<ul id="listSection2" class="listSection thumblist fn-clear">
+									<li class="pubitem fn-clear":id="'WU_FILE_HAS_'+i" v-for="(pic,i) in editArr.filearr">
+										<s class="chose"></s>
+										<a class="li-rm" href="javascript:;">×</a>
+										<div class="li-thumb" style="display: block;" >
+											<img :data-val="pic.path" :src="pic.picpath" :data-url="+pic.picpath">
+										</div>
+									</li>
+								</ul>
+								<ul class="bg">
+									<li><span>前</span></li>
+									<li><span>右</span></li>
+									<li><span>后</span></li>
+									<li><span>左</span></li>
+									<li><span>顶</span></li>
+									<li><span>底</span></li>
+								</ul>
+							</div>
+						</div>
+					</div>
+				</div>
+
+
+
+				<a href="javascript:;" class="submit" @click="add_quanjing()">确认提交</a>
+			</form>
+		</div>
+
+
+
+		<!-- 加载中 -->
+		<div class="loading" v-show="loading"><s></s></div>
+	</div>
+	<div>{#$cfg_statisticscode#}</div>
+</body>
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/publicUpload_v2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/webuploader/webuploader.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/albums.js?v={#$cfg_staticVersion#}"></script>
+</html>

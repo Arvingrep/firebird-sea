@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<title>{#$langData['siteConfig'][0][7]#} - {#$cfg_webname#}</title>{#* 会员中心  *#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+</head>
+<body>
+<p style="margin:50px 0;text-align:center;color:#666;font-size:14px;">{#$langData['siteConfig'][32][59]#}···</p>{#* 正在进入会员中心，请稍后···  *#}
+<script>
+  var masterDomain = '{#$cfg_basehost#}', cookiePre = '{#$cfg_cookiePre#}', staticPath = '{#$cfg_staticPath#}';
+  var changeUser = {#$changeUser|default:0#};
+  var errorUrl = '{#$errorUrl#}', succUrl = '{#$succUrl#}';
+
+  var host = window.location.host;
+  var host_ = host.split('.');
+  var len = host_.length;
+  var domain = '', start = len > 2 ? len - 2 : 0;
+  for(var i = start; i < len; i++){
+    domain += '.' + host_[i];
+  }
+
+  if(changeUser){
+    $.cookie(cookiePre+'login_user', null, {expires: -10, domain: host, path: '/'});
+    $.cookie(cookiePre+'login_user', null, {expires: -10, domain: domain, path: '/'});
+  }
+
+  //单点登录执行脚本
+  function ssoLogin(info){
+    //已登录
+    if(info){
+
+      $.cookie(cookiePre+'login_user', info['userid_encode'], {expires: 365, domain: host, path: '/'});
+      $.cookie(cookiePre+'login_user', info['userid_encode'], {expires: 365, domain: domain, path: '/'});
+
+      if(succUrl){
+        location.href = succUrl;
+      }else{
+        location.reload();
+      }
+
+    //未登录
+    }else{
+
+      $.cookie(cookiePre+'login_user', null, {expires: -10, domain: host, path: '/'});
+      $.cookie(cookiePre+'login_user', null, {expires: -10, domain: domain, path: '/'});
+      location.href = errorUrl ? errorUrl : masterDomain;
+
+    }
+
+  }
+  //多域名同步登录
+  var masterDomainClean = typeof masterDomain != 'undefined' ? masterDomain.replace("http://", "").replace("https://", "") : "",
+      channelDomainClean = typeof channelDomain != 'undefined' ? channelDomain.replace("http://", "").replace("https://", "") : window.location.host;
+  if(masterDomainClean != "" && channelDomainClean != "" && channelDomainClean.indexOf(masterDomainClean) == -1){
+    channelDomainClean = channelDomainClean.split("/")[0];
+    $("body").append('<iframe src="'+masterDomain+'/sso.html?site='+channelDomainClean+'" style="display:none;"></iframe>');
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{#$title#}</title>
+<meta name="apptitle" content="{#$title#}">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$cfg_basehost#}/templates/member/touch/css/public-pay.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script type="text/javascript">
+	var staticPath = "{#$cfg_staticPath#}";
+	var app_platform = '{#$app_platform#}';
+</script>
+</head>
+<body>
+<div class="container">
+	<div class="header">
+		<div class="header-l"><a href="{#$backUrl#}"><img src="{#$cfg_basehost#}/templates/member/touch/images/header_back.png"></a></div>
+		<div class="header-address">{#$title#}</div>
+	</div>
+	<form action="{#$cfg_basehost#}/include/ajax.php" method="get" id="payform">
+		<input type="hidden" name="service" id="service" value="{#$service#}" />
+		<input type="hidden" name="action" id="action" value="{#if $service =='awardlegou' && $paytuikuanlogtic ==1#}logticpay{#else#}pay{#/if#}" />
+		<input type="hidden" name="ordernum" id="ordernum" value="{#$ordernum#}" />
+		<input type="hidden" name="peerpay" id="peerpay" value="{#$peerpay#}" />
+		<!-- <input type="hidden" name="videotype" id="videotype" value="{#$videotype#}" /> -->
+		{#if $service =='awardlegou'#}
+		<input type="hidden" name="paytuikuanlogtic" id="paytuikuanlogtic" value="{#$paytuikuanlogtic#}" />
+		{#/if#}
+		{#$paramsHtml#}
+		<div class="order-info">
+			<div class="order-info-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/shop.png"></div>
+			<div class="order-info-txt">
+				<h3><span class="mprice">{#echoCurrency type='symbol'#}{#$totalAmount#}</span></h3>
+				{#if $ordernum#}
+				<p><a href="{#if $service != 'circle' && $service != 'member'#}{#if $orderurl#}{#$orderurl#}{#else#}{#getUrlPath service='member' type='user' template='order' action={#$service#}#}{#/if#}{#else#}javascript:;{#/if#}"  data-temp="order" data-module="mcenter" data-param="mod={#$service#}" >{#$langData['siteConfig'][19][308]#}：{#$ordernum#}</a></p>
+				{#else#}
+				<p><a href="javascript:;">{#$orderTitle#}</a></p>
+				{#/if#}
+			</div>
+		</div>
+		{#if $service == 'integral'#}
+		<div class="points">
+			<label>
+				<span>{#$langData['siteConfig'][19][362]#}{#$cfg_pointName#}</span>   {#* 使用  *#}
+				<em>{#$langData['siteConfig'][19][731]#}：{#$userinfo.point#}</em>   {#* 总积分  *#}
+				<input type="checkbox" name="usePoint" id="usePoint" value="1">
+				<span class="checkbox-icon"></span>
+			</label>
+		</div>
+		<div class="balancePwd">
+			<input type="password" name="paypwd" id="paypwd" placeholder="{#$langData['siteConfig'][20][213]#}" /><input type="hidden" name="usePcount" id="usePcount" />   {#* 请输入支付密码  *#}
+		</div>
+		<div class="fogetpwd">
+			<a href="{#getUrlPath service='member' type='user' template='security-paypwdEdit'#}">{#$langData['siteConfig'][6][4]#}{#$langData['siteConfig'][5][7]#}</a>
+		</div>
+		{#/if#}
+		{#if $service != 'integral' && $userinfo.point > 0 && awardlegouc !== false  && $allowUsePoint!==false#}
+			{#if  $service == 'awardlegou' && $paytuikuanlogtic == 0 && $usepoint==0#}
+
+			{#else#}
+			<!-- <div class="points">
+				<label>
+					<span>{#$langData['siteConfig'][19][362]#}{#$cfg_pointName#}</span>   {#* 使用  *#}
+					<em>{#$userinfo.point#}</em>
+					<input type="checkbox" name="usePinput" id="usePoint" value="1">
+					<span class="checkbox-icon"></span>
+					<input type="hidden" name="point" id="usePcount" />
+				</label>
+			</div> -->
+			{#/if#}
+		{#/if#}
+		{#if $service != 'integral' && $userinfo.money > 0 && $allowUseMoney !== false#}
+		<div class="balance">
+			<label>
+				<span>{#$langData['siteConfig'][19][833]#}</span>
+				<em>{#echoCurrency type='symbol'#}{#$userinfo.money#}</em>
+				<input type="checkbox" name="useBalance" id="useBalance" value="1">
+				<span class="checkbox-icon"></span>
+			</label>
+		</div>
+		<div class="balancePwd"><input type="password" name="paypwd" id="paypwd" placeholder="{#$langData['siteConfig'][20][213]#}" /><input type="hidden" name="balance" id="useBcount" /></div>
+		<div class="fogetpwd">
+			<a href="{#getUrlPath service='member' type='user' template='security-paypwdEdit'#}">{#if $userinfo.paypwdCheck == 0#}{#$langData['siteConfig'][6][173]#}{#else#}{#$langData['siteConfig'][6][4]#}{#$langData['siteConfig'][5][7]#}{#/if#}</a>
+		</div>
+		{#/if#}
+		<div class="pay-check">
+			{#siteConfig action="payment"#}
+			{#if $row.pay_code == "devpay"#}
+			<div class="check-item" id="devpayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/devpay/devpay.png"></div>
+				<div class="check-item-txt"><h3>{#$row.pay_name#}</h3><p>{#$langData['siteConfig'][41][51]#}</p></div>  {#* 推荐智慧城市用户使用  *#}
+				<div class="check-item-right"><input type="radio" name="paytype" value="devpay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+			{#if $row.pay_code == "rfbp_icbc"#}
+			<div class="check-item" id="rfbp_icbcObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/rfbp_icbc/rfbp_icbc.png"></div>
+				<div class="check-item-txt"><h3>{#$row.pay_name#}</h3><p>聚合支付，支持微信、支付宝。</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="rfbp_icbc"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+			{#if $row.pay_code == "baidumini"#}
+			<div class="check-item" id="baiduminiObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/baidumini/baidumini.png"></div>
+				<div class="check-item-txt"><h3>{#$row.pay_name#}</h3><p>支持度小满、微信、支付宝等</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="baidumini"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+			{#if $row.pay_code == "qqmini"#}
+			<div class="check-item" id="qqminiObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/wxpay.png"></div>
+				<div class="check-item-txt"><h3>微信支付</h3><p>{#$langData['siteConfig'][19][809]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="qqmini"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+			{#if $row.pay_code == "bytemini"#}
+			<div class="check-item" id="byteminiObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/bytemini/bytemini.png"></div>
+				<div class="check-item-txt"><h3>抖音支付</h3><p>支持微信、支付宝。</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="bytemini"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+
+			{#if $row.pay_code == "fomopay_wxpay"#}
+			<div class="check-item" id="fomopaywObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/wxpay.png"></div>
+				<div class="check-item-txt" style="line-height: .8rem;"><h3>{#$row.pay_name#}</h3></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="fomopay_wxpay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+			{#if $row.pay_code == "fomopay_paynow"#}
+			<div class="check-item" id="fomopaypObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/fomopay_paynow/images/fomopay_paynow.png"></div>
+				<div class="check-item-txt" style="line-height: .8rem;"><h3>{#$row.pay_name#}</h3></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="fomopay_paynow"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+
+			{#if $row.pay_code == "wxpay"#}
+			<div class="check-item" id="wxpayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/wxpay.png"></div>
+				<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][712]#}</h3><p>{#$langData['siteConfig'][19][809]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="wxpay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "globalalipay"#}
+			<div class="check-item" id="alipayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/alipay.png"></div>
+				<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][713]#}</h3><p>{#$langData['siteConfig'][19][810]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="globalalipay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "alipay"#}
+			<div class="check-item" id="alipayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/alipay.png"></div>
+				<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][713]#}</h3><p>{#$langData['siteConfig'][19][810]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="alipay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "paypal"#}
+			<div class="check-item" id="paypalObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/paypal.png"></div>
+				<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][714]#}</h3><p>{#$langData['siteConfig'][19][811]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="paypal"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "yabandpay_wxpay"#}
+			<div class="check-item" id="wxpayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/wxpay.png"></div>
+				<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][712]#}</h3><p>{#$langData['siteConfig'][19][809]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="yabandpay_wxpay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "yabandpay_alipay"#}
+			<div class="check-item" id="alipayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/alipay.png"></div>
+				<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][713]#}</h3><p>{#$langData['siteConfig'][19][810]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="yabandpay_alipay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "xorpay_wxpay"#}
+			<div class="check-item" id="wxpayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/wxpay.png"></div>
+				<div class="check-item-txt"><h3>{#$row.pay_name#}</h3><p>{#$langData['siteConfig'][19][809]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="xorpay_wxpay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "xorpay_alipay"#}
+			<div class="check-item" id="alipayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/alipay.png"></div>
+				<div class="check-item-txt"><h3>{#$row.pay_name#}</h3><p>{#$langData['siteConfig'][19][810]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="xorpay_alipay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "allinpay_wxpay"#}
+			<div class="check-item" id="wxpayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/wxpay.png"></div>
+				<div class="check-item-txt"><h3>{#$row.pay_name#}</h3><p>{#$langData['siteConfig'][19][809]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="allinpay_wxpay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#elseif $row.pay_code == "allinpay_alipay"#}
+			<div class="check-item" id="alipayObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/alipay.png"></div>
+				<div class="check-item-txt"><h3>{#$row.pay_name#}</h3><p>{#$langData['siteConfig'][19][810]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="allinpay_alipay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+			{#/siteConfig#}
+			{#if $service == 'shop' && $delivery#}
+			<div class="check-item" id="delivery">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/delivery.png"></div>
+				<div class="check-item-txt"><h3>{#$langData['shop'][5][80]#}</h3><p>{#$langData['shop'][5][80]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="delivery"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+			<div class="check-item fn-hide" id="moneyObj" style="padding:0;display:none !important;"><input type="radio" name="paytype" value="money"></div>
+			{#if $service == "waimai" && $ordertype == "waimai" && $delivery && $ordertype1 != 1 && !$peerpay#}
+			<div class="check-item" id="deliveryObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/delivery.png"></div>
+				<div class="check-item-txt"><h3>{#$langData['siteConfig'][16][51]#}</h3><p>{#$langData['siteConfig'][19][834]#}</p></div>
+				<div class="check-item-right"><input type="radio" name="paytype" value="delivery"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+
+			{#if $peerpayState && !$peerpay && $huodongtype!=3 && $huodongtype!=4#}
+			<div class="check-item" id="daiObj">
+				<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/daipay.png"></div>
+				<div class="check-item-txt"><h3>找人代付</h3><p>发送给好友帮忙付款</p></div>  {#*      *#}
+				<div class="check-item-right"><input type="radio" name="paytype" value="peerpay"><span class="checkbox-icon-round"></span></div>
+			</div>
+			{#/if#}
+
+
+		</div>
+		<div class="confirm"><a href="javascript:;" {#if $cfg_iosVirtualPaymentState#}class="iOS_miniprogram_nocash"{#/if#} id="payBtn">{#$langData['siteConfig'][6][42]#}<span>{#echoCurrency type='symbol'#}{#$totalAmount#}</span></a></div>
+
+		<div id="iframe-box" style="opacity: 0;"></div>
+	</form>
+</div>
+
+<script type="text/javascript">
+	var totalPoint = 0;
+	var masterDomain = "{#$cfg_basehost#}", totalAmount = {#$totalAmount#}, totalBalance = {#$userinfo.money|default:0#}, orderTotalAmount = {#$totalAmount#}, pointRatio = {#$cfg_pointRatio#}, pointName = '{#$cfg_pointName#}',service='{#$service#}',usepoint ='{#$usepoint#}',paytuikuanlogtic = '{#$paytuikuanlogtic#}';
+	if(service == 'awardlegou' &&usepoint !=0 && paytuikuanlogtic!=1){
+		totalPoint = {#$usepoint|default:0#};
+	}else{
+		totalPoint = {#$userinfo.point|default:0#}
+	}
+</script>
+
+{#if $peerpayState && !$peerpay#}
+<script type="text/javascript">
+	
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '我在{#$cfg_shortname#}下了订单，请帮我付个款吧~',
+        "title": '代付款申请',
+        "imgUrl": '{#$cfg_basehost#}/templates/member/touch/images/daipay.png',
+        "link": '{#getUrlPath service="member" type="user" template="daipay" param="module={#$service#}&ordernum={#$ordernum#}&peerpay=1"#}',
+    };
+
+    document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+{#/if#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script src="{#$cfg_basehost#}/templates/member/touch/js/public-pay.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

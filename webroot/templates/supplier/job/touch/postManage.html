@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>职位管理</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/postManage.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+    <script>
+        var hasConfig = {#if $job_cid#}true{#else#}false{#/if#}; //是否是第一次配置
+        var firstConfig = {#if $job_cid#}true{#else#}false{#/if#}; //是否是第一次配置
+        var cityid = '{#$siteCityInfo.cityid#}'
+        var memberDomain  = '{#$member_userDomain#}'
+        var masterDomain = '{#$cfg_basehost#}'
+        var tempSkin = '{#$templets_skin#}'
+        var currtab = {#$smarty.get.to|default:0#};
+        var job_channel = '{#getModuleConfig module='job' key='channelDomain'#}'
+
+        var package_job = '{#$company_package_job|default:0#}'; //增值包
+        var canJobs = '{#if $company_canJobs == -1#}999999{#else#}{#$company_canJobs#}{#/if#}'; //可以上架的职位
+        var canJobs_real = {#$company_canJobs|default:0#}
+        var combo_id = '{#$company_combo_id#}'; //套餐id
+        var combo_job = '{#if $company_combo_job == -1#}999999{#else#}{#$company_combo_job#}{#/if#}'; //套餐上架次数
+        var combo_job_real = {#$combo_job|default:0#}
+        var combo_enddate = '{#$company_combo_enddate#}'; //套餐到期时间
+        var pcount = '{#$company_pcount#}'
+        var topDays_fee = {#$customJob_top_fee|default:0#}; //置顶1天的钱
+        var upPost_fee = {#$customJob_fee|default:0#}; //上架一条职位的钱
+        <!-- var topAlldays = '{#$company_combo_top + $company_package_top#}'; //置顶剩余时长 -->
+        var topAlldays = '{#if $company_combo_top + $company_package_top > 0 #}{#$company_combo_top + $company_package_top#}{#else#}0{#/if#}'; //置顶剩余时长
+        var allRefreshDay = '{#$company_can_job_refresh + $company_package_refresh#}'; //刷新剩余次数
+        var tab = {#$smarty.get.tab|default:0#}
+    </script>
+</head>
+<body>
+    <div class="pageBox" id="page" v-cloak>
+        <!-- 定位在头部 -->
+        <div class="fixedTop">
+
+            <div class="header alignLeft">
+                <div class="header-l">
+                    <a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+                </div>
+                <div class="header-address" v-show="!searchShow">
+                    <span>职位管理</span>
+                </div>
+                <div class="header-search" @click="searchShow = true" v-show="!searchShow"><s></s></div>
+                <div class="searchBox" v-show="searchShow">
+                    <!-- @keyup="searchKeyResult" -->
+                    <input type="text" placeholder="请输入搜索关键字" v-model="keywords" @keyup="searchKeyResult" >
+                    <a href="javascript:;" class="clear_btn" v-show="keywords" @click="keywords = ''"></a>
+                </div>
+                <a href="javascript:;" class="hideSearch" @click="searchShow = false;initData()" v-show="searchShow && !miniprogram">取消</a>
+            </div>
+            <div class="tabBox">
+                <ul>
+                    <li v-for="item in tabs" @click="changeTab(item.id)" :class="{'on_chose' : item.id == currTab}">{{item.tit}}<em>{{item.num}}</em></li>
+                </ul>
+                <s></s>
+            </div>
+        </div>
+
+        <div :class="['listBox',{'loadPage':loading}]">
+            <ul>
+
+                <!-- 招聘中 -->
+                <template v-if="currTab === 1">
+                    <li class="list_item " v-for="(item,ind) in tableData" :data-next="item.refreshDetail.next && item.is_refreshing ? item.refreshDetail.next : '' ">
+                        <a :href="item.url " class="postInfo toMini" data-module="job" data-temp="job" :data-id="item.id">
+                            <div class="ptitle">
+                                <h2>{{item.title}}</h2>
+                                <div class="salary">{{item.show_salary}} {{item.dy_salary > 12 ? ' · ' + item.dy_salary + '薪' : ''}}</div>
+                            </div>
+                            <div class="pinfo">
+                                <div class="plab"><span v-if="item.experience">{{item.experience}}</span><em v-if="item.experience"></em><span v-if="item.educational">{{item.educational}}</span><em v-if="item.educational"></em><span v-if="item.nature">{{item.nature}}</span></div>
+                                <div class="paddr" v-if="item.job_addr_detail">{{item.job_addr_detail.addrName[0]}}</div>
+                            </div>
+                            <div class="pCountBox">
+                                <div class="pnum">
+                                    <h4>{{item.td}}</h4>
+                                    <p>投递量</p>
+                                </div>
+                                <div class="pnum">
+                                    <h4>{{item.click}}</h4>
+                                    <p>浏览量</p>
+                                </div>
+                                <div class="pnum">
+                                    <h4>{{item.collected}}</h4>
+                                    <p>被收藏</p>
+                                </div>
+                            </div>
+                            <p class="endTime">招聘截止：<span>{{item.long_valid ? '长期有效' : transTimes(item.valid,2).replace(/-/g,'.')}}</span></p>
+                        </a>
+    
+                        <!-- 刷新置顶显示 -->
+                        <div class="showFreshTop">
+                            <div class="topping tg_item" v-if="item.is_topping && item.toppingDetail.top_total" @click="showTgDetailPop(item,'top')">
+                                <label for="">职位置顶中</label>
+                                <div class="">置顶{{item.toppingDetail.top_total}}天，{{transTimes(item.toppingDetail.top_end,4).replace(/-/g,'/')}}结束</div>
+                            </div>
+                            <div class="fresh tg_item" v-if="item.is_refreshing && item.refreshDetail && (item.refreshDetail.next && item.refreshDetail.next > parseInt(new Date().valueOf() /1000))" @click="showTgDetailPop(item,'refresh')">
+                                <label for="">智能刷新中</label>
+                                <div class=""><span class="fshow">00:00:00</span>后刷新，{{transTimes(item.refreshDetail.end_date,2).replace(/-/g,'/')}} {{item.refreshDetail.limit_end ? item.refreshDetail.limit_end : '00:00'}}结束</div>
+                            </div>
+                    
+                        </div>
+    
+    
+                        <div class="btnsGroup">
+                            <div class="btn btn_tg {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}" @click="tuiguang(item)"><span>职位推广</span></div>
+                            <div class="btn btn_fresh {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}" @click="refreshPost(item)"><span>刷新</span></div>
+                            <div class="btn btn_share" @click="showSharePop(item)"><span>分享</span></div>
+                            <a :href="`{#getModuleConfig module='job' key='channelDomain'#}/talent?appFullScreen&type=${item.typeid}&nature=${item.natureid}&min_salary=${item.min_salary}&max_salary=${item.max_salary}&mianyi=${item.mianyi}&education=${item.educationalid}&experience=${item.experienceid}` " class="btn btn_pp"><span>匹配</span></a>
+                            <div class="btn btn_more" @click="showMenu">
+                                <span>更多</span>
+                                <div class="optBox">
+                                    <a :href="'{#$cfg_basehost#}/supplier/job/add_post.html?appFullScreen&id=' + item.id" class="btn btn_edit">编辑</a>
+                                    <div class="btn btn_off" @click="offPost(item)">下架</div>
+                                    <div class="btn btn_del" @click="delPost(item)">删除</div>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+
+                </template>
+
+                <!-- 待审核 -->
+                <template v-if="currTab === 0">
+
+                    <li class="list_item hasOff " v-for="item in tableData">
+                        <a :href="item.url" class="postInfo toMini" data-module="job" data-temp="job" :data-id="item.id">
+                            <div class="ptitle">
+                                <h2>{{item.title}}</h2>
+                                <div class="salary">{{item.show_salary}} {{item.dy_salary > 12 ? ' · ' + item.dy_salary + '薪' : ''}}</div>
+                            </div>
+                            <div class="pinfo">
+                                <div class="plab"><span>招{{item.number ? item.number : '若干'}}人</span><em></em><span v-if="item.nature">{{item.nature}}</span></div>
+                                <div class="paddr" v-if="item.job_addr_detail">{{item.job_addr_detail.addrName[0]}}</div>
+                            </div>
+                            <div class="pCountBox refuseMsg">
+                                <p class="endTime">招聘截止：<span>{{item.long_valid ? '长期有效' : transTimes(item.valid,2).replace(/-/g,'.')}}</span></p>
+                            </div>
+                        </a>
+                        <div class="btnsGroup">
+                            <a href="javascript:;" class="btn_del" @click="delPost(item)">删除</a>
+                            <div class="btns">
+                                <a href="javascript:;" class="off" @click="offPost(item,1)">取消上架</a>
+                                <a :href="'{#$cfg_basehost#}/supplier/job/add_post.html?appFullScreen&id=' + item.id" class="reOff">修改</a>
+                            </div>
+                        </div>
+                    </li>
+
+                </template>
+
+                <!-- 已下架 -->
+                <template v-if="currTab === 3">
+                    <li class="list_item hasOff" v-for="item in tableData">
+                        <a :href="item.url"  class="postInfo toMini" data-module="job" data-temp="job" :data-id="item.id">
+                            <div class="ptitle">
+                                <h2>{{item.title}}</h2>
+                                <div class="salary">{{item.show_salary}} {{item.dy_salary > 12 ? ' · ' + item.dy_salary + '薪' : ''}}</div>
+                            </div>
+                            <div class="pinfo">
+                                <div class="plab"><span v-if="item.experience">{{item.experience}}</span><em v-if="item.experience"></em><span v-if="item.educational">{{item.educational}}</span><em v-if="item.educational"></em><span v-if="item.nature">{{item.nature}}</span></div>
+                                <div class="paddr" v-if="item.job_addr_detail">{{item.job_addr_detail.addrName[0]}}</div>
+                            </div>
+                            <div class="pCountBox ">
+                                <div class="endTime">下架日期：<span>{{transTimes(item.offdate,2).replace(/-/g,'.')}}</span></div>
+                                <div class="updatetime">最后更新：{{transTimes(item.update_time,5).replace(/-/g,'.')}}</div>
+                                <div class="updatetime">招聘数据：<p><span>招聘人数<em>{{item.number}}</em></span><s></s><span>投递<em>{{item.td}}</em></span><s></s><span>浏览<em>{{item.click}}</em></span></p></div>
+                            </div>
+                        </a>
+                        <div class="btnsGroup">
+                            <a href="javascript:;" class="btn_del" @click="delPost(item)">删除</a>
+                            <div class="btns">
+                                <a :href="'{#$cfg_basehost#}/supplier/job/add_post.html?appFullScreen&id=' + item.id" class="btn_edit">编辑</a>
+                                <a href="javascript:;" class="reOff {#if $company_canJobs == 0 && $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" @click="upPost(item)">重新上架</a>
+                            </div>
+                        </div>
+                    </li>
+                </template>
+
+                <!-- 未通过 -->
+                <template v-if="currTab === 2">
+
+                    <li class="list_item hasOff hasRefuse" v-for="item in tableData">
+                        <a :href="item.url"  class="postInfo toMini" data-module="job" data-temp="job" :data-id="item.id">
+                            <div class="ptitle">
+                                <h2>{{item.title}}</h2>
+                                <div class="salary">{{item.show_salary}} {{item.dy_salary > 12 ? ' · ' + item.dy_salary + '薪' : ''}}</div>
+                            </div>
+                            <div class="pinfo">
+                                <div class="plab"><span>招{{item.number ? item.number : '若干'}}人</span><em></em><span v-if="item.nature">{{item.nature}}</span></div>
+                                <div class="paddr" v-if="item.job_addr_detail">{{item.job_addr_detail.addrName[0]}}</div>
+                            </div>
+                            <div class="pCountBox refuseMsg">
+                                <label class="refuse">拒绝理由:</label>
+                                <p>{{item.refuse_msg}}</p>
+                            </div>
+                        </a>
+                        <div class="btnsGroup">
+                            <div class="btns">
+                                <a href="javascript:;" class="btn_del" @click="delPost(item)">删除</a>
+                                <a :href="'{#$cfg_basehost#}/supplier/job/add_post.html?appFullScreen&id=' + item.id"  class="reOff ">修改</a>
+                            </div>
+                        </div>
+                    </li>
+                </template>
+
+            </ul>
+            <div class="nodata" v-if="!tableData.length && loadEnd">
+                <div class="noData_img"><img src="{#$templets_skin#}images/noData.png" alt=""></div>
+                <p >暂无相关职位</p>
+            </div>
+        </div>
+
+        <div class="bottomBox bottomFixed" v-show="currTab === 1">
+            <a href="javascript:;" class="refresh_btn {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}" @click="refreshAllPost">刷新全部<em>{{tabs[0].num}}</em></a>
+            <a class="add_btn" href="{#$cfg_basehost#}/supplier/job/add_post.html?appFullScreen" >新增职位</a>
+        </div>
+
+
+        <!-- 各类弹窗 -->
+
+        <div class="popContainerBox">
+
+            <!-- 推广弹窗 s-->
+            <div :class="['pop_mask',showType + '_mask']" v-show="showPop" @click="hidePop"></div>   
+            <div :class="['popBox tgPopBox',{'show':showPop && showType== 'tg'}]">
+                <div class="popHeader">
+                    <h2>选择职位推广方式</h2>
+                    <p>解锁更多人才曝光，快速提高招聘效率</p>
+                </div>
+
+                <!-- 置顶和刷新 -->
+                <div class="popCon">
+                    <ul class="tg_ul">
+                        <li class="toTop" @click="showPopDetail('top')">
+                            <div class="li_info">
+                                <h3>置顶</h3>
+                                <p>置顶职位强势曝光，抢占人才先机！</p>
+                            </div>
+                        </li>
+                        <li class="smartFresh" @click="showPopDetail('refresh')">
+                            <div class="li_info">
+                                <h3>智能刷新</h3>
+                                <p>自动刷新职位持续位于前列，稳定曝光！</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="popFoot">
+                    <a href="javascript:;" class="btn_cancel" @click="showPop = false; showType = ''">取消</a>
+                </div>
+            </div>
+            <!-- 推广弹窗 e-->
+
+
+            <!-- 推广详情 s   --> 
+            <div :class="['popBox tgDetailBox',{'show':showPop && showType== 'tgDetail'}]" >
+                <div class="popHeader">
+                    <h3>{{tgDetail.type === 'top' ? '职位置顶': '智能刷新'}}详情</h3>
+                    <a href="javascript:;" class="close_pop" @click="showPop = false;"></a>
+                </div>
+                <div class="popCon" v-if="tgDetail.detail.id">
+                    <dl v-if="tgDetail.type === 'refresh' && tgDetail.detail.refreshDetail && tgDetail.detail.refreshDetail.interval" >
+                        <dt>{{tgDetail.detail.title}}</dt>
+                        <dd>
+                            <label for="">刷新时间：</label>
+                            <p>{{transTimes(tgDetail.detail.refreshDetail.start_date,2).replace(/-/g,'/')}} - {{transTimes(tgDetail.detail.refreshDetail.end_date,2).replace(/-/g,'-')}}</p>
+                        </dd>
+                        <dd >
+                            <label for="">限制时段：</label>
+                            <p>{{tgDetail.detail.refreshDetail.limit_start}}-{{tgDetail.detail.refreshDetail.limit_end}}</p>
+                        </dd>
+                        <dd>
+                            <label for="">刷新间隔：</label>
+                            <p>{{(tgDetail.detail.refreshDetail.interval / 60) > 1 ?  parseInt(tgDetail.detail.refreshDetail.interval / 60) + '小时' : tgDetail.detail.refreshDetail.interval + '分钟'}}</p>
+                        </dd>
+                        <dd>
+                            <label for="">刷新进度：</label>
+                            <p>{{tgDetail.detail.refreshDetail.next > tgDetail.detail.refreshDetail.last ? '已刷新' : '待刷新'}}</p>
+                        </dd>
+                        <dd>
+                            <label for="">下次刷新：</label>
+                            <p class="freshNext">{{transTimes(tgDetail.detail.refreshDetail.next,4).replace(/-/g,'/')}}</p>
+                        </dd>
+                    </dl>
+                    <dl v-else>
+                        <dt>{{tgDetail.detail.title}}</dt>
+                        <dd>
+                            <label for="">置顶时长：</label>
+                            <p class="freshNext">{{tgDetail.detail.toppingDetail.top_total}}天</p>
+                        </dd>
+                        <dd>
+                            <label for="">开始时间：</label>
+                            <p>{{transTimes(tgDetail.detail.toppingDetail.top_start,5)}}</p>
+                        </dd>
+                        <dd>
+                            <label for="">结束时间：</label>
+                            <p>{{transTimes(tgDetail.detail.toppingDetail.top_end,5)}}</p>
+                        </dd>
+                        <dd v-if="tgDetail.detail.toppingDetail && tgDetail.detail.toppingDetail.no_top_zh && tgDetail.detail.toppingDetail.no_top_zh.length">
+                            <label for="">其他设置：</label>
+                            <p>{{tgDetail.detail.toppingDetail.no_top_zh.join('、')}}不置顶</p>
+                        </dd>
+                        
+                    </dl>
+                </div>
+                <div class="popFoot">
+                    <a href="javascript:;" class="btn_sure" @click="hidePop">好的</a>
+                </div>
+            </div>
+            <!-- 推广详情 e   --> 
+
+
+            <!-- 智能刷新 -->
+            <div :class="['popBox smartRefreshBox setTgBox',{'show':showPop && showType == 'refresh'}]">
+                <div class="popHeader">
+                    <h3>职位智能刷新<span>自动刷新，稳定曝光</span></h3>
+                </div>
+                <div class="popCon popForm">
+                    <h4>选择刷新间隔 <span v-if="allRefreshDay && payInfoObj && showType == 'refresh'">已选刷新<em>{{timeOff(payInfoObj.start_date_s,payInfoObj.end_date_s)}}</em>天（共计<em>{{payInfoObj.count}}</em>次）</span></h4>
+                    <ul class="interview fn-clear">
+                        <li v-for="(item,ind) in timesArr"  @click="refreshForm.interval = item.value; timeChoseInd = ind" :class="{'on_chose': timeChoseInd == ind}">{{item.unit}}</li>
+                        <li :class="['inp',{'on_chose':timeChoseInd == timesArr.length}]"><input  placeholder="自定义" v-model="interval_hour" type="number" oninput="value = value.replace(/[^\d]/g,''); " @focus="inputFocus = true;timeChoseInd = timesArr.length" @blur="inputFocus = false"><span style="flex-shrink: 0;">小时</span></li>
+                    </ul>
+                    <div class="inpBox flexBox">
+                        <label for="">设置日期</label>
+                        <div class="right_inp">
+                            <div class="inp"><input type="text" name="" placeholder="开始时间" readonly :value="refreshForm.start_date" @click="freshStartPop = true"></div>
+                            -
+                            <div class="inp"><input type="text" name="" placeholder="结束时间"  readonly :value="refreshForm.end_date" @click="freshEndPop = true"></div>
+                        </div>
+                    </div>
+                    <div class="inpBox flexBox timeArea">
+                        <label for="">设置限制时段</label>
+                        <div class="right_inp">
+                            <div class="inp"><input type="text" name="" readonly placeholder="默认全天24h" :value="(refreshForm.limit_start != '00:00' || refreshForm.limit_end != '24:00' ) ? refreshForm.limit_start + '-' + refreshForm.limit_end : ''" @click="timeLimitPop = true"></div>
+                        </div>
+                    </div>
+                    <div class="ptip" v-if="allRefreshDay">使用我的招聘资源：职位刷新剩余<em>{{allRefreshDay}}</em>次</div>
+                    <h4 v-else-if="payInfoObj && showType == 'refresh'"><span>已选刷新<em>{{timeOff(payInfoObj.start_date_s,payInfoObj.end_date_s)}}</em>天（共计<em>{{payInfoObj.count}}</em>次）</span></h4>
+                </div>
+                <div class="popFoot">
+                    <div class="btnsBox">
+                        <div class="priceCount" v-if="payInfoObj && payInfoObj.amount > 0">需支付<span>{#echoCurrency type="symbol"#}<b>{{(payInfoObj.amount).toString().split('.')[0]}}</b><b class="sm" v-if="payInfoObj && (payInfoObj.amount).toString().split('.').length > 1">.{{(payInfoObj.amount).toString().split('.')[1]}}</b></span></div>
+                        <a href="javascript:;" :class="['btn_submit ',{'disabled':!payInfoObj || payLoad}]" @click="showPayPop(5)">立即刷新</a>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 置顶 -->
+            <div :class="['popBox toTopBox setTgBox',{'show':showPop && showType == 'top'}]">
+                <div class="popHeader">
+                    <h3>职位置顶<span>极速提升曝光，锁定人才流量</span></h3>
+                </div>
+                <div class="popCon popForm">
+                    <h4>选择置顶时长</h4>
+                    <ul class="interview fn-clear" v-if="topAlldays">
+                        <li v-for="item in (topAlldays > 6 ? 6 : topAlldays)" :class="{'on_chose': item == toTopForm.top_date}" @click="toTopForm.top_date = item">{{item}}天</li>
+                        <li class="inp"><input type="number" oninput="value = value.replace(/[^\d]/g,''); " v-model="top_date" placeholder="自定义">天</li>
+                    </ul>
+
+                    <ul class="noleft interview fn-clear" v-else>
+                        <li v-for="item in 5" :class="{'on_chose': item == toTopForm.top_date && !selfDefineTop}" @click="toTopForm.top_date = item; selfDefineTop = false">
+                            <p>{{item}}天</p>
+                            <h4>{#echoCurrency type="symbol"#}<b>{{item * topDays_fee}}</b></h4>
+                        </li>
+                       
+                        <li @click="selfDefineTop = true" v-if="!selfDefineTop && !top_date">
+                            <p>自定义</p>
+                        </li>
+                        <li v-show="selfDefineTop" :class="{'on_chose':selfDefineTop}">
+                            <div class="inp"><input type="number" placeholder="请输入" oninput="value = value.replace(/[^\d]/g,''); " maxlength="3" pattern=[0-9]* ref="topDate" v-model="top_date">天</div>
+                            <h4>{#echoCurrency type="symbol"#}<b>{{top_date * topDays_fee}}</b></h4>
+                        </li>
+                    </ul>
+                   
+                    <div class="inpBox flexBox timeArea">
+                        <label for="">设置特定时间不置顶</label>
+                        <div class="right_inp" @click="noTopPop = true">
+                            <div class="inp"><input type="text" name=""  @focus="inputFocus = true" @blur="inputFocus = false" placeholder="选填" readonly :value="checkNoTop()" ></div>
+                        </div>
+                    </div>
+                    <div class="ptip" v-if="topAlldays > 0">使用我的招聘资源：职位置顶剩余<em>{{topAlldays}}</em>天</div>
+                </div>
+                <div class="popFoot">
+                    <div class="btnsBox">
+                        <div class="priceCount" v-show="toTopForm.amount && topAlldays > 0 ">需支付<span>{#echoCurrency type="symbol"#}<b>{{toTopForm.amount.toString().split('.')[0]}}</b><b class="sm" v-if="toTopForm.amount.toString().split('.').length > 1">.{{toTopForm.amount.toString().split('.')[1]}}</b></span></div>
+                        <a href="javascript:;" class="btn_submit"  @click="showPayPop(4)">立即置顶</a>
+                    </div>
+                </div>
+            </div>
+
+           
+
+
+            
+            <!-- 时间选择器 -->
+            <div class="pop_mask pickerMask" v-show="freshStartPop || freshEndPop || timeLimitPop"></div>
+            <div :class="['pickerPop popBox',{'show':freshStartPop}]">
+                <van-datetime-picker
+                    show-toolbar
+                    v-model="start_date"
+                    title="设置开始时间"
+                    visible-item-count="5"
+                    type="date"
+                    :min-date="start_minDate"
+                    @confirm="confirmDate('start')"
+                    @cancel="freshStartPop = false"
+                ></van-datetime-picker>
+            </div>
+            <div :class="['pickerPop popBox',{'show':freshEndPop}]">
+                <van-datetime-picker
+                    show-toolbar
+                    v-model="end_date"
+                    title="设置结束时间"
+                    visible-item-count="5"
+                    type="date"
+                    @cancel="freshEndPop = false"
+                    :min-date="end_minDate"
+                    @confirm="confirmDate('end')"
+                ></van-datetime-picker>
+            </div>
+
+            <div :class="['pickerPop popBox ',{'show':timeLimitPop}]">
+                <div class="popHeader">
+                    <div class="flexBox">
+                        <a href="javascript:;" class="cancel_btn" @click="noLimit">不限制</a>
+                        <h4>限制时段</h4>
+                        <a href="javascript:;" class="sure_btn" @click="confirmTime">确定</a>
+                    </div>
+                    <div class="tip">每天仅在此时段内自动刷新，可避开休息时间</div>
+                </div>
+                <div class="popCon flexBox">
+                    <van-datetime-picker
+                    :show-toolbar="false"
+                    v-model="limit_start"
+                    :filter="timeFilter"
+                    visible-item-count="5"
+                    type="time"
+                    ></van-datetime-picker>
+                    <span class="line">-</span>
+                    <van-datetime-picker
+                    :show-toolbar="false"
+                    v-model="limit_end"
+                    visible-item-count="5"
+                    :filter="timeFilter"
+                    type="time"
+                    ></van-datetime-picker>
+                </div>
+            </div>
+            
+
+            <!-- 智能刷新 -->
+            <div class="pop_mask" v-show="refreshPop" style="z-index: 10;"></div>
+            <div :class="['smartFreshConfirm',{'showPop':refreshPop && refreshPopType === 2}]">
+                <a href="javascript:;" class="close_pop" @click="refreshPop = false;"></a>
+                <h3>今日职位刷新次数(<span>{{allRefreshDay}}</span>/{{allRefreshDay}})已用光</h3>
+                <p>试试智能刷新，自动更新职位稳定曝光！</p>
+                <div class="btnsGroup">
+                    <a href="javascript:;" class="showFreshPop" @click="showPop = true;  showType = 'refresh'">智能定时刷新</a>
+                    <a href="javascript:;" class="freshNow" @click="directRefresh()">普通刷新</a>
+                </div>
+            </div>
+
+            <!-- 普通刷新 -->
+            <div :class="['freshConfirm smartFreshConfirm',{'showPop':refreshPop && refreshPopType === 1}]">
+                <a href="javascript:;" class="close_pop" @click="refreshPop = false;"></a>
+                <h3><span>智能刷新</span>生效中，仍要立即刷新简历吗？</h3>
+                <p v-if="refreshItem.refreshDetail && refreshItem.refreshDetail.next">下次自动刷新时间：<em>{{timeStrToDate(refreshItem.refreshDetail.next)}}</em></p>
+                <a href="javascript:;" class="freshNow" @click="directRefresh()">普通刷新</a>
+            </div>
+
+            <!-- 全部刷新 部分成功 -->
+            <div :class="['freshSuccessPop partSuccessPop',{'showPop':refreshPop && refreshPopType === 3}]">
+                <a href="javascript:;" class="close_pop" @click="refreshPop = false;"></a>
+                <h3>{{freshSuccess}}条职位刷新成功！</h3>
+                <p><span>刷新次数不足，</span>已自动刷新最新的{{freshSuccess}}条职位</p>
+                <div class="btsBox">
+                    <p class="tip">*您可明日再刷新，或购买增值包</p>
+                    <a href="javascript:;" class="btns_buy" @click="showPackagePop">
+                        <h5>购买增值包</h5>
+                        <p>立即生效，刷新无限制！</p>
+                    </a>
+                </div>
+            </div>
+
+
+            <!-- 职位上架包 -->
+            <div class="pop_mask pickerMask" v-show="showUpPostPop" @click="showUpPostPop = false;"></div>
+            <div :class="['packageBoxPop upPostPackagePop',{'showPop':showUpPostPop}] ">
+                <div class="popHeader">
+                    <div class="swicthBox">
+                        <h4 :class="{'on_chose':!packageBuy}" @click="packageBuy = 0"><span>升级职位数</span></h4>
+                        <h4  :class="{'on_chose':packageBuy}"  @click="packageBuy = 1"><span>职位增值包</span></h4>
+                    </div>
+                </div>
+                <div class="popCon">
+                    <div class="switchCon directUpCon" v-show="!packageBuy">
+                        <p>购买的职位数有效期：跟随当前套餐({{combo_enddate == -1 ? '永久有效' : transTimes(combo_enddate,2).replace(/-/g,'/')}})</p>
+                        <div class="upPostItem">
+                            <p>增加上架1个职位</p>
+                            <h4>{{upPostItem.title}}</h4>
+                            <div class="price">{#echoCurrency type="symbol"#}<b>{#$customJob_fee|default:0#}</b></div>
+                        </div>
+                        <div class="validShow" @click="showPop = true; showType = 'valid'">
+                            <label for="">请设置该招聘截止时间</label>
+                            <span class="inp"><input type="text" readonly placeholder="请选择" :value="long_valid ? '长期有效' : (upPost_valid ? transTimes(upPost_valid,2) : '')" /> </span>
+                        </div>
+                        <div class="bottomBtns">
+                            <a href="javascript:;" :class="['btn_submit', {'disabled':!long_valid && !upPost_valid }]" @click="directBuy">{{!long_valid && !upPost_valid ? '请选择截止时间':'支付并上架'}}</a>
+                        </div>
+                    </div>
+
+                    <div class="switchCon packageCon" v-show="packageBuy">
+                        <p>购买的职位数有效期：跟随当前套餐({{combo_enddate == -1 ? '永久有效' : transTimes(combo_enddate,2).replace(/-/g,'/')}})</p>
+                        <div class="itemWrap">
+                            <ul class="itemUl fn-clear">
+                                {#loop service='job' action='packageList' type="2" pageSize='100' page='1' return='item'#}
+                                <li :class="{'on_chose' : chosePopular && chosePopular.id == '{#$item.id#}'}" @click='choseCurrItem()' data-price="{#$item.price#}" data-id="{#$item.id#}" data-type="{#$item.type#}" data-refresh="{#$item.refresh#}" data-resume="{#$item.resume#}" data-top="{#$item.top#}"  data-job="{#$item.job#}" data-buy="{#$item.buy#}" data-mprice="{#$item.mprice#}" data-title="{#$item.title#}" data-recommand="{#$item.recommand#}">
+                                    <p>{#$item.job#}个职位</p>
+                                    <div class="price">
+                                        <h5>{#echoCurrency type="symbol"#}<b>{#$item.price#}</b></h5>
+                                        <p class="oprice">{#echoCurrency type="symbol"#}{#$item.mprice#}</p>
+                                    </div>
+                                    {#if $item.mprice > $item.price#}<p class="save">节省{#$item.mprice - $item.price#}{#echoCurrency type='short'#}</p>{#/if#}
+                                </li>
+                                {#/loop#}
+                                
+                            </ul>
+                        </div>
+                        <div class="popFooter">
+                            <p class="pay_amount"v-show='chosePopular.id && chosePopular.price'>需付金额：<span>{#echoCurrency type="symbol"#}<b>{{chosePopular.price}}</b></span></p>
+                            <a href="javascript:;" class="btn btn_buy" @click="buyPackage(2)">立即购买</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+             <!-- 有效期 -->
+             <div :class="['validPop popBox',{'show':showPop && showType == 'valid'}]" >
+                <div class="popHeader">
+                    <a href="javascript:;" class="btn_cancel" @click="hidePop">取消</a>
+                    <h4>职位有效期</h4>
+                    <a href="javascript:;" class="btn_sure" @click="popConfirm('valid')">确定</a>
+                </div>
+                <div class="shortCutOptions">
+                    <ul>
+                        <!-- <li @click="longValid" :class="long_valid == 1">长期有效</li> -->
+                        <li @click="longValid" :class="{'on_chose':long_valid == 1 && fastChose}">长期有效</li>
+                        <li v-for="item in shortCutOptions" @click="choseDays(item),fastChose = true" :class='{"on_chose":validDays == item.value && fastChose}'>{{item.title}}</li>
+                    </ul>
+                </div>
+                <van-datetime-picker
+                    :show-toolbar="false"
+                    v-model="validShow"
+                    visible-item-count="5"
+                    type="date"
+                    @change="fastChose = false"
+                    :min-date="minDate"
+                    title="选择年月日"
+                ></van-datetime-picker>
+            </div>
+
+
+
+            <!-- 设置不置顶时间 -->
+            <div class="pop_mask valid" v-show="noTopPop" @click="noTopPop = false;"></div>
+            <div :class="['validPop popBox noTopPop' ,{'show':noTopPop}]">
+                <div class="popHeader">
+                    <a href="javascript:;" class="btn_cancel" @click="noTopPop = false;">取消</a>
+                    <h4>设置不置顶时间</h4>
+                    <a href="javascript:;" class="btn_sure" @click="popConfirm('noTop')">确定</a>
+                </div>
+                <div class="popCon">
+                    <ul>
+                        <li v-for="item in weekdays" :class="{'on_chose': noTopDayArr.indexOf(item.id) > -1}" @click="choseNoTop(item)">{{item.name}}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+
+
+
+    </div>
+    {#include file="public_pop.html"  noVue=1 swiper='1'#}
+    {#include file="../../../member/touch/public-pay-pop.html"  noVue=1#}
+</body>
+<script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/postManage.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+
+</html>

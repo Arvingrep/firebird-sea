@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="{#$cfg_soft_lang#}">
+    <title>商家会员中心</title>{#* 商家会员中心 *#}
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper-bundle.min.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/busiIndex.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+    <script>
+    var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#getModuleConfig module='car' key='channelDomain'#}', staticPath = '{#$cfg_staticPath#}', templets_skin = '{#$templets_skin#}';
+    var hideFileUrl = {#$cfg_hideUrl#};
+    var cookiePre = '{#$cfg_cookiePre#}';
+    var mod = '{#$smarty.get.mod#}'
+    var hasModArr = '{#json_encode($memberPackage)#}'
+    var businessConfig = '{#json_encode($businessConfig)#}'
+    var busiDomain = '{#$member_busiDomain#}?appFullScreen&currentPageOpen=1&appIndex=1';
+    var moreUrl = '{#$member_userDomain#}/enter_contrast.html';
+    var userid = '{#$userinfo.userid#}'
+    var businessUrl = '{#$member_busiDomain#}'
+    var iosVirtual= {#$cfg_iosVirtualPaymentState|default:0#};
+    </script>
+</head>
+<body>
+
+    <div class="page" id="page" v-cloak>
+        <div class="header">
+            <div class="header-l">
+                <a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+            </div>
+            <div class="header-address"></div>
+            <div class="header-search ">
+                <a href="{#$member_busiDomain#}/enter-order.html" class="link">开通记录</a>
+            </div>
+        </div>
+        <div class="pageCon">
+            <div class="conBox">
+                <div class="titleCon"  v-cloak>
+                    <h1 v-if="!mod">商家会员中心</h1>
+                    <h1 v-else>开通{{currModInfo.title}}</h1>
+                </div>
+                <div class="modBox">
+                    <a class="userInfo" href="{#$member_busiDomain#}/business-config.html">
+                        <div class="photo"><img src="{#$userinfo.photo|default:'/static/images/noPhoto_100.jpg'#}" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'"></div>
+                        <div class="info">
+                            <h5 class="nickname">{#$userinfo.nickname#}</h5>
+                            <!-- <div class="vip"><span>商家会员</span><em></em><span>已开通</span></div> -->
+                            <div v-cloak :class="['vip' ,{'noVip' : !isVip}]"><span>商家会员</span><em></em><span>{{ !isVip ? '未' : '已'}}开通</span></div>
+                        </div>
+                    </a>
+                    <div class="swipeBox">
+                        <div class="swiperItem swiper-container mySwiper">
+                            <!-- <div class="swiper-wrapper">
+                                
+                            </div> -->
+                            <ul class="siwperUl swiper-wrapper" v-cloak>
+                                <li v-for="item in iconList" class="swiper-slide">
+                                    <div class="icon"><img :src="`{#$templets_skin#}images/enter/icon${item.id}.png`" alt=""></div>
+                                    <div class="text">
+                                        <h5>{{item.title}}</h5>
+                                        <p>{{item.text}}</p>
+                                    </div>
+                                </li>
+                            </ul>
+                            <div class="pagination"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tabBox" v-cloak>
+                <div class="tab_ul">
+                    <template  v-for="(item,ind) in tabArr" :key="ind">
+                        <a :href="ind == 3 ? '{#$member_userDomain#}/enter_contrast.html' : 'javascript:;'" :class="['tab_li',{'on_chose': tabOn == ind}] "  @click="changeTab(ind)" v-if="mod && ind < 2 || (!mod && ind >= 2)">
+                            <span>{{item}}</span>
+                            <div class="tab_bg"></div>
+                        </a>
+                    </template>
+                    
+                </div>
+                <div class="tabCon">
+                    <div class="tabConBox" v-show="tabOn == 0">
+                        <div class="tcBox">
+                            <h6>请选择开通时长</h6>
+                            <div class="ulBox">
+                                <ul>
+                                    <li :class="['tc',{'on_chose':choseTime.times == item.times}]" v-for="item in joinTimes" @click="changeTc(item)">
+                                        <div class="time">{{item.times}}{{businessConfig.joinTimesUnit ? '年' : '个月'}}</div>
+                                        <div class="price">
+                                            <div class="currPrice">
+                                                <span>{#echoCurrency type="symbol"#}</span><b>{{parseFloat((currModInfo.price * item.times * item.discount / 10).toFixed(2))}}</b>
+                                            </div>
+                                            <p v-if="currModInfo.mprice > currModInfo.price">{#echoCurrency type="symbol"#}{{parseFloat((currModInfo.mprice * item.times).toFixed(2))}}</p>
+                                        </div>
+                                        <div class="fuli" v-if=" item.discount > 0 && item.discount < 10">立减{{parseFloat((currModInfo.price * item.times * (10 - item.discount) / 10).toFixed(2))}}元</div>
+                                        <div class="fuli" v-else-if="item.point ">送{{item.point}}{#$cfg_pointName#}</div>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="btn_Box">
+                                <a href="javascript:;" class="btn {#if $cfg_iosVirtualPaymentState#} iOS_miniprogram_nocash{#/if#} {#if $userinfo.phoneCheck#}publicpaybtn{#/if#}" @click="buyModule()"><span v-if="currModInfo && currModInfo.totalAmount" >{#echoCurrency type="symbol"#}{{currModInfo.totalAmount}}</span>立即开通</a>
+                            </div>
+                            <p :class="['tip p',{'agree':agree}]"><span @click="agree = !agree">请阅读并同意</span><a href="{#getUrlPath service='siteConfig' template='protocol' title='商家入驻服务协议'#}">《商家入驻服务协议》</a></p>
+                        </div>
+
+                        
+                        <div class="helpKfBox">
+                            <div class="help_header">
+                                <h3>客服帮助</h3>
+                                <p>如对开通商家有任何疑问，或想咨询更适合、更优惠的套餐方案：</p>
+                            </div>
+                            <div class="help_con {#if $cfg_weixinQr#}hasQr{#/if#}">
+                                {#if !$cfg_weixinQr#}
+                                <div class="help_icon"></div>
+                                <div class="help_info">
+                                    <h4><em class="sub">“</em><span>我需要更优惠的入驻套餐</span><em class="sup">”</em></h4>
+                                    <div class="telBox">
+                                        <h5>客服电话</h5>
+                                        <h2>{#$cfg_hotline#}</h2>
+                                    </div>
+                                </div>
+                                {#else#}
+                                <div class="rightBox">
+                                    <div class="help_icon"></div>
+                                    <h4><em class="sub">“</em><span>我需要更优惠<br>的入驻套餐</span><em class="sup">”</em></h4>
+                                </div>
+                                <div class="leftBox">
+                                    <div class="qrBox">
+                                        <div class="qrImg"><img src="{#$cfg_weixinQr#}" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                                        <p>扫码加微信客服</p>
+                                    </div>
+                                    <div class="telBox">
+                                        <h5>客服电话</h5>
+                                        <h2>{#$cfg_hotline#}</h2>
+                                    </div>
+                                </div>
+                                {#/if#}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tabConBox" v-show="tabOn == 1 || tabOn == 2">
+                        <div class="openBox" style="padding-top:.2rem;">
+                            <template v-if="allMods && allMods.length">
+
+                                <h6>我的全部频道商家会员</h6>
+                                <!-- 已开模块 -->
+                                <div class="modBox">
+                                    <ul :class="{'fullLi' : allMods && allMods.length == 1}">
+                                        <li class="mod {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" v-for="item in allMods" @click="showSlidePop(item)">
+                                            <template v-if="item.name == 'job'">
+
+                                                <div class="left_info">
+                                                    <div class="m_info">
+                                                        <h4>招聘套餐</h4>
+                                                        <p>{{item.expired >= 0 ? timeTrans(item.expired) : '永久有效'}}{{checkExpired(item.expired,15) ? '' : '到期'}}</p>
+                                                    </div>
+                                                    <div class="m_price">
+                                                        {{item.expired == -1 ? '套餐内容与详情…' : (allMods.length == 1 ? '套餐内容与权益、套餐续费、更换…' : '套餐续费、更换…')}}
+                                                    </div>
+                                                </div>
+                                                <div class="right_info">
+                                                    <p v-if="checkExpired(item.expired,15)">{{item.expired == '0' ? "":"即将到期"}}</p>
+                                                    <a href="javascript:;" class="btn_xu" >查看</a>
+                                                </div>
+                                            </template>
+                                            <template v-else>
+
+                                                <div class="left_info">
+                                                    <div class="m_info">
+                                                        <h4>{{item.title}}</h4>
+                                                        <p>{{timeTrans(item.expired)}}{{checkExpired(item.expired,15) ? '' : '到期'}}</p>
+                                                    </div>
+                                                    <div class="m_price">
+                                                        <b>{{item.price}}</b>{#echoCurrency type="short"#}/{{businessConfig.joinTimesUnit == 0 ? '月' : '年'}}
+                                                    </div>
+                                                </div>
+                                                <div class="right_info">
+                                                    <p v-if="checkExpired(item.expired,15)">{{item.expired == '0' ? "":"即将到期"}}</p>
+                                                    <a href="javascript:;" class="btn_xu" >续费</a>
+                                                </div>
+                                            </template>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </template>
+                            
+                            <div class="openRight" v-if="privileges.length ">
+                                <h3>已开特权</h3>
+                                <div class="rightBox">
+                                    <ul>
+                                        <li class="mod {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" v-for="item in privileges" @click="showSlidePop(item)">
+                                            <div class="left_info">
+                                                <div class="m_info">
+                                                    <h4>{{item.title}}</h4>
+                                                    <p>{{timeTrans(item.expired)}}到期</p>
+                                                </div>
+                                            </div>
+                                            <div class="right_info">
+                                                <a href="javascript:;" class="btn_xu" >续费</a>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="moreRightBox">
+                            <h4>更多商家特权</h4>
+                            <div class="busiRight">
+                                <ul>
+                                    <li {#if $cfg_iosVirtualPaymentState#}class="iOS_miniprogram_nocash"{#/if#} v-for="item in privileges_no['busi']" @click="showSlidePop(item)">
+                                        <div class="left_info">
+                                            <h4>{{item.title}}</h4>
+                                            <div class="price"><b>{{item.price}}</b>{#echoCurrency type="short"#}/{{businessConfig.joinTimesUnit == 0 ? '月' : '年'}}</div>
+                                        </div>
+                                        <div class="right_btn" >开通</div>
+                                    </li>
+                                   
+                                </ul>
+                            </div>
+                            <div class="otherRight">
+                                <ul>
+                                    <li {#if $cfg_iosVirtualPaymentState#}class="iOS_miniprogram_nocash"{#/if#} v-for="item in privileges_no['net']" @click="showSlidePop(item)">
+                                        <div class="left_info">
+                                            <h4>{{item.title}}<span class="price"><b>{{item.price}}</b>{#echoCurrency type="short"#}/{{businessConfig.joinTimesUnit == 0 ? '月' : '年'}}</span></h4>
+                                            <p>{{item.note}}</p>
+                                        </div>
+                                        <div class="right_btn" >开通</div>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="help_con {#if $cfg_weixinQr#}hasQr{#/if#}">
+                                {#if !$cfg_weixinQr#}
+                                <div class="help_icon"></div>
+                                <div class="help_info">
+                                    <h4><em class="sub">“</em><span>我需要更优惠的入驻套餐</span><em class="sup">”</em></h4>
+                                    <div class="telBox">
+                                        <h5>客服电话</h5>
+                                        <h2>{#$cfg_hotline#}</h2>
+                                    </div>
+                                </div>
+                                {#else#}
+                                <div class="rightBox">
+                                    <div class="help_icon"></div>
+                                    <h4><em class="sub">“</em><span>我需要更优惠<br>的入驻套餐</span><em class="sup">”</em></h4>
+                                </div>
+                                <div class="leftBox">
+                                    <div class="qrBox">
+                                        <div class="qrImg"><img src="{#$cfg_weixinQr#}" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                                        <p>扫码加微信客服</p>
+                                    </div>
+                                    <div class="telBox">
+                                        <h5>客服电话</h5>
+                                        <h2>{#$cfg_hotline#}</h2>
+                                    </div>
+                                </div>
+                                {#/if#}
+                            </div>
+                        </div>
+                        <div  class="bottom_btn">
+                            <a href="tel:{#$cfg_hotline#}" class="btn_contact">联系客服咨询</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="popBox"  v-cloak>
+            <div class="pop_mask_inner" v-show="slidePop "></div>
+            <div :class="['popConBox',{'show':slidePop}]">
+                <a href="javascript:;" class="close_pop" @click="slidePop = false;"></a>
+                <div class="pop_header">
+                    <h3>{{xu_modInfo.title}}</h3>
+                    <p>选择商家会员开通时长</p>
+                </div>
+                <div class="pop_con">
+                    <div class="ulBox">
+                        <ul>
+                            <li :class="['tc',{'on_chose':xu_choseTime.times == item.times}]" v-for="item in joinTimes" @click="changeTc(item,1)">
+                                <div class="time">{{item.times}}{{businessConfig.joinTimesUnit ? '年' : '个月'}}</div>
+                                <div class="price">
+                                    <div class="currPrice">
+                                        <span>{#echoCurrency type="symbol"#}</span><b>{{parseFloat((xu_modInfo.price * item.times * item.discount / 10).toFixed(2))}}</b>
+                                    </div>
+                                    <p v-if="xu_modInfo.mprice > xu_modInfo.price">{#echoCurrency type="symbol"#}{{parseFloat((xu_modInfo.mprice * item.times).toFixed(2))}}</p>
+                                </div>
+                                <div class="fuli" v-if="item.discount">立减{{parseFloat((xu_modInfo.price * item.times * (10 - item.discount) / 10).toFixed(2))}}元</div>
+                                <div class="fuli" v-else-if="item.point ">送{{item.point}}{#$cfg_pointName#}</div>
+                            </li>
+                           
+                        </ul>
+                    </div>
+                </div>
+                <div class="pop_foot">
+                    <p :class="['tip p',{'agree':agree}]"><span @click="agree = !agree">请阅读并同意</span><a href="{#getUrlPath service='siteConfig' template='protocol' title='《商家入驻服务协议》'#}">《商家入驻服务协议》</a></p>
+                    <a href="javascript:;" class="btn" @click="buyModule()"><span v-if="xu_modInfo.totalAmount" >{#echoCurrency type="symbol"#}{{xu_modInfo.totalAmount}}</span> 立即开通</a>
+                </div>
+            </div>
+            <div class="pop_mask_inner" v-show="agreePop "></div>
+
+            <div class="popCenter" v-if="agreePop ">
+                <div :class="['popCon',{'show':agreePop}]">
+                    <h4>商家入驻服务协议</h4>
+                    <p>请阅读并同意《商家入驻服务协议》</p>
+                    <div class="btnsGroup">
+                        <a href="javascript:;" class="agree_btn" @click="agree = true;agreePop = false;buyModule()">同意并继续</a>
+                        <a href="javascript:;" class="refuse_btn" @click="agreePop = false">不同意</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper-bundle.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/busiIndex.js?v={#$cfg_staticVersion#}"></script>
+</html>

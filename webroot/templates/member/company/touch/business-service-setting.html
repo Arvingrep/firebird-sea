@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>买单设置</title>
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}../../touch/css/mobiscroll.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/business-maidan-setting.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}', templateSkin = '{#$templets_skin#}';
+	var hideFileUrl = {#$cfg_hideUrl#};
+</script>
+</head>
+<body>
+<!-- 头部 s -->
+{#include file="../../../siteConfig/touch_top.html" pageTitle="买单设置" #}
+<!-- 头部 e -->
+
+<div class="main">
+    <form action="/include/ajax.php?service=business&action=maidanSaveConfig" id="serviceFrom">
+        <dl>
+            <dt>是否开启买单/优惠</dt>
+            <dd id="maidanState">
+                <!-- <label>请选择</label> -->
+                <p class="setval" style="display: block;">
+                    {#if $maidan_state == 0#}
+                    未开启收款功能
+                    {#else#}
+                        {#if $maidan_youhui_open#}
+                            {#if $maidan_not_youhui_open#}
+                            部分优惠
+                            {#else#}
+                            整单优惠
+                            {#/if#}
+                        {#else#}
+                        无优惠
+                        {#/if#}
+                    {#/if#}</p>
+                <p class="saletip"{#if $maidan_state == 1 && $maidan_youhui_open == 1 && $maidan_not_youhui_open == 1 && $maidan_youhui_limit#} style="display: inline-block;"{#/if#}>{#$maidan_youhui_limit#}</p>
+                <input type="hidden" name="maidan_state" id="maidan_state" value="{#$maidan_state#}" />
+                <input type="hidden" name="maidan_not_youhui_open" id="maidan_not_youhui_open" value="{#$maidan_youhui_open#}" />
+                <input type="hidden" name="maidan_youhui_open" id="maidan_youhui_open" value="{#$maidan_youhui_open#}" />
+                <input type="hidden" name="maidan_youhui_limit" id="maidan_youhui_limit" value="{#$maidan_youhui_limit#}" />
+            </dd>
+        </dl>
+        <dl id="saleSel"{#if $maidan_state == 1 && $maidan_youhui_open#} style="display: block;"{#/if#}>
+            <dt>设置优惠折扣</dt>
+            <dd id="saleObj">
+                <label class="fn-hide">请选择</label>
+                <p class="setval" style="display: block;">{#((100-$maidan_youhui_value)/10)|string_format:"%.1f"#} 折</p>
+                <input type="hidden" name="maidan_youhui_value" id="maidan_youhui_value" value="{#$maidan_youhui_value#}" />
+            </dd>
+            <s class="delsale"{#if $maidan_youhui_value#} style="display: block;"{#/if#}>&times;</s>
+        </dl>
+        <dl id="fenxiaoSel"{#if $maidan_state == 1#} style="display: block;"{#/if#}>
+            <dt>设置推广费用</dt>
+            <dd id="fenxiaoObj" class="fn-clear">
+                <div class="fx-item">
+                    <span class="tit">新客户</span>
+                    <span data-id="XfenxiaoFee" class="val{#if $maidan_XfenxiaoFee#} active{#/if#}" contenteditable="true">{#if $maidan_XfenxiaoFee#}{#$maidan_XfenxiaoFee#}%{#else#}请填写{#/if#}</span>
+                </div>
+                <div class="fx-item">
+                    <span class="tit">老客户</span>
+                    <span data-id="fenxiaoFee" class="val{#if $maidan_XfenxiaoFee#} active{#/if#}" contenteditable="true">{#if $maidan_fenxiaoFee#}{#$maidan_fenxiaoFee#}%{#else#}请填写{#/if#}</span>
+                </div>
+                <input type="hidden" name="maidan_fenxiaoFee" id="maidan_fenxiaoFee" value="{#$maidan_fenxiaoFee#}" />
+                <input type="hidden" name="maidan_XfenxiaoFee" id="maidan_XfenxiaoFee" value="{#$maidan_XfenxiaoFee#}" />
+            </dd>
+        </dl>
+        <p class="help"{#if $maidan_state == 1#} style="display: block;"{#/if#}>用户推荐新客到店消费买单，可得实付金额的佣金比例；<br /><span id="fxFeeTips">可分别设置新客首次买单、及该客户后续每次买单时，推荐人可得比例</span></p>
+
+        <div class="btnFixed">
+            <button type="submit" id="save">保存设置</button>
+        </div>
+        
+    </form>
+</div>
+
+<div class="maidanPop">
+    <div class="overlay"></div>
+    <div class="maidan-set">
+        <h5>是否开启买单/优惠</h5>
+        <ul>
+            <li data-id="1"{#if $maidan_state && !$maidan_youhui_open#} class="curr"{#/if#}>无优惠<s></s></li>
+            <li data-id="2"{#if $maidan_state && $maidan_youhui_open && !$maidan_not_youhui_open#} class="curr"{#/if#}>整单优惠<s></s></li>
+            <li data-id="3"{#if $maidan_state && $maidan_youhui_open && $maidan_not_youhui_open#} class="curr"{#/if#}>部分优惠<s></s><p>如酒水锅底、台位费等不参与折扣，可选此项</p></li>
+        </ul>
+        <ul>
+            <li data-id="4" class="close-maidan{#if $maidan_state == 0#} curr{#/if#}">禁用收款码<s></s><p>关闭收款码功能，买单页面将无法打开</p></li>
+        </ul>
+    </div>
+</div>
+
+<div class="maidanSalePop">
+    <h5>优惠限制</h5>
+    <div class="sale-info">
+        <textarea placeholder="选填，如酒水饮料">{#$maidan_youhui_limit#}</textarea>
+    </div>
+    <div class="sale-btn">
+        <button class="cancel">跳过</button>
+        <button class="sure">确定</button>
+    </div>
+</div>
+<div class="maidanSalePopOverlay"></div>
+
+<script src='{#$cfg_staticPath#}js/ui/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/business-maidan-setting.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

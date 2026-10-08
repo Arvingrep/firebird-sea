@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>房产经纪</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all"
+        href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_plus_2.9.0.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/brokerageRecord.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/topNav/topNav.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/leftNav/leftNav.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue-3.5.12.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0_zh-cn.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}';
+        var staticVersion = '{#$cfg_staticVersion#}'; //版本号
+        var logoUrl = '{#getModuleConfig module='house' key='logoUrl'#}';
+        var templets_skin = '{#$templets_skin#}';
+        var member_busiDomain = "{#$member_busiDomain#}";
+        var channelDomain = "{#getModuleConfig module='house' key='channelDomain'#}";
+    </script>
+</head>
+
+<body>
+    <div class="navPage Shell" id="brokerageRecord" v-cloak>
+        <!-- 顶部导航 -->
+        <top-nav :user-info="userInfo" :company-info="companyInfo"></top-nav>
+        <!-- 左侧导航 -->
+        <template v-if="userInfo.uid">
+            <left-nav type="broker" :active-index="9" :user-info="userInfo" :company-info="companyInfo"
+                v-if="companyInfo.type==0"></left-nav>
+            <left-nav type="distribute" :active-index="4" :user-info="userInfo" :company-info="companyInfo"
+                v-else></left-nav>
+        </template>
+        <!-- 内容 -->
+        <div class="boxContent">
+            <div class="b-main">
+                <!-- 顶部操作区 -->
+                <div class="bm-top">
+                    <!-- tab切换 -->
+                    <div class="bmt-left">
+                        <div v-for="(item,index) in tabConfig.list " :key="item.id"
+                            :class="['item',{active:index==tabConfig.active}]" @click="tabFn(index)">
+                            <span class="title">{{item.title}}</span>
+                            <span class="sum" v-if="item.num">({{item.num}})</span>
+                        </div>
+                    </div>
+                    <!-- 筛选/提现 -->
+                    <div class="bmt-right">
+                        <!-- 日期筛选 -->
+                        <el-date-picker v-model="filterConfig.date.value" type="daterange" unlink-panels clearable
+                            :shortcuts="filterConfig.date.shortcuts" value-format="YYYY-MM-DD" @change="getTableData"
+                            class="dateFilter">
+                        </el-date-picker>
+                        <!-- 关键字筛选 -->
+                        <el-input v-model="filterConfig.keywords" placeholder="客户、报备人、楼盘" @change="getTableData"
+                            class="searchInput">
+                            <template #suffix>
+                                <img src="{#$cfg_staticPath#}images/f_search.png?v={#$cfg_staticVersion#}"
+                                    class="searchIcon" />
+                            </template>
+                        </el-input>
+                        <!-- 提现 -->
+                        <div class="withdraw">
+                            <template v-if="tabConfig.active==0">
+                                <div class="number">
+                                    可提现佣金<span>{{tableConfig.pageInfo.commissionTotal||0}}</span>元
+                                </div>
+                                <div class="btn" @click="widthdrawPopFn(false)">全部提现</div>
+                            </template>
+                            <template v-else>
+                                <div class="number">
+                                    共提现佣金<span>{{tableConfig.pageInfo.cashTotal||0}}</span>元
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <!-- 表格 -->
+                <el-table :ref="res=>{tableConfig.ref=res;}" :data="tableConfig.list" header-cell-class-name="bm-header"
+                    cell-class-name="bm-cell" v-loading="tableConfig.loading" @selection-change="selectChangeFn">
+                    <el-table-column type="selection" class="bmt-select">
+                    </el-table-column>
+                    <template v-for="(item,index) in tableConfig.column" :key="item.id">
+                        <el-table-column :prop="item.prop" :align="item.align" :class="`bmt-item ${item.prop}`"
+                            v-if="item.show.includes(tabConfig.active)">
+                            <template #header>
+                                <div class="bmti-head">{{item.label}}</div>
+                            </template>
+                            <template #default="data">
+                                <div style="display: flex;align-items: center;justify-content: center;"
+                                    v-if="item.prop=='operate'">
+                                    <div class="withdraw" @click="widthdrawPopFn(data.row)" v-if="data.row.status==1">
+                                        提现
+                                    </div>
+                                    <div class="audit" v-else-if="data.row.status==2">
+                                        <img src="{#$templets_skin#}images/delay.png?v={#$cfg_staticVersion#}" />
+                                        <span>提现审核</span>
+                                    </div>
+                                    <div class="success" v-else>
+                                        <img src="{#$templets_skin#}images/confirmBlue.png?v={#$cfg_staticVersion#}" />
+                                        <span>提现成功</span>
+                                    </div>
+                                </div>
+                                <div class="success" v-else-if="item.prop=='status'">
+                                    <img src="{#$templets_skin#}images/confirmBlue.png?v={#$cfg_staticVersion#}" />
+                                    <span>提现成功</span>
+                                </div>
+                            </template>
+                        </el-table-column>
+                    </template>
+                </el-table>
+                <!-- 全选 -->
+                <div class="bm-select">
+                    <el-checkbox v-model="selectConfig.all" @click="selectAllFn">
+                        <div class="bms-select">全选(<span>{{selectConfig.count}}</span>/{{tableConfig.list.length}})
+                        </div>
+                    </el-checkbox>
+                    <div class="bms-export" @click="exportFn">导出Excel</div>
+                </div>
+                <!-- 分页 -->
+                <el-pagination background hide-on-single-page layout="prev, pager, next" prev-text="上一页" next-text="下一页"
+                    :page-size="tableConfig.pageSize" :total="tableConfig.pageInfo.totalCount"
+                    @current-change="pagingFn" class="bm-pagination" v-if="tableConfig.pageInfo?.totalCount">
+                </el-pagination>
+                <!-- 提现二次弹窗提示 -->
+                <el-dialog v-model="widthdrawConfig.pop" :show-close="false" :lock-scroll="false"
+                    :close-on-click-modal="false" center class="bm-pop">
+                    <template #header>
+                        <div class="bmp-close">
+                            <div class="bmp-title">
+                                确定提现{{widthdrawConfig.ids.length==1?'该':`这${widthdrawConfig.ids.length}`}}笔佣金共{{widthdrawConfig.money}}元？
+                            </div>
+                            <img src="{#$templets_skin#}images/close_icon.png?v={#$cfg_staticVersion#}"
+                                @click="widthdrawConfig.pop=false" />
+                        </div>
+                    </template>
+                    <template #default>
+                        <div class="bmp-tip">提交后请留意到账信息，提现账户：{{userInfo.bank}} {{userInfo.card_number}}</div>
+                    </template>
+                    <template #footer>
+                        <div class="bmp-btns">
+                            <div class="cancel" @click="widthdrawConfig.pop=false">取消</div>
+                            <div class="confirm" v-loading="widthdrawConfig.loading" @click="withdrawFn">确定提现</div>
+                        </div>
+                    </template>
+                </el-dialog>
+            </div>
+            <div class="b-copyright">
+                版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="module" src="{#$templets_skin#}js/brokerageRecord.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

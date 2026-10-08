@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{#$cfg_fenxiaoName#}-{#$langData['siteConfig'][35][4]#}</title>{#* 我的下线 *#}
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fenxiao_offline.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var pointname = '{#$cfg_pointName#}';
+    </script>
+</head>
+<body>
+{#include file="../../siteConfig/touch_top.html" pageTitle={#$langData['siteConfig'][35][4]#}#}{#* 我的下线 *#}
+<div id="page">
+    <div class="searchDiv">
+        <div>
+            <form>
+                <s></s>
+                <input type="text" id="serKey" placeholder="搜索" enterkeyhint="search" autocomplete="off">    
+            </form>      
+        </div>     
+    </div>
+    <div class="nav fn-clear"><span class="fn-left filter"><em>{#$langData['siteConfig'][35][15]#}</em> <i></i></span> <span class="fn-right" id="totalCount">共{{totalCount}}人</span></div>{#* 按时间倒序 *#}
+    
+    <div class="choose-box">
+        <ul class="choose-sort">
+            <li class="curr" data-id="">{#$langData['siteConfig'][35][15]#}</li>{#* 按时间倒序 *#}
+            <li data-id="1">{#$langData['siteConfig'][35][16]#}</li>{#* 按时间正序 *#}
+        </ul>
+    </div>
+    
+    <div class="mask mask-hide"></div>
+    
+    <div class="list-box" v-cloak>
+        <ul v-if="list && list.length" >
+            <li class="fn-clear" v-for="fxItem in list" @click="showDetail(fxItem)">
+                <div class="item_info">
+                    <div class="left_info">
+                        <div class="imgbox"><img :src="fxItem.user.photo" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                        <div class="fx_info">
+                            <h3>{{fxItem.user.username}}</h3>
+                            <p>{{timeStr(fxItem.user.regtime)}}加入</p>
+                        </div>
+                    </div>
+                    <div class="right_info"  v-if="fxItem.useramount != undefined"><span>带来收益<b>{{numTrans(fxItem.useramount)}}</b></span></div>
+                </div>
+                <div :class="['item_text',{'headAlign': !fxItem.point && !fxItem.money}]" v-if="fxItem.money || fxItem.point || fxItem.usercount ">
+                    <span v-if="fxItem.money != undefined">余额<b>{{numTrans(fxItem.money)}}</b></span>
+                    <span v-if="fxItem.point != undefined">{#$cfg_pointName#}<b>{{numTrans(fxItem.point)}}</b></span>
+                    <span v-if="fxItem.usercount != undefined">{{!fxItem.point && !fxItem.money ? 'Ta的' : ''}}团队<b>{{fxItem.usercount}}</b></span>
+                </div>
+            </li>
+            
+        </ul>
+        <div class="loading"><span>{#$langData['siteConfig'][20][409]#}</span></div>{#* 正在获取，请稍后 *#}
+    </div>
+
+    <div class="mask_detail" @click="hidePop"></div>
+    <div class="popDetailBox"  v-cloak>
+        <div class="popTit">
+            <h3>成员详情</h3>
+            <a href="javascript:;" class="arr_down" @click="hidePop"></a>
+        </div>
+        <div class="scrollBox">
+            <div class="detailBox" v-if="currItem && currItem.user">
+                <div class="item_info">
+                    <div class="left_info">
+                        <div class="imgbox" ><img v-if="currItem.user" :src="currItem.user.photo" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                        <div class="fx_info">
+                            <h3>{{currItem.user.username}}</h3>
+                            <p>{{timeStr(currItem.user.regtime)}}加入</p>
+                        </div>
+                    </div>
+                    <div class="right_info"  v-if="currItem.useramount != undefined"><span>带来收益<b>{{numTrans(currItem.useramount)}}</b></span></div>
+                </div>
+                <div class="item_text">
+                    <div class="phone" v-if="currItem.phone != undefined"><span>手机 <b>{{currItem.phone}}</b></span></div>
+                    <div class="account">
+                        <span v-if="currItem.money != undefined">余额 <b>{{numTrans(currItem.money)}}</b></span>
+                        <span v-if="currItem.point != undefined">{#$cfg_pointName#} <b>{{numTrans(currItem.point)}}</b></span>
+                    </div>
+                </div>
+            </div>
+            <div class="detailChild" v-if="currItem && currItem.child">
+                <div class="childCount">Ta的团队{{currItem.child.length}}人</div>
+                <ul class="childList">
+                    <li class="childLi" v-for="child1 in currItem.child" @click="showChildDetail(child1)">
+                        <div class="left_info">
+                            <div class="imgbox"><img v-if="child1.user" :src="child1.user.photo" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                            <div class="fx_info">
+                                <h3>{{child1.user.username}}</h3>
+                                <p :class="{'noArr': child1.child.length == 0}"><span v-if="child1.money != undefined">余额 <b>{{numTrans(child1.money)}}</b></span><span v-if="child1.point != undefined">{#$cfg_pointName#} <b>{{numTrans(child1.point)}}</b></span><span>团队 <b>{{child1.child.length}}</b></span></p>
+                            </div>
+                        </div>
+                        <div class="right_phone" v-if="child1.phone != undefined">{{child1.phone}}</div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="childDetail_mask" @click="hideSlide"></div>
+        <div class="childDetail_pop">
+            <div class="scrollBox" v-if="currItemChild">
+                <div class="detailBox">
+                    <div class="item_info">
+                        <div class="left_info">
+                            <div class="imgbox" ><img v-if="currItemChild.user" :src="currItemChild.user.photo" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                            <div class="fx_info">
+                                <h3>{{currItemChild.user.username}}</h3>
+                                <p>{{timeStr(currItemChild.user.regtime)}}加入</p>
+                            </div>
+                        </div>
+                        <div class="right_info"  v-if="currItemChild.useramount != undefined"><span>带来收益<b>{{numTrans(currItemChild.useramount)}}</b></span></div>
+                    </div>
+                    <div class="item_text">
+                        <div class="phone" v-if="currItemChild.phone != undefined"><span>手机 <b>{{currItemChild.phone}}</b></span></div>
+                        <div class="account">
+                            <span v-if="currItemChild.money != undefined">余额 <b>{{numTrans(currItemChild.money)}}</b></span>
+                            <span v-if="currItemChild.point != undefined">{#$cfg_pointName#} <b>{{numTrans(currItemChild.point)}}</b></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="detailChild">
+                    <div class="childCount">Ta的团队{{currItemChild.child.length}}人</div>
+                    <ul class="childList">
+                        <li class="childLi" v-for="child in currItemChild.child">
+                            <div class="left_info">
+                                <div class="imgbox"><img v-if="child.user" :src="child.user.photo" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                <div class="fx_info">
+                                    <h3>{{child.user.username}}</h3>
+                                    <p class="noArr"><span v-if="child.money != undefined">余额 <b>{{numTrans(child.money)}}</b></span><span v-if="child.point != undefined">{#$cfg_pointName#} <b>{{numTrans(child.point)}}</b></span><span v-if="child.child != undefined">团队 <b>{{child.child.length}}</b></span></p>
+                                </div>
+                            </div>
+                            <div class="right_phone" v-if="child.phone">{{child.phone}}</div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fenxiao_offline.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!-- 商城营销组件 -->
+<div class="qianggouConBox" v-if="[16,17,18,19].includes(modCon.id)" :data-ind="modInd" >
+    <!-- 1/2组件 -->
+    <div class="halfCon" v-if="modCon.content.styletype == 1" :style="getObjStyle(modCon.content,'yxBoxBg',modInd)">
+        <div class="halfConWrap">
+            <div class="conHeader">
+                <div class="title">
+                    <h4 :style="'color:' + modCon.content.title.style.color + ';'" v-if="modCon.content.title.type == 'text'">
+                        <span v-if="modCon.content.title.text">{{modCon.content.title.text}}</span>
+                        <template v-else>
+                            <span v-if="modCon.id == 16">秒杀</span>
+                            <span v-else-if="modCon.id == 17">拼团</span>
+                            <span v-else-if="modCon.id == 18">砍价</span>
+                            <span v-else-if="modCon.id == 19">抢购</span>
+                        </template>
+                    </h4>
+                    <h4 v-if="modCon.content.title.type == 'image'"><img crossOrigin='anonymous' :src="modCon.content.title.image"></h4>
+                    <div class="cutDown" v-if="modCon.id == 19 ">
+                        <span :style="'color:' + modCon.content.style.cutDown + '; background-color:' +modCon.content.style.cutDownBg+ ';'">{{modCon.content.cutDownTimeToText[0] ? modCon.content.cutDownTimeToText[0] : '00'}}</span>
+                        <em :style="'color:' + modCon.content.style.split + ';'">:</em>
+                        <span :style="'color:' + modCon.content.style.cutDown + '; background-color:' +modCon.content.style.cutDownBg+ ';'">{{modCon.content.cutDownTimeToText[1] ? modCon.content.cutDownTimeToText[1] : '00'}}</span>
+                        <em :style="'color:' + modCon.content.style.split + ';'">:</em>
+                        <span :style="'color:' + modCon.content.style.cutDown + '; background-color:' +modCon.content.style.cutDownBg+ ';'">{{modCon.content.cutDownTimeToText[2] ? modCon.content.cutDownTimeToText[2] : '00'}}</span>
+                    </div>
+                </div>
+                <el-carousel height="20px" direction="vertical" indicator-position="none" :autoplay="true" v-if="modCon.content.stitle && modCon.content.stitle.styletype">
+                    <el-carousel-item v-for="(stitle,ind) in  modCon.content.stitle.textArr" :key="ind">
+                        <p :style="'color:'+ modCon.content.stitle.style.color +';'" v-if="modCon.content.stitle.styletype == 2">{{stitle.value}}</p>
+                        <template v-else>
+                            <p :style="'color:'+ modCon.content.stitle.style.color +';'" v-if="modCon.id == 18">
+                               <em class="nickname"> {{stitle.nickname ? stitle.nickname : '**用户'}}</em><span>{{stitle.enddate &&  new Date(new Date().getFullYear() + stitle.enddate).toLocaleDateString()== new Date().toLocaleDateString() ? '刚刚' : '' }}砍价成功</span>
+                            </p>
+                            <p :style="'color:'+ modCon.content.stitle.style.color +';'" v-else-if="modCon.id == 16">
+                                <em class="nickname">{{stitle.nickname ? stitle.nickname : '**用户'}}</em><span>抢到了{{stitle.title}}</span>
+                            </p>
+                            <p :style="'color:'+ modCon.content.stitle.style.color +';'" v-else-if="modCon.id == 17">
+                                <em class="nickname">{{stitle.nickname ? stitle.nickname : '**用户'}}</em><span>{{stitle.enddate &&  new Date(new Date().getFullYear() + stitle.enddate).toLocaleDateString()== new Date().toLocaleDateString() ? '刚刚' : '' }}拼团成功</span>
+                            </p>
+                        </template>
+                    </el-carousel-item>
+                </el-carousel>
+                <template v-else-if="!modCon.content.stitle.styletype">
+                    <!-- <div class="stitlePlace"  style="height:20px;"></div> -->
+                </template>
+            </div>
+            <div class="conInner">
+                <!-- :style="modCon.content.bgStyle == 3 ? 'border-radius:'+(modCon.content.style.borderRadius / 2)+'px;': ''"  -->
+                <!-- ,{'proShow2': modCon.content.singleShow == 1 || (!modCon.content.listArr || !modCon.content.listArr.length)} -->
+                <div :class="['proShow' ,'proShow' + modCon.content.bgStyle]" :style="'height:'+getCarouselHeight(modCon,modInd)+'px;' + (modCon.content.bgStyle == 3 ? 'border-radius:'+(modCon.content.style.borderRadius / 2)+'px;': 'border-radius:'+(modCon.content.style.borderRadius / 2 > 4 ? (modCon.content.style.borderRadius / 2 - 4) : 0)+'px;')">
+                    <el-carousel v-if="modCon.content.listArr && modCon.content.listArr.length" :height="getCarouselHeight(modCon,modInd)" direction="vertical" indicator-position="none" :loop="true" :autoplay="true">
+                        <el-carousel-item v-for="(group,gind) in arrToGroup((modCon.content.listArr.length < modCon.content.listCount ? modCon.content.listArr : (modCon.content.listArr.slice(0,modCon.content.listCount))), modCon.content.singleShow)" :key="gind">
+                            <ul :class="'swiperInner slideShow' + modCon.content.singleShow" >
+                               
+                                <template v-if="modCon.content.singleShow == 1">
+                                    <!-- 单行显示1条数据 -->
+                                    <li class="singlePro"  v-for="pro in group">
+                                        <h2 :style="'color:'+modCon.content.dataObj.price.style.tcolor+';'">{{pro.title}}</h2>
+                                        <div class="flexBox">
+                                            <div class="flex_l ">
+                                                <h4 class="price"> 
+                                                    <b :style="'color:'+modCon.content.dataObj.price.style.color+';'" v-if="modCon.id == 18">￥{{parseFloat(pro.floorprice)}}</b>
+                                                    <b :style="'color:'+modCon.content.dataObj.price.style.color+';'" v-else>￥{{parseFloat(pro.huodongprice)}}</b>
+                                                    <s :style="'color:'+modCon.content.dataObj.price.style.scolor+';'"  v-show="modCon.content.dataObj.price.sprice">￥{{parseFloat(pro.mprice)}}</s> </h4>
+                                                <span class="btn" :style="'background-color:'+ modCon.content.dataObj.price.style.color +';'">
+                                                    <em v-if="modCon.id == 19">抢购</em>
+                                                    <em v-if="modCon.id == 18">立即抢</em>
+                                                    <em v-if="modCon.id == 17">拼团</em>
+                                                    <em v-if="modCon.id == 16">秒杀</em>
+                                                </span>
+                                            </div>
+                                            <div class="flex_r">
+                                                <div class="litpic"><img crossOrigin='anonymous' :src="pro.litpic" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </template>
+        
+                                <template v-else>
+                                    <!-- 单行显示两条数据的样式 -->
+                                    <li v-for="pro in group">
+                                        <div class="litpic">
+                                            <img crossOrigin='anonymous' :src="pro.litpic" onerror="this.src='/static/images/404.jpg'" alt="">
+                                        </div>
+                                        <div :class="['priceShow priceShow' + modCon.content.dataObj.price.styletype,{'otherPrice': modCon.id == 17 || modCon.id == 18}]">
+                                            <div class="priceBtn">
+                                                <div class="price" :style="getObjStyle(modCon,'yxpriceBtn')" >
+                                                    <span class="ptext" :style="modCon.content.dataObj.price.styletype > 1 && ((modCon.id !== 17 && modCon.id !== 18))? 'color:#fff;' : 'color:'+modCon.content.dataObj.price.style.color+';'">￥<b v-if="modCon.id == 18">{{parseFloat(pro.floorprice)}}</b><b v-else>{{parseFloat(pro.huodongprice)}}</b> </span>
+                                                    <template v-if="modCon.content.dataObj.price.styletype == 2 && modCon.id != 19 && modCon.id != 16" >
+                                                        <span class="ttext" v-if="modCon.id == 18"><i class="bg_price" :style="'background:'+modCon.content.dataObj.price.style.color+';'"></i><em>可砍至</em></span>
+                                                        <span class="ttext" v-if="modCon.id == 17"><i class="bg_price" :style="'background:'+modCon.content.dataObj.price.style.color+';'"></i><em>团</em></span>
+                                                    </template>
+                                                    <s class="sprice" v-show="modCon.content.dataObj.price.sprice" :style="'color:'+modCon.content.dataObj.price.style.scolor+';'" v-if="modCon.content.dataObj.price.styletype == 1 ">￥{{parseFloat(pro.mprice)}}</s>
+                                                </div>
+                                                <s class="sprice" v-show="modCon.content.dataObj.price.sprice"  :style="'color:'+modCon.content.dataObj.price.style.scolor+';'" v-if="modCon.content.dataObj.price.styletype == 2 ">￥{{parseFloat(pro.mprice)}}</s>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </template>
+                            </ul>
+                        </el-carousel-item>
+                    </el-carousel>
+                    <div class="noData" v-else>
+                        <span>暂无相关活动</span>
+                    </div>
+                </div>
+    
+                <!-- 营销背景 -->
+                <template >
+                    <div class="yx_bg_header" :style="getObjStyle(modCon.content,'yx_header_bg')"></div>
+                    <div class="yx_bg" v-if="modCon.content.bgStyle == 1 || modCon.content.bgStyle == 2" :style="' background: linear-gradient(180deg, '+checkBgColor((modCon.content.listArr.length || modCon.content.bgStyle == 2 ? modCon.content.style.bgMask : '#ffffff'),'0')+' 10%, '+checkBgColor((modCon.content.listArr.length || modCon.content.bgStyle == 2 ? modCon.content.style.bgMask : '#ffffff'),'100')+' 40%,'+checkBgColor((modCon.content.listArr.length || modCon.content.bgStyle == 2 ? modCon.content.style.bgMask : '#ffffff'),'100')+' 100%);border-radius:'+ modCon.content.style.borderRadius / 2 +'px;'"></div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全组件 -->
+    <div class="fullCon" v-else :style="getObjStyle(modCon.content,'yxBoxBg')" >
+        <div class="conHeader flexAlign">
+            <div class="flex_l">
+                <div class="title">
+                    <h4 :style="'color:' + modCon.content.title.style.color + ';'" v-if="modCon.content.title.type == 'text'">
+                        <span v-if="modCon.content.title.text">{{modCon.content.title.text}}</span>
+                        <template v-else>
+                            <span v-if="modCon.id == 16">秒杀</span>
+                            <span v-else-if="modCon.id == 17">拼团</span>
+                            <span v-else-if="modCon.id == 18">砍价</span>
+                            <span v-else-if="modCon.id == 19">抢购</span>
+                        </template>
+                    </h4>
+                    <h4 v-if="modCon.content.title.type == 'image'"><img crossOrigin='anonymous' :src="modCon.content.title.image"></h4>
+                    <div class="cutDown" v-if="modCon.id == 19">
+                        <template v-if="Array.isArray(modCon.content.cutDownTimeToText) || !modCon.content.cutDownTimeToText">
+                            <span :style="'color:' + modCon.content.style.cutDown + '; background-color:' +modCon.content.style.cutDownBg+ ';'">{{modCon.content.cutDownTimeToText[0] ? modCon.content.cutDownTimeToText[0] : '00'}}</span>
+                            <em :style="'color:' + modCon.content.style.split + ';'">:</em>
+                            <span :style="'color:' + modCon.content.style.cutDown + '; background-color:' +modCon.content.style.cutDownBg+ ';'">{{modCon.content.cutDownTimeToText[1] ? modCon.content.cutDownTimeToText[1] : '00'}}</span>
+                            <em :style="'color:' + modCon.content.style.split + ';'">:</em>
+                            <span :style="'color:' + modCon.content.style.cutDown + '; background-color:' +modCon.content.style.cutDownBg+ ';'">{{modCon.content.cutDownTimeToText[2] ? modCon.content.cutDownTimeToText[2] : '00'}}</span>
+                        </template>
+                        <div v-else :style="'color:' + modCon.content.style.cutDown + '; background-color:' +modCon.content.style.cutDownBg+ ';'">{{modCon.content.cutDownTimeToText}}</div>
+                    </div>
+
+                    <el-carousel height="22px" direction="vertical" indicator-position="none" :autoplay="true" v-if="modCon.content.stitle && modCon.content.stitle.styletype">
+                        <el-carousel-item v-for="(stitle,ind) in  modCon.content.stitle.textArr" :key="ind">
+                            <p :style="'color:'+ modCon.content.stitle.style.color +';'" v-if="modCon.content.stitle.styletype == 2">{{stitle.value}}</p>
+                            <template v-else>
+                                <p :style="'color:'+ modCon.content.stitle.style.color +';'" v-if="modCon.id == 18">
+                                    <em class="nickname"> {{stitle.nickname ? stitle.nickname : '**用户'}}</em><span>{{stitle.enddate &&  new Date(new Date().getFullYear() + stitle.enddate).toLocaleDateString()== new Date().toLocaleDateString() ? '刚刚' : '' }}砍价成功</span>
+                                 </p>
+                                 <p :style="'color:'+ modCon.content.stitle.style.color +';'" v-else-if="modCon.id == 16">
+                                     <em class="nickname">{{stitle.nickname ? stitle.nickname : '**用户'}}</em><span>抢到了{{stitle.title}}</span>
+                                 </p>
+                                 <p :style="'color:'+ modCon.content.stitle.style.color +';'" v-else-if="modCon.id == 17">
+                                     <em class="nickname">{{stitle.nickname ? stitle.nickname : '**用户'}}</em><span>{{stitle.enddate &&  new Date(new Date().getFullYear() + stitle.enddate).toLocaleDateString()== new Date().toLocaleDateString() ? '刚刚' : '' }}拼团成功</span>
+                                 </p>
+                            </template>
+                        </el-carousel-item>
+                    </el-carousel>
+                </div>
+
+            </div>
+            <div class="flex_r">
+                <span class="more" v-if="modCon.content.more.show" :style="'color:'+ modCon.content.more.style.color +';'">{{modCon.content.more.text}}
+                    <s :style="'background-color:'+ checkBgColor(modCon.content.more.style.arrColor,15) +';'" v-if="modCon.content.more.arr">
+                        <!-- <em :style="modCon.content.more.style.arrColor ? 'filter: drop-shadow('+ modCon.content.more.style.arrColor +' 18px 0px 0px);  transform: translateX(-100%);' : ''"></em> -->
+                        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="11px" height="20px" viewBox="-6 -10 22 40"> <path fill-rule="evenodd"  :fill="modCon.content.more.style.arrColor ? modCon.content.more.style.arrColor : 'rgb(161, 164, 179，.6)'" d="M10.977,9.976 C10.977,9.618 10.831,9.260 10.544,8.986 L3.484,0.385 C2.910,-0.161 1.972,-0.161 1.401,0.385 C0.822,0.935 0.822,1.820 1.401,2.368 L7.415,9.976 L1.401,17.583 C0.822,18.130 0.822,19.020 1.401,19.567 C1.972,20.113 2.910,20.113 3.484,19.567 L10.544,10.968 C10.831,10.694 10.977,10.336 10.977,9.976 Z"/> </svg>
+                    </s>
+                </span>
+            </div>
+        </div>
+        <div class="conInner" :style="modCon.content.bgStyle == 2 ? 'padding-bottom:5px;':''">
+            <!-- :style="modCon.content.bgType == 3 ? '': ''" -->
+            <!-- 背景样式 -->
+            <div  :class="['proShow' ,'proShow' + modCon.content.bgStyle]" :style="modCon.content.bgStyle == 3 ? 'border-radius:'+(modCon.content.style.borderRadius / 2)+'px;':  'border-radius:'+(modCon.content.style.borderRadius / 2 > 4 ? (modCon.content.style.borderRadius / 2 - 4) : 0)+'px;'" >
+
+                <!-- 单行显示1条数据 -->
+                <ul class="slide1" v-if="modCon.content.singleShow === 1 && modCon.content.listArr && Array.isArray(modCon.content.listArr)">
+                    <li v-for="pro in (modCon.content.listArr.length < modCon.content.listCount ? modCon.content.listArr : (modCon.content.listArr.slice(0,modCon.content.listCount)))" :style="'border-radius:'+ (modCon.content.style.borderRadius / 2) +'px;'">
+                        <div class="litpic">
+                            <img crossOrigin='anonymous' :src="pro.litpic" onerror="this.src='/static/images/404.jpg'" alt="">
+                            <span class="tuan_num" v-if="modCon.id == 17 && modCon.content.tuan.show" :style="'color:'+  modCon.content.tuan.style.textColor +'; background: linear-gradient(180deg, '+checkBgColor(modCon.content.tuan.style.bgColor,'0')+' 0%, '+ modCon.content.tuan.style.bgColor +' 100%);'">{{pro.huodongnumber}}人团</span>
+                        </div>
+                        <div class="proInfo">
+                            <h4 :style="'color:'+modCon.content.dataObj.price.style.tcolor+';'">{{pro.title}}</h4>
+                            <p><s class="sprice"  v-if="modCon.content.dataObj.price.styletype === 4" v-show="modCon.content.dataObj.price.sprice"  :style="'color:'+ modCon.content.dataObj.price.style.scolor +';'">￥{{parseFloat(pro.mprice)}}</s>
+                                <template v-if="modCon.content.dataObj.stockInfo">
+                                    <span class="stock" v-show="modCon.content.dataObj.stockInfo.stockShow" :style="'color:'+modCon.content.dataObj.stockInfo.color+';'">{{pro.huodonginventory > 10 ? ('库存 ' + pro.huodonginventory) : ('仅剩' + pro.huodonginventory + '件')}}</span>
+                                    <span class="stock" v-show="modCon.content.dataObj.stockInfo.saleShow" :style="'color:'+modCon.content.dataObj.stockInfo.color+';'">已售{{pro.sales ? pro.sales : 0}}</span>
+                                </template>
+                            </p>
+
+                            
+                            <div :class="['priceShow priceShow' + modCon.content.dataObj.price.styletype,{'otherPrice':modCon.id != 19 && modCon.id != 16 }]">
+                                <div :class="'priceBtn singleShow' + modCon.content.singleShow" :style="modCon.content.dataObj.price.styletype == 4 ? 'background:linear-gradient(90deg, '+ modCon.content.dataObj.price.style.color +' 50%, #FFDFAC 100%);' : ''" >
+                                    <div class="price"   :style="modCon.content.dataObj.price.styletype == 2 ? ('background-color:'+checkBgColor(modCon.content.dataObj.price.style.color,(modCon.id == 17 || modCon.id == 18 ? 5 : 100))+';') : ''"> <span class="ptext" :style="getObjStyle(modCon,'yxprice')">￥<b v-if="modCon.id == 18">{{parseFloat(pro.floorprice)}}</b> <b v-else>{{parseFloat(pro.huodongprice)}}</b></span>
+                                        <template v-if="modCon.content.dataObj.price.styletype == 2 && modCon.id != 19 && modCon.id != 16" >
+                                            <span class="ttext" v-if="modCon.id == 18"><i class="bg_price" :style="'background:'+modCon.content.dataObj.price.style.color+';'"></i><em>可砍至</em></span>
+                                            <span class="ttext" v-if="modCon.id == 17"><i class="bg_price" :style="'background:'+modCon.content.dataObj.price.style.color+';'"></i><em>团</em></span>
+                                        </template>
+                                        <s class="sprice" v-show="modCon.content.dataObj.price.sprice"  v-if="modCon.content.dataObj.price.styletype == 3 || modCon.content.dataObj.price.styletype === 1  ">￥{{parseFloat(pro.mprice)}}</s>
+                                        <em v-if="modCon.content.dataObj.price.styletype == 4 " style="color:rgba(255,255,255,.6);">{{modCon.id == 17 ? '拼团价' : '低价抢'}}</em>
+                                    </div>
+                                    <s class="sprice" v-show="modCon.content.dataObj.price.sprice"  v-if="modCon.content.dataObj.price.styletype == 2 " :style="'color:'+ modCon.content.dataObj.price.style.scolor +';'">￥{{parseFloat(pro.mprice)}}</s>
+                                    <div class="btn" v-if="modCon.content.dataObj.price.styletype == 3 || modCon.content.dataObj.price.styletype == 4" :style="(modCon.content.dataObj.price.styletype == 3 ? 'background:'+ modCon.content.dataObj.price.style.color +';' : '')">
+                                        <span v-if="modCon.id == 19" v-html="modCon.content.dataObj.price.styletype == 3 ? '<em>抢</em><em>购</em>':'抢'"></span>
+                                        <span v-if="modCon.id == 18" v-html="modCon.content.dataObj.price.styletype == 3 ? '<em>砍</em><em>一刀</em>':'砍'"></span>
+                                        <span v-if="modCon.id == 17" v-html="modCon.content.dataObj.price.styletype == 3 ? '<em>拼</em><em>团</em>': pro.huodongnumber + '人团'"></span>
+                                        <span v-if="modCon.id == 16" v-html="modCon.content.dataObj.price.styletype == 3 ? '<em>秒</em><em>杀</em>':'抢'"></span>
+                                        <!-- <span v-if="modCon.id == 19">{{modCon.content.dataObj.price.styletype == 3 ? '抢购' : '抢'}}</span>
+                                        <span v-if="modCon.id == 18">{{modCon.content.dataObj.price.styletype == 3 ? '砍一刀' : '砍'}}</span>
+                                        <span v-if="modCon.id == 17">{{modCon.content.dataObj.price.styletype == 3 ? '拼团' : pro.huodongnumber + '人团'}}</span>
+                                        <span v-if="modCon.id == 16">{{modCon.content.dataObj.price.styletype == 3 ? '秒杀' : '抢'}}</span> -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 按钮样式 3-->
+                            <!-- <div class="priceShow priceShow4 fn-hide">
+                                <div class="priceBtn">
+                                    <div class="price">
+                                        <span class="ptext">￥<b>9.9</b></span>
+                                        <em>低价抢</em>
+                                    </div>
+                                    <div class="btn"><span>抢</span></div>
+                                </div>
+                            </div> -->
+
+                            <!--价格按钮样式 2 -->
+                            <!-- <div class=" priceShow3 fn-hide">
+                                <div class="priceBtn">
+                                    <div class="price">
+                                        <span class="ptext">￥<b>9.9</b></span>
+                                        <s>￥30</s>
+                                    </div>
+                                    <div class="btn"><span>抢购</span></div>
+                                </div>
+                            </div> -->
+                            <!--价格按钮样式 1 -->
+                            <!-- otherPrice -->
+                            <!-- <div class=" priceShow2 ">
+                                <div class="priceBtn">
+                                    <div class="price">
+                                        <span class="ptext">￥<b>9.9</b></span>
+                                        <span class="ttext"><em>可砍至</em></span>
+                                    </div>
+                                    <s class="sprice">￥30</s>
+                                </div>
+                            </div> -->
+                            <!--价格按钮样式 1 -->
+                            <!-- <div class=" priceShow1 ">
+                                <div class="priceBtn">
+                                    <div class="price">
+                                        <span class="ptext">￥<b>9.9</b></span>
+                                        <s class="sprice">￥30</s>
+                                    </div>
+                                </div>
+                            </div> -->
+                        </div>
+                    </li>
+                </ul>
+                <!-- 单行显示2条数据 -->
+                <el-carousel :height="getCarouselHeight(modCon,modInd)" :indicator-position="modCon.content.listArr.length > modCon.content.singleShow ? 'outside' : 'none'" :autoplay="true" v-else-if="modCon.content.listArr && Array.isArray(modCon.content.listArr)">
+                    <el-carousel-item class="progroup" v-for="(group,gind) in arrToGroup((modCon.content.listArr.length < modCon.content.listCount ? modCon.content.listArr : (modCon.content.listArr.slice(0,modCon.content.listCount))), modCon.content.singleShow)" :key="gind">
+                        <!-- 单行显示 -->
+                        <div class="swiperInner">
+                            <ul :class="' ul_'+modCon.content.singleShow">
+                                <li v-for="pro in group">
+                                    <div class="litpic">
+                                        <img crossOrigin='anonymous' :src="pro.litpic" onerror="this.src='/static/images/404.jpg'">
+                                        <span class="tuan_num" v-if="modCon.id == 17 && modCon.content.tuan.show" :style="'color:'+  modCon.content.tuan.style.textColor +'; background: linear-gradient(180deg, '+checkBgColor(modCon.content.tuan.style.bgColor,'0')+' 0%, '+ modCon.content.tuan.style.bgColor +' 100%);'">{{pro.huodongnumber}}人团</span>
+                                    </div>
+                                    <div class="proInfo">
+                                        <h4 v-if="modCon.content.dataObj.price.style.titleLine > 0 " :class="{'oneLine':modCon.content.dataObj.price.styletype == 2}" :style="'color:'+modCon.content.dataObj.price.style.tcolor+'; -webkit-line-clamp: '+ modCon.content.dataObj.price.style.titleLine +'; height:'+( 15 * modCon.content.dataObj.price.style.titleLine)+'px;'">{{pro.title}}</h4>
+                                        <!-- 按钮样式 3-->
+                                        <div :class="['priceShow priceShow' + modCon.content.dataObj.price.styletype,{'otherPrice':modCon.id != 19 && modCon.id != 16 }]">
+                                            <div :class="'priceBtn singleShow' + modCon.content.singleShow" :style="modCon.content.dataObj.price.styletype == 4 ? 'background:linear-gradient(90deg, '+ modCon.content.dataObj.price.style.color +' 50%, #FFDFAC 100%);' : ''" >
+                                                <!-- #FFDFAC -->
+                                                
+                                                <div class="price" :style="modCon.content.dataObj.price.styletype == 2 ? ('background-color:'+checkBgColor(modCon.content.dataObj.price.style.color,(modCon.id == 17 || modCon.id == 18 ? 5 : 100))+';') : ''">
+                                                    <span class="ptext" :style="getObjStyle(modCon,'yxprice')">￥<b v-if="modCon.id == 18">{{parseFloat(pro.floorprice)}}</b> <b v-else>{{parseFloat(pro.huodongprice)}}</b></span>
+                                                    <template v-if="modCon.content.dataObj.price.styletype == 2 && modCon.id != 19 && modCon.id != 16" >
+                                                        <span class="ttext" v-if="modCon.id == 18"><i class="bg_price" :style="'background:'+modCon.content.dataObj.price.style.color+';'"></i><em>可砍至</em></span>
+                                                        <span class="ttext" v-if="modCon.id == 17"><i class="bg_price" :style="'background:'+modCon.content.dataObj.price.style.color+';'"></i><em>团</em></span>
+                                                    </template>
+                                                    <s class="sprice" v-show="modCon.content.dataObj.price.sprice"  v-if="modCon.content.dataObj.price.styletype == 3 || modCon.content.dataObj.price.styletype === 1 ">￥{{parseFloat(pro.mprice)}}</s>
+                                                    <em v-if="modCon.content.dataObj.price.styletype == 4 " style="color:rgba(255,255,255,.6);"> {{modCon.id == 17 ? '拼团价' : '低价抢'}}</em>
+                                                </div>
+                                                <s class="sprice" v-show="modCon.content.dataObj.price.sprice"  v-if="modCon.content.dataObj.price.styletype == 2 " :style="'color:'+ modCon.content.dataObj.price.style.scolor +';'">￥{{parseFloat(pro.mprice)}}</s>
+                                                <div class="btn" v-if="modCon.content.dataObj.price.styletype == 3 || modCon.content.dataObj.price.styletype == 4 " :style="(modCon.content.dataObj.price.styletype == 3 ? 'background:'+ modCon.content.dataObj.price.style.color +';' : '')">
+                                                    <span v-if="modCon.id == 19" v-html="modCon.content.dataObj.price.styletype == 3 ? '<em>抢</em><em>购</em>':'抢'"></span>
+                                                    <span v-if="modCon.id == 18" v-html="modCon.content.dataObj.price.styletype == 3 ? '<em>砍</em><em>一刀</em>':'砍'"></span>
+                                                    <span v-if="modCon.id == 17" v-html="modCon.content.dataObj.price.styletype == 3 ? '<em>拼</em><em>团</em>': pro.huodongnumber + '人团'"></span>
+                                                    <span v-if="modCon.id == 16" v-html="modCon.content.dataObj.price.styletype == 3 ? '<em>秒</em><em>杀</em>':'抢'"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                        </el-carousel-item>
+                    </el-carousel-item>
+                </el-carousel>
+
+                <div class="noData" v-if="!modCon.content.listArr || modCon.content.listArr.length == 0">暂无相关活动</div>
+            </div>
+            <!-- 营销背景 -->
+            <!-- 有数据显示 设置的颜色 -->
+            <template >
+                <div class="yx_bg_header" :style="getObjStyle(modCon.content,'yx_header_bg')"></div>
+                <div class="yx_bg" v-if="(modCon.content.bgStyle == 1 || modCon.content.bgStyle == 2) && (modCon.content.listArr && modCon.content.listArr.length)" :style="' background: linear-gradient(180deg, '+checkBgColor(modCon.content.style.bgMask,'0')+' 10%, '+checkBgColor(modCon.content.style.bgMask,'100')+' 40%,'+checkBgColor(modCon.content.style.bgMask,'100')+' 100%); border-radius:'+ modCon.content.style.borderRadius / 2 +'px;'"></div>
+    
+                <!-- 无数据显示 白色 -->
+                <div class="yx_bg" v-else :style="' background: linear-gradient(180deg, '+checkBgColor('#ffffff','0')+' 10%, '+checkBgColor('#ffffff','100')+' 40%,'+checkBgColor('#ffffff','100')+' 100%); border-radius:'+ modCon.content.style.borderRadius / 2 +'px;'"></div>
+            </template>
+        </div>
+    </div>
+</div>

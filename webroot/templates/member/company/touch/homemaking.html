@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="{#$cfg_soft_lang#}">
+  <title>{#$langData['homemaking'][1][27]#}</title> {#* 家政服务 *#}
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+  <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/homemaking.css?v={#$cfg_staticVersion#}">
+  <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+  <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+  <script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+    var userId = `{#$userinfo.userid#}`;
+    var imgError = `{#$cfg_staticPath#}images/404.jpg?v={#$cfg_staticVersion#}`;
+    var memberUrl = `{#getUrlPath service='member'#}`; //店铺配置页面
+    if (!userId) {
+      location.href = `${masterDomain}/login.html`;
+    }
+  </script>
+</head>
+
+<body>
+  {#* 家政服务 *#}
+  <div id="vue" v-cloak>
+    <!-- 页面载入loading -->
+    <div class="loading" v-if="false">页面加载中...</div>
+    <!-- 页面内容 -->
+    <div :class="['Shell',{'app':appBoolean}]" v-if="detail.id">
+      <!-- 商家信息 -->
+      <div class="companyDetail">
+        <div class="c-nav">
+          <img src="{#$templets_skin#}images/back-r.png?v={#$cfg_staticVersion#}" class="cn-left" @click="backFn">
+          <img src="{#$templets_skin#}images/shop/set-icon.png?v={#$cfg_staticVersion#}" class="cn-right"
+            @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+        </div>
+        <div class="c-info">
+          <div class="ci-left">
+            <img :src="detail.logo||imgError" class="cil-logo" @error="detail.logo=imgError">
+            <div class="cil-info">
+              <div class="title">{{detail.name}}</div>
+              <!-- 审核中 -->
+              <div class="aduit" @click="linkTo(`{#getUrlPath service='member' template='config-homemaking'#}`)"
+                v-if="detail.state==0">商家资料审核中</div>
+              <!-- 审核拒绝 -->
+              <div class="refuse" @click="linkTo(`{#getUrlPath service='member' template='config-homemaking'#}`)"
+                v-else-if="detail.state==2">商家资料审核未通过</div>
+              <!-- 审核通过 -->
+              <div class="tip" v-else>
+                <span>商家版到期 {{detail.endTime}}</span>
+                <div @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">续费</div>
+              </div>
+            </div>
+          </div>
+          <div class="ci-right" @click="linkTo(detail.homepage)">
+            <img src="{#$templets_skin#}images/houseWhite.png?v={#$cfg_staticVersion#}">
+            <span>我的主页</span>
+          </div>
+        </div>
+        <div class="c-data">
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.order.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.order.today}}</div>
+            <div class="cdi-text">今日订单(笔)</div>
+          </div>
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.money.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.money.today}}</div>
+            <div class="cdi-text">今日成交额(元)</div>
+          </div>
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.click.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.click.today}}</div>
+            <div class="cdi-text">今日客流(人)</div>
+          </div>
+        </div>
+      </div>
+      <!-- 订单管理 -->
+      <div class="orderNav">
+        <div class="o-title" @click="linkTo(`{#getUrlPath service='member' template='order-homemaking'#}`)">
+          <div class="ot-left">管理订单</div>
+          <div class="ot-right">
+            查看全部订单</div>
+        </div>
+        <div class="o-list">
+          <div class="ol-item"
+            @click="linkTo(`{#getUrlPath service='member' template='order-homemaking' param='state=1'#}`)">
+            <img src="{#$templets_skin#}images/homemaking/newOrder.png?v={#$cfg_staticVersion#}">
+            <span>待确认({{orderInfo.state1||0}})</span>
+            <div v-if="orderInfo.state1>0">新订单</div>
+          </div>
+          <div class="ol-item"
+            @click="linkTo(`{#getUrlPath service='member' template='order-homemaking' param='state=2'#}`)">
+            <img src="{#$templets_skin#}images/homemaking/newService.png?v={#$cfg_staticVersion#}">
+            <span>待服务({{orderInfo.state20||0}})</span>
+          </div>
+          <div class="ol-item"
+            @click="linkTo(`{#getUrlPath service='member' template='order-homemaking' param='state=3'#}`)">
+            <img src="{#$templets_skin#}images/homemaking/newConfirm.png?v={#$cfg_staticVersion#}">
+            <span>待验收({{orderInfo.state5||0}})</span>
+          </div>
+          <div class="ol-item"
+            @click="linkTo(`{#getUrlPath service='member' template='order-homemaking' param='state=6'#}`)">
+            <img src="{#$templets_skin#}images/homemaking/newMoney.png?v={#$cfg_staticVersion#}">
+            <span>退款售后({{orderInfo.state8||0}})</span>
+          </div>
+        </div>
+      </div>
+      <!-- 服务管理/员工账号 -->
+      <div class="manageItem">
+        <div class="m-left" @click="linkTo(`{#getUrlPath service='member' template='manage-homemaking' param="htype=serve"#}`,'/pages/packages/mcenter/bfabu/bfabu?htype=serve&mold=homemaking')">
+          <div class="ml-right">
+            <div class="title">服务管理</div>
+            <div class="tip">发布家政服务</div>
+          </div>
+          <img src="{#$templets_skin#}images/homemaking/newTool.png?v={#$cfg_staticVersion#}" class="ml-pic">
+        </div>
+        <div class="m-right" @click="linkTo(`{#getUrlPath service='member' template='homemaking-personal'#}`)">
+          <div class="mr-right">
+            <div class="title">员工账号</div>
+            <div class="tip">分配订单上门服务</div>
+          </div>
+          <img src="{#$templets_skin#}images/homemaking/newRefresh.png?v={#$cfg_staticVersion#}" class="mr-pic">
+        </div>
+      </div>
+      <!-- 员工保姆管理 babysitterList.length>0-->
+      <div class="staffList" v-if="babysitterList.length>0">
+        <div class="s-title">
+          <div class="st-left">保姆月嫂</div>
+          <div class="st-right" @click="linkTo(`{#getUrlPath service='member' template='manage-homemaking' param="htype=sitter"#}`,`/pages/packages/mcenter/bfabu/bfabu?mold=homemaking&htype=sitter`)">查看全部
+          </div>
+        </div>
+        <div class="s-list">
+          <!-- 一个 -->
+          <div class="sl-item" @click="linkTo(babysitterList[0].url)" v-if="babysitterList.length==1">
+            <div class="sli-picture">
+              <img :src="babysitterList[0].photo||imgError" @error="babysitterList[0].photo=imgError">
+              <div v-if="babysitterList[0].naturename.length>0">{{babysitterList[0].naturename[0]}}</div>
+            </div>
+            <div class="sli-info">
+              <div class="title">{{babysitterList[0].username}}</div>
+              <div class="tip">
+                {{babysitterList[0].age}}岁<span>|</span>{{babysitterList[0].placename}}<span>|</span>{{babysitterList[0].educationname}}<span>|</span>{{babysitterList[0].experiencename}}
+              </div>
+              <div class="time"><span>{{babysitterList[0].salaryname}}</span>/月</div>
+            </div>
+          </div>
+          <!-- 多个 -->
+          <div class="sl-item" v-for="(item,index) in babysitterList" :key="index" @click="linkTo(item.url)" v-else>
+            <div class="sli-picture">
+              <img :src="item.photo||imgError" @error="item.photo=imgError">
+              <div v-if="item.naturename.length>0">{{item.naturename[0]}}</div>
+            </div>
+            <div class="sli-info">
+              <div class="title">{{item.username}}</div>
+              <div class="tip one">{{item.age}}岁<span>|</span>{{item.placename}}</div>
+              <div class="time"><span>{{item.salaryname}}</span>/月</div>
+            </div>
+          </div>
+        </div>
+        <div class="s-btn" @click="linkTo(`{#getUrlPath service='member' template='fabu-homemaking-nanny'#}`)">
+          添加/管理阿姨</div>
+      </div>
+      <div class="staffNone" v-else-if="false">
+        <div class="s-title">
+          <div class="st-left">保姆月嫂</div>
+          <div class="st-right">无此业务？<span>可关闭组件</span></div>
+        </div>
+        <div class="s-tip">完善公司旗下保姆/月嫂等资料，客户自动找上门</div>
+        <div class="s-add" @click="linkTo(`{#getUrlPath service='member' template='fabu-homemaking-nanny'#}`)">添加阿姨
+        </div>
+      </div>
+      <!-- 续费标签 -->
+      <div class="continueLabel" v-if="detail.continue">
+        <div class="c-left">
+          <div class="title">商家版即将到期</div>
+          <div class="tip">续费套餐，续享全部商家服务</div>
+        </div>
+        <div class="c-btn" @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">
+          <span>查看/续费</span>
+          <img src="{#$templets_skin#}images/newRight.png?v={#$cfg_staticVersion#}">
+        </div>
+      </div>
+      <!-- 家政管理 -->
+      <div class="orderList">
+        <div class="l-title">家政管理</div>
+        <div class="l-list">
+          <div class="ll-item" @click="linkTo(`{#getUrlPath service='member' template='config-homemaking'#}`)">
+            <img src="{#$templets_skin#}images/homemaking/newNews.png?v={#$cfg_staticVersion#}">
+            <div>店铺配置</div>
+          </div>
+          <div class="ll-item" @click="linkTo(`{#getUrlPath service='member' template='manage-homemaking' param="htype=sitter"#}`,`/pages/packages/mcenter/bfabu/bfabu?mold=homemaking&htype=sitter`)">
+            <img src="{#$templets_skin#}images/homemaking/newPeople.png?v={#$cfg_staticVersion#}">
+            <div>保姆月嫂</div>
+          </div>
+          <div class="ll-item" @click="linkTo(`{#$cfg_basehost#}/mobile.html`)" v-if="!appBoolean">
+            <img src="{#$templets_skin#}images/newShield.png?v={#$cfg_staticVersion#}">
+            <div>下载APP</div>
+          </div>
+          <div class="ll-item" @click="linkTo(`{#getUrlPath service='member' type='user' template='pocket'#}`)">
+            <img src="{#$templets_skin#}images/homemaking/newWallet.png?v={#$cfg_staticVersion#}">
+            <div>我的钱包</div>
+          </div>
+          <div class="ll-item" @click="linkTo(`tel:${detail.hotline}`)">
+            <img src="{#$templets_skin#}images/newHeadset.png?v={#$cfg_staticVersion#}">
+            <div>客服帮助</div>
+          </div>
+          <div class="ll-item app_show" @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+            <img src="{#$templets_skin#}images/set_icon_red.png?v={#$cfg_staticVersion#}">
+            <div>系统设置</div>
+          </div>
+        </div>
+      </div>
+      <!-- 审核状态/过期弹窗 -->
+      <div class="auditPop" v-if="false">
+        <!-- 审核弹窗 -->
+        <div class="a-content" v-if="false">
+          <img src="{#$templets_skin#}images/closePop.png?v={#$cfg_staticVersion#}" class="ac-close">
+          <!-- 审核中 -->
+          <div class="ac-auditing" v-if="false">
+            <img src="{#$templets_skin#}images/shopState0.png?v={#$cfg_staticVersion#}" class="aca-picture">
+            <div class="aca-title">店铺资料审核中</div>
+            <div class="aca-tip">平台正在尽快审核，请耐心等待！</div>
+            <div class="aca-btn">我知道了</div>
+          </div>
+          <!-- 审核拒绝 -->
+          <div class="ac-refuse" v-else-if="false">
+            <img src="{#$templets_skin#}images/shopState2.png?v={#$cfg_staticVersion#}" class="acr-picture">
+            <div class="acr-title">店铺资料审核未通过，请重新修改提交</div>
+            <div class="acr-tip">如有疑问，可联系平台客服</div>
+            <div class="acr-btn">
+              <div class="kefu">联系客服</div>
+              <div>修改资料</div>
+            </div>
+          </div>
+          <!-- 审核通过 -->
+          <div class="ac-access" v-else>
+            <img src="{#$templets_skin#}images/shopState1.png?v={#$cfg_staticVersion#}" class="acc-picture">
+            <div class="acc-title">审核通过，快去完善店铺吧~</div>
+            <div class="acr-btn">
+              <div class="kefu">完善信息</div>
+              <div>发布商品</div>
+            </div>
+          </div>
+        </div>
+        <!-- 过期弹窗 -->
+        <div class="e-content" v-else>
+          <div class="ec-text">
+            <div class="title">尊敬的商家:</div>
+            <div class="title">您的店铺已到期，请续费</div>
+            <div class="tip">店铺及商品已下架，订单可正常管理， 其余功能停用，续费后恢复正常</div>
+          </div>
+          <div class="ec-btn">立即续费</div>
+          <img src="{#$templets_skin#}images/shop/close_guoqiPop.png?v={#$cfg_staticVersion#}" class="ec-close">
+        </div>
+      </div>
+      <template v-if="!appBoolean">
+        {#include file="../../../siteConfig/touch_bottom_5.0.html" active="fourthicon" bottom_module="homemaking"#}
+      </template>
+    </div>
+    <!-- 页面载入失败提示 -->
+    <div class="Warn" v-else-if="!loadingb">
+      <div class="w-tip">
+        <img src="{#$cfg_staticPath#}images/notfindempty.png?v={#$cfg_staticVersion#}" class="wt-pic">
+        <div class="wt-title">{{info}}</div>
+        <div class="wt-btn" @click="linkTo(`{#getUrlPath service='member' type='user' template='enter_contrast'#}`)">确定
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script src="{#$templets_skin#}js/homemaking.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

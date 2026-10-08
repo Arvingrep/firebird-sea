@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>{#$langData['car'][5][37]#}</title>{#*汽车频道 *#}
+    <meta name="wap-font-scale" content="no">
+    <meta name="viewport"
+        content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/car.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}';
+        var userId = `{#$userinfo.userid#}`;
+        var imgError = `{#$cfg_staticPath#}images/404.jpg?v={#$cfg_staticVersion#}`;
+        var memberUrl = `{#getUrlPath service='member' type='user'#}`; //店铺配置页面
+        if (!userId) {
+            location.href = `${masterDomain}/login.html`;
+        }
+    </script>
+</head>
+
+<body>
+    <div id="vue" v-cloak>
+        <!-- 页面载入loading -->
+        <div class="loading" v-if="false">页面加载中...</div>
+        <div :class="['Shell',{'app':appBoolean}]" v-if="detail.id">
+            <!-- 商家信息 -->
+            <div class="companyDetail">
+                <div class="c-nav">
+                    <img src="{#$templets_skin#}images/back-r.png?v={#$cfg_staticVersion#}" class="cn-left"
+                        @click="backFn">
+                    <img src="{#$templets_skin#}images/shop/set-icon.png?v={#$cfg_staticVersion#}" class="cn-right"
+                        @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+                </div>
+                <div class="c-info">
+                    <div class="ci-left">
+                        <img :src="detail.logo||imgError" class="cil-logo" @error="detail.logo=imgError">
+                        <div class="cil-info">
+                            <div class="title">{{detail.name}}</div>
+                            <div class="tip">
+                                <span>商家版到期 {{detail.endTime}}</span>
+                                <div @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">续费
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ci-right" @click="linkTo(detail.homepage)">
+                        <img src="{#$templets_skin#}images/houseWhite.png?v={#$cfg_staticVersion#}">
+                        <span>我的主页</span>
+                    </div>
+                </div>
+                <div class="c-data">
+                    <div class="cd-item">
+                        <div class="cdi-number">{{detail.statistics.appoint.today}}</div>
+                        <div class="cdi-title">
+                            <div class="cdi-text">今日预约(人)</div>
+                            <span></span>
+                            <div class="cdi-time">昨日{{detail.statistics.appoint.yesterday}}</div>
+                        </div>
+                    </div>
+                    <div class="cd-item">
+                        <div class="cdi-number">{{detail.statistics.click.today}}</div>
+                        <div class="cdi-title">
+                            <div class="cdi-text">今日客流(人)</div>
+                            <span></span>
+                            <div class="cdi-time">昨日{{detail.statistics.click.yesterday}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 管理 -->
+            <div class="manageList">
+                <!-- 跳转 -->
+                <div class="manageItem">
+                    <div class="m-left">
+                        <div class="ml-right"
+                            @click="linkTo(`{#getUrlPath service='member' type='user' template='manage-car'#}`,'/pages/packages/mcenter/fabu/fabu?mold=car&code=1')">
+                            <div class="title">车源管理</div>
+                            <div class="tip">快速发布二手车</div>
+                        </div>
+                        <img src="{#$templets_skin#}images/car/newCar.png?v={#$cfg_staticVersion#}" class="ml-pic">
+                    </div>
+                    <div class="m-right">
+                        <div class="mr-right"
+                            @click="linkTo(`{#getUrlPath service='member' type='user' template='carappoint'#}`)">
+                            <div :class="['title',{'dot':subscribeInfo>0}]">预约到店</div>
+                            <div class="tip">客户预约信息</div>
+                        </div>
+                        <img src="{#$templets_skin#}images/car/newTime.png?v={#$cfg_staticVersion#}" class="mr-pic">
+                    </div>
+                </div>
+                <!-- 公司其他信息 -->
+                <div class="otherInfo">
+                    <div class="o-item"
+                        @click="linkTo(`{#getUrlPath service='member' type='user' template='config-car'#}`)">
+                        <div class="oi-left">
+                            <img src="{#$templets_skin#}images/car/newConfig.png?v={#$cfg_staticVersion#}">
+                            <span>公司信息</span>
+                        </div>
+                        <!-- 审核中 -->
+                        <div class="oi-audit" v-if="detail.state==0">商家资料审核中</div>
+                        <!-- 审核拒绝 -->
+                        <div class="oi-refuse" v-else-if="detail.state==2">商家资料审核未通过</div>
+                        <div class="oi-right" v-else>
+                            <span>公司简介/相册</span>
+                            <img src="{#$templets_skin#}images/newArrow.png?v={#$cfg_staticVersion#}">
+                        </div>
+                    </div>
+                    <div class="o-item"
+                        @click="linkTo(`{#getUrlPath service='member' type='user' template='car-broker'#}`)">
+                        <div class="oi-left">
+                            <img src="{#$templets_skin#}images/car/newPeople.png?v={#$cfg_staticVersion#}">
+                            <span>售车顾问</span>
+                        </div>
+                        <div class="oi-right">
+                            <span>添加顾问信息</span>
+                            <img src="{#$templets_skin#}images/newArrow.png?v={#$cfg_staticVersion#}">
+                        </div>
+                    </div>
+                </div>
+                <!-- 续费标签 -->
+                <div class="continueLabel" v-if="detail.continue">
+                    <div class="c-left">
+                        <div class="title">商家版即将到期</div>
+                        <div class="tip">续费套餐，续享全部商家服务</div>
+                    </div>
+                    <div class="c-btn" @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">
+                        <span>查看/续费</span>
+                        <img src="{#$templets_skin#}images/newRight.png?v={#$cfg_staticVersion#}">
+                    </div>
+                </div>
+            </div>
+            <!-- 公司管理项 -->
+            <div class="orderList">
+                <div class="l-title">常用功能</div>
+                <div class="l-list">
+                    <div class="ll-item" @click="linkTo(`{#$cfg_basehost#}/mobile.html`)" v-if="!appBoolean">
+                        <img src="{#$templets_skin#}images/newShield.png?v={#$cfg_staticVersion#}">
+                        <div>下载APP</div>
+                    </div>
+                    <div class="ll-item" @click="linkTo(`tel:${detail.hotline}`)">
+                        <img src="{#$templets_skin#}images/newHeadset.png?v={#$cfg_staticVersion#}">
+                        <div>客服帮助</div>
+                    </div>
+                    <div class="ll-item app_show" @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+                        <img src="{#$templets_skin#}images/set_icon_red.png?v={#$cfg_staticVersion#}" onerror="this.src='/static/images/404.jpg'" />
+                        <div>系统设置</div>
+                    </div>
+                </div>
+            </div>
+            <template v-if="!appBoolean">
+                {#include file="../../siteConfig/touch_bottom_5.0.html" active="fifthicon" bottom_module="car"#}
+            </template>
+        </div>
+        <!-- 页面载入失败提示 -->
+        <div class="Warn" v-else-if="!loadingb">
+            <div class="w-tip">
+                <img src="{#$cfg_staticPath#}images/notfindempty.png?v={#$cfg_staticVersion#}" class="wt-pic">
+                <div class="wt-title">{{info}}</div>
+                <div class="wt-btn"
+                    @click="linkTo(`{#getUrlPath service='member' type='user' template='enter_contrast'#}`)">确定
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script src="{#$templets_skin#}js/car.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

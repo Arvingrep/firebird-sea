@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#$langData['waimai'][10][56]#}</title> {#*  收入统计  *#}
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mypocket.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+
+		<script src="{#$templets_skin#}js/axios.min.js"></script>
+		
+		<script>
+			var kaigong = "{#$courier_state#}";
+			var arr = {#$installModuleArr|@json_encode#};
+			var app_platform = '{#$app_platform#}';
+			var wxconfig  = {  //微信相关配置
+				appId: '{#$wxjssdk_appId#}',
+				timestamp: '{#$wxjssdk_timestamp#}',
+				nonceStr: '{#$wxjssdk_nonceStr#}',
+				signature: '{#$wxjssdk_signature#}',
+				wxjssdk_url: '{#$wxjssdk_url#}',
+			}
+		</script>
+	</head>
+	<body>
+		<div class="page_box" id="page">
+			<div class="top_box">
+				<div class="headbox">
+					<a href="javascript:;" class="back_btn goBack" onclick="history.go(-1)"></a>
+					<div class="htitle">钱包账户</div> {#*  钱包账户  *#}
+				</div>
+			</div>
+			<div class="countBoxMonth">
+				<div class="allCount">
+					<div class="leftAmount">
+						<h3>{#$money#}</h3>
+						<p>账号余额({#echoCurrency type="short"#})</p>
+					</div>
+					<a href="/?service=waimai&do=courier&template=withdraw" class="myPocket">提现</a>
+				</div>
+			</div>
+			<div class="detailsBox">
+				<ul class="tab_ul">
+					<li  data-tab="0" data-page="1" data-isload="0">全部明细</li>
+					<li  data-tab="1" data-page="1" data-isload="0">收入</li>
+					<li  data-tab="2" data-page="1" data-isload="0">支出</li>
+					<li  data-tab="3" data-page="1" data-isload="0">提现记录</li>
+					<s class="line"></s>
+				</ul>
+				<div class="detailList" v-cloak>
+					<div class="detailListBox" v-if="datalist.length > 0">
+						<dl v-for="item in changeData">
+							<dt>
+								<span class="month">{{item.month}}</span>
+								本月收入<span class="amount_in">{{item.income}}</span>，支出<span class="amount_in">{{item.outcome}}</span>，提现<span class="amount_in">{{item.withdraw}}</span>
+							</dt>
+							<dd :class="[{'income':(dd.type == 1)},{'outcome':(dd.type == 0)}]" v-for="dd in item.dlList">
+								<div class="detInfo">
+									<h3>{{dd.info}}</h3>
+									<h4 class="detin" v-if="dd.type == 1">+{{dd.amount}}</h4>
+									<h4 class="detin" v-if="dd.type == 0">-{{dd.amount}}</h4>
+									<h4 class="detin" v-if="dd.cattype == 'tixian'">-{{dd.amount}}</h4>
+								</div>
+								<div class="info">
+									<span class="detime">{{dd.date}}</span>
+									<span class="destate" v-if="dd.cattype == 'tixian' && dd.state == 0">待审核</span>
+									<!-- <span class="destate failTip" v-if="dd.cattype == 'tixian' && dd.state == 2" @click="showFailTip(dd.note)">提现失败，查看原因</span> -->
+									<span class="destate balanceTip" v-if="dd.status != '1' || !dd.wid">余额{{dd.balance}}</span>
+									<!-- 此处需判断是否是微信提现 且审核成功  -->
+									{#if $app_platform == 'android'#}{#/if#}
+									<div class="sureGetIncome" v-if="dd.status == 1 && dd.wid" @click="confirmGetMoney(dd)">确认收款</div>
+									
+								</div>
+
+								
+							</dd>
+
+						</dl>
+					</div>
+					<div class="loadText">{{loadText}}</div>
+				</div>
+			</div>
+			<div class="maskPop" v-show="failPop" @click="failPop = false" v-cloak></div>
+			<div class="failPop" v-show="failPop"  v-cloak>
+				<h3>提现失败原因</h3>
+				<p class="txFailNote">{{failNote?failNote:'未填写原因'}}</p> 
+				<a href="javascript:;" class="hidePop" @click="failPop = false">好的，知道了</a>
+			</div>
+		</div>
+	</body>
+	<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/mypocket.js?v={#$cfg_staticVersion#}"> </script>
+</html>

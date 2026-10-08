@@ -1,0 +1,252 @@
+<div :class="['rightCon',{'show':currEditPart === 'pageSet'}] " v-cloak>
+    <div class="modBox">
+        <div class="title">页面设置
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 'pageSet' && showResetPop" @show="showResetPop = true" v-if="!config || !config.pageSet ">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('pageSet',0)"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 'pageSet' && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('pageSet',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference" @click="">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 'pageSet' && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end" >
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('pageSet',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+            
+        </div>
+
+        <div class="modInfoStyle">
+            <template v-if="busiInfoFormData.showHeader || currPlatform.id == 'wxmini' || currPlatform.id == 'app'">
+
+                <div class="modstyleBox contentSetBox marginTopBox" v-if="currPlatform.id != 'h5' && currPlatform.id != 'dymini'">
+                    <h2 class="stitle">页面标题<span>（用户上划页面后，浮起并固定在顶部的内容）</span></h2>
+                    <div class="sContent" >
+                        <div class="style_options">
+                            <div class="column_chose fullwidth">
+                                <s :class="{'layout2': pageSetFormData.showType === 2}" style="width: calc(50% - 2px);"></s>
+                                <span @click="pageSetFormData.showType = 1">显示商家信息</span>
+                                <span @click="pageSetFormData.showType = 2">固定标题</span>
+                            </div>
+                            <div class="inpbox" v-show="pageSetFormData.showType == 2">
+                                <el-input class="bgColorInp" v-model="pageSetFormData.title.text" placeholder="请输入标题"></el-input>
+                            </div>
+                        </div>
+                        <div class="style_item noBg">
+                            <div class="style_options">
+                                <label for="">标题位置：</label>
+                                <div class="split_options radioBox">
+                                    <span :class="{'onChose':pageSetFormData.title.posi == (!key ? 'left' : 'center')}" v-for="(item,key) in 2" :key="key" @click="pageSetFormData.title.posi = (key == 0 ? 'left' : 'center')"><s></s>{{!key ? '居左' : '居中'}} </span> 
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">标题背景：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker class="colorpicker" v-model="pageSetFormData.style.background" @active-change="value => activeChangeColor(value,'pageSetFormData.style.background')"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" :value="pageSetFormData.style.background.replace('#','')" @change="changeColor('pageSetFormData.style.background')" spellcheck="false" maxlength="6">
+                                    <button @click="resetColor('pageSetFormData.style.background')">重置</button>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">标题颜色：</label>
+                                <div :class="['colorpickerBox']">
+                                    <el-color-picker class="colorpicker" v-model="pageSetFormData.title.style.color" @active-change="value => activeChangeColor(value,'pageSetFormData.title.style.color')"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" :value="pageSetFormData.title.style.color.replace('#','')" @change="changeColor('pageSetFormData.title.style.color')" spellcheck="false" maxlength="6">
+                                    <button @click="resetColor('pageSetFormData.title.style.color')">重置</button>
+                                </div>
+                            </div>
+                            <template v-if="currPlatform.id != 'wxmini' && busiInfoFormData.showHeader">
+                                <div class="style_options">
+                                    <label for="">右侧按钮：</label>
+                                    <div class="split_options radioBox">
+                                        <span v-for="(item,key) in 3" :class="{'onChose':pageSetFormData.rBtns.showType == key}"  @click="changeRtBtns(key)"><s></s>{{key == 0 ? '默认' : (key == 1 ? '不显示' : '自定义')}}</span>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">按钮颜色：</label>
+                                    <div :class="['colorpickerBox',{'noColor':!pageSetFormData.rBtns.style.color}]">
+                                        <el-color-picker class="colorpicker" v-model="pageSetFormData.rBtns.style.color" @active-change="value => activeChangeColor(value,'pageSetFormData.rBtns.style.color')"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" class="colorShow" :value="pageSetFormData.rBtns.style.color.replace('#','')" @change="changeColor('pageSetFormData.rBtns.style.color')" spellcheck="false" maxlength="6">
+                                        <button @click="resetColor('pageSetFormData.rBtns.style.color')">重置</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+    
+                <div class="modstyleBox contentSetBox marginTopBox" v-else>
+                    <h2 class="stitle">顶部操作区<span> 用户上划页面后，是否浮起并固定在顶部</span></h2>
+                    <div class="sContent" >
+                        <div class="style_item noBg" >
+    
+                            <div class="style_options" style="padding-left: 6px;">
+                                <label for=""> 固定在顶部：</label>
+                                <div class="split_options radioBox">
+                                    <span v-for="(item,key) in 2" :class="{'onChose':pageSetFormData.h5FixedTop == (!key ? 1 : 0)}"  @click="pageSetFormData.h5FixedTop = (!key ? 1 : 0)"><s></s>{{key == 0 ? '固定' : '不固定'}}</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">背景颜色：</label>
+                                <div class="colorpickerBox">
+                                    <el-color-picker class="colorpicker" v-model="pageSetFormData.style.bgImgColor" @active-change="value => activeChangeColor(value,'pageSetFormData.style.bgImgColor')"></el-color-picker>
+                                </div>
+                                <div class="colorShowBox" v-if="pageSetFormData.style.hasOwnProperty('bgImgColor')">
+                                    <span class="single">#</span>
+                                    <input type="text" class="colorShow" :value="pageSetFormData.style.bgImgColor.replace('#','')" @change="changeColor('pageSetFormData.style.bgImgColor')" spellcheck="false" maxlength="6">
+                                    <button @click="resetColor('pageSetFormData.style.bgImgColor')">重置</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+    
+                <div class="modstyleBox contentSetBox marginTopBox" v-show="pageSetFormData.rBtns.showType == 2">
+                    <h2 class="stitle">右侧按钮</h2>
+                    <div class="sContent" >
+                        <div class="btn_item btnsSort sortBox" data-sort="pageSetFormData.rBtns.btns" data-drag=".item" data-filter=".inpbox">
+                            <div class="item" :data-id="ind" v-for="(item,ind) in pageSetFormData.rBtns.btns" :key="item.id">
+                                <s class="del_item" v-if="pageSetFormData.rBtns.btns.length > 1" @click="delTopBtns('pageSetFormData.rBtns',ind)"></s>
+                                <s class="left_icon"><img src="{#$cfg_basehost#}/static/images/admin/order_icon.png" alt=""></s>
+                                <div class="item_con">
+                                    <div class="img_up fn-clear">
+                                        <div :class="['upbtn smShowImg',{'hasup':item.icon}]">
+                                            <input type="file" name="Filedata" id="business_filedata" data-type="business" accept="png,jpg,jpeg" class="fileUp" @change="fileInpChange(`pageSetFormData.rBtns.btns.${ind}.icon`)">
+                                            <img :src="item.icon" alt="">
+                                            <span>更换图片</span>
+                                        </div>
+                                        <div class="imgText">
+                                            <h4>按钮</h4>
+                                            <p>建议图标尺寸70*70px</p>
+                                        </div>
+                                    </div>
+                                    <div class="inpbox linkbox linkChose" @click="changeLink(`pageSetFormData.rBtns.btns.${ind}.link`)">
+                                        <s><img :src="'{#$cfg_basehost#}/static/images/admin/'+(item.linkInfo && item.linkInfo.type== 4 ? '/siteMemberPage/tel' : 'link')+'.png'" alt=""></s>
+                                        <input type="text" placeholder="请选择按钮链接" class="iconLink" readonly :value="item.linkInfo && item.linkInfo.linkText ? item.linkInfo.linkText :item.link" >
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="javascript:;" class="add_more" @click="addNewTopBtns('pageSetFormData.rBtns');"  v-if="!pageSetFormData.rBtns.btns || pageSetFormData.rBtns.btns.length < 3 "><s></s>添加按钮</a>
+                        </div>
+                    </div>
+                </div>
+            </template>
+            <div class="modstyleBox contentSetBox marginTopBox">
+                <h2 class="stitle">页面背景</h2>
+                <div class="sContent" >
+                    <div class="style_item noBg" >
+                        <div class="style_options">
+                            <label for="">页面背景：</label>
+                            <div class="split_options radioBox">
+                                <span v-for="(item,key) in 2" :class="{'onChose':pageSetFormData.bgType == (!key ? 'color' : 'image')}"  @click="pageSetFormData.bgType = (!key ? 'color' : 'image')"><s></s>{{key == 0 ? '纯色' : '渐变'}}</span>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">背景色{{pageSetFormData.bgType == 'image' ? 1 : ''}}：</label>
+                            <div :class="['colorpickerBox',{'noColor':!pageSetFormData.style.bgColor1}]">
+                                <el-color-picker class="colorpicker" v-model="pageSetFormData.style.bgColor1" @active-change="value => activeChangeColor(value,'pageSetFormData.style.bgColor1')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="pageSetFormData.style.bgColor1.replace('#','')" @change="changeColor('pageSetFormData.style.bgColor1')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('pageSetFormData.style.bgColor1')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options" v-if="pageSetFormData.bgType == 'image'">
+                            <label for="">背景色2：</label>
+                            <div :class="['colorpickerBox',{'noColor':!pageSetFormData.style.bgColor2}]">
+                                <el-color-picker class="colorpicker" v-model="pageSetFormData.style.bgColor2" @active-change="value => activeChangeColor(value,'pageSetFormData.style.bgColor2')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="pageSetFormData.style.bgColor2.replace('#','')" @change="changeColor('pageSetFormData.style.bgColor2')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('pageSetFormData.style.bgColor2')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options" v-if="pageSetFormData.bgType == 'image'">
+                            <label for="">渐变位置：</label>
+                            <el-slider step="2" tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="100" v-model="pageSetFormData.style.start"></el-slider>
+                            <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                <input type="number"  class="colorShow"  :value="pageSetFormData.style.start"  @input="checkMax(0,100,'pageSetFormData.style.start')">
+                                <span class="single back">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 间距设置 -->
+            <div class="marginSetBox modstyleBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" v-show="showMarginSet">
+                        <div class="sContent">
+                            
+                            <div class="style_options">
+                                <label for="">圆角值：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="50" v-model="pageSetFormData.style.borderRadius" @input="val => allCompsChange('borderRadius',val)"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="pageSetFormData.style.borderRadius"  @input="checkMax(0,50,'pageSetFormData.style.borderRadius')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">上间距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="pageSetFormData.style.marginTop" @input="val => allCompsChange('marginTop',val)"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="pageSetFormData.style.marginTop"  @input="checkMax(0,40,'pageSetFormData.style.marginTop')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" :min="0" :max="40" v-model="pageSetFormData.style.marginLeft" @input="val => allCompsChange('marginLeft',val)"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number"  class="colorShow"  :value="pageSetFormData.style.marginLeft"  @input="checkMax(0,40,'pageSetFormData.style.marginLeft')">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+
+                           
+                            
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+        </div>
+
+    </div>
+</div>

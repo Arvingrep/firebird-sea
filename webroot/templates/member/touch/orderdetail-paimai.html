@@ -1,0 +1,233 @@
+<script type="text/javascript">
+	var ordernum1 = '{#$detail_ordernum#}'
+</script>
+{#$stateInfo = ""#}
+{#if $detail_orderstate == 0#}
+	{#$stateInfo = $langData['siteConfig'][9][22]#}   {#* 未付款  *#}
+{#elseif $detail_orderstate == 1#}
+{#if $detail_type == 'pai'#}
+	{#$stateInfo = '已成功付款，等待发货'#}   {#* 已付款  *#}
+	{#else#}
+	{#$stateInfo = '保证金已支付，成功报名'#}   {#* 已付款  *#}
+{#/if#}
+	
+{#elseif $detail_orderstate == 3#}
+	{#if $detail_product.jy_type == 1#}
+	{#$stateInfo = '该商品是线下交易，商家已发货，请及时收货'#}{#* 商家已发货  *#}	
+	{#else#}
+	{#$stateInfo = '商家已发货,等待收货'#}{#* 商家已发货  *#}	
+	{#/if#}
+{#elseif $detail_orderstate == 4#}
+	{#$stateInfo = '交易已完成'#}   {#* 交易成功  *#}
+
+{#elseif $detail_orderstate == 5#}
+	{#if $detail_success_num > 0#}
+	{#$stateInfo = '您因超时未支付，已经违约'#}
+	{#else#}
+	{#$stateInfo = '您未获拍，系统稍后会将保证金退还到您的账户'#}
+	{#/if#}
+	
+{#elseif $detail_orderstate == 6#}
+	{#$stateInfo = '您已支付成功，请等待商家发货'#}  
+{#elseif $detail_orderstate == 7#}
+	{#$stateInfo = '您已中拍，请及时付款'#}   {#* 关闭  *#}
+{#/if#}
+	<dl class="info-section">
+		<dt>
+			{#* 当前订单状态  *#}
+			<span class="info-title">{#$langData['siteConfig'][19][318]#}：</span><em class="info-text">{#$stateInfo#}</em>
+			<!-- {#if $detail_orderstate == 7#}
+			&nbsp;&nbsp;{#$langData['siteConfig'][19][42]#}：{#$detail_retOkdate|date_format:"%Y-%m-%d %H:%M:%S"#}
+			{#/if#}
+			{#* 退款时间  *#} -->
+		</dt>
+
+		{#* 未付款 *#}
+		{#if $detail_orderstate == 0#}
+		<dd class="last">
+			{#if $detail_type == 'pai'#}
+			<p>您已成功获取该商品的购买资格，请及时付款，</p> 
+			{#else#}
+			<p>支付保证金之后，即可获取竞拍该商品的资格</p> 
+			{#/if#}
+			
+		</dd>
+		{#/if#}
+
+		{#* 已付款 *#}
+		{#if $detail_orderstate == 1#}
+		<dd class="last">
+			{#if $detail_type == 'pai'#}
+			<p>您已成功拍下该商品，等待发货</p> 
+			{#else#}
+			<p>您已成功报名该商品的竞拍，请及时参与</p> 
+			{#/if#}
+			
+		</dd>
+		{#/if#}
+
+		{#* 确认收货 *#}
+		{#if $detail_orderstate == 3#}
+		<dd class="last">
+			<div class="operation">
+				{#if  $detail_wuliu['expDate']#}
+				<small>{#$langData['siteConfig'][19][707]#}：</small>{#* 或者  *#}<a class="btn sh" href="javascript:;">{#$langData['siteConfig'][6][45]#}</a>{#* 确认收货  *#}
+				{#elseif $detail_retOkdate != 0#}
+				{#/if#}
+			</div>
+		</dd>
+		{#/if#}
+
+</dl>
+
+
+	{#if ($detail_orderstate == 3 ) && $detail_wuliu['expDate']#}
+	<div class="info-block">
+		<div class="info-title">{#$langData['siteConfig'][19][62]#}</div>   {#* 快递信息  *#}
+		<div class="info-content">
+			<dl><dt>{#$langData['siteConfig'][19][63]#}：</dt><dd>{#$detail_wuliu['expCompany']#}</dd></dl>   {#* 快递公司  *#}
+			<dl><dt>{#$langData['siteConfig'][19][64]#}：</dt><dd>{#$detail_wuliu['expNumber']#}</dd></dl>   {#* 快递单号  *#}
+			<dl><dt>{#$langData['siteConfig'][19][65]#}：</dt><dd>{#$detail_wuliu['expDate']|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>    {#* 发货时间  *#}
+		</div>
+	</div>
+	{#/if#}
+
+
+	{#* 申请退款 *#}
+	{#if $detail_orderstate == 1 || ($detail_orderstate == 2 && $detail_paydate != 0) || ($detail_orderstate == 6 && $detail_retState == 0)#}
+	<div class="layer">
+		<div class="top fn-clear">
+      <div class="top-l" id="typeback"><a href="javascript:;">{#$langData['siteConfig'][6][117]#}</a></div>    {#* 返回  *#}
+			<div class="top-c">{#$langData['siteConfig'][6][66]#}</div>    {#* 申请退款  *#}
+			<div class="top-r"></div>
+    </div>
+		<div class="fn-clear">
+	    <div class="imgbox">
+	      <div class="addimg">
+	        <ul class="fn-clear noimg" id="litpic">
+	          <li class="add"><div id="filePicker" class="btn"></div></li>
+	        </ul>
+	      </div>
+	    </div>
+	    <p class="uploader-btn"></p>
+	  </div>
+    <dl class="inpbox">
+      <dt><span>{#$langData['siteConfig'][19][43]#}</span></dt>    {#* 退款原因  *#}
+      <dd class="selgroup">
+        <select id="type" name="type">
+			<option value="">{#$langData['siteConfig'][7][2]#}</option>    {#* 请选择  *#}
+			<option value="{#$langData['siteConfig'][19][197]#}">{#$langData['siteConfig'][19][197]#}</option>    {#* 缺货  *#}
+			<option value="{#$langData['siteConfig'][19][198]#}">{#$langData['siteConfig'][19][198]#}</option>    {#* 未按约定时间发货  *#}
+			<option value="{#$langData['siteConfig'][19][199]#}">{#$langData['siteConfig'][19][199]#}</option>    {#* 协商一致退款  *#}
+			<option value="{#$langData['siteConfig'][19][200]#}">{#$langData['siteConfig'][19][200]#}</option>    {#* 拍错/多拍/不想要  *#}
+			<option value="{#$langData['siteConfig'][19][201]#}">{#$langData['siteConfig'][19][201]#}</option>    {#* 其他  *#}
+        </select>
+      </dd>
+      <input type="hidden" name="typeid" id="typeid" value="">
+    </dl>
+    <dl class="inpbox">
+      <dt><span>{#$langData['siteConfig'][19][44]#}</span></dt>    {#* 退款说明  *#}
+      <dd><textarea placeholder="" name="" class="textarea" id="textarea"></textarea></dd>
+    </dl>
+		<div class="submit">
+			<a href="javascript:;" id="submit">{#$langData['siteConfig'][6][68]#}</a>    {#* 提交申请  *#}
+		</div>
+		<div class="error"></div>
+	</div>
+	{#/if#}
+
+ {#if $detail_type=='pai' && !$detail_jy_type#}
+  <div class="info-block">
+    <div class="info-title">{#$langData['siteConfig'][19][54]#}</div>    {#* 联系信息  *#}
+    <div class="info-content">
+    	{#* 收&nbsp;&nbsp;货&nbsp;人  *#}
+    	<dl><dt>{#$langData['siteConfig'][41][37]#}：</dt><dd>{#$detail_wuliu['userName']#}</dd></dl>
+
+    	{#* 联系电话  *#}
+    	<dl><dt>{#$langData['siteConfig'][19][56]#}：</dt><dd>{#$detail_wuliu['userContact']#}</dd></dl>
+
+    	{#* 送货地址  *#}
+    	<dl><dt>{#$langData['siteConfig'][19][57]#}：</dt><dd>{#$detail_wuliu['userAddr']#}</dd></dl>
+
+    	{#* 买家留言  *#}
+    	<!-- <dl><dt>{#$langData['siteConfig'][19][58]#}：</dt><dd>{#$detail_['note']#}</dd></dl> -->
+    </div>
+  </div>
+ {#/if#}
+  <div class="info-block">
+  	<div class="info-title">{#$langData['siteConfig'][19][322]#}</div> {#* 购买信息  *#}
+  	<div class="shop-pro">
+      <div class="item" data-id="{#$detail_product.id#}">
+        <div class="info fn-clear">
+          <div class="imgbox fn-left">
+            <a href="{#$detail_product.url#}"><img src="{#changeFileSize url={#$detail_product.litpic#} type='small'#}" alt=""></a>
+          </div>
+          <div class="txtbox">
+            <div class="title"><p>{#$detail_product.title#}</p><span>&yen;{#$detail_product['money']#} </span></div>
+          </div>
+					{#if $detail_orderstate == 7#}
+					<div class="opbtn">
+            <a data-url="{#$detail_payurl#}" href="javascript:;" class="gray apply-refund-link">{#$langData['siteConfig'][6][14]#}</a> {#* 付款  *#}
+          </div>
+					{#/if#}
+					<!--
+					{#if $detail_orderstate == 3#}
+					<div class="opbtn">
+            <a href="{#getUrlPath service='member' type='user' template='write-comment' module='shop' id={#$id#}#}" class="gray apply-refund-link">{#if $detail_common == 1#}{#$langData['siteConfig'][8][2]#}{#else#}{#$langData['siteConfig'][19][365]#}{#/if#}</a> {#* 修改评价  *#}  {#* 评价  *#}
+          </div>
+					{#/if#}
+					-->
+        </div>
+        <ul class="calculate">
+          <li><span>{#$langData['siteConfig'][19][324]#}</span><em>×{#$detail_procount#}</em></li>  {#* 数量  *#}
+        </ul>
+      </div>
+
+  		<!-- <div class="delivery">
+  			<p>{#$langData['siteConfig'][17][40]#}<span>&yen;{#$detail_freight#}</span></p>  {#* 配送费  *#}
+  		</div> -->
+  		<div class="delivery">
+  			<p>付款类型<span>{#if $detail_type == 'regist'#}保证金{#else#}竞拍价{#/if#}</span></p>  {#* 配送费  *#}
+  		</div>
+  		<div class="youhuiInfo">
+  			{#foreach from=$detail_priceinfo item=hui#}
+  			<p>{#$hui.body#}<span>-&yen;{#$hui.amount#}</span></p>
+  			{#/foreach#}
+  		</div>
+  		<div class="sum">
+  			{#* 总计  *#}
+  			<div class="right">{#$langData['siteConfig'][19][664]#}：<font class="fn-right">&yen;<strong>{#if detail_orderstate == 7#}{#$detail_product["money"]#}{#else#}{#$detail_amount#}{#/if#}</strong> </font></div> {#* 现金  *#}
+  		</div>
+  	</div>
+  </div>
+
+	<div class="info-block">
+		<div class="info-title">{#$langData['siteConfig'][19][319]#}</div>{#* 订单信息  *#}
+		<div class="info-content">
+			{#* 订单编号  *#}
+			<dl><dt>{#$langData['siteConfig'][19][50]#}：</dt><dd>{#$detail_ordernum#}</dd></dl>
+
+			{#* 下单时间  *#}
+			<dl><dt>{#$langData['siteConfig'][19][51]#}：</dt><dd>{#$detail_orderdate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>
+
+			{#* 付款方式  *#}
+			{#if $detail_paydate != 0#}
+			<dl><dt>{#$langData['siteConfig'][19][52]#}：</dt><dd>{#$detail_paytype#}</dd></dl>
+
+			{#* 付款时间  *#}
+			<dl><dt>{#$langData['siteConfig'][19][53]#}：</dt><dd>{#$detail_paydate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>
+			{#/if#}
+		</div>
+	</div>
+
+	{#if $detail_expDate#}
+	<div class="info-block">
+		<div class="info-title">{#$langData['siteConfig'][26][127]#}</div>{#* 配送信息  *#}
+		<div class="info-content">
+			<dl><dt>{#$langData['siteConfig'][19][63]#}：</dt><dd>{#$detail_expCompany#}</dd></dl>{#* 快递公司  *#}
+			<dl><dt>{#$langData['siteConfig'][19][64]#}：</dt><dd>{#$detail_expNumber#}</dd></dl>{#* 快递单号  *#}
+		</div>
+	</div>
+	{#/if#}
+
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}

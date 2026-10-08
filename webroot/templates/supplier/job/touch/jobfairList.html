@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>招聘会  </title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/jobfairList.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var id = '{#$marty.get.id#}'; //面试id
+    </script>
+</head>
+<body>
+    <div class="pageBox" id="page">
+        <div class="header">
+            <div class="header-l"><a href="javascript:;" onclick="history.go(-1)" class="goBack"></a></div>
+            <div class="header-address">
+                <span>我的招聘会</span>
+            </div>
+            <div class="header-r"><span class="record" @click="showPop = true">报名记录</span></div>
+        </div>
+        <div class="fairTip">
+            <p>如对招聘会报名、填写信息有所疑问，请联系客服为您提供帮助，客服电话：<a href="tel:{#getModuleConfig module='job' key='hotline'#}">{#getModuleConfig module='job' key='hotline'#}</a></p>
+        </div>
+    
+        <div class="listBox">
+            <ul>
+                <li v-for="item in fairList">
+                    <a :href="'{#getModuleConfig module='job' key='channelDomain'#}/zhaopinhui-detail?id=' + item.id" :data-type="item.type" class="toMini" data-module="job" data-temp="zhaopinhuiDetail" :data-id="item.id">
+                        <div class="zph_info">
+                            <div class="zph_detail fn-clear">
+                                <div class="zph_pic">
+                                    <img :src="item.head_img ? item.head_img : (item.picture && item.picture.length > 0 ? item.picture[0].pic : '')" onerror="this.src='/static/images/404.jpg'" alt="">
+                                    <span v-if="item.stating === 1">进行中</span>
+                                </div>
+                                <div class="zph_text">
+                                    <h3>{{item.type === 1 ? '[现场招聘]' : ''}}{{item.title}}</h3>
+                                    <p class="zph_time">{{item.startdate_str}} - {{item.enddate_str}} </p>
+                                    <div class="labBox"><span class="toStart" v-if="item.stating === 0">即将开始</span><span v-if="item.type === 2">网络招聘</span><span v-if="item.type=== 1">主办：{{item.fairs.title}}</span></div>
+                                </div>
+                            </div>
+                            <!-- 举办地点 -->
+                            <div class="zph_org">
+                                <p><label for="">面向人群：</label><span>{{item.obj}} </span></p>
+                                <p v-if="item.type === 1"><label for="" >场馆地址：</label><span>{{item.fairs.address}}</span></p>
+                            </div>
+                        </div>
+                        <div class="zph_opt">
+                            <div class="zw_info">
+                                <template  v-if="item.type === 1">
+                                    <h4>{{item.joinDetail.seat ? item.joinDetail.seat : '待确认'}} </h4>
+                                    <p>展位号</p>
+                                </template>
+                            </div>
+                            <div class="btnsBox">
+                                <!-- <span class="post_btn">海报</span> -->
+                                <span class="share_btn" @click.prevent.stop="showSharePop(item)">分享</span>
+                            </div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+            <div class="noData" v-if="loadEnd && fairList.length == 0">
+                <div class="img"><img src="{#$templets_skin#}images/noData_fair.png" alt=""></div>
+                <div class="noData_text">
+                    <h4>当前未参与招聘会</h4>
+                    <p>近期有招聘会举办，赶快了解报名！</p>
+                    <a href="{#getModuleConfig module='job' key='channelDomain'#}/zhaopinhui" data-module="job" data-temp="zhaopinhui" class="toMini">查看近期招聘会</a>
+                </div>
+            </div>
+            <div v-else class="loading">
+                <p v-if="loadEnd && fairList.length > 0">没有更多了~</p>
+                <p v-else-if="isload">加载中~</p>
+                <p v-else>下拉加载更多~</p>
+            </div>
+        </div>
+        <div class="bottomBox">
+            <a href="{#getModuleConfig module='job' key='channelDomain'#}/zhaopinhui" data-module="job" data-temp="zhaopinhui"  v-if="!loadEnd || fairList.length " class="btn_more toMini">查看近期招聘会</a>
+        </div>
+
+        <!-- 招聘记录 -->
+        <div :class="['mask_pop',{'showPop':showPop}]" @click="showPop = false"></div>
+        <div :class="['popBox bottomPopBox',{'showPop':showPop}]">
+            <div class="pop_header">
+                <a href="javascript:;" class="btn_close" @click="showPop = false"></a>
+                <h4>报名记录</h4>
+            </div>
+            <div class="pop_con">
+                <ul class="zph_list" v-if="fairList_record.length">
+                    <li :class="['zph_li',{'hasEnd':item.state === 2}]" v-for="item in fairList_record">
+                        <a :href="'{#getModuleConfig module='job' key='channelDomain'#}/zhaopinhui-detail?id=' + item.id" class="toMini" data-module="job" data-temp="zhaopinhuiDetail" :data-id="item.id">
+                            <p>报名时间：{{transTimes(item.joinDetail.pubdate,4).replace(/-/g,'/')}}</p>
+                            <div class="zph_info">
+                                <div class="zph_pic">
+                                    <img :src="item.head_img ? item.head_img : (item.picture && item.picture.length > 0 ? item.picture[0].pic : '')" onerror="this.src='/static/images/404.jpg'" alt="">
+                                    <span v-if="item.stating===2">已结束</span>
+                                </div>
+                                <div class="zph_text">
+                                    <h3>{{item.title}}</h3>
+                                    <p class="zph_time">{{item.startdate_str}} - {{item.enddate_str}}  </p>
+                                    <div class="labBox"><span>{{item.type === 2 ? '网络招聘':'现场招聘'}}</span></div>
+                                </div>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+                <div class="noData" v-else>
+                    <div class="img"><img src="{#$templets_skin#}images/noData_fair.png" alt=""></div>
+                    <div class="noData_text">
+                        <h4>当前未参与招聘会</h4>
+                        <p>近期有招聘会举办，赶快了解报名！</p>
+                        <a href="{#getModuleConfig module='job' key='channelDomain'#}/zhaopinhui" data-module="job" data-temp="zhaopinhui" class="toMini">查看近期招聘会</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+{#include file="public_pop.html"  noVue=1 showType='zph'#}
+<script src="{#$templets_skin#}js/jobfairList.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+</html>

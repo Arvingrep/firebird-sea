@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+	<title>图片视频</title>
+	<meta name="keywords" content="{#$cfg_keywords#}">
+	<meta name="description" content="{#$cfg_description#}">
+	<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+	<!-- <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}"> -->
+	<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$templets_skin#}css/albums-detail.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}',
+			staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = '{#$cfg_hideUrl#}';
+		var cookiePre = '{#$cfg_cookiePre#}',
+			cfg_clihost = '{#$cfg_clihost#}';
+		var templets = '{#$templets_skin#}';
+
+
+		var currid = 22;
+		var albumdetail = 1;
+		var modeType = 'house';
+		var albumDetailList = {#if $imglist#}{#$imglist#} {#else#} [] {#/if#};
+		var loupanid = '{#$loupanid#}';
+		var albumid = '{#$albumid#}';
+		var modelType = 'house';
+	</script>
+</head>
+
+<body class="w1200">
+	<div id="page">
+		<!-- 加载中 -->
+		<div class="loading" v-show="loading"><s></s></div>
+		<!-- 头部 -->
+		{#include file="top.html"#}
+		<div class="conbox">
+			{#include file="left.html"#}
+			<!-- 右侧 -->
+			<div class="right_box">
+				<div class="rConBox">
+					<h3>{#$title#}</h3>
+					<div class="ListContainer">
+						<div class="headbox">
+							<div class="btn_group" v-if="!piliang">
+								<a href="javascript:;" :class="['btn_piliang',{'disabled_btn':albumDetailList.length==0}]" @click="piliang = !piliang">批量管理</a>
+								<a href="javascript:;" class="btn_edit">相册设置
+									<div class="optbox">
+										<span class="rename" @click="showPop('.pop_albums')"><s></s>重命名</span>
+										<span class="del_album" @click="showPop('.confirm_del','1')"><s></s>删除相册</span>
+									</div>
+								</a>
+							</div>
+							<div class="btn_group" v-if="piliang && albumDetailList.length>0" v-cloak>
+									<a href="javascript:;" class="btn_piliang" @click="piliang = !piliang">管理完成</a>
+									<div class="eidt_groups">
+										<span href="javascript:;" :class="['all_select',{'chosed':all_chose}]" @click="all_chose = !all_chose"><s></s>全选</span>
+										<span href="javascript:;" class="all_del" @click="del_all"><s></s>删除</span>
+									</div>
+							</div>
+						</div>
+						<div class="listbox listImgBox fn-clear"  v-cloak>
+							<ul :class="['imgList_ul fn-clear listSection thumblist',{'piliang':piliang}] ">
+								<div class="img_upload" v-show="!piliang ">
+									<div class="img_upload upload_btn  uploadinp"  @click="uploadimg">
+										<s></s>
+										<p>点击上传图片</p>
+									</div>
+								</div>
+
+
+								<li :class="['pubitem imgList_li fn-clear',{'chosed':all_chose}]" :data-id="pic.id" :id="'WU_FILE_HAS_'+i" v-for="(pic,i) in albumDetailList" v-if="pic!=''" @click="piliang_chose">
+									<s class="chose"></s>
+									<a class="del_btn" href="javascript:;" @click="del_img(pic.id,i)"></a>
+									<div class="li-thumb" style="display: block;" :data-id="pic.id">
+										<img :data-val="pic.path" :src="pic.pathsour" :data-url="+pic.pathsour">
+									</div>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+			</div>
+			
+
+
+		<!-- 弹窗 -->
+		<div class="pop_mask" @click="close_pop"></div>
+
+		<!-- 相册弹窗 -->
+		<div class="Popbox pop_albums" v-cloak>
+			<a href="javascript:;" class="close_pop" @click="close_pop"></a>
+			<h2>重命名相册</h2>
+			<form action="" class="formbox">
+				<div class="albuminp">
+					<label for="title"><em>*</em>相册标题</label>
+					<div class="inp">
+						<p class="err_tip">请输入相册标题</p>
+						<input type="text" name="title" placeholder="填写相册标题">
+					</div>
+				</div>
+				<a href="javascript:;" class="submit" @click="add_album('edit')">确认提交</a>
+			</form>
+		</div>
+
+		<div class="Popbox confirm_del">
+			<h3>确定删除相册？相册中有15张照片</h3>
+			<p>相册一经删除，不可恢复，请谨慎操作</p>
+			<div class="btn_group"><a href="javascript:;" class="sure_del" @click="delAlbum()">确认删除</a><a href="javascript:;" class="cancel_del" @click="close_pop">取消删除</a></div>
+		</div>
+
+
+		<!-- 视频弹窗 -->
+		<div class='Popbox pop_videos localVideo' v-cloak >
+			<a href="javascript:;" class="close_pop" @click="close_pop"></a>
+			<h2>上传图片</h2>
+			<form action="" class="formbox">
+				<div  class="videoinp fn-clear">
+					<label for="">图片列表</label>
+					<div class="inp_div img_upload listImgBox">
+						<input type="hidden" name="albunimg" class="imglist-hidden albunimg" placeholder="请上传楼盘图片"/>
+						<div class="imgbox">
+							<ul id="listSection1" class="listSection thumblist fn-clear" data-type="before">
+								<div class="upload_btn filePicker uploadinp album_img" id="filePicker1"  data-type="desc"  data-count="10" data-size="{#$thumbSize#}" data-imglist="" >
+									<s></s>
+									<p>上传图片</p>
+								</div>
+
+							</ul>
+
+						</div>
+					</div>
+				</div>
+
+
+
+				<a href="javascript:;" class="submit" @click="add_img()">确认提交</a>
+			</form>
+		</div>
+	</div>
+<div>{#$cfg_statisticscode#}</div>
+</body>
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/publicUpload_v2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/webuploader/webuploader.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/albums.js?v={#$cfg_staticVersion#}"></script>
+</html>

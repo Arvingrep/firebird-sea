@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>分销配置</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/config.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = '{#$cfg_hideUrl#}';
+        var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+        var templets = '{#$templets_skin#}';
+    	var loupanid = '{#$loupanid#}';
+        var currid = 83;
+    </script>
+</head>
+<body class="w1200">
+    <div id="page">
+        <!-- 头部 -->
+        {#include file="top.html"#}
+        <div class="conbox">
+            <!-- 左侧导航 -->
+            {#include file="left.html"#}
+            <div class="right_box">
+                <div class="rConBox">
+                    <div class="tabBox disflex a-c">
+                        <!-- <div class="tab ative">佣金明细</div>
+                        <div class="tab">提现处理<span class="tag">71</span></div> -->
+                        <div :class="`tab ${tabOn == ind ? 'active': ''}`" @click="changeTab(ind)" v-for="(item,ind) in tabList">{{item.name}}</div>
+                    </div>
+                    <div class="formBox">
+                        <el-form :model="formData" ref="formData" label-width="140px">
+                            <template v-if="tabOn == 0">
+
+                                <el-form-item label="分销功能" class="boldItem">
+                                    <el-radio-group v-model="formData.status" >
+                                        <el-radio-button v-for="item in 2" :label="item == 2 ? 0 : 1">{{item == 2 ? '关闭' : '开启'}}</el-radio-button>
+                                    </el-radio-group>
+                                    <p class="tip">关闭后全部分销停止提交新报备，已提交的报备可继续处理</p>
+                                </el-form-item>
+                                <el-form-item label="渠道分销" >
+                                    <el-radio-group class="radiobox" v-model="formData.channelStatus" >
+                                        <el-radio v-for="item in 2" :label="item == 2 ? 0 : 1">{{item == 2 ? '对外隐藏' : '对外显示'}}</el-radio>
+                                    </el-radio-group>
+                                    <p class="tip">是否对普通用户显示渠道分销方案，开关不影响实际渠道分销进行</p>
+                                </el-form-item>
+                                <el-form-item label="报备限制" class="boldItem">
+                                    <div class="itemForm">
+                                        <div class="form_item disflex a-s">
+                                            <label for="" class="label labelw">禁止报备客户名单</label>
+                                            <el-checkbox-group v-model="formData.restrictCustomer">
+                                                <el-checkbox v-for="item in checkOptions" :label="item.value">{{item.label}}</el-checkbox>
+                                            </el-checkbox-group>
+                                            <p style="display: inline; margin-left: 10px;" class="tip">
+                                                勾选后禁止报备名单内已有客户，<span @click="open('customerManage?active=2')">可随时导入</span>
+                                            </p>
+                                        </div>
+                                        <div class="form_item disflex a-s">
+                                            <label for="" class="label labelw">报备人账号限制</label>
+                                            <el-checkbox-group v-model="formData.restrictAccount">
+                                                <el-checkbox v-for="item in 2" :label="item + ''">{{item == 1 ? '手机绑定' : '实名认证'}}</el-checkbox>
+                                            </el-checkbox-group>
+                                        </div>
+                                    </div>
+                                </el-form-item>
+                                <el-form-item label="打印设置"  class="boldItem">
+                                    <div class="form_item disflex a-c">
+                                        <label for="" class="label">到访打印机：</label>
+                                        <el-radio-group class="radiobox" v-model="formData.printStatus">
+                                            <el-radio v-for="item in 2"  :label="item == 1 ? 1 : 0">{{item == 1 ? '开启' : '关闭'}}</el-radio>
+                                        </el-radio-group>
+                                    </div>
+                                    <!-- <div class="itemForm" v-if="formData.printStatus == 1">
+                                        <div class="bgForm">
+                                            <div class="form_item disflex a-c">
+                                                <label for="" class="label">打印机名称：</label>
+                                                <div class="inpbox">
+                                                    <el-input placehoder="请输入打印机名称" ></el-input>
+                                                </div>
+                                            </div>
+                                            <div class="form_item disflex a-c">
+                                                <label for="" class="label">打印机名称：</label>
+                                                <div class="inpbox">
+                                                    <el-input placehoder="请输入打印机名称" ></el-input>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div> -->
+                                </el-form-item>
+    
+                                <el-form-item label="客户保护期"  class="boldItem">
+                                    <div class="inlinebox disflex a-c">客户私有保护<el-input v-model="formData.protectDay"></el-input>天，超期后将掉落公开至楼盘共享池</div>
+                                </el-form-item>
+                                <el-form-item label="审核设置"  class="boldItem">
+                                    <div class="inlinebox disflex a-c form_item" >
+                                        <label for="" class="label">带看审核</label>
+                                        <el-radio-group class="radiobox" v-model="formData.visitType">
+                                            <el-radio v-for="item in 2"   :label="item">
+                                                <template v-if="item == 1">
+                                                    有<el-input v-model="formData.visitValue"></el-input>人审核通过即可
+                                                </template>
+                                                <template v-else>全部人员审核通过</template>
+                                            </el-radio>
+                                        </el-radio-group>
+                                        <p class="tip">有权限的审核人员中，需要几人审核通过</p>
+                                    </div>
+                                    <div class="inlinebox disflex a-c form_item" >
+                                        <label for="" class="label">成交审核</label>
+                                        <el-radio-group class="radiobox" v-model="formData.dealType">
+                                            <el-radio :label="1" disabled> 全部人员审核通过 </el-radio>
+                                        </el-radio-group>
+                                    </div>
+                                </el-form-item>
+                                <el-form-item label="审核通知"  class="boldItem">
+                                    <div class="inlinebox disflex a-c form_item" >
+                                        <label for="" class="label labelsw">微信公众号</label>
+                                        <el-radio-group class="radiobox" v-model="formData.wechatNotice">
+                                            <el-radio :label="item == 1 ? 1 : 0" v-for="item in 2"> {{item == 1 ? '开启' : '关闭'}} </el-radio>
+                                        </el-radio-group>
+                                    </div>
+                                    <div class="inlinebox disflex a-c form_item" >
+                                        <label for="" class="label labelsw">App</label>
+                                        <el-radio-group class="radiobox" v-model="formData.appNotice">
+                                            <el-radio :label="item == 1 ? 1 : 0" v-for="item in 2"> {{item == 1 ? '开启' : '关闭'}} </el-radio>
+                                        </el-radio-group>
+                                    </div>
+                                    <div class="inlinebox disflex a-c form_item" >
+                                        <label for="" class="label labelsw">短信</label>
+                                        <el-radio-group class="radiobox" v-model="formData.smsNotice">
+                                            <el-radio :label="item == 1 ? 1 : 0" v-for="item in 2"> {{item == 1 ? '开启' : '关闭'}} </el-radio>
+                                        </el-radio-group>
+                                    </div>
+                                </el-form-item>
+                            </template>
+                            <template v-else>
+                                <div class="titbox disflex a-c">
+                                    <h4>楼盘卖点</h4>
+                                    <p>添加楼盘推销卖点文案，可供参与分销的人员复制推广</p>
+                                </div>
+                                <el-form-item label="推广语"  class="textareabox">
+                                    <el-input type="textarea" placeholder="如：地铁现房大横厅，首付10万起，安家城市中心" v-model="formData.adText"></el-input>
+                                </el-form-item>
+                                <el-form-item :label="`call说辞${ind == 0 ? '' : (ind + 1)}`" class="textareabox" v-for="(item,ind) in callTextList" >
+                                    <div class="disflex a-s">
+                                        <el-input type="textarea" placeholder="如：交通方便，配套完善" v-model="callTextList[ind]"></el-input>
+                                        <div class="delbtn" v-if="callTextList.length != 1" @click="delCallText(ind)">删除</div>
+                                    </div>
+                                </el-form-item>
+                                <el-form-item>
+                                    <el-button class="addCall" type="primary" @click="addCallText"><i class="el-icon-plus"></i>说辞</el-button>
+                                </el-form-item>
+                            </template>
+                            <el-form-item label="">
+                                <el-button type="primary" class="saveBtn" @click="saveConfig">保存</el-button>
+                            </el-form-item>
+                        </el-form>
+                       
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/config.js?v={#$cfg_staticVersion#}"></script>
+</html>

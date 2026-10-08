@@ -1,0 +1,89 @@
+<script>
+    var geetest = {#$cfg_geetest#} ; //是否开启极验
+    var cfg_smsLogin_state = '{#$cfg_smsLoginState#}' ; //是否短信验证
+    var cfg_privateNumber_state = '{#$cfg_privatenumberState#}'; //是否隐私保护通话
+    var if_login =  {#if $userinfo && $userinfo.userid#}1{#else#}0{#/if#}; //是否登录
+    var phoneCheck = {#if $userinfo.phoneCheck#}{#$userinfo.phoneCheck#}{#else#}0{#/if#};
+    var userRealPhone = '{#$userinfo.phone#}' ; //号码
+    var userPhone = '{#$userinfo.phoneEncrypt#}' ; //号码加密
+</script>
+
+{#* 系统启用【付费查看电话】或者【隐私号】就加载以下资源 *#}
+{#if $cfg_privatenumberState || $cfg_payPhoneState#}
+<button style="display: none;" id="codeButton" type="button" ref="codeButton"></button> 
+<div id="private_phone_container" v-show="showPrivatePop || showCallPop || loading" v-cloak>
+    <div class="private_phone_mask"></div>
+    <div class="private_phone_pop private_phone_LoginByMsg"  v-cloak v-show="showPrivatePop">
+        <a href="javascript:;" class="close_priveta_phone_pop" @click="showPrivatePop = false"></a>
+        <!-- 登录 -->
+        <div class="private_phone_header" v-if="!if_login">
+            <h3>请先登录/注册</h3>
+            <p>为保护您的隐私，验证手机号登录后将为您使用虚拟号码拨出</p>
+        </div> 
+        <!-- 验证手机号 -->
+        <div class="private_phone_header" v-else-if="!phoneCheck">
+            <h3>为保护您的隐私，请先绑定手机</h3>
+            <p>验证后将为您使用虚拟号码拨出</p>
+        </div> 
+
+        <!-- 修改绑定的手机号 -->
+        <div class="private_phone_header" v-else-if="phoneCheck">
+            <h3>验证手机号</h3>
+            <p>为保护您的隐私，请先验证手机号，我们将为您使用虚拟号码拨出</p>
+        </div> 
+
+        <div class="private_phone_form">
+            <div class="private_phone_inputBox">
+                <input type="tel" placeholder="请输入手机号" name="tel" v-model="telphone">
+            </div>
+            <div class="private_phone_inputBox">
+                <input type="tel" placeholder="请输入验证码" name="tel" maxlength="6" class="private_phone_vscode" v-model="phoneCode" autocomplete="off">
+                <a href="javascript:;" class="pp_getCode" @click="getPhoneMsg" >获取验证码</a>
+            </div>
+            <button type="button" :disabled="!phoneCode || !telphone" class="private_phone_btn private_phone_login_btn" @click="lohin_by_msg" v-if="!if_login">登录</button>
+            <button v-else-if="!phoneCheck" type="button" :disabled="!phoneCode || !telphone" class="private_phone_btn private_phone_login_btn" @click="bindPhone">确定</button>
+            <button v-else type="button" :disabled="!phoneCode || !telphone" class="private_phone_btn private_phone_login_btn" @click="useOtherPhone">确定</button>
+        </div>
+    </div>
+    <div class="private_phone_loading" v-if="loading"></div>
+
+    <div class="private_phone_callPop private_phone_pop" v-show="showCallPop">
+        <a href="javascript:;" class="close_priveta_phone_pop" @click="showCallPop = false"></a>
+        <!-- 登录 -->
+        <div class="private_phone_header" >
+            <h3>请使用<span class="showTipPhone">{{userPhone}}<div class="private_phone_tip"> <s class="private_phone_arr"></s> <p>为保护用户隐私，当前仅可通过{{userRealPhone}}拨打对方号码，其他手机将无法拨通</p> <a href="javascript:;" class="private_phone_changePhone" @click="changePhone=true;showCallPop = false;showPrivatePop = true;">使用其他手机号拨打</a> </div> </span>拨打
+                <span class="private_phone_text">我们将为您使用虚拟号码拨出
+                    <s class="priveta_phone_showTip">
+                        <div class="private_phone_tip">
+                            <s class="private_phone_arr"></s>
+                            <p>为保护用户隐私，当前仅可通过{{userRealPhone}}拨打对方号码，其他手机将无法拨通</p>
+                            <a href="javascript:;" class="private_phone_changePhone" @click="changePhone=true;showCallPop = false;showPrivatePop = true;">使用其他手机号拨打</a>
+                        </div>
+                    </s>
+                </span>
+            </h3>
+            
+        </div> 
+        <div class="private_phone_con">
+            <div class="private_phone_btnGroup">
+                <a href="javascript:;" class="private_phone_call_btn"><s class="private_phone_call_icon"></s><span>{{private_phone}}</span></a>
+                <a href="javascript:;" class="private_phone_cutDown">电话<span>{{cutDown}}</span>后失效，请尽快拨打</a>
+            </div>
+            <div class="private_phone_QrCodeBox">
+                <div class="private_phone_QrCode"><img :src='"/include/qrcode.php?data="+detail_info.url' alt="" ></div>
+                <p>您还可以扫码<span>一键拨打</span> ，免输入</p>
+            </div>
+        </div>
+    </div>
+</div>
+{#if $cfg_geetest#}
+{#if $cfg_geetest == 1#}
+<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/privatePhone.js?v={#$cfg_staticVersion#}"></script>
+
+{#/if#}

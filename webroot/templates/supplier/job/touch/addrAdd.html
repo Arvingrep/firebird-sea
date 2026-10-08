@@ -1,0 +1,125 @@
+{#$pageTitle = '新增地址'#}
+{#if $smarty.get.id#}
+{#$pageTitle = '编辑地址'#}
+{#/if#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title> {#$pageTitle#}</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/addrAdd.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script>
+        var id = {#$smarty.get.id|default:0#};
+        var cityid = '{#$siteCityInfo.cityid#}';
+        var city = '{#$siteCityInfo.name#}';
+        var masterDomain  = '{#$cfg_basehost#}'
+        var com = {#$smarty.get.com|default:0#}; //设置为公司地址
+    </script>
+   
+</head>
+<body>
+    {#include file="../../../siteConfig/touch_top.html" pageTitle=$pageTitle pageRight='<div style="width: 1rem;"></div>'#}
+    <div class="pageBox" id="page">
+        <div class="formBox"  v-cloak>
+            <div class="form_item addr">
+                <label class="" for="">所在地区</label>
+                <input type="text" placeholder="请选择" readonly :value="Array.isArray(form.addrName) ? form.addrName.join('/') : form.addrName" @click="changeAddr">
+                <a href="javascript:;" class="addr" @click="addWorkPosi = true">定位</a>
+            </div>
+            <div class="form_item">
+                <label class="" for="">详细地址</label>
+                <input type="text" placeholder="请填写" v-model="form.address">
+            </div>
+            <div class="spotWrap">
+                <div class="selftxt" id="spot" contenteditable="true" placeholder="试试粘贴地址，自动识别填写地址信息" @input="inputAddr"></div>
+                <div class="spotOper" style="display: flex;" v-show="textCount > 0">
+                    <a href="javascript:;" class="spotCancel" @click="clearText">取消</a>
+                    <a href="javascript:;" class="spotSure" @click="spotSure">识别</a>
+                </div>
+            </div>
+        </div>
+        <div class="formBox noPad">
+            <div class="form_item ">
+                <div class="left">
+                    <label for="">设为公司地址</label>
+                    <p>设置为招聘主页的公司地址</p>
+                </div>
+                <a href="javascript:;" @click="form.setCompany = (form.setCompany ? 0 : 1);" :class="['switch',{'on':form.setCompany},{'disabled':!canSet}]"></a>
+            </div>
+        </div>
+        <a href="javascript:;"  class="saveAddr" @click="getAddrList('save',form.id)">保存地址</a>
+
+
+
+        <!-- 添加地址 -->
+        <div :class="['mask_pop addWorkPosiMask' ,{'showMask':addWorkPosi}]" @click="addWorkPosi = false" v-cloak></div>
+        <div :class="['pubPopBox addWorkPosiPopBox', {'showPop':addWorkPosi}]"  v-cloak>
+            <!-- 新增 工作地 -->
+            <div class="addWorkPosiPop popBox" >
+                <div class="popHeader">
+                    <div class="btnsGroup">
+                        <a href="javascript:;" class="cancel_btn" @click="hideAddPosiPop">取消</a>
+                        <a href="javascript:;" class="sure_btn" @click="confirmAddr">确定</a>
+                    </div>
+                    <div class="searchBox">
+                        <input type="text" placeholder="搜索位置" @input="searchKey" @focus="showSearchPage" @blur="hideSearchPage">
+                    </div>
+                </div>
+                <div class="popCon">
+                    <div class="searchPage" v-show="showSearch">
+                        <ul>
+                            <li v-for="(item,ind) in searchList" :class="{'on_chose':ind == currInd}" @click="chosePosi(item,'',ind)">
+                                <h4>{{item.name}}</h4>
+                                <p>{{item.address}}</p>
+                            </li>
+                            <li class="toDefine" v-show="loadEnd">
+                                <a :href="'{#$member_userDomain#}/mapDefine.html?cityid='+cityid+'&city='+city+'&currentPageOpen=1'" @click="toMapDefine">
+                                    <div class="addrInfo" >
+                                        <h3>{{searchList.length ? '以上都不是' : '暂无相关地址'}}</h3>
+                                        <p>点击添加自定义位置</p>
+                                    </div>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="showPage" v-show="!showSearch">
+                        <div class="mapBox">
+                            <div class="mapdiv" id="mapdiv"></div>
+                            <div class="mapCenter"></div>
+                        </div>
+                        <div class="suggestList">
+                            <ul>
+                                <li v-for="(item,ind) in surroundingPois"  @click="chosePosi(item,1,ind)" :class="{'on_chose':ind === currInd}">
+                                    <h4>{{item.title}}</h4>
+                                    <p>{{item.address}}</p>
+                                </li>
+                                <li class="toDefine" v-show="loadEnd">
+                                    <a :href="'{#$member_userDomain#}/mapDefine.html?cityid='+cityid+'&city='+city+'&currentPageOpen=1'" @click="toMapDefine">
+                                        <div class="addrInfo">
+                                            <h3>以上都不是</h3>
+                                            <p>点击添加自定义位置</p>
+                                        </div>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    {#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+    {#include file="{#$HUONIAOROOT#}/templates/member/touch/cityChose.html" noLimit=1#}
+</body>
+<script src="{#$templets_skin#}js/addrAdd.js?v={#$cfg_staticVersion#}"></script>
+</html>

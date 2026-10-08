@@ -1,0 +1,348 @@
+<!-- 会员组件 -->
+<div :class="['rightCon',{'show':currEditPart === 30}] " v-cloak>
+    <!-- 会员信息组件 -->
+    <div class="memberInfoStyleContainer modBox" v-if="busiInfoFormData && busiInfoFormData.bgType" >
+        <div class="title">会员信息 
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 30 && showResetPop" @show="showResetPop = true" v-if="!checkHasIn('busiInfo',30)">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('busiInfo',0)"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 30 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end" v-if="checkHasIn('busiInfo',30)">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('busiInfo',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference" @click="">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 30 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end" >
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('busiInfo',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+            
+        </div>
+        <div class="memberInfoStyle">
+            <!-- 组件样式 -->
+            <div class="modstyleBox">
+                <h2 class="stitle">组件设置</h2>
+                <div class="style fn-clear" style="z-index: 999; position:relative; display: flex; align-items: center;">
+                    <div class="column_chose">
+                        <s :class="busiInfoFormData.themeType"></s>
+                        <span data-col="dark" @click="changeThemeStyle('dark')">深色</span>
+                        <span data-col="light" @click=" changeThemeStyle('light')">反白</span>
+                    </div>
+                    <div class="colorPickerBox">
+                        <div class="colorPicker">
+                            <div class="color_picker"  data-type="1">
+                                <div class="color bgimg" v-show="busiInfoFormData.bgType == 'image'">
+                                    <div class="imgShow" v-if="busiInfoFormData.bgType == 'image'"><img :src="busiInfoFormData.style.bgImage" alt=""></div>
+                                    <div class="imgShow" v-else :style="'background:'+ busiInfoFormData.style.bgColor +';'"></div>
+                                </div>
+                                <el-color-picker v-model="busiInfoFormData.style.bgColor" popper-class="borderColorPicker"  @active-change="value => {activeChangeColor(value,'busiInfoFormData.style.bgColor'); busiInfoFormData.bgType = 'color'}" @change="value => {resetColor('busiInfoFormData.style.bgColor',value); busiInfoFormData.bgType = 'color';}"></el-color-picker>
+                            </div>
+                        </div>
+                        <!-- 显示官方提供的图 -->
+                        <a href="javascript:;" class="btn_showPop" @click="showMemberCardPop = true;busiInfoFormData.bgType = 'image' ">
+                            <!-- <input type="file" name="Filedata" > -->
+                        </a>
+                    </div> 
+                </div>
+            </div>
+            <!-- <div class="contentSetBox modstyleBox" style="margin-bottom: -30px;">
+                
+                <div class="sContent" >
+                    
+                </div>
+            </div> -->
+            <!-- 内容设置 -->
+            <div class="contentSetBox modstyleBox" >
+                <h2 :class="['stitle']"  v-if="currPlatform.id != 'wxmini'">顶部操作区</h2>
+                <el-collapse-transition >
+                    <div class="sContent" >
+                        <div class="style_item noBg"  v-if="currPlatform.id != 'wxmini'" style="padding-top: 0 !important; padding-left: 0 !important;">
+                            <div class="style_options" style=" margin-bottom: 10px; padding-left: 6px;">
+                                <label for="" style="width: auto;"> 是否显示：</label>
+                                <div class="split_options radioBox">
+                                    <span v-for="(item,key) in 2" :class="{'onChose':busiInfoFormData.showHeader == (!key ? 1 : 0)}"  @click="busiInfoFormData.showHeader = (!key ? 1 : 0)"><s></s>{{key == 0 ? '显示' : '不显示'}}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <template v-if="busiInfoFormData.showHeader || currPlatform.id == 'wxmini'">
+
+                            <!-- 左上 -->
+                            <dl class="setbox" >
+                                <dt><h5>左上区域</h5></dt>
+                                <dd class="btn_item " >
+                                    <div class="item">
+                                        <s class="left_icon"><img src="{#$cfg_basehost#}/static/images/admin/order_icon.png" alt=""></s>
+                                        <div class="item_con">
+                                            <div class="img_up fn-clear">
+                                                <div class="upbtn hasup smShowImg">
+                                                    <input type="file" name="Filedata" id="business_filedata" data-type="business" accept="png,jpg,jpeg" class="fileUp" @change="fileInpChange('busiInfoFormData.business.icon')">
+                                                    <img :src="busiInfoFormData.business.icon" alt="">
+                                                    <span>更换图片</span>
+                                                </div>
+                                                <div class="imgText">
+                                                    <h4>切换个人版</h4>
+                                                    <p>建议图标尺寸70*70px</p>
+                                                </div>
+                                            </div>
+                                            <div class="inpbox">
+                                                <el-input v-model="busiInfoFormData.business.text" @focus="currFocus = 'business'" maxlength="5" show-word-limit  placeholder="请输入按钮名称" class="iconName"></el-input>
+                                            </div>
+                                            <div class="inpbox linkbox linkChose">
+                                                <s><img :src="'{#$cfg_basehost#}/static/images/admin/'+(busiInfoFormData.business.linkInfo && busiInfoFormData.business.linkInfo.selfSetTel ? '/siteMemberPage/tel' : 'link')+'.png'" alt=""></s>
+                                                <input type="text" placeholder="请选择按钮链接" class="iconLink disabled" readonly :value="busiInfoFormData.business.linkInfo && busiInfoFormData.business.linkInfo.linkText ? busiInfoFormData.business.linkInfo.linkText :busiInfoFormData.business.link" >
+                                            </div>
+                                        </div>
+                                    </div>
+                                </dd>
+                            </dl>
+    
+                            <!-- 右上 -->
+                            <dl class="setbox">
+                                <dt><h5>右上区域</h5> </dt>
+                                <dd>
+                                    <div class="style_options">
+                                        <label for="">快捷操作：</label>
+                                        <el-checkbox v-model="addDropMenu" :disabled="!addDropMenu && busiInfoFormData.rtBtns.btns.length >= 3" @change="val => quickOption(val,'dropMenu')">添加下拉选项按钮</el-checkbox>
+                                        <el-checkbox v-model="addScan" :disabled="!addScan && busiInfoFormData.rtBtns.btns.length >= 3" @change="val => quickOption(val,'scan')">添加扫码</el-checkbox>
+                                    </div>
+                                    <div class="style_options">
+                                        <label for="">按钮文本：</label>
+                                        <div class="split_options radioBox">
+                                            <span :class="{'onChose':busiInfoFormData.rtBtns.txtStyle === 0}" @click="busiInfoFormData.rtBtns.txtStyle = 0"><s></s>无(默认)</span>
+                                            <span :class="{'onChose':busiInfoFormData.rtBtns.txtStyle === 1}" @click="busiInfoFormData.rtBtns.txtStyle = 1"><s></s>文本(小)</span>
+                                            <span :class="{'onChose':busiInfoFormData.rtBtns.txtStyle === 2}" @click="busiInfoFormData.rtBtns.txtStyle = 2"><s></s>文本(大)</span>
+                                        </div>
+                                    </div>
+                                </dd>
+                                <dd class="marginTopSetBox">
+                                    <div  class="btnsBox btn_item btnsSort sortBox" data-sort="busiInfoFormData.rtBtns.btns"  data-drag=".item">
+                                        <div :class="['option_item item',{'hasBorder':btn.linkInfo.type == 3}]" v-for="(btn,ind) in busiInfoFormData.rtBtns.btns" :key="'rtBtns_'+ btn.id" :data-id="ind">
+                                            <s class="del_item" @click="delBtn(ind)"></s>
+                                            <s class="left_icon"><img  src="/static/images/admin/order_icon.png" alt=""></s>
+                                            <div class="item_con flex_r ">
+                                                <div class="img_up fn-clear">
+                                                    <div :class="['upbtn',{'hasup':btn.icon}]">
+                                                        <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp"  class="fileUp" :id="'rtBtns_' + ind + '_filedata'" :data-type="'rtBtns_' + ind" @change="fileInpChange(`busiInfoFormData.rtBtns.btns.${ind}.icon`)">
+                                                        <img v-if="btn.icon" :src="btn.icon"  alt="">
+                                                        <span>更换图片</span>
+                                                    </div>
+                                                    <div :class="['imgText',{'noBorder':!busiInfoFormData.rtBtns.txtStyle || btn.linkInfo.type == 3}]">
+                                                        <div class="inpbox" v-show="busiInfoFormData.rtBtns.txtStyle != 0">
+                                                            <el-input maxlength="5"  show-word-limit  placeholder="请输入按钮名称" class="iconName" v-model="btn.text" ></el-input>
+                                                        </div>
+                                                        <template v-if="">
+                                                            <div :class="[{'inpbox': btn.linkInfo.type != 3} ,{'editbox': btn.linkInfo.type == 3},{'marginTop': busiInfoFormData.rtBtns.txtStyle === 0},'linkbox linkChose']" @click="changeLink('busiInfoFormData.rtBtns.btns.' + ind + '.link',btn.linkInfo.type == 3)"  :style="busiInfoFormData.rtBtns.txtStyle ? '' : 'padding-top:0;'">
+                                                                <s>
+                                                                    <img v-if="btn.linkInfo.type == 1"  src="/static/images/admin/link.png">
+                                                                    <img v-else-if="btn.linkInfo.type == 2"  src="/static/images/admin/siteConfigPage/scan_icon.png?v=1">
+                                                                    <img v-else-if="btn.linkInfo.type == 3"  src="/static/images/admin/siteConfigPage/editlink_icon.png?v=1">
+                                                                    <img v-else-if="btn.linkInfo.type == 4"  src="/static/images/admin/siteMemberPage/tel.png">
+                                                                </s>
+                                                                <input type="text" placeholder="请选择链接" class="iconLink" v-if="btn.linkInfo.type != 3" readonly :value="btn.linkInfo.linkText ? btn.linkInfo.linkText : btn.link " >
+                                                                <h6 v-else>编辑下拉选项</h6>
+                                                            </div>
+                                                            
+                                                            <p v-show="!busiInfoFormData.rtBtns.txtStyle && btn.linkInfo.type !== 3">建议图标尺寸100*100px</p>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                                
+                                            </div>
+                                        </div>
+                                        <a href="javascript:;" class="add_more" @click="addNewBtn();"  v-show="!busiInfoFormData.rtBtns.btns || busiInfoFormData.rtBtns.btns.length < 3 "><s></s>添加按钮</a>
+                                    </div>
+                                </dd>
+                            </dl>
+                        </template>
+
+
+                        
+                    </div>
+                </el-collapse-transition>
+            </div>
+
+            <!-- 用户信息右侧 -->
+            <div class="contentSetBox modstyleBox">
+                <h2 class="stitle" >用户信息右侧</h2>
+                <div class="sContent" >
+                    <div class="style_options singleOptions " v-if=" busiInfoFormData.linkInfo">
+                        <label for="">头像链接：</label>
+                        <div :class="[{'inpbox': busiInfoFormData.linkInfo.type != 3} ,{'editbox': busiInfoFormData.linkInfo.type == 3},{'marginTop': busiInfoFormData.txtStyle === 0},'linkbox linkChose']" @click="changeLink('busiInfoFormData.link',busiInfoFormData.linkInfo.type == 3)"  :style="busiInfoFormData.txtStyle ? '' : 'padding-top:0;'">
+                            <s>
+                                <img v-if="busiInfoFormData.linkInfo.type == 1"  src="/static/images/admin/link.png">
+                                <img v-else-if="busiInfoFormData.linkInfo.type == 2"  src="/static/images/admin/siteConfigPage/scan_icon.png?v=1">
+                                <img v-else-if="busiInfoFormData.linkInfo.type == 3"  src="/static/images/admin/siteConfigPage/editlink_icon.png?v=1">
+                                <img v-else-if="busiInfoFormData.linkInfo.type == 4"  src="/static/images/admin/siteMemberPage/tel.png">
+                            </s>
+                            <input type="text" placeholder="请选择链接" class="iconLink" v-if="busiInfoFormData.linkInfo.type != 3" readonly :value="busiInfoFormData.linkInfo.linkText ? busiInfoFormData.linkInfo.linkText : busiInfoFormData.link " >
+                        </div>
+                    </div>
+                    <div class="style_options singleOptions ">
+                        <label for="">右侧按钮：</label>
+                        <el-checkbox v-for="btn in rightInfoDefault" @change="changeRightShow(btn)" :value="busiInfoFormData.rightInfo.btnStyle == btn.id">{{btn.text}}</el-checkbox>
+                    </div>
+                    <div class="style_item item">
+                        <div :class="{'style_options':true,  'mb10':busiInfoFormData.rightInfo.btnStyle == 3}" v-if="[2,3,4].includes(busiInfoFormData.rightInfo.btnStyle)">
+                            <label for="">{{busiInfoFormData.rightInfo.btnStyle == 2 ? '评分图标：':'按钮图标：'}}</label>
+                            <div class="img_up fn-clear">
+                                <div :class="['upbtn vip_icon fullW', {'hasup':busiInfoFormData.rightInfo.btn.icon}]  ">
+                                    <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" id="icon_filedata" data-type="icon" @change="fileInpChange('busiInfoFormData.rightInfo.btn.icon')">
+                                    <img :src="busiInfoFormData.rightInfo.btn.icon"  alt="" v-if="busiInfoFormData.rightInfo.btn.icon">
+                                    <span>更换图片</span>
+                                </div>
+                                <div class="imgText">
+                                    <p>建议尺寸60*60px</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="style_options " v-if="busiInfoFormData.rightInfo.btnStyle == 4">
+                            <label for="">按钮文本：</label>
+                            <el-checkbox :value="busiInfoFormData.rightInfo.btn.txtStyle == 0" @change="busiInfoFormData.rightInfo.btn.txtStyle = 0">无</el-checkbox>
+                            <el-checkbox :value="busiInfoFormData.rightInfo.btn.txtStyle == 1" @change="busiInfoFormData.rightInfo.btn.txtStyle = 1">文本（小）</el-checkbox>
+                            <el-checkbox :value="busiInfoFormData.rightInfo.btn.txtStyle == 2" @change="busiInfoFormData.rightInfo.btn.txtStyle = 2">文本（大）</el-checkbox>
+                        </div>
+
+                        <!-- 文字输入 -->
+                        <div class="style_options  mb10" v-if="busiInfoFormData.rightInfo.btnStyle != 2 && busiInfoFormData.rightInfo.btn.txtStyle != 0 " >
+                            <label for="">{{![1,4].includes(busiInfoFormData.rightInfo.btnStyle) ? '按钮' : ''}}文字：</label>
+                            <el-input maxlength="5"  show-word-limit  placeholder="请输入按钮名称" class="iconName" v-model="busiInfoFormData.rightInfo.btn.text" ></el-input>
+                        </div>
+
+                        <!-- 链接输入 -->
+                        <div class="style_options" >
+                            <label for="">链接：</label>
+                            <div :class="[{'inpbox': busiInfoFormData.rightInfo.btn.linkInfo.type != 3} ,{'editbox': busiInfoFormData.rightInfo.btn.linkInfo.type == 3},{'marginTop': busiInfoFormData.rightInfo.btn.txtStyle === 0},'linkbox linkChose']"  @click="changeLink('busiInfoFormData.rightInfo.btn.link',busiInfoFormData.rightInfo.btn.linkInfo.type == 3)"  :style="`${busiInfoFormData.rightInfo.btn.txtStyle ? '' : 'padding-top:0;'} background:#fff;`">
+                                <s>
+                                    <img v-if="busiInfoFormData.rightInfo.btn.linkInfo.type == 1"  src="/static/images/admin/link.png">
+                                    <img v-else-if="busiInfoFormData.rightInfo.btn.linkInfo.type == 2"  src="/static/images/admin/siteConfigPage/scan_icon.png?v=1">
+                                    <img v-else-if="busiInfoFormData.rightInfo.btn.linkInfo.type == 3"  src="/static/images/admin/siteConfigPage/editlink_icon.png?v=1">
+                                    <img v-else-if="busiInfoFormData.rightInfo.btn.linkInfo.type == 4"  src="/static/images/admin/siteMemberPage/tel.png">
+                                </s>
+                                <input type="text" placeholder="请选择链接" class="iconLink" v-if="busiInfoFormData.rightInfo.btn.linkInfo.type != 3" readonly :value="busiInfoFormData.rightInfo.btn.linkInfo.linkText ? busiInfoFormData.rightInfo.btn.linkInfo.linkText : busiInfoFormData.rightInfo.btn.link " >
+                            </div>
+                        </div>
+                       
+                        <!-- 文字/评分颜色 -->
+                        <div class="style_options">
+                            <label for="">{{busiInfoFormData.rightInfo.btnStyle != 2 ? '文字':'评分'}}颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  @change="value => pickerChangeColor(value,'busiInfoFormData.rightInfo.btn.style.textColor')" class="colorpicker" @active-change="(value) => activeChangeColor(value,'busiInfoFormData.rightInfo.btn.style.textColor')" v-model="busiInfoFormData.rightInfo.btn.style.textColor" ></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow"  @change="changeColor('busiInfoFormData.rightInfo.btn.style.textColor')"  :value="busiInfoFormData.rightInfo.btn.style.textColor ? busiInfoFormData.rightInfo.btn.style.textColor.replace('#','') : ''" spellcheck="false"  maxlength="6">
+                                <button @click="resetColor('busiInfoFormData.rightInfo.btn.style.textColor')" >重置</button>
+                            </div>
+                            <div class="opciatyBox" v-if="[1,2].includes(busiInfoFormData.rightInfo.btnStyle)">
+                                <input type="text" class="opciatySet" v-model="busiInfoFormData.rightInfo.btn.style.text_opacity">
+                                <span  class="single back">%</span>
+                            </div>
+                        </div>
+
+                        <!-- 图标/箭头颜色 -->
+                        <div class="style_options" v-if="[1,2].includes(busiInfoFormData.rightInfo.btnStyle)">
+                            <label for="">{{busiInfoFormData.rightInfo.btnStyle == 1 ? '箭头颜色：' : '图标颜色：'}}</label>
+                            <div :class="['colorpickerBox',{'noColor': !busiInfoFormData.rightInfo.btn.style.iconColor}]">
+                                <el-color-picker  popper-class="borderColorPicker" @change="value => pickerChangeColor(value,'busiInfoFormData.rightInfo.btn.style.iconColor')" class="colorpicker" @active-change="(value) => activeChangeColor(value,'busiInfoFormData.rightInfo.btn.style.iconColor')" v-model="busiInfoFormData.rightInfo.btn.style.iconColor" ></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow"  @change="changeColor('busiInfoFormData.rightInfo.btn.style.iconColor')"  :value="busiInfoFormData.rightInfo.btn.style.iconColor ? busiInfoFormData.rightInfo.btn.style.iconColor.replace('#','') : ''" spellcheck="false"  maxlength="6">
+                                <button @click="resetColor('busiInfoFormData.rightInfo.btn.style.iconColor')" >重置</button>
+                            </div>
+                            <div class="opciatyBox" v-if="busiInfoFormData.rightInfo.btnStyle == 1">
+                                <input type="text" class="opciatySet" v-model="busiInfoFormData.rightInfo.btn.style.icon_opacity">
+                                <span  class="single back">%</span>
+                            </div>
+                        </div>
+
+                        <!-- 按钮背景色 -->
+                        <div class="style_options" v-if="busiInfoFormData.rightInfo.btnStyle == 3">
+                            <label for="">按钮颜色：</label>
+                            <div :class="['colorpickerBox',{'noColor':!busiInfoFormData.rightInfo.btn.style.btnBgColor}]">
+                                <el-color-picker @change="value => pickerChangeColor(value,'busiInfoFormData.rightInfo.btn.style.btnBgColor')" class="colorpicker" @active-change="(value) => activeChangeColor(value,'busiInfoFormData.rightInfo.btn.style.btnBgColor')" v-model="busiInfoFormData.rightInfo.btn.style.btnBgColor" ></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow"  @change="changeColor('busiInfoFormData.rightInfo.btn.style.btnBgColor')"  :value="busiInfoFormData.rightInfo.btn.style.btnBgColor ? busiInfoFormData.rightInfo.btn.style.btnBgColor.replace('#','') : ''" spellcheck="false"  maxlength="6">
+                                <button @click="resetColor('busiInfoFormData.rightInfo.btn.style.btnBgColor')" >重置</button>
+                            </div>
+                        </div>
+                        <!-- 按钮边框 -->
+                        <div class="style_options" v-if="busiInfoFormData.rightInfo.btnStyle == 3">
+                            <label for="">按钮边框：</label>
+                            <div :class="['colorpickerBox',{'noColor':!busiInfoFormData.rightInfo.btn.style.bordeColor}]">
+                                <el-color-picker popper-class="borderColorPicker"   @change="value => pickerChangeColor(value,'busiInfoFormData.rightInfo.btn.style.bordeColor')" class="colorpicker" @active-change="(value) => activeChangeColor(value,'busiInfoFormData.rightInfo.btn.style.bordeColor')" v-model="busiInfoFormData.rightInfo.btn.style.bordeColor" ></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow"  @change="changeColor('busiInfoFormData.rightInfo.btn.style.bordeColor')"  :value="busiInfoFormData.rightInfo.btn.style.bordeColor ? busiInfoFormData.rightInfo.btn.style.bordeColor.replace('#','') : ''" spellcheck="false"  maxlength="6">
+                                <button @click="resetColor('busiInfoFormData.rightInfo.btn.style.bordeColor')" >重置</button>
+                            </div>
+                            <div class="opciatyBox" >
+                                <input type="text" class="opciatySet" v-model="busiInfoFormData.rightInfo.btn.style.borderSize">
+                                <span  class="single back">px</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 间距设置 -->
+            <div class="marginSetBox modstyleBox contentSetBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" >
+                        <div class="sContent">
+                            <div class="style_options">
+                                <label for="">背景高度：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" v-model="busiInfoFormData.style.bgHeight" :min="360" :max="840" :step="8"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="checkMax(360,840,'busiInfoFormData.style.bgHeight')":value="busiInfoFormData.style.bgHeight" >
+                                    <!-- <input type="number" class="colorShow" @change="busiInfoFormData.style.bgHeight = (busiInfoFormData.style.bgHeight ? busiInfoFormData.style.bgHeight : 0)" v-model="busiInfoFormData.style.bgHeight" > -->
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" v-model="busiInfoFormData.style.marginLeft"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="checkMax(0,40,'busiInfoFormData.style.marginLeft')" :value="busiInfoFormData.style.marginLeft" >
+                                    <!-- <input type="number" class="colorShow" @change="busiInfoFormData.style.marginLeft = (busiInfoFormData.style.marginLeft ? busiInfoFormData.style.marginLeft : 0)"  v-model="busiInfoFormData.style.marginLeft"  > -->
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+        </div>
+    </div>
+</div>

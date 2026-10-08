@@ -1,0 +1,551 @@
+{#if {#verifyModuleAuth module='shop'#}#}
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/admin/datetimepicker.css?v={#$cfg_staticVersion#}">
+<style>
+	/*日历弹窗*/
+.dropdown-menu{position: absolute;top: 100%;left: 0;z-index: 100000;display: none;float: left;min-width: 150px;padding: 5px 0;margin: 2px 0 0;list-style: none;background-color: #fff;border: 1px solid #ccc;border: 1px solid rgba(0,0,0,0.05);*border-right-width: 2px;*border-bottom-width: 2px;-webkit-border-radius: 0 0 6px 6px;-moz-border-radius: 0 0 0 6px 6px;border-radius: 0 0 6px 6px;-webkit-box-shadow: 0 5px 50px rgb(0 0 0 / 30%);-moz-box-shadow: 0 5px 50px rgba(0,0,0,0.3);box-shadow: 0 5px 50px rgb(0 0 0 / 30%);-webkit-background-clip: padding-box;-moz-background-clip: padding;background-clip: padding-box;}
+.table-condensed th, .table-condensed td{padding: 4px 5px;}
+
+.icon-arrow-left{display: inline-block;width: 14px;height: 14px;margin-top: 1px;*margin-right: .3em;line-height: 14px;vertical-align: text-top;background-image: url(/static/images/admin/glyphicons-halflings.png);background-repeat: no-repeat;background-position: -240px -96px;}
+.icon-arrow-right{display: inline-block;width: 14px;height: 14px;margin-top: 1px;*margin-right: .3em;line-height: 14px;vertical-align: text-top;background-image: url(/static/images/admin/glyphicons-halflings.png);background-repeat: no-repeat;background-position: -264px -96px;}
+.datetimepicker td, .datetimepicker th{font-size: 14px;color: #333;}
+.datetimepicker th{font-weight: bold;}
+
+.hdtimeTip{font-size: 14px;color: #666;float: left;margin-left: 10px;margin-right: 10px;}
+.form_datetime .time-tip{font-size: 14px;color: #999;margin-left: 14px;}
+
+.w-form dl.mainAdvice{margin-top: -8px;}
+.w-form dl.mainAdvice dt{padding: 0;}
+.w-form dl.mainAdvice dd{padding: 0 10px;}
+.w-form dl.mainAdvice dd p{font-size: 14px;color: #999}
+
+</style>
+{#if $pagetype != 0#}
+{#$modAdrr = $pagetype#}
+{#/if#}
+<script>
+  var upType    = 'thumb';
+  var tuanFlag  = {#if $detail_promotype == 1 || $modAdrr == 1#}1{#else#}2{#/if#};//1为团购发布
+   var brandId = '{#$detail_brand#}';
+  var expressId = '{#$detail_logisticId#}';
+  var yfId      = '{#$detail_blogistic#}';
+  var promotype      = '{#$detail_promotype#}';
+
+  	var service = 'shop';
+	var pubModelType = '{#$module#}';
+	var server_video_url = '/include/upload.inc.php?mod={#$module#}&filetype=video&type=video&utype=video';
+	var server_image_url = '/include/upload.inc.php?mod={#$module#}&filetype=image&type=atlas';
+	var doe = '{#$do#}';
+	var logistic = '{#$detail_logisticId#}';
+	var blogistic = '{#$detail_blogisticId#}';
+	var modAdrr = '{#if $modAdrr#}{#$modAdrr#}{#else#}1{#/if#}';
+	var pagetype = '{#$pagetype#}'
+</script>
+{#if ($typeid == 0 && $do != "edit") || $do == "editype"#}
+<form class="editform" method="post" action="{#getUrlPath service='member' template='fabu' action='shop' typeid='%typeid%' param="{#if $id != ""#}do=edit{#/if#}"#}">
+  <input type="hidden" name="typeid" id="typeid" value="{#$typeid#}" />
+  <input type="hidden" name="typename" id="typename" value="{#$typename#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="modAdrr" id="modAdrr" value="{#if $do == "edit"#}{#$detail_promotype#}{#else#}{#if $modAdrr#}{#$modAdrr#}{#else#}1{#/if#}{#/if#}" />
+  <h3 class="xztit xztit1 {#if $modAdrr==1 || $modAdrr==2 || $id#}fn-hide{#/if#}">选择展示模板：</h3>
+  <dl class="fn-clear choseMod {#if $modAdrr==1 || $modAdrr==2 || $id#}fn-hide{#/if#}">
+  	<dt></dt>
+  	<dd>
+  		<div class="choseCon fn-clear">
+  			<div class="leftCon comCon active" data-type="1">
+  				<div class="lfimg">
+  					<a class="seeBig" href="{#$cfg_staticPath#}images/shop/tuandetail.png" target="_blank"></a><s></s>
+  					<img src="{#$cfg_staticPath#}images/shop/tuandetail.png" alt="">
+  				</div>
+				<div class="lgInfo">
+					<h3>团购套餐模板</h3>
+					<span><i>• </i>建议本地团购商家使用<br/><i>• </i>可添加多规格、套餐内容、使用须知等<br/><i>• </i>支持<em>到店消费、同城配送、快递邮寄</em></span>
+				</div>
+  			</div>
+  			<div class="lrCon comCon" data-type="2">
+  				<div class="lfimg">
+  					<a class="seeBig" href="{#$cfg_staticPath#}images/shop/diandetail.png" target="_blank"></a><s></s>
+  					<img src="{#$cfg_staticPath#}images/shop/diandetail.png" alt="">
+  				</div>
+				<div class="lgInfo">
+					<h3>电商销售模板</h3>
+					<span><i>• </i>建议电商销售商品使用<br/><i>• </i>可添加多规格、优惠券、参数/品牌信息等<br/><i>• </i>支持<em>快递邮寄、同城配送</em></span>
+				</div>
+  			</div>
+  		</div>
+  		<div class="nextStep"><a href="javascript:;">下一步</a></div>
+  	</dd>
+  </dl>
+  <h3 class="xztit xztit2 {#if $modAdrr==0 && !$id#}fn-hide{#/if#}">{#$langData['siteConfig'][19][559]#}：</h3>
+  <dl class="fn-clear choseFenlei {#if $modAdrr==0 && !$id#}fn-hide{#/if#}">
+    <dt></dt>
+    <!-- <dd>
+      <div class="t-main">
+        <s class="cc-nav prev" title="{#$langData['siteConfig'][26][187]#}">{#$langData['siteConfig'][26][187]#}</s>
+        <div class="t-list">
+          <ol class="t-ol fn-clear" id="tList"></ol>
+        </div>
+        <s class="cc-nav next" title="{#$langData['siteConfig'][26][188]#}">{#$langData['siteConfig'][26][188]#}</s>
+      </div>
+      <div class="confrim">
+        <strong>{#$langData['siteConfig'][19][561]#}：</strong><span id="cTxt">{#$langData['siteConfig'][13][20]#}</span>
+      </div>
+      <input class="btn btn-large{#if $typeid != ""#} btn-primary{#/if#}" type="submit" name="submit" id="btnNext" value="{#$langData['siteConfig'][6][95]#}" {#if $typeid == ""#}disabled{#/if#} />
+    </dd> -->
+	<dd class="newFL">
+		<div class="flBox">
+			<div class="searchFl">
+				<s class="search_icon"></s>
+				<input type="text" placeholder="搜索分类关键词">
+				<div class="searchCon">
+					<ul></ul>
+				</div>
+			</div>
+			<div class="flListBox">
+				<ul class="typeList rootList">
+					{#loop service="shop" action="type" return="type"#}
+					<li data-id="{#$type.id#}">{#$type.typename#}</li>
+					{#/loop#}
+				</ul>
+				<div class="typeList flList">
+					{#loop service="shop" action="type" return="type"#}
+					<div class="fl_list {#if $typeid == $type.id#}chosed{#/if#}" data-id="{#$type.id#}" data-lower="{#$type.lower#}">
+						<h4>{#$type.typename#}</h4>
+						<ul>
+							{#loop service="shop" action="type" type=$type.id return="ltype" #}
+							<li data-id="{#$ltype.id#}" data-lower="{#$ltype.lower#}" class="{#if $ltype.lower > 0#}lower{#/if#} {#if $typeid == $ltype.id#}chosed{#/if#}">{#$ltype.typename#}{#if $ltype.lower#}<s></s>{#/if#}</li>
+							{#/loop#}
+						</ul>
+					</div>
+					{#/loop#}
+				</div>
+			</div>
+		</div>	
+		<div class="confrim">
+			<strong>{#$langData['siteConfig'][19][561]#}：</strong><span id="cTxt">{#$langData['siteConfig'][13][20]#}</span>
+		</div>
+		{#if $do != 'editype'#}
+		<a href="javascript:;" class="backBtn btn" style="margin-right: 10px; margin-left: 0">上一步</a>
+		{#/if#}
+		<input class="btn btn-large{#if $typeid != ""#} btn-primary{#/if#}" type="submit" name="submit" id="btnNext" value="{#$langData['siteConfig'][6][95]#}" {#if $typeid == ""#}disabled{#/if#} />
+	</dd>
+  </dl>
+</form>
+<script type="text/javascript">
+  var specifiVal = [], atlasMax = 5;
+</script>
+<script type="text/javascript" src="{#$templets_skin#}js/selectShopCategory.js?v={#$cfg_staticVersion#}"></script>
+{#else#}
+	<!-- 团购发布 -->
+	{#if $detail_promotype ==1 || $modAdrr ==1#}
+	{#include file="fabu-shop-modtuan.html"#}
+	{#else#}
+	<!-- 电商发布 -->
+<div class="w-form diansForm">
+	<div class="formTab">
+		<ul class="fn-clear">
+			<li class="active"><a href="javascript:;">基本信息</a></li>
+			<li><a href="javascript:;">销售信息</a></li>
+			<li><a href="javascript:;">物流信息</a></li>
+			<!-- <li><a href="javascript:;">图文详情</a></li> -->
+			<li><a href="javascript:;">详情描述</a></li>
+		</ul>
+	</div>
+	<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=shop&action={#if $do == 'edit'#}edit&id={#$id#}{#else#}put{#/if#}" data-url="{#getUrlPath service='member' template='manage' action='shop'#}">
+    <input type="hidden" name="typeid" id="typeid" value="{#$typeid#}" />
+    <input type="hidden" name="id" id="id" value="{#$id#}" />
+    <input type="hidden" name="itemid" id="itemid" value="{#$itemid#}" />
+
+    <input type="hidden" name="modAdrr" id="modAdrr" value="{#if $do == "edit"#}{#$detail_promotype#}{#else#}{#$modAdrr#}{#/if#}" />
+		<dl class="fn-clear fenlei" data-required="1">
+			<dt>{#$langData['siteConfig'][19][393]#}：</dt>   {#* 分类 *#}
+			<dd class="editype">
+				{#$proType#}&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="{#getUrlPath service='member' template='fabu' action='shop' typeid={#$typeid#} param="do=editype{#if $id != 0#}&id={#$id#}{#/if#}{#if $modAdrr != 0#}&modAdrr={#$modAdrr#}{#/if#}"#}">{#$langData['siteConfig'][19][562]#}</a>   {#* 编辑分类 *#}
+			</dd>
+		</dl>
+		{#if $modAdrr#}
+		<dl class="fn-clear" data-required="1">
+			<dt>{#$langData['siteConfig'][19][563]#}：</dt>     {#* 品牌 *#}
+			<dd>
+				<select name="brand" id="brand" class="input-large">{#$brandOption#}</select>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#/if#}
+		<div class="compage">
+			<h2 class="tit1">基础信息</h2>
+			<dl class="fn-clear" data-required="1">
+				<dt><span>*</span>商品标题：</dt>   {#* 商品标题 *#}
+				<dd>
+					<input type="text" name="title" class="inp" id="title" size="60" maxlength="50" data-title="{#$langData['siteConfig'][27][130]|replace:'100':'50'|replace:'1':'5'#}" value="{#$detail_title#}" />
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+	        <dl class="fn-clear">
+				<dt>{#$langData['siteConfig'][19][522]#}：</dt>   {#* 副标题 *#}
+				<dd>
+					<textarea class="inp text" name="subtitle" id="subtitle" rows="3" cols="60" data-title="{#$langData['siteConfig'][20][416]#}">{#$detail_subtitle#}</textarea>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+			{#if $storeTypeOption#}
+			<dl class="fn-clear" data-required="1">
+				<dt>店铺中分类：</dt>
+				<dd>
+					<select name="category[]" id="category" multiple style="width: 300px; height: 150px; margin-bottom: 10px;">{#$storeTypeOption#}</select>
+					<span class="tip-inline" style="display: inline-block;"><s></s>请选择商品所属店铺中分类，支持多选！</span>
+				</dd>
+			</dl>
+	    	{#/if#}
+	    	<dl class="fn-clear">
+				<dt>{#$langData['shop'][5][81]#}：</dt>  {#* 条形码 *#}
+				<dd>
+					<input type="text" name="barcode" class="inp" id="barcode" size="30" maxlength="50" data-title="{#$langData['shop'][5][110]#}" value="{#$detail_barcode#}" />  {#* 请输入条形码 *#}
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt>商品单位：</dt>
+				<dd>
+					<input type="text" name="shopunit" class="inp" id="shopunit" size="6" maxlength="5" data-title="如：件、箱、条、包等" value="{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}" />
+					<span class="tip-inline" style="display: inline-block;"><s></s>如：件、箱、条、包等</span>
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt><span>*</span>商品图集：</dt>
+				<dd class="listImgBox">
+					<div id="listSection003" class="listSection filePickerBox">
+						<!-- 主图 -->
+						{#if $detail_litpic#}
+				          <div id="WU_UP_lip_FILE_00" class="pubitem">
+							<a href="{#changeFileSize url="{#$detail_litpic#}"#}" target="_blank" title="" class="enlarge"><img src="{#changeFileSize url="{#$detail_litpic#}" type="small"#}" onerror="this.src='/static/images/404.jpg'" data-val="{#$detail_litpicSource#}" data-url="{#changeFileSize url="{#$detail_litpic#}" type="small"#}"></a><a class="li-rm" href="javascript:;"><span>删除</span></a><span class="setMain">设为主图</span><span class="mainImg">主图</span>
+						</div>
+				        {#/if#}
+						{#if $detail_pics#}
+						{#foreach from=$detail_pics key=k item=i#}
+						<div id="WU_UP_lip_FILE_{#$k#}" class="pubitem">
+							<a href="{#changeFileSize url="{#$i.path#}"#}" target="_blank" title="" class="enlarge"><img src="{#changeFileSize url="{#$i.path#}" type="small"#}" onerror="this.src='/static/images/404.jpg'" data-val="{#$i.pathSource#}" data-url="{#changeFileSize url="{#$i.path#}" type="small"#}"></a><a class="li-rm" href="javascript:;"><span>删除</span></a><span class="setMain">设为主图</span><span class="mainImg">主图</span></div>
+						{#/foreach#}
+						{#/if#}
+						<div class="btn-section fn-clear">
+							<div class="wxUploadObj fn-clear">
+								<div class="uploadinp " data-main="1" data-right="1" id="filePicker003"  data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder003"></div><span>添加图片</span><em>+</em></div>
+							</div>
+						</div>
+					</div>
+					<p class="upTip ">{#$langData['siteConfig'][54][19]|replace:' 1 ':(($atlasSize/1024)|string_format:"%.1f")|replace:' 2 ':$atlasMax#}，推荐图片比例1:1，如900像素 × 900像素</p>
+					<input type="hidden" name="litpic" id="litpic" value="{#$detail_litpicSource#}" />
+					<input type="hidden" name="imglist" value="" class="imglist-hidden" id="imglist"> 
+				</dd>
+			</dl>
+			<dl class="fn-clear uploadVideo">
+	       	 	<dt>{#$langData['siteConfig'][6][195]#}：</dt>{#* 上传视频 *#}
+	            <dd class="listImgBox fn-clear">
+	                <div class="list-holder">
+	                    <ul id="listSection004" class="fn-clear listSection">
+	                        {#if $detail_video#}
+	                        <li id="WU_FILE_40" class="pubitem complete">
+	                            <video class="video-js" id="WU_FILE_41" src="{#$detail_video#}" data-url="{#$detail_videosource#}" data-val="{#$detail_videosource#}"></video>
+	                            <div class="file-panel li-rm"><span class="cancel">{#$langData['siteConfig'][6][8]#}</span></div>{#* 删除 *#}
+	                            <span class="player"></span>
+	                        </li>
+	                        {#/if#}
+	                    </ul>
+	                    <input type="hidden" id="video" name="video" value="{#$detail_videosource#}" class="imglist-hidden">
+	                </div>
+	                <div class="btn-section fn-clear">
+	                    <div class="uploadinp filePicker" id="filePicker004" data-extensions="mp4" data-mime="video/mp4" data-type="filenail" data-type-real="video" data-count="1" data-size="{#$softSize#}" data-imglist=""><div id="flasHolder004"></div><span>{#$langData['siteConfig'][6][196]#}</span><em>+</em></div>{#* 添加视频 *#}
+	                </div>
+	                <div class="tip-inline focus"><s></s>如上传视频将排在主图前</div>
+	            </dd>
+	        </dl>
+
+		</div>
+		<div class="compage">
+			<h2 class="tit1">销售信息</h2>
+			<div class="bg_gray {#if $huodong==1#}noEdit{#/if#}" id="specification">
+				{#if $huodong==1#}<div class="hd_mask"></div>{#/if#}
+				<h3>产品规格 {#if $huodong==1#}<em>(活动中的商品不能编辑此项)</em>{#/if#}</h3>
+
+		    	{#if $specification != ""#}
+				{#$specification#}
+		    	{#/if#}
+				<dl class="self_dl fn-clear">
+				    <dt>自定义规格：</dt>
+				    <dd>
+						{#if $specifiCustom#}
+						{#foreach from=$specifiCustom key=key item=cus#}
+						<div class="self_div">
+							<h2 class="fn-clear"><input type="text" value="{#$key|replace:'>':'&gt;'|replace:'<':'&lt;'|replace:'"':'&quot;'|replace:"'":'&#x27;'|replace:'`':'&#x60;'#}" class="inp" size="22" maxlength="50" placeholder="输入属性名称"> <a href="javascript:;" class="del_dd">删除</a></h2>
+							<ul class="fn-clear">
+								{#foreach from=$cus item=c#}
+								<li class="fn-clear" ><input type="text" value="{#$c|replace:'>':'&gt;'|replace:'<':'&lt;'|replace:'"':'&quot;'|replace:"'":'&#x27;'|replace:'`':'&#x60;'#}"  class="inp"  size="22" maxlength="50" placeholder="请输入属性值"><i class="del_prop"></i></li>
+								{#/foreach#}
+								<li class="fn-clear" ><input type="text"   class="inp"  size="22" maxlength="50" placeholder="请输入属性值"><i class="del_prop"></i></li>
+							</ul>
+						</div>
+						{#/foreach#}
+						{#else#}
+						<div class="self_div">
+							<h2 class="fn-clear"><input type="text"  class="inp" size="22" maxlength="50" placeholder="输入属性名称"> <a href="javascript:;" class="del_dd">删除</a></h2>
+							<ul class="fn-clear">
+								<li class="fn-clear" ><input type="text"   class="inp"  size="22" maxlength="50" placeholder="请输入属性值"><i class="del_prop"></i></li>
+							</ul>
+						</div>
+						{#/if#}
+						<div class="self_tip">
+							<button type="button"  class="adddiv">+增加自定义规格</button>
+							<span>自定义规格为非必填项，您可以自定义填写属性项和属性值的名称，如果不需要设置可以不填写。</span>
+						</div>
+				    </dd>
+
+				</dl>
+				<div id="speList" class="fn-hide">
+				    <dl class="fn-clear">
+				      <dt>{#$langData['siteConfig'][26][189]#}：</dt>
+				      <dd class="fn-clear">
+				        <div class="speTab"><table><thead></thead><tbody></tbody></table></div>
+						<a href="javascript:;" class="piliang">批量填写</a>
+				        <span class="tip-inline tip-inlines" style="display:inline-block; margin-top: 9px;"><s></s>{#$langData['siteConfig'][27][132]#}</span>
+				      </dd>
+				    </dl>
+				  </div>
+			</div>
+
+		    <dl class="fn-clear" data-required="1">
+				<dt><span>*</span>{#$langData['siteConfig'][19][527]#}：</dt>
+				<dd>
+		        	<div class="input-append">
+						<input id="mprice" name="mprice" type="text" size="8" data-title="{#$langData['siteConfig'][27][131]#}" value="{#$detail_mprice#}">
+						<span class="add-aft">{#echoCurrency type="short"#}</span>
+					</div>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+		    <dl class="fn-clear" data-required="1">
+				<dt><span>*</span>{#$langData['siteConfig'][19][564]#}：</dt>
+				<dd>
+		        	<div class="input-append">
+						<input id="price" name="price" type="text" size="8" data-title="{#$langData['siteConfig'][27][131]#}" value="{#$detail_price#}">
+						<span class="add-aft">{#echoCurrency type="short"#}</span>
+					</div>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+
+    		
+
+    		<dl class="fn-clear" data-required="1">
+				<dt><span>*</span>{#$langData['siteConfig'][19][525]#}：</dt>
+				<dd>
+	       		 	<div class="input-append">
+						<input id="inventory" name="inventory" type="text" size="8" maxlength="6" data-title="{#$langData['siteConfig'][27][133]#}" value="{#$detail_inventory#}">
+						<span class="add-aft">{#$langData['shop'][3][1]#}</span>
+					</div>
+					<span class="tip-inline"><s></s>{#$langData['siteConfig'][27][133]#}</span>
+				</dd>
+			</dl>
+
+			<dl data-title="请选择" data-type="radio" class="fn-clear">
+				<dt><font color="#f00">*</font>库存计数：</dt>
+				<dd>
+					<div class="radio" data-title="请选择">
+						<span data-id="0"{#if !$detail_inventoryCount#} class="curr"{#/if#}>拍下减库存</span>
+						<span data-id="1"{#if $detail_inventoryCount == 1#} class="curr"{#/if#}>付款减库存</span>
+						<span data-id="2"{#if $detail_inventoryCount == 2#} class="curr"{#/if#}>永不减库存</span>
+						<input type="hidden" name="inventoryCount" id="inventoryCount" value="{#$detail_inventoryCount#}">
+					</div>
+					<span class="tip-inline"><s></s>请选择</span>
+					<p class="inventoryTips">注意：拍下减库存，<span title='当商品在短时间内被大量拍下且不付款，买家以此来要胁、敲诈等影响交易的非正常行为，此类情况可能为“恶拍”现象。'>存在恶拍风险</span>；付款减库存，<span title='超卖即“超卖缺货”，当商品库存接近0时，如果多个买家同时付款购买此宝贝，将会出现“超卖缺货”现象。'>存在超卖风险</span>；请根据实际情况选择相应的选项！</p>
+				</dd>
+			</dl>
+			<dl class="fn-clear" data-required="1">
+				<dt>{#$langData['siteConfig'][19][565]#}：</dt>
+				<dd>
+        			<div class="input-append">
+						<input id="volume" name="volume" type="text" size="8" maxlength="6" value="{#$detail_volume#}">
+					<span class="add-aft">m³</span>
+					</div>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+    		<dl class="fn-clear" data-required="1">
+				<dt>{#$langData['siteConfig'][19][566]#}：</dt>
+				<dd>
+        			<div class="input-append">
+						<input id="weight" name="weight" type="text" size="8" maxlength="6" value="{#$detail_weight#}">
+						<span class="add-aft">kg</span>
+					</div>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+			<dl class="fn-clear" data-required="1">
+				<dt><span>*</span>最小起订量：</dt>
+				<dd>
+					<div class="input-append">
+						<input id="smallCount" name="smallCount" type="text" size="8" maxlength="6" data-title="{#$langData['siteConfig'][27][134]#}" value="{#if $detail_smallCount#}{#$detail_smallCount#}{#else#}1{#/if#}">
+						<span class="add-aft">{#$langData['shop'][3][1]#}</span>
+					</div>
+					<span class="tip-inline"><s></s>{#$langData['siteConfig'][27][134]#}</span>
+				</dd>
+			</dl>
+			<dl class="fn-clear" >
+				<dt><span>*</span>装箱数量：</dt>
+				<dd>
+					<div class="input-append">
+						<input id="packingCount" name="packingCount" type="text" size="8" maxlength="6" data-title="{#$langData['siteConfig'][27][134]#}" value="{#if $detail_packingCount#}{#$detail_packingCount#}{#else#}1{#/if#}">
+						<span class="add-aft">{#$langData['shop'][3][1]#}</span>
+					</div>
+				</dd>
+			</dl>
+
+	    	<dl class="fn-clear" data-required="1">
+				<dt><span>*</span>{#$langData['siteConfig'][19][567]#}：</dt>
+				<dd>
+	        		<div class="input-append">
+						<input id="limit" name="limit" type="text" size="8" maxlength="6" data-title="{#$langData['siteConfig'][27][134]#}" value="{#$detail_limitcount#}">
+						<span class="add-aft">{#$langData['shop'][3][1]#}</span>
+					</div>
+					<span class="tip-inline"><s></s>{#$langData['siteConfig'][27][134]#}</span>
+				</dd>
+			</dl>
+			<dl data-title="请选择" data-type="radio" class="fn-clear choseTuikuan">
+				<dt><font color="#f00">*</font>是否支持退款：</dt>
+				<dd>
+					<div class="radio" data-title="请选择">
+						<span data-id="0"{#if !$detail_is_tuikuan#} class="curr"{#/if#}>支持退款</span>
+						<span data-id="1"{#if $detail_is_tuikuan == 1#} class="curr"{#/if#}>不支持</span>
+						<input type="hidden" name="tuikuantype" id="tuikuantype" value="{#$detail_is_tuikuan#}">
+					</div>
+					<span class="tip-inline"><s></s>请选择</span>
+				</dd>
+			</dl>
+
+		</div>
+		<div class="compage wuliu">
+			<h2 class="tit1">物流信息</h2>
+			<dl class="fn-clear saleCon">
+				<dt><font color="#f00">*</font>销售类型：</dt>
+				<dd>
+					<div class="checkbox">
+						{#if $express == 1#}
+	                    <label><input type="checkbox" class="kdps" value="4" {#if $detail_typesalesarr &&  in_array('4',$detail_typesalesarr)#} checked{#/if#}>快递</label>
+	                    {#/if#}
+	                    {#if $merchant_deliver == 1#}
+	                    <label><input type="checkbox" class="sjps" value="2" {#if $detail_typesalesarr &&  in_array('2',$detail_typesalesarr)#} checked{#/if#}>商家配送</label>
+	                    {#else if $distribution ==1#}
+	                    <label><input type="checkbox" class="ptps" value="3" {#if $detail_typesalesarr &&  in_array('3',$detail_typesalesarr)#} checked{#/if#}>平台配送</label>
+	                    {#/if#}
+	                    
+	                    
+	                </div>
+	                <div class="xsAlert">
+	                	<span class="xstit"><i></i>区别是什么？</span>
+	                	<div class="sale_pop">
+	                		<b class="triangle"></b><b class="filltriangle"></b>
+	                		<div class="xsItem">
+	                			<h4>平台配送</h4><p>将由本平台专业骑手进行配送。</p>
+	                		</div>
+	                		<div class="xsItem">
+	                			<h4>商家配送</h4><p>需要商家自行配送上门。</p>
+	                		</div>
+	                		<div class="xsItem">
+	                			<h4>快递</h4><p>由快递公司寄送，商家自行选择快递公司。</p>
+	                		</div>
+	                	</div>
+	                </div>
+	                <span class="tip-inline"></span>
+	               
+				</dd>
+			</dl>
+			<!-- 发布时  和编辑时 只有到店消费时 隐藏设置运费 否则显示-->
+			<dl class="fn-clear psWrap {#if !$detail_typesalesarr#}fn-hide{#/if#}" data-required="1" data-title="{#$langData['shop'][4][72]#}">
+				<dt><span>*</span>设置运费：</dt>
+				<dd>
+					<div class="fn-clear">
+<!--						&lt;!&ndash; 商家配送 &ndash;&gt;-->
+<!--						<div class="psChose comchose fn-hide" data-id="2">-->
+<!--							<select name="logistic" id="logistic" class="input-large"></select>-->
+<!--						</div>-->
+<!--						&lt;!&ndash; 快递配送 &ndash;&gt;-->
+<!--						<div class="kdChose comchose fn-hide" data-id="4">-->
+<!--							<select name="express" id="express" class="input-large">-->
+<!--							</select>-->
+<!--						</div>-->
+
+						<!-- 商家配送 -->
+						<div class="psChose comchose  {#if $detail_typesalesarr && !in_array('2',$detail_typesalesarr)#}fn-hide{#/if#}" data-id="2">
+							<select name="logistic" id="logistic" class="input-large" value="{#$detail_blogisticId#}"></select>
+						</div>
+						<!-- 快递配送 -->
+						<div class="kdChose comchose {#if $detail_typesalesarr && !in_array('4',$detail_typesalesarr)#}fn-hide{#/if#}" data-id="4">
+							<select name="express" id="express" class="input-large" value="{#$detail_logisticId#}">
+							</select>
+						</div>
+
+						<span class="tip-inline"><s></s>暂未添加<em></em>相关运费模板，可<a href="javascript:;" class="saveBook">保存到货架</a>以保留所填信息</span>
+					</div>
+					<div class="yfTip">
+						<!-- 商家2 平台3 -->
+						<!-- {#if $merchant_deliver == 1#}
+						<p data-tp="2"><i></i>买家地址超出模板设置的配送范围则按快递收费</p>
+						{#elseif $distribution ==1#}
+						<p data-tp="3"><i></i>买家地址超出<span title=" 平台最大配送距离为商家地址3公里内">平台配送范围</span>则按快递收费</p>
+						{#/if#} -->
+
+						<p data-tp="3|4"><i></i>买家地址超出<span>平台配送范围</span>则按快递收费</p>
+						<p data-tp="2|4"><i></i>买家地址超出模板设置的配送范围则按快递收费</p>
+						<p data-tp="2"><i></i>买家地址超出模板设置的商家配送范围则无法下单</p>
+					</div>
+					
+					
+				</dd>
+			</dl>
+		</div>
+		<div class="compage ">
+			<h2 class="tit1">详情描述</h2>
+		  	<!-- 产品参数s -->
+		  	<div class="proParam bg_gray" id="proItem">
+		  	  	<h3>产品参数</h3>
+		  		{#$proItemList#}
+                <p><button type="button" class="adddiv" style="float: none; margin-left: 169px; margin-top: 10px;">+增加自定义参数</button></p>
+		  	</div>
+		  	<!-- 产品参数e -->
+			<dl class="fn-clear miaoshu">
+				<dt><span>*</span>{#$langData['siteConfig'][26][121]#}{#$langData['siteConfig'][19][335]#}：</dt>  {#* 电脑端描述 *#}
+				<dd>
+					<p><small>图片尺寸建议宽930px，高度不限</small></p>
+					<script id="body" name="body" type="text/plain" style="width:90%;height:500px">{#$detail_body#}</script>
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt>{#$langData['siteConfig'][26][122]#}{#$langData['siteConfig'][19][335]#}：</dt>  {#* 移动端描述 *#}
+				<dd>
+	                <p><small>留空将自动同步电脑端描述内容</small></p>
+					<script id="mbody" name="mbody" type="text/plain" style="width:90%;height:500px">{#$detail_mbody#}</script>
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt>&nbsp;</dt>
+				<dd>
+					<button class="submit tosale">{#if $id == 0#}发布销售{#else#}{#$langData['siteConfig'][6][122]#}{#/if#}</button>
+					<button class="submit nosale">保存到货架</button>
+				</dd>
+			</dl>
+		</div>
+	</form>
+</div>
+<script type="text/javascript">
+  var specifiVal = {#$specifiVal#}, atlasMax = 5;
+</script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap-datetimepicker.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fabu_shop_upimg.js?v={#$cfg_staticVersion#}">
+
+</script>
+{#/if#}
+
+{#else#}
+<div class="list" style="padding: 200px 0; text-align: center; font-size: 14px; color: red;">{#$langData['siteConfig'][20][403]#}</div>
+{#/if#}

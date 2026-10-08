@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<title>{#$langData['siteConfig'][16][8]#}</title>
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/maidan.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript">
+	var staticPath = '{#$cfg_staticPath#}';
+    var cookiePre = '{#$cfg_cookiePre#}';
+    var shopid = {#$detail.id#};
+    var state = {#$detail.maidan_state#};
+    var youhui_open = {#$detail.maidan_youhui_open#};
+    var state = {#$detail.maidan_state#};
+    var youhui_value = {#$detail.maidan_youhui_value#};
+    var youhui_limit = '{#$detail.maidan_youhui_limit#}';
+    var payUrl = '{#getUrlPath service="business" template="pay" param="ordernum=%ordernum%"#}';
+    var detailUrl = '{#getUrlPath service="business" template="detail" id=$detail.id#}';
+    var maidan = true;
+</script>
+<style>
+	.popupRightBottom {display: none!important;}
+</style>
+</head>
+<body>
+	{#include file="../../../siteConfig/touch_top.html" pageTitle="{#$langData['siteConfig'][16][8]#}"#}  {#*  买单  *#}
+
+	<!-- 店铺名 -->
+	<div class="shop_info">
+		<div class="shop_img"><img src="{#$detail.logo#}" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+		<h3>{#$detail.title#}</h3>
+	</div>
+
+	<form action="" class="formbox" id="selfNumBox">
+		<div class="inpbox focus">
+			<span class="blink fn-hide" v-if="ds_inp && currInd == '0'">|</span>
+			<label>{#$langData['siteConfig'][22][67]#}{#if $detail.maidan_youhui_open && $detail.maidan_youhui_value#}<span><i>{#$langData['siteConfig'][22][64]|replace:'1':((100-$detail.maidan_youhui_value)/10)#}</i></span><i class="discount"></i>{#/if#}</label>{#* 消费总额 *#}
+			<input type="text" id="all_money_show" :class="{'currInd':currInd=='0'}" readonly @click="checkInp(0)" value="" placeholder="{#$langData['siteConfig'][22][68]#}" >{#* 询问服务员后输入 *#}
+			<input type="hidden" id="all_money">
+
+		</div>
+		{#if $detail.maidan_not_youhui_open#}
+		<div class="inpbox inpbox_youhui">
+			<span class="blink fn-hide" v-if="ds_inp && currInd == '1'">|</span>
+			<label>{#$langData['siteConfig'][19][513]#}</label>{#* 不参与优惠金额 *#}
+			<input id="out_money_show" :class="{'currInd':currInd=='1'}" type="text" readonly @click="checkInp(1)"  value="" placeholder="(选填，如酒水…)" >{#* 选填 *#}
+			<input type="hidden" id="out_money">
+		</div>
+		{#/if#}
+
+		   
+		<div class="count">
+            {#$langData['siteConfig'][19][514]#}<span>{#echoCurrency type="symbol"#}<em>0.00</em></span>{#* 实付金额 *#}
+            <div class="sale_tips">{#if $detail.maidan_not_youhui_open#}优惠说明{#else#}买单说明{#/if#}</div>
+        </div>
+        
+		<a href="javascript:;" class="btn_pay disabled">{#if $detail.maidan_not_youhui_open#}优惠买单{#else#}{#$langData['siteConfig'][22][71]#}{#/if#}</a> {#* 确认买单 *#}
+        
+		<div :class="['ds_keyboard',{'toTop':ds_inp}]" v-cloak>
+            <ul>
+              <li @touchstart="numIn" v-for="i in 9" :data-id="i">{{i}}</li>
+              <li @touchstart="numIn" data-id="." class="dot">.</li>
+              <li @touchstart="numIn" data-id="0">0</li>
+              <li @touchstart="ds_delNum" class="ds_delNum"></li>
+            </ul>
+        </div>
+	</form>
+
+    <!-- 优惠说明/买单说明 -->
+    <div class="sale_tips_box">
+        <div class="sale_tips_box_bg"></div>
+        <div class="sale_tips_box_main">
+            <div class="sale_tips_box_title"><i></i>{#if $detail.maidan_not_youhui_open#}优惠说明{#else#}买单说明{#/if#}</div>
+            <div class="sale_tips_box_content">
+                {#if $detail.maidan_youhui_limit#}
+                <dl class="tip_hui">
+                    <dt>{#$langData['siteConfig'][54][152]#}</dt>{#* 优惠限制 *#}
+                    <dd>{#$detail.maidan_youhui_limit#}</dd>
+                </dl>
+                {#/if#}
+
+                <dl class="tip_hui sys">
+                    <dt>规则说明</dt>
+                    <dd>买单仅限到店支付，请勿提前购买</dd>
+                    <dd>买单优惠能否与店铺其他优惠同享，请您向商户咨询</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+	
+    <script type="text/javascript">
+    	var wxconfig = {
+    		"appId": '{#$wxjssdk_appId#}',
+    		"timestamp": '{#$wxjssdk_timestamp#}',
+    		"nonceStr": '{#$wxjssdk_nonceStr#}',
+    		"signature": '{#$wxjssdk_signature#}',
+    		"description": '{#$detail.title#}',
+    		"title": '{#$langData['siteConfig'][16][8]#}',
+    		"imgUrl": '{#if $detail.logo#}{#$detail.logo#}{#else#}{#$templets_skin#}images/shop.png{#/if#}',
+    		"link": '{#getUrlPath service='business' template='maidan' id=$detail.id#}',
+    	};
+
+    	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+    </script>
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+{#if $detail.short_video_promote#}
+<script>
+$(function(){
+	var short_video_promote;
+	$('body').bind('click', function(){
+		if(!short_video_promote){
+			short_video_promote = new ClipboardJS(this, {
+				text: function() {
+					return "{#$detail.short_video_promote#}";
+				}
+			});
+			short_video_promote.on("success", function(e) {
+				short_video_promote.destroy();
+			});
+			short_video_promote.on("error", function(e) {
+				short_video_promote = null;
+			});
+			this.click();  //解决clipboard二次点击生效问题
+			short_video_promote.destroy();
+		}
+	});
+})
+</script>
+{#/if#}
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/maidan.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

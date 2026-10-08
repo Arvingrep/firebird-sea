@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>验证码</title>
+    <script src="https://o.alicdn.com/captcha-frontend/aliyunCaptcha/AliyunCaptcha.js"></script>
+    <style>
+      .captchaBox{display: flex; align-items: center; justify-content: center; height: 100vh; background: transparent;}
+      html,body{background: transparent;padding: 0;}
+    </style>
+</head>
+<body>
+    <div class="captchaBox" id="captcha" onclick="pageClose()"></div>
+</body>
+<script>
+  var geetest = 2;
+</script>
+<script type="text/javascript" src="/static/js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+
+<script>
+    
+  function pageClose(){
+    let doc = document.getElementById('captcha')
+    if(doc == event.target){
+      setupWebViewJavascriptBridge(function (bridge) {
+          bridge.callHandler('pageClose', {}, function (responseData) {
+          });
+      });
+    }
+  }
+  captchaVerifyFun.initCaptcha('app','#captcha',captchaVerifyCallback)
+// 在H5页面中定义一个函数，用于发送消息给原生代码，并返回一个Promise
+    async function sendMessageToNative(action, data) {
+      return new Promise((resolve, reject) => {
+        setupWebViewJavascriptBridge(function (bridge) {
+          bridge.callHandler(action, { 'value': data }, function (responseData) {
+            if(responseData != 'cancel'){
+              let res = responseData && typeof(responseData) == 'string' ? JSON.parse(responseData) : responseData
+              resolve({
+                captchaResult: !res.info || res.info != '图形验证错误，请重试！',
+                bizResult: res.state &&  res.state == 100,
+              });
+            }else{
+
+            }
+          });
+        })
+
+      });
+    }
+
+    // 使用async函数来调用sendMessageToNative，并等待原生代码的回复
+  // 业务请求(带验证码校验)回调函数
+  async function captchaVerifyCallback(captchaVerifyParam) {
+    // 1.调用sendMessageToNative方法获取验证结果
+    let result = {};
+    try {
+     
+      result = await sendMessageToNative('getVerifyResult', captchaVerifyParam);
+    } catch (error) {
+      console.error('发生错误:', error);
+      // 错误处理/兼容逻辑
+      result = {
+        captchaResult: false,
+        bizResult: false,
+      };
+    }
+    // 如果是在App侧执行验证码是否通过/业务验证是否通过逻辑，则不需要下面的返回值，直接关闭H5即可
+    return {
+      captchaResult: result.captchaResult, // 验证码验证是否通过，boolean类型，必选
+      bizResult: result.bizReuslt, // 业务验证是否通过，boolean类型，可选；若为无业务验证结果的场景，bizResult可以为空
+    };
+  }
+
+  // 业务请求验证结果回调函数
+  function onBizResultCallback(bizResult) {
+   
+  }
+  //注册客户端webview
+function setupWebViewJavascriptBridge(callback) {
+    if (window.WebViewJavascriptBridge) {
+        return callback(WebViewJavascriptBridge);
+    } else {
+        document.addEventListener("WebViewJavascriptBridgeReady", function () {
+            return callback(WebViewJavascriptBridge);
+        }, false);
+    }
+
+    var _device = navigator.userAgent.toLowerCase();
+    // if (device.indexOf('huoniao_iOS') > -1 && device.indexOf('huoniao_Android') <= -1) {
+    // if(_device.indexOf('toutiaomicroapp') <= -1 && !wx_miniprogram && !baidu_miniprogram && !qq_miniprogram){
+    if (_device.indexOf('huoniao') > -1) {
+        if (window.WVJBCallbacks) { return window.WVJBCallbacks.push(callback); }
+        window.WVJBCallbacks = [callback];
+        var WVJBIframe = document.createElement("iframe");
+        WVJBIframe.style.display = "none";
+        WVJBIframe.src = "wvjbscheme://__BRIDGE_LOADED__";
+
+        document.documentElement.appendChild(WVJBIframe);
+        setTimeout(function () { document.documentElement.removeChild(WVJBIframe) }, 0);
+    }
+    // }
+}
+</script>
+</html>

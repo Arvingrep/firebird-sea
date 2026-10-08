@@ -1,0 +1,835 @@
+{#include file="../../member/public-pay-pop.html"  noVue=1#}
+
+<link rel="stylesheet" href="{#$templets_skin#}/css/public.css?v={#$cfg_staticVersion#}">
+<script>
+	var navList = [{txt:'招聘工作台',link:'/supplier/job',},{txt:'公司信息',link:'/supplier/job/company_info.html',},{txt:'人才库',link:'/supplier/job/personList.html',},{txt:'职位管理',link:'/supplier/job/postManage.html',},{txt:'简历管理',link:'/supplier/job/resumeManage.html',},{txt:'简历收藏',link:'/supplier/job/resumeManage.html?type=1',},{txt:'面试日程',link:'/supplier/job/interviewManage.html',},{txt:'招聘会',link:'/supplier/job/jobfairList.html',},{txt:'增值包',link:'/supplier/job/jobmeal.html?tab=1',},{txt:'招聘套餐',link:'/supplier/job/jobmeal.html',},{txt:'招聘设置',link:'/supplier/job/setting.html',}];
+	var topDays_fee = {#$customJob_top_fee|default:0#}; //置顶1天的钱
+	var download_resume= '{#$customJob_fee#}'
+	var contactName = '李小姐' 
+	var contactPhone = '18014578587' ;
+	var job_cid = {#$job_cid|default:0#}; //招聘公司id 
+	var busi_state = {#$company_state|default:0#} ;  //公司的审核状态 ，1表示审核通过， 0是待审核  2是拒绝 
+	imconfig = {
+		chatid:'0', //聊天id
+	}
+	var customAgentCheck = {#$customAgentCheck|default:0#}; //发布信息是否需要审核
+	var payResultInterval = null;
+	var shortName = '{#$cfg_shortname#}'
+	var city_lng = '{#$siteCityInfo.lng#}';
+	var city_lat = '{#$siteCityInfo.lat#}';
+	var city_name = '{#$siteCityInfo.name#}';
+	var masterDomain = '{#$cfg_basehost#}';
+	var mapPop = {};
+</script>
+<div class="topBox fn-clear">
+	<div class="left_con">
+		<div class="logobox">
+			{#if $module == 'job'#}
+			<img src="{#getModuleConfig module='job' key='logoUrl'#}" onerror="this.src='{#$cfg_weblogo#}'" >
+			{#/if#}
+		<s></s></div>
+		<div class="line"></div>
+		<div class="title">{#$pageTitle#}</div>
+	</div>
+	<div class="right_con">
+		{#if $module == 'job'#}
+		<a href="{#getModuleConfig module='job' key='channelDomain'#}" class="home_job link_to" target="_blank">
+			<s></s>招聘首页
+		</a>
+		<div  class="message_to link_to">
+			<a href="{#$cfg_basehost#}/supplier/job/resumeManage.html" class="link"><s></s>新简历投递 {#if $newDelivery > 0#}<em>{#$newDelivery#}</em>{#/if#}</a>
+			<!-- <a href="{#$member_userDomain#}/message.html?state=0" class="link"><s></s>消息中心 {#if $newDelivery > 0 || $postMessage > 0 || $systemMessage#}<em>{#$newDelivery + $postMessage +$systemMessage #}</em>{#/if#}</a> -->
+			<!-- <ul class="hoverbox">
+				<li><a href="{#$cfg_basehost#}/supplier/job/resumeManage.html">新简历投递 {#if $newDelivery > 0#}<em>{#$newDelivery#}</em>{#/if#}</a></li>
+				<li><a href="{#$cfg_basehost#}/supplier/job/postManage.html">职位动态{#if $postMessage > 0#}<em>{#$postMessage#}</em>{#/if#}</a></li>
+				<li><a href="{#$member_userDomain#}/message.html?state=0">系统消息{#if $systemMessage > 0#}<em>{#$systemMessage#}</em>{#/if#}</a></li>
+			</ul> -->
+		</div>
+		{#/if#}
+		{#if $userinfo#}
+		<div class="user" >
+			<div class="user_icon"><img src="{#$company_photo#}" onerror="this.src='/static/images/noPhoto_40.jpg'" alt=""></div>
+			<div class="nickname">{#$company_title#}</div>
+			<s class="arr"></s>
+			<div class="change_account"><a href="{#$cfg_basehost#}/logout.html" class="logout"><s></s>切换账户</a></div>
+		</div>
+		{#else#}
+		<div class="user">
+			<a class="user_icon"><img src="/static/images/noPhoto_40.jpg" onerror="this.src='/static/images/noPhoto_40.jpg'" alt=""></a>
+			<a class="nickname" href="{#$cfg_basehost#}/login.html">去登陆</a>
+		</div>
+		{#/if#}
+	</div>
+</div>
+<!-- 此处需要地图的地方才有 -->
+{#if $showMap != ''#}
+<script>
+	var site_map = "{#$site_map#}", site_map_key = '{#$site_map_key#}';
+	var site_map_apiFile = '{#$site_map_apiFile#}';
+	var showMap = '{#$showMap#}'; //是否显示地图 1是显示地图和弹窗 2是只显示弹窗 3是只显示地图
+	
+	// var site_map = "{#$job_map#}", site_map_key = '{#$job_map_key#}';
+	// var site_map_apiFile = '{#$job_map_apiFile#}';
+	// var showMap = '{#$showMap#}'; //是否显示地图 1是显示地图和弹窗 2是只显示弹窗 3是只显示地图
+</script>
+
+{#if $site_map == "amap"#}
+{#$amap_jscode#} {#* 高德地图安全密钥 *#}
+{#/if#}
+{#if $showMap == 1 ||  $showMap == 3#}
+<script type="text/javascript" src="{#$site_map_apiFile#}{#if $site_map == 'amap'#}&plugin=AMap.AutoComplete{#/if#}"></script>
+
+{#if $site_map == "qq"#}
+<script type="text/javascript" src="https://3gimg.qq.com/lightmap/components/geolocation/geolocation.min.js" charset="utf-8"></script>
+{#/if#}
+{#if $site_map != "amap"#}
+<script type="text/javascript" src="{#$site_map_amap_apiFile#}" charset="utf-8"></script>
+{#/if#}
+
+{#/if#}
+
+<div id="public_mapContainer" v-cloak>
+	{#if $showMap == 1 ||  $showMap == 2#}
+	<!-- 公共弹窗——提示 -->
+	<!-- 确认弹窗 -->
+	
+	<div class="popConfirmContainer" >
+		<div :class="['confirmPop_mask',{'showPop':confirmPop}]" @click.stop="confirmPop=false;"></div>
+		<div class="confirmPopBox" >
+
+			<div :class="'confirmPop pop_'+ confirmPopInfo.icon + ' confirmPop_'+(confirmPopInfo.btngroups && confirmPopInfo.btngroups.length ? confirmPopInfo.btngroups.length : '0' ) + (confirmPop ? ' showPop' : '')+' '+ (confirmPopInfo.popClass && confirmPopInfo.popClass != '' ? confirmPopInfo.popClass : '')" >
+				<a href="javascript:;" class="close_btn" @click="confirmPopInfo.closeFn?confirmPopInfo.closeFn():closeConfirmPop()"></a>
+				<h3  v-if="confirmPopInfo.icon"><s></s>{{confirmPopInfo.title}}</h3>
+				<h3 v-else v-html="confirmPopInfo.title"></h3>
+				<div class="ptext" v-html="confirmPopInfo.tip"></div>
+				<div :class="'btnsGroup btnsGroup_' + (confirmPopInfo.btngroups && confirmPopInfo.btngroups.length ? confirmPopInfo.btngroups.length : '')">
+					<template v-for="btn in confirmPopInfo.btngroups">
+						<div class="btn_self" v-html="btn.html" v-if="btn.type=='selfDefine'"  @click="btnClick(btn.fn)"></div>
+						<el-button :class="(btn.cls && btn.cls != '' ? btn.cls : '' )" v-else :type="btn.type"  @click="btnClick(btn.fn,btn.tit.indexOf('保存简历至本地')!=-1?1:0)">{{btn.tit}}</el-button>
+					</template>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 黑框提示 -->
+	<transition name="el-fade-in" v-if="showErrTip && !showErrTipdefine">
+		
+		<div class="tooltipBox" v-show="showErrTip">
+			<div class="" v-if="showErrTipText && !showErrTipTit">
+				<s></s><span>{{showErrTipText}}</span>
+			</div>
+			<div v-else-if="showErrTipTit && !showErrTipText" >
+				<p style="padding:0 10px">{{showErrTipTit}}</p>
+			</div>
+			<div v-else style="padding: 9px 0px;">
+				<h3 style="padding:0 10px">{{showErrTipTit}}</h3>
+				<p style="padding-bottom: 0px;">{{showErrTipText}}</p>
+			</div>
+		</div>
+	</transition>
+
+	<transition name="el-fade-in" v-if="showErrTip && showErrTipdefine">
+		<div class="defineToolTipBox" v-show="showErrTip">
+			<div class="tipCon" v-html="showErrTipdefine"></div>
+		</div>
+	</transition>
+
+	<!-- 成功提示 -->
+	<div class="successContainer" v-if="successTip">
+		<div :class="['confirmPop_mask successTip', {'showPop':successTip}]"></div>
+		<div class="successBox"  v-if="successTip">
+			<transition name="el-fade-in">
+				<div :class="'successTip tip_'+ (successTipConfig.type ? successTipConfig.type : 'success')">
+					<s></s>{{successTipText}}
+				</div>
+			</transition>
+		</div>
+	</div>
+
+
+	<!-- 设置刷新/置顶成功 -->
+	<div class="successModelBox" v-if="successModel">
+		<div :class="['confirmPop_mask successTip', {'showPop':successModel}]"></div>
+		<div class="successModel" v-show="successModel">
+			<h4><s></s>{{successModelOptions.title}}</h4>
+			<p>{{successModelOptions.tip}}</p>
+			<div class="btnBox">
+				<a href="javascript:;" class="btn" v-for="btn in successModelOptions.btns" @click="btn.fn">{{btn.text}}</a>
+			</div>
+		</div>
+	</div>
+
+
+	<!-- form表单弹窗 邀请面试 -->
+	<div class="formPopContainer" v-if="formPop">
+		<div :class="['confirmPop_mask', {'showPop':formPop}]"></div>
+		<div :class="['formPop',{'showPop':formPop}]">
+			
+			<a href="javascript:;" class="close_pop" @click="formPop = false"></a>
+			<div class="popHead">
+				<h2>发送面试邀请</h2>
+				<p>请先与求职者联系传达面试意向，沟通一致后再发送邀请，建议您同时发送面试短信</p>
+			</div>
+			<el-form label-width="140px" class="pop_form" :model="resumeForm">
+				<el-form-item label="面试时间：" class="form_datePiceker">
+					<el-date-picker	 class="datePicker inviTime"
+					v-model="inviteDate"
+					:picker-options="pickerOptions"
+					format="yyyy-MM-dd"
+					:editable="false"
+					type="date"
+					popper-class="invitationTime"
+					value-format="timestamp"
+					placeholder="请选择面试时间"
+					@change="inviselHour===''?invitimePick():''">
+					</el-date-picker>
+					<div v-show="inviteDate" class="detailTime">
+						<input type="text" readonly placeholder="请选择时间" @click.stop="invitimePick">
+						<div>
+							<ul>
+								<li :class="{'active':inviselHour===item.value}" v-for="(item,index) in invitHour" @click.stop="invisel(1,item)">{{item.hourText}}</li>
+							</ul>
+							<ul>
+								<li :class="{'active':inviselMinute===item.value}" v-for="(item,index) in invitMinutes" @click.stop="invisel(0,item)">{{item.minuteText}}</li>
+							</ul>
+						</div>
+						<i class="el-icon-time"></i>
+					</div>
+				</el-form-item>
+				<el-form-item label="面试职位：" class="form_select">
+					<el-popover
+						ref="resumeForm"
+						popper-class="postListPop"
+						width="476"
+						trigger="click">
+						<div class="postList">
+							<div class="searchInp"><el-input placeholder="搜索在招职位" v-model="resumeForm.keywords" @input="changeKeywords()"><i slot="prefix" class="el-input__icon el-icon-search"></i></el-input></div>
+							<ul>
+							<li v-for="item in (searchPost && searchPost.length ? searchPost : postArr)" @click="chosePost(item)" :class="[{'hadoff':item.off==1}]"><span class="sala">{{salaryChange(item)}}{{item.dy_salary>12&&item.mianyi==0 ? ' ·'+item.dy_salary : ''}} <em v-if="item.dy_salary>12">薪</em></span> <span class="tit"> {{item.title}}</span><span style="color: #999 !important;font-size: 12px;" v-if="item.off==1">(已下架)</span></li>
+							</ul>
+						</div>
+						<div class="inpBox" slot="reference">
+							<span class="placeholder" v-if="!resumeForm.postInfo">请选择面试职位</span>
+							<div v-else class="chosedPost"><span class="sala">{{salaryChange(resumeForm.postInfo) }}{{resumeForm.postInfo.dy_salary>12&&resumeForm.postInfo.mianyi==0 ? ' ·'+item.dy_salary : ''}}<b v-if="resumeForm.postInfo.dy_salary>12">薪</b></span><span class="tit"> {{resumeForm.postInfo.title}}</span></div>
+						</div>
+					</el-popover>
+				</el-form-item>
+				<el-form-item label="面试地点：" class="form_address">
+					<div class="resumeAddr">
+						<div class="addr_show" v-if="!changeResumeAddr && resumeForm.postInfo.job_addr_detail">
+							<p class="address">{{resumeForm.postInfo.job_addr_detail && resumeForm.postInfo.job_addr_detail.addrName ? resumeForm.postInfo.job_addr_detail.addrName.join("") : ''}} {{resumeForm.postInfo.job_addr_detail && resumeForm.postInfo.job_addr_detail.address ? resumeForm.postInfo.job_addr_detail.address : ''}}</p>
+							<el-button type="text" class="changeAddr" @click="changeResumeAddr = true;jobAddrList.length == 1?showPop=true:''">修改</el-button>
+						</div>
+						<el-select v-model="resumeForm.job_addr_id" :disabled="!resumeForm.postInfo"  placeholder="请选择" class="bigInp" popper-class="addressPop" v-else-if="jobAddrList" ref="selectRef">
+							<el-option
+								v-for="item in jobAddrList"
+								:key="item.id"
+								:value="item.id"
+								:label="item.address">
+								<span style="float: left">{{ item.address }}</span>
+								<span v-if="item.add" style="float: right; color: #BDC0C9; font-size: 12px">刚刚添加</span>
+							</el-option>
+							<el-option value="a"><a href="javascript:;" class="add_addr" ><i class="el-icon-plus"></i>选择其他地址</a></el-option>
+						</el-select>
+						<span class="edit_posi" v-if="resumeForm.job_addr_id===0" @click="addNewAddr"><s></s>编辑/查看</span>
+					</div>
+				</el-form-item>
+				<el-form-item label="其他须知：" class="form_textarea">
+					<el-input type="textarea" resize="none" v-model="resumeForm.remark"></el-input>
+				</el-form-item>
+				<el-form-item label="联系人：" class="contactInfo">
+					<span class="contact_person"><em>{{resumeForm.name}}</em></span>
+					<span  class="contact_phone"><label for="">联系电话:</label><em>{{resumeForm.phone}}</em></span>
+					<el-button type="text" class="changeContact" @click="toUrl(1)" >修改招聘负责人信息></el-button>
+				</el-form-item>
+				<div :class="['btn_box',{'none':!resumeForm.dateTime||!inviselHour||!resumeForm.postInfo||resumeForm.job_addr_id===''}]">
+					<el-button type="primary" class="sentInfo" @click="resumeForm.dateTime&&inviselHour&&resumeForm.postInfo&&resumeForm.job_addr_id!==''?sendInvitation():''"> 发送</el-button>
+
+				</div>
+			</el-form>
+		</div>
+	</div>
+
+
+	<!-- 刷新置顶弹窗 -->
+	<div class="popularPopContainer" v-if="popularPop">
+		<div :class="['confirmPop_mask', {'showPop':popularPop}]"></div>
+		<div :class="['popularPop',{'showPop':popularPop},{'resfreshConPop':!toTopForm.toTop}]">
+			<a href="javascript:;" class="close_btn" @click="toTopFormFn"></a>
+			<div class="popularCon toTopCon" v-if="toTopForm.toTop">
+				<div class="headbox">
+					<h2>职位置顶</h2>
+					<p>尊敬的企业会员您好！置顶职位强势曝光，抢占人才先机！</p>
+				</div>
+				<div class="popularPopConBox">
+					<div class="popular_tip toTop">
+						<div class="fn-left">
+							<span class="lab"><s></s>置顶</span>
+							<span class="text">我的招聘资源：职位置顶剩余<b>{{businessInfo ? allTopDay : '0'}}</b>天</span>
+						</div>
+						<a class="fn-right link_to" href="javascript:;" @click="showAddPop(4)" v-if="businessInfo.combo_id">增值包<s></s></a>
+					</div>
+					
+					<el-form>
+						<el-form-item label="置顶时长" label-width="74px" class="topDays">
+							<div class="labs fn-clear">
+								<div :class="['topDay_item', {'on_chose':item == toTopForm.topDayChose}]" v-for="item in (allTopDay > 5  || allTopDay == 0 ? 5 : allTopDay)" @click="toTopForm.topDayChose = item;toTopForm.topDays = '';changeTopDay()"><s></s>{{item}}天</div>
+								<el-input placeholder="自定义置顶天数" :class="['self_define',{'focus': toTopForm.topDays}]" v-model="toTopForm.topDays" @change="toTopForm.topDayChose = '';changeTopDay()" @input="toTopForm.topDays=toTopForm.topDays.replace(/[^\d]/g,'')"><em class="unit_text" slot="suffix" v-if="toTopForm.topDays && toTopForm.topDays > 0">天</em></el-input>
+							</div>
+							
+						</el-form-item>
+						<el-form-item label="不置顶日" label-width="74px" class="topDays">
+							<div class="topTimeSet">
+								<el-checkbox v-for="(item,index) in weekdays" v-if="index < 2 || showOther " name="topdays_time"  :label="item.name" @change="changenoTop(item.id)" :value="toTopForm.noTopArr.indexOf(item.id) > -1"></el-checkbox>
+								<a href="javascript:;" class="showOther" @click="showOther = true" v-if="!showOther">其他时间></a>
+								
+							</div>
+						</el-form-item>
+						<div class="btn_box">
+							<el-button class="toTop_btn" type="primary"  @click="payRefreshPop">立即置顶<span class="pay_count" v-if="toTopForm.amount">{#echoCurrency type="symbol"#}<b>{{toTopForm.amount}}</b></span></el-button>
+						</div>
+					</el-form>
+				</div>
+			</div>
+			<div class="popularCon resfreshCon"  v-else>
+				<div class="headbox">
+					<h2>职位智能刷新</h2>
+					<p>尊敬的企业会员您好！自动刷新职位持续位于前列，稳定曝光！</p>
+				</div>
+				<div class="popularPopConBox">
+					<div class="popular_tip refresh">
+						<div class="fn-left">
+							<span class="lab"><s></s>刷新</span>
+							<span class="text" >我的招聘资源：职位刷新剩余<b>{{businessInfo && allRefreshDay}}</b>次
+								
+								<el-popover
+									popper-class="refreshTipPop"
+									placement="bottom"
+									width="344"
+									trigger="hover">
+									<div class="refresh_tip">
+										包含：<span>招聘套餐内剩余<em>{{businessInfo && businessInfo.can_job_refresh}}</em>次，今日有效（默认优先使用）</span> <span> 增值包补充<em>{{businessInfo.package_refresh}}</em>次,永久有效</span>
+									</div>
+									<s slot="reference" class="tip_icon"></s>
+								</el-popover>
+							</span>
+						</div>
+						<a class="fn-right link_to" href="javascript:;" @click="showAddPop(5)" v-if="businessInfo.combo_id">增值包<s></s></a>
+					</div>
+					<el-form v-loading="toTopForm.couting">
+						<el-form-item label="刷新间隔" label-width="74px" class="topDays">
+							<div class="labs fn-clear">
+								<div :class="['topDay_item',{'on_chose':toTopForm.timeRefreshChose == item.value}] " v-for="item in timesArr" @click="toTopForm.timeRefreshChose = item.value;refreshtimePre=item.value;toTopForm.timeRefresh = ''; getTimeOff()"><s></s>{{item.unit}}</div>
+								<el-input placeholder="自定义" name="timeRefresh" class="self_define" v-model="toTopForm.timeRefresh" @change="inputChange(); getTimeOff()" @input="checkInp()" @focus="toTopForm.timeRefreshChose = '';" @blur="!toTopForm.timeRefresh?toTopForm.timeRefreshChose=refreshtimePre:''"><em class="unit_text" slot="suffix">小时</em></el-input>
+							</div>
+						</el-form-item>
+						<div class="fn-clear refresh_inp">
+							<!-- <el-form-item label="刷新次数" label-width="74px" class="topDays fn-left" prop="refreshTimes" :rules="[ { type: 'number', message: '请输入整数'}]">
+								<div class="topTimeSet">
+									<el-input placeholder="输入刷新次数" v-model="toTopForm.refreshTimes" name="refreshTimes" @input="checkInp(1)" @change="getTimeOff()"><em class="unit_text" slot="suffix">次</em></el-input>
+								</div>
+							</el-form-item> -->
+							<el-form-item label="设置日期" label-width="74px" class="topDays fn-left" >
+
+								<el-date-picker
+									class="datePicker fn-left"
+									value-format="yyyy-MM-dd"
+									:picker-options="pickerOptions"
+									v-model="toTopForm.refreshDate"
+									type="daterange"
+									range-separator="-"
+									@change="getTimeOff"
+									start-placeholder="开始"
+									end-placeholder="结束">
+								</el-date-picker>
+							</el-form-item>
+
+							<div class="el-form-item topDays timePicker fn-left">
+								
+
+								<el-popover
+								placement="bottom-start"
+								popper-class="tipBlue"
+								content="仅在此时间段内自动刷新，可避开休息时间"
+								trigger="hover">
+								<label class="el-form-item__label showTip "  slot="reference" style="width: 88px;"><s></s>限制时段</label>
+								</el-popover>
+
+								<div :class="['timePickerContainer',{'clear':toTopForm.startTime||toTopForm.startTime}]">
+									<el-time-select
+									placeholder="选填"
+									v-model="toTopForm.startTime"
+									@change="getTimeOff"
+									:picker-options="{
+										start: '00:00',
+										step: '00:30',
+										end: '24:00'
+										}" 
+									popper-class="refreshset"
+									:editable='false'
+									:clearable="false"
+									>
+									</el-time-select>
+									-
+									<el-time-select
+										:placeholder="toTopForm.startTime ? '请选择' : '选填'"
+										v-model="toTopForm.endTime"
+										@change="getTimeOff"
+										:picker-options="{
+										start: '00:00',
+										step: '00:30',
+										end: '24:00',
+										minTime: minTime
+										}"
+										popper-class="refreshset"
+										:editable='false'
+										:clearable="false"
+									>
+									</el-time-select>
+									<i class="el-icon-circle-close" @click="toTopForm.endTime='';toTopForm.startTime='';getTimeOff()"></i>	
+								</div>
+								
+
+								
+
+
+							</div>
+						</div>
+						<el-form-item label="刷新次数" label-width="74px" :class="{'opciaty':!toTopForm.refreshTimes||!toTopForm.refreshDate}">
+							<div class="topTimeSet">{{toTopForm.refreshTimes}}次 </div>
+						</el-form-item>
+						<div class="btn_box">
+							<p class="tip">温馨提示：设置生效后不可更改，请确认后提交</p>
+							<el-button :class="['toTop_btn',{'none':(!toTopForm.timeRefresh||!toTopForm.timeRefreshChose)&&!toTopForm.refreshDate||(!toTopForm.startTime&&toTopForm.endTime||toTopForm.startTime&&!toTopForm.endTime)}]" type="primary" @click="(!toTopForm.timeRefresh||!toTopForm.timeRefreshChose)&&!toTopForm.refreshDate||(!toTopForm.startTime&&toTopForm.endTime||toTopForm.startTime&&!toTopForm.endTime)?'':payRefreshPop()">立即设置<span class="pay_count" v-if="toTopForm.amount">{#echoCurrency type="symbol"#}<b>{{toTopForm.amount}}</b></span></el-button>
+						</div>
+					</el-form>
+				</div>
+			</div>
+		</div>
+	</div> 	
+
+
+	<!-- 刷新置顶增值包购买 -->
+	<div class="popularPopAddContainer" v-if="popularAddPop">
+		<div :class="['confirmPop_mask', {'showPop':popularAddPop}]"></div>
+		<div :class="['popularAddPop',{'showPop':popularAddPop}]">
+			<a href="javascript:;" class="close_btn" @click="popularAddPopFn"></a>
+			<div class="headbox">
+				<h2 v-if="singleForm.offPost == 2">职位上架</h2>
+				<!-- 职位{{popularType === 4 ? '置顶' : (popularType == 5 ? '刷新' : '增值包')}} -->
+				<h2 v-else-if="popularType">招聘增值包</h2>
+				<h2 v-else>购买增值包</h2>
+				<p>尊敬的企业会员您好！您当前是<em>{{businessInfo.combo_title}}</em><span v-if="popularTip">，{{popularTip}}</span></p>
+			</div>
+			<div class="popularAddConBox">			
+				<div class="tabBox">
+					<ul class="fn-clear">
+						<li :class="{'on_chose':currPopularTab === 0}" @click="currPopularTab = 0" v-if="!noSingle">
+							<h3>单项购买</h3>
+							<p>一键购买 更省心</p>
+						</li>
+
+						<!-- 会员才有增值包 -->
+						<li  :class="{'on_chose':currPopularTab === 1}" @click="currPopularTab = 1" v-if="businessInfo.combo_id && businessInfo.combo_enddate > currDate">
+							<span class="rec">推荐</span>
+							<h3>增值包</h3>
+							<p>组合购买 更划算！</p>
+						</li>
+						<!-- <li  :class="{'on_chose':currPopularTab === 2}" @click="currPopularTab = 2">
+							<h3>好友助力</h3>
+							<p>招聘资源 免费得！</p>
+						</li> -->
+					</ul>
+				</div>
+				<div class="tabConBox">
+					<!-- 单项购买 -->
+					<div :class="['tabCon',{'fn-hide': currPopularTab !== 0}]">
+						<el-form class="singleForm" v-if="singleType == 4 || popularType === 4">
+							<el-form-item label="置顶时长" label-width="90px"  class="topDays">
+								<div class="labs fn-clear">
+									<div :class="['topDay_item',{'on_chose':singleForm.topDaysChose === item}] " v-for="item in 5" @click="singleForm.topDaysChose = item"><s></s>{{item}}天</div>
+									<el-input placeholder="自定义" class="self_define"  v-model="singleForm.topDays"><em class="unit_text" slot="suffix" v-if="singleForm.topDays">天</em></el-input>
+								</div>
+							</el-form-item>
+							<el-form-item label="支付金额" label-width="90px" >
+								<div class="pay_count">{#echoCurrency type="symbol"#}<b>{{singleForm.payCount}}</b></div>
+								<div class="QRConBox fn-clear">
+									<div class="QRBox fn-left"><img :src="singleForm.paySrc" alt=""></div>
+									<div class="wxCode">
+										<div class="iconBox"><img src="{#$templets_skin#}/images/aliPay_icon.png" alt=""><img src="{#$templets_skin#}/images/wxPay_icon.png" alt=""></div>
+										<p>使用支付宝、微信扫码支付</p>
+										<a href="javascript:;" class="" @click="changePayWay()">其他支付方式></a>
+									</div>
+								</div>
+							</el-form-item>
+						</el-form>
+						<el-form class="singleForm" v-if="singleType == 6">
+							<el-form-item label="购买项目" label-width="90px"  class="topDays">
+								<div class="labs fn-clear">
+									<div :class="['topDay_item on_chose',{'on_chose':singleForm.offPost == 2}] " :data-post="singleForm.offPost"  ><s></s>增加{{singleForm.offPost}}个职位</div>
+									<span class="tips" v-if="businessInfo.combo_id && (businessInfo.combo_enddate > currDate || businessInfo.combo_enddate == -1)"><s></s>升级的职位数有效期至：{{businessInfo.combo_enddate == -1 ? '永久有效' : transTimes(businessInfo.combo_enddate,2)}}(即当前套餐结束)</span>
+									<!-- <el-input placeholder="自定义" class="self_define"  v-model="singleForm.topDays"><em class="unit_text" slot="suffix" v-if="singleForm.topDays">天</em></el-input> -->
+								</div>
+							</el-form-item>
+							<el-form-item label="支付金额" label-width="90px" >
+								<div class="pay_count">{#echoCurrency type="symbol"#}<b>{{singleForm.payCount}}</b></div>
+								<div class="QRConBox fn-clear">
+									<div class="QRBox fn-left"><img :src="singleForm.paySrc" alt=""></div>
+									<div class="wxCode">
+										<div class="iconBox"><img src="{#$templets_skin#}/images/aliPay_icon.png" alt=""><img src="{#$templets_skin#}/images/wxPay_icon.png" alt=""></div>
+										<p>使用支付宝、微信扫码支付</p>
+										<a href="javascript:;" class="" @click="changePayWay()">其他支付方式></a>
+									</div>
+								</div>
+							</el-form-item>
+						</el-form>
+					</div>
+
+					<!-- 增值包购买 -->
+					<div :class="['tabCon tabCon_add' ,{'fn-hide': currPopularTab !== 1}]">
+						<div class="fn-left tabChoseBox">
+							<ul>
+								<li v-for="(item,index) in addPackage" :class="{'on_chose': item.id == popularType}" @click="popularType = item.id " v-if="!(index==1&&businessInfo.combo_job==-1)&&!(index==2&&businessInfo.combo_resume==-1)">
+									<h3>{{item.tit}}</h3>
+									<p>{{item.desc}}</p>
+									<s></s>
+								</li>
+							</ul>
+						</div>
+						<div class="tabChoseConBox">
+							<template v-for="item in addPackage" v-laoding>
+								<div class="tabChoseCon longLiCon " v-if="popularType === item.id && popularType === 1">
+									<ul>
+										<!-- 长矩形 ，超值优享包 -->
+										<li v-for="p in item.conArr" @click="chosePopularItem = p;buyPackage(p,item);"  :class="['long_li',{'on_chose':chosePopularItem.id == p.id}] ">
+											<div class="rec" v-if="p.recommand">推荐</div>
+											<div class="fn-clear liCon">
+												<div class="fn-left addP_info">
+													<h4>超值优享包</h4>
+													<p><span class="price">{#echoCurrency type="symbol"#}<b>{{p.price}}</b></span><s v-if="p.price < p.mprice">{#echoCurrency type="symbol"#}{{p.mprice}}</s></p>
+												</div>
+												<div class="fn-left addP_detail">
+													<div class="detail_item">
+														<label for="">下载简历：</label>
+														<span>{{p.resume}}份</span>
+													</div>
+													<div class="detail_item">
+														<label for="">职位置顶：</label>
+														<span>{{p.top}}天</span>
+													</div>
+													<div class="detail_item">
+														<label for="">职位刷新：</label>
+														<span>{{p.refresh}}次</span>
+													</div>
+												</div>
+												<div class="fn-right btnsbox">
+													<span class="hasGou"><s></s>{{p.buy}}已购买</span>
+													<el-button class="buy_btn" size="medium" round type="plaint">购买</el-button>
+												</div>
+											</div>
+										</li>
+										<!-- <li class="long_li">
+											<div class="rec">推荐</div>
+											<div class="fn-clear liCon">
+												<div class="fn-left addP_info">
+													<h4>超值优享包</h4>
+													<p><span class="price">{#echoCurrency type="symbol"#}<b>20</b></span><s>{#echoCurrency type="symbol"#}56</s></p>
+												</div>
+												<div class="fn-left addP_detail">
+													<div class="detail_item">
+														<label for="">下载简历：</label>
+														<span>20份</span>
+													</div>
+													<div class="detail_item">
+														<label for="">职位置顶：</label>
+														<span>1天</span>
+													</div>
+													<div class="detail_item">
+														<label for="">职位刷新：</label>
+														<span>5次</span>
+													</div>
+												</div>
+												<div class="fn-right btnsbox">
+													<span class="hasGou"><s></s>97已购买</span>
+													<el-button class="buy_btn" size="medium" round type="plaint" >购买</el-button>
+												</div>
+											</div>
+										</li> -->
+									</ul>
+								</div>
+								<div class="tabChoseCon shortLiCon" v-else-if="popularType === item.id">
+									<ul class="fn-clear" v-if="item.conArr">
+										<li v-for="p in item.conArr" :class="['fn-left',{'on_chose':chosePopularItem.id == p.id}]" @click="chosePopularItem = p;buyPackage(p,item)">
+											<div class="shortCon">
+												<h3>{{item.tit}}：
+													<span v-if="popularType == 5">{{p.refresh}}次</span>
+													<span v-else-if="popularType == 4">{{p.top}}天</span>
+													<span v-else-if="popularType == 3">{{p.resume}}个</span>
+													<span v-else-if="popularType == 2">{{p.job}}个</span>
+												</h3>
+												<div class="info fn-clear">
+													<div class="left_price">
+														<span class="price">{#echoCurrency type="symbol"#}<b>{{p.price}}</b></span>
+														<s class="oprice" v-if="p.price < p.mprice">{#echoCurrency type="symbol"#}{{p.mprice}}</s>
+														<span class="money_save" v-if="p.price < p.mprice">省{{p.mprice - p.price}}</span>
+													</div>
+													<div class="right_info">
+														<span class="hasGou"><s></s>{{p.buy}}已购买</span>
+														<el-button class="buy_btn fn-hide" type="primary" size="medium" round>购买</el-button>
+													</div>
+												</div>
+											</div>
+										</li>
+									</ul>
+								</div>
+							</template>
+						</div>
+					</div>
+
+					<!-- 好友助力 -->
+					<div :class="['tabCon tabCon_help',{'fn-hide': currPopularTab !== 2}]">
+						<h3>活动规则</h3>
+						<p>邀请好友助力分享，您可免费获得以下权限：</p>
+						<div class="helpCon">
+							<ul>
+								<li><label for="">上架职位<em>1</em>份：</label><span>10助力</span></li>
+								<li><label for="">上架职位<em>1</em>份：</label><span>10助力</span></li>
+								<li><label for="">上架职位<em>1</em>份：</label><span>10助力</span></li>
+								<li><label for="">上架职位<em>1</em>份：</label><span>10助力</span></li>
+							</ul>
+						</div>
+						<div class="btn-box">
+							<el-popover
+								placement="bottom-start"
+								width="340"
+								popper-class="inviteQRcodePop"
+								trigger="hover">
+								<div class="qrCodeBox">
+									<el-divider content-position="center">转发分享职位</el-divider>
+									<div class="qrCode">
+										<img src="" alt="">
+									</div>
+									<p><em>手机/微信</em>扫码转发到朋友圈</p>
+								</div>
+								<el-button type="primary" class="invite_btn" slot="reference">邀好友助力</el-button>
+							</el-popover>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- 开通套餐的弹窗 -->
+	<div class="buyMealPopContainer" v-if="buyMeadlPop">
+		<div :class="['confirmPop_mask', {'showPop':buyMeadlPop}]"></div>
+		<div :class="['buyMealPop',{'showPop':buyMeadlPop}]">
+			<a href="javascript:;" class="close_btn" @click="buyMeadlPop = false;"></a>
+			<div class="buyMeal_head">
+				<h3><s></s>请先开通招聘套餐</h3>
+				<p>{{buyMealTip}},请开通招聘套餐使用完整服务</p>
+			</div>
+			<div class="buyMeal_con">
+				<ul class="fn-clear">
+					<li>
+						<div class="iconbox"><img src="{#$templets_skin#}images/icon_meal1.png" alt=""></div>
+						<h4><b>海量人才</b>极速招聘</h4>
+						<p>专业平台、助力企业招聘</p>
+					</li>
+					<li>
+						<div class="iconbox"><img src="{#$templets_skin#}images/icon_meal2.png" alt=""></div>
+						<h4><b>高效曝光</b>坐收简历</h4>
+						<p>职位刷新置顶、招聘会</p>
+
+					</li>
+					<li>
+						<div class="iconbox"><img src="{#$templets_skin#}images/icon_meal3.png" alt=""></div>
+						<h4><b>主动出击</b>在线畅聊</h4>
+						<p>自研im系统、职位在线畅聊</p>
+
+					</li>
+				</ul>
+				<a class="btn_to" target="_blank" href="{#$masterDomain#}/supplier/job/jobmeal.html">查看详情</a>
+			</div>
+		</div>
+	</div>
+
+	<!-- 下载简历弹窗 -->
+	<div class="resumeContainer" v-if="downResumePop">
+		<div :class="['confirmPop_mask', {'showPop':downResumePop}]"></div>
+		<div :class="['resumePop', {'showPop':downResumePop}]">
+			<div class="resumeCon">
+
+				<a href="javascript:;" class="close_btn" @click="downResumePopFn"></a>
+				<div class="resumeHead">
+					<h3>下载简历</h3>
+					<p>立即解锁人才联系方式，在线发起面试邀请</p>
+				</div>
+				<div class="resumeDetail" v-if="downResumeDetail.resume">
+					<div class="rPhoto">
+						<el-avatar :size="80" shape="circle" :src="downResumeDetail.resume.photo_url">
+							<img src="/static/images/noPhoto_100.jpg"/>
+						</el-avatar>
+					</div>
+					<div class="rInfo">
+						<h3><b>{{downResumeDetail.resume.name}}</b> <span>{{downResumeDetail.resume.age}}岁 <em>|</em> {{downResumeDetail.resume.edu_tallest_name}} <em>|</em> {{downResumeDetail.resume.work_jy_name}}</span></h3>
+						<p :title="downResumeDetail.resume.job_name.join('、')">{{downResumeDetail.resume.job_name.join('、')}}</p>
+					</div>
+				</div>
+				<p class="resume_tip" v-if="!businessInfo.combo_id && businessInfo.package_resume > 0"> <span>您还未开通招聘套餐，</span>剩余体验下载次数：<span>{{businessInfo.package_resume}}次</span> </p>
+				<p class="resume_tip" v-else-if="businessInfo.can_resume_down"> 套餐剩余简历下载：<span>{{businessInfo.package_resume==-1||businessInfo.can_resume_down==-1?'不限':businessInfo.package_resume+businessInfo.can_resume_down}}次</span> </p>
+				<p class="resume_tip" v-else> <span>套餐内简历下载次数已用完，</span>选择增值包更划算！ </p>
+				<div class="btnsGroup">
+					<el-button type="primary" v-if="businessInfo.can_resume_down" class="btn_dark btn_big" @click="downResumeConfirm(downResumeDetail.resume.id)" :loading="purloading">下载<em v-if="businessInfo.can_resume_down!='不限'">(使用1次)</em></el-button>
+					<template v-else>
+						<el-button type="primary" class="btn_dark" @click="showAddPop(3)" v-if="businessInfo.combo_id && (businessInfo.combo_enddate > currDate || businessInfo.combo_enddate == -1)">增值包<span class="rec">推荐选择</span></el-button>
+						<el-button type="primary" class="btn_dark" @click="goLink" data-url="{#$masterDomain#}/supplier/job/jobmeal.html" v-else>招聘套餐<span class="rec">推荐</span></el-button>
+						<el-button type="primary" class="btn_light btn_big" @click="downResumeConfirm(downResumeDetail.resume.id)" v-if="businessInfo.package_resume && businessInfo.package_resume > 0" :loading="purloading">下载<em>(使用1次)</em></el-button>
+						<el-button type="primary" class="btn_light btn_big"  v-else @click="buyResumeDirect(downResumeDetail.resume.id)" :loading="purloading">直接购买<em>({#echoCurrency type="symbol"#}{{businessInfo.config.resume_fee}})</em></el-button>
+					</template>
+				</div>
+				<!-- <div class="btnsGroup">
+					<el-button type="primary" v-if="businessInfo.can_resume_down" class="btn_dark btn_big" @click="downResumeConfirm(downResumeDetail.resume.id)">下载<em>(使用1次)</em></el-button>
+					<template v-else>
+						<el-button type="primary" class="btn_dark ">增值包<span class="rec">推荐选择</span></el-button>
+						<el-button type="primary" class="btn_light btn_big">直接购买<em>({#echoCurrency type="symbol"#}2.0)</em></el-button>
+					</template>
+				</div> -->
+			</div>
+		</div>
+	</div>
+	
+	<!-- 绑定邮箱 -->
+	<div class="addEmailContainer">
+		<div :class="['confirmPop_mask', {'showPop':addEmailPop || emailCheckSuccess}]"></div>
+		<div :class="['addEmailPop',{'showPop':addEmailPop}]">
+			<h3>填写邮箱</h3>
+			<a href="javascript:;" class="close_btn" @click="addEmailPopFn" ></a>
+			<div class="emailForm">
+				<el-input placeholder="请输入企业招聘邮箱" type="text" v-model="companyEmail"></el-input>
+				<p class="ftip" v-if="!companyEmail">*购买简历可自动发送简历附件到邮箱</p>
+				<p v-else style="font-size: 13px;color: #1975FF;">温馨提示：为顺利发送邮件，请确保邮箱填写正确</p>
+				<div class="btn_groups">
+					<el-button type="primary" class="cancel" @click="addEmailPop = false;">取消</el-button>
+					<el-button type="primary" class="confirm" @click="sendToEmail()">确定</el-button>
+				</div>
+			</div>
+		</div>
+		<div class="checkEmailBox" v-show="emailCheckSuccess">
+			<a href="javascript:;" class="close_btn" @click="addEmailPop = false;" ></a>
+			<h3><s></s>已发送邮件，请24小时内前往邮箱完成验证</h3>
+			<dl class="emailCheckTip">
+				<dt>没有收到邮件？ </dt>
+				<dd>1. 请先检查是否在垃圾邮件中</dd>
+				<dd>2. 如果还未收到，请点击<span @click="sendToEmail()">重新发送</span></dd>
+				<dd>3. 重新发送邮件，还未收到？请试试<span @click="addEmailPop = true; emailCheckSuccess = false;">更换邮箱</span></dd>
+			</dl>
+		</div>
+	</div>
+
+	<!-- 批量上架选择有效期 -->
+	<div class="plupPostPopContainer">
+		<div :class="['confirmPop_mask', {'showPop':plupPostPop}]"></div>
+		<div :class="['plupPostPop confirmPop', {'showPop':plupPostPop}]">
+			<a href="javascript:;" class="close_btn" @click="plupPostPop = false"></a>
+			<h3>请选择职位有效期后，提交上架</h3>
+			<div class="popCon" v-if="plupPostPop">
+				<h4>
+					<span>招聘有效期</span>
+					<el-checkbox-group v-model="long_valid" class="checkInline" @change="validDate=long_valid?'':validDate">
+						<el-checkbox :label="upPostItemArr.length<=1?'长期招聘':'全设为长期招聘'" name="long_valid" value="1" :checked="long_valid"></el-checkbox>
+					</el-checkbox-group>
+				</h4>
+				<div class=""><el-date-picker :picker-options="reupPost" v-model="validDate" :class="['bigInp datePick']" prefix-icon="" suffix-icon="el-icon-arrow-down" type="date" :placeholder="long_valid?'长期招聘':'请选择有效期至'" :disabled="long_valid"> </el-date-picker></div>
+			</div>
+			<div class="btnsGroup">
+				<el-button class="cancel_btn" @click="plupPostPop = false;">取消</el-button>
+				<el-button class="btn_big" type="primary" @click="confirmUp()">{{upPostItemArr.length<=1?'确认上架':'确认批量上架('+upPostItemArr.length+')'}}</el-button>
+			</div>
+		</div>
+	</div>
+
+
+	<!-- 温馨提示 -->
+	<div class="warnTipPopContainer">
+		<div :class="['confirmPop_mask', {'showPop':warnTipPop}]"></div>
+		<div :class="['warnTipPop confirmPop', {'showPop':warnTipPop}]">
+			<a href="javascript:;" class="close_btn" @click="warnTipPop = false"></a>
+			<div class="wtipHead">
+				<h3><s></s>温馨提示</h3>
+				<p>尊敬的企业用户您好，请先按顺序完成以下条件，即可下载简历</p>
+			</div>
+			<div class="popCon" v-if="warnTipPop">
+				<ul>
+					<li>
+						<a href="{#$cfg_basehost#}/supplier/job/company_info.html">
+							<h5><s></s>完善企业信息</h5>
+							<span>立即完善></span>
+						</a>
+					</li>
+					<li>
+						<a href="{#$cfg_basehost#}/supplier/job/add_post.html">
+							<h5><s></s>发布招聘职位</h5>
+							<span>立即完善></span>
+						</a>
+					</li>
+				</ul>
+			</div>
+			<div class="btnsGroup">
+				<el-button class="cancel_btn" @click="checkAgain()" >我已完成以上操作</el-button>
+			</div>
+		</div>
+	</div>
+
+	{#/if#}
+	{#if $showMap == 1 ||  $showMap == 3#}
+	<!-- 地图弹窗 -->
+	<div class="mapContainerBox" v-show="showPop">
+		<input type="hidden" v-model="city" id="city" />
+		<div :class="['mask_map',{'showPop':showPop}]"></div>
+		<div :class="['mapAreaBox',{'showPop':showPop}]">
+			<h3>添加工作地址、定位<a href="javascript:;" class="close_btn"  @click="closeMap();"></a></h3>
+			<div class="mapContainer">
+				<div :class="['mapSearch']" >
+					<div class="mapSearchInp" v-show="!showAddress">
+						<div class="addridBox" v-show="areaEnd">
+							<el-cascader ref="cascaderAddr" v-model="mapArea" :props="props" :options="options" collapse-tags  @change="changeMapArea"  @expand-change="changeMapAreaText" ></el-cascader>
+						</div>
+						<div class="inputBox">
+							<input type="text" id="address_detail" @input="changeValue" @change="submitKeywords(1)"  @keyup="submitKeywords()" @compositionstart="chineseInp = true"  @compositionend="chineseInp = false;changeValue" @change="getSuggestion" placeholder="请输入详细地址" v-model="addrDeatil">
+							<div class="suggestionList">
+								<ul>
+									<li v-for="item in suggestionList">{{item.name}}</li>
+								</ul>
+							</div>
+						</div>
+						<input type="hidden" id="lng" value="">
+						<input type="hidden" id="lat" value="">
+						<el-button type="primary" class="btn_posi" @click="rePosi">自动定位</el-button>
+					</div>
+					<div class="detail_address" v-if="showAddress">
+						<label for="">详细地址</label>
+						<p>{{addrDeatil}}</p>
+					</div>	
+				</div>
+				<div id="map" :class="{showAddress:showAddress}"></div>
+				<div class="moveBtn" @click="moveMap" title="回到坐标点" v-show="!showAddress"></div>
+			</div>	
+			<div class="btns_tips" v-show="!showAddress">
+				<p>请确保详细地址和定位无误 <em>(可点击地图手动调整定位)</em></p>
+				<el-button class="btn_sure" type="primary" size="medium " :disabled="btn_disabled" @click="sureAddr()">确认</el-button>
+			</div>
+			<div class="btns_tips" v-show="showAddress">
+				<p><span v-if="count_use">该地址有{{count_use}}条职位信息正在使用，请谨慎修改或删除</span></p>
+				<div class="btn_groups"><a href="javascript:;" class="edit_btn" @click="editAddressConfirmPop(1)">修改地址</a><em></em><a href="javascript:;" class="del_btn" @click="showConfirmDel(editAddrObj)">删除地址</a></div>
+			</div>
+		</div>
+	</div>
+	{#/if#}
+</div>
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}

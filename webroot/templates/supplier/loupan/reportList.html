@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>分销报备列表</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/reportList.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = '{#$cfg_hideUrl#}';
+        var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+        var templets = '{#$templets_skin#}';
+    	var loupanid = '{#$loupanid#}';
+        var mpermission = '{#$mpermission#}'
+        var permission = '1,2'
+        var pageType = '{#$smarty.get.type#}'
+        var dcoid = '{#$smarty.get.id#}';
+        var currid = 8;
+        var memberDomain = '{#$member_userDomain#}'
+    </script>
+</head>
+
+<body class="w1200">
+    <div id="page">
+        <!-- 头部 -->
+        {#include file="top.html"#}
+        <div class="conbox">
+            <!-- 左侧导航 -->
+            {#include file="left.html"#}
+            <div class="right_box">
+                <div class="rConBox">
+                    <div class="disflex a-c j-b h3">
+                        <h3>分销审核</h3>
+                        <div class="refreshBox disflex a-c">
+                            <a href="javascript:;" class="refresh_btn">已开启限制</a>
+                            <span class="refresh_tip">
+                                禁止报备名单中已有客户，您可以随时<span @click="open('customerManage?active=2')">导入更新客户名单></span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="ListContainer">
+                        <div class="headbox">
+                            <div class="left_list">
+                                <ul class="post_ul">
+                                    <li v-for="(item,key) in stateList" v-if="!item.checkRight||mpermission.indexOf(item.checkRight) > -1 || item.id != 14" :key="key" :class="`post_li ${state_ind == key ? 'active' : ''}` " @click="tabChange(key)" >
+                                        {{item.name}}
+                                        <em v-if="!item.is_new">({{item.count}})</em>
+                                        <em v-else class="tag">{{item.count}}</em>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="right">
+                                <el-select class="selectbox" v-model="filterForm.dcoid" placeholder="分销公司/方案" @change="changeDcoid">
+                                    <el-option
+                                        v-for="item in fxList"
+                                        :key="item.dcoid"
+                                        :label="item.name"
+                                        :value="item.dcoid">
+                                    </el-option>
+                                </el-select>
+                                <el-input class="search" placeholder="客户、电话、报备人" v-model="filterForm.keyword" @change="reloadList()">
+                                    <div icon="el-icon-search" slot="suffix" class="el-icon el-icon-search" @click="reloadList"></div>
+                                </el-input>
+                                <div class="btn export_btn" @click="exportCustomer">导出Excel</div>
+                            </div>
+                        </div>
+                        <div class="bodyBox" >
+
+                            <!-- <template slot="header">
+                            <span>自定义表头</span>
+                            </template> -->
+                            <el-table
+                            :key="listData.list.length"
+                            ref="tableData"
+                            :data="listData.list"
+                            @row-click="rowClick"
+                            header-row-class-name="grey_row"
+                            style="width: 100%">
+                                <el-table-column type="selection" width="55"> </el-table-column>
+                                <el-table-column width="120" prop="cname" label="客户" > 
+                                    <template slot-scope="scope">
+                                        <b class="cname" style="font-size: 15px; color: #17171A;">{{ scope.row.cname }}</b>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column prop="phone" width="150" label="联系方式" v-if="listData.pageInfo.hasPerm">
+                                    <template slot-scope="scope">
+                                        <span  class="disflex a-c"><s class="icon tel_icon"></s>{{ scope.row.phone }}</span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column prop="expectVisitTime" label="预计到访" width="150" v-if="[11,12].includes(filterForm.pageType)">
+                                    <template slot="header">
+                                        <span>预计到访</span>
+                                        <el-popover
+                                            placement="bottom-start"
+                                            :offset="-75"
+                                            width="300"
+                                            trigger="hover"
+                                            content="报备等待期结束后才可带看，提前到访、超时未带看均视为报备无效">
+                                            <span class="tip_icon" slot="reference"></span>
+                                        </el-popover>
+                                    </template>
+                                    <template slot-scope="scope">
+                                        <span style="color:#17171A;">{{ scope.row.expectVisitTime}}后</span> 
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="到访时间" v-if="[13].includes(filterForm.pageType)">
+                                    <template slot-scope="scope">
+                                        <span style="color: #1966FF;">{{ scope.row.visitTime }}</span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column prop="reportUser" label="报备人" >
+                                    <template slot-scope="scope">
+                                        <el-popover
+                                            v-if="scope.row.dcoid"
+                                            placement="bottom-start"
+                                            :offset="-33"
+                                            popper-class="reportInfoPopover"
+                                            width="400"
+                                            trigger="hover">
+                                            <div class="reportInfo">
+                                                <div class="cpInfo disflex a-c">
+                                                    <div class="logo">
+                                                        <img :src="scope.row.reportCompany.logo" alt="">
+                                                    </div>
+                                                    <div class="cpDetail">
+                                                        <h4>{{scope.row.reportCompany.name}}</h4>
+                                                        <p>{{scope.row.reportCompany.shortName}}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="peopleInfo">
+                                                    <div class="txt"><label for="">负责人：</label><span>{{scope.row.reportCompany.people}} {{scope.row.reportCompany.phone}}</span></div>
+                                                    <div class="txt"><label for="">分销截止：</label><span>{{scope.row.reportCompany.endTime && scope.row.reportCompany.endTime.replace(/-/g,'.')}}</span></div>
+                                                </div>
+                                            </div>
+                                            <el-tag size="mini" slot="reference"  :class="`tag_${scope.row.dcoid ? 1 : 2}`">{{scope.row.dcoid ? '渠道' : '全民'}}</el-tag>
+                                        </el-popover>
+                                        <el-tag size="mini" v-if="!scope.row.dcoid" :class="`tag_${scope.row.dcoid ? 1 : 2}`">{{scope.row.dcoid ? '渠道' : '全民'}}</el-tag>
+                                        <span >{{ scope.row.reportUser }}</span>
+                                        <span class="phone_text">手机：{{ scope.row.reportUserPhone }}</span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="报备时间" v-if="[11].includes(filterForm.pageType)">
+                                    <template slot-scope="scope">
+                                        <span >{{ scope.row.reportTime }}</span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column prop="mark" label="报备人备注" > </el-table-column>
+                                <el-table-column label="报备时间" v-if="[12,13].includes(filterForm.pageType)">
+                                    <template slot-scope="scope">
+                                        <span >{{ scope.row.reportTime }}</span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column prop="visitTime" label="到访时间/凭证" v-if="[14,15,16].includes(filterForm.pageType)">
+                                    <template slot-scope="scope">
+                                        <div class="disflex a-c">
+                                            <span>{{ scope.row.visitTime }}</span>
+                                            <template v-if="scope.row.visitCert && scope.row.visitCert.imageUrl && scope.row.visitCert.imageUrl.length ">
+                                                <div class="v_pic"  v-for="(pic,ind) in scope.row.visitCert.imageUrl.slice(0,2)"  @click.stop="showCertificatePop('verifyVisit',scope.row)">
+                                                    <span v-if="scope.row.visitCert.imageUrl.length > 2 && ind" class="disflex a-c j-c">{{scope.row.visitCert.imageUrl.length}}+</span>
+                                                    <img :src="pic" onerror="this.src='/static/images/404.jpg'" alt="">
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </el-table-column>
+
+                                <el-table-column label="成交时间" prop="dealTime" v-if="filterForm.pageType == 16">
+                                    <template slot-scope="scope">
+                                        <div class="disflex a-c">
+                                            <span>{{ scope.row.dealTime }}</span>
+                                            <template v-if="scope.row.dealCert && scope.row.dealCert.contractUrl && scope.row.dealCert.contractUrl.length ">
+                                                <div class="v_pic"  v-for="(pic,ind) in scope.row.dealCert.contractUrl.slice(0,2)">
+                                                    <span v-if="scope.row.dealCert.contractUrl.length > 2 && ind" class="disflex a-c j-c">{{scope.row.dealCert.contractUrl.length}}+</span>
+                                                    <img :src="pic" onerror="this.src='/static/images/404.jpg'" alt="">
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="有效成交截止" v-if="[14,15].includes(filterForm.pageType)">
+                                    <template slot-scope="scope">
+                                        <span >{{ scope.row.dealEndTime }}</span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="失败原因" v-if="filterForm.pageType == 17">
+                                    <template slot-scope="scope">
+                                        <span >{{ scope.row.invalidReson }}</span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="操作" align="center" v-if="filterForm.pageType != 13 && filterForm.pageType != 15 && filterForm.pageType != 16">
+                                    <template slot-scope="scope" >
+                                        <div class="disflex a-c j-c" v-if="stateList[state_ind].id == 11  && listData.pageInfo.hasPerm" >
+                                            
+                                            
+                                            <el-button class="confirm_btn" v-if="listData.pageInfo.hasPerm" @click.stop="confirm_heshi('auditReport',scope.row)">确认报备有效</el-button>
+                                            <el-popover
+                                                placement="bottom-end"
+                                                :offset="90"
+                                                width="540"
+                                                popper-class="confirmVerify-dialog"
+                                                v-model="scope.row.popperShow">
+                                                <div class="confirm_header disflex a-c j-b">
+                                                    <div class="confirm_header_title">报备无效</div>
+                                                    <div class="disflex a-c ">
+                                                        <span :class="`${ind == verifyForm.ind ? 'on_chose' : 'confirm_del_btn'}`" @click="verifyForm.ind = ind; verifyForm.message = item" v-for="(item,ind) in verifyObj['auditReport']">{{item}}</span>
+                                                    </div> 
+                                                </div>
+                                                <div class='confirm_content'>
+                                                    <textarea placeholder="(选填)补充说明" id="markInp" v-model="verifyForm.mark"></textarea>
+                                                </div>
+                                                <div  class="btns">
+                                                    <el-button @click="scope.row.popperShow = false;" >取消</el-button>
+                                                    <el-button class="confirm_del_btn" type="primary"  @click="verifyState('auditReport',2,scope.row);scope.row.popperShow = false">确定无效</el-button>
+                                                </div>
+                                                <a href="javascript:;" slot="reference" class="cancelReport" style="margin-left: 36px;" @click.stop="currChose = scope.row" >报备无效</a>
+                                            </el-popover>
+                                        </div>
+                                        <template v-else-if="stateList[state_ind].id == 12">
+                                            <el-button class="confirm_btn" @click.stop="printVisit(scope.row.id,listData.pageInfo.hasPrintPerm)"  v-if="listData.pageInfo.hasPrintPerm">{{listData.pageInfo.hasPrintPerm == 0 ? '确认到访' : '确认到访，打印到访单'}}</el-button>
+                                            <template v-else>
+                                                <a href="javascript:;" class="link" style="margin-right: 20px;">待报备人提交到访</a>
+                                            </template>
+                                            <el-popover
+                                            placement="bottom-end"
+                                            :offset="90"
+                                            width="540"
+                                            popper-class="confirmVerify-dialog"
+                                            v-model="scope.row.popperShow">
+                                            <div class="confirm_header disflex a-c j-b">
+                                                <div class="confirm_header_title">报备无效</div>
+                                                <div class="disflex a-c ">
+                                                    <span :class="`${ind == verifyForm.ind ? 'on_chose' : 'confirm_del_btn'}`" @click="verifyForm.ind = ind; verifyForm.message = item" v-for="(item,ind) in verifyObj['auditReport']">{{item}}</span>
+                                                </div> 
+                                            </div>
+                                            <div class='confirm_content'>
+                                                <textarea placeholder="(选填)补充说明" id="markInp" v-model="verifyForm.mark"></textarea>
+                                            </div>
+                                            <div  class="btns">
+                                                <el-button @click="scope.row.popperShow = false" >取消</el-button>
+                                                <el-button class="confirm_del_btn" type="primary"  @click="verifyState('auditReport',2,scope.row);scope.row.popperShow = false">确定无效</el-button>
+                                            </div>
+                                            <a href="javascript:;" slot="reference" class="cancelReport" @click.stop="currChose = scope.row" >报备无效</a>
+                                        </el-popover>
+                                        </template>
+                                        <el-button class="confirm_btn"  v-else-if="stateList[state_ind].id == 14 && listData.pageInfo.hasPerm" @click.stop="showDealPop(scope.row)">更新成交信息</el-button>
+                                        <a href="javascript:;" class="link"  v-else-if="stateList[state_ind].id == 17 && listData.pageInfo.hasPerm">查看处理记录</el-button>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="成交状态/操作" align="right" v-else-if="stateList[state_ind].id == 15">
+                                    <template slot-scope="scope" >
+                                        <div class="disflex a-c j-e" v-if="scope.row.verifyStatus >= 1 && listData.pageInfo.hasPerm">
+                                            <template v-if="scope.row.dealCert && scope.row.dealCert.contractUrl && scope.row.dealCert.contractUrl.length ">
+                                                <div class="v_pic"  v-for="(pic,ind) in scope.row.dealCert.contractUrl.slice(0,2)">
+                                                    <span v-if="scope.row.dealCert.contractUrl.length > 2 && ind" class="disflex a-c j-c">{{scope.row.dealCert.contractUrl.length}}+</span>
+                                                    <img :src="pic" onerror="this.src='/static/images/404.jpg'" alt="">
+                                                </div>
+                                            </template>
+                                            <el-button class="confirm_btn" type="primary" v-if="listData.pageInfo.hasPerm" style="margin-left: 20px;" @click.stop="showCertificatePop('verifyDeal',scope.row)">成交核实</el-button>
+                                        </div>
+                                        <div class="disflex a-c j-e" v-else>
+                                            <a class="cancelReport disflex a-c j-c" href="javascript:;" style="min-width: 78px; margin-right: 0;">待成交</a>
+                                        </div>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="到访凭证/操作" align="left" v-else-if="filterForm.pageType == 13">
+                                    <template slot-scope="scope" >
+                                        <div class="disflex a-c ">
+                                            <div class="disflex" v-if="scope.row.visitCert && scope.row.visitCert.imageUrl && scope.row.visitCert.imageUrl.length " style="margin-right: 20px; ">
+                                                <div class="v_pic"  v-for="(pic,ind) in scope.row.visitCert.imageUrl.slice(0,2)"  @click.stop="showCertificatePop('verifyVisit',scope.row)" >
+                                                    <span v-if="scope.row.visitCert.imageUrl.length > 2 && ind" class="disflex a-c j-c">{{scope.row.visitCert.imageUrl.length}}+</span>
+                                                    <img :src="pic" onerror="this.src='/static/images/404.jpg'" alt="">
+                                                </div>
+                                            </div>
+                                            <a href="javascript:;" class="link" v-if="scope.row.status == 3 && scope.row.verifyStatus == 0">待报备人提交到访</a>
+                                            <el-button class="confirm_btn"  v-else-if=" listData.pageInfo.hasPerm" @click.stop="showCertificatePop('verifyVisit',scope.row)">核实到访</el-button>
+                                            <el-popover
+                                                placement="bottom-end"
+                                                :offset="90"
+                                                width="540"
+                                                popper-class="confirmVerify-dialog"
+                                                v-model="scope.row.popperShow">
+                                            <div class="confirm_header disflex a-c j-b">
+                                                <div class="confirm_header_title">到访无效</div>
+                                                <div class="disflex a-c ">
+                                                    <span :class="`${ind == verifyForm.ind ? 'on_chose' : 'confirm_del_btn'}`" @click="verifyForm.ind = ind; verifyForm.message = item" v-for="(item,ind) in verifyObj['verifyVisit']">{{item}}</span>
+                                                </div> 
+                                            </div>
+                                            <div class='confirm_content'>
+                                                <textarea placeholder="(选填)补充说明" id="markInp" v-model="verifyForm.mark"></textarea>
+                                            </div>
+                                            <div  class="btns">
+                                                <el-button @click="scope.row.popperShow = false" >取消</el-button>
+                                                <el-button class="confirm_del_btn" type="primary"  @click="verifyState('verifyVisit',2,scope.row);scope.row.popperShow = false">确定无效</el-button>
+                                            </div>
+                                            <a href="javascript:;" slot="reference" class="cancelReport" @click.stop="currChose = scope.row" >到访无效</a>
+                                        </el-popover>
+                                        </div>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="状态" v-else align="center">
+                                    <template slot-scope="scope">
+                                        <span style="color: #FF1E00;">已成交，{{scope.row.status == 6 ? '待发放' : '已发放'}}佣金</span>
+                                        <!-- <span style="color: #FF1E00;">已成交</span> -->
+                                    </template>
+                                </el-table-column>
+                            </el-table>
+
+                            <div class="optBox disflex a-c">
+                                <el-checkbox @change="val => selectAll(val)" >
+                                    <span>全选(<em>{{choseList.length}}</em>/{{listData.total > listData.pageSize ? listData.pageSize : listData.total}})</span>
+                                </el-checkbox>
+                            </div>
+                            <div class="pageBox disflex a-c j-e">
+                                <el-pagination
+                                background
+                                :hide-on-single-page="true"
+                                @current-change="getList"
+                                    :current-page.sync="listData.page"
+                                    :page-size="listData.pageSize"
+                                    layout=" prev, pager, next"
+                                    :total="listData.total">
+                                </el-pagination>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="foot">
+            <div class="foot-bottom">
+                <div class="bottom wrap">
+                    版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+                </div>
+            </div>
+        </div>
+
+        <div class="allPopContainer">
+            <!-- 成交信息提交 -->
+            <div class="popBox" v-if="dealPopShow">
+                <div :class="['pop_mask',{'show':dealPopShow}] "></div>
+                <div :class="['dealPop Popbox',{'show':dealPopShow}]">
+                    <div class="pop_head disflex a-c j-b">
+                        <h2>提交成交信息</h2>
+                        <a href="javascript:;" class="close_pop el-icon-close"  @click="dealPopShow = false"></a>
+                    </div>
+                    <div class="pop_con">
+                        <div class="dealInfo">
+                            <h2><b>【客户】</b>{{currChose.cname}}</h2>
+                            <ul>
+                                <li>
+                                    <label for="">报备人：</label>
+                                    <span>{{currChose.reportUser}} {{currChose.reportUserPhone}} </span>
+                                </li>
+                                <li>
+                                    <label for="">报备时间：</label>
+                                    <span style="color: #616366;">{{currChose.reportTime && currChose.reportTime.replace(/-/g,'.')}} </span>
+                                </li>
+                                <li v-if="currChose.reportCompany && currChose.reportCompany.name">
+                                    <label for="">分销组织：</label>
+                                    <span>{{currChose.reportCompany.name}} </span>
+                                </li>
+                                <li v-else>
+                                    <label for="">分销模式：</label>
+                                    <span>全民分销 </span>
+                                </li>
+                            </ul>
+                        </div>
+                        <el-form label-width="90px" class="formbox">
+                            <el-form-item :required="currChose.commissionType == 1 ? true : false" label="成交金额">
+                                <el-input class="purchase_inp inpbox" v-model="formData.purchase" placeholder="请输入内容"></el-input>{#echoCurrency type="short"#}
+                            </el-form-item>
+                            <el-form-item label="房号信息">
+                                <div class="disflex a-c">
+                                    <div class="sminp disflex a-c">
+                                        <el-input v-model="formData.dong" class="dong inpbox" placeholder="请填写"></el-input>栋
+                                    </div>
+                                    <div class="sminp disflex a-c">
+                                        <el-input v-model="formData.danyuan" class="danyuan inpbox" placeholder="请填写"></el-input>单元
+                                    </div>
+                                    <div class="sminp disflex a-c">
+                                        <el-input v-model="formData.hao" class="dong inpbox" placeholder="请填写"></el-input>号<span class="tip">（没有的项不填）</span>
+                                    </div>
+                                    
+                                </div>
+                            </el-form-item>
+                            <el-form-item label="认购证明" :required="true" class="formPicbox">
+                                <el-radio-group v-model="formData.ctype">
+                                    <el-radio :label="1">房源认购协议书</el-radio>
+                                    <el-radio :label="2">商品房买卖合同</el-radio>
+                                </el-radio-group>
+                                <div class="uploadList">
+                                    <div class="uploadBox" v-for="(item,ind) in contract">
+                                        <img :src="item.path" alt="">
+                                        <div class="del el-icon-error" @click="delFile(ind,'contract')"></div>
+                                    </div>
+                                    <div class="uploadBox">
+                                        <input type="file" accept="image/*" class="fileUp" @change="e => uploadFile(e,'contract','image')">
+                                        <div class="upPlace disflex a-c j-c">
+                                            <p>上传扫描件</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </el-form-item>
+                            <el-form-item label="收款收据" :required="true" class="formPicbox">
+                                <div class="uploadBox" v-for="(item,ind) in receipt">
+                                    <img :src="item.path" alt="">
+                                    <div class="del el-icon-error" @click="delFile(ind,'receipt')"></div>
+                                </div>
+                                <div class="uploadBox">
+                                    <input type="file" accept="image/*" class="fileUp" @change="e => uploadFile(e,'receipt','image')">
+                                    <div class="upPlace disflex a-c j-c">
+                                        <p>上传扫描件</p>
+                                    </div>
+                                    <!-- <template v-else>
+                                        <img :src="formData.receipt_path" alt="">
+                                        <span class="reUptext" >重新上传</span>
+                                    </template> -->
+                                </div>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+                    <div class="pop_foot">
+                        <div class="btns_group disflex a-c j-e">
+                            <el-button class="cancel_btn" @click="dealPopShow = false">取消</el-button>
+                            <el-button type="primary" class="submit_btn" @click="submitData(stateList[state_ind].id)">确认提交</el-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 到访凭证 -->
+            <div class="popBox" v-if="certificatePopShow">
+                <div :class="['pop_mask certificate_mask',{'show':certificatePopShow}] "></div>
+                <div :class="['certificatePop Popbox disflex' ,{'show':certificatePopShow}]">
+                    <a href="javascript:;" class="close_pop" @click="certificatePopShow = false"></a>
+                    <div class="flPicBox disflex">
+                        <!-- 到访核实 -->
+                        <template  v-if="certificateType == 'verifyVisit'">
+                            <div class="p_h">
+                                <h4>到访凭证</h4>
+                            </div>
+                            <div class="pic_box">
+                                <el-carousel ref="carousel" :autoplay="false" height="100%" :loop="true" @change="e => {currOn = e}">
+                                    <el-carousel-item v-for="item in currChose.visitCert.imageUrl" :key="item">
+                                        <img :src="item" onerror="this.src='/static/images/404.jpg'" alt="">
+                                    </el-carousel-item>
+                                </el-carousel>
+                            </div>
+                            <div class="p_b">
+                                <ul class="disflex a-c j-c">
+                                    <li v-for="(item,ind) in currChose.visitCert.imageUrl" :class="ind == currOn?'active':''" @click="changeImg(ind)">
+                                        <span>{{ind + 1}}</span>
+                                        <img :src="item"  onerror="this.src='/static/images/404.jpg'"></img>
+                                    </li>
+                                </ul>
+                            </div>
+                        </template>
+                        <!-- 成交核实 -->
+                        <template  v-if="certificateType == 'verifyDeal'">
+                            <div class="p_h">
+                                <h4 style="color: #D92E00;" v-if="listData.pageInfo.hasPerm">请核实{{currChose.dealCert.ctype == '1' ? '认购协议书' : '买卖合同'}}</h4>
+                                <h4  v-else>{{currChose.dealCert.ctype == '1' ? '认购协议书' : '买卖合同'}}</h4>
+                            </div>
+                            <div class="pic_box">
+                                <div class="imgBox" v-if="currChose.dealCert && currChose.dealCert.contractUrl && currChose.dealCert.contractUrl.length || (currChose.dealCert && currChose.dealCert.receiptUrl && currChose.dealCert.receiptUrl.length) ">
+                                    <img :src="currChose.dealCert.contractUrl[currOn]" v-if="currOn <= (currChose.dealCert.contractUrl.length - 1)"  onerror="this.src='/static/images/404.jpg'"></img>
+                                    <img :src="currChose.dealCert.receiptUrl[currOn - currChose.dealCert.contractUrl.length]" v-if="currOn > (currChose.dealCert.contractUrl.length - 1)"  onerror="this.src='/static/images/404.jpg'"></img>
+                                </div>
+                                <div class="img_tag">
+                                    {{currOn >= currChose.dealCert.contractUrl.length ? '收据' : `${currChose.dealCert.ctype == '1' ? '认购协议' : '买卖合同'}`}}
+                                </div>
+                            </div>
+                            <div class="p_b">
+                                <ul class="disflex a-c j-c">
+                                    <li v-for="(item,ind) in currChose.dealCert.contractUrl" :class="ind == currOn?'active':''" @click="changeImg(ind)">
+                                        <span>{{ind + 1}}</span>
+                                        <img :src="item"  onerror="this.src='/static/images/404.jpg'"></img>
+                                    </li>
+                                    <li v-for="(item,ind) in currChose.dealCert.receiptUrl" :class="ind == (currOn - currChose.dealCert.contractUrl.length) ?'active':''" @click="changeImg(ind + currChose.dealCert.contractUrl.length)">
+                                        <span>{{ind + 1 + currChose.dealCert.contractUrl.length}}</span>
+                                        <img :src="item"  onerror="this.src='/static/images/404.jpg'"></img>
+                                    </li>
+                                </ul>
+                            </div>
+                        </template>
+                        
+                    </div>
+                    <div class="frReportBox">
+                        <div class="repInfoBox">
+                            <div class="rp_lab disflex a-c j-c">报备人</div>
+                            <div class="repUser disflex a-c">
+                                <div class="photo"><img :src="currChose.reportUserAvatar || `/static/images/noPhoto_100.jpg`" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                <h4>{{currChose.reportUser}}</h4>
+                            </div>
+                            <ul>
+                                <li>
+                                    <label for="">联系方式：</label>
+                                    <span style="color: #333;">{{currChose.reportUserPhone}}</span>
+                                </li>
+                                <li>
+                                    <label for="">分销模式：</label>
+                                    <span style="color: #1966FF;">{{!currChose.dcoid ? '全民' : '渠道'}}分销</span>
+                                </li>
+                                <li v-if="currChose.dcoid && currChose.reportCompany && currChose.reportCompany.name">
+                                    <label for="">分销组织：</label>
+                                    <span style="color: #333;">{{currChose.reportCompany.name}}分销</span>
+                                </li>
+                                <li>
+                                    <label for="">到访时间：</label>
+                                    <span style="color: #616366;">{{currChose.visitTime && currChose.visitTime.replace(/-/g,'.')}}</span>
+                                </li>
+                            </ul>
+                            <div class="btns" v-if="certificateType == 'verifyVisit' && currChose.status == 3 && currChose.verifyStatus <= 1">
+                                <div class="btn"><el-button type="primary" class="confirm_btn" @click="confirm_heshi()">核实到访</el-button></div>
+                                <div class="btn"><el-button class="cancel_btn" @click="cancel_heshi('verifyVisit',2)">到访无效</el-button></div>
+                            </div>
+                            <div class="btns" v-if="certificateType == 'verifyDeal' && currChose.status == 5 && currChose.verifyStatus <= 1">
+                                <div class="btn"><el-button type="primary" class="confirm_btn redBtn" @click="confirm_heshi('verifyDeal')">确认认购成功</el-button></div>
+                                <div class="btn"><el-button class="cancel_btn" @click="cancel_heshi('verifyDeal',2)">驳回成交</el-button></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 报备详情 -->
+            <div class="popBox" v-if="reportPopShow">
+                <div :class="['pop_mask reportPop_mask',{'show':reportPopShow}] "></div>
+                <!-- failPop表示失效 -->
+                <div :class="['reportPop Popbox disflex' ,{'show':reportPopShow}]">
+                    <a href="javascript:;" class="close_pop el-icon-close" @click="reportPopShow = false"></a>
+                    <div class="pop_header">
+                        <h4>{{reportDetail.reportUser && reportDetail.reportUser.rname}}{{reportDetail.reportUser && reportDetail.reportUser.org ? `【${reportDetail.reportUser.org}团队】` : ''}}提交的报备</h4>
+                    </div>
+                    <div class="pop_con disflex a-st" v-if="reportDetail.reportUser">
+                        <div class="fl_popcon">
+                            <div class="scrollBox">
+                                <div class="scrollCon">
+                                    <div :class="`customerInfoBox disflex ${ reportDetail.auditUser.status == 2 ? 'f-g' : ''}` ">
+                                        <div class="customerInfo_title">客户信息</div>
+                                        <div class="customerInfo ">
+                                            <h3>{{reportDetail.customer.cname}} <span>{{phoneFormat(reportDetail.customer.cphone)}}</span></h3>
+                                            <div class="disflex a-s j-b">
+                                                <div class="cInfo_list" v-if="reportDetail.auditUser.status != 2">
+                                                    <div class="inline" v-if="reportDetail.customer.visitTime">到访时间：<span>{{reportDetail.customer.visitTime.replace(/-/g,'.')}}</span></div>
+                                                    <div class="inline" v-else-if="reportDetail.customer.expectVisitTime">到访时间：<span>{{reportDetail.customer.expectVisitTime.replace(/-/g,'.')}}</span></div>
+                                                    <div class="inline" v-if="reportDetail.customer.dealEndTime">有效时间：<span style="color: #313233;">{{reportDetail.customer.dealEndTime.replace(/-/g,'.')}}</span></div> <br/>
+                                                    <div class="inline">报备时间：<span>{{reportDetail.customer.reportTime.replace(/-/g,'.')}}</span></div>
+                                                </div>
+                                                <div class="cInfo_list" v-else>
+                                                    <div class="inline">预计到访：<span>{{reportDetail.customer.expectVisitTime.replace(/-/g,'.')}}</span></div>
+                                                    <div class="inline">报备等待期：<span style="color: #313233;">{{reportDetail.customer.waitTime}}分钟</span></div> <br/>
+                                                    <div class="inline">报备时间：<span>{{reportDetail.customer.reportTime.replace(/-/g,'.')}}</span></div>
+                                                </div>
+    
+                                                <a href="javascript:;" class="showQr" @click="qrShow = true" v-if="reportDetail.auditUser.status == 3 && (reportDetail.report.verifyStatus == 0 || reportDetail.report.verifyStatus == 3) && !reportDetail.report.invalidType">待报备人提交到访</a>
+                                            </div>
+                                            
+                                        </div>
+                                        <div class="rpMark disflex a-c" v-if="reportDetail.customer.mark">
+                                            <div class="inline">报备人备注：<span>{{reportDetail.customer.mark}}</span></div>
+                                        </div>
+                                    </div>
+                                    <div class="qrCodeBox disflex" v-if="qrShow && reportDetail.auditUser.status == 3 && (reportDetail.report.verifyStatus == 0 || reportDetail.report.verifyStatus == 3) && !reportDetail.report.invalidType">
+                                        <h4>请报备人本人 扫码更新到访凭证</h4>
+                                        <div class="qrbox">
+                                            <img :src="`/include/qrcode.php?data={#getModuleConfig module='house' key='channelDomain'#}/fenxiao/reportDetail?id=${reportDetail.drid}&source=3`" alt="">
+                                        </div>
+                                        <div class="tipInfo">
+                                            <p>如已到访，可提醒报备人提交</p>
+                                            <p>带看时间/提交截止：<span style="color: #FF1E00;">{{reportDetail.customer.expectVisitTime.replace(/-/g,'.')}} - {{reportDetail.customer.endTime.replace(/-/g,'.')}}</span></p>
+                                        </div>
+                                        <el-button @click="qrShow = false" class="back_btn">返回</el-button>
+                                    </div>
+                                    <div :class="['progressListBox'] " v-else>
+                                        <!-- errBox表示审核未通过  successBox 表示交易成功  failBox 表示失效-->
+                                        <ul :class="['progressList',{'successBox':reportDetail.report.status == 7 && reportDetail.auditUser.auditPerm && !reportDetail.report.invalidType},{'failBox':reportDetail.report.invalidType},{'errBox':(reportDetail.report.status == 3 || reportDetail.report.status == 1 || reportDetail.report.status == 5 )  && reportDetail.report.verifyStatus == 3 && !reportDetail.report.invalidType}]">
+                                            <li class="progressItem" style="padding-bottom: 0;">
+                                                <div class="" >
+                                                    <div class="currStep disflex a-c j-b">
+                                                        <!-- 普通状态 <span><i class="el-icon-time clock"></i>当前进度</span> -->
+                                                        <!-- errBox表示审核未通过 <span><i class="el-icon-warning-outline clock"></i>当前进度</span> -->
+                                                        <!-- failBox表示失效 <span><i class="el-icon-circle-close clock"></i>当前进度</span> -->
+                                                        <!-- successBox交易成功未通过 <span><i class="el-icon-circle-check  clock"></i>当前进度</span> -->
+                                                        <span v-if="reportDetail.report.status == 7"><i class="el-icon-circle-check  clock"></i>分销成功</span>
+                                                        <span v-else-if="reportDetail.report.invalidType"><i class="el-icon-circle-close clock"></i>{{reportDetail.report.invalidTime.replace(/-/g,'.')}}</span>
+                                                        <span v-else-if="(reportDetail.report.status == 1 || reportDetail.report.status == 3 || reportDetail.report.status == 5) && reportDetail.report.verifyStatus == 3"><i class="el-icon-warning-outline clock"></i>当前进度</span>
+                                                        <span v-else><i class="el-icon-time clock"></i>当前进度</span>
+                                                        <el-checkbox class="check" v-model="filterInfo">过滤无效记录</el-checkbox>
+                                                    </div>
+                                                    <div class="currState disflex a-c j-b" >
+                                                        <template v-if="reportDetail.report.invalidType">
+                                                            <div class="currInfo"  >
+                                                                <h5>报备无效</h5>
+                                                                <p>
+                                                                    <span v-if="reportDetail.report.invalidType == 1">报备无效</span>
+                                                                    <span v-else-if="reportDetail.report.invalidType == 2">客户提前到访</span>
+                                                                    <span v-else-if="reportDetail.report.invalidType == 3">报备人未带看</span>
+                                                                    <span v-else-if="reportDetail.report.invalidType == 4">带看未通过</span>
+                                                                    <span v-else-if="reportDetail.report.invalidType == 5">未成交</span>
+                                                                    <span v-else-if="reportDetail.report.invalidType == 6">成交核实未通过</span>
+                                                                    <span v-else-if="reportDetail.report.invalidType == 7">分销已结束,报备未成交已失效</span>
+                                                                    <span v-if="reportDetail.list && reportDetail.list.length && reportDetail.list[0][0].mark&& reportDetail.list[0][0].mark.note">{{reportDetail.list[0][0].mark.note}}</span>
+                                                                </p>
+                                                            </div>
+                                                        </template>
+                                                        <template v-else-if="reportDetail.report.status == 7">
+                                                            <template v-if="reportDetail.auditUser.auditPerm">
+                                                                <div class="currInfo"  >
+                                                                    <h5>房源已成交，已结算佣金<b>{{reportDetail.report.commissionFee}}</b></h5>
+                                                                    <p>{{reportDetail.report.dcoid ? '渠道佣金请在佣金明细中统一处理提现、打款' : '佣金已自动结算至报备人账户'}}</p>
+                                                                </div>
+                                                                <el-button class="btn_check" >查看佣金</el-button>
+                                                            </template>
+                                                            <div class="currInfo" v-else >
+                                                                <h5>房源已成交，已结算佣金</h5>
+                                                            </div>
+                                                        </template>
+                                                        <template v-else>
+                                                            <div class="currInfo"  v-if="reportDetail.report.status == 1">
+                                                                <h5>{{reportDetail.auditUser.auditPerm ? '请审核报备信息' : `待${reportDetail.report.auditGname.join('、')}审核报备信息`}}</h5>
+                                                                <p v-if="reportDetail.auditUser.auditPerm">{{`待${reportDetail.report.auditGname.join('、')}审核报备有效`}}</p>
+                                                            </div>
+                                                            <div class="currInfo"  v-if="reportDetail.report.status == 2">
+                                                                <h5>待客户到访</h5>
+                                                                <p v-if="reportDetail.auditUser.auditPerm">带看时间：<span style="color:#FF1E00;">{{reportDetail.customer.expectVisitTime}}等待期生效后</span></p>
+                                                            </div>
+                                                            <template v-if="reportDetail.report.status == 3">
+    
+                                                                <div class="currInfo"  v-if="!reportDetail.auditUser.auditPerm">
+                                                                    <h5>{{`待${reportDetail.report.visistGname.join('、')}核实到访情况`}}</h5>
+                                                                </div>
+                                                                <div class="currInfo"  v-else-if="reportDetail.report.verifyStatus == 0">
+                                                                    <h5>待客户到访</h5>
+                                                                    <p v-if="reportDetail.auditUser.auditPerm">带看时间：<span style="color:#FF1E00;">{{reportDetail.customer.expectVisitTime}}等待期生效后</span></p>
+                                                                </div>
+                                                                <div class="currInfo"  v-else-if="reportDetail.report.verifyStatus == 1">
+                                                                    <h5>请核实客户到访情况</h5>
+                                                                    <p>{{`待${reportDetail.report.visistGname.join('、')}核实报备人带客户到访情况`}}</p>
+                                                                </div>
+                                                                <div class="currInfo"  v-else-if="reportDetail.report.verifyStatus == 3">
+                                                                    <h5>客户到访审核未通过，待报备人重提交</h5>
+                                                                    <p>原因：{{reportDetail.list && reportDetail.list.length && reportDetail.list[0][0].mark && reportDetail.list[0][0].mark.note}}</p>
+                                                                </div>
+                                                            </template>
+                                                        </template>
+                                                        <div class="currInfo"  v-if="reportDetail.report.status == 4">
+                                                            <h5>{{reportDetail.auditUser.auditPerm ? '待成交，需提交认购凭证' : `客户已到访，待成交`}}</h5>
+                                                            <p v-if="reportDetail.auditUser.auditPerm">如已成交，请及时上传，提交截止：<span style="color:#FF1E00;">{{reportDetail.customer.dealEndTime}}</span></p>
+                                                        </div>
+                                                        <template v-if="reportDetail.report.status == 5">
+                                                            <div class="currInfo"  v-if="!reportDetail.auditUser.auditPerm">
+                                                                <h5>{{`待${reportDetail.report.dealGname.join('、')}核实认购结果`}}</h5>
+                                                            </div>
+                                                            <div class="currInfo"  v-else-if="reportDetail.report.verifyStatus == 1">
+                                                                <h5>请核实成交信息</h5>
+                                                                <p>{{`待${reportDetail.report.dealGname.join('、')}核实报备人带客户到访情况`}}</p>
+                                                            </div>
+                                                            <div class="currInfo"  v-else-if="reportDetail.report.verifyStatus == 3">
+                                                                <h5>成交结果未通过，请重提交</h5>
+                                                                <p>原因：{{reportDetail.list && reportDetail.list.length && reportDetail.list[0][0].mark && reportDetail.list[0][0].mark.note}}</p>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                            <li class="progressItem" v-for="(list,ind) in reportDetail.list " v-if="!filterInfo || (list.length == 1 && !list[0].hide) || list.length > 1">
+                                                <div class="ptime" v-if="ind != 0 && list.length == 1">{{list[0].time.replace(/-/g,'.')}}</div>
+    
+                                                
+                                               
+                                                <div class="pcon" v-if="!filterInfo || checkShow(list)">
+                                                    <div class="opList">
+                                                        <div class=" optItem" v-for="item in list"  >
+                                                            <div class="disflex a-c j-b">
+                                                                <div class="info disflex a-c">
+                                                                    <div class="photo"><img :src="item.avatar" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                                                    <div class="txt" v-if="item.type == 1 && item.logType == 1">{{item.gname}}{{item.name && item.gname ? `【${item.name}】` : item.name}}提交了报备审核<span class="mark"  v-if="item.mark">(备注：{{item.mark}})</span></div>
+                                                                    <div class="txt" v-else-if="item.type == 1 && item.logType == 2 && typeof(item.mark) == 'object'">{{item.gname}}{{item.name && item.gname ? `【${item.name}】` : item.name}}不通过报备审核</div>
+                                                                    <div class="txt" v-else-if="item.type == 3 && item.logType == 1">{{item.gname}}{{item.name && item.gname ? `【${item.name}】` : item.name}}提交带看到访记录</div>
+                                                                    <div class="txt" v-else-if="item.type == 3 && item.logType == 2 && typeof(item.mark) == 'object'">{{item.gname}}{{item.name && item.gname ? `【${item.name}】` : item.name}}审核不通过到访记录</div>
+                                                                    <div class="txt" v-else-if="item.type == 5 && item.logType == 1">{{item.gname}}{{item.name && item.gname ? `【${item.name}】` : item.name}}提交认购凭证</div>
+                                                                    <div class="txt" v-else-if="item.type == 5 && item.logType == 2 && typeof(item.mark) == 'object'">{{item.gname}}{{item.name && item.gname ? `【${item.name}】` : item.name}}审核不通过认购凭证</div>
+                                                                    <div class="txt" v-else>{{item.gname}}{{item.name && item.gname ? `【${item.name}】` : item.name}}{{item.mark}}</div>
+                                                                    <div class="time" v-if="list.length > 1">{{item.time.replace(/-/g,'.')}}</div>
+                                                                </div>
+                                                                <div class="picsbox" v-if="item.type==3 && item.logType == 1">
+                                                                    <a href="javascript:;" class="linkBtn">到访视频/照片<s><img :src="item.mark && item.mark.imageUrl && item.mark.imageUrl[0] || '/static/images/404.jpg'" onerror="this.src='/static/images/404.jpg'" alt=""></s></a>
+                                                                </div>
+                                                            </div>
+                                                            <div class="picbox" v-if="item.type == 5 && item.logType == 1">
+                                                                <template v-if="item.mark && item.mark.contract && item.mark.contract.length">
+                                                                    <div class="xieyi pic" v-if="item.mark && item.mark.ctype == '1'">
+                                                                        <div class="imgShow">
+                                                                            <img :src="item.mark.contractUrl[0]" alt="" onerror="this.src='/static/images/404.jpg'">
+                                                                        </div>
+                                                                        <p>认购协议书</p>
+                                                                    </div>
+                                                                    <div class="hetong pic" v-else>
+                                                                        <div class="imgShow">
+                                                                            <img :src="item.mark.contractUrl[0]" alt="" onerror="this.src='/static/images/404.jpg'">
+                                                                        </div>
+                                                                        <p>买卖合同</p>
+                                                                    </div>
+                                                                </template>
+                                                                <div class="shouju  pic" v-if="item.mark && item.mark.receipt && item.mark.receipt.length">
+                                                                    <div class="imgShow">
+                                                                        <img :src="item.mark.receiptUrl[0]" alt=""  onerror="this.src='/static/images/404.jpg'">
+                                                                    </div>
+                                                                    <p>收款收据</p>
+                                                                </div>
+                                                            </div>
+                                                            <p :class="`note ${item.mark.status && (item.mark.status == 5 ||item.mark.status == 3) ? 'error' : '' }`" v-if="item.mark && item.mark.note">{{item.mark.status && (item.mark.status == 5 ||item.mark.status == 3) ? '原因：' : '说明：'}}{{item.mark.note}}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fr_popcon">
+                            <div class="repInfoBox">
+                                <div class="rp_lab disflex a-c j-c">报备人</div>
+                                <div class="repUser disflex a-c">
+                                    <div class="photo"><img :src="reportDetail.reportUser.avatar || `/static/images/noPhoto_100.jpg`" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                    <h4>{{reportDetail.reportUser.rname}}</h4>
+                                </div>
+                                <ul>
+                                    <li>
+                                        <label for="">联系方式：</label>
+                                        <span style="color: #333;">{{reportDetail.reportUser.rphone}}</span>
+                                    </li>
+                                    <li>
+                                        <label for="">分销模式：</label>
+                                        <span style="color: #1966FF;">{{!reportDetail.reportUser || !reportDetail.reportUser.org ? '全民' : '渠道'}}分销</span>
+                                    </li>
+                                    <li v-if="reportDetail.reportUser && reportDetail.reportUser.org">
+                                        <label for="">分销组织：</label>
+                                        <span style="color: #333;">{{reportDetail.reportUser && reportDetail.reportUser.org}}分销</span>
+                                    </li>
+                                </ul>
+
+                                <template v-if="!reportDetail.report.invalidType && reportDetail.auditUser.auditPerm">
+
+                                    <div class="btns" v-if="reportDetail.report.status == 7">
+                                        <div class="btn"><el-button  class=" btn_check">查看佣金</el-button></div>
+                                    </div>
+                                    <div class="btns" v-else-if="reportDetail.report.status == 1">
+                                        <div class="btn"><el-button type="primary" class="confirm_btn" @click.stop="confirm_heshi('auditReport','',1)">确认有效</el-button></div>
+                                        <div class="btn"><el-button class="cancel_btn" @click="cancel_heshi('auditReport',1)">报备无效</el-button></div>
+                                    </div>
+                                    <div class="btns" v-else-if="reportDetail.report.status == 2">
+                                        <div class="btn"><el-button type="primary" class="confirm_btn" @click.stop="printVisit(reportDetail.drid,reportDetail.auditUser.printPerm,1)">{{reportDetail.auditUser.printPerm ? '打印到访单' : '确认到访'}}</el-button></div>
+                                        <div class="btn"><el-button class="cancel_btn" @click="confirm_heshi('invalidReport')">提前到访，报备无效</el-button></div>
+                                    </div>
+                                    <div class="btns" v-else-if="reportDetail.report.status == 3">
+                                        <div class="btn" ><el-button type="primary" class="confirm_btn" @click="confirm_heshi()">核实到访情况</el-button></div>
+                                        <div class="btn"><el-button class="cancel_btn" @click="cancel_heshi('verifyVisit',2)">到访无效</el-button></div>
+                                    </div>
+                                    <div class="btns" v-else-if="reportDetail.report.status == 4">
+                                        <div class="btn"><el-button type="primary" class="confirm_btn" @click="showDealPop(currChose)">更新成交信息</el-button></div>
+                                    </div>
+                                    <div class="btns" v-else-if="reportDetail.report.status == 5">
+                                        <div class="btn" ><el-button type="primary" class="confirm_btn" @click="showCertificatePop('verifyDeal',currChose)">核实成交结果</el-button></div>
+                                        <div class="btn"><el-button class="cancel_btn" @click="cancel_heshi()">驳回成交</el-button></div>
+                                    </div>
+                                    <div class="btns" v-else-if="reportDetail.report.verifyStatus == 3">
+                                        <div class="btn" v-if="reportDetail.report.status == 5"><el-button type="primary" class="confirm_btn" @click="confirm_heshi()" >重新提交成交信息</el-button></div>
+                                        <div class="btn" v-if="reportDetail.report.status == 3"><el-button type="primary" class="confirm_btn" @click="confirm_heshi()" >重新提交到访信息</el-button></div>
+                                        <div class="btn" v-if="reportDetail.report.status == 1"><el-button type="primary" class="confirm_btn" @click="confirm_heshi()" >重新审核报备信息</el-button></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <iframe name="printVisitConfirm" id="printVisitConfirm" style="display: none;"></iframe>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/reportList.js?v={#$cfg_staticVersion#}"></script>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

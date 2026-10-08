@@ -1,0 +1,1999 @@
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<script>
+  var  geetest = {#$cfg_geetest|default:0#}
+  var phone = '{#$userinfo.phone#}';
+  var cityid = '{#$siteCityInfo.cityid#}';
+  var userid_  = '{#$userinfo.userid#}'
+  var jobhref='{#getModuleConfig module='job' key='channelDomain'#}';
+</script>
+
+<!-- 生成简历 -->
+<div class="resumeContentWrap whiteBGWrap" id="resumePage" v-cloak>
+
+  <!-- 简历列表 -->
+  <div class="resumeListBox" v-if="pageShow === 1">
+    <div class="btn_groups btn_header">
+      <a href="javascript:;" class="createResume" @click="resumeSetPop = resumeList.length<6?true:createMax(); resumeSetType = 'createResume'"><s></s>新建简历</a>
+      <a href="javascript:;" class="setPrivate" @click="resumeSetPop = true; resumeSetType = 'private'"><s></s>隐私设置</a>
+    </div>
+    <div class="auditting" v-if="currResume.need_complete!=1"><img src="{#$templets_skin#}images/job/warncir.png">该简历未完善，暂不可使用</div>
+    <div class="auditting" v-else-if="currResume.state==0"><img src="{#$templets_skin#}images/job/warncir.png">该简历审核中，暂不可用于投递，已投递的职位、面试不受影响</div>
+    <div class="aduitRefused" v-else-if="currResume.state==2"><img src="{#$templets_skin#}images/job/warncirred.png">该简历审核未通过，请修改后提交：{{currResume.refuse}}</div>
+    <!-- 简历 -->
+    <div class="resumeBox">
+      <!-- 渐变背景 -->
+      <div class="bg_gradient"></div>
+
+      <!-- 切换显示的简历 -->
+      <div class="resumeTabBox" v-if="resumeList && resumeList.length > 1">
+        <ul>
+          <li v-for="item in resumeList" :class="{'currTab' : item.id == currResume.id}" @click="tabFn(item)">{{item.default ? '默认简历' : item.alias}}</li>
+        </ul>
+      </div>
+
+      <!-- 当前显示的简历 -->
+      <div class="currResumeBox" v-if="currResume">
+        <div class="resumeBaseInfoContainer"  v-show="!editInfoObj.edit || editInfoObj.editType !== 1">
+          <div class="resumeInfo fn-clear" >
+            <h2><b>{{resumeList && resumeList.length> 1?currResume.alias:"个人简历"}}</b><s class="edit_alias" @click="resumeSetPop = true; resumeSetType = 'alias'; setForm.alias = currResume.alias" v-if="resumeList && resumeList.length> 1"></s><span v-if="currResume.default">默认投递</span></h2>
+            <div class="btn_groups" v-if="currResume.default">
+              <a href="javascript:;" class="btn_refresh" @click="refreshResume" v-if="currResume.state==1"><s></s>刷新简历</a>
+              <a href="javascript:;" class="btn_toTop" @click="showResumeUpdatePop(1)" v-if="currResume.state==1"><s></s>简历置顶</a>
+              <a @click="previewResume" class="btn_preview"><s></s>预览简历</a>
+            </div>
+            <div class="btn_groups" v-else>
+              <a href="javascript:;" class="btn_default" @click="setResumeDefault(currResume)" v-if="currResume.state==1&&currResume.need_complete==1"><s></s>设为默认</a>
+              <a href="javascript:;" class="btn_preview" @click="previewResume"><s></s>预览简历</a>
+              <a href="javascript:;" class="btn_del" @click="delResume()"><s></s>删除简历</a>
+            </div>
+          </div>
+          <!-- 简历的基本信息 -->
+          <div class="resumeBaseInfoBox fn-clear">
+            <a href="javascript:;" class="edit_btn" @click="checkResumeState(editInfo,1)" ><s></s>编辑</a>
+            <div class="photoBox fn-left"><img :src="currResume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+            <div class="resumeBaseInfo">
+                <h4><b>{{currResume.name}}</b> <span class="lab" v-if="currResume.identify_name=='学生'">{{currResume.identify_name}}</span></h4>
+                <p>
+                  <span>{{currResume.sex_name}}</span><em>|</em>
+                  <span v-if="currResume.edu_tallest_name">{{currResume.edu_tallest_name}}</span><em v-if="currResume.edu_tallest_name">|</em>
+                  <span v-if="currResume.work_jy_name">{{currResume.work_jy_name.replace('经验','')}}经验</span><em v-if="currResume.work_jy_name">|</em>
+                  <span>{{currResume.workState_name}}</span>
+                </p>
+                <ul class="contactBox">
+                  <li class="phone">
+                    <s></s> <span style="margin-right: 4px;">{{currResume.phone}}</span> <a href="javascript:;" @click="phoneChange = true;bindchange=true;">更换手机</a>
+                  </li>
+                  <li class="email" v-if="currResume.email"><s></s><span>{{currResume.email}}</span></li>
+                  <li class="wechat" v-if="currResume.wechat"><s></s><span>{{currResume.wechat}}</span></li>
+                </ul>
+            </div>
+          </div>
+
+        </div>
+        
+        <!-- 编辑简历基本信息 -->
+        <div class="moduleBox"  v-if="editInfoObj.edit && editInfoObj.editType === 1">
+          <h4 class="module_title"><b>基本信息</b><span class="lab">必填</span><em class="tip" v-if="!editInfoObj.editTip">基本资料修改后将同步至所有简历</em><span class="editWarn" v-else><i></i>请先保存当前内容</span></h4>
+          <div class="workJlBox">
+            <div class="workJlForm fn-clear">
+              <div class="form-item form-item_lg" data-required="1">
+                <label for="">头&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;像:</label>
+                <div class="uploadBox">
+                  <el-upload :action="uploadAction" ref="uploadBtn" data-name="avatar" class="uploadBtn"  accept=".png,.jpg,.jpeg" :limit="1" name="Filedata" :show-file-list="false" :on-success="handleSuccess"  :on-change="handleChange">
+                    <div class="uploadBtn">
+                      <img :src="form.photo_url" v-if="form.photo" alt="">
+                      <span>上传</span>
+                    </div>
+                  </el-upload>
+                  <p>请上传真实清晰半身像，让简历更加分</p>
+                </div>
+              </div>
+            
+              <div class="form-item" data-required="1">
+                <label for="">姓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;名:</label>
+                <div class="inpBox">
+                  <input type="text" name="name" v-model="form.name">
+                </div>
+              </div>
+              
+              <div class="form-item" data-required="1">
+                <label for="">性&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;别:</label>
+                <div class="radioBox">
+                  <ul>
+                    <li @click="form.sex = 0"><input type="radio" name="sex" value="0" :checked="form.sex == 0" /><s></s>男</li>
+                    <li @click="form.sex = 1"><input type="radio" name="sex" value="1" :checked="form.sex == 1" /><s></s>女</li>
+                  </ul>
+                </div>
+              </div>
+  
+              <div class="form-item" data-required="1">
+                <label for="">出生年月:</label>
+                <div class="inpBox selectBox">
+                  <el-date-picker
+                  :clearable="false"
+                  :editable="false"
+                  value-format="timestamp"
+                  :picker-options="pickerOptions"
+                  v-model="form.birth"
+                  :default-value="new Date(+new Date()-31536000000*16)"
+                  type="month"
+                  placeholder="选择日期"
+                  popper-class="birthTime"
+                  onclick="$('.birthTime .el-date-picker__header-label').eq(0).trigger('click')">
+                </el-date-picker>
+                </div>
+              </div>
+              
+              <!-- 求职状态（显隐） -->
+              <div class="form-item" data-required="1" v-if="form.identify==1">
+                <label for="">求职状态:</label>
+                <div class="inpBox selectBox">
+                  <el-select v-model="form.workState" placeholder="请选择">
+                    <el-option-group
+                      v-for="(group,ind) in workStateGroup"
+                      :key="ind"
+                      v-show="!form.identify||(ind!=2&&form.identify==1)||ind==2&&form.identify==2"
+                      >
+                      <el-option
+                        v-for="item in group"
+                        :key="item.title"
+                        :label="item.title"
+                        :value="item.id"
+                        >
+                      </el-option>
+                    </el-option-group>
+                  </el-select>
+                </div>
+              </div>
+              <!-- -------------- -->
+              <div class="form-item" data-required="1">
+                <label for="">身&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;份:</label>
+                <div class="inpBox selectBox">
+                  <el-select v-model="form.identify" placeholder="请选择">
+                    <el-option
+                      v-for="item in identifyArr"
+                      :key="item.title"
+                      :label="item.title"
+                      :value="item.id">
+                    </el-option>
+                  </el-select>
+                </div>
+              </div>
+  
+  
+              <div class="form-item" >
+                <label for="email">邮&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;箱:</label>
+                <div class="inpBox">
+                  <input type="text" name="email" v-model="form.email">
+                </div>
+              </div>
+              <!-- 工作经验<==>在校状态 -->
+              <div class="form-item" data-required="1" v-if="form.identify==1">
+                <label for="">工作经验:</label>
+                <div class="inpBox selectBox">
+                  <el-select v-model="form.work_jy" placeholder="请选择">
+                    <el-option label="暂无经验" :value="0"></el-option>
+                    <el-option
+                      v-for="item in 11"
+                      :key="item"
+                      :label="item == 11? '10年以上' : item + '年'"
+                      :value="item">
+                    </el-option>
+                  </el-select>
+                </div>
+              </div>
+              <div class="form-item" data-required="1" v-else>
+                <label for="">在校状态:</label>
+                <div class="inpBox selectBox">
+                  <el-select v-model="form.workState" placeholder="请选择">
+                    <el-option-group
+                      v-for="(group,ind) in workStateGroup"
+                      :key="ind"
+                      v-show="!form.identify||(ind!=2&&form.identify==1)||ind==2&&form.identify==2"
+                      >
+                      <el-option
+                        v-for="item in group"
+                        :key="item.title"
+                        :label="item.title"
+                        :value="item.id"
+                        >
+                      </el-option>
+                    </el-option-group>
+                  </el-select>
+                </div>
+              </div>
+              <!-- -------------- -->
+              <div class="form-item" >
+                <label for="wechat">微&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;信:</label>
+                <div class="inpBox">
+                  <input type="text" name="wechat" v-model="form.wechat">
+                </div>
+              </div>
+            </div>
+            <div class="btn_groups">
+              <a href="javascript:;" class="cancel_btn" @click="cancelEdit">取消</a>
+              <a href="javascript:;" class="sure_btn" @click="submitData(1)">确定</a>
+            </div>
+          </div>
+
+        </div>
+
+
+        <!-- 简历的求职意向 -->
+        <div class="resumeIntentionBox moduleBox">
+            <a href="javascript:;" class="edit_btn" @click="editInfo(2)" ><s></s>编辑</a>
+            <h4 class="module_title"><b>求职意向</b><span class="lab">必填</span> <span class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 2"><i></i>请先保存当前内容</span> <span class="editText" v-show="editInfoObj.edit&&editInfoObj.editType==2">如修改期望职位，将同步至所有简历</span></h4>
+            <ul class="fn-clear item_show" v-show="!editInfoObj.edit || editInfoObj.editType !== 2">
+              <li>
+                <label for="">期望薪资：</label>
+                <span>{{currResume.show_salary}}</span>
+              </li>
+              <li>
+                <label for="">期望行业：</label>
+                <span :title="currResume.type_name.join('、')">{{currResume.type_name.join('、')}}</span>
+              </li>
+              <li>
+                <label for="">期望职位：</label>
+                <span :title="currResume.job_name.join('、')">{{currResume.job_name.join('、')}}</span>
+              </li>
+              <li>
+                <label for="">工作性质：</label>
+                <span>{{currResume.nature_name}}</span>
+              </li>
+              <li>
+                <label for="">期望地点：</label>
+                <span v-if="currResume.addr_list_Name.length>=2">{{currResume.addr_list_Name[currResume.addr_list_Name.length - 2]}} {{currResume.addr_list_Name[currResume.addr_list_Name.length - 1]}}</span>
+                <span v-else>{{currResume.addr_list_Name[currResume.addr_list_Name.length - 1]}}</span>
+              </li>
+              <li>
+                <label for="">到岗时间：</label>
+                <span>{{currResume.startWork_name}}</span>
+              </li>
+            </ul>
+
+            <div class="workJlBox" v-if="editInfoObj.edit && editInfoObj.editType === 2">
+              <div class="workJlForm fn-clear">
+                <div class="form-item" data-required="1">
+                  <label for="">期望职位:</label>
+                  <div class="inpBox">
+                    <input type="text" name="job" :value="form.job_name" readonly v-if="categoryList.length != 1 || categoryList[0].length > 20" @click="postCategoryPop = true">
+                    <el-select v-model="form.job" placeholder="" v-else>
+                      <el-option
+                        v-for="item in categoryList[0]"
+                        :key="item.id"
+                        :label="item.typename"
+                        :value="item.id">
+                      </el-option>
+                    </el-select>
+                  </div>
+                </div>
+  
+                <div class="form-item" data-required="1" data-name="jobNature">
+                  <label for="">工作性质:</label>
+                  <div class="radioBox blockRadioBox">
+                      <ul class="jobNature">
+                        <!-- <li @click="form.nature = 1">
+                          <input type="radio" name="nature" :value="1" :checked="form.nature === 1">
+                          <span>全职</span>
+                        </li>
+                        <li @click="form.nature = 2">
+                          <input type="radio" name="nature"  :value="1" :checked="form.nature == 2">
+                          <span>兼职</span>
+                        </li> -->
+                        <li v-for="item in baseConfig['jobNature']" @click="form.nature = item.id">
+                          <input type="radio" name="nature"  :value="item.id" :checked="form.nature == item.id">
+                          <span>{{item.typename}}</span>
+                        </li>
+                      </ul>
+                  </div>
+                </div>
+  
+                <div class="form-item" data-required="1">
+                  <label for="">期望行业:</label>
+                  <div class="inpBox">
+                    <input type="text" name="industry" :value="form.type_name" readonly v-if="categoryList.length != 1 || categoryList[0].length > 20" @click="industryCategoryPop = true">
+                    <el-select v-model="form.type" placeholder="" v-else>
+                      <el-option
+                        v-for="item in categoryList_industry[0]"
+                        :key="item.id"
+                        :label="item.typename"
+                        :value="item.id">
+                      </el-option>
+                    </el-select>
+                  </div>
+                </div>
+  
+                <!-- <div class="form-item" data-required="1">
+                  <label for="">求职状态:</label>
+                  <div class="inpBox selectBox">
+                    <el-select v-model="form.workState" placeholder="请选择">
+                      <el-option-group
+                        v-for="(group,ind) in workStateGroup"
+                        :key="ind"
+                        >
+                        <el-option
+                          v-for="item in group"
+                          :key="item.title"
+                          :label="item.title"
+                          :value="item.id">
+                        </el-option>
+                      </el-option-group>
+                    </el-select>
+                  </div>
+                </div> -->
+  
+                <div class="form-item" data-required="1">
+                  <label for="">期望薪资:</label>
+                  <div class="inpBox ">
+                    <div class="smInp">
+                      <!-- <input type="text" v-model="form.min_salary"  placeholder="最低"> -->
+                      <el-select v-model="form.min_salary" placeholder="最低" allow-create filterable default-first-option>
+                        <el-option
+                          v-for="item in salaryArr"
+                          :key="item"
+                          :disabled="item>50000 "
+                          :label="item < 1000 ? '1000以下' : item"
+                          :value="item">
+                        </el-option>
+                      </el-select>
+                      <span>{#echoCurrency type="short"#}/月</span>
+                    </div>
+                    <div class="smInp">
+                      <el-select v-model="form.max_salary" placeholder="最高" allow-create filterable default-first-option>
+                        <el-option
+                          v-for="item in salaryArr"
+                          :key="item"
+                          :disabled="item<=form.min_salary||item>(2*form.min_salary)"
+                          :label="item < 1000 ? '1000以下' : item"
+                          :value="item">
+                        </el-option>
+                      </el-select>
+                      <span>{#echoCurrency type="short"#}/月</span>
+                    </div>
+                  </div>
+                </div>
+  
+                <div class="form-item" data-required="1">
+                  <label for="">到岗时间:</label>
+                  <div class="inpBox selectBox">
+                    <el-select v-model="form.startWork" placeholder="请选择">
+                      <el-option
+                        v-for="item in baseConfig['startWork']"
+                        :key="item.typename"
+                        :label="item.typename"
+                        :value="item.id">
+                      </el-option>
+                    </el-select>
+                  </div>
+                </div>
+  
+                <div class="form-item" data-required="1">
+                  <label for="">期望地点:</label>
+                  <div class="inpBox selectBox addrBox">
+                    <el-cascader :clearable="false" v-model="form.addr_list" ref="cascaderRefArea"	:props="props" :options="options" collapse-tags   @change="changeArea"  @expand-change="changeMapAreaText" popper-class="hopeAddr"></el-cascader>
+                  </div>
+                </div>
+                
+    
+                
+              </div>
+              <div class="btn_groups">
+                <a href="javascript:;" class="cancel_btn" @click="cancelEdit">取消</a>
+                <a href="javascript:;" class="sure_btn" @click="changeForm(2)">确定</a>
+              </div>
+            </div>
+        </div>
+
+        <!-- 工作经历 -->
+        <div class="resumeWorkJl moduleBox">
+          <h4 class="module_title"><b>工作经历</b><span class="lab" v-if="currResume.identify==1">必填</span> <span class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 3&&editInfoObj.editInd==0"><i></i>请先保存当前内容</span> 
+            <a href="javascript:;" class="add_workjy" @click="checkResumeState(addWorkJl)"><s></s>添加</a>
+          </h4>
+          <div class="resumeWorkJlList">
+            <template v-for="(item,ind) in (editInfoObj.edit && editInfoObj.editType == 3 && editInfoObj.editArr ? editInfoObj.editArr : currResume.work_jl)">
+              <div class="workJl" v-if="editInfoObj.editInd != ind || editInfoObj.editType !== 3 || !editInfoObj.edit " :style="editInfoObj.edit && editInfoObj.editType === 3 && ind==currResume.work_jl.length-1?'border:none':'border-bottom: solid 1px #eee'">
+                  <dl class="workCompanyInfo">
+                    <dt>{{item.company}}<a href="javascript:;" class="btn_edit" @click="checkResumeState(editWorkJl,item,ind);"><s></s>编辑</a></dt>
+                    <dd>
+                      <div class="item_info" v-show="item.department">
+                        <label for="">所在部门:</label>
+                        <span>{{item.department}}</span>
+                      </div>
+                      <div class="item_info">
+                        <label for="">担任职位:</label>
+                        <span>{{item.job}}</span>
+                      </div>
+                      <div class="item_info">
+                        <label for="">工作时间:</label>
+                        <span>{{item.work_start.replace('-','.')}} - {{item.work_end.replace('-','.')}}</span>
+                      </div>
+                    </dd>
+                  </dl>
+                  <!-- 工作内容 -->
+                  <div class="workContent" v-if="item.content">
+                    <h5>工作内容：</h5>
+                    <div class="content" v-html="item.content.replaceAll('\r\n','<br>')"></div>
+                  </div>
+              </div>
+              <div v-else-if="editInfoObj.edit && editInfoObj.editType === 3">
+                <div class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 3&&ind!=0"><i></i>请先保存当前内容</div> 
+                <div class="workJlBox">
+                  <div class="workJlForm fn-clear">
+                    <div class="form-item" data-required="1">
+                      <label for="">公司名称: </label>
+                      <div class="inpBox">
+                        <input type="text" name="company" v-model="workjl.company" class="companyName">
+                      </div>
+                    </div>
+                    <div class="form-item" data-required="1">
+                      <label for="">工作时间:</label>
+                      <div class="inpBox">
+                        <div class="smInp selectBox workStart">
+                          <el-date-picker 
+                            :picker-options="pickerOptionswork" 
+                            v-model="workjl.work_start" 
+                            :clearable="false"
+                            type="month" 
+                            format="yyyy/MM" 
+                            :editable="false" 
+                            placeholder="入职时间" 
+                            value-format="yyyy-MM"
+                            :default-value="form.birth+22*365*86400000" 
+                            popper-class="workStart"
+                            onclick="$('.workStart .el-date-picker__header-label').eq(0).trigger('click')">
+                          </el-date-picker>
+                        </div>
+                        <span style="margin: 0 3px; display:inline-block;">- </span>
+                        <div class="smInp selectBox workEnd">
+                          <el-date-picker 
+                            :editable="false" 
+                            :clearable="false" 
+                            v-model="workjl.work_end" 
+                            format="yyyy/MM"
+                            :picker-options="pickerOptionswork" 
+                            type="month" 
+                            value-format="yyyy-MM" 
+                            popper-class="workEnd"
+                            placeholder="离职时间"
+                            :default-value="form.birth+22*365*86400000" 
+                            onclick="$('.workEnd .el-date-picker__header-label').eq(0).trigger('click')">
+                          </el-date-picker>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="form-item" data-required="1">
+                      <label for="">担任职位:</label>
+                      <div class="inpBox">
+                        <input type="text" name="job" v-model="workjl.job"
+                          v-if="categoryList.length != 1 || categoryList[0].length > 20" class="servePost">
+                        <!-- <el-select v-model="form.job" placeholder="" v-else>
+                                        <el-option
+                                          v-for="item in categoryList[0]"
+                                          :key="item.id"
+                                          :label="item.typename"
+                                          :value="item.id">
+                                        </el-option>
+                                      </el-select> -->
+                      </div>
+                    </div>
+                    <div class="form-item">
+                      <label for="">所在部门:</label>
+                      <div class="inpBox">
+                        <input type="text" name="department" placeholder="(选填)" v-model="workjl.department">
+                      </div>
+                    </div>
+                    <div class="form-item form-item_lg flex-item">
+                      <label for="">工作内容:</label>
+                      <div class="textAreaBox">
+                        <textarea class="textarea" v-model="workjl.content"></textarea>
+                        <!-- 占位 -->
+                        <div class="placeText" v-show="workjl.content.length==0">
+                          条理清晰、突出成就的工作内容更容易获得青睐<br>
+                          1...<br>
+                          2...<br>
+                          ...<br>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="btn_groups">
+                    <a href="javascript:;" class="cancel_btn" @click="cancelEdit">取消</a>
+                    <a href="javascript:;" class="sure_btn" @click="sureAddWorkJl">确定</a>
+                  </div>
+                  <a href="javascript:;" class="del_btn" @click="removeItem(ind,'work_jl')"><s></s>删除</a>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="noneWork" v-show="!(editInfoObj.edit && editInfoObj.editType == 3 && editInfoObj.editArr) && defaultResume.work_jl.length==0" style="color: #333;padding: 20px 0px 0px 30px;font-size: 14px;">暂无工作经历</div>
+        </div>
+
+
+        <!-- 教育背景 -->
+        <div class="resumeWorkJl moduleBox resumeEduJl">
+          <h4 class="module_title"><b>教育背景</b><span class="lab">必填</span> <span class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 4&&editInfoObj.editInd==0"><i></i>请先保存当前内容</span> 
+            <a href="javascript:;" class="add_workjy" @click="checkResumeState(addEducationJl)"><s></s>添加</a>
+          </h4>
+          <div class="resumeWorkJlList">
+            <template v-for="(edu,ind) in (editInfoObj.edit && editInfoObj.editType == 4 && editInfoObj.editArr ? editInfoObj.editArr :  currResume.education)">
+              <div class="workJl" v-if="editInfoObj.editInd != ind || editInfoObj.editType !== 4 || !editInfoObj.edit  ">
+                <dl class="workCompanyInfo">
+                  <dt>
+                    {{edu.school}}
+                    <a href="javascript:;" class="btn_edit" @click="checkResumeState(editEducationJl,edu,ind)"><s></s>编辑</a>
+                    <span class="eduDate">{{edu.start.replaceAll('-','.')}} - {{edu.end.replaceAll('-','.')}}</span>
+                  </dt>
+                  <dd>
+                    <p class="ptext"><span>{{edu.xl}}</span><em v-if="edu.zy">|</em><span>{{edu.zy}}</span></p>
+                  </dd>
+                </dl>
+              </div>
+              <div v-else-if="editInfoObj.edit && editInfoObj.editType === 4">
+                <div class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 4&&ind!=0"><i></i>请先保存当前内容</div>
+                <div class="workJlBox">
+                  <div class="workJlForm fn-clear">
+                    <div class="form-item" data-required="1">
+                      <label for="">{{editInfoObj.editInd > 0 ? "" : "最高"}}学历:</label>
+                      <div class="inpBox selectBox educationSelect">
+                        <el-select v-model="educationJl.xl_id" placeholder="请选择">
+                          <el-option v-for="item in baseConfig['education']" :key="item.id" :label="item.typename" :value="item.id">
+                          </el-option>
+                        </el-select>
+                      </div>
+                    </div>
+                    <div class="form-item" data-required="1">
+                      <label for="">时间:</label>
+                      <div class="inpBox ">
+                        <div class="smInp selectBox startSchool">
+                          <el-date-picker 
+                            :picker-options="pickerOptionswork" 
+                            v-model="educationJl.start" 
+                            :clearable="false"
+                            type="month" 
+                            :editable="false" 
+                            format="yyyy/MM" 
+                            value-format="yyyy-MM"
+                            :default-value="form.birth+18*365*86400000" 
+                            placeholder="入学时间" 
+                            popper-class="startSchool"
+                            onclick="$('.startSchool .el-date-picker__header-label').eq(0).trigger('click')">
+                          </el-date-picker>
+                        </div>
+                        <span style="margin: 0 3px; display:inline-block;">- </span>
+                        <div class="smInp selectBox endSchool">
+                          <el-date-picker 
+                            :editable="false" 
+                            :clearable="false" 
+                            v-model="educationJl.end"  
+                            type="month" 
+                            format="yyyy/MM" 
+                            popper-class="endSchool"
+                            value-format="yyyy-MM"
+                            placeholder="毕业时间" 
+                            onclick="$('.endSchool .el-date-picker__header-label').eq(0).trigger('click')">
+                          </el-date-picker>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="form-item" data-required="1">
+                      <label for="">学校名称:</label>
+                      <div class="inpBox">
+                        <input type="text" name="school" v-model="educationJl.school" placeholder="请输入" class="schoolName">
+                      </div>
+                    </div>
+                    <div class="form-item">
+                      <label for="">所学专业:</label>
+                      <div class="inpBox">
+                        <input type="text" name="zy" v-model="educationJl.zy" placeholder="请输入" class="majorName">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="btn_groups">
+                    <a href="javascript:;" class="cancel_btn" @click="cancelEdit">取消</a>
+                    <a href="javascript:;" class="sure_btn" @click="sureAddEdu()">确定</a>
+                  </div>
+                  <a href="javascript:;" class="del_btn" @click="removeItem(ind,'education')" v-if="currResume.education.length>1"><s></s>删除</a>
+                </div>
+              </div>
+            </template>
+          </div>
+          
+        </div>
+
+        <!-- 技能语言 -->
+        <div class="resumeWorkJl moduleBox resumeSkill">
+          <h4 class="module_title"><b>技能/语言</b> <span class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 5&&editInfoObj.editInd==0&&editInfoObj.editKey"><i></i>请先保存当前内容</span> 
+            <a href="javascript:;" class="add_workjy" @click="checkResumeState(addSkill)"><s></s>添加</a>
+          </h4>
+          <div class="resumeWorkJlList">
+            <!-- 语言 -->
+            <template  v-for="(lng,ind)  in (editInfoObj.edit && editInfoObj.editType == 5 && editInfoObj.editKey == 'lng' && editInfoObj.editArr ? editInfoObj.editArr['lng'] :  currResume.skill.lng)">
+              <div class="workJl" v-if="!editInfoObj.edit || editInfoObj.editInd !== ind  || editInfoObj.editKey != 'lng'" >
+                  <b>{{lng.lang}}</b> <p class="ptext"> <span>掌握程度：听说{{lng.level_speak}} 读写{{lng.level_read}}</span><span v-if="lng.certificate"><em>|</em><span>证书：{{lng.certificate}}</span></span></p>
+                  <a href="javascript:;" class="btn_edit"  @click="checkResumeState(editSkill,ind,'lng')"><s></s>编辑</a>
+              </div>
+              <div  v-else-if="editInfoObj.editKey == 'lng' && editInfoObj.editInd == ind">
+                <div class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 5&&ind!=0"><i></i>请先保存当前内容</div>
+                <div class="workJlBox">
+                  <div class="workJlForm fn-clear">
+                    <div class="form-item" data-required="1">
+                      <label for="">能力类型:</label>
+                      <div class="radioBox blockRadioBox">
+                        <ul class="jobNature">
+                          <li>
+                            <input type="radio" name="skii_type" disabled :checked="skillObj.type != 1" value="0">
+                            <span>语言</span>
+                          </li>
+                          <li class="disabeld">
+                            <input type="radio" name="skii_type" disabled :checked="skillObj.type == 1" value="1">
+                            <span>专业技能</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+              
+                    <!-- 语言 -->
+                    <template v-if="skillObj.type == 0">
+                      <div class="form-item" data-required="1">
+                        <label for="">掌握程度:</label>
+                        <div class="inpBox selectBox">
+                          <el-popover popper-class="langLelvePop" placement="bottom" width="300" v-model="levelPop">
+                            <div class="levelOptBox">
+                              <h4><span>听说</span><span>读写</span></h4>
+                              <div class="optionsBox fn-clear">
+                                <ul>
+                                  <li v-for="item in levelArr" :class="{'on_chose': skillObj.level_speak == item}"
+                                    @click="choseLevel('level_speak',item)">{{item}}</li>
+                                </ul>
+                                <ul>
+                                  <li v-for="item in levelArr" :class="{'on_chose': skillObj.level_read == item}"
+                                    @click="choseLevel('level_read',item)">{{item}}</li>
+                                </ul>
+                              </div>
+                            </div>
+                            <input type="text" name="lang_level" slot="reference" readonly
+                              :value="skillObj.level_speak && skillObj.level_read ?  (skillObj.level_speak + (skillObj.level_speak && skillObj.level_read ? '/' : '') + skillObj.level_read) : ''">
+                          </el-popover>
+                        </div>
+                      </div>
+                      <div class="form-item" data-required="1">
+                        <label for="">选择语言:</label>
+                        <div class="inpBox selectBox">
+                          <el-select v-model="skillObj.lang" placeholder="请选择">
+                            <el-option v-for="item in languageArr" :key="item" :label="item" :value="item">
+                            </el-option>
+                          </el-select>
+                        </div>
+                      </div>
+                      <div class="form-item">
+                        <label for="">获得证书:</label>
+                        <div class="inpBox">
+                          <input type="text" name="certificate" v-model="skillObj.certificate">
+                        </div>
+                      </div>
+                    </template>
+              
+                    <!-- 技能 -->
+                    <template v-else>
+                      <div class="form-item" data-required="1">
+                        <label for="">取得时间:</label>
+                        <div class="inpBox selectBox">
+                          <el-date-picker :editable="false" :clearable="false" :picker-options="pickerOptionswork"
+                            v-model="skillObj.time" value-format="yyyy-MM-dd" type="date" placeholder="选择日期">
+                          </el-date-picker>
+                        </div>
+                      </div>
+                      <div class="form-item" data-required="1">
+                        <label for="">证书类型:</label>
+                        <div class="inpBox">
+                          <!-- <input type="text" name="name" > -->
+                          <el-popover popper-class="langLelvePop" placement="bottom-start" width="500" v-model="suggestionPop">
+                            <div class="levelOptBox">
+                              <h4><span>热门证书</span></h4>
+                              <div class="suggestions fn-clear">
+                                <ul>
+                                  <li v-for="item in certificateArr" @click="skillObj.certificateType = item;suggestionPop = false ">
+                                    {{item}}</li>
+                                </ul>
+                              </div>
+                            </div>
+                            <input type="text" name="certificate" slot="reference" v-model="skillObj.certificateType">
+                          </el-popover>
+                        </div>
+                      </div>
+                      <div class="form-item">
+                        <label for="">证书全称:</label>
+                        <div class="inpBox">
+                          <input type="text" name="cer_fullName" placeholder="选填，如xxx证书(二级)" v-model="skillObj.cer_fullName">
+                        </div>
+                      </div>
+              
+                    </template>
+                  </div>
+              
+              
+              
+              
+                  <div class="btn_groups">
+                    <a href="javascript:;" class="cancel_btn" @click="cancelEdit">取消</a>
+                    <a href="javascript:;" class="sure_btn" @click="editSkillSure(1)">确定</a>
+                  </div>
+                  <a href="javascript:;" class="del_btn" @click="removeItem(ind,'lng')"><s></s>删除</a>
+                </div>
+              </div>
+            </template>
+
+            <!-- 技能 -->
+            <template  v-for="(ski,ind) in (editInfoObj.edit && editInfoObj.editType == 5  && editInfoObj.editKey == 'ski' && editInfoObj.editArr ? editInfoObj.editArr['ski'] :  currResume.skill.ski)">
+              <div class="workJl" v-if="!editInfoObj.edit || editInfoObj.editInd !== ind || editInfoObj.editKey != 'ski' || editInfoObj.editType !== 5">
+                  <b>{{ski.certificateType}}</b> <p class="ptext"><span v-if="ski.cer_fullName"><span>证书：{{ski.cer_fullName}}</span><em>|</em></span><span>获取时间：{{ski.time}}年</span></p>
+                  <a href="javascript:;" class="btn_edit" @click="checkResumeState(editSkill,ind,'ski')"><s></s>编辑</a>
+              </div>
+              <div class="workJlBox" v-else-if="editInfoObj.edit && editInfoObj.editKey === 'ski' && editInfoObj.editInd == ind">
+                <div class="workJlForm fn-clear">
+                  <div class="form-item" data-required="1">
+                    <label for="">能力类型:</label>
+                    <div class="radioBox blockRadioBox">
+                      <ul class="jobNature">
+                        <li class="disabeld">
+                          <input type="radio" name="skii_type" disabled :checked="skillObj.type != 1" value="0">
+                          <span>语言</span>
+                        </li>
+                        <li>
+                          <input type="radio" name="skii_type" :checked="skillObj.type == 1" value="1">
+                          <span>专业技能</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+    
+                  <!-- 语言 -->
+                  <template v-if="skillObj.type == 0">
+                    <div class="form-item" data-required="1">
+                      <label for="">掌握程度:</label>
+                      <div class="inpBox selectBox">
+                        <el-popover
+                          popper-class="langLelvePop"
+                          placement="bottom"
+                          width="300"
+                          v-model="levelPop">
+                          <div class="levelOptBox">
+                            <h4><span>听说</span><span>读写</span></h4>
+                            <div class="optionsBox fn-clear">
+                              <ul>
+                                <li v-for="item in levelArr" :class="{'on_chose': skillObj.level_speak == item}" @click="choseLevel('level_speak',item)">{{item}}</li>
+                              </ul>
+                              <ul>
+                                <li v-for="item in levelArr" :class="{'on_chose': skillObj.level_read == item}" @click="choseLevel('level_read',item)">{{item}}</li>
+                              </ul>
+                            </div>
+                          </div>
+                          <input type="text" name="lang_level" slot="reference" readonly :value="skillObj.level_speak && skillObj.level_read ?  (skillObj.level_speak + (skillObj.level_speak && skillObj.level_read ? '/' : '') + skillObj.level_read) : ''"> 
+                        </el-popover>
+                      </div>
+                    </div>
+                    <div class="form-item" data-required="1">
+                      <label for="">选择语言:</label>
+                      <div class="inpBox selectBox">
+                        <el-select v-model="skillObj.lang" placeholder="请选择">
+                          <el-option
+                            v-for="item in languageArr"
+                            :key="item"
+                            :label="item"
+                            :value="item">
+                          </el-option>
+                        </el-select>
+                      </div>
+                    </div>
+                    <div class="form-item" >
+                      <label for="">获得证书:</label>
+                      <div class="inpBox">
+                        <input type="text" name="certificate" v-model="skillObj.certificate">
+                      </div>
+                    </div>
+                  </template>
+    
+                  <!-- 技能 -->
+                  <template v-else>
+                    <div class="form-item" data-required="1">
+                      <label for="">取得时间:</label>
+                      <div class="inpBox selectBox">
+                        <el-date-picker
+                          :editable="false"
+                          :clearable="false"
+                          :picker-options="pickerOptionswork"
+                          v-model="skillObj.time"
+                          value-format="yyyy"
+                          type="year"
+                          format="yyyy 年"
+                          placeholder="选择日期">
+                        </el-date-picker>
+                      </div>
+                    </div>
+                    <div class="form-item" data-required="1">
+                      <label for="">证书类型:</label>
+                      <div class="inpBox">
+                        <!-- <input type="text" name="name" > -->
+                        <el-popover
+                          popper-class="langLelvePop"
+                          placement="bottom-start"
+                          width="500"
+                          v-model="suggestionPop">
+                          <div class="levelOptBox">
+                            <h4><span>热门证书</span></h4>
+                            <div class="suggestions fn-clear">
+                              <ul>
+                                <li v-for="item in certificateArr" @click="skillObj.certificateType = item;suggestionPop = false">{{item}}</li>
+                              </ul>
+                            </div>
+                          </div>
+                          <input type="text" name="certificate" slot="reference" v-model="skillObj.certificateType"> 
+                        </el-popover>
+                      </div>
+                    </div>
+                    <div class="form-item" >
+                      <label for="">证书全称:</label>
+                      <div class="inpBox">
+                        <input type="text" name="cer_fullName" placeholder="选填，如xxx证书(二级)" v-model="skillObj.cer_fullName">
+                      </div>
+                    </div>
+    
+                  </template>
+                </div>
+    
+              
+                
+    
+                <div class="btn_groups">
+                  <a href="javascript:;" class="cancel_btn" @click="cancelEdit">取消</a>
+                  <a href="javascript:;" class="sure_btn" @click="editSkillSure(1)">确定</a>
+                </div>
+                <a href="javascript:;" class="del_btn" @click="removeItem(ind,'ski')"><s></s>删除</a>
+              </div>
+            </template>
+            <!-- 空状态 -->
+            <div class="noneSkill" v-show="(!currResume.skill.ski&&!currResume.skill.lng)&&!(editInfoObj.edit&&editInfoObj.editType==5)">
+              <div @click="addSkill(0);">语言能力</div>
+              <div @click="addSkill(1);">专业技能</div>
+            </div>
+          </div>
+          <div v-if="editInfoObj.edit && editInfoObj.editType === 5 && !editInfoObj.editKey">
+            <div class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 5&&!editInfoObj.editKey"><i></i>请先保存当前内容</div>
+            <div class="workJlBox">
+              <div class="workJlForm fn-clear">
+                <div class="form-item" data-required="1">
+                  <label for="">能力类型:</label>
+                  <div class="radioBox blockRadioBox">
+                    <ul class="jobNature">
+                      <li @click="skillObj.type = 0">
+                        <input type="radio" name="skii_type" :checked="skillObj.type != 1" value="0">
+                        <span>语言</span>
+                      </li>
+                      <li @click="skillObj.type = 1">
+                        <input type="radio" name="skii_type" :checked="skillObj.type == 1" value="1">
+                        <span>专业技能</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+          
+                <!-- 语言 -->
+                <template v-if="skillObj.type == 0">
+                  <div class="form-item" data-required="1">
+                    <label for="">掌握程度:</label>
+                    <div class="inpBox selectBox">
+                      <el-popover popper-class="langLelvePop" placement="bottom" width="300" v-model="levelPop">
+                        <div class="levelOptBox">
+                          <h4><span>听说</span><span>读写</span></h4>
+                          <div class="optionsBox fn-clear">
+                            <ul>
+                              <li v-for="item in levelArr" :class="{'on_chose': skillObj.level_speak == item}"
+                                @click="choseLevel('level_speak',item)">{{item}}</li>
+                            </ul>
+                            <ul>
+                              <li v-for="item in levelArr" :class="{'on_chose': skillObj.level_read == item}"
+                                @click="choseLevel('level_read',item)">{{item}}</li>
+                            </ul>
+                          </div>
+                        </div>
+                        <input type="text" name="lang_level" slot="reference" readonly
+                          :value="skillObj.level_speak && skillObj.level_read ?'听说'+(skillObj.level_speak + (skillObj.level_speak && skillObj.level_read ? '，' : '') +'读写'+skillObj.level_read) : ''" class="masterDegree" placeholder="请选择">
+                      </el-popover>
+                    </div>
+                  </div>
+                  <div class="form-item" data-required="1">
+                    <label for="">选择语言:</label>
+                    <div class="inpBox selectBox languageSel">
+                      <el-select v-model="skillObj.lang" placeholder="请选择">
+                        <el-option v-for="item in languageArr" :key="item" :label="item" :value="item">
+                        </el-option>
+                      </el-select>
+                    </div>
+                  </div>
+                  <div class="form-item">
+                    <label for="">获得证书:</label>
+                    <div class="inpBox">
+                      <input type="text" name="certificate" v-model="skillObj.certificate">
+                    </div>
+                  </div>
+                </template>
+          
+                <!-- 技能 -->
+                <template v-else>
+                  <div class="form-item" data-required="1">
+                    <label for="">取得时间:</label>
+                    <div class="inpBox selectBox getTime">
+                      <el-date-picker :editable="false" :clearable="false" :picker-options="pickerOptionswork"
+                        value-format="yyyy" v-model="skillObj.time" type="year" placeholder="选择日期" format="yyyy 年">
+                        <span>年</span>
+                      </el-date-picker>
+                    </div>
+                  </div>
+                  <div class="form-item" data-required="1">
+                    <label for="">证书类型:</label>
+                    <div class="inpBox">
+                      <!-- <input type="text" name="name" > -->
+                      <el-popover popper-class="langLelvePop" placement="bottom-start" width="500" v-model="suggestionPop">
+                        <div class="levelOptBox">
+                          <h4><span>热门证书</span></h4>
+                          <div class="suggestions fn-clear">
+                            <ul>
+                              <li v-for="item in certificateArr" @click="skillObj.certificateType = item;suggestionPop = false">
+                                {{item}}</li>
+                            </ul>
+                          </div>
+                        </div>
+                        <input type="text" name="certificate" slot="reference" v-model="skillObj.certificateType" class="certificateType">
+                      </el-popover>
+                    </div>
+                  </div>
+                  <div class="form-item">
+                    <label for="">证书全称:</label>
+                    <div class="inpBox">
+                      <input type="text" name="cer_fullName" placeholder="选填，如xxx证书(二级)" v-model="skillObj.cer_fullName">
+                    </div>
+                  </div>
+          
+                </template>
+              </div>
+          
+          
+          
+          
+              <div class="btn_groups">
+                <a href="javascript:;" class="cancel_btn" @click="cancelEdit">取消</a>
+                <a href="javascript:;" class="sure_btn" @click="editSkillSure()">确定</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 个人优势 -->
+        <div class="resumeWorkJl moduleBox resumeAdvantage">
+          <h4 class="module_title"><b>个人优势</b> <span class="editWarn" v-show="editInfoObj.editTip&&editInfoObj.editType === 6"><i></i>请先保存当前内容</span> 
+            <a href="javascript:;" class="edit_btn" @click="checkResumeState(editAdvantage)" v-show="(currResume.ad_tag.length||currResume.advantage)&&!editInfoObj.edit"><s></s>编辑</a>
+          </h4>
+          <div class="advantageShow" v-if="!editInfoObj.edit || editInfoObj.editType !== 6">
+            <div class="resumeAdv" v-html="currResume.advantage.replaceAll('\n','<br>')" v-show="currResume.advantage"></div>
+            <div class="advLab"><span v-for="item in currResume.ad_tag">{{item}}</span></div>
+            <!-- 空状态 -->
+            <div class="noneAdvantage" @click="editAdvantage" v-show="(!currResume.ad_tag.length&&!currResume.advantage)&&!(editInfoObj.edit&&editInfoObj.editType==6)">
+              <p>简短描述自己在求职中的突出优势</p>
+              <span>0/100</span>
+            </div>
+          </div>
+          <div class="workJlBox" v-if="editInfoObj.edit && editInfoObj.editType === 6">
+              <div class="workJlForm fn-clear">
+                <div class="textareaBox">
+                  <textarea placeholder="简短描述自己在求职中的突出优势" v-model="editInfoObj['editArr']['advantage']" maxLength="100"
+                    @input="checkCount" ref="autofocus"></textarea>
+                  <span>{{countText ? countText : (editInfoObj['editArr']['advantage'] ?
+                    editInfoObj['editArr']['advantage'].length : 0)}}/100</span>
+                </div>
+                <div class="ad_tagBox">
+                  <h5>其他加分项：<span>（最多3项）</span></h5>
+                  <ul class="fn-clear labWrap">
+                    <li v-for="item in baseConfig['advantage']"
+                      :class="['lab',{'on_chose':editInfoObj['editArr']['ad_tag'] && editInfoObj['editArr']['ad_tag'].indexOf(item.typename) > -1}]"
+                      @click="choseTag(item)">{{item.typename}}</li>
+                    <li class="add_tag" @click="addSlefDefine" v-show="!selfLabShow && !selfLab "><s></s>自定义</li>
+                    <li class="tagInpBox" v-show="selfLabShow">
+                      <div class="tagInp">
+                        <input type="text" placeholder="请输入" v-model="selfLab" maxlength="8" ref="autofocusLabel">
+                        <span><em>{{selfLab && selfLab.length ? selfLab.length : 0 }}</em>/8</span>
+                      </div>
+                      <a href="javascript:;" class="selfTag_sure" @click="sureSelfText">确定</a>
+                    </li>
+                    <li class="lab slefLab" @click="selfLabShow = true;" v-if="!selfLabShow && selfLab ">{{selfLab}}<s></s></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="btn_groups">
+                <a href="javascript:;" class="cancel_btn" @click="cancelEdit">取消</a>
+                <a href="javascript:;" class="sure_btn" @click="sureAdvantage">确定</a>
+              </div>
+          </div>
+        </div>
+
+
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+  <!-- 创建简历 -->
+  <div class="createResumeBox" v-if="pageShow == 2">
+    <!-- 创建 -> 头部 -->
+    <div class="resumeHeader fn-clear">
+      <div class="leftInfo fn-left">
+        <h2>创建个人简历</h2>
+        <p>简历是求职第一步，优质的简历才能更快找到好工作！</p>
+      </div>
+      <div class="resumeStep fn-right">
+        <ul v-cloak>
+          <li :class="{'currStep':createResumeStep >= (ind + 1)}" @click="skipStep(ind)" v-for="(item,ind) in stepArr"><span>{{ind < (stepArr.length - 1) ? (ind + 1) : ''}}</span>{{item}}</li>
+          
+        </ul>
+      </div>
+    </div>
+    <div class="stepContentBox">
+
+      <!-- 第一步 基本信息 -->
+      <div :class="['step baseInfo',{'fn-hide': createResumeStep != 1}] ">
+        <form class="stepWrap">
+
+          <!-- 基础信息 -->
+          <dl class="form_module" style="padding: 30px 28px;">
+            <dt>基本信息 <span class="lab">必填</span></dt>
+            <dd class="fn-clear">
+              <div class="form-item form-item_lg" data-required="1">
+                <label for="">头&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;像:</label>
+                <div class="uploadBox">
+                  <el-upload :action="uploadAction" ref="uploadBtn"  data-name="avatar" class="uploadBtn photo"  accept=".png,.jpg,.jpeg" :limit="1" name="Filedata" :show-file-list="false" :on-success="handleSuccess"  :on-change="handleChange">
+                    <div class="uploadBtn">
+                      <img :src="form.photo_url" v-if="form.photo" alt="">
+                      <span>上传</span>
+                    </div>
+                  </el-upload>
+                  <p>请上传真实清晰半身像，让简历更加分</p>
+                </div>
+              </div>
+            
+              <div class="form-item" data-required="1">
+                <label for="">姓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;名:</label>
+                <div class="inpBox">
+                  <input type="text" name="name" v-model="form.name" class="chineseName" :placeholder="!form.name&&emptyIndex==1?'请填写':''">
+                </div>
+              </div>
+              
+              <div class="form-item" data-required="1">
+                <label for="">性&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;别:</label>
+                <div class="radioBox" style="background: transparent;">
+                  <ul>
+                    <li @click="form.sex = 0"><input type="radio" name="sex" value="0" :checked="form.sex == 0" /><s></s>男</li>
+                    <li @click="form.sex = 1"><input type="radio" name="sex" value="1" :checked="form.sex == 1" /><s></s>女</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1">
+                <label for="">出生年月:</label>
+                <div class="inpBox selectBox birthDay">
+                  <el-date-picker
+                  :editable="false"
+                  :clearable="false"
+                  :picker-options="pickerOptions"
+                  v-model="form.birth"
+                  :default-value="new Date(+new Date()-31536000000*16)"
+                  value-format="timestamp"
+                  type="month"
+                  popper-class="birthDay"
+                  placeholder="选择日期"
+                  onclick="$('.birthDay .el-date-picker__header-label').eq(0).trigger('click')">
+                </el-date-picker>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1">
+                <label for="">联系电话:</label>
+                <div class="inpBox phoneInp">
+                  <input type="text" name="phone" v-model="form.phone" class="phoneNumber" :placeholder="!form.phone&&emptyIndex==4?'请填写':''">
+                  <span class="sendCode"  v-show="!{#$userinfo.phoneCheck#}||form.phone!=userphone || (currResume && currResume.phone)" @click="phoneChange = true;phone=form.phone;">发送验证码</span>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1">
+                <label for="">身&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;份:</label>
+                <div class="inpBox selectBox identifyType">
+                  <el-select v-model="form.identify" placeholder="请选择" @change="form.workState='';form.work_jy=0">
+                    <el-option
+                      v-for="item in identifyArr"
+                      :key="item.title"
+                      :label="item.title"
+                      :value="item.id">
+                    </el-option>
+                  </el-select>
+                </div>
+              </div>
+
+
+              <div class="form-item">
+                <label for="">邮&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;箱:</label>
+                <div class="inpBox">
+                  <input type="text" name="email" v-model="form.email" @input="form.email=event.target.value.replace(/[\u4e00-\u9fa5]/g,'')">
+                </div>
+              </div>
+              <!-- 根据身份不同切换工作经验和在校状态 -->
+              <div class="form-item" data-required="1" v-if="form.identify!=2">
+                <label for="">工作经验:</label>
+                <div class="inpBox selectBox workExperience">
+                  <el-select v-model="form.work_jy" placeholder="请选择">
+                    <el-option label="暂无经验" :value="0"></el-option>
+                    <el-option
+                      v-for="item in 11"
+                      :key="item"
+                      :label="item == 11? '10年以上' : item + '年'"
+                      :value="item">
+                    </el-option>
+                  </el-select>
+                </div>
+              </div>
+              <div class="form-item" data-required="1" v-else>
+                <label for="">在校状态:</label>
+                <div class="inpBox selectBox jobState">
+                  <el-select v-model="form.workState" placeholder="请选择">
+                    <el-option-group
+                      v-for="(group,ind) in workStateGroup"
+                      :key="ind"
+                      v-show="!form.identify||(ind!=2&&form.identify==1)||ind==2&&form.identify==2"
+                      >
+                      <el-option
+                        v-for="item in group"
+                        :key="item.title"
+                        :label="item.title"
+                        :value="item.id">
+                      </el-option>
+                    </el-option-group>
+                  </el-select>
+                </div>
+              </div>
+              <!-- ------------- -->
+              <div class="form-item">
+                <label for="">微&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;信:</label>
+                <div class="inpBox">
+                  <input type="text" name="wechat" v-model="form.wechat" @input="form.wechat=event.target.value.replace(/[\u4e00-\u9fa5]/g,'')">
+                </div>
+              </div>
+            </dd>
+          </dl>
+
+          <!-- 求职意向 -->
+          <dl class="form_module">
+            <dt>求职意向 <span class="lab">必填</span></dt>
+            <dd class="fn-clear">
+              <div class="form-item" data-required="1">
+                <label for="">期望职位:</label>
+                <div class="inpBox">
+
+                  <input type="text" name="job" :value="form.job_name && form.job_name.length ? form.job_name.join('、') : ''" readonly v-if="categoryList.length != 1 || categoryList[0].length > 20" @click="postCategoryPop = true" class="expectJob" :placeholder="!form.job_name&&emptyIndex==7?'请选择':''">
+                  <el-select v-model="form.job" placeholder="" v-else>
+                    <el-option
+                      v-for="item in categoryList[0]"
+                      :key="item.id"
+                      :label="item.typename"
+                      :value="item.id">
+                    </el-option>
+                  </el-select>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1" data-name="jobNature">
+                <label for="">工作性质:</label>
+                <div class="radioBox blockRadioBox">
+                    <ul class="jobNature">
+                      <li @click="form.nature = 1">
+                        <input type="radio" name="nature" :checked="form.nature === 1">
+                        <span>全职</span>
+                      </li>
+                      <li @click="form.nature = 2">
+                        <input type="radio" name="nature" :checked="form.nature === 2">
+                        <span>兼职</span>
+                      </li>
+                      <li @click="form.nature = 3" v-if="form.identify!=1||!form.identify">
+                        <input type="radio" name="nature" :checked="form.nature === 3">
+                        <span>实习/校招</span>
+                      </li>
+                    </ul>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1">
+                <label for="">期望行业:</label>
+                <div class="inpBox">
+                  <input type="text" name="industry" :value="form.type_name&& form.type_name.length ? form.type_name.join('、') : ''" readonly v-if="categoryList.length != 1 || categoryList[0].length > 20" @click="industryCategoryPop = true" class="expectIndustry" :placeholder="!form.type_name&&emptyIndex==9?'请选择':''">
+                    <el-select v-model="form.type" placeholder="" v-else>
+                      <el-option
+                        v-for="item in categoryList_industry[0]"
+                        :key="item.id"
+                        :label="item.typename"
+                        :value="item.id">
+                      </el-option>
+                    </el-select>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1" v-if="form.identify==1||form.identify==''">
+                <label for="">求职状态:</label>
+                <div class="inpBox selectBox jobState">
+                  <el-select v-model="form.workState" placeholder="请选择">
+                    <el-option-group
+                      v-for="(group,ind) in workStateGroup"
+                      :key="ind"
+                      v-show="!form.identify||(ind!=2&&form.identify==1)||ind==2&&form.identify==2"
+                      >
+                      <el-option
+                        v-for="item in group"
+                        :key="item.title"
+                        :label="item.title"
+                        :value="item.id">
+                      </el-option>
+                    </el-option-group>
+                  </el-select>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1">
+                <label for="">期望薪资:</label>
+                <div class="inpBox ">
+                  <div class="smInp minSalary">
+                    <!-- <input type="text" v-model="form.min_salary"  placeholder="最低"> -->
+                    <el-select v-model="form.min_salary" placeholder="最低" allow-create filterable default-first-option>
+                      <el-option
+                        v-for="item in salaryArr"
+                        :key="item"
+                        :disabled="item>50000 "
+                        :label="item < 1000 ? '1000以下' : item"
+                        :value="item">
+                      </el-option>
+                    </el-select>
+                    <span>{#echoCurrency type="short"#}/月</span>
+                  </div>
+                  <div class="smInp maxSalary">
+                    <el-select v-model="form.max_salary" placeholder="最高" allow-create filterable default-first-option>
+                      <el-option
+                        v-for="item in salaryArr"
+                        :key="item"
+                        :disabled="item<=form.min_salary||item>(2*form.min_salary)"
+                        :label="item < 1000 ? '1000以下' : item"
+                        :value="item">
+                      </el-option>
+                    </el-select>
+                    <span>{#echoCurrency type="short"#}/月</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1">
+                <label for="">到岗时间:</label>
+                <div class="inpBox selectBox workTimeStart">
+                  <el-select v-model="form.startWork" placeholder="请选择">
+                    <el-option
+                      v-for="item in baseConfig['startWork']"
+                      :key="item.typename"
+                      :label="item.typename"
+                      :value="item.id">
+                    </el-option>
+                  </el-select>
+                </div>
+              </div>
+
+              <div class="form-item" data-required="1">
+                <label for="">期望地点:</label>
+                <div class="inpBox selectBox addrBox">
+                  <el-cascader :clearable="false" v-model="form.addr_list" ref="cascaderRefArea"	:props="props" :options="options" collapse-tags clearable  @change="changeArea"  @expand-change="changeMapAreaText" popper-class="iniAddr"></el-cascader>
+                </div>
+              </div>
+            </dd>
+          </dl>
+
+        </form>
+        <div class="bottomBtn">
+          <el-button class="nextStep" @click="skipToNext(2)" type="primary" :loading="nextb">下一步</el-button>
+        </div>
+      </div>
+
+      <!-- 第二步 工作经历 -->
+      <div :class="['step workjyInfo',{'fn-hide': createResumeStep != 2}] ">
+        <form class="stepWrap">
+          <dl class="form_module" style="padding: 30px 28px 228px;">
+            <dt>工作经历 <span class="lab">必填</span> <em class="tip">请填写最近一份工作经历</em></dt>
+            
+            <dd class="fn-clear">
+              <div class="form-item" data-required="1">
+                <label for="">公司名称:</label>
+                <div class="inpBox">
+                  <input type="text" name="company" v-model="workjl.company" class="comName" :placeholder="!workjl.company&&emptyIndex=='company'?'请填写':''">
+                </div>
+              </div>
+              <div class="form-item" data-required="1">
+                <label for="">工作时间:</label>
+                <div class="inpBox noBg">
+                  <div class="smInp selectBox workTimeS">
+                    <el-date-picker 
+                      :picker-options="pickerOptionswork" 
+                      v-model="workjl.work_start" 
+                      :clearable="false"
+                      type="month" format="yyyy/MM" 
+                      :editable="false" 
+                      placeholder="入职时间"  
+                      popper-class="workTimeS"
+                      value-format="yyyy-MM" 
+                      :default-value="form.birth+22*365*86400000" 
+                      onclick="$('.workTimeS .el-date-picker__header-label').eq(0).trigger('click')">
+                    </el-date-picker>
+                  </div>
+                  <span style="margin: 0 3px; display:inline-block;">- </span>
+                  <div class="smInp selectBox workTimeE">
+                    <el-date-picker 
+                      :editable="false" 
+                      :clearable="false" 
+                      v-model="workjl.work_end"  
+                      format="yyyy/MM"
+                      popper-class="workTimeE"
+                      :picker-options="pickerOptionswork" 
+                      type="month" 
+                      value-format="yyyy-MM" 
+                      placeholder="离职时间" 
+                      :default-value="form.birth+22*365*86400000" 
+                      onclick="$('.workTimeE .el-date-picker__header-label').eq(0).trigger('click')">
+                    </el-date-picker>
+                  </div>
+                </div>
+              </div>
+              <div class="form-item" data-required="1">
+                <label for="">担任职位:</label>
+                <div class="inpBox">
+                  <input type="text" name="job" v-model="workjl.job" class="undertakeJob" :placeholder="!workjl.job&&emptyIndex=='job'?'请填写':''">
+                </div>
+              </div>
+              <div class="form-item">
+                <label for="">所在部门:</label>
+                <div class="inpBox">
+                  <input type="text" name="department" v-model="workjl.department">
+                </div>
+              </div>
+              <div class="form-item form-item_lg flex-item">
+                <label for="">工作内容:</label>
+                <div class="textAreaBox">
+                  <textarea class="textarea" placeholder="条理清晰、突出成就的工作内容更受招聘方青睐" v-model="workjl.content" v-html="workjl.content"></textarea>
+                </div>
+              </div>
+            </dd>
+          </dl>
+        </form>
+        <div class="bottomBtn" style="padding-left: 27px;">
+          <el-button class="nextStep"  @click="skipToNext(3)" type="primary" :loading="nextb">下一步</el-button>
+          <span class="setpSkip" @click="skipToNext(3,1)" v-if="!form.work_jy">暂无工作经验，跳过</span>
+        </div>
+      </div>
+
+
+
+      <!-- 第三步  教育经历 -->
+      <div :class="['step educationInfo',{'fn-hide': createResumeStep == 2 || createResumeStep == 1 }]">
+        <form class="stepWrap">
+          <dl class="form_module">
+            <dt>教育经历 <span class="lab">必填</span> <em class="tip">请填写最高学历</em></dt>
+            <dd>
+              <ul>
+                <li class="fn-clear" v-for="(edu,ind) in educationJlArr">
+                  <div class="form-item" data-required="1">
+                    <label for="">{{ind == 0 ? '最高' : ''}}学历:</label>
+                    <div class="inpBox selectBox  highestEdu">
+                      <el-select v-model="edu.xl_id" placeholder="请选择">
+                        <el-option
+                          v-for="item in baseConfig['education']"
+                          :key="item.id"
+                          :label="item.typename"
+                          :value="item.id">
+                        </el-option>
+                      </el-select>
+                    </div>
+                  </div>
+                  <div class="form-item" data-required="1">
+                    <label for="">时间:</label>
+                    <div class="inpBox ">
+                      <div class="smInp selectBox goSchoolTime">
+                        <el-date-picker
+                        :picker-options="pickerOptionswork"
+                        v-model="edu.start"
+                        :clearable="false"
+                        type="month"
+                        :editable="false"
+                        format="yyyy/MM"
+                        value-format="yyyy-MM"
+                        :default-value="form.birth+18*365*86400000"
+                        popper-class="goSchoolTime"
+                        placeholder="入学时间" onclick="$('.goSchoolTime .el-date-picker__header-label').eq(0).trigger('click')">
+                      </el-date-picker>
+                    </div>
+                    <span style="margin: 0 3px; display:inline-block;">- </span>
+                    <div class="smInp selectBox leaveSchoolTime">
+                        <el-date-picker
+                        :editable="false"
+                        :clearable="false"
+                        v-model="edu.end"
+                        :default-value="new Date(Number(edu.start.split('-')[0])+3,edu.start.split('-')[1])"
+                        format="yyyy/MM"
+                        value-format="yyyy-MM"
+                        type="month"
+                        popper-class="leaveSchoolTime"
+                        placeholder="毕业时间">
+                      </el-date-picker>
+                    </div>
+                    </div>
+                  </div>
+                  <div class="form-item" data-required="1">
+                    <label for="">学校名称:</label>
+                    <div class="inpBox">
+                      <input type="text" name="school" v-model="edu.school" class="schoolName" :placeholder="emptyIndex=='school'&&!edu.school?'请填写':''">
+                    </div>
+                  </div>
+                  <div class="form-item" >
+                    <label for="">所学专业:</label>
+                    <div class="inpBox">
+                      <input type="text" name="zy" v-model="edu.zy" class="learnMajor">
+                    </div>
+                  </div>
+                  <a href="javascript:;" class="del_btn" @click="removeEduJl(ind)"><s></s>删除</a>
+                </li>
+              </ul>
+              <div class="moreEduBox">
+                <a href="javascript:;" class="add_edu" @click="addEduJl"><s></s>添加教育经历</a>
+                <p>如本科以上建议完善经历至本科，可稍后继续填写</p>
+              </div>
+            </dd>
+          </dl>
+        </form>
+        <div class="bottomBtn">
+          <el-button class="nextStep" @click="skipToNext(4)" type="primary" :loading="nextb">完成</el-button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- 弹窗 验证手机号 -->
+  <div class="phoneCheckBox" >
+    <div class="phoneCheckMask" v-show="phoneChange"></div>
+    <div class="private_phone_pop private_phone_LoginByMsg" v-show="phoneChange">
+      <a href="javascript:;" class="close_priveta_phone_pop" @click="phoneChange = false;"></a>
+      <div class="private_phone_header">
+        <h3>{{bindchange?'更换联系方式':'请绑定手机'}}</h3>
+        <p>{{bindchange?'如需更换手机号，请完成验证':'为保证简历的真实性，请验证手机号'}}</p>
+      </div>
+      <div class="private_phone_form">
+        <div class="private_phone_inputBox">
+          <div class="areaCode_inp" @click.stop="showAreaCodePop = true">
+            <span>+{{areaCode}}</span>
+          </div>
+          <input type="tel" :placeholder="bindchange?'请输入手机新号':'请输入手机号'" name="tel" v-model="phone">
+          <div class="areaCode_wrap" v-show="showAreaCodePop">
+            <ul>
+              <li v-for="item in areaCodeArr" @click="showAreaCodePop = false; areaCode = item.code">{{item.name}}  +{{item.code}}</li>
+            </ul>
+          </div>
+        </div>
+        <div class="private_phone_inputBox">
+          <input type="tel" placeholder="请输入验证码" name="tel" maxlength="6" autocomplete="off"
+            class="private_phone_vscode" v-model="vercode">
+          <a href="javascript:;" class="pp_getCode" @click="getPhoneMsg">获取验证码</a>
+        </div>
+        <button type="button" :disabled="!vercode || !phone" class="private_phone_btn private_phone_login_btn" @click="changePhone">确定</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 职位分类弹窗 -->
+  <div :class="['industryMask',{'showPop':postCategoryPop}]"></div>
+  <div :class="['industryPop',{'showPop':postCategoryPop}]">
+    <div class="industry_head">
+      <h3>选择意向职位</h3>
+      <a href="javascript:;" class="close_btn" @click="hopePopFn(1)"></a>
+    </div>
+    <div class="industry_content ">
+      <div class="industry_list">
+        <ul>
+          <li :class="{'on_chose': currCategory && currCategory.id == item.id}" v-for="item in categoryList"
+            @click="currCategory = item"> {{item.typename}}</li>
+        </ul>
+      </div>
+      <div class="postArr">
+        <!-- 类别 -->
+        <div class="postArrList" v-if="currCategory" @scroll="cateScroll">
+          <template v-if="categoryShow">
+            <dl v-if="currCategory.noLower && currCategory.noLower.length">
+              <dt>{{currCategory.typename}}</dt>
+              <dd>
+                <ul class="fn-clear">
+                  <li v-for="item in currCategory.noLower" :class="{'on_chose' : currChosePost && currChosePost.indexOf(item.id) > -1}"
+                    @click="postShow(item)">{{item.typename}} </li>
+                </ul>
+              </dd>
+            </dl>
+            <dl v-for="item in currCategory.lower" v-if="item.lower && item.lower.length">
+              <dt>{{item.typename}}</dt>
+              <dd>
+                <ul class="fn-clear">
+                  <li v-for="lower in item.lower" :title="lower.typename"
+                    :class="{'on_chose' : currChosePost && currChosePost.indexOf(lower.id) > -1}" @click="postShow(lower)">
+                    {{lower.typename}}</li>
+                </ul>
+              </dd>
+            </dl>
+          </template>
+
+          <template v-else>
+            <dl v-for="item in categoryList" :data-id="item.id">
+              <dt>{{item.typename}}</dt>
+              <dd>
+                <ul class="fn-clear">
+                  <li v-for="lower in item.lower" :class="{'on_chose' : currChosePost && currChosePost.indexOf(lower.id) > -1}"
+                    @click="postShow(lower)">{{lower.typename}}</li>
+                </ul>
+              </dd>
+            </dl>
+          </template>
+        </div>
+      </div>
+    </div>
+    <div class="industry_bottom">
+      <div class="hasChosed" >
+        <label for="" v-if="!singleChose">已选<em>{{currChosePostText.length}}</em>/3 </label>
+        <span class="warning">请选择职位</span>
+        <template v-if="!singleChose">
+          <el-tag closable v-for="(item,ind) in currChosePostText" :key="ind" @close="removeTag(ind)">{{item}}</el-tag>
+        </template>
+      </div>
+      <div class="btn_box">
+        <el-button type="primary" class="cancel_btn" @click="hopePopFn(1)">取消</el-button>
+        <el-button type="primary" :class="['sure_btn',{'none':currChosePostText.length==0}]" @click="choseJobType()">确定</el-button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- 行业选择弹窗 -->
+  <div :class="['industryMask',{'showPop':industryCategoryPop}]"></div>
+  <div :class="['industryPop',{'showPop':industryCategoryPop}]">
+    <div class="industry_head">
+      <h3>选择意向行业</h3>
+      <a href="javascript:;" class="close_btn" @click="hopePopFn(2)"></a>
+    </div>
+    <div class="industry_content ">
+      <div class="industry_list">
+        <ul>
+          <li :class="{'on_chose': currIndustry && currIndustry.id == item.id}" v-for="item in categoryList_industry"
+            @click="industryScroll(item)"> {{item.typename}}</li>
+        </ul>
+      </div>
+      <div class="postArr">
+        <!-- 类别 -->
+        <div class="postArrList" v-if="currIndustry" @scroll="cateScroll">
+          <template v-if="categoryShow_industry">
+            <dl v-if="currIndustry.noLower && currIndustry.noLower.length">
+              <dt>{{currIndustry.typename}}</dt>
+              <dd>
+                <ul class="fn-clear">
+                  <li v-for="item in currIndustry.noLower" :class="{'on_chose' : currChoseIndustry && currChoseIndustry.indexOf(item.id) > -1}"
+                    @click="industryShow(item)">{{item.typename}} </li>
+                </ul>
+              </dd>
+            </dl>
+            <dl v-for="item in currIndustry.lower" v-if="item.lower && item.lower.length">
+              <dt>{{item.typename}}</dt>
+              <dd>
+                <ul class="fn-clear">
+                  <li v-for="lower in item.lower" :title="lower.typename"
+                    :class="{'on_chose' : currChoseIndustry && currChoseIndustry.indexOf(lower.id) > -1}" @click="industryShow(lower)">
+                    {{lower.typename}}</li>
+                </ul>
+              </dd>
+            </dl>
+          </template>
+
+          <template v-else>
+            <dl v-for="item in categoryList_industry" :data-id="item.id">
+              <dt>{{item.typename}}</dt>
+              <dd>
+                <ul class="fn-clear">
+                  <li v-for="lower in item.lower" :class="{'on_chose' : currChoseIndustry && currChoseIndustry.indexOf(lower.id) > -1}"
+                    @click="industryShow(lower)">{{lower.typename}}</li>
+                </ul>
+              </dd>
+            </dl>
+          </template>
+        </div>
+      </div>
+    </div>
+    <div class="industry_bottom">
+      <div class="hasChosed">
+        <label for="">已选<em>{{currChoseIndustryText ? currChoseIndustryText.length : 0}}</em>/3</label>
+        <span class="warning">请选择职位</span>
+        <el-tag closable v-for="(item,ind) in currChoseIndustryText" @close="removeTag(ind,1)" :key="ind">{{item}}</el-tag>
+      </div>
+      <div class="btn_box">
+        <el-button type="primary" class="cancel_btn" @click="hopePopFn(2)">取消</el-button>
+        <el-button type="primary" :class="['sure_btn',{'none':currChoseIndustryText.length==0}]" @click="choseJobType(1)">确定</el-button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 简历设置弹窗 -->
+  <div class="resumeSetPopBox">
+    <div class="resumeSetMask" v-show="resumeSetPop"></div>
+    
+    <!-- 简历名称 -->
+    <div class="resumeNamePop resumeSetPop" v-show="resumeSetPop && resumeSetType === 'alias'">
+        <div class="popHeader">
+          <h3>简历名称</h3>
+          <a href="javascript:;" class="close_pop"  @click="resumeSetPop = false;"></a>
+        </div>
+        <div class="inpBox">
+          <input type="text" name="resume_name" maxlength="8" placeholder="" v-model="setForm.alias">
+          <span>{{setForm.alias.length}}/8</span>
+        </div>
+        <p class="tip">*仅用于自己区别多份简历，其他人不可见</p>
+        <div class="btn_groups">
+          <button class="cancel_btn" @click="resumeSetPop = false">取消</button>
+          <button class="sure_btn" @click="createResume">确定</button>
+        </div>
+    </div>
+
+    <!-- 简历隐私 -->
+    <div class="resumePrivatePop resumeSetPop" v-show="resumeSetPop && resumeSetType === 'private'">
+      <div class="popHeader">
+        <h3>简历隐私设置</h3>
+        <a href="javascript:;" class="close_pop"  @click="resumeSetPop = false;"></a>
+      </div>
+      <div class="setCon">
+        <ul>
+          <li :class="{'on_chose':setForm.private == 0}" @click="setForm.private = 0">
+            <s></s>
+            <h4>公开简历</h4>
+            <p>所有招聘企业均可查看我的简历，更快找到好工作</p>
+          </li>
+          <li :class="{'on_chose':setForm.private == 1}" @click="setForm.private = 1">
+            <s></s>
+            <h4>不公开简历</h4>
+            <p>不会出现在公开简历库，仅主动投递后，招聘方才可 查看我的简历</p>
+          </li>
+        </ul>
+      </div>
+      <div class="btn_groups">
+        <button class="cancel_btn" @click="resumeSetPop = false;setForm.private = 0">取消</button>
+        <button class="sure_btn" @click="setPrivate()">确定</button>
+      </div>
+    </div>
+
+    <!-- 创建简历 -->
+    <div class="resumeCreatePop resumeSetPop" v-show="resumeSetPop && resumeSetType === 'createResume'">
+      <div class="popHeader">
+        <h3>新建简历</h3>
+        <a href="javascript:;" class="close_pop" @click="resumeSetPop = false;"></a>
+      </div>
+      <div class="setCon">
+        <p><span>简历名称</span>(仅用于自己区别多份简历，其他人不可见)</p>
+        <div class="inpBox">
+          <input type="text" name="resume_name"  maxlength="8" :placeholder="'简历'+(resumeList.length+1)" v-model="setForm.alias">
+          <span>{{setForm.alias.length}}/8</span>
+        </div>
+        <div class="copyInfo">
+          <h3>请选择要复制的信息</h3>
+          <p v-if="resumeList && resumeList.length > 1">以下信息来自默认简历：{{defaultResume.alias}}</p>
+          <p v-else>以下信息来自默认简历</p>
+          <div class="compyItem">
+            <ul class="fn-clear">
+              <li v-for="item in copyOptions" :class="[{ 'disabled' : item.id === 'info'},{'on_chose': copyInfoArr.includes(item.id)}]" @click="copyInfo(item)"><s></s>{{item.tit}}<span v-if="item.id == 'job' || item.id == 'info'">(<s v-if="item.id == 'job'" class="chosed"></s>{{item.id == 'job' ? '职位' : ''}}必选)</span></li>
+            </ul>
+          </div>
+          <div class="btn_groups">
+            <button class="cancel_btn" @click="resumeSetPop = false;">取消</button>
+            <button class="sure_btn" @click="createResume()">创建简历</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 提示弹窗 -->
+  <div class="popConfirmBox" v-if="popConfirm.show">
+    <div class="popConfirm_mask" v-show="popConfirm.show" @click="popConfirm.show=false;"></div>
+    <div :class="'popConfirm ' + popConfirm.cls" v-show="popConfirm.show" :style="'width:' +(popConfirm.width ? popConfirm.width : 390)+'px;height:' +(popConfirm.height ? popConfirm.height : 180)+'px;' ">
+      <a href="javascript:;" class="btn_close" @click="popConfirm.show=false;popConfirm.closeFn()"></a>
+      <div class="pop_title" v-html="popConfirm.title"></div>
+      <p v-if="popConfirm.tip" v-html="popConfirm.tip" ></p>
+      <div class="btns_group">
+        <button v-for="btn in popConfirm.btns" :class="btn.type + '_btn'" :style="'background:'+btn.bgColor+';'" @click="btn.fn()">{{btn.text}}</button>
+      </div>
+    </div>
+  </div>
+  <!-- 提示弹窗（非黑框） -->
+  <div class="popWarn">
+    <img src="{#$templets_skin#}images/job/successTip_icon.png">
+    <span>保存成功</span>
+  </div>
+  <!-- 简历升级弹窗 -->
+    <div class="resumeUpDateBox" v-if="resumeUpDatePop" v-cloak>
+        <div class="resume_mask" v-show="resumeUpDatePop"></div>
+        <div class="resumeUpDatePop" v-show="resumeUpDatePop">
+            <div class="resumeHeader">
+                <h5>简历升级<span>使用求职升级服务，花小钱，解决好工作！</span></h5>
+                <a href="javascript:;" class="close_btn" @click="resumeUpDatePop = false;"></a>
+            </div>
+            <div :class="'resumeTab resumeBg' + resumeTabOn">
+                <ul class="fn-clear">
+                    <li :class="{'onTab': resumeTabOn == 0}" @click="resumeTabOn = 0">
+                        <s class="icon"></s>
+                        <div class="textCon">
+                            <h4>智能刷新</h4>
+                            <div class="p"> 4h自动刷新，获取更多机遇<div class="tip">
+                                <div class="tipConBox">
+                                    <div class="tipCon">
+                                        <h4><b>智能刷新设定：</b>首次购买，付费成功时刷新第一次，每间隔4h自动刷新一次，20:00-次日8:00不刷新，续费购买则累加刷新次数</h4>
+                                        <p>注：套餐预估天数可直观地帮助求职者选择购买，实际推广时长可能增加一天（下单当日因跳过休息时间未用完的刷新次数，将顺延至最后使用完毕）</p>
+                                    </div>
+                                </div>
+                            </div></d>
+                            
+                        </div>
+                    </li>
+                    <li :class="{'onTab': resumeTabOn == 1}" @click="resumeTabOn = 1">
+                        <s class="icon"></s>
+                        <div class="textCon">
+                            <h4>简历置顶</h4>
+                            <p>曝光翻倍提升，求职快人一步</p>
+                        </div>
+                    </li>
+                    <!-- <li :class="{'onTab': resumeTabOn == 2}" @click="resumeTabOn = 2">
+                        <s class="icon"></s>
+                        <div class="textCon">
+                            <h4>投递特权<span class="lab">新</span></h4>
+                            <p>在招聘方列表置顶，有投必应</p>
+                        </div>
+                    </li> -->
+                </ul>
+            </div>
+            <div class="resumeCon">
+                <!-- 支持二维码 -->
+                <div class="resumeTabCon" v-if="payCodeSupport">
+                    <!-- 简历刷新 -->
+                    <div class="rRefreshCon rConBox" v-if="resumeTabOn == 0">
+                        <div class="refreshTab">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/img_show.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择{{currResume.refreshBegan > 0 ? '续费' : '套餐'}}</h6>
+                            <div class="refreshTC">
+                                <div class="prev"></div>
+                                <div class=" swiper-container">
+                                    <div class="swiper-wrapper">
+                                        <div :class="['swiper-slide tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in refresh_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                            <span v-if="item.rec" class="rec">推荐</span>
+                                            <div class="borderBox">
+                                                <p><span>{{item.days}}天</span> · 共刷新{{item.fresh}}次</p>
+                                                <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.countPrice)}}</b></span><s v-if="item.offer">{#echoCurrency type="symbol"#}{{(Number(item.countPrice) + Number(item.offer)).toFixed(2)}}</s></h3>
+                                            </div>
+                                            <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="next"></div>
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                    <!-- 简历置顶 -->
+                    <div class="rRefreshCon rTopCon" v-else-if="resumeTabOn == 1">
+                        <div class="refreshTab rConBox">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/rtop.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择{{currResume.bid_end > 0 ? '续费' : '套餐'}}</h6>
+                            <div class="refreshTC">
+                                <div class="prev"></div>
+                                <div class=" swiper-container">
+                                    <div class="swiper-wrapper">
+                                        <div :class="['swiper-slide tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in top_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                            <span v-if="item.rec" class="rec">推荐</span>
+                                            <div class="borderBox">
+                                                <p>置顶<span>{{item.days}}天</span> </p>
+                                                <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.countPrice)}}</b></span><s v-if="item.offer!=0">{#echoCurrency type="symbol"#}{{(Number(item.countPrice) + Number(item.offer)).toFixed(2)}}</s></h3>
+                                            </div>
+                                            <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="next"></div>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <!-- 投递置顶 -->
+                    <div class="rRefreshCon " v-else-if="resumeTabOn == 2">
+                        <div class="refreshTab rConBox">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/rdelivery.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择套餐</h6>
+                            <div class="refreshTC">
+                                <div class="prev"></div>
+                                <div class=" swiper-container">
+                                    <div class="swiper-wrapper">
+                                        <div :class="['swiper-slide tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in delivery_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                            <span v-if="item.rec" class="rec">推荐</span>
+                                            <div class="borderBox">
+                                                <p>投递置顶<span>{{item.count}}天</span> </p>
+                                                <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.price)}}</b></span><s v-if="item.offer">{#echoCurrency type="symbol"#}{{Number(item.price) + Number(item.offer)}}</s></h3>
+                                            </div>
+                                            <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="next"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 不支持二维码 -->
+                <div class="resumeTabCon" v-else>
+                    <!-- 简历刷新 -->
+                    <div class="rRefreshCon rConBox dTopCon" v-if="resumeTabOn == 0">
+                        <div class="refreshTab">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/img_show.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择套餐</h6>
+                            <div class="refreshTC fn-clear">
+                                <div :class="['tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in refresh_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                    <span v-if="item.rec" class="rec">推荐</span>
+                                    <div class="borderBox">
+                                        <p><span>{{item.days}}天</span> · 共刷新{{item.fresh}}次</p>
+                                        <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.countPrice)}}</b></span><s v-if="item.offer">{#echoCurrency type="symbol"#}{{Number(item.countPrice) + Number(item.offer)}}</s></h3>
+                                    </div>
+                                    <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                    <!-- 简历置顶 -->
+                    <div class="rRefreshCon rTopCon dTopCon" v-else-if="resumeTabOn == 1">
+                        <div class="refreshTab rConBox">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/rtop.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择套餐</h6>
+                            <div class="refreshTC fn-clear">
+                                <div :class="['tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in top_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                    <span v-if="item.rec" class="rec">推荐</span>
+                                    <div class="borderBox">
+                                        <p>置顶<span>{{item.days}}天</span> </p>
+                                        <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.countPrice)}}</b></span><s v-if="item.offer">{#echoCurrency type="symbol"#}{{Number(item.countPrice) + Number(item.offer)}}</s></h3>
+                                    </div>
+                                    <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <!-- 投递置顶 -->
+                    <div class="rRefreshCon dTopCon" v-else-if="resumeTabOn == 2">
+                        <div class="refreshTab rConBox">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/rdelivery.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择套餐</h6>
+                            <div class="refreshTC fn-clear">
+                                <div :class="['tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in delivery_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                    <span v-if="item.rec" class="rec">推荐</span>
+                                    <div class="borderBox">
+                                        <p>投递置顶<span>{{item.count}}天</span> </p>
+                                        <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.price)}}</b></span><s v-if="item.offer">{#echoCurrency type="symbol"#}{{Number(item.price) + Number(item.offer)}}</s></h3>
+                                    </div>
+                                    <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        
+                    </div>
+                </div>
+
+
+                <!-- 支付信息 -->
+                <div class="parInfoBoxShow" v-if="payCodeSupport">
+                    <div class="pay_count"><span>支付金额</span>{#echoCurrency type="symbol"#}<b>{{payForm.payCount}}</b></div>
+                    <div class="QRConBox fn-clear">
+                        <div class="QRBox fn-left">
+                            <div  v-if="payload" class="loading"><s></s></div>
+                            <img v-if="payForm.paySrc" :src="payForm.paySrc" alt="">
+                        </div>
+                        <div class="wxCode">
+                            <div class="iconBox"><img src="{#$templets_skin#}/images/job/aliPay_icon.png" alt="" ><img src="{#$templets_skin#}/images/job/wxPay_icon.png" alt=""></div>
+                            <p>使用支付宝、微信扫码支付</p>
+                            <a href="javascript:;" class="" @click="changePayWay()">其他支付方式></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="btnsGroup parInfoBoxShow" v-else>
+                    <div class="pay_count"><span>支付金额</span>{#echoCurrency type="symbol"#}<b>{{payForm.payCount}}</b></div>
+                    <a href="javascript:;" class="btn_toPay" @click="getPayInfo(1)">立即购买</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 支付成功之后的弹窗 -->
+    <div class="paySuccessPopBox" v-if="successPop.show">
+        <div class="paySuccessMask" v-show="successPop.show"></div>
+        <div :class="['paySuccessPop',{'smPop':!successPop.tip}]" v-show="successPop.show">
+            <a href="javascript:;" class="close_btn" v-if="successPop.tip" @click="successPop.show = false"></a>
+            <h3><s></s>{{successPop.title}}</h3>
+            <p class="tip" v-if="successPop.tip">{{successPop.tip}}</p>
+        </div>
+    </div>
+    <!-- 创建简历弹窗 -->
+    <div class="sendpop">
+      <div class="s-certificate">
+        <img src="{#$templets_skin#}images/job/close_icon.png" class="ss-close" @click="closePopFn">
+        <div class="ss-title">
+          <img src="{#$templets_skin#}images/job/warning_icon.png">
+          <p>请先完善简历</p>
+        </div>
+        <div class="ss-text">
+          <p>完善简历后，才可投递心仪职位！请认真填写哦
+          </p>
+        </div>
+        <div class="ss-btn">
+          <div class="cancel" @click="closePopFn">暂不完善</div>
+          <div class="certificate" @click="closePopFn">继续填写简历</div>
+        </div>
+      </div>
+    </div>
+    <form action="/include/ajax.php" method="post" id="refreshTopForm">
+      <input type="hidden" name="service" id="service" value="siteConfig">
+      <input type="hidden" name="action" id="action" value="refreshTop">
+      <input type="hidden" name="type" id="type" value="">
+      <input type="hidden" name="module" id="module" value="job">
+      <input type="hidden" name="act" id="act" value="{#$act#}">
+      <input type="hidden" name="paytype" id="paytype" value="{#$paytype#}">
+      <input type="hidden" name="aid" id="aid" value="" />
+      <input type="hidden" name="amount" id="amount" value="" />
+      <input type="hidden" name="useBalance" id="useBalance" value="" />
+      <input type="hidden" name="config" id="config" value="" />
+    </form>
+</div>
+{#if $cfg_geetest#}
+{#if $cfg_geetest == 1#}
+<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+{#include file="public-pay-pop.html"  noVue=1#}

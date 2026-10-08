@@ -1,0 +1,193 @@
+{#if {#verifyModuleAuth module='renovation'#}#}
+
+<style media="screen">
+/* 图集 */
+.list-holder li {width:115px; height:86px;}
+.list-holder li a.li-rm {margin:-17px -14px 0 0;}
+.list-holder li .li-name {margin:20px 0 5px 0; width:94%;}
+.list-holder li .li-progress {width:100%; margin:0;}
+.list-holder li .li-thumb {margin:-5px 0 0 0;}
+.common-title{margin:0 20px 20px;padding-bottom:10px ;font-size: 18px;color: #333;font-weight: bold;border-bottom: 1px solid #E9E9E9;}
+.common-title.spe_title{margin-top: 80px;}
+.w-form .inp{width: 233px;}
+.w-form .comBox{position: relative;width: 255px;}
+.w-form .comBox span.sym{position: absolute;right: 14px;top:0;font-size: 14px;color: #3B3B3B}
+.w-form .comBox .caret {position: absolute;right: 14px;top: 14px;display: inline-block; width: 0; height: 0;  vertical-align: top; border-top: 4px solid #000; border-right: 4px solid transparent; border-left: 4px solid transparent; content: "";}
+</style>
+
+<div class="w-form">
+	<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=renovation&action={#if $id != ""#}editAlbums&id={#$id#}{#else#}addAlbums{#/if#}" data-url="{#getUrlPath service='member' template='albums' action='renovation'#}">
+		{#* 基本信息 *#}
+		<div class="common-title">{#$langData['renovation'][2][44]#}</div>
+		{#* 标题 -- 请输入标题*#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][0]#}：</dt>
+			<dd id="selTeam">
+				<input type="text" name="title" class="inp" id="title" size="60" maxlength="50" data-title="{#$langData['renovation'][7][7]#}" value="{#$detail_title#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+
+		{#* 类别 *#}
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['siteConfig'][19][108]#}：</dt>
+			<dd>
+				<div class="radio" id="typeObj">
+					<span data-id="0"{#if $detail_type == 0 || $detail_type == ""#} class="curr"{#/if#}>{#$langData['siteConfig'][19][611]#}</span>
+					<span data-id="1"{#if $detail_type == 1#} class="curr"{#/if#}>{#$langData['siteConfig'][19][612]#}</span>
+					<input type="hidden" name="type" id="type" value="{#if $detail_type#}{#$detail_type#}{#else#}0{#/if#}" />
+				</div>
+			</dd>
+		</dl>
+		{#* 风格 -- 请选择风格*#}
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['siteConfig'][19][613]#}：</dt>
+			<dd>
+				<div class="radio">
+					{#loop service="renovation" action="type" return='type' type='4'#}
+					<span data-id="{#$type.id#}"{#if $detail_styleid == $type.id#} class="curr"{#/if#}>{#$type.typename#}</span>
+					{#/loop#}
+					<input type="hidden" name="style" id="style" value="{#$detail_styleid#}" data-title="{#$langData['renovation'][9][37]#}"/>
+				</div>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<div id="type0"{#if $detail_type == 1#} class="fn-hide"{#/if#}>	
+			{#* 户型 -- 请选择户型*#}		
+			<dl class="fn-clear">
+				<dt><span>*</span>{#$langData['siteConfig'][19][107]#}：</dt>
+				<dd>
+					<div class="radio">
+						{#loop service="renovation" action="type" return='type' type='8'#}
+						<span data-id="{#$type.id#}"{#if $detail_unitsid == $type.id#} class="curr"{#/if#}>{#$type.typename#}</span>
+						{#/loop#}
+						<input type="hidden" name="units" id="units" value="{#$detail_unitsid#}" data-title="{#$langData['renovation'][4][33]#}" />
+					</div>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+			{#* 空间 -- 请选择空间 *#}
+			<dl class="fn-clear">
+				<dt><span>*</span>{#$langData['siteConfig'][19][614]#}：</dt>
+				<dd data-title="{#$langData['renovation'][9][38]#}">
+					<div class="checkbox">
+						{#loop service="renovation" action="type" return='type' type='533'#}
+						<label><input type="checkbox" name="kongjian[]" value="{#$type.id#}"{#if strstr($detail_kongjian, $type.id)#} checked{#/if#}>{#$type.typename#}</label>
+						{#/loop#}
+					</div>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+			{#* 局部  -- 请选择局部 *#}
+			<dl class="fn-clear">
+				<dt><span>*</span>{#$langData['renovation'][5][44]#}：</dt>
+				<dd data-title="{#$langData['renovation'][9][39]#}">
+					<div class="checkbox">
+						{#loop service="renovation" action="type" return='type' type='545'#}
+						<label><input type="checkbox" name="jubu[]" value="{#$type.id#}"{#if strstr($detail_jubu, $type.id)#} checked{#/if#}>{#$type.typename#}</label>
+						{#/loop#}
+					</div>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+			{#* 面积 --请输入面积*#}
+	    	<dl class="fn-clear"  data-required="1">
+				<dt><span>*</span>{#$langData['siteConfig'][19][85]#}：</dt>
+				<dd>
+			        <div class="comBox">
+			          <input id="area" name="area" type="text" size="8" maxlength="6" value="{#$detail_area#}" data-title="{#$langData['siteConfig'][44][80]#}" class="inp">
+			          <span class="sym">{#echoCurrency type='areasymbol'#}</span>
+			        </div>
+			        <span class="tip-inline"></span>
+				</dd>
+			</dl>
+		</div>
+		<div id="type1"{#if $detail_type == 0 || $detail_type == ""#} class="fn-hide"{#/if#}>
+			{#* 公装类型 -- 请选择公装类型 *#}
+			<dl class="fn-clear">
+				<dt><span>*</span>{#$langData['renovation'][3][63]#}：</dt>
+				<dd>
+					<div class="radio">
+						{#loop service="renovation" action="type" return='type' type='3'#}
+						<span data-id="{#$type.id#}"{#if $detail_comstyleid == $type.id#} class="curr"{#/if#}>{#$type.typename#}</span>
+						{#/loop#}
+						<input type="hidden" name="comstyle" id="comstyle" value="{#$detail_comstyleid#}"  data-title="{#$langData['renovation'][15][37]#}"/>
+					</div>
+					<span class="tip-inline"></span>
+				</dd>
+			</dl>
+		</div>
+		
+		
+
+		{#* 造价 -- 请选择造价*#}
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['renovation'][2][6]#}：</dt>
+			<dd id="selApartment">
+				<div class="sel-group">
+					<button type="button" class="sel">{#if $detail_apartment#}{#$detail_apartment#}{#else#}请选择{#/if#}<span class="caret"></span></button>
+					<ul class="sel-menu">
+						{#loop service="renovation" action="type" return='type' type='6'#}
+						<li><a href="javascript:;" data-id="{#$type.id#}">{#$type.typename#}</a></li>
+						{#/loop#}
+					</ul>
+				</div>
+				<input type="hidden" name="price" id="apartment" value="{#$detail_apartmentid#}" data-title="{#$langData['renovation'][15][39]#}"/>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#* 图片信息 *#}
+		<div class="common-title spe_title">{#$langData['renovation'][15][44]#}</div>
+		{#* 效果图 *#}
+		<dl class="fn-clear">
+			<dt><span>*</span>	{#$langData['renovation'][0][8]#}：</dt>
+			<dd class="listImgBox fn-hide">
+				<div class="list-holder">
+					<ul id="listSection2" class="fn-clear listSection fn-hide"{#if $detail_pics#} style="display: block;"{#/if#}>
+						{#foreach from=$detail_pics key=k item=i#}
+						<li class="fn-clear" id="WU_FILE_1_{#$k#}">
+							<span class="li-move" title="{#$langData['siteConfig'][23][42]#}">↕</span>
+							<a class="li-rm" href="javascript:;">×</a>
+							<div class="li-thumb" style="display: block;">
+								<div class="r-progress"><s></s></div>
+								<span class="ibtn">
+									<a href="javascript:;" class="Lrotate" title="{#$langData['siteConfig'][23][43]#}"></a>
+									<a href="javascript:;" class="Rrotate" title="{#$langData['siteConfig'][23][44]#}"></a>
+									<a href="{#$i.path#}" target="_blank" class="enlarge" title="{#$langData['siteConfig'][23][45]#}"></a>
+								</span>
+								<span class="ibg"></span>
+								<img data-val="{#$i.pathSource#}" data-url="{#changeFileSize url="{#$i.path#}" type="small"#}" src="{#changeFileSize url="{#$i.path#}" type="small"#}" />
+							</div>
+						</li>
+						{#/foreach#}
+					</ul>
+					<input type="hidden" name="imglist" value="" class="imglist-hidden">
+				</div>
+        		<div class="btn-section fn-clear">
+					<div class="wxUploadObj fn-clear">
+						<div class="uploadinp filePicker" id="filePicker2" data-type="album" data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][168]#}</span></div>
+						<span class="upload-split fn-hide">{#$langData['siteConfig'][13][0]#}</span> {#*或*#}
+						<dl class="wxUpload fn-hide fn-clear">
+							<dt><img id="wxUploadImg" /></dt>
+							{#*使用*#} {#*微信*#} {#*扫描左侧二维码*#} {#*关注*#} {#*公众号后*#} {#*将图片*#} {#*发送*#} {#*给公众号即可传图*#}
+							<dd>{#$langData['siteConfig'][19][362]#}<em class="wx">{#$langData['siteConfig'][27][139]#}</em>{#$langData['siteConfig'][27][140]#}<br />{#$langData['siteConfig'][19][846]#}{#$cfg_weixinName#}{#$langData['siteConfig'][27][141]#}<br />{#$langData['siteConfig'][27][142]#}<em class="fs">{#$langData['siteConfig'][6][139]#}</em>{#$langData['siteConfig'][27][143]#}</dd>
+
+						</dl>
+					</div>
+					<div class="upload-tip">
+						<p><a href="javascript:;" class="fn-hide deleteAllAtlas"{#if $detail_pics#} style="display: inline-block;"{#/if#}>{#$langData['siteConfig'][6][79]#}</a>&nbsp;&nbsp;{#$langData['siteConfig'][54][19]|replace:' 1 ':'2'|replace:' 2 ':$atlasMax#} <span class="fileerror"></span></p>
+					</div>
+				</div>
+			</dd>
+		</dl>
+		<dl class="fn-clear">
+			<dt>&nbsp;</dt>
+			<dd><button class="submit" id="submit">{#if $id == 0#}{#$langData['shop'][1][7]#}{#else#}{#$langData['siteConfig'][6][122]#}{#/if#}</button></dd>
+		</dl>
+	</form>
+</div>
+
+
+{#else#}
+<div class="list" style="padding: 200px 0; text-align: center; font-size: 14px; color: red;">{#$langData['siteConfig'][20][403]#}</div>
+{#/if#}

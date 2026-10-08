@@ -1,0 +1,109 @@
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}" media="all" />
+<script>
+  var  geetest = {#$cfg_geetest|default:0#}
+  var phone = '{#$userinfo.phone#}';
+  var cityid = '{#$siteCityInfo.cityid#}'
+  var memberDomain = '{#$member_userDomain#}'
+</script>
+<div class="whiteBGWrap deliveryWrap" id="deliveryPage">
+  <div class="wrap_header fn-clear" >
+    <div class="wrap_title fn-left">
+      <h2>我的投递</h2>
+      <el-select v-model="orderby" placeholder="请选择">
+        <el-option
+          v-for="item in selOptions"
+          :key="item.value"
+          :label="item.label"
+          :value="item.value">
+        </el-option>
+      </el-select>
+    </div>
+    <div class="shai_tab fn-right">
+      <span @click="batch = ''" :class="{'on_chose':batch === ''}">全部</span>
+      <span @click="batch = 0" :class="{'on_chose':batch === 0}">单投</span>
+      <span  @click="batch = 1" :class="{'on_chose':batch === 1}">批量投</span>
+    </div>
+  </div>
+  <div class="deliveryContent"> 
+    <div class="tabBox">
+      <ul class="fn-clear">
+        <li v-for="item in tabList" :class="{'on_chose':currOn == item.id}" @click="currOn = item.id"><span>{{item.tit}}</span></li>
+      </ul>
+    </div>
+    <div class="contentBox">
+      <el-table class="tableBox" :data="deliveryList" style="width: 100%" ref="table" key='table1' v-loading="isload" @row-click="gotoLink" >
+        <el-table-column prop="date" label="职位信息">
+          <template slot-scope="scope">
+            <div class="postInfo">
+              <div class="ptitle"><span class="salary_show">{{scope.row.job.show_salary}}</span><span class="title">{{scope.row.job.title}}</span></div>
+              <p>{{scope.row.job.job_addr_detail ? scope.row.job.job_addr_detail.addrName.join(' ') : '' }}</p>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="date" label="公司信息"  >
+          <template slot-scope="scope">
+            <div class="companyInfo">
+              <h6>{{scope.row.companyTitle}}</h6>
+              <p>{{scope.row.companyIndustry}}</p>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="date" label="投递时间" header-align="center" align="center" >
+          <template slot-scope="scope">
+            <div class="delivery_time">{{transTimes(scope.row.date)}}<span>{{scope.row.resume.alias}}</span></div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="date" label="状态" header-align="center" align="center" >
+          <template slot-scope="scope">
+            <span class="update_time">{{transTimes(scope.row.newTime)}}</span>
+            <span :class="'state state' + scope.row.postState">{{stateArr[scope.row.postState]}}</span>
+          </template>
+        </el-table-column>
+        <template slot="empty">
+          <div class="noData" v-show="noData">
+            <div class="nodata_img"><img src="{#$templets_skin#}images/job/delivery_nodata.png" alt=""></div>
+            <p>你还未投递过职位</p>
+            <div class="allDataNone" v-if="noDataAll">
+              <p>立即看看感兴趣的职位吧</p>
+              <a href="#" class="btn_link">查看职位</a>
+            </div>
+          </div>
+        </template>
+      </el-table>
+      
+      <div class="pageBox">
+        <el-pagination
+        :hide-on-single-page="true"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        prev-text="上一页"
+        next-text="下一页"
+        @current-change="changePage"
+        :total="totalCount">
+        </el-pagination>
+      </div>
+    </div>
+  </div>
+<!-- 失效弹窗 -->
+<div class="invalidPop">
+  <div class="s-certificate">
+    <img src="{#$templets_skin#}images/job/close_icon.png" class="ss-close" @click="closePopFn">
+    <div class="ss-title">
+      <img src="{#$templets_skin#}images/job/warning_icon.png">
+      <p>该职位审核中</p>
+    </div>
+    <div class="ss-text">
+      <p>该职位内容有改动，等待平台审核中</p>
+    </div>
+    <div class="ss-btn">
+      <div class="certificate" @click="closePopFn">好的，我知道了</div>
+    </div>
+  </div>
+</div>
+</div>
+
+
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>

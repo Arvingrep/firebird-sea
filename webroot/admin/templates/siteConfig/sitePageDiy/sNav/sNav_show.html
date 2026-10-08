@@ -1,0 +1,62 @@
+ <!-- 导航按钮组 -->
+ <div :class="['navBtnsConBox',{'cardStyle':modCon.content.cardStyle}]" v-if="modCon.id == 5"  :style="'margin-top:'+ (modCon.content.style.marginTop / 2) +'px;'">
+    <div class="navBtnsCon" :style="'border-radius:' + modCon.content.style.cardRadius/2 + 'px; '+(modCon.content.cardStyle ? 'margin:0 '+(modCon.content.style.marginLeft / 2)+'px;' : '')+' background:'+ (modCon.content.cardStyle ? modCon.content.style.cardBg : 'none') +'; '" v-if="modCon.content.slide == 1">
+        <!-- 滑动 -->
+        <!-- (modCon.content.style.btnSize / 2  + 20 )* modCon.content.layout -->
+        <el-carousel  :height="(modCon.content.style.btnSize / 2  + 32 )* modCon.content.layout + 'px'" @change="(value) => modCon.content.activeInd = value" indicator-position="none" :autoplay="false" :arrow=" modCon.content.slide == 0 ||getShowModules(allModules,modCon.content.column * modCon.content.layout).length <= 1  ? 'never' : 'hover'"  >
+            <el-carousel-item v-for="(group,index) in (getShowModules(allModules,modCon.content.column * modCon.content.layout))" :key="index" class="swiper-item">
+                <ul :class="'grid' + modCon.content.column" :style="(!modCon.content.cardStyle ? 'padding:0 '+(modCon.content.style.marginLeft / 2)+'px;' : '')">
+                    <li v-for="item in group">
+                        <div class="icon" :style="'width:'+(modCon.content.style.btnSize / 2)+'px; height:'+(modCon.content.style.btnSize / 2)+'px;'">
+                            <span class="lab" v-if="getLab(item,modCon.content)" :style="'background-color:' + getLab(item,modCon.content).lab.style.bgColor + '; color:' + getLab(item,modCon.content).lab.style.color + ';'">{{getLab(item,modCon.content).lab.text ? getLab(item,modCon.content).lab.text : '标签'}}</span>
+                            <img crossOrigin='anonymous' :src="item.iconurl ? item.iconurl : '/static/images/admin/siteMemberPage/default_icon1.png'" onerror="this.src='/static/images/admin/siteMemberPage/default_icon1.png'" alt="" :style="'border-radius:'+ (modCon.content.btnRadius ? (modCon.content.style.btnRadius / 2) : 0 ) +'px;'">
+                        </div>
+                        <p :style="'font-size:'+(modCon.content.style.fontSize / 2)+'px;color:'+modCon.content.style.color+';'">{{item.subject}}</p>
+                    </li>
+                </ul>
+            </el-carousel-item>
+        </el-carousel>
+        <div class="pagination" v-if="modCon.content.slide == 1 && (getShowModules(allModules,modCon.content.column * modCon.content.layout).length) > 1">
+            <span v-for="item in getShowModules(allModules,modCon.content.column * modCon.content.layout).length" :class="{'bulletActive':modCon.content.activeInd == (item - 1)}" :style="modCon.content.activeInd == (item - 1) ? ('background:'+modCon.content.style.dotColor+';') : ''"></span>
+        </div>
+    </div>
+
+    
+    <!-- 平滑 -->
+    <div class="smoothCon navBtnsCon" v-else  :style="'border-radius:' + modCon.content.style.cardRadius/2 + 'px; '+(modCon.content.cardStyle ? 'margin:0 '+(modCon.content.style.marginLeft / 2)+'px;' : '')+' background:'+ (modCon.content.cardStyle ? modCon.content.style.cardBg : 'none') +'; '" >
+        <div class="swiper-item"  @scroll.capture="btnsScroll" :style="modCon.content.cardStyle ? '  ':' padding:0 '+(modCon.content.style.marginLeft / 2)+'px; '" :data-padding="modCon.content.style.marginLeft">
+            <template v-if="modCon.content.layout > 1">
+                <div class="flexSwiper" v-for="(group,index) in (getShowModules(allModules,modCon.content.column * modCon.content.layout))" :key="index" >
+                    <!-- :style="(!modCon.content.cardStyle ? 'padding:0 '+(modCon.content.style.marginLeft / 2)+'px;' : '')" -->
+                    <ul :class="'grid' + modCon.content.column" >
+                        <li v-for="item in group">
+                            <div class="icon" :style="'width:'+(modCon.content.style.btnSize / 2)+'px; height:'+(modCon.content.style.btnSize / 2)+'px;'">
+                                <span class="lab" v-if="getLab(item,modCon.content)" :style="'background-color:' + getLab(item,modCon.content).lab.style.bgColor + '; color:' + getLab(item,modCon.content).lab.style.color + ';'">{{getLab(item,modCon.content).lab.text ? getLab(item,modCon.content).lab.text : '标签'}}</span>
+                                <img crossOrigin='anonymous' :src="item.iconurl ? item.iconurl : '/static/images/admin/siteMemberPage/default_icon1.png'" onerror="this.src='/static/images/admin/siteMemberPage/default_icon1.png'" alt="" :style="'border-radius:'+ (modCon.content.btnRadius ? (modCon.content.style.btnRadius / 2) : 0 ) +'px;'">
+                            </div>
+                            <p :style="'font-size:'+(modCon.content.style.fontSize / 2)+'px;color:'+modCon.content.style.color+';'">{{item.subject}}</p>
+                        </li>
+                    </ul>
+                </div>
+            </template>
+            <template v-else>
+                <ul :class="'flexItem grid' + modCon.content.column" >
+                    <li v-for="(item,ind) in getShowModules(allModules,modCon.content.column * modCon.content.layout,1)">
+                        <div class="icon" :style="'width:'+(modCon.content.style.btnSize / 2)+'px; height:'+(modCon.content.style.btnSize / 2)+'px;'">
+                            <span class="lab" v-if="getLab(item,modCon.content)" :style="'background-color:' + getLab(item,modCon.content).lab.style.bgColor + '; color:' + getLab(item,modCon.content).lab.style.color + ';'">{{getLab(item,modCon.content).lab.text ? getLab(item,modCon.content).lab.text : '标签'}}</span>
+                            <img crossOrigin='anonymous' :src="item.iconurl ? item.iconurl : '/static/images/admin/siteMemberPage/default_icon1.png'" onerror="this.src='/static/images/admin/siteMemberPage/default_icon1.png'" alt="" :style="'border-radius:'+ (modCon.content.btnRadius ? (modCon.content.style.btnRadius / 2) : 0 ) +'px;'">
+                        </div>
+                        <p :style="'font-size:'+(modCon.content.style.fontSize / 2)+'px;color:'+modCon.content.style.color+';'">{{item.subject}}</p>
+                    </li>
+                    <li class="lastPad" :style="'width: '+(modCon.content.style.marginLeft / 2)+'px;'"></li>
+                </ul>
+            </template>
+        </div>
+        <div class="progressSlide" @click="onClick" @mousedown="onMouseDown" @mousermove.stop="onMouseMover" @mouseup="onMouseUp" v-if="getShowModules(allModules,modCon.content.column * modCon.content.layout).length > 1">
+            <div class="currPageIn" :style="'background:'+modCon.content.style.dotColor+';'"></div>
+        </div>
+    </div>
+
+    <!-- 所有导航都未显示 -->
+    <div class="noNav" v-if="!getShowModules(allModules,modCon.content.column * modCon.content.layout).length"> 请先设置导航内容 </div>
+</div>

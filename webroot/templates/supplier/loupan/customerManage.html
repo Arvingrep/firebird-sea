@@ -1,0 +1,398 @@
+<!-- 团队管理 -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>客户管理</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+        <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/customerManage.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+        <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+		    var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+		    var hideFileUrl = '{#$cfg_hideUrl#}';
+		    var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+			var templets = '{#$templets_skin#}';
+			var protypelist = {#if $protypelist#} {#$protypelist#} {#else#} '' {#/if #}; //物业类型
+			var salestatenames = ['新盘待售','在售','尾盘','售罄']; //销售状态
+			var existingnames = ['现房','期房']; //销售状态
+			var salestate = '{#$detail_salestate#}',   //销售状态
+				existing = '{#$detail_existing#}',   //楼盘状态
+				protype = {#if is_array($detail_protype)#} {#json_encode($detail_protype,true)#} {#else#} '{#$detail_protype#}' {#/if#};   //物业类型
+			var thumbSize = '{#$thumbSize#}', thumbType = "{#$thumbType#}",  //缩略图配置
+				addrid = '{#$addrid#}', addrListArr = '{#$addrListArr#}', mapCity = "{#$mapCity#}", subwayCity = 0;
+			var subwayarr = {#if $detail_subwayarr#}{#$detail_subwayarr#} {#else#}''{#/if#};
+
+			var loupanid = '{#$loupanid#}';
+			var modelType = 'house';
+            var atpage = 1, totalCount = 0, pageSize = 10;
+            var currid = 4;
+            let url=location.search;
+            let params = new URLSearchParams(url.slice(1));
+            var active = params.get('active')||0;
+		</script>
+</head>
+<body class="w1200">
+    <div id="page">
+        <!-- 头部 -->
+        {#include file="top.html"#}
+        <div class="conbox">
+            <!-- 左侧导航 -->
+            {#include file="left.html"#}
+            <div class="right_box">
+                <div class="rConBox">
+                    <div class="crmPageBox">
+                        <ul class="crm_ul">
+                            <li v-for="(item,ind) in crmSource" @click="crmSource_ind = ind;reloadList()" :class="[{'onPage':crmSource_ind == ind}]">{{item.name}}</li>
+                        </ul>
+                    </div>
+
+                    <!-- 线上客户  列表 -->
+                    <div class="crmListBox ListContainer" v-if="crmSource_ind == 0">
+                        <div class="headbox">
+                            <div class="left_list">
+                                <ul class="post_ul" v-if="crmSource[crmSource_ind] && crmSource[crmSource_ind].lower && crmSource[crmSource_ind].lower.length">
+                                    <li v-for="(item,key) in crmSource[crmSource_ind].lower" :key="key" :class="`post_li ${crmSource_type_ind == key ? 'active' : ''}` " @click="crmSource_type_ind = key; reloadList()">{{item.name}}<span>({{item.count}})</span></li>
+                                </ul>
+                            </div>
+                            <div class="right">
+                                <el-select class="selectbox" v-model="filterData.source" placeholder="来源" @change="reloadList()">
+                                    <el-option
+                                      v-for="item in sourceList"
+                                      :key="item.id"
+                                      :label="item.name"
+                                      :value="item.id">
+                                    </el-option>
+                                </el-select>
+                                <el-select class="selectbox" v-model="filterData.status" placeholder="跟进情况" @change="reloadList()">
+                                    <el-option
+                                      v-for="item in statusList"
+                                      :key="item.id"
+                                      :label="item.name"
+                                      :value="item.id">
+                                    </el-option>
+                                </el-select>
+                                <el-input class="search" placeholder="客户、电话" v-model="filterData.keyword" @change="reloadList()">
+                                    <div icon="el-icon-search" slot="suffix" class="el-icon el-icon-search" @click="reloadList"></div>
+                                </el-input>
+                                <div class="btn export_btn" @click="exportCustomer">导出名单</div>
+                                <div class="btn import_btn" >
+                                    导入名单
+                                    <input @change="uploadFile" name="uploadFile" class="uploadFile" type="file" accept=".xls,.xlsx">
+                                </div>
+                                
+                            </div>
+                        </div>
+                        <div class="listbox tablebox">
+                            <div class="titlebox thead">
+                                <div class="col15 cell cInfo alignRight">用户名</div>
+                                <div class="col5 cell alignCenter">
+                                    客户
+                                    <el-popover
+                                        :offset="-20"
+                                        placement="bottom-start"
+                                        width="320"
+                                        trigger="hover"
+                                        content="客户姓名来自用户资料或用户提交，并不一定真实">
+                                        <span slot="reference" class="tip_icon"></span>
+                                    </el-popover>
+                                </div>
+                                <div class="col10 cell alignRight">联系方式</div>
+                                <div class="col10 cell alignCenter">用户轨迹</div>
+                                <div class="col10 cell alignCenter">初始来源</div>
+                                <div class="col10 cell alignRight">最后访问</div>
+                                <div class="col20 cell alignRight">备注</div>
+                                <div class="col5 cell alignCenter">跟进人</div>
+                                <div class="col15 cell alignRight">操作</div>
+
+                            </div>
+                            <ul class="tbody" v-if=" crmSource[crmSource_ind].list.length > 0">
+                                <li class="table_row disflex a-c" v-for="(item,ind) in crmSource[crmSource_ind].list">
+                                    <div class="col15 cell alignRight cInfo_con">
+                                        <div class="disflex a-c">
+                                            <el-checkbox @change="val => choseItem(item,val)" :value="chosedArr.includes(item.id)"></el-checkbox>
+                                            <div class="photo">
+                                                <img src="" onerror="this.src='/static/images/noPhoto_100.jpg'" alt="">
+                                            </div>
+                                            <div class="name">
+                                                <h6>{{item.cname}}</h6>
+                                                <p>ID:{{item.id}}</p>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                    <div class="col5 cell alignCenter">
+                                        <div class="realname">{{item.cname}}</div>
+                                    </div>
+                                    <div class="col10 cell alignRight">
+                                        <div class="telInfo disflex a-c">{{item.phone}} </div>
+                                    </div>
+                                    <div class="col10 cell alignCenter">
+                                        <a href="#" class="link">{{item.tracks}}</a>
+                                    </div>
+                                    <div class="col10 cell alignCenter">{{item.source}}</div>
+                                    <div class="col10 cell alignRight">
+                                        <div class="lastLogin">{{item.time}}</div>
+                                    </div>
+                                    <div class="col20 cell alignRight remarkBox" @dblclick="isMarking = true; mark_ind = ind; remark = item.mark">
+                                        <div class="remark" v-if="item.mark && (!isMarking || mark_ind !=  ind)" >{{item.mark}} </div>
+                                        <div class="remark noRemark" v-else>
+                                            <el-input type="textarea" autosize placeholder="添加备注..." v-model="remark" @change="val => saveCustomerMark(val,item.id)"></el-input>
+                                        </div>
+                                    </div>
+                                    <div class="col5 cell alignCenter">
+                                        <div class="gjr">{{item.owner}}</div>
+                                    </div>
+                                    <div class="col15 cell alignRight">
+                                        <!-- <el-button type="primary" class="btn_point">指派</el-button> -->
+                                        <el-popconfirm
+                                            confirm-button-text='确定'
+                                            cancel-button-text='取消'
+                                            @confirm="delCustomer(item)"
+                                            icon="el-icon-info"
+                                            icon-color="red"
+                                            title="确定要删除该用户吗"
+                                        >
+                                            <a href="javascript:;" slot="reference" class="del" >删除</a>
+                                        </el-popconfirm>
+                                    </div>
+                                </li>
+                            </ul>
+                            <el-empty description="暂无相关数据" v-else></el-empty>
+                        </div>
+                        <div class="disflex a-c j-b" v-if="crmSource[crmSource_ind].count || (crmSource[crmSource_ind].count / 10  > 1)">
+                            <div class="quick_select" @click="choseItem('',(chosedArr.length == pageSize ? true : false),'all')"><el-checkbox :checked="chosedArr.length == pageSize" @change="val => choseItem('',val,'all')"></el-checkbox><span>全选(<em>{{chosedArr.length}}</em>/{{pageSize}})</span></div>
+                            <div class="pagesBox" v-if="crmSource[crmSource_ind].count / 10  > 1" >
+                                <el-pagination
+                                    background
+                                   @current-change="getCustomerList"
+                                    :current-page.sync="crmSource[crmSource_ind].page"
+                                    :page-size="10"
+                                    layout="total, prev, pager, next, jumper"
+                                    :total="crmSource[crmSource_ind].count">
+                                    </el-pagination>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 新房分销 -->
+                    <div class="crmListBox ListContainer" v-if="crmSource_ind == 1">
+                        <div class="headbox">
+                            <div class="left_list"><h3>全部{{crmSource[crmSource_ind].count || 0}}条客户信息</h3></div>
+                            <div class="right">
+                                <el-select class="selectbox" v-model="filterData.status" placeholder="客户状态" @change="reloadList()">
+                                    <el-option
+                                      v-for="item in statusList1"
+                                      :key="item.id"
+                                      :label="item.name"
+                                      :value="item.id">
+                                    </el-option>
+                                </el-select>
+                                <!-- <el-select class="selectbox" v-model="filterData.status" placeholder="指派情况">
+                                    <el-option
+                                      v-for="item in statusList"
+                                      :key="item.id"
+                                      :label="item.name"
+                                      :value="item.id">
+                                    </el-option>
+                                </el-select> -->
+                                <el-input class="search" placeholder="客户、电话" v-model="filterData.keyword" @change="reloadList()">
+                                    <div icon="el-icon-search" slot="suffix" class="el-icon el-icon-search" @click="reloadList()"></div>
+                                </el-input>
+                                <div class="btn export_btn" @click="exportCustomer">导出名单</div>
+                                <div class="btn import_btn" >
+                                    导入名单
+                                    <input @change="uploadFile" name="uploadFile" class="uploadFile" type="file" accept=".xls,.xlsx">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="listbox tablebox">
+                            <div class="titlebox thead">
+                                <div class="col10 cell cInfo cInfo_1 alignRight">客户</div>
+                                <div class="col10 cell alignRight">联系方式</div>
+                                <div class="col30 cell alignRight">备注</div>
+                                <div class="col10 cell alignRight">掉落时间</div> 
+                                <div class="col10 cell alignCenter">状态</div>
+                                <div class="col10 cell alignCenter">跟进人</div>
+                                <div class="col20 cell alignRight">操作</div>
+
+                            </div>
+                            <ul class="tbody" v-if="crmSource[crmSource_ind].list.length">
+                                <li class="table_row disflex a-c" v-for="(item,ind) in crmSource[crmSource_ind].list">
+                                    <div class="col10 cell alignRight cInfo_con">
+                                        <div class="disflex a-c">
+                                            <el-checkbox @change="val => choseItem(item,val)" :value="chosedArr.includes(item.id)"></el-checkbox>
+                                            <div class="name">
+                                                <h3>{{item.cname}}</h3>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                    <div class="col10 cell alignRight">
+                                        <div class="telInfo disflex a-c">{{item.phone}} </div>
+                                    </div>
+                                    <!-- 
+                                    <div class="col10 cell alignCenter">
+                                        <a href="#" class="link">客户轨迹</a>
+                                    </div> -->
+                                    
+                                   
+                                    <div class="col30 cell alignRight remarkBox" @dblclick="isMarking = true; mark_ind = ind; remark = item.mark">
+                                        <div class="remark" v-if="item.mark && (!isMarking || mark_ind !=  ind)" >{{item.mark}} </div>
+                                        <div class="remark noRemark" v-else>
+                                            <el-input type="textarea" autosize placeholder="添加备注..." v-model="remark" @change="val => saveCustomerMark(val,item.id)"></el-input>
+                                        </div>
+                                    </div>
+                                    <div class="col10 cell alignRight">
+                                        <div class="lastLogin">{{item.time}}</div>
+                                    </div>
+                                    <div class="col10 cell alignCenter">{{item.status == 1 ? '已带看' : '未带看'}}</div>
+                                    <div class="col10 cell alignCenter">{{item.owner}}</div>
+                                    <div class="col20 cell alignRight">
+                                        <!-- <el-button type="primary" class="btn_point">指派</el-button> -->
+                                        <el-popconfirm
+                                            confirm-button-text='确定'
+                                            cancel-button-text='取消'
+                                            @confirm="delCustomer(item)"
+                                            icon="el-icon-info"
+                                            icon-color="red"
+                                            title="确定要删除该用户吗"
+                                        >
+                                            <a href="javascript:;" slot="reference" class="del" >删除</a>
+                                        </el-popconfirm>
+                                        
+                                    </div>
+                                </li>
+                            </ul>
+                            <el-empty description="暂无相关数据" v-else></el-empty>
+                        </div>
+                        <div class="disflex a-c j-b" v-if="crmSource[crmSource_ind].count || (crmSource[crmSource_ind].count / 10  > 1)">
+                            <div class="quick_select" @click="choseItem('',(chosedArr.length == pageSize ? true : false),'all')"><el-checkbox :checked="chosedArr.length == pageSize" @change="val => choseItem('',val,'all')"></el-checkbox><span>全选(<em>{{chosedArr.length}}</em>/{{pageSize}})</span></div>
+                            <div class="pagesBox" v-if="crmSource[crmSource_ind].count / 10  > 1" >
+                                <el-pagination
+                                    background
+                                    @current-change="getCustomerList"
+                                    :current-page.sync="crmSource[crmSource_ind].page"
+                                    :page-size="10"
+                                    layout="total, prev, pager, next, jumper"
+                                    :total="crmSource[crmSource_ind].count">
+                                    </el-pagination>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 名单导入 -->
+                    <div class="crmListBox ListContainer" v-if="crmSource_ind == 2">
+                        <div class="headbox">
+                            <div class="left_list"><h3>全部{{crmSource[crmSource_ind].count || 0}}条客户信息</h3></div>
+                            <div class="right">
+                                <el-select class="selectbox" v-model="filterData.status" placeholder="跟进情况" @change="reloadList()">
+                                    <el-option
+                                      v-for="item in statusList"
+                                      :key="item.id"
+                                      :label="item.name"
+                                      :value="item.id">
+                                    </el-option>
+                                </el-select>
+                                <el-input class="search" placeholder="客户、电话" v-model="filterData.keyword" @change="reloadList()">
+                                    <div icon="el-icon-search" slot="suffix" class="el-icon el-icon-search" @click="reloadList()"></div>
+                                </el-input>
+                                <div class="btn export_btn" @click="exportCustomer">导出名单</div>
+                                <div class="btn import_btn" >
+                                    导入名单
+                                    <input @change="uploadFile" name="uploadFile" class="uploadFile" type="file" accept=".xls,.xlsx">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="listbox tablebox">
+                            <div class="titlebox thead">
+                                <div class="col10 cell cInfo cInfo_1 alignRight">客户</div>
+                                <div class="col15 cell alignRight">联系方式</div>
+                                <div class="col15 cell alignRight">微信</div>
+
+                                <!-- 
+                                <div class="col10 cell alignCenter">用户轨迹</div>
+                                <div class="col10 cell alignCenter">初始来源</div>
+                                <div class="col10 cell alignRight">最后访问</div> -->
+                                <div class="col30 cell alignRight">备注</div>
+                                <div class="col10 cell alignCenter">跟进人</div>
+                                <div class="col20 cell alignRight">操作</div>
+
+                            </div>
+                            <ul class="tbody" v-if="crmSource[crmSource_ind].list.length">
+                                <li class="table_row disflex a-c" v-for="(item,ind) in crmSource[crmSource_ind].list" >
+                                    <div class="col10 cell alignRight cInfo_con">
+                                        <div class="disflex a-c">
+                                            <el-checkbox @change="val => choseItem(item,val)" :value="chosedArr.includes(item.id)"></el-checkbox>
+                                            <div class="name">
+                                                <h3>{{item.cname}}</h3>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                    <div class="col15 cell alignRight">
+                                        <div class="telInfo disflex a-c">{{item.phone}} </div>
+                                    </div>
+                                    <div class="col15 cell alignRight">{{item.wechat}}</div>
+
+                                   
+                                    <div class="col30 cell alignRight remarkBox" @dblclick="isMarking = true; mark_ind = ind; remark = item.mark">
+                                        <div class="remark" v-if="item.mark && (!isMarking || mark_ind !=  ind)" >{{item.mark}} </div>
+                                        <div class="remark noRemark" v-else>
+                                            <el-input type="textarea" autosize placeholder="添加备注..." v-model="remark" @change="val => saveCustomerMark(val,item.id)"></el-input>
+                                        </div>
+                                    </div>
+                                    <div class="col10 cell alignCenter">{{item.owner||'-'}}</div>
+                                    <div class="col20 cell alignRight">
+                                        <!-- <el-button type="primary" class="btn_point">指派</el-button> -->
+                                        <el-popconfirm
+                                            confirm-button-text='确定'
+                                            cancel-button-text='取消'
+                                            @confirm="delCustomer(item)"
+                                            icon="el-icon-info"
+                                            icon-color="red"
+                                            title="确定要删除该用户吗"
+                                        >
+                                            <a href="javascript:;" slot="reference" class="del" >删除</a>
+                                        </el-popconfirm>
+                                    </div>
+                                </li>
+                            </ul>
+                            <el-empty description="暂无相关数据" v-else></el-empty>
+                          
+                        </div>
+                        <div class="disflex a-c j-b" v-if="crmSource[crmSource_ind].count || (crmSource[crmSource_ind].count / pageSize  > 1)">
+                            <div class="quick_select" @click="choseItem('',(chosedArr.length != pageSize ? true : false),'all'); "><el-checkbox :value="chosedArr.length == pageSize" @change="val => choseItem('',val,'all')"></el-checkbox><span>全选(<em>{{chosedArr.length}}</em>/{{pageSize}})</span></div>
+                            <div class="pagesBox" v-if="crmSource[crmSource_ind].count / pageSize  > 1" >
+                                <el-pagination
+                                    background
+                                    prev-text="上一页"
+                                    next-text="下一页"
+                                    @current-change="getCustomerList"
+                                    :current-page.sync="crmSource[crmSource_ind].page"
+                                    :page-size.sync="pageSize"
+                                    @size-change="reloadList"
+                                    layout="prev,pager,next"
+                                    :total="crmSource[crmSource_ind].count">
+                                    </el-pagination>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/customerManage.js?v={#$cfg_staticVersion#}"></script>
+</html>

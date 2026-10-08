@@ -1,0 +1,228 @@
+<script>
+	var atpage = 1, totalCount = 0, pageSize = 14;
+	var typeId='2';//1为设计师  2为工长
+	var certify ="2";//1为独立个人 2为有所属公司
+</script>		
+<div class="w-form">
+	<form name="fabuForm" id="fabuForm" method="post"  action="/include/ajax.php?service=renovation&action={#if $profiletype ==1#}editForeman&id={#$id#}{#else#}editTeam&id={#$id#}{#/if#}">
+		{#* 基本信息 *#}
+		<div class="common-title">{#$langData['renovation'][2][44]#}</div>
+		{#* 姓名 -- 请输入姓名*#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][4]#}：</dt>
+			<dd id="selTeam">
+				<input type="text" name="name" class="inp" id="name" size="60" maxlength="50" data-title="{#$langData['siteConfig'][20][330]#}" value="{#$detail_name#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][7]#}：</dt>  {#* 性别 *#}
+			<dd>
+				<div class="radio">
+					<span data-id="0" {#if $detail_sex==0#}class="curr"{#/if#}>	{#$langData['siteConfig'][13][5]#}</span>  {#* 女 *#}
+					<span data-id="1" {#if $detail_sex==1#}class="curr"{#/if#}>	{#$langData['siteConfig'][13][4]#}</span>  {#* 男 *#}
+					<input type="hidden" name="sex" id="sex" value="{#if $detail_sex#}{#$detail_sex#}{#else#}0{#/if#}">
+				</div>
+			</dd>
+		</dl>
+		{#* 上传头像 *#}
+		<dl class="fn-clear">
+            <dt><span>*</span>{#$langData['siteConfig'][6][110]#}：</dt>
+            <dd class="thumb fn-clear listImgBox">
+                <div class="uploadinp filePicker thumbtn{#if $detail_photo != ""#} fn-hide{#/if#}" id="filePicker" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+                {#if $detail_photo != ""#}
+				<ul id="listSection" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$detail_photo#}' target="_blank" title=""><img alt="" src="{#$detail_photo#}" data-val="{#$detail_photo#}"/></a><a class="reupload li-rm" href="javascript:;">{#$langData['siteConfig'][19][176]#}</a></li></ul>{#* 删除图片 *#}
+				{#else#}
+				<ul id="listSection" class="listSection thumblist fn-clear"></ul>
+				{#/if#}
+
+                <input type="hidden" name="photo" value="{#$detail_photoSource#}" class="imglist-hidden" id="photo">
+            </dd>
+        </dl>
+        <dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][424]#}：</dt>  {#* 联系方式 *#}
+			<dd>
+				<span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+				<input type="text" name="phone" class="inp" id="tel" size="20" maxlength="50" data-title="{#$langData['siteConfig'][20][412]#}" value="{#$detail_tel#}" />  {#* 请输入联系方式 *#}
+				<span class="tip-inline"></span>
+				<!--国际区号弹窗-->
+				<div class="areaCode_wrap">
+					<ul>
+						
+					</ul>
+				</div>
+				<input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+			</dd>
+		</dl>
+
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['renovation'][8][24]#}：</dt>  {#* 现居地址 *#}
+			<dd id="selAddr" data-title="{#$langData['renovation'][8][29]#}"> {#* 请选择现居地址 *#}
+				<div class="sel-group" data-title="{#$langData['siteConfig'][20][68]#}">
+					<div class="city-title addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_addrid split=' '#}" data-id="{#$detail_addrid#}">{#if $detail_address#}{#$detail_address#}{#else#}{#$langData['renovation'][7][16]#}{#/if#}</div>{#* 请选择 *#}
+					<span class="caret"></span>
+				</div>
+				<input type="hidden" name="addrid" id="addrid" value="{#$detail_addrid#}" />
+				<input type="hidden" name="addrname" id="addrname" value="{#$detail_addrname#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#* 专业信息 *#}
+		<div class="common-title spe_title">{#$langData['renovation'][15][64]#}</div>
+		{#* 所属公司 -- 请选择所属公司*#}
+		{#if $detail_type ==1#}
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['renovation'][7][17]#}：</dt>  
+			<dd data-title="{#$langData['renovation'][8][10]#}">
+				<div class="combox com_choose">
+					<input type="text" name="companyname" id="company" class="inp" placeholder="{#$langData['siteConfig'][7][2]#}" value="{#$detail_company['company']#}"> {#* 请选择 *#}
+					<span class="caret"></span>
+				</div>
+				<input type="hidden" name="company" id="company" value="{#$detail_company['company']#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#else#}
+
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['renovation'][15][65]#}：</dt>  {#* 身份类型 *#}
+			{#if $profiletype ==2#}
+			{#* 独立设计师 --  独立工长*#}
+			<dd>
+				{#$langData['renovation'][15][66]#}
+			</dd>
+			{#else#}
+				<dd>
+				{#$langData['renovation'][15][67]#}
+				</dd>
+			{#/if#}
+		</dl>
+
+		{#/if#}
+{#if $profiletype ==2#}
+		<dl class="fn-clear"  data-required="1">
+			<dt><span>*</span>{#$langData['renovation'][7][19]#}：</dt>  {#* 所学专业 *#}
+			<dd>
+				<input type="text" id="major" class="inp" name="studied" class="major" data-title="{#$langData['renovation'][7][20]#}" value="{#$detail_studied#}">{#*请输入所学专业*#}
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+{#/if#}
+
+		{#* 工作经验 -- 工龄 --请输入工作经验/工龄*#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['renovation'][7][22]#}/{#$langData['renovation'][8][21]#}：</dt>
+			<dd>
+		        <div class="combox">
+		          <input id="works" name="works" type="text" value="{#$detail_works#}" class="inp" data-title="{#$langData['renovation'][14][50]#}">
+		          <span class="sym">{#$langData['renovation'][7][23]#}</span> {#*年*#}
+		        </div>
+		        <span class="tip-inline"></span>
+			</dd>
+		</dl>
+
+
+	{#if $profiletype ==2#}
+		{#* 设计作品 --请输入您设计过的作品*#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['renovation'][2][23]#}：</dt>
+			<dd>
+				<textarea name="designwork" id="composition" placeholder="{#$langData['renovation'][7][24]#}" data-title="{#$langData['renovation'][7][24]#}">{#$detail_designwork#}</textarea>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+
+		{#* 设计理念 --请输入您的设计理念*#}
+		<dl class="fn-clear dlIdea" data-required="1">
+			<dt><span>*</span>{#$langData['renovation'][2][24]#}：</dt>
+			<dd>
+				<textarea name="idea" id="idea" placeholder="{#$langData['renovation'][7][25]#}" data-title="{#$langData['renovation'][7][25]#}">{#$detail_idea#}</textarea>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#*擅长风格*#}
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['renovation'][2][21]#}：</dt>
+			<dd>
+				<ul class="art_ul fn-clear">
+					{#$styleidsarr = explode(',',$detail_styleids)#}
+	                {#loop service="renovation" action="type" return='type' type='4'#}
+
+					<li data-id="{#$type.id#}" {#if in_array({#$type.id#},$styleidsarr)#} class="curr" {#/if#}>{#$type.typename#}<i></i></li>
+	                {#/loop#}  
+	            </ul>
+	            <input type="hidden" name="style" id=style value="{#$detail_styleids#}">
+			</dd>
+		</dl>
+{#else#}
+		{#* 工长类型 -- 请选择工长类型*#}
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['renovation'][10][12]#}：</dt>
+			<dd data-title="{#$langData['renovation'][15][40]#}">
+				<select name="foremanstyle" id="foremanType">
+					<option value="">{#$langData['siteConfig'][7][2]#}</option> {#* 请选择 *#}
+					{#loop service="renovation" action="type" return='type' type='591'#}
+					<option value="{#$type.id#}">{#$type.typename#}</option>
+					{#/loop#}
+				</select>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#* 年龄 --请输入年龄*#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['renovation'][8][22]#}：</dt>
+			<dd>
+		        <div class="combox">
+		          <input id="age" name="age" type="text" value="{#$detail_age#}" class="inp" data-title="{#$langData['renovation'][8][28]#}">
+		          <span class="sym">{#$langData['renovation'][8][23]#}</span> {#*岁*#}
+		        </div>
+		        <span class="tifip-inline"></span>
+			</dd>
+		</dl>
+{#/if#}
+		{#* 个人简介 --请输入您的个人简介*#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['renovation'][0][33]#}：</dt>
+			<dd>
+				<textarea name="note" id="profile" placeholder="{#$langData['renovation'][8][25]#}" data-title="{#$langData['renovation'][8][25]#}">{#$detail_note#}</textarea>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#* 保存 *#}
+		<dl class="fn-clear">
+			<dt>&nbsp;</dt>
+			<dd><button class="submit" id="submit">{#$langData['siteConfig'][6][27]#}</button></dd>
+		</dl>
+
+
+	</form>
+</div>
+
+<!--立即申请弹出层 e-->
+<div class="apply_mask"></div>
+<div class="apply_con">
+	<h2>{#$langData['renovation'][8][10]#}</h2>  {#* 请选择所属公司 *#}
+            
+	<img src="{#$templets_skin#}images/renovation/close.png" alt="关闭" class="close">
+	<div class="reno_form2">
+	  <form action="" method="get">
+	    <img src="{#$templets_skin#}images/renovation/search.png" alt="">
+	      {#* 搜索公司... *#}
+	    <input type="text" placeholder="{#$langData['renovation'][0][44]#}" value="" name="keywords" id="keywords">
+	    <div class="renoform_go"><button>{#$langData['renovation'][0][1]#}</button></div>  {#* 搜索 *#}
+	  </form>		  
+	</div>
+	<div class="com_list">
+
+		<ul class="fn-clear"></ul>
+	</div>
+
+	<div class="pagination fn-clear"></div>
+
+</div>
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.dragsort-0.5.1.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicUpload.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicAddr.js?v={#$cfg_staticVersion#}"></script>
+
+

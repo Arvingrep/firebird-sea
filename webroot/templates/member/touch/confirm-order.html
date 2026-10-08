@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>{#$langData['siteConfig'][6][141]#}</title>
+<meta name="wap-font-scale" content="no">
+<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/confirm-order.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+  var totalBalance = {#$userinfo.money#};
+</script>
+</head>
+<body>
+
+<div class="header">
+  <a href="{#getUrlPath service='member' type='user' template='select-module'#}" class="back"></a>
+  <div class="userphoto"><a href="javascript:;"><img onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';" src="{#if $userinfo.photo == ""#}{#$cfg_staticPath#}images/noPhoto_100.jpg{#else#}{#changeFileSize url="{#$userinfo.photo#}" type="middle"#}{#/if#}"></a></div>
+  <p class="nickname">{#$userinfo.nickname#}</p>
+</div>
+
+<div class="order-list">
+  <ul class="fn-clear">
+    {#$totalPrice = 0#}
+    {#foreach from=$modules item=m#}
+    <li data-id="{#$m.name#}" data-price="{#$m.price#}">
+      <p class="order-tit">{#getModuleTitle name=$m.name#}</p>
+      <p class="order-btn"><i class="reduce"></i><em class="year"><em>1</em>{#$langData['siteConfig'][13][14]#}</em><i class="add"></i></p>
+      <p class="order-total">{#echoCurrency type='symbol'#}<em>{#$m.price#}</em></p>
+      <span class="del"></span>
+    </li>
+    {#$totalPrice = $totalPrice + $m.price#}
+    {#/foreach#}
+  </ul>
+</div>
+
+<p class="total-price">{#$langData['siteConfig'][19][664]#}：<font>{#echoCurrency type='symbol'#}<em>{#$totalPrice|string_format:"%.2f"#}</em></font></p>
+{#$balance = 0#}
+{#if $userinfo.money#}
+<div class="yue fn-clear">
+  {#$balance = $userinfo.money#}
+  {#if $userinfo.money > $totalPrice#}
+  {#$balance = $totalPrice#}
+  {#/if#}
+  <p class="fn-left active yue-btn">{#$langData['siteConfig'][19][386]#}（{#echoCurrency type='symbol'#}<em>{#$userinfo.money#}</em>）</p><span class="fn-right">-{#echoCurrency type='symbol'#}<em class="reduce-yue">{#$balance|string_format:"%.2f"#}</em></span>
+</div>
+{#/if#}
+<p class="fn-clear gray"><span class="fn-left">{#$langData['siteConfig'][19][316]#}</span><span class="fn-right">{#echoCurrency type='symbol'#}<em class="pay-total">{#($totalPrice - $balance)|string_format:"%.2f"#}</em></span></p>
+
+<!-- 付款方式 s -->
+<div class="pay-list fn-hide" id="paytypeObj">
+  {#siteConfig action="payment"#}
+  {#if $row.pay_code == "wxpay"#}
+  <dl class="fn-clear" id="wxpay">
+    <dt><img src="{#$cfg_basehost#}/templates/member/touch/images/wxpay.png" alt=""></dt>
+    <dd><p>{#$langData['siteConfig'][19][712]#}</p><p class="tips">{#$langData['siteConfig'][19][809]#}</p></dd>
+    <dd class="radio"></dd>
+  </dl>
+  {#elseif $row.pay_code == "globalalipay"#}
+  <dl class="fn-clear" id="globalalipay">
+    <dt><img src="{#$cfg_basehost#}/templates/member/touch/images/alipay.png" alt=""></dt>
+    <dd><p>{#$langData['siteConfig'][19][302]#}</p><p class="tips">{#$langData['siteConfig'][19][810]#}</p></dd>
+    <dd class="radio"></dd>
+  </dl>
+  {#elseif $row.pay_code == "alipay"#}
+  <dl class="fn-clear" id="alipay">
+    <dt><img src="{#$cfg_basehost#}/templates/member/touch/images/alipay.png" alt=""></dt>
+    <dd><p>{#$langData['siteConfig'][19][302]#}</p><p class="tips">{#$langData['siteConfig'][19][810]#}</p></dd>
+    <dd class="radio"></dd>
+  </dl>
+  {#elseif $row.pay_code == "paypal"#}
+  <dl class="fn-clear" id="paypal">
+    <dt><img src="{#$cfg_basehost#}/templates/member/touch/images/paypal.png" alt=""></dt>
+    <dd><p>{#$langData['siteConfig'][19][714]#}</p><p class="tips">{#$langData['siteConfig'][19][811]#}</p></dd>
+    <dd class="radio"></dd>
+  </dl>
+  {#/if#}
+  {#/siteConfig#}
+</div>
+<!-- 付款方式 e -->
+
+<div class="nextbtn"><a href="javascript:;">{#$langData['siteConfig'][19][665]#}</a></div>
+
+<form class="fn-hide" action="/include/ajax.php" method="get" id="pay">
+	<input type="hidden" name="service" value="member" />
+	<input type="hidden" name="action" value="joinPay" />
+	<input type="hidden" name="modules" id="modules" value="" />
+	<input type="hidden" name="balance" id="balance" value="" />
+	<input type="hidden" name="paytype" id="paytype" value="" />
+</form>
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script src="{#$templets_skin#}js/confirm-order.js?v={#$cfg_staticVersion#}" charset="utf-8"></script>
+</body>
+</html>

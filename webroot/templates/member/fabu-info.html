@@ -1,0 +1,569 @@
+<script type="text/javascript">
+	var service = "info";
+	var payReturn = "{#getUrlPath service='member' type='user' template='manage' action='info'#}";
+	var  typeid = "{#$detail_typeid#}";
+	var  typename = "{#$typename#}";
+	var pubModelType = '{#$module#}';
+	var server_video_url = '/include/upload.inc.php?mod={#$module#}&filetype=video&type=video&utype=video';
+	var server_image_url = '/include/upload.inc.php?mod={#$module#}&filetype=image&type=atlas';
+	var geetest = {#$cfg_geetest#};
+	var username = '{#$detail_person#}';
+	var city = '{#$detail_city#}';
+    var oldValid = {#$detail_valid|default:$smarty.now#};
+	var optype="{#$do#}";
+	var infoCount = "{#$infoCount#}";
+	var fabuamount = '{#if $infoCount>0#}0{#else#}{#$fabuamount#}{#/if#}';
+	var defaultPrice="{#if ($cfg_defaultvalid && $cfg_defaultvalid[0]['daytime']) || ($cfg_membervalid && $cfg_membervalid[0]['daytime'])#}0{#else#}{#if $info#}{#$info[0].price#}{#else#}0{#/if#}{#/if#}"
+	var cityid = '{#$siteCityInfo.cityid#}';
+	var bindTel = '{#$userinfo.phone#}'
+    var customFabuCheckPhone = {#$customFabuCheckPhone#};
+    var waitPay = "{#$detail_waitpay#}";
+    var atlasMax = {#if $list_atlasMax == 0#}1{#else#}{#$list_atlasMax#}{#/if#};
+	var ai_token = '{#$token#}';
+	
+</script>
+<div class="typeMask"></div>
+<div class="typePop">
+	<h2 class="popTit">{#$langData['info'][4][74]#} <a href="javascript:;" class="close_pop"></a></h2>{#* 选择发布分类 *#}
+	<div class="popCon">
+		<div class="catagoryBox">
+			{#loop service="info" action="type" return='type'#}
+			{#if $typeid == $type.id#}
+			{#$typeLower = $type.lower#}
+			{#/if#}
+            {#if $do != 'edit' && $type.redirect == ''#}
+			<dl>
+				<dt><s></s>{#$type.typename#}</dt>
+				<dd class="fn-clear">
+					{#$ind = 0#}
+					{#loop service="info" action="type" return='subtype' type="{#$type.id#}"#}
+                    {#if $subtype.redirect == ''#}
+					{#if $detail_typeid == $subtype.id || $typeid == $subtype.id#}
+					{#$typePar = $type.typename#}
+					{#$typeParId = $type.id#}
+					{#$typename = $subtype.typename#}
+					{#/if#}
+					<a href="javascript:;"  class="typechose {#if $crumb[1]["id"] == $subtype.id || $typeid == $subtype.id#}on_chose{#/if#}" data-typeid="{#$subtype.id#}" data-typename="{#$subtype.typename#}">{#$subtype.typename#}</a>
+					<!-- 分类是一级分类s -->
+					{#if $typeLower > 0 && $ind == 0 && $typeid == $type.id #}
+					{#$toTypeid = $subtype.id#}
+					{#/if#}
+					<!-- 分类是一级分类s -->
+                    {#/if#}
+					{#$ind = $ind + 1#}
+					{#/loop#}
+				</dd>
+			</dl>
+            {#/if#}
+			{#/loop#}
+		</div>
+	</div>
+</div>
+
+<ul class="main-tab">
+	<li class="curr">
+		<a href="javascript:;">{#if $do == "edit"#}{#$langData['siteConfig'][6][169]#}{#else#}{#$langData['siteConfig'][11][10]#}{#/if#}</a>
+		{#* 修改分类信息-发布分类信息 *#}
+	</li>
+	<!-- <li><a href="{#getUrlPath service='member' type='user' template='manage' action='info'#}">{#$langData['siteConfig'][10][11]#}</a></li> -->
+	{#* 我的全部信息 *#}
+</ul>
+
+{#if $typeid== 0 && $do != "edit"#}
+<div class="catagoryBox">
+	{#loop service="info" action="type" return='type'#}
+    {#if $type.redirect == ''#}
+	<dl data-pid="{#$type.id#}">
+		<dt><s></s>{#$type.typename#}</dt>
+		<dd class="fn-clear">
+			{#loop service="info" action="type" return='subtype' type="{#$type.id#}"#}
+            {#if $subtype.redirect == ''#}
+			<a href="{#getUrlPath service='member' type='user' template='fabu' action='info' param="typeid={#$subtype.id#}"#}">{#$subtype.typename#}</a>
+            {#/if#}
+			{#/loop#}
+		</dd>
+	</dl>
+    {#/if#}
+	{#/loop#}
+</div>
+{#else#}
+<div class="w-form">
+	<a href="{#$member_userDomain#}/upgrade.html" class="fb_tip">
+		<p><s></s>{#if $infoCount > 0#}{#$langData['info'][4][75]|replace:"0":$infoCount#}{#else#}{#$langData['info'][4][75]#}{#/if#}</p>{#*您本周还可免费发布 <em>3</em> 条信息*#}
+		<p>{#$langData['info'][4][76]|replace:' 1 ':$cfg_shortname#}</p>
+		<div class="levelUp">{#$langData['info'][4][77]#}<s></s></div> {#* 升级会员 发布不受限 *#}
+	</a>
+	<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=info&action={#if $do == "edit"#}edit&id={#$id#}{#else#}put{#/if#}" data-url="{#getUrlPath service='member' type='user' template='manage' action='info'#}">
+		<dl class="fn-clear typeChose" data-required="1">
+			<dt>{#$langData['info'][4][78]#}</dt>  {#* 选择分类 *#}
+			<dd class="fn-clear">
+				<div class="inpBox selectType floatDiv typeParBox {#if $typeParId == ''#}fn-hide{#/if#}" data-id="{#$typeParId#}">
+					<input type="text" name="typepar" value="{#$typePar#}" readonly placeholder="{#$langData['info'][4][79]#}" id="typePar" ><input type="hidden" name="typeparid" id="typeparid" value="{#$typeParId#}"><s class="arr"></s>  {#* 请选择 *#}
+				</div>
+
+				<div class="inpBox selectType floatDiv">
+					<input type="text" name="typename" value="{#$typename#}" readonly placeholder="{#$langData['info'][4][79]#}" id="typename" ><input type="hidden" name="typeid" id="typeid" value="{#if $typeid#}{#$typeid#}{#else#}{#$detail_typeid#}{#/if#}"><s class="arr"></s> {#* 请选择 *#}
+				</div>
+			</dd>
+		</dl>
+
+
+		<dl class="fn-clear ">
+			<dt><span>*</span>{#$langData['info'][4][80]#}</dt>{#* 详情内容 *#}
+			<dd class="aiFitContentBox">
+				<div class="aiBtnPlace">
+					<script id="body" name="desc" type="text/plain" style="width:100%;height:300px">{#$detail_title#}</script>
+				</div>
+				<!-- aiConIsload =>生成中  aiFitConResultShow => 已生成 -->
+				<!-- <div class="aiFitConBox aiConIsload">
+					<div class="aiFitCon_header">
+						<div class="ai_title disflex">
+							<h4>AI内容助手</h4>
+							<p>尝试提供一些描述，AI就能帮写啦</p>
+						</div>
+						<div class="ai_title disflex ai_isload">
+							<h4>AI生成中</h4>
+						</div>
+						<div class="ai_title disflex ai_result">
+							<h4>内容已生成</h4>
+						</div>
+						<div class="ai_btns">
+							<a href="javascript:;" class="ai_getResult"><span>生成内容</span></a>
+							<a href="javascript:;" class="ai_close"></a>
+						</div>
+						<div class="aiOption_btns">
+							<div class="ai_count">
+								<span>字数</span>
+								<input type="text" placeholder="500">
+							</div>
+							<a href="javascript:;" class="ai_randombtn"><div class="btn_inner"><s></s><span>随机</span></div></a>
+							<a href="javascript:;" class="btn_more" data-title="正式">更正式</a>
+							<a href="javascript:;" class="btn_more" data-title="专业">更专业</a>
+							<a href="javascript:;" class="btn_more" data-title="有趣">更有趣</a>
+							<a href="javascript:;" class="ai_getResult"><span>换一换</span></a>
+							<a href="javascript:;" class="ai_close"></a>
+						</div> 
+					</div>
+					<div class="aiFitCon_result">
+						<div class="aiTextShow" placeholder="内容生成中..."></div>
+						<div class="aiResult_btns">
+							<a href="javascript:;" class="aiResult_use">使用此内容</a>
+							<div class="aiResult_change">
+								<a href="javascript:;" class="aiResult_prev"></a>
+								<em></em>
+								<a href="javascript:;" class="aiResult_next"></a>
+							</div>
+						</div>
+					</div>
+					<div class="aiFitCon_options">
+						<p class="ai_tip">补充描述，Ai生成更准确：</p>
+						<div class="customizeBox ">
+							<div class="cContent">
+								{#foreach from=$list_item key=key item=item#}
+								{#$value = ""#}
+								{#$valueArr = array()#}
+								{#foreach from=$detail_item key=k item=i#}
+								{#if $i.id == $item.id#}
+								{#$value = $i.value#}
+								{#$valueArr = $i.valueArr#}
+								{#/if#}
+								{#/foreach#}
+								{#if $item.formtype == "text"#}
+								<dl  data-required="{#$item.required#}">
+									<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+									<dd>
+										<div class="inpBox"><input type="text" placeholder="请填写" name="huoniao_{#$item.field#}" id="huoniao_{#$item.field#}" value="{#if $value#}{#$value#}{#else if count($item.default) > 0#}{#$item.default[0]#}{#/if#}" />{#* 请输入 *#}
+										</div>
+									</dd>
+				
+								</dl>
+				
+								{#elseif $item.formtype == "radio"#}
+								<dl class="radioBox" data-required="{#$item.required#}">
+									<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+									<dd>
+										<ul>
+											{#foreach from=$item.options key=k item=options#}
+											{#if $options#}
+											<li class="{#if $value == $options || (in_array($options, $item.default) && !$id)#}on_chose{#/if#}"><input type="radio" name="huoniao_{#$item.field#}" value="{#$options#}" {#if $value==$options#}checked{#/if#}><s><i></i></s><span>{#$options#}</span></li>
+											{#/if#}
+											{#/foreach#}
+										</ul>
+									</dd>
+								</dl>
+								{#elseif $item.formtype == "checkbox"#}
+								<dl class="AllcheckBox fn-clear"  data-required="{#$item.required#}">
+									<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+									<dd>
+										<div class="checkbox">
+											{#foreach from=$item.options key=k item=options#}
+											{#if $options#}
+											<label><input type="checkbox" name="huoniao_{#$item.field#}[]" value="{#$options#}" {#if (in_array($options, $item.default) && !$id) || in_array($options, $valueArr)#} checked{#/if#} />{#$options#}</label>
+											{#/if#}
+											{#/foreach#}
+										</div>
+									</dd>
+								</dl>
+								{#/if#}
+								{#/foreach#}
+							</div>
+						</div>
+					</div>
+				</div> -->
+			</dd>
+			<dd class="tabArrs outerTabArrs" >
+				{#foreach from=$list_label key=key item=item#}
+				<span data-id="{#$item.id#}">{#$item.name#}</span>
+				{#/foreach#}
+			</dd>
+			<input type="hidden" name="feature" id="feature" value="{#$detail_feature#}">
+		</dl>
+
+
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][27]#}</dt>{#* 所在区域 *#}
+			<dd id="selAddr">
+				<div class="sel-group" data-title="{#$langData['siteConfig'][20][68]#}">{#* 请选择所在区域 *#}
+					{#if !$detail_addrid#}
+					{#$detail_addrid = $siteCityInfo['cityid']#}
+					{#/if#}
+					<div class="city-title addrBtn" data-field="addrid" data-ids="{#if detail_addrid#}{#getPublicParentInfo tab='site_area' id=$detail_addrid split=' '#}{#else#}{#$siteCityInfo['cityid']#}{#/if#}" data-id="{#if $detail_addrid#}{#$detail_addrid#}{#else#}{#$siteCityInfo.cityid#}{#/if#}">{#if $detail_address != "" && $detail_addrArr != ""#}{#getPublicParentInfo tab='site_area' id=$detail_addrid type='typename' split='/'#}{#else#}{#if $detail_addrArr != ""#}{#$detail_addrArr#}{#else if $detail_city#}{#$detail_city#}{#else#}{#$siteCityInfo['name']#} <span style="color:#B3B3B3;">/{#$langData['siteConfig'][7][2]#}区域</span>{#/if#}{#/if#}</div>{#* 请选择*#}
+                  	<input type="hidden" name="addrArr" id="addrArr" value="{#$detail_addrArr#}">
+				</div>
+				<div class="detaiAddrBox ">
+					<div class="inpBox detaiAddr {#if !$detail_address#}fn-hide{#/if#}" ><input type="text" name="address" id="addrPosi" value="{#$detail_address#}" readonly></div>
+				<div class="posiBox {#if $detail_address#}pFixed{#/if#}" id="markbtn"><s></s><span>{#if $detail_address#}查看定位{#else#}{#$langData['info'][4][83]#}{#/if#}</span></div>{#* 可添加定位 *#}
+				</div>{#* 可添加详细位置  *#}
+				<input type="hidden" id="lnglat" name="lnglat" value="{#$detail_lng#},{#$detail_lat#}">
+				<input type="hidden" name="addr" id="addidArr" value="{#$detail_addrid#}" />
+        <input type="hidden" name="cityid" id="cityid" value="{#$detail_cityid|default:$siteCityInfo['cityid']#}" />
+				<!-- 定位 -->
+
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+
+		<!-- <dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][642]#}：</dt>{#* 联系人*#}
+			<dd>
+				<input type="text" name="person" class="inp" id="person" size="20" data-title="{#$langData['waimai'][3][52]#}" value="{#if $detail_person != ""#}{#$detail_person#}{#else#}{#$userinfo.nickname#}{#/if#}" />{#* 商品单位 *#}
+				<span class="tip-inline"></span>
+			</dd>
+		</dl> -->
+		<!-- <dl class="fn-clear">
+			<dt>{#$langData['siteConfig'][19][14]#}：</dt>{#* QQ号码 *#}
+			<dd><input type="text" name="qq" class="inp" id="qq" size="20" onkeyup="value=value.replace(/\D+/ig,'')" value="{#if $detail_qq != ""#}{#$detail_qq#}{#else#}{#$userinfo.qq#}{#/if#}" /></dd>
+		</dl> -->
+		<dl class="fn-clear botMore" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][3][6]#}</dt>{#* 手机号码 *#}
+			<dd class="fn-clear inpBox">
+				 <span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+				<input type="text" name="phone"  id="tel" size="20" data-title="{#$langData['siteConfig'][20][463]#}" onkeyup="value=value.replace(/\D+/ig,'')" value="{#if $detail_telNum != ""#}{#$detail_telNum#}{#else#}{#$userinfo.phone#}{#/if#}" />{#* 请输入手机号码 *#}
+				<span class="tip-inline"></span>
+				<div class="areaCode_wrap areaCode_wrap2">
+          <ul>
+
+          </ul>
+        </div>
+        <input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+			</dd>
+			<dd class="fn-clear  pCode fn-hide">
+				<div class="inpBox"><input type="text" name="vercode" value="" id="vercode" placeholder="{#$langData['info'][4][72]#}"></div><a href="javascript:;" class="getpCode codebtn">{#$langData['info'][4][73]#}</a>{#* 请输入验证码  发送验证码  *#}
+			</dd>
+		</dl>
+        {#if $list_atlasMax#}
+		<dl class="fn-clear">
+			<dt>添加照片</dt>{#* 添加照片 *#}
+			<dd class="listImgBox">
+				<p class="upTip ">添加真实照片更吸引人，最多{#$list_atlasMax#}张</p>
+
+				<div id="listSection1" class="listSection filePickerBox">
+					{#foreach from=$detail_imglist key=k item=i#}
+					<div id="WU_UP_FILE_0" class="pubitem">
+						<a href="{#$i.path#}" target="_blank" title="" class="enlarge"><img src="{#$i.path#}" data-val="{#$i.pathSource#}" data-url="{#$i.path#}"></a><a class="li-rm" href="javascript:;"></a><span class="setMain">设为主图</span><span class="mainImg">主图</span></div>
+					{#/foreach#}
+					<div class="btn-section fn-clear">
+						<div class="wxUploadObj fn-clear">
+							<div class="uploadinp " data-main="1" data-right="1" id="filePicker1"  data-count="{#$list_atlasMax#}" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>上传图片</span></div>
+						</div>
+					</div>
+				</div>
+
+			</dd>
+		</dl>
+        {#/if#}
+        {#if $list_videoSwitch#}
+		<dl class="fn-clear">
+			<dt>添加视频</dt>{#* 添加视频 *#}
+			<dd class="listImgBox">
+
+
+				<div id="listSection2" class="listSection filePickerBox">
+					{#if $detail_video#}
+					<div id="WU_VIDEO_FILE_0" class="pubitem videoItem">
+						<a href="{#$detail_video#}" target="_blank" title="" class="enlarge"><video src="{#$detail_video#}" poster="{#$detail_videoPoster#}" data-val="{#$detail_videoPath#}" data-url="{#$detail_videoPath#}" data-poster="{#$detail_videoPosterPath#}"></video></a><a class="li-rm" href="javascript:;"></a><span class="bmask">视频</span></div>
+					{#/if#}
+					<div class="btn-section fn-clear" style="{#if $detail_video#}display:none;{#/if#}">
+						<div class="vUploadObj fn-clear">
+							<div class="uploadbtn " data-main="1" data-right="1" id="filePicker2"  data-count="1" data-size="{#$atlasSize#}" data-imglist=""><div class="video_btn"></div><span>上传视频</span></div>{#* 图片/视频 *#}
+						</div>
+					</div>
+				</div>
+
+			</dd>
+		</dl>
+        {#/if#}
+	<!-- 自定义内容 s -->
+		<!-- <div class="customizeBox {#if !$list_item#}fn-hide{#/if#}">
+			<dl class="cTitle">{#$langData['info'][4][84]#}<s class="arr"></s></dl>{#*  <dt>完善信息</dt><dd><span>选填，完善信息可提高吸引力哦</span></dd>  *#}
+			<div class="cContent">
+				{#foreach from=$list_item key=key item=item#}
+				{#$value = ""#}
+				{#$valueArr = array()#}
+				{#foreach from=$detail_item key=k item=i#}
+				{#if $i.id == $item.id#}
+				{#$value = $i.value#}
+				{#$valueArr = $i.valueArr#}
+				{#/if#}
+				{#/foreach#}
+				{#if $item.formtype == "text"#}
+				<dl  data-required="{#$item.required#}">
+					<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+					<dd>
+						<div class="inpBox"><input type="text" placeholder="请填写" name="huoniao_{#$item.field#}" id="huoniao_{#$item.field#}" value="{#if $value#}{#$value#}{#else if count($item.default) > 0#}{#$item.default[0]#}{#/if#}" />{#* 请输入 *#}
+						</div>
+					</dd>
+
+				</dl>
+
+				{#elseif $item.formtype == "radio"#}
+				<dl class="radioBox" data-required="{#$item.required#}">
+					<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+					<dd>
+						<ul>
+							{#foreach from=$item.options key=k item=options#}
+							<li class="{#if $value == $options || (in_array($options, $item.default) && !$id)#}on_chose{#/if#}"><input type="radio" name="huoniao_{#$item.field#}" value="{#$options#}" {#if $value==$options#}checked{#/if#}><s><i></i></s><span>{#$options#}</span></li>
+							{#/foreach#}
+						</ul>
+					</dd>
+				</dl>
+				{#elseif $item.formtype == "checkbox"#}
+				<dl class="AllcheckBox fn-clear"  data-required="{#$item.required#}">
+					<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+					<dd>
+						<div class="checkbox">
+							{#foreach from=$item.options key=k item=options#}
+							<label><input type="checkbox" name="huoniao_{#$item.field#}[]" value="{#$options#}" {#if (in_array($options, $item.default) && !$id) || in_array($options, $valueArr)#} checked{#/if#} />{#$options#}</label>
+							{#/foreach#}
+						</div>
+					</dd>
+				</dl>
+				{#/if#}
+				{#/foreach#}
+			</div>
+		</div> -->
+      <!-- 自定义内容 e -->      
+
+		<!-- 自定义内容 s -->
+		<dl class="customBox fn-clear {#if count($list_item) > 3#}slideClose{#else#}slideOpen{#/if#}">
+			<dt>完善信息</dt>
+			<dd>
+				<div class="tipbox disflex a-c j-b">
+					<p class="tip">完善信息也可提高信息曝光度</p>
+					{#if count($list_item) > 3#}
+					<a href="javascript:;" class="slide_btn disflex a-c"><span>展开</span><s></s></a>
+					{#/if#}
+				</div>
+				<div class="customizeBox " style="{#if count($list_item) <= 3#}height:auto;{#/if#}">
+					<div class="cContent">
+						{#foreach from=$list_item key=key item=item#}
+						{#$value = ""#}
+						{#$valueArr = array()#}
+						{#foreach from=$detail_item key=k item=i#}
+						{#if $i.id == $item.id#}
+						{#$value = $i.value#}
+						{#$valueArr = $i.valueArr#}
+						{#/if#}
+						{#/foreach#}
+						{#if $item.formtype == "text"#}
+						<dl  data-required="{#$item.required#}" data-name="huoniao_{#$item.field#}">
+							<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+							<dd>
+								<div class="inpBox"><input type="text" placeholder="请填写" name="huoniao_{#$item.field#}" id="huoniao_{#$item.field#}" value="{#if $value#}{#$value#}{#else if count($item.default) > 0#}{#$item.default[0]#}{#/if#}" />{#* 请输入 *#}
+								</div>
+							</dd>
+		
+						</dl>
+		
+						{#elseif $item.formtype == "radio"#}
+						<dl class="radioBox" data-required="{#$item.required#}" data-name="huoniao_{#$item.field#}">
+							<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+							<dd>
+								<ul>
+									{#foreach from=$item.options key=k item=options#}
+									{#if $options#}
+									<li class="{#if $value == $options || (in_array($options, $item.default) && !$id)#}on_chose{#/if#}"><input type="radio" name="huoniao_{#$item.field#}" value="{#$options#}" {#if $value==$options#}checked{#/if#}><s><i></i></s><span>{#$options#}</span></li>
+									{#/if#}
+									{#/foreach#}
+								</ul>
+							</dd>
+						</dl>
+						{#elseif $item.formtype == "checkbox"#}
+						<dl class="AllcheckBox fn-clear"  data-required="{#$item.required#}" data-name="huoniao_{#$item.field#}">
+							<dt>{#if $item.required=='1'#}<span>*</span>{#/if#}{#$item.title#}</dt>
+							<dd>
+								<div class="checkbox">
+									{#foreach from=$item.options key=k item=options#}
+									{#if $options#}
+									<label><input type="checkbox" name="huoniao_{#$item.field#}[]" value="{#$options#}" {#if (in_array($options, $item.default) && !$id) || in_array($options, $valueArr)#} checked{#/if#} />{#$options#}</label>
+									{#/if#}
+									{#/foreach#}
+								</div>
+							</dd>
+						</dl>
+						{#/if#}
+						{#/foreach#}
+					</div>
+				</div>
+				<div class="bg_mask"></div>
+			</dd>
+		</dl>
+		<!-- 自定义内容 e -->
+
+      {#if $list_sysTips#}
+      <div class="sysTips fb_tip"><p><s></s>{#$list_sysTips#}</p></div>
+      {#/if#}
+
+	  {#if ($do != 'edit' || ($detail_valid - $smarty.now)<=0 || $waitPay == '1')#}
+		<dl class="fn-clear validBox" {#if count($info) <= 0#} style="display:none;"{#/if#}>
+			<dt>延长有效期</dt>{#* 有效期 *#}
+			<!-- <dd class="endtimeBox hide">
+					<s class="decor"></s>
+					<div class="dd_head ">
+						<h3>{#$langData['info'][3][32]#}</h3>   {#* 信息有效期 *#}
+						{#if count($info) > 0#}
+						{#if $freeValidDay && $freeValidDay['day'] > 0#}
+						<p>{#$langData['info'][3][33]|replace:"3":$freeValidDay['day']#}</p>{#*  默认3天有效，可增加时长提升曝光！  *#}
+						{#else#}
+						<p></p>{#*  默认3天有效，可增加时长提升曝光！  *#}
+						{#/if#}
+						{#else#}
+						<p></p>{#*  默认3天有效，可增加时长提升曝光！  *#}
+						{#/if#}
+					</div>
+					<div class="endSelBox">
+							<h4 class="fn-clear"><span class="left_tit">{#$langData['info'][3][34]#}</span><span class="right_tip">{#$langData['info'][3][35]#}</span></h4>{#* 选择时长 优惠仅限当前页面哦 *#}
+							<ul class="fn-clear">
+								{#if $infoCount > 0 && ($do != 'edit' || $detail_waitpay=='1') #}
+									{#if $freeValidDay && $freeValidDay['day'] > 0#}
+										<li data-time="{#$freeValidDay['time']#}" data-price="0" class="on_chose default_valid">
+											<h3><b>{#$freeValidDay['day']#}</b>{#$langData['info'][1][17]#}</h3>  {#* 月 *#}
+											<p>免费</p>   {#* 需 *#}
+										</li>
+									{#/if#}
+								{#else#}
+									<s></s>
+								{#/if#}
+								{#foreach from=$info key=k item=i#}
+								<li data-time="{#$i.daytime#}" data-price="{#$i.price#}" >
+									<h3><b>{#$i.day#}</b>{#$i.dayText#}</h3>  {#* 月 *#}
+									<p>{#if $i.price > 0#}{#$langData['info'][3][38]#}{#$i.price#}{#echoCurrency type="short"#}{#else#}免费{#/if#}</p>   {#* 需 *#}
+								</li>
+								{#/foreach#}
+								{#if $cfg_valid && $cfg_valid[0]['daytime']#}
+								<li class="forever" data-time="{#$cfg_valid[0]['daytime']|default:0#}"   data-price="{#$cfg_valid[0]['price']#}">
+									<h3>{#$langData['info'][3][36]#}</h3>{#*  永久有效  *#}
+									<p>{#if $cfg_valid[0]['price'] > 0#}{#$langData['info'][3][38]#}{#$cfg_valid[0]['price']#}{#echoCurrency type="short"#}{#else#}免费{#/if#}</p>{#*  需  *#}
+								</li>
+								{#/if#}
+							</ul>
+					</div>
+					
+
+
+			</dd> -->
+			<dd class="feeBox endSelBox">
+				<ul class=" fn-clear">
+					{#if $infoCount > 0 && ($do != 'edit' || $detail_waitpay=='1') #}
+						{#if $freeValidDay && $freeValidDay['day'] > 0#}
+							<li data-time="{#$freeValidDay['time']#}" data-price="0" class="on_chose default_valid feeItem">
+								<h3><b>{#$freeValidDay['day']#}</b>{#$langData['info'][1][17]#}</h3>  {#* 月 *#}
+								<p>免费</p>   {#* 需 *#}
+							</li>
+						{#/if#}
+					{#else#}
+						<s></s>
+					{#/if#}
+					{#foreach from=$info key=k item=i#}
+					<li data-time="{#$i.daytime#}" data-price="{#$i.price#}" class="feeItem">
+						<h3><b>{#$i.day#}</b>{#$i.dayText#}</h3>  {#* 月 *#}
+						<p>{#if $i.price > 0#}{#$langData['info'][3][38]#}{#$i.price#}{#echoCurrency type="short"#}{#else#}免费{#/if#}</p>   {#* 需 *#}
+					</li>
+					{#/foreach#}
+					{#if $cfg_valid && $cfg_valid[0]['daytime']#}
+					<li class="forever  feeItem" data-time="{#$cfg_valid[0]['daytime']|default:0#}"   data-price="{#$cfg_valid[0]['price']#}">
+						<h3><b style="font-size: 16px;">{#$langData['info'][3][36]#}</b></h3>{#*  永久有效  *#}
+						<p>{#if $cfg_valid[0]['price'] > 0#}{#$langData['info'][3][38]#}{#$cfg_valid[0]['price']#}{#echoCurrency type="short"#}{#else#}免费{#/if#}</p>{#*  需  *#}
+					</li>
+					{#/if#}
+				</ul>
+			</dd>
+		</dl>
+		{#/if#}
+		{#if $list_topSwitch#}
+		<dl class="topSetbox">
+			<dt><img src="{#$templets_skin#}images/topSet_icon.png"></dt>
+			<dd class="feeBox ">
+				<ul class="topNormalUl fn-clear">
+				
+				</ul>
+				<input type="hidden" id="topDay" name="top">
+				<p class="top_tip">增加8-10倍曝光效果！</p>
+			</dd>
+		</dl>
+		{#/if#}
+		<dl class="fn-clear">
+			<dt>&nbsp;</dt>
+				<dd><button class="submit" id="submit">{#$langData['siteConfig'][11][19]#}</button></dd>
+				{#* 立即发布 - 提交修改  *#}
+		</dl>
+	</form>
+</div>
+<div class="mapMask"></div>
+<div class="mapPopBox">
+	<a href="javascript:;" class="pop-close">&times;</a>
+	<div class="pop-title">标注地图位置</div>
+	<div class="pop-con">
+		<iframe name="markDitu" id="markDitu" frameborder="0"></iframe>
+		<!-- <div class="btns"><a href="javascript:;" id="okPop">{#$langData['siteConfig'][6][1]#}</a><a href="javascript:;" id="cloPop">{#$langData['siteConfig'][6][12]#}</a></div>{#* 取消 *#} -->
+		<div class="choseBox fn-clear">
+			<div class="leftBox">
+				<span class="txt"><s></s>当前定位</span>
+				<div class="posiInp"><input type="text" id="currAddr" placeholder="定位中..."><a href="javascript:;" class="edit_posi"><s></s>编辑地址</a></div>
+			</div>
+			<a href="javascript:;" class="right_btn" id="okPop">确定</a>
+		</div>
+	</div>
+</div>
+<script>
+	var map_city = '{#$cfg_mapCity#}', site_map = "{#$site_map#}";
+
+	// 为避免直接进入一级分类  默认选中第一个分类
+	var typeLower = '{#$typeLower|default:0#}'
+	var toTypeid = '{#$toTypeid|default:0#}'
+	if(typeLower > 0 && toTypeid){
+		location.replace(`{#$member_userDomain#}/fabu-info?typeid=${toTypeid}`)
+	}
+</script>
+<script type="text/javascript" src="{#$site_map_apiFile#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.coord.js"></script>
+
+{#if $cfg_geetest#}
+{#if $cfg_geetest == 1#}
+<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicAddr.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ai2Con.js?v={#$cfg_staticVersion#}"></script>

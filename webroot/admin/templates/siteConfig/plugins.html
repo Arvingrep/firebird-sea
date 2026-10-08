@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="/static/css/core/base.css" media="all"/>
+    <link rel="stylesheet" href="/static/css/ui/element_ui_index.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/admin/plugins.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="/static/js/vue/vue.min.js"></script>
+    <script src="/static/js/vue/axios.min.js"></script>
+    <script src="/static/js/ui/element_ui_index.js"></script>
+    <title>插件管理</title>
+    <style>
+      [v-cloak] {
+        display: none;
+      }
+    </style>
+    <script>
+     var adminPath = "{#$adminPath#}", adminRoute = '{#$adminRoute#}';
+    </script>
+  </head>
+  <body>
+    <div id="app" v-cloak>
+      <div class="container fn-clear">
+        <div class="main fn-clear">
+          <div class="main-tab fn-clear">
+            <div class="main-tab-left">
+              <span>{{isUnInstall?'卸载插件':'插件管理'}}</span>
+              <div class="uninstall-btn" @click="uninstallPlugin" v-show="!isUnInstall">
+                <img src="/static/images/admin/uninstall.png" alt="">
+                <span>卸载插件</span>
+              </div>
+              <div class="uninstall-btn" @click="uninstallPlugin" v-show="isUnInstall" style="background-color: #409EFF;">
+                <span style="color: #fff">完成</span>
+              </div>
+            </div>
+            <div class="main-tab-right">
+              <div class="searchPlugin-input">
+                <img src="/static/images/admin/search.png" alt="">
+                <input type="text" placeholder="搜索插件" @keyup.enter="searchPlugin" v-model="keyword">
+              </div>
+              <button class="searchPlugin-btn" @click="searchPlugin" >搜索</button>
+              <button class="searchPlugin-more" v-show="!isUnInstall" @click="installNew">获取更多插件</button>
+            </div>
+          </div>
+          <div class="main-content" v-loading="loading">
+            <div class="listBox">
+              <ul class="main-content-my sameUl fn-clear" v-if="!noData">
+                <li v-for="(item,index) in pluginsList" :key="item.id">
+                  <div class="imgDiv"><img :src="item.litpic || (defaultImageUrl + item.pid + '.png')" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                  <div class="titlteDiv">
+                    <span>{{item.title}}</span>
+                    <span>{{item.version}}</span>
+                  </div>
+                  <div class="description">
+                    <span :title="item.description">{{item.description}}</span>
+                  </div>
+                  <a @click="enterLink(item,$event)" :href="'/include/plugins/'+item.pid+'/index.php?adminRoute='+adminRoute" class="my-plugin-install enter-uninstall" v-show="!isUnInstall" target="_blank">
+                      <span>进入插件</span>
+                      <div class="arrow">
+                        <span></span>
+                        <span></span>
+                      </div>
+                  </a>
+                  <div class="my-plugin-install uninstall-box installBg" v-show="isUnInstall" @click="uninstallBtn(item.id)">
+                    <span class="uninstall-span">{{item.id == deleteId?unInstallText:'卸载'}}</span>
+                    <div class="uninstall-img">
+                      <img src="/static/images/admin/uninstall_red.png" alt="">
+                    </div>
+                  </div>
+                </li>
+              </ul>
+              <div class="noData" v-else="noData">暂无相关信息</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {#$jsFile#}
+  </body>
+</html>

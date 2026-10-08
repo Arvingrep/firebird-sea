@@ -1,0 +1,277 @@
+{#if $smarty.get.page == 'email'#}
+{#$pageTitle = '邮箱/短信'#}
+{#else#}
+{#$pageTitle = '智能设置'#}
+{#/if#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title> {#$pageTitle#}</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/setting.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script>
+        var pageType = '{#$smarty.get.page#}'
+        // 邮件
+        var userEmail = '{#$userinfo.email#}';
+        var emailEncrypt = '{#$userinfo.emailEncrypt#}'
+        var sms_delivery = '{#$company_sms_delivery#}'
+        var sms_fair= '{#$company_sms_fair#}'
+        var sms_interviewRefuse= '{#$company_sms_interviewRefuse#}'
+        var sms_onlineNotice= '{#$company_sms_onlineNotice#}'
+        var email = '{#$company_email#}'
+        var email_delivery = '{#$company_email_delivery#}'
+        var email_fair = '{#$company_email_fair#}'
+        var email_buyResume = '{#$company_email_buyResume#}'
+        var emailnotice = '{#$company_emailnotice#}'
+
+        // 智能处理
+        var time = '{#$company_delivery_limit.time#}'; //时间限制
+        var account = '{#$company_delivery_limit.account#}'; //账户限制
+        var delivery_refuse = '{#json_encode($company_delivery_refuse)#}'; //账户限制
+    </script>
+</head>
+<body class="{#if $smarty.get.page == 'email'#}greyHeader{#/if#}">
+    {#include file="../../../siteConfig/touch_top.html" pageTitle=$pageTitle pageRight='<div style="width: 1rem;"></div>'#}
+    <div id="page" class="pageBox">
+        <div class="pageEmail" v-if="pageType == 'email'">
+            <dl>
+                <dt>招聘邮箱<span>用于接收求职者简历、投递信息</span></dt>
+                <dd>
+                    <div class="form_item">
+                        <input type="text" placeholder="请填写招聘邮箱" v-model="form.email">
+                    </div>
+                    {#if $userinfo.emailCheck#}
+                    <div class="form_item sm_height" @click="setEmail">
+                        <p class="tip">将登录邮箱{#$userinfo.emailEncrypt#}设为招聘邮箱</p>
+                    </div>
+                    {#/if#}
+                </dd>
+                <dd >
+                    <div class="form_item switchBox">
+                        <div class="flexLeft">
+                            <h4>自动发送简历</h4>
+                            <p>购买简历，将会自动发送简历附件到邮箱</p>
+                        </div>
+                        <a href="javascript:;" :class="['switch',{'on':form.email_buyResume === 1}]" @click="form.email_buyResume = (form.email_buyResume === 1 ? 0 : 1)"></a>
+                    </div>
+                </dd>
+                <dd >
+                    <div class="form_item switchBox">
+                        <div class="flexLeft">
+                            <h4>投递邮件通知</h4>
+                            <p>求职者投递简历，将会收到带简历附件的邮件</p>
+                        </div>
+                        <a href="javascript:;" :class="['switch',{'on':form.email_delivery === 1}]" @click="form.email_delivery = (form.email_delivery === 1 ? 0 : 1)"></a>
+                    </div>
+                </dd>
+            </dl>
+            <dl>
+                <dt class="msg">短信通知</dt>
+                <dd >
+                    <div class="form_item switchBox">
+                        <div class="flexLeft">
+                            <h4>投递短信通知</h4>
+                            <p>求职者投递简历，将会收到短信通知</p>
+                        </div>
+                        <a href="javascript:;" :class="['switch',{'on':form.sms_interviewRefuse === 1}]" @click="form.sms_interviewRefuse = (form.sms_interviewRefuse === 1 ? 0 : 1)"></a>
+                    </div>
+                </dd>
+                <dd >
+                    <div class="form_item switchBox">
+                        <div class="flexLeft">
+                            <h4>面试取消通知</h4>
+                            <p>求职者回绝面试邀请，将会收到短信通知</p>
+                        </div>
+                        <a href="javascript:;" :class="['switch',{'on':form.sms_fair === 1}]" @click="form.sms_fair = (form.sms_fair === 1 ? 0 : 1)"></a>
+                    </div>
+                </dd>
+            </dl>
+            <div class="bottomBox">
+                <a href="javascript:;" class="savedata" @click="saveData">保存</a>
+            </div>
+        </div>
+        <div class="smartySolve" v-else>
+            <dl>
+                <dt class="limit">投递限制<span>被限制的求职者将无法投递简历</span></dt>
+                <dd>
+                    <div class="form_item flex_item" @click="showPop = true; showType ='time'">
+                        <label for="">再次投递间隔</label>
+                        <div class="flexRight">
+                            <input type="text" placeholder="请选择" readonly :value="checkValue('time')">
+                        </div>
+                    </div>
+                    <div class="form_item ">
+                        <label for="">账号限制</label>
+                        <div class="flexRight">
+                            <span :class="['check',{'on_chose':smartyForm.account.indexOf('1') > -1}]" @click="accountIn('1')">实名认证</span>
+                            <span :class="['check',{'on_chose':smartyForm.account.indexOf('2') > -1}]" @click="accountIn('2')">手机认证</span>
+                        </div>
+                    </div>
+                </dd>
+            </dl>
+            <dl>
+                <dt class="filter">自动过滤<span>不符合要求的投递，系统将自动为您拒绝</span></dt>
+                <dd>
+                    <div class="form_item flex_item">
+                        <label for="">工作经验</label>
+                        <div class="flexRight">
+                            <input type="text" placeholder="请选择" readonly :value="checkValue('experience')"  @click="showPop = true; showType ='experience'">
+                        </div>
+                    </div>
+                    <div class="form_item flex_item">
+                        <label for="">学历要求</label>
+                        <div class="flexRight">
+                            <input type="text" placeholder="请选择" readonly :value="checkValue('education')" @click="showType= 'education'; showPop = true">
+                        </div>
+                    </div>
+                    <div class="form_item ">
+                        <label for="">年龄要求</label>
+                        <div class="flexRight">
+                            <input type="tel" class="age" maxlength="100" placeholder="最小年龄" :value="checkValue('min_age')"  @change="changeInput('min_age',1)">
+                            <span class="ge">-</span>
+                            <input type="text" class="age" maxlength="100" placeholder="最大年龄" :value="checkValue('max_age')" @change="changeInput('max_age',1)">
+                        </div>
+                    </div>
+                    <div class="form_item flex_item">
+                        <label for="">期望薪资</label>
+                        <div class="flexRight">
+                            <input type="text" placeholder="请选择" readonly :value="checkValue('salary')" @click="showPop = true; showType= 'salary'">
+                        </div>
+                    </div>
+                    <div class="form_item flex_item">
+                        <label for="">简历完成度</label>
+                        <div class="flexRight">
+                            <input type="text" placeholder="请选择" readonly :value="checkValue('complete')" @click="showType = 'complete'; showPop = true">
+                        </div>
+                    </div>
+                
+                </dd>
+            </dl>
+            <div class="bottomBox">
+                <a href="javascript:;" class="savedata" @click="saveData_smarty">保存</a>
+            </div>
+        </div>
+
+        <div class="popContainer">
+            <div class="mask_pop" v-show="showPop"></div>
+
+            <!-- 薪资限制 -->
+            <div :class="['popBox salaryPop',{'showPop':showPop && showType =='salary'}]" >
+                <div class="pop_header">
+                    <a href="javascript:;" class="btn_cancel" @click="showPop = false">取消</a>
+                    <h4>薪资限制</h4>
+                    <a href="javascript:;" class="btn_sure" @click="smartyForm.salary = salary; showPop = false">确定</a>
+                </div>
+                <div class="pop_con">
+                    <ul class="options">
+                        <li v-for="item in optionArr" :class="[(!item.id ? 'inputBox' : 'select'),{'on_chose':(item.id && item.id === salary) || (!item.id && salary >= 0) }]" @click="changeForm('salary',item)">
+                            <label v-if="item.id">{{item.text}}薪资</label>
+                            <template v-else>
+                                <label for="">与发布薪资偏差</label>
+                                <div class="flexRight"><input type="text" :value="salary> 0  ? salary : ''" @change="changeInput('salary')"><span>以内</span></div>
+                            </template>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 工作经验 -->
+            <div :class="['popBox salaryPop',{'showPop':showPop && showType =='experience'}]" >
+                <div class="pop_header">
+                    <a href="javascript:;" class="btn_cancel" @click="showPop = false">取消</a>
+                    <h4>工作经验限制</h4>
+                    <a href="javascript:;" class="btn_sure" @click="smartyForm.experience = experience; showPop = false">确定</a>
+                </div>
+                <div class="pop_con">
+                    <ul class="options">
+                        <li v-for="item in optionArr" :class="[(!item.id ? 'inputBox' : 'select'),{'on_chose':(item.id && item.id === experience) || (!item.id && experience >= 0) }]" @click="changeForm('experience',item)">
+                            <label v-if="item.id">{{item.id == -1 ? '不限':'按发布经验要求'}}</label>
+                            <template v-else>
+                                <label for="">与经验要求相差</label>
+                                <div class="flexRight"><input type="text" :value="experience> 0  ? experience : ''" @change="changeInput('experience')"><span>年以内</span></div>
+                            </template>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 学历 -->
+            <div :class="['popBox salaryPop',{'showPop':showPop && showType =='education'}]">
+                <div class="pop_header">
+                    <a href="javascript:;" class="btn_cancel" @click="showPop = false">取消</a>
+                    <h4>学历限制</h4>
+                    <a href="javascript:;" class="btn_sure" @click="confirmValue('education')">确定</a>
+                </div>
+                <div class="pop_con">
+                    <van-picker 
+                        ref="edu"
+                        v-model="education"
+                        value-key='text'
+                        title="学历教育"
+                        :show-toolbar="false"
+                        :columns="xlArr"
+                        @change="valHasChange"
+                ></van-picker>
+                </div>
+            </div>
+
+            <!-- 完成度 -->
+            <div :class="['popBox salaryPop',{'showPop':showPop && showType =='complete'}]">
+                <div class="pop_header">
+                    <a href="javascript:;" class="btn_cancel" @click="showPop = false">取消</a>
+                    <h4>简历完整度限制</h4>
+                    <a href="javascript:;" class="btn_sure" @click="smartyForm.complete = complete; showPop = false">确定</a>
+                </div>
+                <div class="pop_con">
+                    <ul class="options completeOptions">
+                        <li :class="['normalHeight select',{'on_chose':!complete}]" @click="complete = ''"><h4>不限</h4></li>
+                        <li v-for="item in  completionList" :class="['select',{'on_chose':item == complete}]"  @click="complete = item">
+                            <div class="con">
+                                <h4>{{item}}%以上</h4>
+                                <p v-if="item == 60"> 基本信息包含工作经验、教育、求职意向 </p>
+                                <p v-if="item == 85"> 增加了个人技能/优势 </p>
+                                <p v-if="item == 90"> 全部完善，描述详尽，要求较高慎选 </p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+
+            <!-- 再投限制 -->
+            <div :class="['popBox salaryPop',{'showPop':showPop && showType =='time'}]">
+                <div class="pop_header">
+                    <a href="javascript:;" class="btn_cancel" @click="showPop = false">取消</a>
+                    <h4>再次投递简历限制</h4>
+                    <a href="javascript:;" class="btn_sure" @click="confirmValue('time')">确定</a>
+                </div>
+                <div class="pop_con">
+                    <div class="scrollTip" v-if="time > 0">
+                        {{time == 12 ? '1年':time + '个月'}}内无法再次投递，同一职位或公司其他职位均不可
+                    </div>
+                    <van-picker 
+                        ref="limit"
+                        v-model="time"
+                        :show-toolbar="false"
+                        value-key="text"
+                        @change="valHasChange_time"
+                        :columns="timeArr"
+                ></van-picker>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$templets_skin#}js/setting.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

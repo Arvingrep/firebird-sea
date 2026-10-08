@@ -1,0 +1,261 @@
+<h2 class="subtitle">
+	{#$langData['siteConfig'][19][313]#}{#* 订单详情  *#}
+	<a href="{#getUrlPath service='member' type='user' template='order' module='homemaking'#}">{#$langData['siteConfig'][10][16]#}</a>{#* 返回我的订单列表  *#}
+
+</h2>
+<script>
+	var detailID = {#$id#}, rates = {#$rates#};
+	var imconfig = {
+        'mod':'homemaking',
+        'chatid':"{#$detail_userid#}",
+    }
+</script>
+<!-- 联系卖家 专有 s-->
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/im/BenzAMRRecorder.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/im/im-formatted.js?v={#$cfg_staticVersion#}"></script>
+
+<!-- 联系卖家 专有 e-->
+{#$usertype = 1#}
+
+{#if $detail_orderstate==0#}
+	{#$stateinfo = $langData['homemaking'][9][100]#} {#*待付款 *#}
+	{#$describe  = $langData['homemaking'][10][4]#} {#*请尽快付款，订单超时系统将自动取消！ *#}
+	{#$statetime = $detail_enddate#}
+{#elseif $detail_orderstate==1#}
+	{#$stateinfo = $langData['homemaking'][10][0]#} {#*待确认 *#}
+{#elseif $detail_orderstate==2#}
+	{#$stateinfo = $langData['homemaking'][10][3]#} {#*待服务 *#}
+{#elseif $detail_orderstate==3#}
+	{#$stateinfo = $langData['homemaking'][9][53]#} {#*服务无效 *#}
+{#elseif $detail_orderstate==4#}
+	{#$stateinfo = $langData['homemaking'][10][3]#} {#*待服务 *#}
+{#elseif $detail_orderstate==5#}
+	<!-- 我买的 -->
+	{#if $usertype == 1#}
+		{#$stateinfo = $langData['homemaking'][9][89]#} {#*商家已服务，待验收 *#}
+	{#else#}
+	<!-- 我服务的 -->
+		{#$stateinfo = "已服务，待客户验收"#} {#*已服务，待客户验收 *#}
+	{#/if#}
+
+{#elseif $detail_orderstate==6#}
+	{#$stateinfo = $langData['homemaking'][10][7]#} {#*服务完成 *#}
+
+{#elseif $detail_orderstate==7#}
+	{#$stateinfo = $langData['homemaking'][9][53]#} {#*已取消 *#}
+{#elseif $detail_orderstate==8#}
+	{#$stateinfo = $langData['homemaking'][9][71]#} {#*退款中 *#}
+{#elseif $detail_orderstate==9#}
+	{#$stateinfo = $langData['homemaking'][10][14]#} {#*退款成功 *#}
+{#elseif $detail_orderstate==11#}
+	{#$stateinfo = $langData['homemaking'][10][34]#} {#*已结单 *#}
+{#/if#}
+
+
+
+<dl class="info-section">
+	<dt>
+		<span class="info-title">{#$langData['siteConfig'][19][318]#}：</span><p class="info-text">{#$stateinfo#}</p>{#*  当前订单状态  *#}
+	</dt>
+	{#if $detail_orderstate == 1#}
+	<dd class="oprDd">
+		{#if $detail_homemakingtype == 0#}
+		<a href="javascript:;" class="yuyue_cancel clred">{#$langData['homemaking'][10][11]#}</a> {#* 取消预约 *#}
+		{#else#}
+		<a href="{#getUrlPath service='member' type='user' template='refund' id={#$id#}#}" class="clred">{#$langData['siteConfig'][6][66]#}</a> {#* 申请退款 *#}
+		{#/if#}
+	</dd>
+
+	{#elseif $detail_orderstate == 2#}
+	<dd class="oprDd">
+		<!-- 我买的 -->
+		{#if $usertype == 1#}
+			<!-- 有预付金的--申请售后--不退钱 -->
+			{#if $detail_homemakingtype == 1#}
+			{#* 申请售后 *#}
+			<a href="javascript:;" class="nomoney_back clred">{#$langData['homemaking'][10][15]#}</a>
+			{#* 服务码 *#}
+			<a href="javascript:;" class="buy_service_code clred">{#$langData['homemaking'][9][74]#}</a>
+			{#elseif $detail_homemakingtype == 0#}
+			<!-- 免费预约--退钱 -->
+			{#* 取消预约 *#}
+			<a href="javascript:;" class="yuyue_cancel clred">{#$langData['homemaking'][10][11]#}</a>
+			{#/if#}
+		{#else#}
+		<!-- 我服务的 -->
+			{#* 确认无效 *#}
+			<a href="javascript:;" class="confirm_none clred">{#$langData['homemaking'][9][45]#}</a>
+			{#if $detail_homemakingtype == 1#}
+			{#* 服务码 *#}
+			<a href="javascript:;" class="service_code clred">{#$langData['homemaking'][9][74]#}</a>
+			{#/if#}
+		{#/if#}
+	</dd>
+
+	{#elseif $detail_orderstate == 4#}
+	<dd class="oprDd">
+		<!-- 我买的 -->
+		{#if $usertype == 1#}
+			<!--  实价--申请售后-->
+			{#if $detail_homemakingtype == 2#}
+			<a href="{#getUrlPath service='member' type='user' template='refund' id={#$id#}#}" class="money_back">{#$langData['homemaking'][10][15]#}</a> {#* 申请售后 *#}
+			{#elseif $detail_homemakingtype == 0#}
+			{#* 取消预约 *#}
+			<a href="javascript:;" class="yuyue_cancel clred">{#$langData['homemaking'][10][11]#}</a>
+
+			{#/if#}
+		{#else#}
+		<!-- 我服务的 -->
+			<a href="javascript:;" class="suerFw">{#$langData['homemaking'][7][1]#}</a> {#* 确认服务 *#}
+		{#/if#}
+	</dd>
+	{#elseif $detail_orderstate == 5#}
+	<dd class="oprDd">
+		<!-- 我买的 -->
+		{#if $usertype == 1#}
+			<!-- 实价 --申请售后-->
+			{#if $detail_homemakingtype == 2#}
+			<a href="{#getUrlPath service='member' type='user' template='saleafter' id={#$id#}#}" class="clred">{#$langData['homemaking'][9][76]#}</a> {#* 申请售后 *#}
+			{#/if#}
+
+			<!-- 验收服务 -->
+			<a href="javascript:;" class="jz_yanshou clred">{#$langData['homemaking'][9][90]#}</a> {#* 验收服务 *#}
+		{#else#}
+		<!-- 我服务的 -->
+
+		{#/if#}
+	</dd>
+	{#elseif $detail_orderstate == 6#}
+	<dd class="oprDd">
+		<!-- 我买的 -->
+		{#if $usertype == 1#}
+			<a href="javascript:;" class="">{#$langData['homemaking'][10][35]#}</a> {#* 等待商家结单 *#}
+			{#if $detail_aftersale == 1#}
+			<a href="javascript:;" class="buyshouhou shouhou clred">{#$langData['homemaking'][9][94]#}</a> {#* 售后维保 *#}
+			{#/if#}
+		{#else#}
+		<!-- 我服务的 -->
+			<a href="javascript:;" class="fwjiedan clred">{#$langData['homemaking'][7][14]#}</a> {#* 结单 *#}
+		{#/if#}
+	</dd>
+	{#elseif $detail_orderstate == 8#}
+	<dd class="oprDd">
+		<a href="{#getUrlPath service='member' type='user' template='refund-homemaking' id={#$id#}#}" class="refund_cancel clred">查看退款</a> {#* 查看退款 *#}
+	</dd>
+	{#elseif $detail_orderstate == 11#}
+	<dd class="oprDd">
+		<!-- 我买的 -->
+		{#if $usertype == 1#}
+			{#if $detail_aftersale == 1#}
+			<a href="javascript:;" class="buyshouhou shouhou clred">{#$langData['homemaking'][9][94]#}</a> {#* 售后维保 *#}
+			{#/if#}
+		{#else#}
+		<!-- 我服务的 -->
+			{#if $detail_aftersale == 1#}
+			<a href="javascript:;" class="fwshouhou shouhou clred">{#$langData['homemaking'][9][94]#}</a> {#* 售后维保 *#}
+			{#/if#}
+		{#/if#}
+	</dd>
+	{#/if#}
+
+
+</dl>
+
+
+<dl class="bunch-section">
+	<dt>{#$langData['homemaking'][6][1]#}</dt>  {#* 预约信息 *#}
+	<dd>
+		<ul class="jzinfoUl">
+			{#*预约账户 *#}
+			<li><span>{#$langData['homemaking'][6][2]#}：</span><span>{#$detail_username#}</span></li>
+			{#*联系电话 *#}
+			<li><span>{#$langData['homemaking'][2][4]#}：</span><span>{#$detail_usercontact#}</span></li>
+			{#*预约地址 *#}
+			<li><span>{#$langData['homemaking'][6][3]#}：</span><span>{#$detail_useraddr#}</span></li>
+			{#*预约时间 *#}
+			<li class="change_time"><span>{#$langData['homemaking'][6][4]#}：</span><span class="choose_txt">{#$detail_doortime|replace:'|':'&nbsp;&nbsp;&nbsp;'#}</span></li>		{#*修改时间 *#}
+			<!-- <span class="time_choose">{#$langData['homemaking'][6][5]#}</span> -->
+			{#if $detail_usernote#}
+			{#*备注说明 *#}
+			<li><span>{#$langData['homemaking'][4][25]#}：</span><span>{#$detail_usernote#}</span></li>
+			{#/if#}
+			{#if $detail_failnote#}
+			{#*失败原因 *#}
+			<li><span>{#$langData['homemaking'][10][26]#}：</span><span>{#$detail_failnote#}</span></li>
+			{#/if#}
+			{#if $detail_orderstate==8 || $detail_orderstate==9#}
+				{#if $detail_rettype#}
+				<!-- 退款原因 -->
+				<li><span>{#$langData['homemaking'][10][27]#}：</span><span>{#$detail_rettype#}</span></li>
+				{#/if#}
+				{#if $detail_retnote#}
+				<!-- 退款说明 -->
+				<li><span>{#$langData['homemaking'][10][28]#}：</span><span>{#$detail_retnote#}</span></li>
+				{#/if#}
+			{#/if#}
+		</ul>
+	</dd>
+	{#if $detail_dispatchid#}
+	<dt>{#$langData['homemaking'][6][10]#}</dt>  {#* 派单信息 *#}
+	<dd>
+		<ul class="jzinfoUl">
+			<li><span>{#$langData['homemaking'][6][11]#}：</span><span>{#$detail_dispatch['courier']#}</span></li>  {#* 服务人员 *#}
+			<li><span>{#$langData['homemaking'][2][4]#}：</span><span>{#$detail_dispatch['tel']#}</span></li>  {#* 联系电话 *#}
+		</ul>
+	</dd>
+	{#/if#}
+
+	<dt>{#$langData['siteConfig'][19][319]#}</dt>{#*  订单信息 *#}
+	<dd>
+		<ul class="flow-list fn-clear">
+			<li>{#$langData['siteConfig'][19][50]#}：{#$detail_ordernum#}</li>{#*  订单编号 *#}
+			<li>{#$langData['siteConfig'][19][51]#}：{#$detail_orderdate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>{#*  下单时间 *#}
+			{#* if $detail_orderstate == 1 || ($detail_orderstate == 2 && $detail_paydate != 0) || $detail_orderstate == 3 || $detail_orderstate == 4 *#}
+			{#if $detail_paydate != 0#}
+			<li>{#$langData['siteConfig'][19][52]#}：{#$detail_paytype#}</li>{#*  付款方式 *#}
+			<li>{#$langData['siteConfig'][19][53]#}：{#$detail_paydate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>{#*  付款时间 *#}
+			{#/if#}
+		</ul>
+	</dd>
+
+	<dt class="proInfo"><span>商品</span><span>单价</span><span>数量</span><span>实付金额</span></dt>
+	<dd class="shop-pro">
+		<ul class="jzsp clearfix">
+			<li>
+				<a href="{#getUrlPath service='homemaking' template='detail' id={#$detail_product['id']#}#}" target="_blank" class="proImg"><img src="{#changeFileSize url={#$detail_product['litpic']#} type='small'#}"></a>
+				<a href="{#getUrlPath service='homemaking' template='detail' id={#$detail_product['id']#}#}" target="_blank" class="proTit">{#$detail_product['title']#}</a>
+			</li>
+			<li>{#$detail_product['price']#}</li>
+			<li>{#$detail_procount#}</li>
+			<li>{#$detail_orderprice#}</li>
+
+		</ul>
+		<!-- <div class="sum">
+			<div class="right">实付：<font><strong>{#$detail_totalmoney#}</strong></font></div>
+		</div> -->
+		<div class="priceDetail">
+			<ul>
+				<li><span class="label">积分抵扣：</span><span class="pjian">-{#echoCurrency type="symbol"#}{#$detail_pointprice#}</span></li>
+				<li class="priceAll"><span class="label">实付款：</span><span class="pjian">{#echoCurrency type="symbol"#}{#$detail_totalmoney - $detail_pointprice#}</span></li>
+			</ul>
+		</div>
+	</dd>
+	<dt>商家信息</dt>
+	<dd class="storeInfo">
+		<div class="storeImg">
+			<a href="{#getUrlPath service="homemaking" template="store-detail" id={#$detail_store['id']#}#}">
+				<img src="{#$detail_store['pics'][0]['path']#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';">
+		</a></div>
+		<div class="storeTxt">
+			<h2>
+				<a href="{#getUrlPath service="homemaking" template="store-detail" id={#$detail_store['id']#}#}" class="titlea">{#$detail_store['title']#}</a>
+				<a href="javascript:;" class="contactStore chat_to-Link" data-type="user"><i></i>联系买家</a>
+			</h2>
+			<p class="telStore"><i></i>{#$detail_store['tel']#}</p>
+			<p class="adrStore">{#$langData['homemaking'][10][2]#}{#$detail_store['address']#}</p>{#* 地址 *#}
+		</div>
+	</dd>
+
+</dl>
+{#include file="order_homemaking_common.html"#}

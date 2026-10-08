@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{#$langData['siteConfig'][16][31]#}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}"/>
+<link rel="stylesheet" href="{#$templets_skin#}css/upgrade.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+	var payUrl = '{#getUrlPath service="member" template="pay" param="ordernum=#ordernum"#}';
+	var apayUrl = '/include/ajax.php?service=member&action=pay&app=&paytype=delivery&ordernum=#ordernum';
+	var nlevel = '{#$userinfo.level#}';
+	var usermoney = '{#$userinfo.money#}';
+
+	var service = 'member';
+
+	var upordertype = 'upgrade_filter_user';
+    var ordertype = 'upgrade';
+</script>
+{#* 微信分享 *#}
+{#$Share_description = {#$cfg_description#}#}
+{#$Share_title = {#$langData['siteConfig'][16][31]#}#}
+{#$Share_img = {#$cfg_weblogo#}#}
+{#$Share_url = {#$cfg_basehost#}#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+
+</head>
+
+<body>
+
+{#include file="../../siteConfig/touch_top.html" headTheme=" " pageTitle="{#$langData['siteConfig'][16][31]#}" needByte="true"#}
+<div class="hui_show ">
+	<div class="info_show {#if $userinfo.level#}yes_member{#else#}no_member{#/if#}">
+		<i class="hui_icon"><img src="{#$templets_skin#}images/member/hui_{#if $userinfo.level#}2{#else#}1{#/if#}.png"></i>
+		<div class="user_info">
+			<div class="head_img"><img onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';" src='{#if $userinfo.photo == ""#}{#$cfg_staticPath#}images/noPhoto_100.jpg{#else#}{#changeFileSize url="{#$userinfo.photo#}" type="middle"#}{#/if#}' /></div>
+			<div class="member_info">
+				<h3>{#$userinfo.nickname#}</h3>
+				<p>{#if $userinfo.level#}{#$userinfo.expired|date_format:"%Y-%m-%d"#}{#$langData['siteConfig'][39][11]#}{#else#}{#$langData['siteConfig'][52][4]#}{#/if#}</p>{#* 到期 开通会员享更多特权 *#}
+			</div>
+		</div>
+		<!-- {#if $userinfo.level#}
+		<a href="javascript:;" class="btn_buy publicpaybtn">{#$langData['siteConfig'][43][23]#}</a>{#*  立即续费  *#}
+		{#else#}
+		<a href="javascript:;" class="btn_buy publicpaybtn">{#$langData['siteConfig'][6][185]#}</a>{#*  立即开通  *#}
+		{#/if#} -->
+		<span class="level_{#$userinfo.level#}"><i><img src="{#$templets_skin#}images/member/level_{#if $userinfo.level<=5#}{#$userinfo.level#}{#else#}5{#/if#}.png"></i> {#$userinfo.levelName#}</span>
+	</div>
+
+	<!-- 会员价格展示 -->
+	<div class="grade_box">
+		<div class="grade">
+		  <ul class="fn-clear">
+		    {#foreach from=$memberlevelList item=level key=k#}
+		    <li{#if $k == 0#} class="active"{#/if#} data-type="{#$level.id#}"><span>{#$level.name#}</span></li>
+		    {#/foreach#}
+		  </ul>
+		</div>
+		<div class="price">
+			<div class="tab_box">
+				{#$i = 0#}
+				{#foreach from=$memberlevelList item=level #}
+				<div class="tab_li {#if $i==0#}show{#/if#}" data-type="{#$level.id#}">
+					<div class="swiper-container price-swiper">
+					  <ul class="swiper-wrapper {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash {#/if#}">
+						 {#foreach from=$level['discount'] item=dcount#}
+						 {#if $dcount['month'] >= $level["mintime"] #}
+						  <li class="swiper-slide li_box " data-time="{#$dcount['month']#}" data-count="{#if $dcount['discount']>0#}{#$dcount['discount'] *$dcount['month'] * $level.price / 10#}{#else#}{#$level.price * $dcount['month']#}{#/if#}" data-dcount="{#$dcount['discount']#}">
+							 {#*<span class="rec">推荐</span>*#}
+							  <h4>{#$langData['siteConfig'][21][80]|replace:"1":$dcount['month']#}</h4>  {#* 1个月 *#}
+							  <h2><em>{#echoCurrency type='symbol'#}</em><span>{#if $dcount['discount']>0#}{#floatval(($dcount['discount'] *$dcount['month'] * $level.price / 10)|string_format:"%.2f")#}{#else#}{#floatval(($level.price * $dcount['month'])|string_format:"%.2f")#}{#/if#}</span></h2>
+
+							  <p class="o_price">{#if $dcount['discount']>0#}{#echoCurrency type='symbol'#}{#floatval(($level.price * $dcount['month'])|string_format:"%.2f")#}{#/if#}</p>
+							  {#$yhPrice = floatval(($level.price * (1-$dcount['discount']/10) * $dcount['month'])|string_format:"%.2f")#}
+							  {#if $dcount['discount']!=0 && $yhPrice>0#}
+							  <span class="tip"><em>{#$langData['siteConfig'][52][5]|replace:"1": $yhPrice#}{#echoCurrency type='short'#}</em></span>{#* 立省1元 *#}
+							  {#/if#}
+						  </li>
+						  {#/if#}
+						 {#/foreach#}
+					  </ul>
+					</div>
+				</div>
+				{#$i = $i+1#}
+				{#/foreach#}
+				</div>
+			</div>
+
+            <div class="agree_box">
+				<i class=""></i>我已阅读并同意<a href="{#getUrlPath service='siteConfig' template='protocol' title='会员服务协议'#}">《会员服务协议》</a>    
+			</div>
+
+		  <a href="javascript:;" class="btn_join publicpaybtn {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash {#/if#}">{#$langData['siteConfig'][6][185]#}</a>{#*  立即开通  *#}
+		</div>
+	</div>
+</div>
+
+<!-- 特权 -->
+<div class="special_box">
+	{#$r = 0#}
+	{#foreach from=$memberlevelList item=level #}
+	<div class="right_box {#if $r==0#}show{#/if#}">
+		<div class="rbox1">
+			<h2><span>{#$level["name"]#}{#$langData['siteConfig'][52][6]|replace:"1":count(array_filter($level["privilege"]))#}</span></h2>  {#* 享<em>1</em>大特权 *#}
+			<ul>
+				{#$m=1#}
+				{#if  $level["privilege"]['delivery']#}
+				<li class="li_r">
+					<span>{#$langData['siteConfig'][52][7]#}{#$m#}</span>  {#* 特权 *#}
+					<div class="left_info">
+						<h3>{#$langData['siteConfig'][52][8]#}</h3>        {#* 外卖配送费优惠  *#}
+						{#if $level["privilege"]['delivery'][0]['type']=='discount'#}
+						<p>{#$langData['siteConfig'][52][9]|replace:"1":($level["privilege"]['delivery'][0]['val'])#}</p>       {#* 可享配送费1折优惠  *#}
+						{#else#}
+						<p>{#$langData['siteConfig'][52][10]|replace:"1":($level["privilege"]['delivery'][0]['val'])#}</p>     {#* 可享免1次配送费  *#}
+						{#/if#}
+					</div>
+					<div class="right_icon"><img src="{#$templets_skin#}images/member/wm_icon1.png"></div>
+					{#$m = $m +1#}
+				</li>
+				{#/if#}
+				{#if  $level["privilege"]['waimai']#}
+				<li class="li_r">
+					<span>{#$langData['siteConfig'][52][7]#}{#$m#}</span>
+					<div class="left_info">
+						<h3>{#$langData['siteConfig'][52][12]#}</h3>    {#* 外卖商品优惠  *#}
+						<p>{#$langData['siteConfig'][52][11]|replace:"1":($level["privilege"]['waimai'])#}</p>    {#* 可享外卖商品1折优惠  *#}
+					</div>
+					<div class="right_icon"><img src="{#$templets_skin#}images/member/wm_icon2.png"></div>
+				</li>
+				{#$m = $m +1#}
+				{#/if#}
+				{#if $level["privilege"]['shop']#}
+				<li class="li_r">
+					<span>{#$langData['siteConfig'][52][7]#}{#$m#}</span>
+					<div class="left_info">
+						<h3>{#$langData['siteConfig'][52][13]#}</h3>                   {#* 商城商品优惠  *#}
+						<p>{#$langData['siteConfig'][52][14]|replace:"1":($level["privilege"]['shop'])#}</p>   {#* 可享商城商品1折优惠  *#}
+					</div>
+					<div class="right_icon"><img src="{#$templets_skin#}images/member/shop_icon.png"></div>
+				</li>
+				{#$m = $m +1#}
+				{#/if#}
+
+				{#if $level["privilege"]['quan']#}
+				<li class="li_r">
+					<span>{#$langData['siteConfig'][52][7]#}{#$m#}</span>
+					<div class="left_info">
+						<h3>{#$langData['siteConfig'][52][15]#}
+							{#if $userinfo.level == $level.id#}<span>{#$langData['siteConfig'][52][16]|replace:"1":$level["userquannumall"]#}</span>{#/if#}
+						</h3>  {#*   剩1张*#}
+						{#foreach from =$level["privilege"]['quan'] item=quan#}
+						<p>{#$langData['siteConfig'][52][17]|replace:" 1 ":$quan['num']|replace:" 2 ":$quan['money']|replace:" Q ":{#echoCurrency type='short'#}|replace:" 3 ":$quan['name']#}</p>
+						{#/foreach#}{#* 每月赠送 1 张 2 元面值 3 *#}
+					</div>
+					<div class="right_icon"><img src="{#$templets_skin#}images/member/quan_icon.png"></div>
+					{#$m = $m +1#}
+				</li>
+				{#/if#}
+			</ul>
+		</div>
+		<div class="rbox2">
+			{#if $m > 1#}
+			{#$count = count($level["privilege"])-4#}
+			{#else#}
+			{#$count = count($level["privilege"])#}
+			{#/if#}
+			<h3><span>{#$langData['siteConfig'][52][18]|replace:"1":$count#}</span></h3>  {#* 1大信息发布特权 *#}
+			<ul>
+
+				{#foreach from=$level["privilege"] item=right key="l" #}
+				{#siteConfig action="siteModule" return="module"#}
+				{#if $module.code==$l && ($l != 'waimai' && $l != 'shop')#}
+				<li class="li_r2">
+					<div class="libox">
+						{#if $level.id == $userinfo.level#}<span {#if $privilegeinfo[$l] >0#} class="many" {#else#} class="zero" {#/if#}>{#$langData['siteConfig'][54][3]|replace:"1":$privilegeinfo[$l]#}</span>{#/if#}    {#* 本周剩1条  *#}
+						<div class="left_icon"><img src="{#$templets_skin#}images/member/{#$l#}.png"></div>
+						<div class="right_info">
+							<h2>{#$module.name#}</h2>
+							<p>{#$langData['siteConfig'][54][2]|replace:"1":$right#}{#if $l == 'info'#}<br />有效期{#$level["privilege"]['infoday']#}天{#/if#}</p>    {#*  每月免费发布1条信息  *#}
+						</div>
+					</div>
+				</li>
+				{#/if#}
+				{#/siteConfig#}
+				{#if $l=='livetime' && in_array("live", $installModuleArr)#}
+				<li class="li_r2">
+					<div class="libox">
+						<div class="left_icon"><img src="{#$templets_skin#}images/member/live.png"></div>
+						<div class="right_info">
+							<h2>{#$langData['siteConfig'][54][0]#}</h2>   {#*  直播时间  *#}
+							<p>{#$langData['siteConfig'][54][1]|replace:"1":$right#}</p>      {#*  可享最长1小时每条  *#}
+						</div>
+					</div>
+				</li>
+				{#/if#}
+				{#/foreach#}
+
+				<li class="li_r2">
+					<div class="libox more">
+						{#$langData['siteConfig'][52][19]#}
+					</div> {#*  更多特权敬请期待...  *#}
+				</li>
+			</ul>
+		</div>
+	</div>
+	{#$r = $r +1#}
+	{#/foreach#}
+</div>
+
+<!-- 充值记录 -->
+{#if $userinfo.level#}
+<a href="{#$member_userDomain#}/opendetail.html" class="cz_record">
+	<span>{#$langData['siteConfig'][54][4]#}</span>   {#*  我的充值记录  *#}
+	<i class="arr_r"></i>
+</a>
+{#/if#}
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/upgrade.js?v={#$cfg_staticVersion#}" charset="utf-8"></script>
+</body>
+</html>

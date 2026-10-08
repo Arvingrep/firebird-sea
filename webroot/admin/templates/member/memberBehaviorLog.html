@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>会员行为日志</title>
+{#$cssFile#}
+<style type="text/css">
+.statistics label {display: inline-block;margin-right: 15px;cursor: text;line-height: 35px;}
+</style>
+</head>
+
+<body>
+<div class="search">
+  <label>搜索：</label>
+  <div class="btn-group" id="cmodule" data-id="">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">所属模块<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li><a href="javascript:;" data-id="">全部</a></li>
+      <li><a href="javascript:;" data-id="siteConfig">系统相关</a></li>
+      <li><a href="javascript:;" data-id="member">会员相关</a></li>
+      <li><a href="javascript:;" data-id="business">商家相关</a></li>
+      {#foreach from=$moduleList item=l#}
+      {#if $l.name != 'huangye' && $l.name != 'image' && $l.name != 'integral' && $l.name != 'paper' && $l.name != 'quanjing' && $l.name != 'special' && $l.name != 'video' && $l.name != 'website'#}
+      <li><a href="javascript:;" data-id="{#$l.name#}">{#$l.title#}</a></li>
+      {#/if#}
+      {#/foreach#}
+    </ul>
+  </div>
+  <div class="btn-group" id="ctype" data-id="">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">操作类型<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li><a href="javascript:;" data-id="">全部</a></li>
+      <li><a href="javascript:;" data-id="sel">查找</a></li>
+      <li><a href="javascript:;" data-id="ins">新增</a></li>
+      <li><a href="javascript:;" data-id="upd">更新</a></li>
+      <li><a href="javascript:;" data-id="del">删除</a></li>
+    </ul>
+  </div>
+
+  <div style="display: inline-flex; align-items: center; width: auto;">
+    <select style="width: auto; border-right: 0; border-radius: 4px 0 0 4px; border-color: #dcdfe6;" name="searchType" id="searchType">
+      <option value="uid">用户ID</option>
+      <option value="aid">信息id</option>
+      <option value="username">用户名</option>
+      <option value="nickname">昵称</option>
+      <option value="phone">手机号</option>
+      <option value="ip">IP地址</option>
+      <option value="ipaddr">IP归属地</option>
+      <option value="note">描述</option>
+    </select>
+    <input class="input-large" style="border-radius: 0 4px 4px 0!important;" type="search" id="keyword" placeholder="请输入关键字" title="输入关键词进行搜索">
+  </div>
+
+  &nbsp;&nbsp;操作日期&nbsp;&nbsp;<input class="input-small" value="{#$startDate#}" type="text" id="stime" placeholder="开始日期">&nbsp;&nbsp;到&nbsp;&nbsp;<input class="input-small" type="text" value="{#$endDate#}" id="etime" placeholder="结束日期">&nbsp;&nbsp;
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+  <button type="button" class="btn pull-right" id="customConfigBtn"><i class="icon-cog" style="vertical-align: bottom;"></i> 自定义配置</button>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="statistics">
+      <a href="javascript:;" class="btn btn-primary" id="export">导出</a>
+      <label style="margin-left: 20px;">记录数：<span class="totalCount">0</span></label>
+    </div>
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row5 left">&nbsp;用户ID</li>
+  <li class="row12 left">用户信息</li>
+  <li class="row6 left">所属模块</li>
+  <li class="row25 left">操作描述</li>
+  <li class="row15 left">IP地址</li>
+  <li class="row15 left">IP归属地</li>
+  <li class="row15 left">记录时间</li>
+  <li class="row7 left">设备信息</li>
+</ul>
+
+<div class="list common mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+
+<script id="editForm" type="text/html">
+    <form action="" class="quick-editForm" name="editForm">
+      <dl class="clearfix">
+        <dt>日志保存天数：</dt>
+        <dd><input class="input-mini" type="text" name="day" id="day" value="{#$max_memberBehaviorLog_save_day#}" /> 天 <small style="margin-left: 20px; color: #999;">建议180天</small><br /><small style="color: red;">确认后，将自动删除超过该时间的日志记录！</small></dd>
+      </dl>
+    </form>
+</script>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="mmodule"></span>
+  <span id="mtype"></span>
+  <span id="start">{#$startDate#}</span>
+  <span id="end">{#$endDate#}</span>
+</div>
+
+<script>var adminPath = "{#$adminPath#}", token = '{#$token#}';</script>
+{#$jsFile#}
+</body>
+</html>

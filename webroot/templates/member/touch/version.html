@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<title>{#$langData['siteConfig'][16][107]#}</title>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/version.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+	var hideFileUrl = {#$cfg_hideUrl#};
+</script>
+</head>
+
+<body>
+{#$pageTitle = $langData['siteConfig'][16][107]#}
+{#include file="top.html"#}
+
+<div class="HN_logo">
+	<div class="logo"><img src="{#$logo#}"></div>
+	<h2>{#$cfg_shortname#}</h2>
+	{#if $is_app#}
+	{#* 版本号 *#}
+	<p><em>{#$langData['siteConfig'][54][63]#}</em>v<i id="version"></i></p>
+	{#/if#}
+
+</div>
+<!-- 列表 -->
+<div class="HN_about_list">
+	{#if $is_app#}
+	<ul>
+		{#*  最新版本  *#}
+		<li style="display: none" id="newVersion">
+			<em>{#$langData['siteConfig'][16][110]#}</em>
+			<p class="fn-right versionP"><a href="javascript:;"><i>v</i><s id="n_version"></s>&nbsp;&nbsp;&nbsp;&nbsp;{#$langData['siteConfig'][16][111]#}<span></span></a></p>
+		</li>
+	</ul>
+	{#/if#}
+	<ul>
+
+		{#*  系统权限设置  *#}
+		{#if $is_app#}
+		<li class="about fn-clear"><a href="javascript:;" class="systemPermissions"><em>{#$langData['siteConfig'][16][187]#}</em><span></span></a></li>
+		{#/if#}
+
+		{#*  隐私政策  *#}
+		<li class="about fn-clear"><a href="{#getUrlPath service='siteConfig' template='protocol' title='隐私政策'#}"><em>{#$langData['siteConfig'][16][185]#}</em><span></span></a></li>
+		{#*  用户协议  *#}
+		<li class="about fn-clear"><a href="{#getUrlPath service='siteConfig' template='protocol' title='会员注册协议'#}"><em>{#$langData['siteConfig'][23][57]#}</em><span></span></a></li>
+
+		{#*  使用帮助  *#}
+		{#if $app_platform != 'harmony'#}
+		<li><a href="{#$cfg_basehost#}/help.html"><em>{#$langData['siteConfig'][54][64]#}</em><span></span></a></li>
+		{#/if#}
+	</ul>
+	<ul>
+
+		{#*  官方电话  *#}
+		<li><a href="tel:{#$cfg_hotline#}"><em>{#$langData['siteConfig'][54][65]#}</em><p class="fn-right ">{#$cfg_hotline#}<span></span></p></a></li>
+
+		{#*  官方网址  *#}
+		<li><em>{#$langData['siteConfig'][54][66]#}</em><p class="fn-right siteP">{#$cfg_basehost#}</p></li>
+	</ul>
+
+  	<div class="copyright">
+        {#if isApp()#}
+            {#$cfg_app_copyright#}
+        {#else#}
+            {#$cfg_powerby#}
+        {#/if#}
+    </div>
+</div>
+<!-- 列表 -->
+
+<script type="text/javascript">
+var android_version = "{#$android_version#}", ios_version = "{#$ios_version#}";
+
+$(function(){
+    var device = navigator.userAgent;
+    if (device.indexOf('huoniao_iOS') > -1) {
+    	$('body').addClass('huoniao_iOS');
+    }
+    
+    setupWebViewJavascriptBridge(function(bridge) {
+    	bridge.callHandler("getAppInfo", {}, function(responseData){
+    		var data = JSON.parse(responseData);
+    
+    		var device = data.device.toLowerCase(), version = data.version;
+    		$("#device").html(device + langData['siteConfig'][16][108]);
+    		$("#version").html(version);
+    
+    		if(device == "android"){
+    			$("#n_version").html(android_version);
+    			$("#newVersion").attr("href", '{#$android_download#}');
+    		}
+    		if(device == "ios"){
+    			$("#n_version").html(ios_version);
+    			$("#newVersion").attr("href", '{#$ios_download#}');
+    		}
+    
+    		if((device == "android" && compare(android_version, version)) || (device == "ios" && compare(ios_version, version))){
+    			$("#newVersion").show();
+    		}
+    
+    	});
+    
+    	//检查更新
+    	$("#newVersion").bind("click", function(){
+    		bridge.callHandler("checkAppUpdate", {}, function(responseData){});
+    	});
+    
+    	//系统权限设置
+    	$(".systemPermissions").bind("click", function(){
+    		bridge.callHandler("systemPermissions", {}, function(responseData){});
+    	});
+    
+    });
+})
+
+/*
+ * 版本号比较方法
+ * 传入两个字符串，当前版本号：curV；比较版本号：reqV
+ * 调用方法举例：compare("1.1","1.2")，将返回false
+ */
+function compare(curV,reqV){
+   if(curV && reqV){
+      //将两个版本号拆成数字
+      var arr1 = curV.split('.'),
+          arr2 = reqV.split('.');
+      var minLength=Math.min(arr1.length,arr2.length),
+          position=0,
+          diff=0;
+      //依次比较版本号每一位大小，当对比得出结果后跳出循环
+      while(position<minLength && ((diff=parseInt(arr1[position])-parseInt(arr2[position]))==0)){
+          position++;
+      }
+      diff=(diff!=0)?diff:(arr1.length-arr2.length);
+      //若curV大于reqV，则返回true
+      return diff>0;
+   }else{
+      //输入为空
+      console.log(langData['siteConfig'][20][391]);
+      return false;
+   }
+}
+</script>
+</body>
+</html>

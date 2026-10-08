@@ -1,0 +1,144 @@
+<script>
+	var userDomain='{#getUrlPath service='member' type='user' template='manage-live'#}', detailUrl = '{#$url#}',staticPath = '{#$cfg_staticPath#}', templatePath = '{#$templets_skin#}';
+	var modelType = 'live';
+	var map_city = '{#$cfg_mapCity#}', site_map = "{#$site_map#}";
+</script>
+<div class="main">
+	<h2 class="fb_tit">{#if !empty($id)#}{#$langData['live'][0][51]#}{#else#}{#$langData['live'][0][30]#}{#/if#}</h2>   {#*  修改直播  创建直播  *#}
+	<div class="form_box">
+		<form id="fbForm" action="/include/ajax.php?service=live&action={#if !empty($id)#}edit&id={#$id#}{#else#}getPushSteam{#/if#}">
+			<input type="hidden" id="lnglat" name="lnglat" value="{#$lnglat#}">
+			<input type="hidden" id="location" name="location" value="{#$location#}">
+			<dl class="fn-clear" data-required="1">
+				<dt><span>*</span><label>{#$langData['live'][0][38]#}</label></dt>{#*  直播标题  *#}
+				<dd class="longdd"><input class="linp" type="text" id="live_title" name="title" value="{#$title#}"><span class="inp_limit"><em>0</em>/30</span></dd>
+			</dl>
+			<dl class="fn-clear" data-required="1">
+				<dt><span>*</span><label>{#$langData['live'][0][31]#}</label></dt>   {#*  直播时间  *#}
+				<dd class="fn-clear">
+					<div class="SDate"><input type="text" id="startDate" readonly="readonly" placeholder="{#$langData['live'][0][39]#}" value="{#$ftime_|date_format:"%Y-%m-%d"#}"><i></i></div>  {#*  请选择直播日期  *#}
+					<div class="STime"><input type="text" id="startTime" readonly="readonly" placeholder="{#$langData['live'][0][40]#}" value="{#$ftime_|date_format:"%H:%M"#}"><i></i></div>   {#*  请选择直播时间  *#}
+					<input type="hidden" name="valid" id="valid" value="{#$ftime_|date_format:"%Y-%m-%d %H:%M:%S"#}">
+				</dd>
+			</dl>
+			<dl class="fn-clear" data-required="1">
+				<dt><span>*</span><label>{#$langData['live'][0][42]#}</label></dt>    {#*  直播类别  *#}
+				<dd class="fn-clear">
+					{#*  直播创建成功后，类别和模式将不可再修改。当前分类下，直播将以<em>横屏模式</em>展示<i class="tooltip"><p><em>•</em>不同模式仅为更好的显示效果，均享有全部直播功能</p></i>  *#}
+					<div class="dd_txt fn-hide">
+						{#$langData['live'][0][41]|replace:" 1 ":$langData['live'][0][43]#}
+					</div>
+					<input type="hidden" name="typeid" id="live_fl" value="{#$typeid#}" />
+					<ul class="fn-clear type_ul">
+						
+						 {#loop service="live" action="type" return="typenav" type="0"#}
+						 {#if $id#}
+						 {#if $typeid == $typenav.id#}
+						  <li data-id="{#$typenav.id#}" class="type_li  selected">{#$typenav.typename#} <i class="gou"></i></li>
+						 {#/if#}
+						 {#else#}
+						 <li data-id="{#$typenav.id#}" class="type_li  {#if $typeid == $typenav.id#}selected{#/if#}">{#$typenav.typename#} <i class="gou"></i></li>
+						 {#/if#}
+						{#/loop#}
+						
+					</ul>
+					<div class="mod_box fn-clear fn-hide">
+						<div class="r_mod model_ selected" data-id="0">
+							<h4>{#$langData['live'][0][43]#}</h4>   {#*  横屏模式  *#}
+							<div class="fn-clear">
+								<div class="pc_mod">
+									<div class="modshow"></div>
+									<p>{#$langData['live'][0][45]#}</p>    {#*  电脑端  *#}
+								</div>
+								<div class="phone_mod">
+									<div class="modshow"></div>
+									<p>{#$langData['live'][0][46]#}</p>    {#*  移动端  *#}
+								</div>
+							</div>
+						</div>
+						<div class="v_mod model_" data-id="1">
+							<h4>{#$langData['live'][0][44]#}</h4>   {#*  竖屏模式  *#}
+							<div class="fn-clear">
+								<div class="pc_mod">
+									<div class="modshow"></div>
+									<p>{#$langData['live'][0][45]#}</p>    {#*  电脑端  *#}
+								</div>
+								<div class="phone_mod">
+									<div class="modshow"></div>
+									<p>{#$langData['live'][0][46]#}</p>    {#*  移动端  *#}
+								</div>
+							</div>
+						</div>
+						<input type="hidden" value="0" name="way" id="show">
+					</div>
+				</dd>
+			</dl>
+			<dl class="fn-clear" data-required="1">
+				<dt><span>*</span><label>{#$langData['live'][0][47]#}</label></dt>   {#*  直播封面  *#}
+				<dd class="fn-clear">
+					{#if $litpic != ""#}
+					<ul id="listSection1" class="listSection thumblist fn-clear" style="display:inline-block;">
+						<li class="upimg filePicker" id="filePicker1" data-imglist="" data-count="1" data-type="thumb" data-size="4096" style="display: none;">
+							<div class="add_">
+								<i></i>
+								<span>{#$langData['live'][0][48]#}</span>{#*  上传封面  *#}
+							</div>
+							<p>{#$langData['live'][0][49]#}</p>{#*  图片尺寸比例为16:9<br/> 建议小于4M  *#}
+						</li>
+						<li id="WU_FILE_0_1" class="pubitem"><a href='javascript:;'><img alt="" src="{#$litpic#}" data-val="{#$litpicS#}"/></a><a class="reupload li-rm" href="javascript:;">重新上传</a></li>
+					</ul>
+
+					{#else#}
+					<ul id="listSection1" class="listSection thumblist fn-clear">
+						<li class="upimg filePicker" id="filePicker1" data-imglist="" data-count="1" data-type="thumb" data-size="4096" >
+							<div class="add_">
+								<i></i>
+								<span>{#$langData['live'][0][48]#}</span>{#*  上传封面  *#}
+							</div>
+							<p>{#$langData['live'][0][49]#}</p>{#*  图片尺寸比例为16:9<br/> 建议小于4M  *#}
+						</li>
+					</ul>
+					{#/if#}
+					<input type="hidden" name="litpic" value="{#$litpicS#}" id="litpic" class="imglist-hidden">
+				</dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt class="fb_tit"><label>{#$langData['live'][0][50]#}</label></dt>   {#*  直播简介  *#}
+				<dd> <script id="note" name="note" type="text/plain" style="width:660px;height:300px">{#$note#}</script></dd>
+			</dl>
+			<dl class="fn-clear">
+				<dt class="fb_tit"><label>{#$langData['live'][1][0]#}</label></dt>   {#*  直播权限  *#}
+				<dd>
+					<input type="hidden" name="catid" id="live_lx" value="{#$catid#}">
+					<div class="livetype">
+						<label>{#$langData['live'][1][1]#} <span data-val="1" class="{#if $catid==1#}selected{#/if#}"><i></i></span></label>   {#*  直播加密  *#}
+						<label>{#$langData['live'][1][2]#} <span data-val="2" class="{#if $catid==2#}selected{#/if#}"><i></i></span></label>   {#*  直播收费  *#}
+					</div>
+				</dd>
+			</dl>
+			<dl class="fn-clear {#if $catid == 1#}{#else#}fn-hide{#/if#} type_psd" >
+				<dt><label>{#$langData['live'][1][3]#}</label></dt>   {#*  直播密码  *#}
+				<dd class="live_psd"><input id="password" type="password" name="password" value="{#$password#}" placeholder="{#$langData['live'][1][5]#}"></dd>{#*  请输入密码  *#}
+			</dl>
+			<dl class="fn-clear {#if $catid == 2#}{#else#}fn-hide{#/if#} type_fee" >
+				<dt><label>{#$langData['live'][1][4]#}</label></dt>    {#*  直播中收费  *#}
+				<dd class="live_fee">
+					<i class="sub_btn"></i>
+					<input type="text" name="startmoney" id="start_collect" placeholder="" value="{#if !empty($startmoney)#}{#$startmoney#}{#else#}0{#/if#}">
+					<i class="add_btn"></i>
+				</dd>
+			</dl>
+			<dl class="fn-clear {#if $catid == 2#}{#else#}fn-hide{#/if#} type_fee" >
+				<dt><label>{#$langData['live'][1][6]#}</label></dt>   {#*  回放收费  *#}
+				<dd class="live_fee">
+					<i class="sub_btn"></i>
+					<input type="text" placeholder="" name="endmoney"  value="{#if !empty($endmoney)#}{#$endmoney#}{#else#}0{#/if#}" id="end_collect">
+					<i class="add_btn"></i>
+				</dd>
+			</dl>
+			<button type="submit" class="btn-create">{#if !empty($id)#}{#$langData['live'][0][51]#}{#else#}{#$langData['live'][0][30]#}{#/if#}</button>   {#*  修改直播  创建直播  *#}
+		</form>
+	</div>
+</div>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/calendar/WdatePicker.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>

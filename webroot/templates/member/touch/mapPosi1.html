@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{#$langData['info'][3][93]#}</title>  {#* 添加定位 *#}
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mapPosi.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#getModuleConfig module='car' key='channelDomain'#}', staticPath = '{#$cfg_staticPath#}', templets_skin = '{#$templets_skin#}';
+        var site_map = '{#$site_map#}';
+        var city = "{#$siteCityInfo['name']#}";
+        var radius = '99999';
+
+    </script>
+</head>
+<body>
+{#include file="../../siteConfig/touch_top.html"   pageTitle="{#$langData['info'][3][93]#}"#} {#* 添加定位 *#}
+<div id="pageMap">
+  <div class="searchAddrBox" v-cloak >
+    <div class="cityChose" @click="showCity"><span>{{city}}</span></div>
+    <div :class="['searchInp',{'hideClear':search_key == ''}]" v-cloak><input type="search" placeholder="{#$langData['info'][3][94]#}" class="addrInp" @focus="showList" @blur="hideList" v-model="search_key"> <s @click="search_key = '',searchList = []"></s></div>{#* 搜索位置 *#}
+  </div>
+  <div class="loadImg" v-show="loading"></div>
+  <!-- 地图 -->
+  <div class="topMap" >
+    <div id="mapdiv"></div>
+    <span class="mapcenter"></span>
+  </div>
+
+  <!-- 地址列表 -->
+  <!-- moreHeight -->
+  <div :class="['addrListBox',{'moreHeight':searchList.length > 0}] "  v-cloak>
+    <div class="addrTit">
+      <a href="javascript:;" class="noPosi" @click="noPosi" onclick="self.location=document.referrer;">{#$langData['info'][3][95]#}</a>  {#* 不显示位置 *#}
+      <a href="javascript:;" class="sure" @click="choseArea">{#$langData['info'][2][43]#}</a>  {#* 确定 *#}
+    </div>
+    <div class="addrList" v-show="searchList.length == 0 && search_key==''">
+      <ul>
+        <li  v-for="item in surroundingPois" @click="choseAddr(item)">
+          <a href="javascript:;">
+            <div class="addrInfo">
+              <h3>{{item.title}}</h3>
+              <p>{{item.address}}&nbsp;</p>
+            </div>
+            <div class="addrDistance">{{mapDistance(item.point.lat,item.point.lng,lat,lng)}}</div>
+          </a>
+        </li>
+
+      </ul>
+    </div>
+    <div class="addrList searchList" v-show="searchList.length || search_key!=''" >
+      <ul>
+        <li  v-for="item in searchList" @click="choseAddr(item)">
+          <a href="javascript:;">
+            <div class="addrInfo">
+              <h3>{{item.name}}</h3>
+              <p>{{item.address}}&nbsp;</p>
+            </div>
+            <div class="addrDistance">{{mapDistance(item.lat,item.lng,lat,lng)}}</div>
+          </a>
+        </li>
+
+      </ul>
+    </div>
+    <div class="backMap"></div>
+  </div>
+
+  <!-- 城市选择 -->
+  <div class="cityMask"></div>
+  <div class="siteCityListBox">
+    <div class="cityTitle">
+      <a href="javascript:;" class="city_back" @click="hideCity">{#$langData['info'][2][42]#}</a>   {#* 取消 *#}
+      <h4>{#$langData['info'][3][96]#}</h4>   {#* 城市选择 *#}
+      <a href="javascript:;" class="city_sure"></a>
+    </div>
+    <div class="jump_szm"></div>
+    <div class="cityList">
+      <ul class="right_szm">
+        <li @click="go_szm(0)" data-id="hot">{#$langData['info'][3][97]#}</li>{#* 热门 *#}
+        <li v-for="(szm,ind) in szmArr" @click="go_szm(ind+1)"  :data-id="szm">{{szm}}</li>
+      </ul>
+      <div class="cityUl">
+        <dl class="hot" id="hot">
+          <dt>{#$langData['info'][3][98]#}</dt>  {#* 热门城市 *#}
+          <dd @click="chose_city(city)" v-for="city in hotCity"  :data-cityid="city.cityid">{{city.name}}</dd>
+        </dl>
+        <dl v-for="szm in szmArr" :id="szm">
+          <dt>{{szm}}</dt>
+          <dd @click="chose_city(city)"  v-for="city in orderBy(szm)":data-cityid="city.cityid">{{city.name}}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '{#$cfg_fenxiaoName#}',
+        "title": '{#$cfg_fenxiaoName#}',
+        "imgUrl": '{#$cfg_weblogo#}',
+        "link": '{#getUrlPath service='member' type='user' template='fenxiao_charts'#}',
+    };
+
+    document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script src="{#$templets_skin#}js/mapPosi.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{#getModuleConfig module='renovation' key='channelName'#}</title>
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    {#if $module == ""#}
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/renovation.css?v={#$cfg_staticVersion#}">
+    {#else#}
+    <link rel="stylesheet" type="text/css"
+        href="{#$templets_skin#}css/renovation-{#$module#}.css?v={#$cfg_staticVersion#}">
+    {#/if#}
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+</head>
+<script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}'; templatePath = '{#$templets_skin#}'; templateSkin = '{#$templets_skin#}';
+    var hideFileUrl = '{#$cfg_hideUrl#}';
+
+    var module = 'renovation';
+    var Identity = '{#json_encode($Identity)#}'; /*身份(工长/设计师/公司)*/
+    var state = '';
+    var userId = `{#$userinfo.userid#}`;
+    var imgError = `{#$cfg_staticPath#}images/404.jpg?v={#$cfg_staticVersion#}`;
+    var memberUrl = `{#getUrlPath service='member'#}`; //店铺配置页面
+    if (!userId) {
+        location.href = `${masterDomain}/login.html`;
+    }
+</script>
+
+<body>
+    {#if $module == ""#}
+    <div id="vue" v-cloak>
+        <!-- 页面载入loading -->
+        <div class="loading" v-if="false">页面加载中...</div>
+        <!-- 商家页面 -->
+        <div :class="['Shell',{'app':appBoolean}]" v-if="detail.id">
+            <!-- 商家信息 -->
+            <div class="companyDetail">
+                <div class="c-nav">
+                    <img src="{#$templets_skin#}images/back-r.png?v={#$cfg_staticVersion#}" class="cn-left"
+                        @click="backFn">
+                    <img src="{#$templets_skin#}images/shop/set-icon.png?v={#$cfg_staticVersion#}" class="cn-right"
+                        @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+                </div>
+                <div class="c-info">
+                    <div class="ci-left">
+                        <img :src="detail.logo||imgError" class="cil-logo" @error="detail.logo=imgError">
+                        <div class="cil-info">
+                            <div class="title">{{detail.name}}</div>
+                            <div class="tip">
+                                <span>商家版到期 {{detail.endTime}}</span>
+                                <div @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">续费
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ci-right" @click="linkTo(detail.homepage)">
+                        <img src="{#$templets_skin#}images/houseWhite.png?v={#$cfg_staticVersion#}">
+                        <span>我的主页</span>
+                    </div>
+                </div>
+                <div class="c-data">
+                    <div class="cd-item">
+                        <div class="cdi-number">{{detail.statistics.customer.today}}</div>
+                        <div class="cdi-title">
+                            <div class="cdi-text">今日新增客户(人)</div>
+                            <span></span>
+                            <div class="cdi-time">昨日{{detail.statistics.customer.yesterday}}</div>
+                        </div>
+                    </div>
+                    <div class="cd-item" v-if="false">
+                        <div class="cdi-time">昨日{{detail.statistics.tender.yesterday}}</div>
+                        <div class="cdi-number">{{detail.statistics.tender.today}}</div>
+                        <div class="cdi-text">今日资讯(元)</div>
+                    </div>
+                    <div class="cd-item">
+                        <div class="cdi-number">{{detail.statistics.click.today}}</div>
+                        <div class="cdi-title">
+                            <div class="cdi-text">今日客流(人)</div>
+                            <span></span>
+                            <div class="cdi-time">昨日{{detail.statistics.click.yesterday}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 管理 -->
+            <div class="manageList">
+                <!-- 跳转 -->
+                <div class="manageItem">
+                    <div class="m-left" @click="linkTo(`{#getUrlPath service='member' template='renovation-zb'#}`)">
+                        <div class="ml-right">
+                            <div :class="['title',{'dot':bidsInfo>0}]">招标管理</div>
+                            <div class="tip">装修项目招标</div>
+                        </div>
+                        <img src="{#$templets_skin#}images/renovation/newTarget.png?v={#$cfg_staticVersion#}"
+                            class="ml-pic">
+                    </div>
+                    <div class="m-right"
+                        @click="linkTo(`{#getUrlPath service='member' template='renovation-customer'#}`)">
+                        <div class="mr-right">
+                            <div :class="['title',{'dot':clientInfo>0}]">客户管理</div>
+                            <div class="tip">报价/预约参观</div>
+                        </div>
+                        <img src="{#$templets_skin#}images/renovation/newFriend.png?v={#$cfg_staticVersion#}"
+                            class="mr-pic">
+                    </div>
+                </div>
+                <!-- 装修管理 --> 
+                <div class="decorationManage">
+                    <div class="d-title">装修管理</div>
+                    <div class="d-list">
+                        <div class="dl-item"
+                            @click="linkTo(`{#getUrlPath service='member' template='team-renovation'#}`)">
+                            <img src="{#$templets_skin#}images/renovation/newTeam.png?v={#$cfg_staticVersion#}">
+                            <span>团队管理</span>
+                        </div>
+                        <div class="dl-item"
+                            @click="linkTo(`{#getUrlPath service='member' template='manage-renovation' param="rtype=case"#}`,'/pages/packages/mcenter/bfabu/bfabu?mold=renovation&rtype=case')">
+                            <img src="{#$templets_skin#}images/renovation/newTree.png?v={#$cfg_staticVersion#}">
+                            <span>案例管理</span>
+                        </div>
+                        <div class="dl-item"
+                            @click="linkTo(`{#getUrlPath service='member' template='manage-renovation' param="rtype=image"#}`,`/pages/packages/mcenter/bfabu/bfabu?mold=renovation&rtype=image`)">
+                            <img src="{#$templets_skin#}images/renovation/newPicture.png?v={#$cfg_staticVersion#}">
+                            <span>效果图</span>
+                        </div>
+                        <div class="dl-item"
+                            @click="linkTo(`{#getUrlPath service='member' template='renovation-site'#}`)">
+                            <img src="{#$templets_skin#}images/renovation/newWorker.png?v={#$cfg_staticVersion#}">
+                            <span>工地管理</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- 续费标签 -->
+                <div class="continueLabel" v-if="detail.continue">
+                    <div class="c-left">
+                        <div class="title">商家版即将到期</div>
+                        <div class="tip">续费套餐，续享全部商家服务</div>
+                    </div>
+                    <div class="c-btn" @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">
+                        <span>查看/续费</span>
+                        <img src="{#$templets_skin#}images/newRight.png?v={#$cfg_staticVersion#}">
+                    </div>
+                </div>
+            </div>
+            <!-- 公司管理项 -->
+            <div class="orderList">
+                <div>
+                    <div class="l-title">
+                        <span class="title">公司配置</span>
+                        <!-- 审核中 -->
+                        <span class="audit"
+                            @click="linkTo(`{#getUrlPath service='member' template='config-renovation'#}`)"
+                            v-if="detail.state==0">商家资料审核中</span>
+                        <!-- 审核拒绝 -->
+                        <span class="refuse"
+                            @click="linkTo(`{#getUrlPath service='member' template='config-renovation'#}`)"
+                            v-else-if="detail.state==2">商家资料审核未通过</span>
+                    </div>
+                    <div class="l-list">
+                        <div class="ll-item"
+                            @click="linkTo(`{#getUrlPath service='member' template='config-renovation'#}`)">
+                            <img src="{#$templets_skin#}images/newConfig.png?v={#$cfg_staticVersion#}">
+                            <div>公司信息</div>
+                        </div>
+                        <div class="ll-item"
+                            @click="linkTo(`{#getUrlPath service='member' template='renovation-honor'#}`)">
+                            <img src="{#$templets_skin#}images/renovation/newMedal.png?v={#$cfg_staticVersion#}">
+                            <div>荣誉资质</div>
+                        </div>
+                        <div class="ll-item"
+                            @click="linkTo(`{#getUrlPath service='member' template='renovation-dynamic'#}`)">
+                            <img src="{#$templets_skin#}images/renovation/newVideo.png?v={#$cfg_staticVersion#}">
+                            <div>公司动态</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="l-title"><span class="title">常用功能</span></div>
+                    <div class="l-list">
+                        <div class="ll-item" @click="linkTo(`{#$cfg_basehost#}/mobile.html`)" v-if="!appBoolean">
+                            <img src="{#$templets_skin#}images/newShield.png?v={#$cfg_staticVersion#}">
+                            <div>下载APP</div>
+                        </div>
+                        <div class="ll-item" @click="linkTo(`tel:${detail.hotline}`)">
+                            <img src="{#$templets_skin#}images/newHeadset.png?v={#$cfg_staticVersion#}">
+                            <div>客服帮助</div>
+                        </div>
+                        <div class="ll-item app_show" @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+                            <img src="{#$templets_skin#}images/set_icon_red.png?v={#$cfg_staticVersion#}" onerror="this.src='/static/images/404.jpg'" />
+                            <div>系统设置</div>
+                          </div>
+                    </div>
+                </div>
+            </div>
+            <template v-if="!appBoolean">
+                {#include file="../../../siteConfig/touch_bottom_5.0.html" active="fifthicon"
+                bottom_module="renovation"#}
+            </template>
+        </div>
+        <!-- 页面载入失败提示 -->
+        <div class="Warn" v-else-if="!loadingb">
+            <div class="w-tip">
+                <img src="{#$cfg_staticPath#}images/notfindempty.png?v={#$cfg_staticVersion#}" class="wt-pic">
+                <div class="wt-title">{{info}}</div>
+                <div class="wt-btn"
+                    @click="linkTo(`{#getUrlPath service='member' type='user' template='enter_contrast'#}`)">确定
+                </div>
+            </div>
+        </div>
+    </div>
+    {#else#}
+    <!-- 其他页面 -->
+    {#include file="renovation-$module.html"#}
+    {#/if#}
+</body>
+
+<script type='text/javascript'
+    src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+{#if $module != ""#}
+<script type="text/javascript" src="{#$templets_skin#}js/renovation-{#$module#}.js?v={#$cfg_staticVersion#}"></script>
+{#else#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script src="{#$templets_skin#}js/renovation.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+
+</html>

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>招聘系统企业端</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/member/pub_supplier.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/jobmeal.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+            var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+            var hideFileUrl = '{#$cfg_hideUrl#}';
+            var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+            var templets = '{#$templets_skin#}';
+            var loupanid = '{#$loupanid#}';
+			var hasConfig = {#if $job_cid#}true{#else#}false{#/if#}; //是否是第一次配置
+            var navList = [];
+            var hasBeVip = {#if $job_cid && $company_combo_id#}true{#else#}false{#/if#};
+            var jobChannel = '{#getModuleConfig module='job' key='channelDomain'#}';
+            var cid='{#$job_cid#}'
+		</script>
+        <style>
+            .body section{font-size:34px  !important; color:rgba(33,33,33,1) !important;}
+        </style>
+	</head>
+	<body class="w1200">
+        {#$pageTitle = '招聘系统企业端'#}
+		<!-- 头部 -->
+		{#include file="top.html" pageTitle=$pageTitle module='job' showMap=2#}
+        <div  id="page">
+            <div class="conbox">
+                <div class="left_box">
+					<ul v-cloak>
+						<li v-for=" (item,i) in navList" data- :class="{'curr':i==currid || i === hoverid}"  @mouseover="hoverid = i" @mouseleave="hoverid = ''" @click.prevent="checkConfig(item,i)">
+							<a :href="item.link">
+								<s v-if="i!=currid && i !== hoverid"><img :src="'{#$templets_skin#}images/'+(i+1)+'.png'" ></s>
+								<s v-else><img :src="'{#$templets_skin#}images/'+(i+1)+'_on.png'" ></s>
+								<span>{{item.txt}}</span>
+							</a>
+						</li>
+					</ul>
+				</div>
+				<!-- 右侧 -->
+				<div class="right_box">
+					<div class="rConBox">
+                        <h3>招聘套餐</h3>
+                        <div class="mealTip" v-if="!hasBeVip">
+                            <div class="fn-left text_tip"><s></s>立即开通招聘套餐，使用完整招聘功能与服务</div>
+                            <div class="fn-right kefu">客服帮助热线<span>{#$hotline#}</span></div>
+                        </div>
+                        <div class="mealTab mealTip" v-else>
+                            <div class="fn-left tabBox">
+                                <ul>
+                                    <li v-for="(item,index) in mealTab" @click="mealTabOn = item.id" :data-id="item.id" :class="mealTabOn==index?'active':''">{{item.name}}</li>
+                                </ul>
+                                <em class="line"></em>
+                            </div>
+                            <div class="fn-right kefu">客服帮助热线<span>{#$hotline#}</span></div>
+                        </div>
+                        <div class="mealIndex" v-if="mealTabOn == 0">
+
+                            <div class=" conBox_inner flexBox" v-cloak>
+                                <div :class="['fn-left busiInfoBox', {'vipBusiInfoBox': hasBeVip}]">
+                                    <div class="busiInfo  fn-clear">
+                                        <div class="busiLogo fn-left">
+                                            <el-avatar :size="48" shape="circle" fit="fit" :src="businessInfo.logo_url" alt="商家logo"><img src="{#$templets_skin#}images/default_logo.png" alt=""></el-avatar>
+                                            <div class="b_meal" v-if="!hasBeVip">
+                                                <s><img :src="defaultMeal_icon" alt=""></s><span>未开通</span>
+                                            </div>
+                                            <div v-else class="level_icon"><img :src="vipMeal_icon" alt=""></s></div>
+                                        </div>
+                                        <div class="busiDetail fn-left" >
+                                            <h4>{{businessInfo.title ? businessInfo.title :'请先完善企业信息'}}</h4>
+                                            <p v-if="!hasBeVip">开通招聘套餐享超值权益</p>
+                                            <div v-else class="vipInfoBox " @click="renewFee(businessInfo.combo_id,1)" :style="businessInfo.combo_enddate == -1?'pointer-events: none;':''">
+                                                <div class="vipInfo fn-clear" >
+                                                    <div class="fn-left" v-if="businessInfo.combo_enddate>{#$smarty.now#}">当前套餐有效期至：<em>{{businessInfo.combo_enddate ? checkeDate(businessInfo.combo_enddate) : '00-00-00 00:00'}}</em></div>
+                                                    <div class="fn-left" v-else-if="businessInfo.combo_enddate == -1">当前套餐有效期至：<em>永久有效</em></div>
+                                                    <div class="fn-left" v-else>当前套餐：<em>{{businessInfo.combo_title}}已过期</em></div>
+                                                    <a class="fn-right keepVip" href="javascript:;" v-if="businessInfo.combo_enddate != -1">续费</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <el-row class="job_count" >
+                                        <el-col :span="6">
+                                            <div class="grid-content">
+                                                <div class="count">{{businessInfo.combo_job > 0 ||(businessInfo.package_job&&businessInfo.combo_job!=-1)? (businessInfo.combo_job+businessInfo.package_job) : ( businessInfo.combo_job == -1 ? '不限' : 0)}}</div>
+                                                <p>上架职位(个)</p>
+                                            </div>
+                                        </el-col>
+                                        <el-col :span="6">
+                                            <div class="grid-content">
+                                                <div class="count">{{businessInfo.can_resume_down > 0||(businessInfo.package_resume && businessInfo.can_resume_down!=-1)? (businessInfo.can_resume_down+businessInfo.package_resume) : ( businessInfo.can_resume_down == -1 ? '不限' : 0)}}</div>
+                                                <p>下载简历(次)</p>
+                                            </div>
+                                        </el-col>
+                                        <el-col :span="6">
+                                            <div class="grid-content">
+                                                <div class="count">{{businessInfo.combo_top||businessInfo.package_top? (businessInfo.combo_top+businessInfo.package_top) : 0}}</div>
+                                                <p>置顶职位(天)</p>
+                                            </div>
+                                        </el-col>
+                                        <el-col :span="6">
+                                            <div class="grid-content">
+                                                <div class="count">{{businessInfo.can_job_refresh||businessInfo.package_refresh? (businessInfo.can_job_refresh+businessInfo.package_refresh) : 0}}</div>
+                                                <p>刷新职位(次)</p>
+                                            </div>
+                                        </el-col>
+                                    </el-row>
+                                </div>
+                                <div class="fn-left mealAdvBox">
+                                    <div class="text_show">
+                                        <h2>超值套餐 尊享权益</h2>
+                                        <p>套餐自由选择，急速招聘发布、推广、权益享不停</p>
+                                    </div>
+                                    <img src="{#$templets_skin#}images/bg.png" alt="">
+                                </div>
+                            </div>
+                            <div :class="['mealBox conBox_inner',{'greyConBox': tabOn == 1}]">
+                                <div :class="['tabBox fn-clear',{'greyTab': tabOn == 1}]">
+                                    <div class="tab" >
+                                        <div :class="['tab_btn', {'on_tab':tabOn == 0}]" @click="tabOn = 0">招聘套餐<s></s></div>
+                                    </div>
+                                    <div class="tab">
+                                        <div :class="['tab_btn', {'on_tab':tabOn ==1}]" @click="tabOn = 1">增值包<s></s></div>
+                                    </div>
+                                </div>
+                                <div class="tabConBox">
+                                    <div class="tabCon" v-show="tabOn == 0">
+                                        <div class="swiper-container" v-loading="loading">
+                                            <div class="swiper-wrapper">
+                                                <div class="meal swiper-slide" v-for="item in comboList">
+                                                    <div class="mostPop" v-if="item.buy_max">最多企业选择</div>
+                                                    <div class="right_top" v-if="businessInfo && businessInfo.combo_id == item.id">
+                                                        <div class="chosedLab" >已选择</div>
+                                                    </div>
+                                                    <div class="meal_info">
+                                                        <h1 :title="item.title">{{item.title}}</h1>
+                                                        <p>有效时间：{{item.valid > -1 ? item.valid + '天' : '永久有效'}}</p>
+                                                        <div class="meal_price fn-clear">
+                                                            <span class="fn-left">{#echoCurrency type="symbol"#}<b>{{item.money}}</b></span>
+                                                            <p class="fn-right"><s></s>{{item.buy}}人已购买</p>
+                                                        </div>
+                                                    </div>
+                                                    <div class="meal_right">
+                                                        <ul>
+                                                            <!-- <li>赠送简历积分：<b>2000</b></li> -->
+                                                            <li>下载简历：{{!item.resume?'无':item.resume > -1 ? ('每天' + item.resume + '次'): '不限'}}</li>
+                                                            <li>职位刷新：{{item.refresh?'每天'+item.refresh+'次':'无'}}</li>
+                                                            <li> 置顶时长：{{item.top?'共计'+item.top+'天':'无'}}</li>
+                                                            <li>职位上架数：{{!item.job?'无':item.job > -1 ?'共计' + item.job + '个' : '不限'}}</li>
+                                                        </ul>
+                                                    </div>
+                                                    <!-- 更改/升级 -->
+                                                    <template v-if="businessInfo && businessInfo.combo_id">
+                                                        <div class="btn_box" v-if="businessInfo.combo_id != item.id"><el-button type="primary" round class="buyMeal changeMeal" @click="showConfirmPop(item)">更改套餐</el-button></div>
+                                                        <div class="btn_box" v-else-if="businessInfo.combo_enddate!=-1"><el-button type="primary" round class="buyMeal" @click="renewFee(item.id,1)">立即续费</el-button></div>
+                                                        <div class="btn_box" v-else><el-button type="primary" round class="buyMeal infinity">当前套餐，永久有效</el-button></div>
+                                                    </template>
+                                                    <!-- 开通/续费 -->
+                                                    <div class="btn_box" v-else><el-button type="primary" round class="buyMeal" @click="renewFee(item.id,1)">立即开通</el-button></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="prev"></div>
+                                        <div class="next"></div>
+                                        <p class="currTip" v-if="businessInfo && businessInfo.combo_id">您当前是：{{businessInfo.combo_title}} 服务到期时间为：{{businessInfo.combo_enddate == -1 ? '永久有效' :checkeDate(businessInfo.combo_enddate)}}，可随时更换套餐</p>
+                                    </div>
+                                    <!-- 增值套餐 -->
+                                    <div class="tabCon addPackage" v-show="tabOn == 1">
+                                        <div class="addCon fn-clear">
+                                            <div class="leftCon fn-left">
+                                                <ul>
+                                                    <li v-for="(item,index) in addValArr" :class="{'on_tab':addValOn == item.id}" @click="addValOn = item.id" v-if="!(index==1&&businessInfo.combo_job==-1)&&!(index==2&&businessInfo.combo_resume==-1)">
+                                                        <div class="icon"><img :src="'{#$templets_skin#}images/zz_icon' + (index + 1) +'.png'" alt=""></div>
+                                                        <div class="info">
+                                                            <h4>{{item.title}}</h4>
+                                                            <p>{{item.text}}</p>
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                            <div :class="['rightCon',{'bg_grey':addValOn == 0}]" v-loading="loading">
+                                                <div class="addValList" v-if="addValOn == 0">
+                                                    <li v-for="item in packageList">
+                                                        <div class="recTab" v-if="item.recommand">推荐</div>
+                                                        <div class="addValInfo fn-left">
+                                                            <h3>{{item.title}}</h3>
+                                                            <div class="price"><span>{#echoCurrency type='symbol'#}<b>{{item.price}}</b></span><s>{{item.mprice && item.price < item.mprice ? '{#echoCurrency type='symbol'#}' + item.mprice :''}}</s></div>
+                                                        </div>
+                                                        <div class="addValCon fn-left">
+                                                            <p>
+                                                                <span v-if="item.resume">下载简历<em>{{item.resume}}份</em></span> 
+                                                                <span v-if="item.job">职位上架数<em>{{item.job}}个</em></span> 
+                                                                <span v-if="item.top">职位置顶<em>{{item.top}}天</em></span> 
+                                                                <span v-if="item.refresh">职位刷新<em>{{item.refresh}}次</em></span></p>
+                                                            
+                                                        </div>
+                                                        <div class="btnbox fn-right">
+                                                            <span class='hasCount'><s></s>{{item.buy}}人已购买</span>
+                                                            <el-button class="buy_btn" type="primary" round @click="renewFee(item.id,2)">立即购买</el-button>
+                                                        </div>
+                                                    </li>
+                                                </div>
+                                                <div class="addValList padd" v-if="addValOn != 0">
+                                                    <ul class="">
+                                                        <li v-for="item in packageList" :class="[{'on_chose':currItemChose && currItemChose.id == item.id},{'noBottom':item.price >= item.mprice}]" @click="currItemChose = item">
+                                                            <div class="borderBox">
+                                                                <p v-if="addValOn == 1">上架职位：{{item.job}}个</p>
+                                                                <p v-else-if="addValOn == 2">简历下载：{{item.resume}}次</p>
+                                                                <p v-else-if="addValOn == 3">职位置顶：{{item.top}}天</p>
+                                                                <p v-else-if="addValOn == 4">职位刷新：{{item.refresh}}次</p>
+                                                                <p v-else>智能刷新：{{item.refresh}}次</p>
+                                                                <h3><span>{#echoCurrency type='symbol'#}<b>{{item.price}}</b></span><s v-if="item.price < item.mprice">{#echoCurrency type='symbol'#}{{item.mprice}}</s></h3>
+                                                            </div>
+                                                            <p class="tip" v-if="item.price < item.mprice">省{{item.mprice - item.price}}元</p>
+                                                        </li>
+                                                    </ul>
+                                                    <div class="countBox">
+                                                        <p>金额支付：<span>{#echoCurrency type='symbol'#}<b>{{currItemChose ? currItemChose.price : 0}}</b></span></p>
+                                                        <el-button type="primary" class="buy_btn" round @click="renewFee(currItemChose.id,2)">立即购买</el-button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="text_con">
+                                            <div class="add_tit fn-left"> 温馨提示： </div>
+                                            <div class="add_text">
+                                                1、增值包仅限已经开通招聘套餐的企业会员购买<br/>
+                                                2、招聘套餐有限期内，每天的套餐内容用光后，开始使用增值包<br/>
+                                                3、增值包永久有效，不会产生浪费请放心购买~<br/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="freshtopBox" v-else>
+                            <div class="freshtop_part1">
+                                <!-- 刷新置顶的统计 -->
+                                <div class="freshtop_count fn-clear">
+                                    <div class="fn-left ft_con_box">
+                                        <div class="ft_post ft_con">
+                                            <div class="left_count fn-clear">
+                                                <s class="fn-left icon"></s>
+                                                <div class="ft_count">
+                                                    <h5>当前{{mealTab[mealTabOn].name}}职位</h5>
+                                                    <p><b>{{mealTabOn === 1 ? optData_1.length : (mealTabOn === 2 ? optData_2.length : '0')}}</b>个</p>
+                                                </div>
+
+                                            </div>
+                                            <div class="right_btn"><el-button type="primary" @click="toUrl">去{{mealTab[mealTabOn].name}}职位</el-button></div>
+                                        </div>
+                                    </div>
+                                    <div class="ft_buy fn-right ft_con_box">
+                                        <div class="ft_buy ft_con">
+                                            <div class="left_count fn-clear">
+                                                <s class="fn-left icon"></s>
+                                                <div class="ft_count">
+                                                    <h5>剩余{{mealTab[mealTabOn].name}}资源</h5>
+                                                    <p v-if="mealTabOn != 2"><b>{{businessInfo.package_top+businessInfo.combo_top}}</b>天</p>
+                                                    <p v-else>
+                                                        <b><span class="orange">{{businessInfo.combo_refresh}}</span><span class="add" v-if="businessInfo.package_refresh">+</span><span v-if="businessInfo.package_refresh">{{businessInfo.package_refresh}}</span></b>次
+                                                        <el-popover 
+                                                            placement="top-start"
+                                                            width="335"
+                                                            trigger="hover">
+                                                            <span><b style="color: #1975FF;">{{businessInfo.combo_refresh}}</b>：招聘套餐内剩余次数，今日有效<br></span>
+                                                            <span v-if="businessInfo.package_refresh>0"><b style="color: #3D4566;">{{businessInfo.package_refresh}}</b>：增值包补充次数，永久有效，套餐用光后开始使用</span>
+                                                            <s slot="reference" class="tip_icon"></s>
+                                                        </el-popover>    
+                                                    </p>
+                                                </div>
+
+                                            </div>
+                                            <div class="right_btn"><el-button type="primary" class="buy_btn" @click="showPopularPop(mealTabOn)">购买{{mealTabOn == 2 ?'刷新':'时长'}}</el-button></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 刷新置顶的职位 2条-->
+                                <div class="ftPostList_box" v-loading="loading" v-if="loading || (optData_1 && optData_1.length && mealTabOn == '1') || (optData_2 && optData_2.length && mealTabOn == '2')" >
+                                    <div class="post fn-clear" v-if="mealTabOn == 1" v-for="item in optData_1">
+                                        <div class="post_info fn-left">
+                                            <h3><span>{{item.title}}</span> 
+                                                <el-tag type="plaint" size="mini" v-if="mealTabOn == '2'">智能刷新</el-tag>
+                                                <el-tag type="plaint" size="mini" v-else-if="item.state==0">待置顶</el-tag>
+                                                <el-tag type="plaint" size="mini" v-else-if="item.state==1">置顶中</el-tag>
+                                            </h3>
+                                            <p><span><label for="">{{mealTab[mealTabOn].name}}剩余：</label><s>{{item.topText}}</s></span><em>|</em><span><label for="">{{mealTab[mealTabOn].name}}时间：</label><s>{{checkeDate(item.top_start,4)}} - {{checkeDate(item.top_end,4)}} </s>(<span v-if="item.no_top && item.no_top.length">周<span v-for="(items,index) in item.no_top">{{week[items-1]+(index!=item.no_top.length-1?'、':'')}}</span>不置顶，</span> 共{{item.top_total}}天)</span></p>
+                                        </div>
+                                        <div class="post_opt fn-right">
+                                            <div class="opt_count" v-if="mealTabOn == '1'">
+                                                <span>投递<s>{{item.td}}</s></span>
+                                                <em>|</em>
+                                                <span>浏览<s>{{item.click}}</s></span>
+                                                <em>|</em>
+                                                <span>被收藏<s>{{item.collect}}</s></span>
+                                            </div>
+                                            <el-button type="primary"><a :href="'{#getModuleConfig module='job' key='channelDomain'#}/job.html?id='+item.pid" target="_blank" style="color: white;">职位详情</a></el-button>
+                                        </div>
+                                    </div>
+                                    <div class="post fn-clear" v-if="mealTabOn == 2" v-for="item in optData_2">
+                                        <div class="post_info fn-left">
+                                            <h3><span>{{item.posts_name}}</span> 
+                                                <el-tag type="plaint" size="mini">智能刷新</el-tag>
+                                            </h3>
+                                            <p><span><label for="">{{mealTab[mealTabOn].name}}剩余：</label><s>{{item.less}}</s></span><em>|</em><span><label for="">{{mealTab[mealTabOn].name}}时间：</label><s>{{item.limit_start}} - {{item.limit_end}} </s>(共{{item.refresh_count}}次)</span></p>
+                                        </div>
+                                        <div class="post_opt fn-right">
+                                            <div class="opt_count refresh_opt">
+                                                <span v-if="item.last">最近刷新：<s>{{item.lastStr}}</s></span>
+                                                <em v-if="item.last">|</em>
+                                                <span>下次刷新：<s>{{item.nextStr}} </s></span>
+                                            </div>
+                                            <el-button type="primary"><a :href="'{#getModuleConfig module='job' key='channelDomain'#}/job.html?id='+item.posts" target="_blank" style="color: white;">职位详情</a></el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 刷新/置顶记录 -->
+                            <div class="freshtop_part2 freshtopRecordBox">
+                                <h1 class="freshtop_head"><span>{{mealTab[mealTabOn].name}}记录</span></h1>
+                                <div class="shaiBox">
+                                    <!-- 排序 -->
+                                    <el-select v-model="orderby" placeholder="请选择">
+                                        <el-option
+                                            v-for="item in orderArr"
+                                            :key="item.value"
+                                            :label="item.label"
+                                            :value="item.value">
+                                        </el-option>
+                                    </el-select>
+
+                                    <!-- 时间选择 -->
+                                    <el-date-picker
+                                        v-model="timeArea"
+                                        type="daterange"
+                                        unlink-panels
+                                        range-separator="至"
+                                        start-placeholder="开始日期"
+                                        end-placeholder="结束日期"
+                                        value-format="timestamp"
+                                        :picker-options="pickerOptions">
+                                    </el-date-picker>
+
+                                    <div class="tabType">
+                                        <span :class="{'onTab':onTab == ''}" @click="onTab = ''">全部</span>
+                                        <em></em>
+                                        <span :class="{'onTab':onTab == 1}" @click="onTab = 1">{{mealTabOn == 2 ? '刷新中' : '置顶中'}}</span>
+                                        <em></em>
+                                        <span :class="{'onTab':onTab == 2}" @click="onTab = 2">已结束</span>
+                                    </div>
+                                </div>
+                                <div class="tableBox fn-clear">
+                                    <el-table
+                                        :data="recordData"
+                                        border
+                                        style="width: 100%">
+                                        <el-table-column
+                                        width="50">
+                                        </el-table-column>
+                                        <el-table-column
+                                        head-align="left"
+                                        align="left"
+                                        prop="title"
+                                        :label="mealTab[mealTabOn].name + '职位'"
+                                        min-width="120">
+                                        <template slot-scope="scope">
+                                            <!-- <h3>{{scope.row.title}}<em v-if="scope.row.postType != '0'">({{scope.row.postType == '1' ? '兼职' : '实习'}})</em></h3> -->
+                                            <h3>{{scope.row.title}}<em v-if="scope.row.nature">({{scope.row.nature}})</em></h3>
+                                        </template>
+                                        </el-table-column>
+                                        <el-table-column v-if="mealTabOn == '2'"
+                                        head-align="center"
+                                        align="center"
+                                        prop="state"
+                                        :label="mealTab[mealTabOn].name + '类型'"
+                                        min-width="60">
+                                        <template slot-scope="scope">
+                                            <p v-if="mealTabOn == '1'" :class="{'blue':scope.row.state != '2'}">{{scope.row.state == '1' ? mealTab[mealTabOn].name + '中' : (scope.row.state == '2' ? '已结束' : '待' + mealTab[mealTabOn].name )}}</p>
+                                            <p v-else :class="{'blue':scope.row.type != '1'}">{{scope.row.type == '2' ? '智能刷新' : '普通刷新'}}</p>
+                                        </template>
+                                        </el-table-column>
+                                        <el-table-column
+                                        head-align="center"
+                                        align="center"
+                                        prop="state"
+                                        :label="mealTab[mealTabOn].name + '状态'"
+                                        min-width="60">
+                                        <template slot-scope="scope">
+                                            <p  v-if="mealTabOn == '1'" :class="{'blue':scope.row.state != '2'}">{{scope.row.state == '1' ? mealTab[mealTabOn].name + '中' : (scope.row.state == '2' ? '已结束' : '待' + mealTab[mealTabOn].name )}}</p>
+                                            <p v-else>已完成</p>
+                                        </template>
+                                        </el-table-column>
+                                        <el-table-column v-if="mealTabOn == '1'"
+                                        head-align="center"
+                                        align="center"
+                                        prop="topdays"
+                                        min-width="60"
+                                        label="置顶时长">
+                                        <template slot-scope="scope">
+                                            <p>{{scope.row.top_total}}天</p>
+                                        </template>
+                                        </el-table-column>
+                                        <el-table-column
+                                        head-align="left"
+                                        align="left"
+                                        prop="topTime"
+                                        min-width="180"
+                                        :label="mealTab[mealTabOn].name + '时间'">
+                                        <template slot-scope="scope">
+                                            <div class="" v-if="mealTabOn === 2">
+                                                {{checkeDate(scope.row.pubdate,5,'/')}}{{scope.row.type==2 ? '(第'+scope.row.current+'次 共'+scope.row.total+'次)' : ''}}
+                                            </div>
+                                            <div class="" v-else>
+                                                {{checkeDate(scope.row.top_start,6,'/')}} 至 {{checkeDate(scope.row.top_end,6,'/')}} <span v-if="scope.row.noTop && scope.row.noTop.length">{{scope.row.noTopArr.join('、')}}不置顶</span>
+                                            </div>
+                                        </template>
+                                        </el-table-column>
+                                        <template slot="empty">
+                                            <p v-if="!loading && recordData && recordData.length <= 0">暂无数据</p>
+                                            <p v-else>加载中</p>
+                                        </template>
+                                    </el-table>
+                                    <div class="pageBox">
+                                        <el-pagination
+                                        :hide-on-single-page="true"
+                                        background
+                                        layout="prev, pager, next"
+                                        :page-size="10"
+                                        prev-text="上一页"
+                                        next-text="下一页"
+                                        @current-change="changePage"
+                                        :total="recordTotalCount">
+                                        </el-pagination>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="foot">
+                    <div class="foot-bottom">
+                        <div class="bottom wrap">
+                            版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+
+
+        </div>
+    
+    </body>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/jobmeal.js?v={#$cfg_staticVersion#}"></script>
+    </html>

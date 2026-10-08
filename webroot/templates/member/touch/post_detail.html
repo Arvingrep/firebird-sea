@@ -1,0 +1,235 @@
+
+
+{#$pageTitle = '面试详情'#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$pageTitle#}</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/invitation_detail.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/mobiscroll.javascript.css">
+    <script src="{#$cfg_staticPath#}js/ui/mobiscroll.custom-3.0.0-beta4.js"></script>
+    <script>
+      var invitation_state = 2; //不合适
+      var templets_skin = '{#$templets_skin#}'
+      var pageData = {
+        id: '30',
+        title: '',
+        address: '',
+        lat: '',
+        lng: '',
+        mapType: '{#$site_map#}',
+        cityName: '{#$siteCityInfo['name']#}',
+        mapKey: '{#$site_map_key#}',
+    };
+    var staticPath  = '{#$cfg_staticPath#}'
+    </script>
+</head>
+<body>
+  <div class="page" id="page" v-cloak>
+      <div class="header alignLeft">
+        <div :class="['header-l',{'white_arr':infoType === 1 && !popInfoDetail.invitation_state}]">
+          <a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+        </div>
+        <div class="header-address">
+            <span></span>
+        </div>
+      
+      </div>
+      <div class="bg_blue" v-if="infoType == 1 && !popInfoDetail.invitation_state"></div>
+      <div class="bg_ligntblue" v-else></div>
+      <div :class="'pageCon invitation_state' + ((infoType === 1 && (popInfoDetail.invitation_state > 0 || popInfoDetail.refuse_time > 0 ) || (infoType === 0 )) ? 0 : 1) " v-if="popInfoDetail">
+        <!-- 面试状态 -->
+        <div class="invitationStateBox" v-if="infoType === 0">
+          <div class="invitationState" v-if="popInfoDetail.refuse_time">
+              <div class="lText">
+                <h2>不合适</h2>
+                <p v-if="popInfoDetail.refuse_msg">“{{popInfoDetail.refuse_msg}}”</p>
+              </div>
+              <div class="resolve_btnBox">
+                  <p >{{timeStrToDate(popInfoDetail.refuse_time)}}</p>
+              </div>
+
+          </div>
+          <div class="invitationState" v-else-if="popInfoDetail.pass_time">
+              <div class="lText">
+                <h2>有意向</h2>
+                <p >招聘方对你的简历很感兴趣！</p>
+              </div>
+              <div class="resolve_btnBox">
+                  <p >{{timeStrToDate(popInfoDetail.pass_time)}}</p>
+              </div>
+
+          </div>
+          <div class="invitationState" v-else-if="popInfoDetail.read_time">
+              <div class="lText">
+                <h2>已查阅</h2>
+              </div>
+              <div class="resolve_btnBox">
+                  <p >{{timeStrToDate(popInfoDetail.read_time)}}</p>
+              </div>
+
+          </div>
+          <div class="invitationState" v-else-if="popInfoDetail.date">
+              <div class="lText">
+                <h2>已投递</h2>
+                <p>等待招聘方查收</p>
+              </div>
+              <div class="resolve_btnBox">
+                  <p >{{timeStrToDate(popInfoDetail.date)}}</p>
+              </div>
+
+          </div>
+        </div>
+        <div class="invitationStateBox" v-else>
+          <template v-if="!popInfoDetail.invitation_state">
+
+            <div class="lText">
+              <h2>待面试</h2>
+              <p>{{timeStrToDate(popInfoDetail.date)}}</p>
+            </div>
+            <div class="resolve_btnBox">
+                <a href="javascript:;" class="btn_resolve" @click="showBtn = true;">处理</a>
+                <a href="javascript:;" :class="['btn_refuse',{'showBtn':showBtn}]" @click="showPop = true; showBtn = false;">回绝面试</a>
+            </div>
+          </template>
+          <template v-else>
+            <div class="lText">
+              <h2>{{popInfoDetail.invitation_state  === 1 ? '面试已取消' : '面试记录'}}</h2>
+              <p>{{popInfoDetail.invitation_state === 1? '“双方联系沟通一致，取消面试”' : '该面试时间已过，祝你早日找到好工作！'}}</p>
+            </div>
+            <div class="resolve_btnBox" v-if="popInfoDetail.invitation_state == 2">
+                <a href="javascript:;" class="btn_resolve" @click="showBtn = true;">标记</a>
+                <div class="remarkbox" v-show="showBtn">
+                  <ul>
+
+                    <li @click="changeUreamark(1)">备选</li>
+                    <li @click="changeUreamark(2)">不合适</li>
+                  </ul>
+                </div>
+            </div>
+          </template>
+          <div class="nask_hide" v-if="showBtn" @click="showBtn = false" @scroll="showBtn = false"></div>
+        </div>
+        <!-- 公司信息 -->
+        <div class="companyInfoBox" >
+          <div class="td_company" v-if="popInfoDetail.company" >
+            <a class="tdComInfo toMini" :href="popInfoDetail.company.url" data-module="job"  data-temp="company" :data-id="popInfoDetail.company.id">
+                <div class="clogo"><img :src="popInfoDetail.company.logo_url" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                <div class="cinfo">
+                    <h4>{{popInfoDetail.company.title}}</h4>
+                    <p><span>{{popInfoDetail.company.nature}}</span><em> | </em><span>{{popInfoDetail.company.scale}}</span><em> | </em><span>{{popInfoDetail.company.industry.join('/')}}</span></p>
+                </div>
+            </a>
+            <a :class="['td_post invitation_item',{'toMini':popInfoDetail.job.state === 1 && (!popInfoDetail.job.off) && (!popInfoDetail.job.del)}]" :href="popInfoDetail.job.state === 1 && (!popInfoDetail.job.off) && (!popInfoDetail.job.del)   ? popInfoDetail.job.url : 'javascript:;'" @click="toPostLink(popInfoDetail.job)" data-module="job"  data-temp="job" :data-id="popInfoDetail.job.id">
+                <div class="text_con">
+                    <label for=""><span>{{infoType ? '面试岗位' : '投递岗位'}}</span>：</label>
+                    <span :class="['salary',{'otherColor':popInfoDetail.state === 2}]">{{popInfoDetail.job.show_salary}} {{popInfoDetail.job.dy_salary > 12 ?'· ' + popInfoDetail.job.dy_salary : ''}}<b v-if="popInfoDetail.job.dy_salary > 12">薪</b></span>
+                    <span class="ptitle">{{popInfoDetail.job.title}}</span>
+                </div>
+            </a>
+            <template v-if="infoType === 1  ">
+
+              <div class="invitation_remark invitation_item" v-if="popInfoDetail.notice">
+                <label for=""><span>备注</span>：</label>
+                <p>{{popInfoDetail.notice}}</p>
+              </div>
+              <a href="javascript:;" class="invitation_remark invitation_item appMapBtn">
+                <label for=""><span>面试地点</span>：</label>
+                <div class="address">
+                  <div class="addressText">
+                    <p>{{popInfoDetail.company.addr.join("/")}}{{popInfoDetail.company.address}} </p>
+                  </div>
+                </div>
+              </a>
+            </template>
+          </div>
+        </div>
+
+        <!-- 联系人信息 -->
+        <div class="contactInfoBox">
+          <div class="headImg"><img style="border-radius: 50%;" :src="popInfoDetail.company.people_pic_url" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'"></div>
+          <div class="contactInfo">
+            <h4>{{popInfoDetail.company.people}}<span>@{{popInfoDetail.company.title}}</span></h4>
+            <p>{{popInfoDetail.company.people_job}}</p>
+          </div>
+        </div>
+
+
+        <!-- 推荐职位 -->
+        <div class="recPostBox" v-if="recPostList && recPostList.length">
+          <h4>{{pltou ? '已投递以下职位，好工作正在赶来' : '这些职位更适合你'}}</h4>
+          <ul class="recPostList">
+            <li :class="['recPost',{'on_chose':chosePostArr.indexOf(item.id) > -1}] " v-for="item in recPostList" v-if="!pltou || (chosePostArr.indexOf(item.id) > -1 && pltou)">
+              <div class="left_area" @click="changePostChose(item.id)" v-if="!pltou && !popInfoDetail.deliveryDetailPost">
+                <s class="chose_btn"></s>
+              </div>
+              <a :href="item.url" :class="{'hastou':pltou || popInfoDetail.deliveryDetailPost}">
+                <div class="postInfo">
+                  <h2>{{item.title}}</h2>
+                  <div class="salary"><span>{{item.show_salary}}</span><span v-if="item.dy_salry > 12">· {{item.dy_salry}}<b>薪</b></span></div>
+                  <div class="companyInfo">
+                      <div class="clogo"><img :src="item.companyDetail.logo_url" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                      <h4 class="cname">{{item.companyDetail.title}}</h4>
+                      <p><span>1-3年</span><em>|</em><span>1-3年</span><em>|</em><span>1-3年</span></p>
+                  </div>
+                  <div class="labs"><span v-for="lab in item.companyDetail.welfareNames">{{lab}}</span></div>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+
+
+        <div class="btn_bottom" v-if="(infoType === 1 && popInfoDetail.state != 2)|| (recPostList.length && (!pltou && !popInfoDetail.deliveryDetailPost))">
+          <a :href="'tel:' + popInfoDetail.company.contact" class="btn_blue" v-if="infoType === 1">电话联系</a>
+          <a href="javascript:;" class="btn_blue" v-else @click="diliveryPost">一键投递{{chosePostArr.length}}个职位</a>
+        </div>
+      </div>
+
+      <!-- 回绝弹窗 -->
+      <div class="refuse_mask" v-show="showPop"></div>
+      <div :class="['refuse_pop',{'showPop':showPop}]">
+        <div class="pop_head">
+					<div class="info">
+            <h2>确定回绝该面试邀请？</h2>
+            <p>不可撤销，请谨慎操作</p>
+          </div>
+					<a href="javascript:;" class="close_pop" @click="showPop = false"></a>
+				</div>
+        <div class="pop_con">
+          <div class="scrollBox" id="scollObj"> </div>
+          <div class="btn_box"><a href="javascript:;" class="btn_blue" @click="refuseInvitation">回绝面试</a></div>
+        </div>
+      </div>
+    </div>
+    
+<script>
+  var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "title": '',
+        "imgUrl": '',
+        "link": '',
+        "description":''
+    };
+</script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicShare.js?v={#$cfg_staticVersion#}"></script>
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicOpenMap.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/invitation_detail.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

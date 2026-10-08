@@ -1,0 +1,355 @@
+{#if {#verifyModuleAuth module='awardlegou'#}#} 
+<script>
+	//自动确认收货
+	var expDate = "{#$detail_expDate#}",confirmDay = {#$confirmDay|default:'0'#};//发货时间和确认天数
+	//自动同意退款
+	var retDate = "{#$detail_retDate#}",customautotuikuan = {#$customautotuikuan|default:'0'#};
+	//自动同意退货
+	var customautotuihuo = {#$customautotuihuo|default:'0'#};
+	//自动关闭退货申请
+	var tongyidate = "{#$detail_tongyidate#}",customofftuikuan = {#$customofftuikuan|default:'0'#};
+</script>
+{#*  判断倒计时类型  自动同意退款/自动同意退货/自动关闭退货申请 *#}
+	
+{#$djstype = ''#}
+<!-- 未发货 买家申请退款中 自动同意退款 or  已退货 等待自动同意退款-->
+{#if ($detail_orderstate == 5 && $detail_retState == 1) || ($detail_orderstate == 9 && $detail_retExpnumber!='' && $detail_retExpcompany!='')#}
+	{#$djstype = 1#}
+
+<!-- 已发货 买家申请退款中 自动同意退货-->	
+{#elseif $detail_orderstate == 6 && $detail_retState == 1#}
+	{#$djstype = 2#}
+<!-- 商家已发货 未申请退款 自动确认收货 -->	
+{#elseif $detail_orderstate == 6 && $detail_retState != 1#}
+	{#$djstype = 3#}	
+
+<!-- 商家已同意退货 买家还未退货 -- 自动关闭退货申请-->
+{#elseif $detail_orderstate == 9 && ($detail_retExpnumber=='' || $detail_retExpcompany=='')#}
+	{#$djstype = 4#}
+
+{#/if#}
+
+<input type="hidden" value="{#$djstype#}" id="djstype">
+<dl class="info-section">
+	<dt>
+		<span class="info-title">{#$langData['siteConfig'][19][318]#}：</span>
+		{#if $detail_orderstate == 5#}
+
+			{#if $detail_retState == 1#}
+			<div class="info-text">{#$langData['siteConfig'][55][43]#}</div> {#* 未发货买家申请退款 *#}
+			{#else#}
+			<div class="info-text">{#$detail_binfo#}</div>
+			{#/if#}
+
+		{#elseif $detail_orderstate == 6#}
+
+			{#if $detail_retState == 1#}
+			<div class="info-text">{#$langData['siteConfig'][55][44]#}</div> {#* 已发货买家申请退货退款 *#}
+			{#else#}
+			<div class="info-text">{#$detail_binfo#}</div>
+			<div class="infoTxt">还剩<div class="time-item"><strong id="day_show">0</strong><span class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动确认收货</div>
+			{#/if#}
+
+		{#elseif $detail_orderstate == 9#}
+
+			{#if $detail_retExpnumber!='' && $detail_retExpcompany!=''#}
+			<div class="info-text">{#$langData['siteConfig'][55][45]#}</div> {#* 买家已退货，请确认货品无误后退款 *#}
+			{#else#}
+			<div class="info-text">{#$langData['siteConfig'][55][38]#}</div> {#* 等待买家退货 *#}
+			<div class="infoTxt">还剩<div class="time-item"><strong id="day_show">0</strong><span class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动关闭退款</div>
+			{#/if#}
+
+		{#elseif  $detail_orderstate == 7#}
+			<!-- 被申请退款 -->
+			{#if $detail_retState == 1#}
+				{#if $detail_retExpnumber =='' && $detail_retExpcompany==''#}
+					<div class="info-text">{#$langData['siteConfig'][55][46]#}</div> {#* 未发货，已退款 *#}
+				{#else#}
+					<div class="info-text">{#$langData['siteConfig'][55][47]#}</div> {#* 已退货退款 *#}
+				{#/if#}
+			<!-- 未抽中直接退款	 -->
+			{#else#}
+				<div class="info-text">{#$detail_binfo#}</div>
+			{#/if#}
+		{#else#}
+			<div class="info-text">{#$detail_binfo#}</div>
+		{#/if#}
+
+	</dt>
+
+
+	{#* 已经申请过退款 -- 退款流程 *#}
+	{#if (($detail_orderstate == 5 || $detail_orderstate == 6 || $detail_orderstate == 7) && $detail_retState == 1)  || ($detail_is_paytuikuanlogtic == 1 && $detail_orderstate == 9)#}
+	<dd class="last">
+
+		<ul class="retUl">
+			{#* 退款原因 *#}
+			<li><label>{#$langData['siteConfig'][19][43]#}：</label>{#$detail_retType#}&nbsp;&nbsp;</li>
+			{#* 退款说明 *#}
+			<li><label>{#$langData['siteConfig'][19][44]#}：</label>{#$detail_retNote#}&nbsp;&nbsp;</li>
+			{#* 退款凭证 *#}
+			{#if $detail_retPics|@count > 0#}
+			<li class="retPics"><label>{#$langData['siteConfig'][19][45]#}：</label>
+				{#foreach from=$detail_retPics item=pics key=k#}
+				<a href="{#$pics.path#}" target="_blank"><img src="{#changeFileSize url="{#$pics.path#}" type="small"#}" /></a>
+				{#/foreach#}
+				&nbsp;&nbsp;
+			</li>
+			{#/if#}
+			{#* 申请时间 *#}
+			<li><label>{#$langData['siteConfig'][19][46]#}：</label>{#$detail_retDate|date_format:"%Y-%m-%d %H:%M:%S"#}&nbsp;&nbsp;</li>
+
+			{#if $detail_retExpnumber!='' && $detail_retExpcompany!='' #}
+			{#* 退货物流 *#}
+			<li><label>{#$langData['siteConfig'][55][42]#}：</label>{#$detail_retExpcompany#} {#$detail_retExpnumber#}</li>
+			{#/if#}
+		</ul>
+		
+		<!-- 未发货买家申请退款 // 买家已退货 等待商家退款-->
+		{#if ($detail_retState == 1 && $detail_orderstate == 5) || ($detail_is_paytuikuanlogtic == 1 && $detail_orderstate == 9)#}
+		<div class="operation">
+			<a href="javascript:;" class="tuikuan">{#$langData['siteConfig'][55][35]#}</a> {#* 同意退款 *#}
+			<div class="infoTxt">还剩<div class="time-item"><strong id="day_show">0</strong><span class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动同意退款</div>
+		</div>
+		<!-- 已发货--买家申请退货退款 -->
+		{#elseif $detail_retState == 1 && $detail_orderstate == 6#}
+		<div class="operation">
+			<a href="javascript:;" class="tuihuo">{#$langData['siteConfig'][55][37]#}</a> {#* 同意退货 *#}
+			<div class="infoTxt">还剩<div class="time-item"><strong id="day_show">0</strong><span class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动同意退货</div>
+		</div>
+		{#/if#}
+
+	</dd>
+	{#/if#}
+
+</dl>
+
+{#if $detail_orderstate == 5 && $detail_retState ==0#}
+<dl class="bunch-section zhuPro">
+	<dt>{#$langData['siteConfig'][6][141]#}</dt>  {#* 确认订单 *#}
+	<dd>
+		<div class="formfield">
+			<label><em>*</em> {#$langData['siteConfig'][9][68]#}：</label>  {#* 配送方式 *#}
+			<div class="shipping">
+				<label><input type="radio" name="shipping" value="1" /> {#$langData['siteConfig'][9][70]#}</label>  {#* 快递 *#}
+			</div>
+		</div>
+		<div class="exp fn-hide">
+			<div class="formfield">
+				<label for="exp-company"><em>*</em> {#$langData['siteConfig'][19][63]#}：</label>
+	            <select name="exp-company" id="exp-company">
+	                <option value="">{#$langData['siteConfig'][7][2]#}</option>  {#* 请选择 *#}
+	                {#foreach from=$juhe_express_company key=k item=exp#}
+	                <option value="{#$k#}">{#$exp#}</option>
+	                {#/foreach#}
+	            </select>
+				<span class="input-tips"><s></s>{#$langData['siteConfig'][27][60]#}</span>
+			</div>
+			<div class="formfield">
+				<label for="exp-number"><em>*</em> {#$langData['siteConfig'][19][64]#}：</label>
+				<input type="text" name="exp-number" id="exp-number" size="25" maxlength="20" />
+				<span class="input-tips"><s></s>{#$langData['siteConfig'][20][406]#}</span>
+			</div>
+		</div>
+		<div class="btns">
+			<button type="button" class="cbtn" id="expBtn">{#$langData['siteConfig'][6][0]#}</button>
+		</div>
+	</dd>
+</dl>
+{#/if#}
+
+<dl class="bunch-section">
+	{#* 订单信息 *#}
+	<dt>{#$langData['siteConfig'][19][319]#}</dt>
+	<dd>
+		<ul class="flow-list fn-clear">
+			<li>{#$langData['siteConfig'][19][50]#}：{#$detail_ordernum#}</li>
+			<li>{#$langData['siteConfig'][19][51]#}：{#$detail_orderdate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>
+			{#* if $detail_orderstate == 1 || ($detail_orderstate == 2 && $detail_paydate != 0) || $detail_orderstate == 3 || $detail_orderstate == 4 *#}
+			{#if $detail_paydate != 0#}
+			<li>{#$langData['siteConfig'][19][52]#}：{#$detail_paytype#}</li>
+			<li>{#$langData['siteConfig'][19][53]#}：{#$detail_paydate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>
+			{#/if#}
+		</ul>
+	</dd>
+
+    {#if $cfg_juhe && $cfg_juhe['express']#}
+    {#if ($detail_orderstate == 3 || $detail_orderstate == 5 || $detail_orderstate == 6 || $detail_orderstate == 7) && $detail_expNumber != '' && $detail_expDate != 0 && $detail_shipping == 1#}
+    <dt class="">{#$langData['siteConfig'][19][62]#}</dt>  {#* 快递信息 *#}
+    <dd>
+        <div class="logisticsInfo">
+            <span>{#$langData['siteConfig'][19][63]#}：{#$juhe_express_company[$detail_expCompany]#}</span>
+            <span>{#$langData['siteConfig'][19][64]#}：{#$detail_expNumber#}</span>
+            <span>{#$langData['siteConfig'][19][65]#}：{#$detail_expDate|date_format:"%Y-%m-%d %H:%M:%S"#}</span>
+        </div>
+        <div class="scroll-box">
+            {#foreach from=$detail_expTrack item=exp key=k#}
+            <div class="scroll"><img src="{#$templets_skin#}images/intro-0{#if $k==0#}2{#else#}1{#/if#}.png" alt="">{#$exp.remark#}  {#$exp.datetime#}</div>
+            {#/foreach#}
+        </div>
+    </dd>
+    {#/if#}
+    {#/if#}
+
+	{#* 配送信息 *#}
+	<dt class="speDt"><strong>{#$langData['siteConfig'][26][127]#}</strong><strong>买家信息</strong></dt>
+	<dd class="spedd fn-clear">
+		<ul>
+			<li>{#$langData['siteConfig'][19][33]#}：{#$detail_username#}</li>
+			<li>{#$langData['siteConfig'][19][56]#}：{#$detail_usercontact#}</li>
+			<li>{#$langData['siteConfig'][19][57]#}：{#$detail_useraddr#}</li>
+			<li>{#$langData['siteConfig'][19][344]#}：{#$detail_note#}</li>
+		</ul>
+		<ul>
+			<li>买家：{#$detail_nickname#}<a href="javascript:;" class="contactUser chat_to-Link" data-type="user"><i></i></a></li>
+			<li>{#$langData['siteConfig'][19][56]#}：{#$detail_phone#}</li> {#* 联系电话 *#}
+		</ul>
+	</dd>
+
+    {#if !$cfg_juhe || !$cfg_juhe['express']#}
+	{#if ($detail_orderstate == 3 || $detail_orderstate == 5 || $detail_orderstate == 6 || $detail_orderstate == 7) && $detail_expNumber != '' && $detail_expDate != 0#}
+	<dt>{#$langData['siteConfig'][19][62]#}</dt>
+	<dd>
+		<ul>
+			<li>{#$langData['siteConfig'][19][63]#}：{#$juhe_express_company[$detail_expCompany]#}</li>
+			<li>{#$langData['siteConfig'][19][64]#}：{#$detail_expNumber#}</li>
+			<li>{#$langData['siteConfig'][19][65]#}：{#$detail_expDate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>
+			<li>{#$langData['siteConfig'][19][66]#}：<a href="https://www.baidu.com/s?wd={#$juhe_express_company[$detail_expCompany]#} {#$detail_expNumber#}" target="_blank" style="color:#027cff;">{#$langData['siteConfig'][6][94]#}</a></li>
+		</ul>
+	</dd>
+	{#/if#}
+	{#/if#}
+
+	<dt>{#$langData['siteConfig'][19][322]#}</dt>
+	<dd class="shop-pro">
+		<ul class="sp clearfix">
+			<li class="t0"></li>
+			<li class="t1"><a href="/include/qrcode.php?data={#getUrlPath service='awardlegou' template='detail' id={#$detail_proarr.id#}#}" target="_blank"><img src="{#changeFileSize url={#$detail_proarr.litpicpath#} type='small'#}"></a></li>
+			<li class="t2"><a href="/include/qrcode.php?data={#getUrlPath service='awardlegou' template='detail' id={#$detail_proarr.id#}#}" target="_blank">{#$detail_proarr.title#}</a><br /><small>{#$product.specation|replace:"$$$":"、"#}</small></li>
+		</ul>
+		<div class="sum">
+			<div class="right">积分：{#$detail_point#}+现金：{#$detail_balance+$detail_payprice#} {#$langData['siteConfig'][19][330]#}：<font><strong>{#$detail_amount#}</strong></font></div>
+		</div>
+	</dd>
+
+</dl>
+<!-- 奖品列表 -->
+<dl class="bunch-section">
+	<dt>奖品列表</dt>
+	<dd class="gift_list">
+		<h1><span class="contit">奖品信息</span><span class="custit">客户信息</span><span class="statit">状态</span></h1>
+		<ul class="customBox">
+			{#foreach from=$detail_prizearr item=prize#}
+			{#if $prize.rewardtype ==0#}
+			<li class="fn-clear">
+				<div class="proBox fn-clear">
+					<div class="pro_img"><img src="/include/attachment.php?f={#$prize.reward.litpic#}" alt=""></div>
+					<div class="pro_tit">
+						<h3>商品</h3>
+						<p>{#$prize.reward.title#}</p>
+					</div>
+				</div>
+				<div class="customInfo">
+					<h4>联系人：{#$prize.addres.username#}</h4>
+					<p>电话：{#$prize.addres.usercontact#}</p>
+					<p>地址：{#$prize.addres.useraddr#}</p>
+				</div>
+				{#if !$prize.jpexpNumber && !$prize.jpexpDate#}
+				<div class="gift_state">
+					<div class="formfield">
+						<label><em>*</em> {#$langData['siteConfig'][9][68]#}：</label>  {#* 配送方式 *#}
+						<div class="shipping">
+							<label><input type="radio" name="shipping" value="1" /> {#$langData['siteConfig'][9][70]#}</label>  {#* 快递 *#}
+						</div>
+					</div>
+					<div class="exp fn-hide">
+						<div class="formfield">
+							<label for="exp-company"><em>*</em> {#$langData['siteConfig'][19][63]#}：</label>
+					        <select name="exp-company" class="exp-company">
+					            <option value="">{#$langData['siteConfig'][7][2]#}</option>  {#* 请选择 *#}
+					            {#foreach from=$juhe_express_company key=k item=exp#}
+					            <option value="{#$k#}">{#$exp#}</option>
+					            {#/foreach#}
+					        </select>
+							<span class="input-tips"><s></s>{#$langData['siteConfig'][27][60]#}</span>
+						</div>
+						<div class="formfield">
+							<label for="exp-number"><em>*</em> {#$langData['siteConfig'][19][64]#}：</label>
+							<input type="text" name="exp-number" class="exp-number" size="25" maxlength="20" />
+							<span class="input-tips"><s></s>{#$langData['siteConfig'][20][406]#}</span>
+						</div>
+					</div>
+					<div class="btns">
+						<button type="button" data-id="{#$prize.id#}" class="cbtn expBtn" >{#$langData['siteConfig'][6][0]#}</button>
+					</div>
+				</div>
+				{#else#}
+				<div class="gift_state">
+					<p>状态：已发货</p>
+					<p>快递单号：{#$prize.jpexpNumber#}</p>
+				</div>
+				{#/if#}
+			</li>
+			{#else#}
+			<li class="fn-clear hb_li">
+				<div class="proBox fn-clear">
+					<div class="pro_img"></div>
+					<div class="pro_tit">
+						<h3>红包</h3>
+						<p>{#$prize.hongbaomoney#}元</p>
+					</div>
+				</div>
+				<div class="customInfo">
+					<h4>联系人：{#$prize.addres.username#}</h4>
+					<p>电话：{#$prize.addres.usercontact#}</p>
+					<p>地址：{#$prize.addres.useraddr#}</p>
+				</div>
+				<div class="gift_state">
+					<p>状态：{#if $prize.is_receive ==1#} 已领取 {#else#} 未领取 {#/if#}</p>
+				</div>
+			</li>
+			{#/if#}
+			{#/foreach#}
+		</ul>
+	</dd>
+</dl>
+
+<!-- 退货弹窗 -->
+<div class="agreelegouMask"></div>
+<div class="agreehuoWrap legouComWrap">
+	<div class="sureAlert"> 
+		<h2 class="sureTit">{#$langData['siteConfig'][6][0]#}</h2> {#* 确认 *#}
+	 	<a href="javascript:;" class="closeAlert"></a>
+	 	<div class="agreeCon">
+	 		<h3><i></i>{#$langData['siteConfig'][55][40]#}</h3> {#* 确定同意买家退货吗？ *#}
+	 		<ul>
+	 			<li><a href="javascript:;" class="sureTuihuo" data-id="{#$detail_id#}">{#$langData['siteConfig'][55][37]#}</a></li> {#* 同意退货 *#}
+	 			<li><a href="javascript:;" class="cancelTui">{#$langData['siteConfig'][6][12]#}</a></li> {#* 取消 *#}
+	 		</ul>
+	 	</div>	
+	 </div>
+</div>
+<!-- 退款弹窗 -->
+<div class="agreekuanWrap legouComWrap">
+	<div class="sureAlert">
+		<h2 class="sureTit">{#$langData['siteConfig'][6][0]#}</h2> {#* 确认 *#}
+	 	<a href="javascript:;" class="closeAlert"></a>
+	 	<div class="agreeCon">
+	 		<h3><i></i>{#$langData['siteConfig'][55][41]#}</h3> {#* 确定同意退款吗？确定后钱款将直接退回买家账户，请谨慎操作！ *#}
+	 		<ul>
+	 			<li><a href="javascript:;" class="sureTuikuan" data-id="{#$detail_id#}">{#$langData['siteConfig'][55][35]#}</a></li> {#* 同意退款 *#}
+	 			<li><a href="javascript:;" class="cancelTui">{#$langData['siteConfig'][6][12]#}</a></li> {#* 取消 *#}
+	 		</ul>
+	 	</div>	
+	 </div>
+</div>
+<script>
+	var imconfig = {
+            'mod':'awardlegou',
+            'chatid':"{#$detail_userid#}",
+        }
+</script>
+
+{#else#}
+<div class="list" style="padding: 200px 0; text-align: center; font-size: 14px; color: red;">{#$langData['siteConfig'][20][403]#}</div>
+{#/if#}

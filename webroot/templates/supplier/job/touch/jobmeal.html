@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title> 招聘套餐</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/jobmeal.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}'
+        var job_cid = '{#$job_cid#}'
+        var jobCount = {#$managerCount.job|default:0#}
+        var pcount = '{#$company_pcount|default:0#}'
+        var combo_id = {#$company_combo_id|default:0#} ; //套餐ID
+        var combo_job = {#$company_combo_job|default:0#}; //职位
+        var package_job = {#$company_package_job|default:0#}; //职位增值包
+        var can_resume_down = {#$company_can_resume_down|default:0#}; //下载简历
+        var package_resume = {#$company_package_resume|default:0#}; //下载简历增值包
+        var combo_top = {#$company_combo_top|default:0#}; //置顶
+        var package_top = {#$company_package_top|default:0#}; //置顶增值包
+        var can_job_refresh = {#$company_can_job_refresh|default:0#}; //刷新
+        var package_refresh = {#$company_package_refresh|default:0#}; //刷新增值包
+        var combo_wait = '{#json_encode($company_combo_wait)#}'
+    </script>
+</head>
+<body>
+    {#include file="../../../siteConfig/touch_top.html" pageTitle='招聘套餐' headTheme=" transparent"#} 
+    <div class="pageBox" id="page" v-cloak>
+        <!-- 套餐展示 -->
+        <div class="tcContainer">
+            <div class="tcBox">
+                <!-- 套餐信息 -->
+                <div class="tcInfo">
+                    <span :class="['state',{state1:businessInfo.combo_id}]">{{businessInfo.combo_id ? '已开通' : '未开通'}}</span>
+                    <h4><span>{{currItemChose.title ? currItemChose.title : '企业会员'}}</span></h4>
+                    <p v-if="!businessInfo.combo_id">助力企业招聘！套餐有效时间：{{currItemChose.valid > -1 ? currItemChose.valid + '天' : '永久有效'}}</p>
+                    <p v-else>套餐有效期至：{#if $company_combo_enddate == -1#}永久有效{#else if $company_combo_enddate < $smarty.now#}已过期{#else#}{#$company_combo_enddate|date_format:"%Y/%m/%d"#}{#/if#}</p>
+                </div>
+
+                <!-- 套餐包含内容 -->
+                <div class="tcCon">
+                    <h3>{{businessInfo.combo_id ? '当前':'开通该'}}套餐享{{checkQuanyi()}}项招聘权益</h3>
+                    <ul>
+                        <li>
+                            <div class="icon"><img src="{#$templets_skin#}images/resume_icon.png" alt=""></div>
+                            <h6>{{currItemChose.resume ? (currItemChose.resume == -1 ? '不限' : currItemChose.resume + '份') : 0 + '份'}}</h6>
+                            <p>下载简历/天</p>
+                        </li>
+                        <li>
+                            <div class="icon"><img src="{#$templets_skin#}images/job_icon.png" alt=""></div>
+                            <h6>{{currItemChose.job? (currItemChose.job == -1 ? '不限' : currItemChose.job + '个' ) : 0 + '个'}}</h6>
+                            <p>职位上架数</p>
+                        </li>
+                        <li>
+                            <div class="icon"><img src="{#$templets_skin#}images/top_icon.png" alt=""></div>
+                            <h6>{{currItemChose.top? (currItemChose.top == -1 ? '不限' : currItemChose.top + '天') : 0 + '天'}}</h6>
+                            <p>职位置顶</p>
+                        </li>
+                        <li>
+                            <div class="icon"><img src="{#$templets_skin#}images/refresh_icon.png" alt=""></div>
+                            <h6>{{currItemChose.refresh? (currItemChose.refresh == -1 ? '不限' : currItemChose.refresh + '次') : 0 + '次'}}</h6>
+                            <p>刷新职位/天</p>
+                        </li>
+                    </ul>
+                </div>
+                <!-- 套餐剩余 -->
+                {#if $company_combo_id#}
+                <div class="tcLeft" @click="showPop = true; showType = 'tcCon'">
+                    <ul>
+                        
+                        <li :class="{'none':businessInfo.can_resume_down != -1 && (businessInfo.can_resume_down+businessInfo.package_resume) == 0}">{{businessInfo.can_resume_down > 0||(businessInfo.package_resume && businessInfo.can_resume_down!=-1)? '今日余' +(businessInfo.can_resume_down+businessInfo.package_resume) + '份': ( businessInfo.can_resume_down == -1 ? '不限' : '今日余0份')}}</li>
+                        <li>已上架{#$company_pcount|default:0#}</li>
+                        <li :class="{'none':businessInfo.combo_top != -1 && (businessInfo.combo_top+businessInfo.package_top) == 0}">{{businessInfo.combo_top > 0||(businessInfo.package_top && businessInfo.combo_top!=-1)? '余' +(businessInfo.combo_top+businessInfo.package_top) + '天': ( businessInfo.combo_top == -1 ? '不限' : '余0天')}}</li>
+                        <li :class="{'none':businessInfo.can_job_refresh != -1 && (businessInfo.can_job_refresh+businessInfo.package_refresh) == 0}">{{businessInfo.can_job_refresh > 0||(businessInfo.package_refresh && businessInfo.can_job_refresh!=-1)? '今日余' +(businessInfo.can_job_refresh+businessInfo.package_refresh) + '次': ( businessInfo.can_job_refresh == -1 ? '不限' : '今日余0次')}}</li>
+                    </ul>
+                </div>
+                {#/if#}
+            </div>
+        </div>
+
+        <!-- 套餐列表 -->
+        <div class="tcListBox">
+            <div class="tcList swiper-container" v-if="!businessInfo.combo_id">
+                <ul class="swiper-wrapper" v-if="comboList && comboList.length">
+                    <li :class="['swiper-slide',{'on_chose':item.id == currItemChose.id}]" v-for="item in comboList" @click="currItemChose = item">
+                        <div class="tcCon">
+                            <span class="rec" v-if="item.buy_max">最多企业选择</span>
+                            <h4 class="title">{{item.title}}</h4>
+                            <p class="date">有效时间：{{item.valid > -1 ? item.valid + '天' : '永久有效'}}</p>
+                            <div class="price">{#echoCurrency type="symbol"#}<b>{{item.money}}</b></div>
+                            <p class="hasBuy">{{item.buy}}人已购买</p>
+                        </div>
+                    </li>
+                </ul>
+
+                <!-- 占位符 -->
+                <ul class="swiper-wrapper" v-else>
+                    <li :class="['swiper-slide','bg_grey']" v-for="item in 3"> </li>
+                </ul>
+            </div>
+            <div class="btns">
+                <a href="javascript:;" class="btn_buy {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" @click="renewFee(currItemChose.id,1,1)"><b>{{currItemChose.money ? currItemChose.money : 0}}</b><em>{#echoCurrency type="short"#} </em> {{businessInfo.combo_id ? '立即续费':'立即开通'}}<span>{{businessInfo.combo_id ? '续享服务' + (currItemChose.valid ? currItemChose.valid : 0) + '天': '立即生效'}}</span></a>
+                <p>购买即视为同意<a href="{#getUrlPath service='siteConfig' template='protocol' title='企业招聘协议'#}">《企业招聘协议》</a></p>
+            </div>
+
+            <!-- 其他套餐 已购买过-->
+            <div class="tcListBox_sm" v-if="businessInfo.combo_id">
+                <div class="box-header">
+                    <h5>更换招聘套餐</h5>
+                    <a href="javascript:;" class="btn_show" @click="showTcChange(0)">查看全部</a>
+                </div>
+                <div class="box-container swiper-container">
+                    <ul class=" swiper-wrapper">
+                        <li class="swiper-slide" @click="showTcChange(ind)" v-for="(item,ind) in comboList" >
+                            <div class="tcInfo">
+                                <h4>{{item.title}}</h4>
+                                <p>{{item.valid > -1 ? '有效期' + item.valid + '天' : '永久有效'}}</p>
+                            </div>
+                        </li>
+                        
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- 套餐增值服务 -->
+        <div class="packageBox">
+            <div class="instr_package_box" v-if="!businessInfo.combo_id">
+                <h3>招聘增值服务</h3>
+                <dl class="instr_package">
+                    <dt>增值包说明</dt>
+                    <dd>1、增值包仅限已经开通招聘套餐的企业会员购买<br> 2、招聘套餐有限期内，每日套餐内容用光后，开始使用增值包<br> 3、增值包永久有效，使用不受限、不浪费，请放心购买</dd>
+                </dl>
+            </div>
+            <div class="packageCon">
+                <h3 class="title" v-if="businessInfo.combo_id && packageList.length == 0">招聘增值包<span>套餐不够用？随心叠加同享优惠</span></h3>
+                <ul :class="['tab',{'noPackage':packageList.length == 0}]">
+                    <li :class="[{'on_chose':currTab == 0}]" @click="changeTab(0)">超值优享包</li>
+                    <li :class="[{'on_chose':currTab == 1}]" @click="changeTab(1)">单项增值服务</li>
+                </ul>
+                <div class="swiper-container package-container">
+                    <div class="swiper-wrapper">
+                        <div class="swiper-slide yxPackage" >
+                            <ul>
+                                <li class="package_li {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" v-for="item in packageList" @click="renewFee(item.id,2)">
+                                    <h3>{{item.title}}<span class="rec" v-if="item.rec">推荐</span></h3>
+                                    <p class="price">
+                                        <span class="nprice">{#echoCurrency type="symbol"#}<b>{{item.price}}</b></span>
+                                        <s class="oprice">{#echoCurrency type="symbol"#}{{item.mprice}}</s>
+                                    </p>
+                                    <div class="pcon  fn-clear">
+                                        <p v-if="item.resume">下载简历<span>{{item.resume}}</span>份</p>
+                                        <p v-if="item.job">职位上架数<span>{{item.job}}</span>个</p>
+                                        <p v-if="item.top">职位置顶<span>{{item.top}}</span>天</p>
+                                        <p v-if="item.refresh">职位刷新<span>{{item.refresh}}</span>次</p>
+                                        <!-- <p>职位畅聊<span>200</span>条</p> -->
+                                    </div>
+                                    <div class="btns">
+                                        <a href="javascript:;" class="buy_btn">立即购买</a>
+                                        <p>{{item.buy}}人已购买</p>
+                                    </div>
+                                </li>
+                                
+                            </ul>
+                        </div>
+                        <div class="swiper-slide singlePackage">
+                            <ul>
+                                <li class="package_li {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" @click="showPackagePop(2)" v-if="can_resume_down != -1">
+                                    <div class="flex_left">
+                                        <div class="icon"><img src="{#$templets_skin#}images/job_icon1.png" alt=""></div>
+
+                                        <div class="pInfo">
+                                            <h4>上架职位</h4>
+                                            <p>企业招聘职位</p>
+                                        </div>
+                                    </div>
+                                </li>
+                                <li class="package_li {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" @click="showPackagePop(3)" v-if="combo_job != -1">
+                                    <div class="flex_left">
+                                        <div class="icon"><img src="{#$templets_skin#}images/resume_icon1.png" alt=""></div>
+                                        <div class="pInfo">
+                                            <h4>简历下载</h4>
+                                            <p>捕获更多人才</p>
+                                        </div>
+                                    </div>
+                                </li>
+                                <li class="package_li {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" @click="showPackagePop(4)">
+                                    
+                                    <div class="flex_left">
+                                        <div class="icon"><img src="{#$templets_skin#}images/top_icon1.png" alt=""></div>
+                                        <div class="pInfo">
+                                            <h4>职位置顶</h4>
+                                            <p>置顶位流量飞升</p>
+                                        </div>
+                                    </div>
+                                </li>
+                                <li class="package_li" @click="showPackagePop(5)">
+                                    <div class="flex_left">
+                                        <div class="icon"><img src="{#$templets_skin#}images/refresh_icon1.png" alt=""></div>
+                                        <div class="pInfo">
+                                            <h4>职位刷新</h4>
+                                            <p>持续稳定曝光</p>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="instr_package_box" v-if="businessInfo.combo_id">
+                <h3>招聘增值服务</h3>
+                <dl class="instr_package">
+                    <dt>增值包说明</dt>
+                    <dd>1、增值包仅限已经开通招聘套餐的企业会员购买<br> 2、招聘套餐有限期内，每日套餐内容用光后，开始使用增值包<br> 3、增值包永久有效，使用不受限、不浪费，请放心购买</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="bottom_btns" v-if="!businessInfo.combo_id">
+            <a href="javascript:;" class="btn_buy {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" @click="renewFee(currItemChose.id,1,1)">
+                <div class="price"><span>{#echoCurrency type="symbol"#}<b>{{currItemChose.money ? currItemChose.money : 0}}</b></span> 套餐价</div>
+                <span class="block">立即开通</span>
+            </a>
+            <p :class="{'on_chose':hasGou}" @click="hasGou = !hasGou">购买即视为同意<a href="{#getUrlPath service='siteConfig' template='protocol' title='企业招聘协议'#}">《企业招聘协议》</a></p>
+        </div>
+
+
+        <!-- 弹窗 => 改变套餐 -->
+        <div class="tc_mask" v-show="showPop" @click="showPop = false;"></div>
+        <div :class="['tcBoxPop',{'showPop':showPop && showType == 'change'}]">
+            <div class="pop_header">
+                <h4>更换套餐</h4>
+                <p>套餐自由选择，助力企业招聘！</p>
+            </div>
+            <a href="javascript:;" class="close_pop" @click="showPop = false;"></a>
+            <div class="pop_con">
+                <div class="tcList swiper-container" v-if="businessInfo.combo_id" >
+                    <ul class="swiper-wrapper" v-if="comboList && comboList.length">
+                        <li :class="['swiper-slide',{'on_chose':changeChoseItem.id == item.id}]" v-for="item in comboList" @click="changeChoseItem = item; showBottom = true" v-if="businessInfo.combo_id != item.id">
+                            <div class="tcCon">
+                                <span class="rec" v-if="item.buy_max">最多企业选择</span>
+                                <h4 class="title">{{item.title}}</h4>
+                                <p class="date">有效时间：{{item.valid > -1 ? item.valid + '天' : '永久有效'}}</p>
+                                <div class="price">{#echoCurrency type="symbol"#}<b>{{item.money}}</b></div>
+                                <p class="hasBuy">{{item.buy}}人已购买</p>
+                            </div>
+                        </li>
+                    </ul>
+    
+                    <!-- 占位符 -->
+                    <ul class="swiper-wrapper" v-else>
+                        <li :class="['swiper-slide','bg_grey']" v-for="item in 3"> </li>
+                    </ul>
+                </div>
+                <div class="currShowInfo" v-show="changeChoseItem.id && showBottom" >
+                    <ul>
+                        <li>
+                            <h6>{{changeChoseItem.resume ? (changeChoseItem.resume > -1 ? (changeChoseItem.resume + '份') : '不限') : '0份'}}</h6>
+                            <p>下载简历/天</p>
+                        </li>
+                        <li>
+                            <h6>{{changeChoseItem.job? (changeChoseItem.job > -1 ? (changeChoseItem.job + '个') : '不限') : '0个'}}</h6>
+                            <p>职位上架数</p>
+                        </li>
+                        <li>
+                            <h6>{{changeChoseItem.top? changeChoseItem.top : 0}}天</h6>
+                            <p>职位置顶</p>
+                        </li>
+                        <li>
+                            <h6>{{changeChoseItem.refresh? changeChoseItem.refresh : 0}}次</h6>
+                            <p>刷新职位/天</p>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="pop_bottom">
+                <a href="javascript:;" class="btn_buy {#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}" @click="changeTc(changeChoseItem)">
+                    <div class="price">需支付 <span>{#echoCurrency type="symbol"#}<b>{{changeChoseItem.money ? changeChoseItem.money : 0}}</b></span></div>
+                    <span class="block">立即开通</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 弹窗 => 招聘资源剩余 -->
+        <div :class="['currTcConShowPop',{'showPop':showPop && showType == 'tcCon'}]">
+            <div class="pop_header">
+                <h4>招聘资源剩余</h4>
+            </div>
+            <div class="pop_con">
+                <div class="tabChange">
+                    <ul>
+                        <li :class="{'on_chose':currCon.ind == 0}" :data-tc="businessInfo.can_resume_down"  :data-tc="businessInfo.package_resume" @click="choseCurrCon(0)">
+                            <h5>今日下载简历</h5>
+                            <div class="leftCon"><b>{{businessInfo.can_resume_down == -1 ? '不限' : businessInfo.can_resume_down}}</b><span>+{{businessInfo.package_resume}}份</span></div>
+                        </li>
+                        <li @click="choseCurrCon(1)" :class="{'on_chose':currCon.ind == 1}" :data-tc="businessInfo.can_job_refresh"  :data-tc="businessInfo.package_refresh">
+                            <h5>今日刷新职位</h5>
+                            <div class="leftCon"><b>{{businessInfo.can_job_refresh == -1 ? '不限' : businessInfo.can_job_refresh}}</b><span>+{{businessInfo.package_refresh}}次</span></div>
+                        </li>
+                        <li @click="choseCurrCon(2)" :class="{'on_chose':currCon.ind == 2}" :data-tc="businessInfo.combo_top"  :data-tc="businessInfo.package_top">
+                            <h5>职位置顶</h5>
+                            <div class="leftCon"><b>{{businessInfo.combo_top != -1 ? (businessInfo.combo_top + businessInfo.package_top) : '不限'}}</b><span>天</span></div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="currCon">
+                    <p><span>{{currCon.tc == -1 ? '不限' : currCon.tc}}:</span><em>套餐余量，</em>今日有效</p>
+                    <p><span>{{currCon.package ? currCon.package : 0 }}:</span><em>增值包余量，</em>永久有效，套餐用光后开始使用</p>
+                </div>
+                <p class="tip_buy">套餐不够用？您可以<span class="btn" @click="showPackage">购买增值包</span>或<span @click="showType = 'change'">升级套餐</span></p>
+            </div>
+        </div>
+    </div>
+    {#include file="public_pop.html"  noVue=1#}
+    {#include file="../../../member/touch/public-pay-pop.html"  noVue=1#}
+</body>
+<script src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/jobmeal.js?v={#$cfg_staticVersion#}"></script>
+</html>

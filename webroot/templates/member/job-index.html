@@ -1,0 +1,496 @@
+
+{#$pageTitle = '个人中心'#}
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<script> 
+var userName = '{#$userinfo.realname#}';
+var userid_ = '{#$userinfo.userid#}'
+</script>
+<div class="jobIndexContenWrap" id="pageVue" v-cloak>
+    <a class=" finishInfoTipBox" v-if="(currResume.certifyState==0 || !currResume.id || currResume.need_complete === '0')&&currResume.state==1" v-cloak :href="!currResume.id?'{#$member_userDomain#}/job-resume.html':currResume.need_complete === '0'?'{#$member_userDomain#}/job-resume.html':currResume.certifyState==0?'{#$member_userDomain#}/security-shCertify.html':'javascript:;'" :target="currResume.certifyState==0?'_blank':''">
+        <div class="iconbox fn-left"><img src="{#$templets_skin#}images/job/tip_icon3.png" alt=""></div>
+
+        <div class="fn-left tip_text" v-if="!currResume.id">
+            <h3><span>温馨提示：</span>您还未创建简历</h3>
+            <p>优质的简历是求职的第一步，创建简历后才可投递心仪职位哦</p>
+            <div class="goLink">创建简历</div>
+        </div>
+
+        <div class="fn-left tip_text" v-else-if="currResume.need_complete === '0'">
+            <h3><span>温馨提示：</span>您的简历有待完善</h3>
+            <p>优质的简历是求职的第一步，完善简历后才可投递心仪职位哦</p>
+            <div class="goLink">完善简历</div>
+        </div>
+    
+        <div class="fn-left tip_text" v-else-if="currResume.certifyState==0">
+            <h3><span>温馨提示：</span>您还未实名认证</h3>
+            <p>认证后可提高简历可信度，更容易得到招聘方关注</p>
+            <div class="goLink">实名认证</div>
+        </div>
+    </a>
+    <div class="auditting" v-if="currResume.state==0"><img src="{#$templets_skin#}images/job/warncir.png">简历审核中，暂不可投递新职位，正在进行中的投递、面试不受影响</div>
+    <div class="aduitRefused" v-if="currResume.state==2"><img src="{#$templets_skin#}images/job/warncirred.png">简历审核未通过，请修改后提交，拒绝原因：{{currResume.refuse}}</div>
+    <!-- 我的求职 -->
+    <div class="whiteBGWrap wrapJob" v-cloak>
+        <div class="wrap_title">我的求职</div>
+        <div class="gridWrap">
+            <a class="grid-content green" :span="31" href="{#$member_userDomain#}/job-invitation.html">
+                <div class="icon"><img src="{#$templets_skin#}images/job/icon_1.png" alt=""></div>
+                <div class="con">
+                    <h4>面试邀请</h4>
+                    <div  class="msg_tip {#if $invitationPoint > 0 #}new {#/if#}">{#$invitationCount#}</div>
+                </div>
+            </a>
+            <a class="grid-content blue" :span="31" href="{#$member_userDomain#}/job-delivery.html">
+                <div class="icon"><img src="{#$templets_skin#}images/job/icon_2.png" alt=""></div>
+                <div class="con">
+                    <h4>我的投递</h4>
+                    <div class="msg_tip {#if $deliveryCountPoint > 0 #}new {#/if#}">{#$deliveryCount#}</div>
+                </div>
+            </a>
+            <a href="{#$member_userDomain#}/job-collections.html" class="grid-content purple" :span="31">
+                <div class="icon"><img src="{#$templets_skin#}images/job/icon_3.png" alt=""></div>
+                <div class="con">
+                    <h4>收藏职位</h4>
+                    <div  class="msg_tip {#if $collectJobPoint > 0 #}new {#/if#}">{#$collectJobCount#}</div>
+                </div>
+            </a>
+            <a class="grid-content blue2" :span="40" href="{#$member_userDomain#}/job-collections.html?type=company">
+                <div class="icon"><img src="{#$templets_skin#}images/job/icon_4.png" alt=""></div>
+                <div class="con">
+                    <h4>关注公司</h4>
+                    <div class="msg_tip {#if $collectCompanyPoint > 0 #}new {#/if#}">{#$collectCompanyCount#}</div>
+                </div>
+                
+            </a>
+        </div>
+    </div>
+
+    <!-- 我的简历 -->
+    <a class="whiteBGWrap wrapResume" v-if="!currResume.id" v-cloak href="{#$member_userDomain#}/job-resume.html">
+        <div class="wrap_title">我的简历</div>
+        <div class="wrap_con fn-clear">
+            <div class="resume_photo"><img :src="currResume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+            <div class="resume_con">
+                <h4>请先创建简历</h4>
+                <p>创建简历后才可投递心仪职位</p>
+            </div>
+            <div class="btn_groups create_resume"><s></s>创建简历</div>
+        </div>
+    </a>
+    <div class="whiteBGWrap wrapResume" v-else-if="currResume.need_complete === '0'" v-cloak>
+        <div class="wrap_title">我的简历</div>
+        <div class="wrap_con fn-clear">
+            <div class="resume_photo"><img :src="currResume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+            <div class="resume_con">
+                <h4>{{currResume.name}} <div class="resume_detail"><span>{{currResume.age}}岁</span><em v-if="currResume.age">|</em><span>{{currResume.edu_tallest_name}}</span><em v-if="currResume.edu_tallest_name">|</em><span>{{currResume.work_jy_name}}</span></div></h4>
+                <p>完善简历后才可以投递心仪职位</p>
+            </div>
+            <div class="btn_groups"><a href="{#$member_userDomain#}/job-resume.html" class="create_resume"><s></s>完善简历</a></div> 
+        </div>
+    </div>
+    <a class="whiteBGWrap wrapResume" v-else v-cloak href="{#$member_userDomain#}/job-resume.html">
+        <div class="wrap_title">我的简历</div>
+        <div class="wrap_con fn-clear">
+            <div class="resume_photo"><img :src="currResume.photo_url" alt=""></div>
+            <div class="resume_con">
+                <h4>{{currResume.name}} <div class="resume_detail"><span>{{currResume.age}}岁</span><em v-if="currResume.age">|</em><span>{{currResume.edu_tallest_name}}</span><em v-if="currResume.edu_tallest_name">|</em><span>{{currResume.work_jy_name}}</span><em v-if="currResume.work_jy_name">|</em><span>{{currResume.workState_name}}</span></div></h4>
+                <div class="resume_detail_lab"><span class="nature">{{currResume.nature_name}}</span> <span class="industry" v-for="item in currResume.type_name">{{item}}</span></div>
+                <div class="intention"><span class="salary_show">{{currResume.show_salary}}</span>{{currResume.job_name.join('、')}} </div>
+                <div class="resumeUpState fn-clear">
+                    <div class="refresh_state resumeState" @click.stop.prevent="showResumeUpdatePop(0)" v-if="currResume.refreshSmart == '1'"> <h5><span class="title">智能刷新 · </span>下次刷新<em>{{timeTransTime(currResume.refreshNext)}}</em><span> (剩余{{currResume.refreshSurplus}}次,还剩{{Math.ceil(currResume.refreshSurplus / 4)}}天结束) </span></h5> </div>
+                    <div class="toTop_state resumeState" @click.stop.prevent="showResumeUpdatePop(1)" v-if="currResume.bid_end > '{#$smarty.now#}'"><h5><span class="title">简历置顶 · </span><em>已开启强势曝光！ </em><span> ({{timeTransTime(currResume.bid_end,1)}}天后结束) </span></h5></div>
+                </div>
+            </div>
+            <div class="btn_groups">
+                <div class="create_resume resumeLevelUp" @click.stop.prevent="showResumeUpdatePop()" v-if="currResume.state==1" style="cursor: pointer;"><s></s>简历升级</div>
+                <div class="create_resume" style="cursor: pointer;"><s></s>编辑简历</div>
+            </div>
+        </div>
+    </a>
+
+
+    <!-- 我的面试日程 -->
+    <div class=" whiteBGWrap fn-clear myInterviewBox" v-cloak>
+        <div class="fn-left wrapInterview">
+            <div class="wrap_title">我的面试日程</div>
+            <div class="more_interview" v-if="myInterviewList.length > 1">
+                <ul>
+                    <li class="post" v-for="item in myInterviewList">
+                        <a href="{#$member_userDomain#}/post_detail.html?type=delivery&id=item.id" target="_blank">
+                            <div class="pInfo fn-clear">
+                                <h3 class="fn-left">{{item.job.title}}</h3>
+                                <span class="pSalary fn-right">{{item.job.show_salary}}</span>
+                            </div>
+                            <div class="pdetail fn-clear">
+                                <p class="pRequire fn-left">
+                                    <span>{{item.job.type}}</span>
+                                </p> 
+                                <p class="paddr fn-right">{{item.job.job_addr_detail['addrName'].join(' ')}}</p>
+                            </div>
+                            <p class="p_company">{{item.companyTitle}}</p>
+                            <div class="interview_state"><span>待面试 </span><span> {{timeTrans(item.date)}}</span></div>
+                        </a>
+                    </li>
+                    
+                </ul>
+                <div class="all_count" v-if="interviewTotal > 2">全部共{{interviewTotal}}场面试</div>
+            </div>
+            <div class="single_interview" v-else-if="myInterviewList.length == 1">
+                <a class="interview_info"  :href="'{#$member_userDomain#}/post_detail.html?type=invitation&id='+myInterviewList[0].id" target="_blank">
+                    <h4>{{myInterviewList[0].job.title}}</h4>
+                    <p><span>{{myInterviewList[0].companyNature}}</span><em v-if="myInterviewList[0].companyNature">|</em><span>{{myInterviewList[0].companyScale}}</span><em>|</em><span>{{myInterviewList[0].companyIndustry}}</span></p>
+                    <div class="salary_show">{{myInterviewList[0].job.show_salary}} · <span v-if="myInterviewList[0].job.dy_salary"> {{myInterviewList[0].job.dy_salary}}<b>薪</b></span></div>
+                </a>
+                <div class="mapBox">
+                    <div class="company_info">
+                        <h6>{{myInterviewList[0].companyTitle}}</h6>
+                        <p>{{myInterviewList[0].job.job_addr_detail ? myInterviewList[0].job.job_addr_detail.addrName.join(' ') : ''}}</p>
+                    </div>
+                    <div class="map" id="map"></div>
+                </div>
+                <div class="interview_state"><span>待面试</span><span> {{timeTrans(myInterviewList[0].date)}}</span></div>
+            </div>
+            <div class="noData" v-else>
+                <img src="{#$templets_skin#}images/job/noData.png" alt="">
+                <p>暂无面试安排，快去投递心仪职位吧~</p>
+            </div>
+        </div>
+        <div class="fn-right wrapDelivery" v-if="myDeliveryList && myDeliveryList.length > 0">
+            <div class="wrap_title">投递动态</div>
+            <ul>
+                <li :class="'dState_li state' + item.postState" v-for="item in myDeliveryList">
+                    <a :href="'{#$member_userDomain#}/post_detail.html?type=delivery&id=' + item.id">
+                        <h5><span class="dstate_text"><s></s>{{stateArr[item.postState]}}</span><span class="update_time">{{timeTrans(item.newTime)}}</span></h5>
+                        <div class="postInfo">
+                            <h4>{{item.job.title}}</h4>
+                            <p>{{item.companyTitle}}</p>
+                            <span class="salary_show">{{item.job.show_salary}}</span>
+                        </div>
+                    </a>
+                </li>
+                
+            </ul>
+        </div>
+    </div>
+
+
+    <!-- 感兴趣，职位推荐 -->
+    <div class="whiteBGWrap interestInfo" v-if="fairsList && fairsList.length > 0" v-cloak>
+        <!-- 感兴趣 -->
+        <div class="zphBox">
+            <div class="wrap_title">猜你感兴趣</div>
+            <div class="zphList">
+                <div :class="['zph',{'live_zph': item.type === 2 }]" v-for="item in fairsList">
+                    <a :href="item.url" class="fn-clear">
+                        <div class="zph_img"><img :src="item.picture[0].pic" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                        <div class="zph_con">
+                            <h3><b>【{{item.type === 2 ? '网络' : '现场'}}招聘会】</b>{{item.title}}</h3>
+                            <p>{{item.fairs.title}}</p>
+                            <div class="zph_start">
+                                {{timeTrans(item.startdate)}} <span style="font-size: 15px;">开始</span>
+                            </div>
+                        </div>
+                        <button class="btn_to"></button>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 职位推荐 -->
+        <div class="postResBox" v-if="postList && postList.length > 0" v-cloak>
+            <div class="wrap_title">职位推荐</div>
+            <ul class="postList fn-clear">
+                <li class="post" v-for="item in postList">
+                    <a :href="item.url" target="_blank">
+                        <div class="pInfo fn-clear">
+                            <h3 class="fn-left">{{item.title}}</h3>
+                            <span class="pSalary fn-right">{{item.show_salary}} <em v-if="item.dy_salary > 12">·{{item.dy_salary}}<b>薪</b></em></span>
+                        </div>
+                        <div class="pdetail fn-clear">
+                            <p class="pRequire fn-left">
+                                <span>{{item.experience}}</span><em v-if="item.experience">|</em><span>{{item.educational}}</span><em v-if="item.educational">|</em><span>{{item.nature}}</span>
+                            </p> 
+                            <p class="paddr fn-right">{{item.job_addr_detail ? item.job_addr_detail.addrName.join(' ') : ''}}</p>
+                        </div>
+                        <p class="p_company">{{item.companyDetail.title}}</p>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+
+    <!-- 简历升级弹窗 -->
+    <div class="resumeUpDateBox" v-if="resumeUpDatePop" v-cloak>
+        <div class="resume_mask" v-show="resumeUpDatePop"></div>
+        <div class="resumeUpDatePop" v-show="resumeUpDatePop">
+            <div class="resumeHeader">
+                <h5>简历升级<span>使用求职升级服务，花小钱，解决好工作！</span></h5>
+                <a href="javascript:;" class="close_btn" @click="resumeUpDatePop = false;"></a>
+            </div>
+            <div :class="'resumeTab resumeBg' + resumeTabOn">
+                <ul class="fn-clear">
+                    <li :class="{'onTab': resumeTabOn == 0}" @click="resumeTabOn = 0">
+                        <s class="icon"></s>
+                        <div class="textCon">
+                            <h4>智能刷新</h4>
+                            <div class="p"> 4h自动刷新，获取更多机遇<div class="tip">
+                                <div class="tipConBox">
+                                    <div class="tipCon">
+                                        <h4><b>智能刷新设定：</b>首次购买，付费成功时刷新第一次，每间隔4h自动刷新一次，20:00-次日8:00不刷新，续费购买则累加刷新次数</h4>
+                                        <p>注：套餐预估天数可直观地帮助求职者选择购买，实际推广时长可能增加一天（下单当日因跳过休息时间未用完的刷新次数，将顺延至最后使用完毕）</p>
+                                    </div>
+                                </div>
+                            </div></d>
+                            
+                        </div>
+                    </li>
+                    <li :class="{'onTab': resumeTabOn == 1}" @click="resumeTabOn = 1">
+                        <s class="icon up"></s>
+                        <div class="textCon">
+                            <h4>简历置顶</h4>
+                            <p>曝光翻倍提升，求职快人一步</p>
+                        </div>
+                    </li>
+                    <!-- <li :class="{'onTab': resumeTabOn == 2}" @click="resumeTabOn = 2">
+                        <s class="icon"></s>
+                        <div class="textCon">
+                            <h4>投递特权<span class="lab">新</span></h4>
+                            <p>在招聘方列表置顶，有投必应</p>
+                        </div>
+                    </li> -->
+                </ul>
+            </div>
+            <div class="resumeCon">
+                <!-- 支持二维码 -->
+                <div class="resumeTabCon" v-if="payCodeSupport">
+                    <!-- 简历刷新 -->
+                    <div class="rRefreshCon rConBox" v-if="resumeTabOn == 0">
+                        <div class="refreshTab">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/img_show.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择{{currResume.refreshBegan > 0 ? '续费' : '套餐'}}</h6>
+                            <div class="refreshTC">
+                                <div class="prev"></div>
+                                <div class=" swiper-container">
+                                    <div class="swiper-wrapper">
+                                        <div :class="['swiper-slide tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in refresh_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                            <span v-if="item.rec" class="rec">推荐</span>
+                                            <div class="borderBox" :style="item.offer=='0.00'?'height:112px':''">
+                                                <p><span>{{item.days}}天</span> · 共刷新{{item.fresh}}次</p>
+                                                <h3><span>{#echoCurrency type="symbol"#}<b>{{item.countPrice}}</b></span><s v-if="item.offer!='0.00'">{#echoCurrency type="symbol"#}{{(Number(item.countPrice) + Number(item.offer)).toFixed(2)}}</s></h3>
+                                            </div>
+                                            <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="next"></div>
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                    <!-- 简历置顶 -->
+                    <div class="rRefreshCon rTopCon" v-else-if="resumeTabOn == 1">
+                        <div class="refreshTab rConBox">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/rtop.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择{{currResume.bid_end > 0 ? '续费' : '套餐'}}</h6>
+                            <div class="refreshTC">
+                                <div class="prev"></div>
+                                <div class=" swiper-container">
+                                    <div class="swiper-wrapper">
+                                        <div :class="['swiper-slide tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in top_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                            <span v-if="item.rec" class="rec">推荐</span>
+                                            <div class="borderBox" :style="item.offer=='0.00'?'height:112px':''">
+                                                <p>置顶<span>{{item.days}}天</span> </p>
+                                                <h3><span>{#echoCurrency type="symbol"#}<b>{{item.countPrice}}</b></span><s v-if="item.offer!='0.00'">{#echoCurrency type="symbol"#}{{(Number(item.countPrice) + Number(item.offer)).toFixed(2)}}</s></h3>
+                                            </div>
+                                            <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="next"></div>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <!-- 投递置顶 -->
+                    <div class="rRefreshCon " v-else-if="resumeTabOn == 2">
+                        <div class="refreshTab rConBox">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/rdelivery.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择套餐</h6>
+                            <div class="refreshTC">
+                                <div class="prev"></div>
+                                <div class=" swiper-container">
+                                    <div class="swiper-wrapper">
+                                        <div :class="['swiper-slide tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in delivery_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                            <span v-if="item.rec" class="rec">推荐</span>
+                                            <div class="borderBox">
+                                                <p>投递置顶<span>{{item.count}}天</span> </p>
+                                                <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.price)}}</b></span><s v-if="item.offer">{#echoCurrency type="symbol"#}{{Number(item.price) + Number(item.offer)}}</s></h3>
+                                            </div>
+                                            <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="next"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 不支持二维码 -->
+                <div class="resumeTabCon" v-else>
+                    <!-- 简历刷新 -->
+                    <div class="rRefreshCon rConBox dTopCon" v-if="resumeTabOn == 0">
+                        <div class="refreshTab">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/img_show.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择套餐</h6>
+                            <div class="refreshTC fn-clear">
+                                <div :class="['tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in refresh_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                    <span v-if="item.rec" class="rec">推荐</span>
+                                    <div class="borderBox" :style="item.offer=='0.00'?'height:112px':''">
+                                        <p><span>{{item.days}}天</span> · 共刷新{{item.fresh}}次</p>
+                                        <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.countPrice)}}</b></span><s v-if="item.offer!='0.00'">{#echoCurrency type="symbol"#}{{(Number(item.countPrice) + Number(item.offer)).toFixed(2)}}</s></h3>
+                                    </div>
+                                    <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                    <!-- 简历置顶 -->
+                    <div class="rRefreshCon rTopCon dTopCon" v-else-if="resumeTabOn == 1">
+                        <div class="refreshTab rConBox">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/rtop.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择套餐</h6>
+                            <div class="refreshTC fn-clear">
+                                <div :class="['tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in top_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                    <span v-if="item.rec" class="rec">推荐</span>
+                                    <div class="borderBox" :style="item.offer=='0.00'?'height:112px':''">
+                                        <p>置顶<span>{{item.days}}天</span> </p>
+                                        <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.countPrice)}}</b></span><s v-if="item.offer!='0.00'">{#echoCurrency type="symbol"#}{{(Number(item.countPrice) + Number(item.offer)).toFixed(2)}}</s></h3>
+                                    </div>
+                                    <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <!-- 投递置顶 -->
+                    <div class="rRefreshCon dTopCon" v-else-if="resumeTabOn == 2">
+                        <div class="refreshTab rConBox">
+                            <div class="imgShow"><img src="{#$templets_skin#}images/job/rdelivery.png" alt=""></div>
+                        </div>
+                        <div class="refreshTcBox">
+                            <h6>选择套餐</h6>
+                            <div class="refreshTC fn-clear">
+                                <div :class="['tcBox',{'noBottom':!item.offer},{'on_chose':currTcIndex == ind}]" v-for="(item,ind) in delivery_tc" @click="currTcIndex = ind; payForm.payCount = item.price">
+                                    <span v-if="item.rec" class="rec">推荐</span>
+                                    <div class="borderBox">
+                                        <p>投递置顶<span>{{item.count}}天</span> </p>
+                                        <h3><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(item.price)}}</b></span><s v-if="item.offer">{#echoCurrency type="symbol"#}{{Number(item.price) + Number(item.offer)}}</s></h3>
+                                    </div>
+                                    <p class="tip" v-if="item.offer > 0">省{{item.offer}}{#echoCurrency type="short"#}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        
+                    </div>
+                </div>
+
+
+                <!-- 支付信息 -->
+                <div class="parInfoBoxShow" v-if="payCodeSupport">
+                    <div class="pay_count"><span>支付金额</span>{#echoCurrency type="symbol"#}<b>{{payForm.payCount}}</b></div>
+                    <div class="QRConBox fn-clear">
+                        <div class="QRBox fn-left">
+                            <div  v-if="payload" class="loading"><s></s></div>
+                            <img v-if="payForm.paySrc" :src="payForm.paySrc" alt="">
+                        </div>
+                        <div class="wxCode">
+                            <div class="iconBox"><img src="{#$templets_skin#}/images/job/aliPay_icon.png" alt="" ><img src="{#$templets_skin#}/images/job/wxPay_icon.png" alt=""></div>
+                            <p>使用支付宝、微信扫码支付</p>
+                            <a href="javascript:;" class="" @click="changePayWay()">其他支付方式></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="btnsGroup parInfoBoxShow" v-else>
+                    <div class="pay_count"><span>支付金额</span>{#echoCurrency type="symbol"#}<b>{{payForm.payCount}}</b></div>
+                    <a href="javascript:;" class="btn_toPay" @click="getPayInfo(1)">立即购买</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 支付成功之后的弹窗 -->
+    <div class="paySuccessPopBox" v-if="successPop.show">
+        <div class="paySuccessMask" v-show="successPop.show"></div>
+        <div :class="['paySuccessPop',{'smPop':!successPop.tip}]" v-show="successPop.show">
+            <a href="javascript:;" class="close_btn" v-if="successPop.tip" @click="successPop.show = false"></a>
+            <h3><s></s>{{successPop.title}}</h3>
+            <p class="tip" v-if="successPop.tip">{{successPop.tip}}</p>
+        </div>
+    </div>
+    <!-- 创建简历弹窗 -->
+    <div class="sendpop">
+        <div class="s-certificate" :style="currResume.work_jl&&currResume.work_jl.length==0||currResume.education&&currResume.education.length==0?'height:150px':'height:180px'">
+            <img src="{#$templets_skin#}images/job/close_icon.png" class="ss-close" @click="closePopFn">
+            <div class="ss-title">
+                <img src="{#$templets_skin#}images/job/warning_icon.png">
+                <p>您还没有创建简历</p>
+            </div>
+            <div class="ss-text">
+                <p>简历是求职第一步，优质的简历才能更快找到好工作！<br>请认真填写哦
+                </p>
+            </div>
+            <div class="ss-btn">
+                <div class="cancel" @click="closePopFn">暂不创建</div>
+                <a class="certificate" href="{#$member_userDomain#}/job-resume.html">立即创建简历</a>
+            </div>
+        </div>
+    </div>
+</div>
+<form action="/include/ajax.php" method="post" id="refreshTopForm">
+	<input type="hidden" name="service" id="service" value="siteConfig">
+	<input type="hidden" name="action" id="action" value="refreshTop">
+	<input type="hidden" name="type" id="type" value="">
+	<input type="hidden" name="module" id="module" value="job">
+	<input type="hidden" name="act" id="act" value="{#$act#}">
+	<input type="hidden" name="paytype" id="paytype" value="{#$paytype#}">
+	<input type="hidden" name="aid" id="aid" value="" />
+	<input type="hidden" name="amount" id="amount" value="" />
+	<input type="hidden" name="useBalance" id="useBalance" value="" />
+	<input type="hidden" name="config" id="config" value="" />
+</form>
+<script>
+    var site_map = "{#$site_map#}", site_map_key = '{#$site_map_key#}';
+    var site_map_apiFile = '{#$site_map_apiFile#}'
+</script>
+
+<script type="text/javascript" src="{#$site_map_apiFile#}"></script>
+{#if $site_map == "qq"#}
+<script type="text/javascript" src="https://3gimg.qq.com/lightmap/components/geolocation/geolocation.min.js" charset="utf-8"></script>
+{#/if#}
+{#if $site_map != "amap"#}
+<script type="text/javascript" src="{#$site_map_amap_apiFile#}" charset="utf-8"></script>
+{#/if#}
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+{#include file="public-pay-pop.html"  noVue=1#}
+

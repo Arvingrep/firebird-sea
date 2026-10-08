@@ -1,0 +1,135 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>退款详情</title>   {#* 退款详情 *#}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/refunddetail.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';templatePath = '{#$templets_skin#}';
+	var hideFileUrl = {#$cfg_hideUrl#};
+  var module = '{#$module#}',detailId = '{#$id#}';
+  var orderdetailUrl = '{#getUrlPath service="member" template="orderdetail-$module" id={#$id#}#}';
+  var datedjs = 100000;//商家未处理--商家剩余处理时间（从买家申请退款时间开始） 商家拒绝--自动关闭退款申请时间
+  var imconfig = {
+    'mod':'{#$module#}',
+    'chatid':"{#$detail_userid#}",
+  }
+  var  id = '{#$id#}', title ="{#$detail_product['title']#}";
+  var  proid = '{#$proid#}';
+    var pics ="{#$detail_product['pics']#}";
+  var price = "{#$detail_totalmoney#}"
+  //倒计时
+  var serviceTime = "{#$smarty.now#}";
+  var jsTime = parseInt((new Date()).valueOf()/1000);
+  var timeOffset = parseInt(jsTime - serviceTime);
+	var autotuikuantime = '{#$detail_autotuikuantime#}'; //自动关闭退款时间
+</script>
+</head>
+
+<body>
+
+{#$pageTitle = "退款详情"#}   {#* 退款详情 *#}
+{#include file="top.html"#}
+
+{#include file="refunddetail-{#$module#}.html"#}
+
+
+
+
+<!-- 协商历史 s-->
+<div class="talkList bgrf"><a href="{#getUrlPath service="member" template="talkhistory-{#$module#}" id={#$id#} param="proid={#$proid#}"#}">协商历史<i></i></a></div>
+<!-- 协商历史 e-->
+
+
+
+<!-- 商品信息 s-->
+<div class="storeCon bgrf">
+  <h3 class="refundH">商品信息</h3>
+    {#if $module == 'homemaking'#}
+    <div class="orderCon">
+        <a href="{#$detail_product['url']#}">
+        <div class="proimg"><img src="{#$detail_product['litpic']#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+        <div class="proInfo">
+            <h3>{#$detail_product['title']#}</h3>
+            <p><em>{#echoCurrency type='symbol'#}{#$detail_orderprice#}</em>{#if $detail_product['homemakingtype']==1#}<span class="yufu">{#$langData['homemaking'][8][60]#}</span>{#/if#}</p>
+        </div>
+        </a>
+    </div>
+    {#elseif $module == 'shop'#}
+      {#foreach from=$detail_product item="product"#}
+      <div class="orderCon">
+        <a href="{#getUrlPath service='shop' template='detail' id={#$product['id']#}#}">
+            <div class="proimg"><img src="{#$product.litpic#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/good_default.jpg';"></div>
+            <div class="proInfo">
+            <h3>{#$product.title#}</h3>
+            <p><em>{#echoCurrency type='symbol'#}{#$product.price#}</em></p>
+            </div>
+        </a>
+      </div>
+      {#/foreach#}
+    {#/if#}
+  <div class="contactDiv">
+    <a href="javascript:;" class="contactStore chat_to-Link" data-type="user"><i></i>联系买家</a>
+  </div>
+</div>
+<!-- 商品信息 e-->
+
+<!-- 退款信息 s-->
+<div class="tuiCon bgrf">
+  <h3 class="refundH">退款信息</h3>
+  <div class="tuiInfo">
+    <dl>
+      <dt>退款编号：</dt>
+      <dd>{#$detail_ordernum#}</dd>
+    </dl>
+    <dl><dt>退款金额：</dt><dd>{#echoCurrency type='symbol'#}{#if $module == 'shop'#}{#$detail_ret_amount#}{#else#}{#$detail_product['price']#}{#/if#}</dd></dl>
+    {#if $detail_retType || $detail_rettype#}
+    <dl><dt>原&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 因：</dt><dd>{#if $module == 'shop'#}{#$detail_retType#}{#else#}{#$detail_rettype#}{#/if#}</dd></dl>
+    {#/if#}
+    <dl><dt>退款类型：</dt><dd>仅退款</dd></dl>
+    {#if $detail_retNote || $detail_retnote#}
+    <dl><dt class="bNum">退款说明：</dt><dd>{#if $module == 'shop'#}{#$detail_retNote#}{#else#}{#$detail_retnote#}{#/if#}</dd></dl>
+    {#/if#}
+  </div>
+
+</div>
+<!-- 退款信息 e-->
+
+
+<!-- 拒绝申请 弹窗 s-->
+<div class="comMask"></div>
+<div class="agreeAlert comAlert">
+  <div class="agreeAlertCon comAlertCon">
+    <div>
+      <h2 class="delTile">确定同意退款？</h2>
+      <p>如果您同意将直接退款给买家</p>
+    </div>
+    <ul class="fn-clear">
+      <li class="firLi"><a href="javascript:;" class="cancelDel">取消</a></li>
+      <li><a href="javascript:;" class="sureDel">确认</a></li>
+    </ul>
+  </div>
+</div>
+<!-- 拒绝申请 弹窗 e-->
+<script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '',
+        "title": '',
+        "imgUrl":'',
+        "link": '',
+    };
+</script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/refunddetail-{#$module#}.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

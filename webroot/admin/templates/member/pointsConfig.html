@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>积分设置</title>
+{#$cssFile#}
+<style media="screen">
+	.editform dt {width: 200px;}
+</style>
+<script>
+var adminPath = "{#$adminPath#}";
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label>积分状态：</label></dt>
+    <dd class="radio">
+      {#html_radios name="pointState" values=$pointState checked=$pointStateChecked output=$pointStateNames separator="&nbsp;&nbsp;"#}
+      <span class="input-tips" style="display:inline-block;"><s></s>关闭后，系统前台页面积分入口将隐藏，积分抵扣功能将不能使用！</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="pointName">积分名称：</label></dt>
+    <dd>
+      <input class="input-small" type="text" name="pointName" id="pointName" value="{#$pointName#}" data-regex=".*" />
+      <span class="input-tips"><s></s>自定义名称用于全站显示</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="pointRatio">积分兑换比率：</label></dt>
+    <dd>
+      <input class="input-small" type="number" name="pointRatio" id="pointRatio" value="{#$pointRatio#}" min="1" data-regex="[0-9]\d*" />
+      <span class="input-tips"><s></s>1{#echoCurrency type="name"#}可以兑换的积分比率，最小值为1。</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="pointFee">积分转赠手续费：</label></dt>
+    <dd>
+      <input class="input-small" type="number" name="pointFee" id="pointFee" value="{#$pointFee#}" min="0" data-regex="0|\d*\.?\d+" />%
+      <span class="input-tips"><s></s>转赠1个积分需要收取的手续费</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="pointRegGiving">注册送积分：</label></dt>
+    <dd>
+      <input class="input-small" type="number" name="pointRegGiving" id="pointRegGiving" value="{#$pointRegGiving#}" min="0" data-regex="0|\d*\.?\d+" />
+      <span class="input-tips"><s></s>注册送积分</span>
+    </dd>
+  </dl>
+  <!-- <dl class="clearfix">
+    <dt><label for="pointName">入账送积分：</label></dt>
+    <dd>
+      <input class="input-small" type="text" name="pointName" id="pointName" value="{#$pointName#}" data-regex=".*" />
+      <span class="input-tips"><s></s>自定义名称用于全站显示</span>
+    </dd>
+  </dl> -->
+
+  {#if in_array("pension", $installModuleArr)#}
+  <dl class="clearfix">
+    <dt><label for="pointPension">入驻养老送积分：</label></dt>
+    <dd>
+      <input class="input-small" type="number" name="pointPension" id="pointPension" value="{#$pointPension#}" min="0" data-regex="0|\d*\.?\d+" />
+      <span class="input-tips"><s></s>入驻养老商家赠送积分</span>
+    </dd>
+  </dl>
+  {#/if#}
+
+  <dl class="clearfix">
+    <dt><label for="pointRegGivingRec">注册送优惠券：</label></dt>
+    <dd style="overflow: visible;position: relative;padding: 5px 80px 5px 200px;">
+		<select class="col-sm-2 chosen-select" name="regGivingQuan[]" id="regGivingQuan" data-placeholder="多选" multiple="multiple" style="width:300px;">
+	  		{#foreach from=$quanList item=type#}
+
+	  		<option value="{#$type.quanname#}_{#$type.id#}"{#if $regGivingQuan && in_array($type.id, $regGivingQuan)#} selected{#/if#}>【{#$type.quannameStr#}】{#$type.name#}</option>
+	  		{#/foreach#}
+	  	</select>
+		<span class="input-tips" style="display:inline-block;"><s></s>暂只支持外卖商城优惠券，请先在外卖商城模块添加好优惠券！</span>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label>引导领取方式：</label></dt>
+    <dd class="radio">
+      {#html_radios name="recRegisterGuide" values=$recRegisterGuideState checked=$recRegisterGuide output=$recRegisterGuideNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="pointRegGivingRec">推荐注册送积分：</label></dt>
+    <dd>
+      <input class="input-small" type="number" name="pointRegGivingRec" id="pointRegGivingRec" value="{#$pointRegGivingRec#}" min="0" data-regex="0|\d*\.?\d+" />
+      <span class="input-tips" style="display: inline-block;"><s></s>{#if $fenxiaoBindingChecked == 1 #}<font color="#ff0000">由于分销设置中开启了仅限分销商身份绑定推荐关系，所以这里的功能无效。</font>{#else#}推荐注册送积分{#/if#}</span> 
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="moneyRegGivingRec">推荐注册送现金：</label></dt>
+    <dd>
+      <input class="input-small" type="number" name="moneyRegGivingRec" id="moneyRegGivingRec" value="{#$moneyRegGivingRec#}" min="0" />
+      <span class="input-tips" style="display: inline-block;"><s></s>{#if $fenxiaoBindingChecked == 1 #}<font color="#ff0000">由于分销设置中开启了仅限分销商身份绑定推荐关系，所以这里的功能无效。</font>{#else#}分销商用户送的现金直接到账户余额，普通用户送至专有账户，只可用于提现！{#/if#}</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="moneyRegGivingWithdraw">专有账户起提金额：</label></dt>
+    <dd>
+      <input class="input-small" type="number" name="moneyRegGivingWithdraw" id="moneyRegGivingWithdraw" value="{#$moneyRegGivingWithdraw#}" min="0" />
+      <span class="input-tips" style="display: inline-block;"><s></s>账户满多少可提现！</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>推荐送现金权限：</label></dt>
+    <dd class="radio">
+      {#html_radios name="moneyRegGivingState" values=$moneyRegGivingStateState checked=$moneyRegGivingState output=$moneyRegGivingStateNames separator="&nbsp;&nbsp;"#}
+      <span class="input-tips" style="display:inline-block;"><s></s>默认为所有人推荐注册都送现金，如果勾选分销商，则表示只有分销商推荐新会员注册才会送现金！</span>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label>消费返积分状态：</label></dt>
+    <dd class="radio">
+      {#html_radios name="returnPointState" values=$returnPointState checked=$returnPointStateChecked output=$returnPointStateNames separator="&nbsp;&nbsp;"#}
+      <span class="input-tips" style="display:inline-block;"><s></s>说明：返积分比例为订单金额的百分比，不足1积分则不计入</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>消费返积分比例：</label></dt>
+    <dd>
+      {#if in_array("tuan", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">团购订单</span>
+        <input class="input-mini" type="number" min="0" name="returnPoint_tuan" value="{#$returnPoint_tuan#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("shop", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">商城订单</span>
+        <input class="input-mini" type="number" min="0" name="returnPoint_shop" value="{#$returnPoint_shop#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("info", $installModuleArr)#}
+      <div class="input-prepend input-append hide">
+        <span class="add-on">二手信息</span>
+        <input class="input-mini" type="number" min="0" name="returnPoint_info" value="{#$returnPoint_info#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div>
+      {#/if#}
+      {#if in_array("waimai", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">外卖订单</span>
+        <input class="input-mini" type="number" min="0" name="returnPoint_waimai" value="{#$returnPoint_waimai#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("homemaking", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">家政订单</span>
+        <input class="input-mini" type="number" min="0" name="returnPoint_homemaking" value="{#$returnPoint_homemaking#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("travel", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">旅游订单</span>
+        <input class="input-mini" type="number" min="0" name="returnPoint_travel" value="{#$returnPoint_travel#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("education", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">教育订单</span>
+        <input class="input-mini" type="number" min="0" name="returnPoint_education" value="{#$returnPoint_education#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      <div class="input-prepend input-append">
+        <span class="add-on">商家买单</span>
+        <input class="input-mini" type="number" min="0" name="returnPoint_maidan" value="{#$returnPoint_maidan#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>商家入账返积分：</label></dt>
+    <dd>
+      {#if in_array("tuan", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">团购订单收入</span>
+        <input class="input-mini" type="number" min="0" name="ruzhangPointFee_tuan" value="{#$ruzhangPointFee_tuan#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("shop", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">商城订单收入</span>
+        <input class="input-mini" type="number" min="0" name="ruzhangPointFee_shop" value="{#$ruzhangPointFee_shop#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("info", $installModuleArr)#}
+      <div class="input-prepend input-append hide">
+        <span class="add-on">二手信息收入</span>
+        <input class="input-mini" type="number" min="0" name="ruzhangPointFee_info" value="{#$ruzhangPointFee_info#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div>
+      {#/if#}
+      {#if in_array("waimai", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">外卖订单收入</span>
+        <input class="input-mini" type="number" min="0" name="ruzhangPointFee_waimai" value="{#$ruzhangPointFee_waimai#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("homemaking", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">家政订单收入</span>
+        <input class="input-mini" type="number" min="0" name="ruzhangPointFee_homemaking" value="{#$ruzhangPointFee_homemaking#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("travel", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">旅游订单收入</span>
+        <input class="input-mini" type="number" min="0" name="ruzhangPointFee_travel" value="{#$ruzhangPointFee_travel#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+      {#if in_array("education", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">教育订单收入</span>
+        <input class="input-mini" type="number" min="0" name="ruzhangPointFee_education" value="{#$ruzhangPointFee_education#}">
+        <span class="add-on" style="display: inline-block;">%</span>
+      </div><br />
+      {#/if#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>购买商品积分抵扣比例：</label></dt>
+    <dd>
+        <div style="display: inline-block; vertical-align: middle;">
+            {#if in_array("tuan", $installModuleArr)#}
+            <div class="input-prepend input-append">
+                <span class="add-on">团购订单</span>
+                <input class="input-mini" type="number" min="0" name="offset_tuan" value="{#$offset_tuan#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div><br />
+            {#/if#}
+            {#if in_array("shop", $installModuleArr)#}
+            <div class="input-prepend input-append">
+                <span class="add-on">商城订单</span>
+                <input class="input-mini" type="number" min="0" name="offset_shop" value="{#$offset_shop#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div><br />
+            {#/if#}
+            {#if in_array("waimai", $installModuleArr)#}
+            <div class="input-prepend input-append">
+                <span class="add-on">外卖订单</span>
+                <input class="input-mini" type="number" min="0" name="offset_waimai" value="{#$offset_waimai#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div><br />
+            {#/if#}
+            {#if in_array("homemaking", $installModuleArr)#}
+            <div class="input-prepend input-append">
+                <span class="add-on">家政订单</span>
+                <input class="input-mini" type="number" min="0" name="offset_homemaking" value="{#$offset_homemaking#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div><br />
+            {#/if#}
+            {#if in_array("travel", $installModuleArr)#}
+            <div class="input-prepend input-append">
+                <span class="add-on">旅游订单</span>
+                <input class="input-mini" type="number" min="0" name="offset_travel" value="{#$offset_travel#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div><br />
+            {#/if#}
+            {#if in_array("education", $installModuleArr)#}
+            <div class="input-prepend input-append">
+                <span class="add-on">教育订单</span>
+                <input class="input-mini" type="number" min="0" name="offset_education" value="{#$offset_education#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div><br />
+            {#/if#}
+        </div>
+      <span class="input-tips" style="display:inline-block;"><s></s>开启此功能将影响服务端特约商户的收款能力，未使用微信/支付宝服务商功能的不受影响；<br />有积分抵扣的订单不支持特约商户收款，收款方式将自动使用平台默认账户；<br />订单款项会结算到商户在平台的余额账户，需要通过申请提现的方式结账。</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>互动送积分(发布/评论)：</label></dt>
+    <dd>
+      {#if in_array("sfcar", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="sfcar"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_sfcar" value="{#$returnInteraction_sfcar#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("info", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="info"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_info" value="{#$returnInteraction_info#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("house", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="house"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_house" value="{#$returnInteraction_house#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("live", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="live"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_live" value="{#$returnInteraction_live#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("tieba", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="tieba"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_tieba" value="{#$returnInteraction_tieba#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("car", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="car"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_car" value="{#$returnInteraction_car#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("huodong", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="huodong"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_huodong" value="{#$returnInteraction_huodong#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("article", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="article"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_article" value="{#$returnInteraction_article#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("vote", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="vote"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_vote" value="{#$returnInteraction_vote#}">
+      </div><br />
+      {#/if#}
+      {#if in_array("circle", $installModuleArr)#}
+      <div class="input-prepend input-append">
+        <span class="add-on">{#getModuleTitle name="circle"#}</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_circle" value="{#$returnInteraction_circle#}">
+      </div><br />
+      {#/if#}
+      <div class="input-prepend inputppend">
+        <span class="add-on">发布评论</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_comment" value="{#$returnInteraction_comment#}">
+      </div><br />
+      <div class="input-prepend input-append">
+        <span class="add-on">每天最多赠送</span>
+        <input class="input-mini" type="number" min="0" name="returnInteraction_commentDay" value="{#$returnInteraction_commentDay#}">
+      </div><br />
+    </dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$jsFile#}
+</body>
+</html>

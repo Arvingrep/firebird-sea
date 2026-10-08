@@ -1,0 +1,178 @@
+{#$pageTitle = $langData['siteConfig'][11][12]|cat:" - "|cat:$cfg_webname#}
+{#include file="head.html"#}
+
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/admin/datetimepicker.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu_shop_quan.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript">
+	var bsDomain = '{#$member_busiDomain#}';
+	var foodid = "{#$id#}";
+	var specifiVal = '{#if !$detail_specifiVal#}[]{#else#}{#$detail_specifiVal#}{#/if#}';//多规格
+	var eskuArr = '{#if !$detail_specificationArr#}[]{#else#}{#$detail_specificationArr#}{#/if#}';//编辑--多规格
+	var eskuList = '{#if !$detail_specifiList#}[]{#else#}{#$detail_specifiList#}{#/if#}';//编辑--多规格
+	var hasChosed= '{#$detail_fid#}';
+
+	var litmit = 0; //已经设置过的限领值
+ 	var allCount = 0; //已经设置过的发放值
+	var limit = '{#$detail_limit#}';
+</script>
+</head>
+{#$module = 'shop'#}
+{#$pageCurr = "quan_shop"#}
+<body>
+{#include file="headSidebar.html"#}
+
+<div class="main">
+	<div class="nav-tabs fn-clear">
+		<ul class="fn-clear">
+			<li class="active"><a href="javascript:;">{#if $id == ''#}新建优惠券{#else#}编辑优惠券{#/if#}</a></li>
+			<li><a href="{#getUrlPath service='member' template='quan' action='shop'#}">返回全部优惠券</a></li>
+		</ul>
+	</div>
+	<div class="container fn-clear">
+		<div class="w-form shop_hdCom shop_tuan">
+			<form action="" type="post">
+				<div class="box1">
+					<h2 class="tit1">基本信息</h2>
+					<dl data-required="1" class="fn-clear">
+						<dt><span>*</span>名称：</dt>
+						<dd class="inpbox"><input class="inp" type="text" name="name" value="{#$detail_name#}" placeholder="请输入优惠券名称" {#if $id#}readonly{#/if#}></dd>
+					</dl>
+					<dl class="fn-clear" data-required="1">
+						<dt><span class="star">*</span>使用时间：</dt>
+						<dd class="form_datetime">
+							<div class="input-append form_datetime">
+					          	<input class="commonHdtime startTime" type="text" name="ktime" id="startdate" readonly="" value="{#if $detail_ktime#}{#date('Y-m-d H:i:s',$detail_ktime)#}{#/if#}" placeholder="请选择开始时间" {#if $id#}readonly{#/if#}>
+					          	<span class="add-aft" autocomplete="off"><i class="icon-time"></i></span>
+					        </div>
+					        <em class="hdtimeTip">至</em>
+					        <div class="input-append form_datetime">
+					          	<input class="commonHdtime endTime" type="text" name="etime" id="enddate" readonly="" value="{#if $detail_etime#}{#date('Y-m-d H:i:s',$detail_etime)#}{#/if#}" placeholder="请选择结束时间" {#if $id#}readonly{#/if#}>
+					          	<span class="add-on" autocomplete="off"><i class="icon-time"></i></span>
+					        </div>
+									<span class="time-tip">最长可提前60天创建，有效期不能超过60天</span>
+					        <!-- <span class="tip-inline"></span> -->
+						</dd>
+					</dl>
+					<dl  class="fn-clear" data-type="shiyong" style="{#if $id#}pointer-events: none{#/if#}">
+						<dt><span>*</span>适用范围：</dt>
+						<dd>
+							<div class="radio" data-title="请选择">
+								<span data-id="0" {#if $detail_shoptype ==0#} class="curr" {#/if#}>全店通用</span>
+								<span data-id="1" {#if $detail_shoptype ==1#} class="curr" {#/if#}>指定商品</span>
+								<input type="hidden" name="shoptype" id="item1" value="{#$detail_shoptype#}">
+							</div>
+						</dd>
+					</dl>
+					<dl class="fn-clear goodsDl {#if $detail_shoptype ==0#} fn-hide {#/if#}" >
+						<dt>商品范围：</dt>
+						<dd>
+
+							<a href="javascript:;" class="chooseGoods">请选择商品</a>
+							<span class="tip-inline chooseGoodsNum" style="display:block; line-height:40px;">已选<em>{#if $detail_foodarr#}{#count($detail_foodarr)#}{#else#}0{#/if#}</em>个</span>
+							<span class="time-tip" style="display:block; float:none; clear:both;">一张商品券最多可选择100个指定商品。优惠券一旦创建，商品只能增加，不能删除</span>
+							<input type="hidden" name="fid" id="goodsId" value="{#$detail_fid#}">
+						</dd>
+					</dl>
+					<dl  class="fn-clear" data-type="youhui" style="{#if $id#}pointer-events: none{#/if#}">
+						<dt><span>*</span>优惠方式：</dt>
+						<dd>
+							<div class="radio" data-title="请选择">
+								<span data-id="0" {#if $detail_promotiotype ==0#} class="curr" {#/if#}>现金优惠</span>
+								<span data-id="1" {#if $detail_promotiotype ==1#} class="curr" {#/if#}>折扣优惠</span>
+								<input type="hidden" name="promotiotype" id="promotiotype" value="{#$detail_promotiotype#}">
+							</div>
+						</dd>
+					</dl>
+					<dl data-required="1" class="fn-clear youhui" style="{#if $id#}pointer-events: none{#/if#}">
+						<dt><span>*</span>优惠金额：</dt>
+						<dd class="inpbox">
+							<div class="input-append">
+								<input class="inp" type="text" name="promotio" id="promotio" value="{#$detail_promotio#}" placeholder="请输入优惠券金额" onkeyup="this.value=this.value.replace(/[^\d.]/g,'')" {#if $id#}readonly{#/if#}>
+								<span class="add-aft">{#echoCurrency type="short"#}</span>
+							</div>
+						</dd>
+					</dl>
+					<dl data-required="1" class="fn-clear fn-hide youhui">
+						<dt><span>*</span>优惠金额：</dt>
+						<dd class="inpbox">
+							<div class="input-append">
+								<input class="inp" type="text" name="promotio1" value="{#$detail_promotio#}" id="promotio1" placeholder="输入折扣比例" onkeyup="this.value=this.value.replace(/[^\d.]/g,'');" {#if $id#}readonly{#/if#}>
+								<span class="add-aft">折</span>
+								<span class="time-tip">最高9.99，最低可填0.01，数字越小折扣越大，请谨慎设置</span>
+							</div>
+						</dd>
+					</dl>
+					<dl data-required="1" class="fn-clear menkan">
+						<dt><span>*</span>使用门槛：</dt>
+						<dd class="inpbox">
+							<div class="input-append hastxt">
+								<span class="hitxt">满</span>
+								<input class="inp" type="text" name="basic_price" {#if $id#}readonly{#/if#} value="{#$detail_basic_price#}" placeholder="请输入使用门槛" onkeyup="this.value=this.value.replace(/[^\d.]/g,'')">
+								<span class="add-aft">{#echoCurrency type="short"#}</span>
+								<span class="time-tip">门槛需高于优惠金额，或无门槛可填写“0”</span>
+								<span class="time-tip fn-hide">无门槛可填写“0”</span>
+							</div>
+						</dd>
+					</dl>
+				</div>
+				<div class="box2">
+					<h2 class="tit1">发放信息</h2>
+					<dl data-required="1" class="fn-clear">
+						<dt><span>*</span>发放量：</dt>
+						<dd class="inpbox">
+							<div class="input-append">
+								<input class="inp" type="text" name="number" value="{#$detail_number#}" placeholder="请输入优惠券发放量" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" id="number">
+								<span class="add-aft">张</span>
+								<span class="time-tip">优惠券创建后，发放量只能增加不能减少，请谨慎设置</span>
+							</div>
+						</dd>
+					</dl>
+					<dl data-required="1" class="fn-clear">
+						<dt><span>*</span>每人限领：</dt>
+						<dd class="inpbox">
+							<div class="input-append">
+								<select class="" name="limit" id="quanlimit" data-title="请选择优惠券限领">
+								  <option value="0">请选择</option>
+								</select>
+								<span class="add-aft">张</span>
+								<span class="time-tip">优惠券创建后，发放量只能增加不能减少，请谨慎设置</span>
+							</div>
+						</dd>
+					</dl>
+					<dl class="fn-clear">
+					<dt>&nbsp;</dt>
+					<dd><button type="button" class="submit" id="submit">{#if $id#}立即修改{#else#}立即添加{#/if#}</button></dd>
+				</dl>
+				</div>
+			</form>
+		</div>
+
+
+	</div>
+
+</div>
+<div class="mask_pl"></div>
+<div class="link_pro">
+	<a href="javascript:;" class="cancel_btn"></a>
+	<h1>选择商品</h1>
+	<div class="search_box">
+		<s></s>
+	    <input type="text" id="search_pro" placeholder=" 搜索商品">
+	    <i class="clear"></i>
+	</div>
+	<div class="pro_box">
+		<ul data-type="shop">
+
+		</ul>
+	</div>
+	<div class="btnbox"><a href="javascript:;" class="sure_btn">确定</a></div>
+</div>
+{#include file="footer.html"#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap-datetimepicker.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fabu.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fabu-shop-quan.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

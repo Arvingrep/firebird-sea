@@ -1,0 +1,441 @@
+<div :class="['rightCon',{'show':currEditPart === 32}] " v-cloak>
+    <!-- 数据组  组件设置 -->
+    <div class="modBox">
+        <div class="title">数据组 
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 32 && showResetPop" @show="showResetPop = true" v-if="!checkHasIn('dataCount',32)">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('dataCount',0)"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" v-if="checkHasIn('dataCount',32)" :value="currEditPart === 32 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('dataCount',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference" @click="">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 32 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end" >
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('dataCount',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- 开始设置 -->
+        <div class="modInfoStyle">
+            <div class="modstyleBox">
+                <h2 class="stitle">组件设置</h2>
+                <div class="sContent ">
+                    <div class="column_chose fullwidth">
+                        <s :style="'left:' +(dataCountFormData.numSet.id > 1 ? ((dataCountFormData.numSet.id - 1) * 25 + '%') : '2px') + ';'"></s>
+                        <span v-for="item in 4" @click="choseBtnLen(item)" class="slide4">样式{{numToText[item - 1]}}</span>
+                    </div>
+                    <!-- 标题设置 -->
+                    <div class=" marginTopSetBox checkList">
+                        <el-checkbox class="checkbox"  :value="dataCountFormData.title.show" @change="dataCountFormData.title.show = !dataCountFormData.title.show; dataCountFormData.more.show = (!dataCountFormData.title.show ? false : dataCountFormData.more.show)">显示标题</el-checkbox>
+                        <el-checkbox  :class="['checkbox',{'disabled':!dataCountFormData.title.show}]" :value="dataCountFormData.more.show" @change="dataCountFormData.more.show = !dataCountFormData.more.show">显示查看更多</el-checkbox>
+                    </div>
+                    <div class="inpbox" v-show="dataCountFormData.title.show">
+                        <el-input class="bgColorInp" v-model="dataCountFormData.title.text" placeholder="请输入标题"></el-input>
+                    </div>
+                </div>
+            </div>
+            <div class="contentSetBox modstyleBox">
+                <h2 :class="['stitle']" >内容设置</h2>
+                <div class="sContent " v-if="dataCountFormData.numSet.id != 3">
+                    <!-- 选项 -->
+                    <div class="checkList style_options" v-if="[1,2,4].includes(dataCountFormData.numSet.id)">
+                        <el-checkbox :class="{'disabled':dataCountFormData.numSet.numShow.length >= (dataCountFormData.numSet.id == 4 ? 6 : 4) && !checkValIn(dataCountFormData.numSet.numShow,item.id) }" :value="checkValIn(dataCountFormData.numSet.numShow,item.id)" v-for="item in dataOptions[dataCountFormData.numSet.id]" @change="pullIn(item,dataCountFormData.numSet,dataCountFormData.numSet.id == 4 ? 6 : 4)">{{item.text}}</el-checkbox>
+                    </div>
+
+                    <div class="style_item ">
+                        <div class="style_options" v-if="dataCountFormData.numSet.id == 2">
+                            <label for="">二级数据：</label>
+                            <div class="split_options radioBox">
+                                <span :class="{'onChose':dataCountFormData.numSet.secData == item}" v-for="(item,key) in 2" :key="key" @click="dataCountFormData.numSet.secData = item"><s></s>{{item == 1 ? '昨日' : '本月'}}</span> 
+                            </div>
+                        </div>
+                        <div class="style_options" >
+                            <label for="">颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.numColor')" v-model="dataCountFormData.numSet.style.numColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" @change="changeColor('dataCountFormData.numSet.style.numColor')" class="colorShow" v-model="dataCountFormData.numSet.style.numColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                <button @click="resetColor('dataCountFormData.numSet.style.numColor')" >重置</button>
+                            </div>
+                        </div>
+
+                        <div class="style_options" >
+                            <label for="">数据类型：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.textColor')" v-model="dataCountFormData.numSet.style.textColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text"   @change="changeColor('dataCountFormData.numSet.style.textColor')" class="colorShow" :value="dataCountFormData.numSet.style.textColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                <button @click="resetColor('dataCountFormData.numSet.style.textColor')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options" v-if="dataCountFormData.numSet.id == 2">
+                            <label for="">{{dataCountFormData.numSet.secData == 1 ? '昨日' : '本月'}}：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.secDataColor')" v-model="dataCountFormData.numSet.style.secDataColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" @change="changeColor('dataCountFormData.numSet.style.secDataColor')" class="colorShow" :value="dataCountFormData.numSet.style.secDataColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                <button  @click="resetColor('dataCountFormData.numSet.style.secDataColor')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options" v-if="dataCountFormData.title.show" >
+                            <label for="">组件标题：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.title.style.color')" v-model="dataCountFormData.title.style.color"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" @change="changeColor('dataCountFormData.title.style.color')" class="colorShow" :value="dataCountFormData.title.style.color.replace('#','')" spellcheck="false"  maxlength="6">
+                                <button  @click="resetColor('dataCountFormData.title.style.color')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options" >
+                            <label for="">背景：</label>
+                            <div :class="['colorpickerBox',{'noColor':!dataCountFormData.numSet.style.bgColor}]">
+                                <el-color-picker  popper-class="borderColorPicker" class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.bgColor')" @change="val => resetColor('dataCountFormData.numSet.style.bgColor',val || '',val || '')" v-model="dataCountFormData.numSet.style.bgColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" @change="changeColor('dataCountFormData.numSet.style.bgColor')" class="colorShow" :value="dataCountFormData.numSet.style.bgColor.replace('#','')" spellcheck="false"  maxlength="6" >
+                                <button @click="resetColor('dataCountFormData.numSet.style.bgColor')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options" >
+                            <label for="">边框：</label>
+                            <div :class="['colorpickerBox',{'noColor':!dataCountFormData.numSet.style.bordeColor}]">
+                                <el-color-picker   popper-class="borderColorPicker" class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.bordeColor')" v-model="dataCountFormData.numSet.style.bordeColor" @change="val => resetColor('dataCountFormData.numSet.style.bordeColor',val)" ></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" @change="changeColor('dataCountFormData.numSet.style.bordeColor')" class="colorShow" :value="dataCountFormData.numSet.style.bordeColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                <button @click="resetColor('dataCountFormData.numSet.style.bordeColor')">重置</button>
+                            </div>
+                            <div class="opciatyBox">
+                                <input type="text" class="opciatySet" v-model="dataCountFormData.numSet.style.borderSize">
+                                <span  class="single back">px</span>
+                            </div>
+                        </div>
+                        <div class="style_options">
+                            <label for="">分隔线：</label>
+                            <div class="split_options radioBox">
+                                <span :class="{'onChose':dataCountFormData.splitLine == key}" v-for="(item,key) in 2" :key="key" @click="dataCountFormData.splitLine = key"><s></s>{{!key ? '不' : ''}}显示</span> 
+                            </div>
+                        </div>
+                    </div>
+                    <div class="style_item noBg" v-if="dataCountFormData.numSet.id != 2">
+                       <div class="style_options">
+                            <label for="" style="overflow: visible;">文本自定义：</label>
+                            <div class="split_options radioBox">
+                                <span :class="{'onChose':dataCountFormData.numSet.txtDefine == key}" v-for="(item,key) in 2" :key="key" @click="dataCountFormData.numSet.txtDefine = key"><s></s>{{!key ? '关闭' : '开启'}}</span> 
+                            </div>
+                        </div> 
+                    </div>
+                    <div class="style_item " v-if="dataCountFormData.numSet.txtDefine  && dataCountFormData.numSet.numShow.length">
+                        <div class="style_options flexStart">
+                            <label for="">设置文本：</label>
+                            <div class="split_options">
+                                <div class="inpBox" style="width: 100%;">
+                                    <ul class="textCon">
+                                        <li class="inpbox" v-for="item in dataCountFormData.numSet.numShow">
+                                            <el-input v-model="item.showText">
+                                                <template slot="prepend">{{item.text}}</template>
+                                            </el-input>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 样式三 -->
+                <div class="sContent" v-else>
+                    <dl class="setbox">
+                        <dt><h5>一级数据</h5></dt>
+                        <dd>
+                            <div class="style_options checkList" >
+                                <div class="split_options radioBox">
+                                    <span :class="{'onChose':item.id == dataCountFormData.numSet.titleNum.numShow.id }" @click="changeTitleNum(item,dataCountFormData.numSet.titleNum)" v-for="(item) in dataOptions[dataCountFormData.numSet.id].singleChose"><s></s>{{item.text}}</span> 
+                                </div>
+                            </div>
+                            
+                            <div class="style_item item">
+                                <div class="style_options" >
+                                    <label for="">数字颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.titleNum.style.numColor')" v-model="dataCountFormData.numSet.titleNum.style.numColor"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @change="changeColor('dataCountFormData.numSet.titleNum.style.numColor')" class="colorShow" :value="dataCountFormData.numSet.titleNum.style.numColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('dataCountFormData.numSet.titleNum.style.numColor')" >重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">按钮颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.titleNum.style.btnColor')" v-model="dataCountFormData.numSet.titleNum.style.btnColor"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @change="changeColor('dataCountFormData.numSet.titleNum.style.btnColor')" class="colorShow" :value="dataCountFormData.numSet.titleNum.style.btnColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('dataCountFormData.numSet.titleNum.style.btnColor')">重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">数据类型：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.titleNum.style.textColor')" v-model="dataCountFormData.numSet.titleNum.style.textColor"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @change="changeColor('dataCountFormData.numSet.titleNum.style.textColor')" class="colorShow" :value="dataCountFormData.numSet.titleNum.style.textColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('dataCountFormData.numSet.titleNum.style.textColor')">重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">按钮文字：</label>
+                                    <div class="textSetBox">
+                                        <el-input placeholder="请输入文本" maxlength="5" show-word-limit v-model="dataCountFormData.numSet.titleNum.btn.btnText"></el-input>
+                                    </div>
+                                </div>
+                                <div class="style_options" @click="changeLink('dataCountFormData.numSet.titleNum.btn.link')">
+                                    <label for="">按钮链接：</label>
+                                    <div class="inpbox linkbox">
+                                        <s><img src="/static/images/admin/link.png" alt=""></s>
+                                        <input type="text" placeholder="请选择链接" class="iconLink" readonly :value="dataCountFormData.numSet.titleNum.btn.linkInfo.linkText ? dataCountFormData.numSet.titleNum.btn.linkInfo.linkText : dataCountFormData.more.link ">
+                                    </div>
+                                </div>
+                                
+                            </div>
+                            <div class="style_item noBg" v-if="dataCountFormData.numSet.id != 2">
+                                
+                                <div class="style_options" style="margin-bottom: 10px;">
+                                    <label for="" style="overflow: visible;">文本自定义：</label>
+                                    <div class="split_options radioBox">
+                                        <span :class="{'onChose':dataCountFormData.numSet.txtDefine == key}" v-for="(item,key) in 2" :key="key"
+                                            @click="dataCountFormData.numSet.txtDefine = key"><s></s>{{!key ? '关闭' : '开启'}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="style_item " v-if="dataCountFormData.numSet.txtDefine  && dataCountFormData.numSet.numShow.length">
+                                <div class="style_options flexStart">
+                                    <label for="">设置文本：</label>
+                                    <div class="split_options">
+                                        <div class="inpBox" style="width: 100%;">
+                                            <ul class="textCon">
+                                                <li class="inpbox" v-for="item in dataCountFormData.numSet.numShow">
+                                                    <el-input v-model="item.showText">
+                                                        <template slot="prepend">{{item.text}}</template>
+                                                    </el-input>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            
+                        </dd>
+                    </dl>
+                    <dl class="setbox">
+                        <dt><h5>二级数据</h5></dt>
+                        <dd>
+                            <div class="style_options checkList" >
+                                <el-checkbox :class="{'disabled':dataCountFormData.numSet.numShow.length >= 4 && !checkValIn(dataCountFormData.numSet.numShow,item.id) }" :value="checkValIn(dataCountFormData.numSet.numShow,item.id)" v-for="item in dataOptions[dataCountFormData.numSet.id].moreChose" @change="pullIn(item,dataCountFormData.numSet)">{{item.text}}</el-checkbox>
+                            </div>
+                            <div class="style_item item">
+                                <div class="style_options" >
+                                    <label for="">数字颜色：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.numColor')" v-model="dataCountFormData.numSet.style.numColor"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @change="changeColor('dataCountFormData.numSet.style.numColor')" class="colorShow" :value="dataCountFormData.numSet.style.numColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('dataCountFormData.numSet.style.numColor')">重置</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="style_options" >
+                                    <label for="">数据类型：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.textColor')" v-model="dataCountFormData.numSet.style.textColor"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @change="changeColor('dataCountFormData.numSet.style.textColor')" class="colorShow" :value="dataCountFormData.numSet.style.textColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('dataCountFormData.numSet.style.textColor')">重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" v-if="dataCountFormData.numSet.id == 3">
+                                    <label for="">分隔线：</label>
+                                    <div class="split_options radioBox">
+                                        <span :class="{'onChose':dataCountFormData.splitLine == key}" v-for="(item,key) in 2" :key="key" @click="dataCountFormData.splitLine = key"><s></s>{{!key ? '不' : ''}}显示</span> 
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="style_item">
+                                <div class="style_options" v-if="dataCountFormData.title.show" >
+                                    <label for="">组件标题：</label>
+                                    <div class="colorpickerBox">
+                                        <el-color-picker  class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.title.style.color')" v-model="dataCountFormData.title.style.color"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @change="changeColor('dataCountFormData.title.style.color')" class="colorShow" :value="dataCountFormData.title.style.color.replace('#','')" spellcheck="false"  maxlength="6">
+                                        <button  @click="resetColor('dataCountFormData.title.style.color')">重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">背景：</label>
+                                    <div :class="['colorpickerBox',{'noColor':!dataCountFormData.numSet.style.bgColor}]">
+                                        <el-color-picker  popper-class="borderColorPicker" class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.bgColor')" @change="val => resetColor('dataCountFormData.numSet.style.bgColor',val || '',val || '')" v-model="dataCountFormData.numSet.style.bgColor"></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @change="changeColor('dataCountFormData.numSet.style.bgColor')" class="colorShow" :value="dataCountFormData.numSet.style.bgColor.replace('#','')" spellcheck="false"  maxlength="6" >
+                                        <button @click="resetColor('dataCountFormData.numSet.style.bgColor')">重置</button>
+                                    </div>
+                                </div>
+                                <div class="style_options" >
+                                    <label for="">边框：</label>
+                                    <div :class="['colorpickerBox',{'noColor':!dataCountFormData.numSet.style.bordeColor}]">
+                                        <el-color-picker   popper-class="borderColorPicker" class="colorpicker" @active-change="(value) => activeChangeColor(value,'dataCountFormData.numSet.style.bordeColor')" v-model="dataCountFormData.numSet.style.bordeColor" @change="val => resetColor('dataCountFormData.numSet.style.bordeColor',val)" ></el-color-picker>
+                                    </div>
+                                    <div class="colorShowBox">
+                                        <span class="single">#</span>
+                                        <input type="text" @change="changeColor('dataCountFormData.numSet.style.bordeColor')" class="colorShow" :value="dataCountFormData.numSet.style.bordeColor.replace('#','')" spellcheck="false"  maxlength="6">
+                                        <button @click="resetColor('dataCountFormData.numSet.style.bordeColor')">重置</button>
+                                    </div>
+                                    <div class="opciatyBox">
+                                        <input type="text" class="opciatySet" v-model="dataCountFormData.numSet.style.borderSize">
+                                        <span  class="single back">px</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            <div class="modstyleBox contentSetBox" v-if="dataCountFormData.more.show">
+                <h2 class="stitle">查看更多</h2>
+                <div class="sContent">
+                    <div class="item style_item ">
+                        <div class="style_options" >
+                            <label for="">显示文本：</label>
+                            <div class="textSetBox">
+                                <el-input placeholder="请输入文本" maxlength="8" show-word-limit v-model="dataCountFormData.more.text"></el-input>
+                            </div>
+                            <span :class="['showArr',{'noColor':!dataCountFormData.more.arr}] " @click="dataCountFormData.more.arr = !dataCountFormData.more.arr"></span>
+                        </div>
+                        <div class="style_options" @click="changeLink('dataCountFormData.more.link')">
+                            <label for="">链接：</label>
+                            <div class="inpbox linkbox">
+                                <s><img src="/static/images/admin/link.png" alt=""></s>
+                                <input type="text" placeholder="请选择链接" class="iconLink" readonly :value="dataCountFormData.more.linkInfo.linkText ? dataCountFormData.more.linkInfo.linkText : dataCountFormData.more.link ">
+                            </div>
+                        </div>
+
+                        <div class="style_options" >
+                            <label for="">文本颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker  class="colorpicker" v-model="dataCountFormData.more.style.color" @active-change="(value) => activeChangeColor(value,'dataCountFormData.more.style.color')"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" :value="(dataCountFormData.more.style.color).replace('#','')" @change="changeColor('dataCountFormData.more.style.color')" maxlength="6">
+                                <button @click="resetColor('dataCountFormData.more.style.color')">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+             <!-- 间距设置 -->
+             <div class="marginSetBox modstyleBox contentSetBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" >
+                        <div class="sContent">
+                            <div class="style_options">
+                                <label for="">上圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" v-model="dataCountFormData.numSet.style.borderRadiusTop" :min="0" :max="50"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="dataCountFormData.numSet.style.borderRadiusTop = (dataCountFormData.numSet.style.borderRadiusTop ? dataCountFormData.numSet.style.borderRadiusTop : 0)" v-model="dataCountFormData.numSet.style.borderRadiusTop" >
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">下圆角：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" v-model="dataCountFormData.numSet.style.borderRadiusBottom" :min="0" :max="50"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="dataCountFormData.numSet.style.borderRadiusBottom = (dataCountFormData.numSet.style.borderRadiusBottom ? dataCountFormData.numSet.style.borderRadiusBottom : 0)" v-model="dataCountFormData.numSet.style.borderRadiusBottom" >
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options" >
+                                <label for="">上间距</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" v-model="dataCountFormData.numSet.style.marginTop"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="dataCountFormData.numSet.style.marginTop = (dataCountFormData.numSet.style.marginTop ? dataCountFormData.numSet.style.marginTop : 0)"  v-model="dataCountFormData.numSet.style.marginTop"  >
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" v-model="dataCountFormData.numSet.style.marginLeft"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="dataCountFormData.numSet.style.marginLeft = (dataCountFormData.numSet.style.marginLeft ? dataCountFormData.numSet.style.marginLeft : 0)"  v-model="dataCountFormData.numSet.style.marginLeft"  >
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            
+                            <div class="style_options" :style="dataCountFormData.numSet.style.marginLeft || !dataCountFormData.numSet.style.bgColor || !dataCountFormData.numSet.style.bordeColor || !dataCountFormData.numSet.style.borderSize ? 'visibility:hidden; opacity:0;':''">
+                                <label for="">左右内边距：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip" v-model="dataCountFormData.numSet.style.paddingLeft"  :min="0" :max="60"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="dataCountFormData.numSet.style.paddingLeft = (dataCountFormData.numSet.style.paddingLeft ? dataCountFormData.numSet.style.paddingLeft : 0)"  v-model="dataCountFormData.numSet.style.paddingLeft"  >
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,243 @@
+{#if {#verifyModuleAuth module='tuan'#}#}
+<style>
+#subway dd {max-height: 300px; overflow-x: hidden; overflow-y: auto;}
+</style>
+<div class="w-form">
+	{#if $storeState == 1#}
+		{#if $detail_state == 0#}
+		<p class="state0">{#$langData['siteConfig'][27][25]#}</p>
+		{#elseif $detail_state == 2#}
+		<p class="state0">{#$langData['siteConfig'][27][26]#}</p>
+		{#/if#}
+	{#/if#}
+	<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=tuan&action=storeConfig">
+		{#if !$detail_typeid#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][26][37]#}：</dt>
+			<dd id="selType">
+				<div class="sel-group" data-title="{#$langData['siteConfig'][27][28]#}">
+					<button type="button" class="sel"{#if $detail_typeid#} disabled{#/if#}>{#if $detail_typename != ""#}{#$detail_typename#}{#else#}{#$langData['siteConfig'][7][2]#}{#/if#}<span class="caret"></span></button>
+					{#if !$detail_typeid#}
+					<ul class="sel-menu">
+						{#loop service="tuan" action="type" return="type"#}
+						<li><a href="javascript:;" data-id="{#$type.id#}">{#$type.typename#}</a></li>
+						{#/loop#}
+					</ul>
+					{#/if#}
+				</div>
+				<input type="hidden" name="stype" id="stype" value="{#$detail_typeid#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#else#}
+		<input type="hidden" name="stype" id="stype" value="{#$detail_typeid#}" />
+		{#/if#}
+
+		{#if !$detail_addrid#}
+        {#$detail_addrid = $businessDetail_addrid#}
+        {#/if#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][27]#}：</dt>
+			<dd id="selAddr">
+				<div class="sel-group" data-title="{#$langData['siteConfig'][20][68]#}">
+					<div class="addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_addrid split=' '#}" data-id="{#$detail_addrid#}">{#if $detail_addrid#}{#getPublicParentInfo tab='site_area' id=$detail_addrid type='typename' split='/'#}{#else#}{#$langData['siteConfig'][7][2]#}{#/if#}</div>
+				</div>
+				<input type="hidden" name="addrid" id="addrid" value="{#$detail_circleAddrid#}" />
+				<input type="hidden" name="cityid" id="cityid" value="{#$detail_cityid#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear{#if !$detail_addrid || !$detail_circleid#} fn-hide{#/if#}" id="circle" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][515]#}：</dt>
+			<dd>
+				<div class="checkbox" data-title="{#$langData['siteConfig'][27][29]#}">
+					{#if $detail_addrid#}
+					{#loop service="tuan" action="circle" type="{#$detail_addrid#}"#}
+					<label><input type="checkbox" name="circle[]"{#if $detail_circleid && $row.id|in_array:$detail_circleid#} checked{#/if#} value="{#$row.id#}">{#$row.name#}</label>
+					{#/loop#}
+					{#/if#}
+				</div>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		{#if $cfg_subway_state#}
+		<dl class="fn-clear{#if !$detail_city#} fn-hide{#/if#}" id="subway">
+			<dt>{#$cfg_subway_title#}：</dt>
+			<dd>
+				{#siteConfig action="subway" city=$detail_city#}
+				<label>{#$row.title#}：</label><br />
+				<div class="checkbox">
+					{#siteConfig action="subwayStation" type="{#$row.id#}" return="subway"#}
+					<label><input type="checkbox" name="subway[]"{#if $detail_subwayid && $subway.id|in_array:$detail_subwayid#} checked{#/if#} value="{#$subway.id#}">{#$subway.title#}</label>
+					{#/siteConfig#}
+				</div><br />
+				{#/siteConfig#}
+			</dd>
+		</dl>
+		{#/if#}
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][35]#}：</dt>
+			<dd>
+				<input type="text" name="address" class="inp" id="address" size="35" maxlength="60" data-title="{#$langData['siteConfig'][20][69]#}" value="{#if $detail_address#}{#$detail_address#}{#else#}{#$businessDetail_address#}{#/if#}" />
+				<img src="/static/images/admin/markditu.jpg" id="mark" style="float: left; cursor: pointer; margin-left: 10px;" title="{#$langData['siteConfig'][6][92]#}">
+				<span class="tip-inline"></span>
+				<input type="hidden" name="lnglat" id="lnglat" value="{#if $detail_lnglat#}{#$detail_lnglat#}{#else#}{#$businessDetail_lng#},{#$businessDetail_lat#}{#/if#}">
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][19][56]#}：</dt>
+			<dd>
+				<input type="text" name="phone" class="inp" id="phone" size="25" maxlength="20" data-title="{#$langData['siteConfig'][20][433]#}" value="{#if $detail_tel#}{#$detail_tel#}{#else#}{#$businessDetail_phone#}{#/if#}" />
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt>{#$langData['siteConfig'][42][25]#}：</dt>   {#*座机 *#}
+			<dd>
+				<input type="text" name="tel" class="inp" id="tel" size="25" maxlength="20" data-title="{#$langData['siteConfig'][20][433]#}" value="{#if $detail_phone#}{#$detail_phone#}{#else#}{#$businessDetail_tel#}{#/if#}" />
+				<!--<span class="tip-inline"></span>-->
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt>{#$langData['siteConfig'][19][183]#}：</dt>   {#* 微信号 *#}
+			<dd>
+				<input type="text" name="wechatcode" class="inp" id="wechatcode" size="25" maxlength="60" data-title="{#$langData['siteConfig'][27][10]#}" value="{#if $detail_wechatcode#}{#$detail_wechatcode#}{#else#}{#$businessDetail_wechatcode#}{#/if#}" />  {#* 请输入微信号 *#}
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt>{#$langData['siteConfig'][26][30]#}：</dt>   {#* 联系QQ *#}
+			<dd>
+				<input type="text" name="qq" class="inp" id="qq" size="25" maxlength="60" data-title="{#$langData['siteConfig'][27][11]#}" value="{#if $detail_qq#}{#$detail_qq#}{#else#}{#$businessDetail_qq#}{#/if#}" />   {#* 请输入联系QQ *#}
+			</dd>
+		</dl>
+		<dl class="fn-clear">
+			<dt><span>*</span>{#$langData['siteConfig'][19][2]#}：</dt>
+      		<dd class="listImgBox fn-hide">
+				<div class="list-holder">
+					<ul id="listSection2" class="fn-clear listSection fn-hide"{#if $detail_pics || $businessDetail_banner#} style="display: block;"{#/if#}>
+						{#if $detail_pics#}
+						{#foreach from=$detail_pics key=k item=i#}
+						<li class="fn-clear" id="WU_FILE_1_{#$k#}">
+							<a class="li-rm" href="javascript:;">×</a>
+							<div class="li-thumb" style="display: block;">
+								<div class="r-progress"><s></s></div>
+								<span class="ibtn">
+									<a href="javascript:;" class="Lrotate" title="{#$langData['siteConfig'][23][43]#}"></a>
+									<a href="javascript:;" class="Rrotate" title="{#$langData['siteConfig'][23][44]#}"></a>
+									<a href="{#$i.path#}" target="_blank" class="enlarge" title="{#$langData['siteConfig'][23][45]#}"></a>
+								</span>
+								<span class="ibg"></span>
+								<img data-val="{#$i.pathSource#}" data-url="{#changeFileSize url="{#$i.path#}" type="small"#}" src="{#changeFileSize url="{#$i.path#}" type="small"#}" />
+							</div>
+						</li>
+						{#/foreach#}
+						{#elseif $businessDetail_banner#}
+						{#$bannerArr = ','|explode:$businessDetail_banner#}
+						{#foreach from=$bannerArr key=k item=i#}
+						<li class="fn-clear" id="WU_FILE_1_{#$k#}">
+							<a class="li-rm" href="javascript:;">×</a>
+							<div class="li-thumb" style="display: block;">
+								<div class="r-progress"><s></s></div>
+								<span class="ibtn">
+									<a href="/include/attachment.php?f={#$i#}" target="_blank" class="enlarge" title="{#$langData['siteConfig'][23][45]#}"></a>
+								</span>
+								<span class="ibg"></span>
+								<img data-val="{#$i#}" data-url="/include/attachment.php?f={#$i#}" src="/include/attachment.php?f={#$i#}" />
+							</div>
+						</li>
+						{#/foreach#}
+						{#/if#}
+					</ul>
+					<input type="hidden" name="imglist" value="" class="imglist-hidden">
+				</div>
+				<div class="btn-section fn-clear">
+					<div class="wxUploadObj fn-clear">
+						<div class="uploadinp filePicker" id="filePicker2" data-type="album" data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][168]#}</span></div>
+						<span class="upload-split fn-hide">{#$langData['siteConfig'][13][0]#}</span> {#* 或 *#}
+						<dl class="wxUpload fn-hide fn-clear">
+							<dt><img id="wxUploadImg" /></dt>
+							<dd>{#$langData['siteConfig'][19][362]#}<em class="wx">{#$langData['siteConfig'][27][139]#}</em>{#$langData['siteConfig'][27][140]#}<br />{#$langData['siteConfig'][19][846]#}{#$cfg_weixinName#}{#$langData['siteConfig'][27][141]#}<br />{#$langData['siteConfig'][27][142]#}<em class="fs">{#$langData['siteConfig'][6][139]#}</em>{#$langData['siteConfig'][27][143]#}</dd>{#*使用-微信-扫描左侧二维码-关注-公众号后-将图片-发送-给公众号即可传图 *#}
+						</dl>
+					</div>
+					<div class="upload-tip">
+						<p><a href="javascript:;" class="fn-hide deleteAllAtlas"{#if $detail_pics#} style="display: inline-block;"{#/if#}>{#$langData['siteConfig'][6][79]#}</a>&nbsp;&nbsp;{#$langData['siteConfig'][20][10]|replace:'1':($atlasSize/1024)|replace:'2':'10'#} <span class="fileerror"></span></p>
+					</div>
+				</div>
+			</dd>
+		</dl>
+		{#if !$detail_video#}
+		{#$detail_video = $businessDetail_video#}
+		{#/if#}
+		<dl class="fn-clear uploadVideo">
+			<dt>{#$langData['siteConfig'][6][195]#}：</dt>   {#*上传视频 *#}
+			<dd class="listImgBox fn-clear">
+				<div class="list-holder">
+					<ul id="listSection3" class="fn-clear listSection">
+						{#if $detail_video#}
+						<li id="WU_FILE_00" class="pubitem complete">
+							<video class="video-js" id="WU_FILE_00" src="/include/attachment.php?f={#$detail_video#}" data-val="{#$detail_video#}"></video>
+			                <div class="file-panel li-rm"><span class="cancel">{#$langData['siteConfig'][6][8]#}</span></div>   {#*删除 *#}
+			                <span class="player"></span>
+						</li>
+						{#/if#}
+					</ul>
+					<input type="hidden" id="video" name="video" value="{#$detail_video#}" class="imglist-hidden">
+				</div>
+				<div class="btn-section fn-clear">
+					<div class="uploadinp filePicker" id="filePicker3" data-extensions="mp4" data-mime="video/mp4" data-type="filenail" data-type-real="video" data-count="1" data-size="{#$softSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][196]#}</span><em>+</em></div> {#*添加视频 *#}
+				</div>
+			</dd>
+		</dl>
+		<dl class="fn-clear" data-required="1">
+			<dt><span>*</span>{#$langData['siteConfig'][18][15]#}：</dt>
+			<dd>
+				<div class="input-append input-prepend">
+					<input type="text" name="openStart" class="inp" id="openStart" size="5" autocomplete="off" maxlength="5" value="{#$detail_openStart#}" />
+					<span class="add-aft">{#$langData['siteConfig'][13][51]#}</span>
+					<input type="text" name="openEnd" class="inp" id="openEnd" size="5" autocomplete="off" maxlength="5" value="{#$detail_openEnd#}" />
+				</div>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear">
+			<dt>{#$langData['siteConfig'][19][494]#}：</dt>
+			<dd>
+				<textarea class="inp text" name="note" id="note" rows="3" cols="60" data-title="{#$langData['siteConfig'][27][30]#}">{#$detail_note#}</textarea>
+				<span class="tip-inline"></span>
+			</dd>
+		</dl>
+		<dl class="fn-clear">
+			<dt>{#$langData['siteConfig'][26][36]#}：</dt>
+			<dd>
+				<script id="body" name="body" type="text/plain" style="width:90%;height:500px">{#if $detail_body#}{#$detail_body#}{#else#}{#$businessDetail_body#}{#/if#}</script>
+			</dd>
+		</dl>
+		<dl class="fn-clear">
+			<dt>&nbsp;</dt>
+			<dd><button class="submit" id="submit">{#$langData['siteConfig'][6][63]#}</button></dd>
+		</dl>
+	</form>
+</div>
+
+<div class="map-pop" id="markPopMap">
+	<a href="javascript:;" class="pop-close">&times;</a>
+	<div class="pop-border"></div>
+	<div class="pop-main">
+		<div class="pop-title">{#$langData['siteConfig'][6][92]#}</div>
+		<div class="pop-con">
+			<iframe name="markDitu" id="markDitu" frameborder="0"></iframe>
+			<div class="btns"><a href="javascript:;" id="okPop">{#$langData['siteConfig'][6][1]#}</a><a href="javascript:;" id="cloPop">{#$langData['siteConfig'][6][12]#}</a></div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/calendar/WdatePicker.js?v={#$cfg_staticVersion#}"></script>
+{#else#}
+<div class="list" style="padding: 200px 0; text-align: center; font-size: 14px; color: red;">{#$langData['siteConfig'][20][403]#}</div>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicAddr.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.dragsort-0.5.1.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicUpload.js?v={#$cfg_staticVersion#}"></script>
+<script>
+	var circle = {#if $detail_circlelist#}{#$detail_circlelist#}{#else#}[]{#/if#}, subwaystation = {#if $detail_subwaystationlist#}{#$detail_subwaystationlist#}{#else#}[]{#/if#};
+</script>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+	<title>详细信息</title>
+	<meta name="keywords" content="{#$cfg_keywords#}">
+	<meta name="description" content="{#$cfg_description#}">
+	<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+	<!-- <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}"> -->
+	<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$templets_skin#}css/base_info.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}',
+			staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = '{#$cfg_hideUrl#}';
+		var cookiePre = '{#$cfg_cookiePre#}',
+			cfg_clihost = '{#$cfg_clihost#}';
+		var templets = '{#$templets_skin#}';
+
+		var buildtypenames = {#if is_array($buildlist)#} {#json_encode($buildlist,true)#} {#else#} '' {#/if#}; //建筑类型
+		// var salestatenames = ['新盘待售','在售','尾盘','售罄']; //销售状态
+		// var existingnames = ['现房','期房']; //销售状态
+		var salestate = 0, //销售状态
+			existing = 0, //楼盘状态
+			buildtype = "{#$detail_buildtype#}"; //物业类型
+		var thumbSize = '{#$thumbSize#}',
+			thumbType = "{#$thumbType#}", //缩略图配置
+			addrid = '{#$addrid#}',
+			addrListArr = '{#$addrListArr#}',
+			mapCity = "{#$mapCity#}",
+			subwayCity = 0;
+
+		var peitaoList = {#if $detail_config#} {#json_encode($detail_config,true)#} {#else#} '' {#/if#};
+
+		var loupanid = '{#$loupanid#}';
+
+		var buildtypeTxt = buildtype;
+		var modelType = 'house';
+		var currid = 21;
+	</script>
+</head>
+
+<body class="w1200">
+	<div id="page">
+		<!-- 头部 -->
+		{#include file="top.html"#}
+		<div class="conbox">
+			{#include file="left.html"#}
+			<!-- 右侧 -->
+			<div class="right_box">
+				<div class="rConBox">
+					<h3>详细信息</h3>
+					<div class="formbox">
+						<form action="" id="form">
+							<div class="inpbox ">
+								<label><em>* </em>楼盘简介</label>
+								<div class="inp_div sel_inp">
+                                    <script id="note" name="note" type="text/plain" style="width:85%;height:500px">{#$detail_note#}</script>
+								</div>
+							</div>
+							<div class="inpbox required">
+								<label><em>* </em>售楼处地址</label>
+								<div class="inp_div" >
+									<div class="inp">
+										<input style="background: none;" type="text" name="address" id="address" value="{#$detail_address#}" placeholder="请填写售楼处地址">
+									</div>
+								</div>
+							</div>
+							<div class="inpbox required">
+								<label><em>* </em>售楼处服务时间</label>
+								{#if $detail_worktime !=''#}
+								{#$worktimerarr = explode('-',$detail_worktime)#}
+								{#else#}
+								{#$worktimerarr = array()#}
+								{#/if#}
+
+								<div class="inp_div data_inp">
+									<div class="input-append input-prepend">
+										<input type="text" class="startime" name="openStart" size="5" maxlength="5" autocomplete="off" value="{#if $worktimerarr#}{#$worktimerarr[0]#}{#else#} 00:00 {#/if#}" id="openStart" >
+										<span class="add-aft">至</span>
+										<input type="text" class="stoptime" name="openEnd" size="5" maxlength="5" autocomplete="off" value="{#if $worktimerarr#}{#$worktimerarr[1]#}{#else#} 00:00 {#/if#}" id="openEnd">
+									</div>
+								</div>
+							</div>
+							<div class="inpbox required ">
+								<label><em>* </em>建筑类型</label>
+								<div class="inp_div" >
+									<div class="inp">
+										<input style="background: none;" type="text" name="buildtype" value="{#$detail_buildtype#}" id="buildtype" v-model="buildtypeTxt" placeholder="请填写售楼处地址">
+									</div>
+								</div>
+								<div class="inp_div checkbox" v-cloak>
+									<ul>
+										<li :class="{'check':buildtype.indexOf(item)>-1}" v-for="(item,i) in buildtypelist" @click="checkIn(item)"><input type="checkbox" name="" :value="item" :checked="buildtype.indexOf(item)>-1"><s></s>{{item}}</li>
+									</ul>
+								</div>
+							</div>
+							<div class="inpbox required">
+								<label><em>* </em>装修情况</label>
+								<div class="inp_div sel_inp">
+									<div class="inp selecte_box ">
+										<select name="zhuangxiu" id="zhuangxiu" class="input-large">
+
+											{#foreach from=$zhuangxiuList key='k' item=zx#}
+											<option value="{#$k#}" {#if $k == $detail_zhuangxiuval#}selected="selected" {#/if#}>{#$zx#}</option>
+											{#/foreach#}
+
+										</select>
+										<s></s>
+									</div>
+								</div>
+							</div>
+							<div class="inpbox required">
+								<label><em>* </em>产权年限</label>
+								<div class="inp_div sm_inp sale_inp">
+									<div class="inp "><input type="text" name="buildage" value="{#$detail_buildage_#}" placeholder="请输入产权年限" data-regex=".{3,60}"></div><span class="dw">年</span><p class="last_tip">输入100表示永久产权</p>
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>规划面积</label>
+								<div class="inp_div sm_inp">
+									<div class="inp "><input type="text" name="planarea" value="{#$detail_planarea#}" placeholder="请输入规划面积" data-regex=".{3,60}"></div><span class="dw">㎡</span>
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>建筑面积</label>
+								<div class="inp_div sm_inp">
+									<div class="inp "><input type="text" name="buildarea" value="{#$detail_buildarea#}" placeholder="请输入建筑面积" data-regex=".{3,60}"></div><span class="dw">㎡</span>
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>规划户数</label>
+								<div class="inp_div sm_inp">
+									<div class="inp "><input type="text" name="planhouse" value="{#$detail_planhouse#}" placeholder="请输入规划户数" data-regex=".{3,60}"></div><span class="dw">户</span>
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>车位数</label>
+								<div class="inp_div sm_inp ">
+									<div class="inp "><input type="text" name="parknum" value="{#$detail_parknum#}" placeholder="请输入车位数" data-regex=".{3,60}"></div><span class="dw">个</span>
+								</div>
+							</div>
+							<div class="inpbox  ">
+								<label><em>* </em>容积率</label>
+								<div class="inp_div sm_inp nodw">
+									<div class="inp "><input type="text" name="rongji" value="{#$detail_rongji#}" placeholder="请输入容积率" data-regex=".{3,60}"></div>
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>绿化率</label>
+								<div class="inp_div sm_inp">
+									<div class="inp "><input type="text" name="green" value="{#$detail_green#}" placeholder="请输入绿化率" data-regex=".{3,60}"></div><span class="dw">%</span>
+								</div>
+							</div>
+
+							<div class="inpbox ">
+								<label><em>* </em>环线位置</label>
+								<div class="inp_div">
+									<div class="inp "><input type="text" name="linklocal" value="{#$detail_linklocal#}" placeholder="请输入环线位置" data-regex=".{3,60}"></div>
+								</div>
+							</div>
+							<div class="inpbox required">
+								<label><em>* </em>所在商圈</label>
+								<div class="inp_div">
+									<div class="inp "><input type="text" name="bussiness" value="{#$detail_bussiness#}" placeholder="请输入所在商圈" data-regex=".{3,60}"></div>
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>楼层状况</label>
+								<div class="inp_div">
+									<div class="inp "><input type="text" name="floor" value="{#$detail_floor#}" placeholder="请输入楼层状况" data-regex=".{3,60}"></div>
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>物业公司</label>
+								<div class="inp_div">
+									<div class="inp "><input type="text" name="property" value="{#$detail_property#}" placeholder="请输入物业公司" data-regex=".{3,60}"></div>
+								</div>
+							</div>
+							<div class="inpbox ">
+								<label><em>* </em>物业费</label>
+								<div class="inp_div">
+									<div class="inp "><input type="text" name="proprice" value="{#$detail_proprice#}" placeholder="请输入物业费" data-regex=".{3,60}"></div>
+								</div>
+							</div>
+
+							<div class="inpbox ">
+								<label><em>* </em>配套信息</label>
+								<div class="peitaoList inp_div">
+									<dl v-if="peitaoList.length>0" v-for="(peitao,i) in peitaoList">
+										<dt class="inp icon_inp"><input type="text" placeholder="配套名称" :name="'peitao['+i+'][0]'" v-model="peitao[0]"><i class="del_dl" @click="del_dl(i)"></i></dt>
+										<dd class="inp con_inp">
+											<textarea rows="" cols="" placeholder="配套内容" :name="'peitao['+i+'][1]'" v-model="peitao[1]"></textarea>
+										</dd>
+									</dl>
+									<a href="javascript:;" class="add_peitao" @click="add_peitao">+增加一条</a>
+								</div>
+
+							</div>
+
+							<a href="javascript:;" class="submit" @click="submit">确认提交</a>
+						</form>
+					</div>
+				</div>
+			</div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div>{#$cfg_statisticscode#}</div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/calendar/WdatePicker.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_staticPath#}/js/ui/jquery.dialog-4.2.0.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='/include/ueditor/ueditor.config.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='/include/ueditor/ueditor.all.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='/include/ueditor/mp.weixin.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='/include/ueditor/135editor.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/detail_info.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicAddr.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<title>{#$langData['siteConfig'][5][3]#}</title>
+<meta name="apptitle" content="{#$langData['siteConfig'][5][3]#}">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fpwd_v2.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+  var masterDomain = '{#$cfg_basehost#}', userDomain = '{#$member_userDomain#}', staticPath = '{#$cfg_staticPath#}';
+  var geetest = {#$cfg_geetest#};
+  var fptype ='{#$fptype#}';
+  var areacode  = "{#$internationalPhoneSection[0]['code']#}";
+  var shareAdvancedUrl ;
+  var phoneCheck = {#if $userinfo && $userinfo.phone#}1{#else#}0{#/if#};
+  var emailCheck = {#if $userinfo && $userinfo.email#}1{#else#}0{#/if#};
+</script>
+{#* 微信分享 *#}
+{#$Share_description = {#$cfg_description#}#}
+{#$Share_title = {#$cfg_webname#}#}
+{#$Share_img = {#$cfg_weblogo#}#}
+{#$Share_url = {#$cfg_basehost#}#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+</head>
+<body>
+<div class="fpwd" id="fpwd_page">
+	<div class="header">
+		<a href="javascript:;" class="goBack" onclick="history.go(-1)"></a>
+	</div>
+	<div class="chBox">
+		{#if $userinfo#}<div class="form_title">{#$langData['siteConfig'][5][19]#}</div>{#else#}<div class="form_title">{#$langData['siteConfig'][5][5]#}</div>{#/if#}   {#*   修改登录密码  重置密码  *#}
+		<ul class="tab_ul" v-if="(emailCheck && phoneCheck) " v-cloak>
+			<li :class="{'curr':showtype}" @click="showtype = 1">{#$langData['siteConfig'][3][5]#}</li>  {#*  手机验证  *#}
+			<s></s>
+			<li :class="{'curr':!showtype}" @click="showtype = 0">{#$langData['siteConfig'][3][10]#}</li>  {#*  邮箱验证  *#}
+		</ul>
+		<ul class="tab_ul" v-if="(!emailCheck && !phoneCheck) "  v-cloak>
+			<li :class="{'curr':showtype}" @click="showtype = 1">{#$langData['siteConfig'][3][8]#}</li>  {#*  手机找回  *#}
+			<s></s>
+			<li :class="{'curr':!showtype}" @click="showtype = 0">{#$langData['siteConfig'][3][12]#}</li>  {#*  邮箱找回  *#}
+		</ul>
+		<form action="" class="formbox byphone" v-if="showtype" v-cloak>
+			<div class="inputbox labelInp" v-if="phoneCheck">
+				<label>{#$langData['siteConfig'][3][6]#}</label>    {#*  手机号码  *#}
+				<span>{#$userinfo.phoneEncrypt#}</span>
+				<input type="hidden" name="phone" id="phone" value="{#$userinfo.phone#}" />
+			</div>
+			<div class="inputbox telinp" v-else>
+				<div class="telCode" @click="showAreacode()">
+					<span class="codeChoose">+{{areacode}}</span><a href="javascript:;" class="showCode"></a>
+					<input type="hidden" name="areaCode" :value="areacode" id="codeChoose">
+				</div>
+				<input type="tel" placeholder=" {#$langData['siteConfig'][20][239]#}" name="account" id="phone" autocomplete="off"   key="usertel">  {#*  请输入手机号  *#}
+				<a href="javascript:;" class="clearInp fn-hide" @click="clearInp()"></a>
+			</div>
+			{#if !$cfg_geetest#}
+			<div class="inputbox codeinp imgcode">
+				<input type="text" maxlength="4" placeholder=" {#$langData['siteConfig'][20][176]#}" name="vcode" autocomplete="off" id="vdimgck" key="vdimgck">   {#*  请输入验证码  *#}
+				<a href="javascript:;" class="getCode"><img src="/include/vdimgck.php" alt="" @click="change_vdimgck()"></a>
+			</div>
+			{#/if#}
+			<div class="inputbox codeinp phonecode">
+				<input type="tel" maxlength="6" placeholder=" {#$langData['siteConfig'][20][28]#}" name="vcode" autocomplete="off" id="vercode" key="vercode">   {#*  请输入短信验证码  *#}
+				<a href="javascript:;" class="getCode" @click="getPhoneMsg()">{#$langData['siteConfig'][4][4]#}</a>{#*  获取短信验证码  *#}
+			</div>
+
+			<div class="inputbox psdinp">
+				<input v-bind:type="psdshow?'text':'password'" placeholder=" {#$langData['siteConfig'][20][30]#}" name="password"  autocomplete="off" id="password"  key="psd">  {#*  请设置新的登录密码  *#}
+				<a href="javascript:;" :class="['eyeshow',{eyeclose:psdshow}]" @click="psdshow = !psdshow"></a>
+			</div>
+
+			<p class="psd_tip">{#$langData['siteConfig'][55][0]#}</p>  {#* 新密码建议组合规则：长度为6~14个字符，支持数字, 大小写字母和标点符号 *#}
+
+			<a href="javascript:;" class="btn_change"  @click="change_by_phone()">{#$langData['siteConfig'][6][1]#}</a>  {#*  确定  *#}
+		</form>
+		<form action=""  class="formbox byphone" v-if="!showtype"   v-cloak>
+			<div class="inputbox labelInp" v-if="emailCheck">
+				<label>{#$langData['siteConfig'][3][11]#}</label>   {#*  邮箱帐号  *#}
+				<span>{#$userinfo.emailEncrypt#}</span>
+				<input type="hidden" name="email" id="email" value="{#$userinfo.email#}" />
+			</div>
+			<div class="inputbox" v-else>
+				<input type="email"  placeholder=" {#$langData['siteConfig'][20][31]#}" name="account" autocomplete="off" id="email"> {#*  请输入您的邮箱账号  *#}
+			</div>
+
+			{#if !$cfg_geetest#}
+			<div class="inputbox codeinp imgcode">
+				<input type="text" maxlength="4" placeholder=" {#$langData['siteConfig'][20][176]#}" name="vcode" autocomplete="off" id="vdimgck" key="vdimgck">  {#*  请输入验证码  *#}
+				<a href="javascript:;" class="getCode"><img src="/include/vdimgck.php" alt="" @click="change_vdimgck()"></a>
+			</div>
+			{#/if#}
+			<div class="inputbox codeinp phonecode">
+				<input type="tel" maxlength="6" placeholder=" {#$langData['siteConfig'][20][176]#}" name="vcode" autocomplete="off" id="vercode" key="vercode">  {#*  请输入验证码  *#}
+				<a href="javascript:;" class="getCode" @click="getEmailMsg()">{#$langData['siteConfig'][4][5]#}</a>{#*  获取邮箱验证码  *#}
+			</div>
+
+			<div class="inputbox psdinp">
+				<input v-bind:type="psdshow?'text':'password'" placeholder=" {#$langData['siteConfig'][21][237]#}" name="password"  autocomplete="off" id="password_email"  key="psd">{#*  请输入登录密码  *#}
+				<a href="javascript:;" :class="['eyeshow',{eyeclose:psdshow}]" @click="psdshow = !psdshow"></a>
+			</div>
+			<p class="psd_tip">{#$langData['siteConfig'][55][0]#}</p> {#*  新密码建议组合规则：长度为6~14个字符，支持数字, 大小写字母和标点符号  *#}
+
+			<a href="javascript:;" class="btn_change" @click="change_by_email()">{#$langData['siteConfig'][6][1]#}</a>  {#*  确定  *#}
+		</form>
+	</div>
+	<!-- 区号选择 -->
+	<div class="popl_mask" @click="hideAreaCode()"></div>
+	<div class="popl_box anum_box">
+		<h2>{#$langData['business'][1][4]#}   <a href="javascript:;" class="back" @click="hideAreaCode()">{#$langData['business'][1][5]#}</a></h2>     {#* 选择地区----返回 *#}
+		<div class="areaList" id="areaList">
+			<ul>
+				{#siteConfig action='internationalPhoneSection' return="item"#}
+				<li data-cn="{#$item.name#}" data-code="{#$item.code#}" @click="getAreaCode()"><span>{#$item.name#}<span><em class="fn-right">+{#$item.code#}</em></li>
+				{#/siteConfig#}
+			</ul>
+		</div>
+	</div>
+</div>
+
+
+{#$rsaScript#}
+{#if $cfg_geetest#}
+{#if $cfg_geetest == 1#}
+<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/fpwd_v2.js?v={#$cfg_staticVersion#}"></script>

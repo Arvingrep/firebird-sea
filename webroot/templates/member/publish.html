@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>发布信息-{#$cfg_webname#}</title>
+<meta name="keywords" content="{#$cfg_keywords#}" />
+<meta name="description" content="{#$cfg_description#}" />
+<link rel="stylesheet" href="/static/css/core/base.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="/static/css/ui/element_ui_index.css">
+<link rel="stylesheet" href="{#$templets_skin#}css/publish.css?v={#$cfg_staticVersion#}">
+<script src="/static/js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="/static/js/common.js?v={#$cfg_staticVersion#}"></script>
+
+<script language="javascript" type="text/javascript">
+    var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}", adminPath = "{#$adminPath#}", modelType = action = "{#$action#}", cfg_staticVersion = '{#$cfg_staticVersion#}';
+
+    var infoArr = {#json_encode($infoarr)#}
+   var masterDomain = '{#$cfg_basehost#}';
+   var memberDomain = '{#$member_userDomain#}';
+   var fabu_post = '{#$masterDomain#}/supplier/job/add_post.html';
+   var huodong_fabu = '{#getUrlPath service='huodong' template='fabu'#}';
+   var tieba_fabu = '{#getUrlPath service='tieba' template='fabu'#}';
+   var carDomain = '{#getUrlPath service='car' template='sell'#}'
+   var optAction = false;
+   var headtitle = '{#json_encode($title)#}';
+   headtitle = JSON.parse(headtitle)
+   var fabuModuleChildren = {#if $fabuModuleChildren#}{#json_encode($fabuModuleChildren)#}{#else#}''{#/if#}
+
+</script>
+</head>
+
+<body>
+  {#include file="{#$HUONIAOROOT#}/templates/siteConfig/top1.html"#}
+  <div class="pageBox w1200" id="page">
+    <div class="containBox showPage">
+      <div class="headerBox">
+        <div class="header wrap " v-cloak>
+          <div class="logoBox" >
+            <a class="logo" :href="masterDomain" target="_blank" >
+              <img src="{#if $cfg_weblogo#}{#$cfg_weblogo#}{#else#}{#$cfg_basehost#}/static/images/admin/2.0/logo.png{#/if#}"  alt="{#$cfg_shortname#}" />
+            </a>
+            
+          </div>
+          <div class="stepBox">
+            <ul>  
+              <template v-for="(item,ind) in steps" :key="ind">
+                <li :class="{'on_chose': ind == 0}"  :style="ind == 0 ? `color:${formData.themeColor}` : ''">
+                  <span :style="ind == 0 ? `background-color:${formData.themeColor}` : ''">{{ind + 1 }}</span>{{item}}
+                  <div class="line_after" v-if="ind == 0" :style="ind == 0 ? `background-color:${formData.themeColor}` : ''"></div>
+                </li>
+              </template>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="conBox" v-loading="loading" v-if="formData"> 
+        <div class="conMid wrap">
+          <div class="fabuListBox" v-cloak>
+            <dl :class="['fabu_dl fabu' + fblist.setStyle.marginStyle ]" v-for="(fblist,ind) in formData.fabuArr" :key="'fabu_' + fblist.id"  v-show="fblist.show == 1 || !fblist.code || (Array.isArray(fblist.code))" :data-id="ind">
+              <dt :class="['fbList_title']" >
+                <h4 class="h4":style="`color:${fblist.setStyle.tStyle.color}; font-size:${fblist.setStyle.tStyle.fontSize}px;font-weight:${fblist.setStyle.tStyle.fontWeight ? 'bold':'normal'};`">{{fblist.setStyle.name ? fblist.setStyle.name : '请输入标题'}}</h4>
+              </dt>
+              <dd class="fabu_btn" v-loading="loadInfo && fblist.code =='info'">
+                <ul class="fb_ul sortUl" :data-id="fblist.id">
+                  <template v-for="(item,fb_ind) in fblist.setStyle.typeList" :key="'btn_'+ fblist.id +'_'+ item.id" >
+
+                    <li v-if="item.typename || item.url || item.icon" :class="['fb_li sort_li']"  v-show="item.show == 1 || !item.code"  :data-id="fb_ind">
+  
+                      <a :href="checkUrlPath(item)" target="_blank" :class="['fb_btn']" :style="`background:${item.setStyle.bgColor};`">
+                        <div :class="['btn_icon']" v-if="item.icon && fblist.setStyle.marginStyle != 1" >
+                          <img :src="item.icon" alt="">
+                        </div>
+                        <div class="flex_right">
+                          <div class="colorDivBox">
+                            <div :class="['typename editInp colorDiv',{'alignCenter':!item.icon || fblist.setStyle.marginStyle == 1}]"  :style="`color:${item.setStyle.color};`" >{{item.typename ? item.typename : '按钮' + (fb_ind + 1)}}</div>
+                            <div v-if="fblist.setStyle.marginStyle == 3" :class="['subname colorDiv editInp',{'alignCenter':!item.icon}]" :style="`color:${item.setStyle.subColor};`" >{{item.subname ? item.subname : '按钮副标题'}}</div>
+                          </div>
+                          
+                        </div>
+                      </a>
+                    </li>
+                  </template>
+                </ul>
+              </dd>
+            </dl>
+            
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <!-- 底部 s -->
+<div class="footer-login">
+	<p>
+		{#loop service="siteConfig" action="singel"#}
+		<a href="{#getUrlPath service='siteConfig' template='about' id={#$row.id#}#}">{#$row.title#}</a><span class="pice">|</span>
+		{#/loop#}
+		<a href="{#getUrlPath service='siteConfig' template='help'#}">{#$langData['siteConfig'][19][273]#}</a>    {#* 帮助中心 *#}
+		<span class="pice">|</span>
+		<a href="{#getUrlPath service='siteConfig' template='feedback'#}">{#$langData['siteConfig'][16][171]#}</a>    {#* 意见反馈 *#}
+	</p>
+	{#$cfg_powerby#}
+</div>
+<!-- 底部 e -->
+</body>
+<script src="/static/js/vue/vue.min.js"></script>
+<script src="/static/js/ui/element_ui_index.js"></script>
+<!-- <script src="/static/js/ui/ewPlugins.min.js?v={#$cfg_staticVersion#}"></script> -->
+<script src="{#$templets_skin#}js/publish.js?v={#$cfg_staticVersion#}"></script>
+</html>

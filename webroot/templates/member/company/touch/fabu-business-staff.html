@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="UTF-8">
+	<title>{#$langData['siteConfig'][56][29]#}</title> {#* 员工编辑 *#}
+	<meta name="wap-font-scale" content="no">
+	<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu-business-staff.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js"></script>
+	<script src="{#$cfg_staticPath#}js/vue/vue.js"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}',
+			staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+		var businessstaffurl = "{#getUrlPath service='member' template='business-staff'#}";
+		var staffid = '{#$id#}';
+
+		var hideFileUrl = '{#$cfg_hideUrl #}',
+			atlasSize = 5 * 1024 * 1024,
+			atlasMax = 2;
+		editUrl = "{#getUrlPath service='member' template='fabu' action='business' act='about'#}";
+
+		staffInfo = {
+			name: '{#$detail_nickname#}',
+			tel: '{#$detail_staffphone#}',
+			userid: '{#$detail_staffuid#}',
+			username: '{#$detail_username#}',
+			postion: '{#$detail_jobname#}',
+			realname: '{#$detail_staffname#}',
+			photo: '{#$detail_photopath|default:"{#$cfg_staticPath#}/images/noPhoto_100.jpg"#}',
+			access: Number('{#$detail_state#}'), //1表示设置过权限，0表示没有设置过权限
+			accArr: {
+				'shop': {#if array_key_exists('shop',$detail_business_auth)#}'{#join(',',$detail_business_auth['shop'])#}'{#else#}''{#/if#},
+				'tuan': {#if array_key_exists('tuan',$detail_business_auth)#}'{#join(',',$detail_business_auth['tuan'])#}'{#else#}''{#/if#},
+				'travel': {#if array_key_exists('travel',$detail_business_auth)#}'{#join(',',$detail_business_auth['travel'])#}'{#else#}''{#/if#},
+				'huodong': {#if array_key_exists('huodong',$detail_business_auth)#}'{#join(',',$detail_business_auth['huodong'])#}'{#else#}''{#/if#}
+			}
+		}
+	</script>
+</head>
+<body>
+	{#include file="../../../siteConfig/touch_top.html" pageTitle="{#$langData['siteConfig'][56][29]#}"  #} {#* 员工编辑 *#}
+	<div id="page">
+		<div class="staffInfoBox">
+			<!-- 没有权限，没编辑过的 -->
+			<div class="loading" v-show="loading" style="z-index: 999"></div>
+			<form :class="{'editBox':!staffInfo.access }" id="form" v-cloak>
+				<div class="staffInfo noEdit" v-show="!staffInfo.access">
+					<div class="head"><img :src="staffInfo.photo" alt="" onerror="this.src='/static/images/noPhoto_100.jpg'"></div>
+					<div class="sinfo">
+						<p><span>{#$langData['siteConfig'][19][6]#}</span>{#* 昵称 *#} <em>{{staffInfo.username}}</em></p>
+						<p><span>{#$langData['siteConfig'][56][38]#}</span>{#* 账号 *#} <em>{{staffInfo.userid}}</em></p>
+						<input type="hidden" name="username" :value="staffInfo.username">
+						<input type="hidden" name="userid" :value="staffInfo.userid">
+					</div>
+				</div>
+				<ul class="form_ul" v-show="!staffInfo.access">
+					<li>
+						<label for="staff_name">{#$langData['siteConfig'][56][16]#}</label> {#* 员工姓名 *#}
+						<input type="text" placeholder="{#$langData['siteConfig'][7][0]#}" name="username" v-model="realname">
+					</li>
+					<li>
+						<label for="staff_post">{#$langData['siteConfig'][56][19]#}</label> {#* 职位名称 *#}
+						<input type="text" placeholder="{#$langData['siteConfig'][7][0]#}" name="postname" v-model="staffInfo.postion">
+					</li>
+					<li>
+						<label for="staff_phone">{#$langData['siteConfig'][56][17]#}</label> {#* 联系电话 *#}
+						<input type="tel" placeholder="{#$langData['siteConfig'][7][0]#}" name="staff_phone" v-model="staffInfo.tel">
+					</li>
+				</ul>
+
+				<!-- 有权限，编辑过的 -->
+				<div class="showBox" v-show="staffInfo.access">
+					<div class="staffInfo">
+						<div class="head"><img :src="staffInfo.photo" :alt="staffInfo.realname" onerror="this.src='/static/images/noPhoto_100.jpg'"></div>
+						<div class="sinfo">
+							<h2><span>{{staffInfo.realname}}</span><em>{{staffInfo.postion}}</em></h2>
+							<p><span>{#$langData['siteConfig'][56][38]#}</span> <em>{{staffInfo.userid}}</em></p>
+						</div>
+						<a href="javascript:;" class="edit_btn" @click="staffInfo.access = 0"></a>
+					</div>
+					<div class="phone">{{staffInfo.tel}}</div>
+				</div>
+
+
+		<!-- 权限分配 -->
+		<dl class="accBox">
+			<dt>权限分配</dt>
+			{#if in_array("shop", $installModuleArr)#}
+			<dd>
+				<h4>{#getModuleConfig module='shop' key='channelName'#}</h4>
+				<ul class="fn-clear" data-module="shop">
+					<li data-id="1" :class="{'on_chose': staffInfo.accArr.shop.indexOf('1')>-1}">店铺配置</li>
+					<li data-id="2" :class="{'on_chose': staffInfo.accArr.shop.indexOf('2')>-1}">管理商品</li>
+					<li data-id="3" :class="{'on_chose': staffInfo.accArr.shop.indexOf('3')>-1}">管理订单</li>
+					<li data-id="4" :class="{'on_chose': staffInfo.accArr.shop.indexOf('4')>-1}">核销券</li>
+					<input type="hidden" name="shop" :value="staffInfo.accArr.shop">
+
+				</ul>
+			</dd>
+			{#/if#}
+			{#if in_array("huodong", $installModuleArr)#}
+			<dd>
+				<h4>{#getModuleConfig module='huodong' key='channelName'#}</h4>
+				<ul class="fn-clear" data-module="huodong">
+					<li data-id="1" :class="{'on_chose': staffInfo.accArr.huodong.indexOf('1')>-1}">管理信息</li>
+					<li data-id="2" :class="{'on_chose': staffInfo.accArr.huodong.indexOf('2')>-1}">报名管理</li>
+					<li data-id="3" :class="{'on_chose': staffInfo.accArr.huodong.indexOf('3')>-1}">管理订单</li>
+					<input type="hidden" name="huodong" :value="staffInfo.accArr.huodong">
+				</ul>
+			</dd>
+			{#/if#}
+			{#if in_array("tuan", $installModuleArr)#}
+			<dd>
+				<h4>{#getModuleConfig module='tuan' key='channelName'#}</h4>
+				<ul class="fn-clear" data-module="tuan">
+					<li data-id="1" :class="{'on_chose': staffInfo.accArr.tuan.indexOf('1')>-1}">店铺配置</li>
+					<li data-id="2" :class="{'on_chose': staffInfo.accArr.tuan.indexOf('2')>-1}">管理信息</li>
+					<li data-id="3" :class="{'on_chose': staffInfo.accArr.tuan.indexOf('3')>-1}">管理订单</li>
+					<li data-id="4" :class="{'on_chose': staffInfo.accArr.tuan.indexOf('4')>-1}">核销券</li>
+					<input type="hidden" name="tuan" :value="staffInfo.accArr.tuan">
+
+				</ul>
+			</dd>
+			{#/if#}
+			{#if in_array("travel", $installModuleArr)#}
+			<dd>
+				<h4>{#getModuleConfig module='travel' key='channelName'#}</h4>
+				<ul class="fn-clear" data-module="travel">
+					<li data-id="1" :class="{'on_chose': staffInfo.accArr.travel.indexOf('1')>-1}">店铺配置</li>
+					<li data-id="2" :class="{'on_chose': staffInfo.accArr.travel.indexOf('2')>-1}">管理信息</li>
+					<li data-id="3" :class="{'on_chose': staffInfo.accArr.travel.indexOf('3')>-1}">管理订单</li>
+					<li data-id="4" :class="{'on_chose': staffInfo.accArr.travel.indexOf('4')>-1}">核销券</li>
+					<input type="hidden" name="travel" :value="staffInfo.accArr.travel">
+
+				</ul>
+			</dd>
+			{#/if#}
+		</dl>
+		</form>
+		</div>
+		<div class="btnGroup">
+			<a href="javascript:;" class="del_btn" @click="delStaff">{#$langData['siteConfig'][56][21]#}</a>{#* 删除员工 *#}
+			<a href="javascript:;" class="edit_btn" v-show="!staffInfo.access || edit==1" @click="submitData">{#$langData['siteConfig'][56][39]#}</a>{#* 保存设置 *#}
+		</div>
+	</div>
+
+</body>
+<script src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+
+</html>

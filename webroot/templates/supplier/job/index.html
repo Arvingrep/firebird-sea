@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>招聘系统企业端</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/member/pub_supplier.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/index.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		
+		<script type="text/javascript">
+            var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+            var hideFileUrl = '{#$cfg_hideUrl#}';
+            var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+            var templets = '{#$templets_skin#}';
+            var loupanid = '{#$loupanid#}';
+			var endDate = '{#$company_combo_enddate#}'
+			const jobcid = '{#$job_cid#}'
+			var direct = '{#$smarty.get.direct#}'
+			var jobCount = {#$managerCount.job_state_1|default:0#}
+		</script>
+	</head>
+	<body class="w1200">
+		{#$pageTitle = '招聘系统企业端'#}
+		<!-- 头部 -->
+		{#include file="top.html" pageTitle=$pageTitle module='job' showMap=2#}
+		<div id="page" >
+			<div class="lodingSelf" v-if="lodingSelf"><i class="el-icon-loading"></i></div>
+            <div class="conbox">
+                <div class="left_box" v-cloak>
+					<ul v-cloak>
+						<li v-for=" (item,i) in navList" :class="{'curr':i==currid || i === hoverid}"  @mouseover="hoverid = i" @mouseleave="hoverid = ''" @click.prevent="checkConfig(item,i)" >
+							<a :href="item.link">
+								<s v-if="i!=currid && i !== hoverid"><img :src="'{#$templets_skin#}images/'+(i+1)+'.png'" ></s>
+								<s v-else><img :src="'{#$templets_skin#}images/'+(i+1)+'_on.png'" ></s>
+								<span>{{item.txt}}</span>
+							</a>
+						</li>
+					</ul>
+				</div>
+				<div class="right_box">
+					<!-- 中间 -->
+					<div class="partMid" v-cloak>
+
+						<div class="content">
+							<!-- 更新企业信息 -->
+							<div {#if $company_state==0&&$job_cid#}class="nocertificate"{#elseif $company_state==2&&$job_cid#}class="refusecertificate"{#elseif !$company_complete#} class=" finishInfoTipBox"{#else#} style="display: none;"{#/if#}>
+								<div class="iconbox fn-left"><img src="{#$templets_skin#}images/tip_icon3.png" alt=""></div>
+								<img src="{#if $company_state==0&&$job_cid#}{#$templets_skin#}images/tip_icon.png{#else#}{#$templets_skin#}images/warn_icon.png{#/if#}" class="certificateimg">
+								{#if $company_state==0&&$job_cid#}
+								企业资料审核中，部分招聘功能暂不可使用，正在进行中的简历、面试处理不受影响
+								{#elseif $company_state==2&&$job_cid#}
+								企业资料审核未通过，请修改后提交
+								{#elseif !$company_complete#}
+								<div class="fn-left tip_text">
+									<h3><span>温馨提示：</span>企业资料未完善</h3>
+									<p>立即完善企业资料、介绍信息等，优化企业形象、提升招聘效果！</p>
+									<a href="{#$cfg_basehost#}/supplier/job/company_info.html" target="_blank" class="goLink">完善资料</a>
+								</div>
+								{#elseif !$company_certification#}
+								<div class="fn-left tip_text">
+									<h3><span>温馨提示：</span>企业资质未认证</h3>
+									<p>立即认证资质，获取专属认证标签获得人才信任度，还可获取更多曝光，提升招聘效果！</p>
+								</div>
+								<a href="{#$cfg_basehost#}/supplier/job/company_info.html" target="_blank" class="goLink">完善资料</a>
+								{#elseif !$userinfo.phoneCheck#}
+								<div class="fn-left tip_text">
+									<h3><span>温馨提示：</span>手机未验证</h3>
+									<p>绑定手机号，完成账号认证，可快速登录管理招聘，随时随地轻松招人才</p>
+									<a href="{#$member_userDomain#}/security-chphone.html" target="_blank" class="goLink">验证手机号</a>
+								</div>
+								{#elseif !$userinfo.wechat_conn#}
+								<div class="fn-left tip_text">
+									<h3><span>温馨提示：</span>微信未绑定</h3>
+									<p>绑定微信，可便捷筛选简历、创建管理职位、实时追踪投递情况、快速提醒...等，随时随地轻松招人才</p>
+									<a href="{#$cfg_basehost#}/supplier/job/setting.html" target="_blank" class="goLink">绑定微信</a>
+								</div>
+								{#elseif !$userinfo.emailCheck#}
+								<div class="fn-left tip_text">
+									<h3><span>温馨提示：</span>邮箱未绑定</h3>
+									<p>邮箱绑定后，可用于直接登录账户，接收投递信息，求职者简历附件</p>
+									<a href="{#$member_userDomain#}/security-chemail.html" target="_blank" class="goLink">绑定邮箱</a>
+								</div>
+								{#/if#}
+							</div>
+	
+							<!-- 企业概况 -->
+							<div class="busiInfoCon infoCon">
+								<div class="bsInfo">
+									{#if $job_cid#}
+									<div class="bs_left">
+										<a class="bs_logo" href="{#$cfg_basehost#}/job/company.html?id={#$job_cid#}" target="_blank"><el-avatar :size="80" src="{#$company_logo_url#}"></el-avatar></a>
+										<div class="bs_detail">
+											<h4><a href="{#$cfg_basehost#}/job/company.html?id={#$job_cid#}" target="_blank">{#$company_title#}</a></h4>
+											<a href="{#$cfg_basehost#}/job/company.html?id={#$job_cid#}" target="_blank" class="companyHome"><s></s>主页</a>
+											<div class="labs fn-clear">
+												<a href="{#$cfg_basehost#}/supplier/job/setting.html">
+													{#if $userinfo.phoneCheck#}
+													<div class="lab phoneCheck"><s></s>手机已验证</div>
+													{#else#}
+													<div class="lab phoneCheck noCheck"><s></s>手机未验证</div>
+													{#/if#}
+												</a>
+												<a href="{#$cfg_basehost#}/supplier/job/company_info.html?to=1">
+													{#if $company_certification#}
+													<div class="lab certificatCheck"><s></s>资质已认证</div>
+													{#else#}
+													<div class="lab certificatCheck noCheck"><s></s>资质未认证</div>
+													{#/if#}
+												</a>
+												<a href="{#$cfg_basehost#}/supplier/job/setting.html">
+													{#if $userinfo.wechat_conn#}
+													<div class="lab weChatBind"><s></s>微信已绑定</div>
+													{#else#}
+													<div class="lab weChatBind noCheck"><s></s>微信未绑定</div>
+													{#/if#}
+												</a>
+											</div>
+										</div>
+									</div>
+									{#else#}
+									<a class="bs_left" href="{#$cfg_basehost#}/supplier/job/company_info.html" target="_blank">
+										<div class="bs_logo"><el-avatar :size="80" src="{#$templets_skin#}images/default_logo.png"></el-avatar></div>
+										<div class="bs_detail">
+											<h4>请先完善企业信息</h4>
+											<div class="labs fn-clear">
+												完善公司基本信息后，即可发布招聘职位，挑选人才！
+											</div>
+										</div>
+									</a>
+									{#/if#}
+									
+									<div class="bs_btns">
+										<a href="javascript:;" class="poster_bth" @click="posterFn(0)"><s></s>招聘海报</a>
+										<a href="javascript:;" class="app_bth">
+											<s></s>企业移动端
+											<div class="popver_app">
+												<h4>企业招聘<span>移动端</span></h4>
+												<div class="qrCode"><img src="/include/qrcode.php?data={#$cfg_basehost#}" /></div>
+												<p>人才消息不错过，随时随地轻松招聘</p>
+											</div>
+										</a>
+									</div>
+								</div>
+								<el-row :gutter="12" class="todoList" >
+									<a class="grid-content green" :span="31" href="{#$cfg_basehost#}/supplier/job/interviewManage.html" @click.prevent="checkConfig({txt:'面试日程',link:'{#$cfg_basehost#}/supplier/job/interviewManage.html'},4)">
+										<div class="icon"><img src="{#$templets_skin#}images/icon_1.png" alt=""></div>
+										<div class="con">
+											<h4>面试日程</h4>
+											<el-badge  class="msg_tip">{#$managerCount.interview|default:0#}</el-badge>
+										</div>
+									</a>
+									<a class="grid-content blue" :span="31" href="{#$cfg_basehost#}/supplier/job/resumeManage.html?state=0" @click.prevent="checkConfig({txt:'简历管理',link:'{#$cfg_basehost#}/supplier/job/resumeManage.html?state=0'},4)">
+										<div class="icon"><img src="{#$templets_skin#}images/icon_2.png" alt=""></div>
+										<div class="con">
+											<h4>新简历投递</h4>
+											<el-badge :is-dot="{#if $managerCount.unRead > 0#}true{#else#}false{#/if#}" class="msg_tip">{#$managerCount.unRead|default:0#}</el-badge>
+										</div>
+									</a>
+									<a href="{#$cfg_basehost#}/supplier/job/resumeManage.html" class="grid-content purple" :span="31" @click.prevent="checkConfig({txt:'简历管理',link:'{#$cfg_basehost#}/supplier/job/resumeManage.html'},4)">
+										<div class="icon"><img src="{#$templets_skin#}images/icon_3.png" alt=""></div>
+										<div class="con">
+											<h4>简历管理</h4>
+											<el-badge  class="msg_tip">{#$managerCount.resume|default:0#}</el-badge>
+										</div>
+									</a>
+									<a class="grid-content blue2" :span="40" href="{#$cfg_basehost#}/supplier/job/postManage.html">
+										<div class="icon"><img src="{#$templets_skin#}images/icon_4.png" alt=""></div>
+										<div class="con">
+											<h4>职位管理</h4>
+											<el-badge class="msg_tip">{#$managerCount.job|default:0#}</el-badge>
+										</div>
+										<div class="add_post" data-url="{#$cfg_basehost#}/supplier/job/add_post.html" @click.prevent="checkConfig('',3)"><s></s>新增职位</div>
+									</a>
+									
+								</el-row>
+							</div>
+	
+							<!-- 招聘进展 -->
+							<div class="postInfoCon  infoCon"  v-loading="!jobProgressLoading">
+								<h3 class="title">招聘进展</h3>
+								<el-row class="rowTit">
+									<el-col :span="6">
+										<a class="grid-content" href="{#$cfg_basehost#}/supplier/job/postManage.html">
+											<p>在招职位</p>
+											<h2>{{jobProgress && jobProgress.count.job ? jobProgress.count.job : '-'}}</h2>
+										</a>
+									</el-col>
+									<el-col :span="3" >
+										<div class="grid-content">
+											<p>招聘人数</p>
+											<h2>{{jobProgress && jobProgress.count.dz ? jobProgress.count.dz : '-'}}</h2>
+										</div>
+									</el-col>
+									
+									<el-col :span="3" >
+										<a class="grid-content" href="{#$cfg_basehost#}/supplier/job/resumeManage.html">
+											<p>投递人数</p>
+											<h2>{{jobProgress && jobProgress.count.td ? jobProgress.count.td : '-'}}</h2>
+										</a>
+									</el-col>
+									<el-col  :span="3" >
+										<a class="grid-content" href="{#$cfg_basehost#}/supplier/job/resumeManage.html?state=2">
+											<p>通过初筛</p>
+											<h2>{{jobProgress && jobProgress.count.cs ? jobProgress.count.cs : '-'}}</h2>
+										</a>
+									</el-col>
+									<el-col :span="3" >
+										<a class="grid-content" href="{#$cfg_basehost#}/supplier/job/interviewManage.html">
+											<p>面试人数</p>
+											<h2>{{jobProgress && jobProgress.count.ms ? jobProgress.count.ms : '-'}}</h2>
+										</a>
+									</el-col>
+									<el-col :span="3" >
+										<a class="grid-content" href="{#$cfg_basehost#}/supplier/job/interviewManage.html?state=2">
+											<p>沟通offer</p>
+											<h2>{{jobProgress && jobProgress.count.offer ? jobProgress.count.offer : '-'}}</h2>
+										</a>
+									</el-col>
+									<el-col :span="3" >
+										<a class="grid-content" href="{#$cfg_basehost#}/supplier/job/interviewManage.html?state=3">
+											<p>入职</p>
+											<h2>{{jobProgress && jobProgress.count.drz ? jobProgress.count.drz : '-'}}</h2>
+										</a>
+									</el-col>
+								</el-row>
+								<div class="rowConList"  v-if="jobProgress&&jobProgress.process.length>0 || !jobProgressLoading">
+									<el-row class="rowCon" v-for=" item in jobProgress.process" >
+										<el-col :span="6">
+											<a class="grid-content grid-tit" :href="item.url"><span class="title_txt" :title="item.title">{{item.title}}</span><span class="refresh" @click.prevent="refreshItem(item)"><i class="el-icon-refresh "></i>刷新</span></a>
+										</el-col>
+										<el-col :span="3">
+											<div class="grid-content grid-data">{{item.dz ? item.dz : '-'}}</div>
+										</el-col>
+										<el-col :span="3">
+											<a class="grid-content grid-data" :href="'{#$cfg_basehost#}/supplier/job/resumeManage.html?postid=' + item.id ">{{item.td? item.td : '-'}}</a>
+										</el-col>
+										<el-col :span="3">
+											<a class="grid-content grid-data" :href="'{#$cfg_basehost#}/supplier/job/resumeManage.html?state=2&postid=' + item.id">{{item.cs? item.cs : '-'}}</a>
+										</el-col>
+										<el-col :span="3">
+											<a class="grid-content grid-data" :href="'{#$cfg_basehost#}/supplier/job/interviewManage.html?postid=' + item.id">{{item.ns? item.ns : '-'}}</a>
+										</el-col>
+										<el-col :span="3">
+											<a class="grid-content grid-data" :href="'{#$cfg_basehost#}/supplier/job/interviewManage.html?state=2&postid=' + item.id">{{item.offer? item.offer : '-'}}</a>
+										</el-col>
+										<el-col :span="3">
+											<a class="grid-content grid-data" :href="'{#$cfg_basehost#}/supplier/job/interviewManage.html?state=3&postid=' + item.id">{{item.drz? item.drz : '-'}}</a>
+										</el-col>
+									</el-row>
+								</div>
+							</div>
+	
+	
+							<!-- 推荐人才 -->
+							<div class="personInfoCon  infoCon"  v-if="recommendTalents && recommendTalents.length">
+								<h3 class="title">推荐人才 <a href="{#$cfg_basehost#}/supplier/job/personList.html" class="more">更多人才></a></h3>
+								<div class="personList fn-clear">
+									<a class="person" v-for=" (item,ind) in recommendTalents" :href="item.url"  v-if="ind < 9">
+										<div class="person_photo"><el-avatar :size="46" :src="item.photo_url"><img src="/static/images/noPhoto_100.jpg" alt=""></el-avatar></div>
+										<div class="person_info">
+											<h3>{{item.name}}<el-tag type="warning" size="small" class="top" v-if="item.urgent == '1'">急求职</el-tag></h3>
+											<p><span>{{item.age}}岁 </span><em> | </em><span> {{item.edu_tallest_name ? item.edu_tallest_name : '-'}} </span><em> | </em><span> {{item.work_jy}}年</span></p>
+										</div>
+										<h4>
+											<span class="post_name">{{item.job_name.join('、')}}</span>
+											<b>{{item.min_salary}}{{item.max_salary > 0 ? '-' + item.max_salary : ''}}</b></h4>
+									</a>
+								</div>
+							</div>
+
+						</div>
+						<div class="foot">
+							<div class="foot-bottom">
+								<div class="bottom wrap">
+									版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+								</div>
+							</div>
+						</div>
+					</div>
+					<!-- 右侧 -->
+					<div class="partRight" v-cloak>
+						<!-- 已经是会员 -->
+						<div class="hasBeVip">
+							{#if $job_cid && $company_combo_id#}
+							<div class="vipBox" @click="renew_tc">
+								<h3>招聘VIP套餐</h3>
+								<p v-if="enddate > currDate">套餐到期：{{dateToStr(enddate)}}</p>
+								<p v-else-if="enddate == -1">套餐到期：永久有效</p>
+								<p v-else>套餐已过期</p>
+								<a href="javascript:;" class="renew_btn">续费</a>
+							</div>
+							{#else#}
+							<div class="vipBox">
+								<h3>招聘VIP套餐</h3>
+								<p>开通套餐，即享全部招聘服务</p>
+								<a href="{#$cfg_basehost#}/supplier/job/jobmeal.html" target="_blank" class="renew_btn" >开通</a>
+							</div>
+							{#/if#}
+
+							<!-- 招聘资源 -->
+							{#if $job_cid && $company_combo_id#}
+							<div class="joblist listBox" >
+								<div class="listConBox">
+									<div class="list_title">
+										<h3>招聘资源</h3>
+										<a href="{#$cfg_basehost#}/supplier/job/jobmeal.html">不够用？升级套餐/增值包灵活叠加></a>
+									</div>
+									<div class="listCon">
+										<el-popover
+											popper-class="popover_tip"
+											placement="bottom-start"
+											width="440"
+											trigger="hover">
+											<div class="markBox">
+												<div><b class="blue">{#if $company_can_resume_down == -1#}不限次数{#else#}{#$company_can_resume_down#}{#/if#}</b>：招聘套餐内剩余下载次数，今日有效
+												</div>
+												{#if $company_package_resume > 0#}<p><b>{#$company_package_resume#}</b>：增值包补充下载次数，永久有效，套餐用光后开始使用</p>{#/if#}
+											</div>
+											<div class="con" slot="reference">
+												<h5><b>{#if $company_can_resume_down==-1#}无限{#else#}{#$company_can_resume_down#}{#/if#}</b>{#if $company_package_resume > 0#}+{#$company_package_resume#}{#/if#}份</h5>
+												<p>简历下载</p>
+											</div>
+										</el-popover>
+										<div class="con">
+											<h5><b>{#($company_package_top + $company_combo_top)#}</b>天</h5>
+											<p>置顶时长</p>
+										</div>
+										<el-popover
+											popper-class="popover_tip"
+											placement="bottom-start"
+											width="440"
+											trigger="hover">
+											<div class="markBox">
+												<div><b class="blue">{#$company_can_job_refresh#}</b>：招聘套餐内剩余刷新次数，今日有效 </div>
+												{#if $company_package_refresh > 0#}<p><b>{#$company_package_refresh#}</b>：增值包补充刷新次数，永久有效，套餐用光后开始使用</p>{#/if#}
+											</div>
+											<div class="con" slot="reference">
+												<h5><b>{#$company_can_job_refresh#}</b>{#if $company_package_refresh > 0#}+{#$company_package_refresh#}{#/if#}份</h5>
+												<p>职位刷新</p>
+											</div>
+										</el-popover>
+									</div>
+								</div>
+
+							</div>
+							{#/if#}
+
+							<!-- 面试日程 -->
+							<div class="interviewList listBox" v-cloak v-loading="!interviewScheduleObj.isload">
+								<div class="list_title">
+									<h3><i></i>面试日程</h3>
+									<span v-if="interviewScheduleObj.pageInfo.totalCount > 0">共{{interviewScheduleObj.pageInfo.totalCount}}个面试</span>
+								</div>
+								<div class="listCon" v-if="interviewScheduleObj.interviewSchedule && interviewScheduleObj.interviewSchedule.length || !interviewScheduleObj.isload">
+									<div class="interview" v-for="(item,ind) in interviewScheduleObj.interviewSchedule" v-if="ind < 3">
+										<h2 class="interview_time"><s></s>{{timeStrToDate(item.date)}}</h2>
+										<h3>{{item.resume.name}}   {{item.post.title}}</h3>
+										<p>电话：{{item.resume.phone}}</p>
+										<p v-if="item.remark">备注：{{item.remark}}</p>
+									</div>
+								</div>
+								<div class="noData" v-else>
+									<img src="{#$templets_skin#}images/nodata.png" alt="">
+									<p>暂无面试安排</p>
+								</div>
+							</div> 
+
+							<!-- 待入职 -->
+							<div class="newStuffList listBox" v-cloak v-if="pendingBoardingObj.pendingBoarding && pendingBoardingObj.pendingBoarding.length">
+								<div class="list_title">
+									<h3>待入职</h3>
+									<span>共{{pendingBoardingObj.pageInfo.totalCount}}位职员</span>
+								</div>
+								<div class="listCon">
+									<div class="newStuff fn-clear" v-for="(item,ind) in pendingBoardingObj.pendingBoarding" v-if="ind < 3" v-loading="selectState != ''">
+										<div class="stuff_photo"><el-avatar :size="56" :src="item.resume.photo_url"><img src="/static/images/noPhoto_100.jpg" alt=""></el-avatar></div>
+										<div class="stuff_info">
+											<h5>{{item.resume.name}}   {{item.job.title}}</h5>
+											<p>
+												<span class="join_date" v-if="!item.state || item.state == '0'">{{timeStrToDate(item.date,1)}}</span> 
+												<span class="join_date" v-else>{{item.state == '1' ? '已入职' : '取消入职'}}</span> 
+												{{item.resume.phone}}
+											</p>
+										</div>
+										<el-select v-model="selectState" class="more_btn" @change="changeState(item,ind)">
+											<el-option value="0" label="待入职"></el-option>
+											<el-option value="1" label="已入职"></el-option>
+											<el-option value="2" label="取消入职"></el-option>
+										</el-select>
+									</div>
+								</div>
+							</div>
+
+							<!-- 专属客服 -->
+							{#if $customJobQQ || ($cfg_server_qq && $cfg_server_qq[0]) || $hotline || $JobWechat#}
+							<div class="kefuBox listBox">
+								<div class="list_title">
+									<h3>专属客服</h3>
+								</div>
+								<div class="kefuInfo">
+									<div class="photo">
+										<el-avatar :size="50" src="{#$customKefuImg#}"><img src="/static/images/noPhoto_100.jpg" alt=""></el-avatar>
+									</div>
+									<h4 class="nickname">网站客服 {#if $customJobQQ || ($cfg_server_qq && $cfg_server_qq[0])#}<a target="_blank" href="http://wpa.qq.com/msgrd?v=3&uin={#if $customJobQQ#}{#$customJobQQ#}{#else#}{#$cfg_server_qq[0]#}{#/if#}&site=qq&menu=yes" class="qqkf"></a>{#/if#}</h4>
+								</div>
+								<div class="kefu_contact fn-clear">
+									<div class="fn-left">
+										{#if $hotline#}<p>电话 {#$hotline#}</p>{#/if#}
+										{#if $JobWechat#}<p>微信 {#$JobWechat#}</p>{#/if#}
+										<p class="tip_p">企业招聘服务，提升招聘效果</p>
+									</div>
+									<div class="fn-right">
+										<div class="qrCode">
+											<img src="{#$customJobQrCode#}" alt="" onerror="this.src='/static/images/404.jpg'">
+										</div>
+									</div>
+								</div>
+							</div>
+							{#/if#}
+						</div>
+					</div>
+					
+				</div>
+				
+			</div>
+			<!-- 海报弹窗 -->
+			<div class="poster" @click="posterFn(1)">
+				<!-- 生成海报 -->
+				<div class="p-produce" onclick="event.stopPropagation()">
+					<!-- 关闭按钮 -->
+					<img src="{#$templets_skin#}images/close.png" class="pp-close" @click="posterFn(1)" title="关闭">
+					<p class="pp-title">生成招聘海报</p>
+					<div class="pp-steps">
+						<!-- 步骤1-选择展示职位 -->
+						<div class="step1">
+							<p class="title">1.选择海报展示职位</p>
+							<ul>
+								<li :data-id="item.id" :data-index="index" v-for="(item,index) in jobtype"
+									:class="{'active':posterId.includes(item.id)}">
+									<div class="select"></div>
+									<span>{{item.title}}</span>
+									<div>{{item.show_salary}}</div>
+								</li>
+								<li class="unfold" @click="foldFn(0)">全部职位</li>
+								<li class="fold" @click="foldFn(1)">收起职位</li>
+							</ul>
+						</div>
+						<!-- 步骤2-选择生成模板 -->
+						<div class="step2">
+							<p class="title">2.选择模板生成</p>
+							<ul>
+								<li v-for="(item,index) in posterData" :key="item.id" v-show="item.type==posterType">
+									<img :src="item.litpic">
+									<div class="btn" @click="produceFn(item.id)">
+										<div>生成海报</div>
+									</div>
+								</li>
+							</ul>
+						</div>
+					</div>
+					<div class="pp-nopost">
+						<img src="{#$templets_skin#}images/noData_post.png">
+						<p>公司还未发布职位，请先发布职位哦</p>
+						<a href="{#$cfg_basehost#}/supplier/job/postManage.html">发布职位</a>
+					</div>
+					<!-- 拖拽区域 -->
+					<div class="pp-drag"></div>
+				</div>
+				<!-- 保存海报 -->
+				<div class="p-save" onclick="event.stopPropagation()" @click="posterFn(2)">
+					<div class="pp-poster" onclick="event.stopPropagation()">
+						<div class="pp-loading">
+							<img src="{#$templets_skin#}images/loading.gif" class="loading">
+							<p>生成中...</p>
+						</div>
+						<div class="pp-show"><img src="" class="ppp-showimg" @load="loadFn()"></div>
+						<a @click="psaveFn" href="javascript:;">保存至本地</a>
+					</div>
+				</div>
+				<!-- 弹窗 -->
+				<div class="p-warning">
+					<p>温馨提示：8个以下职位展示效果更好</p>
+				</div>
+			</div>
+		</div>
+		<div>{#$cfg_statisticscode#}</div>
+	</body>
+	<!-- <script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script> -->
+	<!-- <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/echarts/echarts.js?v={#$cfg_staticVersion#}"></script> -->
+	<!-- <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script> -->
+	<script type="text/javascript" src="{#$templets_skin#}js/index.js?v={#$cfg_staticVersion#}"></script>
+</html>

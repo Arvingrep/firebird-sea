@@ -1,0 +1,272 @@
+<script>
+var job_cid = '{#$job_cid|default:0#}';
+var type = '{#$type#}'
+var jobChannel = '{#getModuleConfig module='job' key='channelDomain'#}'
+</script>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}" media="all" />
+
+<!-- 收藏 -->
+<div class="whiteBGWrap collectionsWrap" id="collectPage">
+  <div class="wrap_header fn-clear">
+    <div class="wrap_title fn-left fn-clear">
+      <div :class="['tab_post tab' , {'onTab': showTab == 'post'}]"  @click=" showTab = 'post'">收藏职位<span v-if="totalCount_post > 0">({{totalCount_post}})</span></div>
+      <div :class="['tab_company tab ',{'onTab': showTab == 'company'}]" @click=" showTab = 'company'">收藏公司<span v-if="totalCount_company">({{totalCount_company}})</span></div>
+      <s></s>
+      
+    </div>
+    <div class="shai_tab fn-right">
+      <span @click="collectTime = 2" :class="{'on_chose':collectTime === 2}">3个月内收藏</span>
+      <span @click="collectTime = 1" :class="{'on_chose':collectTime === 1}">全部收藏</span>
+    </div>
+  </div>
+
+ <!-- 职位收藏 -->
+  <div class="contentBox" v-show="showTab == 'post'">
+    <template>
+      <el-table class="tableBox" :data="postCollections" style="width: 100%" ref="table" key='table1' :row-class-name="disabledRow"  v-loading="isload_post" @selection-change="choseAll" @select="selectRow"  @row-click="gotoLink" >
+        <el-table-column
+        class-name="selection_item"
+        type="selection"
+        :selectable="selectAbleFn"
+        width="55">
+        </el-table-column>
+        <el-table-column prop="date" label="职位信息">
+          <template slot-scope="scope">
+            <div class="postInfo" >
+              <div class="ptitle"><span class="salary_show">{{scope.row.show_salary}} </span> <span class="title"> {{scope.row && scope.row.title ? scope.row.title : ''}}</span></div>
+              <p>{{scope.row  && scope.row.companyDetail? scope.row.companyDetail.title : ''}}</p>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="date" label="工作地区" align="center" header-align="center" width="150" >
+          <template slot-scope="scope">
+            <div class="postAddr">
+              {{scope.row.job_addr_detail ?scope.row.job_addr_detail['addrName'].join(' ') : '' }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="date" align="center" header-align="center"  width="100">
+          
+        </el-table-column>
+        <el-table-column prop="date" label="操作"  width="260"  align="center" header-align="center">
+          <template slot-scope="scope">
+            <div class="optBox">
+              <div class="borderBox" v-if="scope.row.off||scope.row.state!=1" ><span class="hasDel">职位已失效</span></div>
+              <div class="borderBox"  v-else-if="scope.row.has_delivery"><span class="has_delivery">已投递</span></div>
+              <div class="borderBox" v-else-if="scope.row.has_delivery_company" ><span class="hasDel">已投递过该公司</span></div>
+              <div class="borderBox" v-else-if="scope.row.companyDetail.id == jobcid" ><span class="hasDel">我发布的职位</span></div>
+              <button class="delivery_btn" v-else @click.stop="td_resume(scope)"><s></s>投递</button>
+              <el-popconfirm 
+                confirm-button-text='删除'
+                cancel-button-text='取消'
+                icon="el-icon-info"
+                icon-color="red"
+                confirm-button-type="danger"
+                title="确定要删除该职位？" 
+                class="confirmTip" 
+                popper-class="confirmDel"
+                @confirm="cancelCollect(scope.row,'job')">
+                <button slot="reference" size="small" class="del_btn" @click.stop=""></button>
+              </el-popconfirm>
+              
+            </div>
+          </template>
+        </el-table-column>
+        <template slot="empty" style="border: 0px;">
+          <div class="noData" v-show="noData_post">
+            <div class="nodata_img"><img src="{#$templets_skin#}images/job/collect_nodata.png" alt=""></div>
+            <p>暂无{{showTab == 'post' ? '收藏' : '关注'}}记录</p>
+            <div class="allDataNone" v-if=" noDataAll_post">
+              <p>立即看看感兴趣的{{showTab == 'post' ? '职位' : '公司'}}吧</p>
+              <a :href="'{#getModuleConfig module='job' key='channelDomain'#}/'+(showTab=='post'?'job-list.html':'company-list.html')" class="btn_link" target="_blank">查看{{showTab == 'post' ? '职位' : '公司'}}</a>
+            </div>
+          </div>
+        </template>
+      </el-table>
+      <div class="tableBottom fn-clear" v-if="!noData_post">
+        <div class="lOptBox fn-left">
+          <el-checkbox label="全选" v-model="selectAllb" @change="selectAll()" class="selectAll"></el-checkbox>
+          <el-button  round size="small" class="pldel_btn" @click="hasChosedItem.length>0?plDelPost():clearInvalid()"><s></s>{{hasChosedItem.length>0?"批量删除":"清除失效"}}</el-button>
+          <button type='text' class="pltd_btn disabled" @click="plDelivery"><s></s>批量投递</button>
+        </div>
+        <div class="pageBox fn-right">
+          <el-pagination
+          :hide-on-single-page="true"
+          background
+          layout="prev, pager, next"
+          :page-size="10"
+          prev-text="上一页"
+          next-text="下一页"
+          @current-change="changePage"
+          :total="totalCount_post">
+          </el-pagination>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- 企业收藏 -->
+  <div class="contentBox" v-show="showTab == 'company'">
+    <div class="tableConBox">
+      <template>
+
+        <el-table class="tableBox" :data="companyCollections" style="width: 100%" key='table1' v-loading="isload_post" @row-click="gotoLink">
+  
+          <el-table-column prop="date" label="公司信息">
+            <template slot-scope="scope">
+              <div class="companyInfo">
+                <div class="clogo"><img :src="scope.row.logo_url" alt=""></div>
+                <div class="cInfo">
+                  <h4>{{scope.row.title}}</h4>
+                  <p><span>{{scope.row.nature}}</span><em
+                      v-if="scope.row.enterprise_type">|</em><span>{{scope.row.scale}}</span><em
+                      v-if="scope.row.scale">|</em><span>{{scope.row.industry[scope.row.industry.length - 1]}}</span>
+                  </p>
+                </div>
+              </div>
+  
+            </template>
+          </el-table-column>
+          <el-table-column prop="date" label="地区" align="center" header-align="center" width="200">
+            <template slot-scope="scope">
+              <div class="postAddr">
+                {{scope.row.addr ? scope.row.addr.join(' ') :scope.row.addrName}}
+              </div>
+            </template>
+          </el-table-column>
+  
+          <el-table-column prop="date" align="center" header-align="center" label="招聘动态">
+            <template slot-scope="scope">
+              <div class="companyCount">
+                <span class="salary">平均薪资 <b>{{scope.row.salary_avg}}</b></span><em>|</em><span
+                  class="job">在招职位{{scope.row.pcount}}</span>
+              </div>
+            </template>
+          </el-table-column>
+  
+          <el-table-column prop="date" align="center" header-align="center" width="80">
+            <template slot-scope="scope">
+              <div class="optBox">
+                <el-popconfirm confirm-button-text='删除' cancel-button-text='取消' icon="el-icon-info" icon-color="red"
+                  confirm-button-type="danger" title="确定要删除该公司？" class="confirmTip"
+                  @confirm="cancelCollect(scope.row,'company')">
+                  <button slot="reference" size="small" class="del_btn" @click.stop.prevent></button>
+                </el-popconfirm>
+              </div>
+            </template>
+          </el-table-column>
+  
+          <template slot="empty" style="border: 0px;">
+            <div class="noData" v-show="noData_company">
+              <div class="nodata_img"><img src="{#$templets_skin#}images/job/collect_nodata.png" alt=""></div>
+              <p>暂无{{showTab == 'post' ? '收藏' : '关注'}}记录</p>
+              <div class="allDataNone" v-if=" noDataAll_company">
+                <p>立即看看感兴趣的{{showTab == 'post' ? '职位' : '公司'}}吧</p>
+                <a :href="'{#getModuleConfig module='job' key='channelDomain'#}/'+(showTab=='post'?'job-list.html':'company-list.html')" class="btn_link" target="_blank">查看{{showTab == 'post' ? '职位' : '公司'}}</a>
+              </div>
+            </div>
+          </template>
+        </el-table>
+        <div class="tableBottom fn-clear">
+          
+          <div class="pageBox fn-right">
+            <el-pagination
+            :hide-on-single-page="true"
+            background
+            layout="prev, pager, next"
+            :page-size="10"
+            prev-text="上一页"
+            next-text="下一页"
+            @current-change="changePage"
+            :total="totalCount_company">
+            </el-pagination>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- 提示弹窗 -->
+  <div class="popConfirmBox" v-if="popConfirm.show">
+    <div class="popConfirm_mask" v-show="popConfirm.show"></div>
+    <div :class="'popConfirm ' + popConfirm.cls" v-show="popConfirm.show" :style="'width:' +(popConfirm.width ? popConfirm.width : 390)+'px;height:' +(popConfirm.height ? popConfirm.height : 180)+'px;' ">
+      <a href="javascript:;" class="btn_close" @click="popConfirm.show = false;"></a>
+      <div class="pop_title" v-html="popConfirm.title"></div>
+      <p v-if="popConfirm.tip" v-html="popConfirm.tip"></p>
+      <div class="btns_group">
+        <button v-for="btn in popConfirm.btns" :class="btn.type + '_btn'" :style="'background:'+btn.bgColor+';'" @click="btn.fn()">{{btn.text}}</button>
+      </div>
+    </div>
+  </div>
+  <!-- 创建简历弹窗 -->
+  <div class="sendpop">
+    <div class="s-certificate" :style="userResume.work_jl&&userResume.work_jl.length==0||userResume.education&&userResume.education.length==0?'height:150px':'height:180px'">
+      <img src="{#$templets_skin#}images/job/close_icon.png" class="ss-close" @click="closePopFn">
+      <div class="ss-title">
+        <img src="{#$templets_skin#}images/job/warning_icon.png">
+        <p>您还没有创建简历</p>
+      </div>
+      <div class="ss-text">
+        <p>简历是求职第一步，优质的简历才能更快找到好工作！<br>请认真填写哦
+        </p>
+      </div>
+      <div class="ss-btn">
+        <div class="cancel" @click="closePopFn">暂不创建</div>
+        <a class="certificate" href="{#$member_userDomain#}/job-resume.html">立即创建简历</a>
+      </div>
+    </div>
+  </div>
+  <!-- 失效弹窗 -->
+  <div class="invalidPop">
+    <div class="s-invalid">
+      <img src="{#$templets_skin#}images/job/close_icon.png" class="ss-close" @click="closePopFn">
+      <div class="ss-title">
+        <img src="{#$templets_skin#}images/job/warning_icon.png">
+        <p>该职位审核中</p>
+      </div>
+      <div class="ss-text">
+        <p>该职位内容有改动，等待平台审核中</p>
+      </div>
+      <div class="ss-btn">
+        <div class="certificate" @click="closePopFn">好的，我知道了</div>
+      </div>
+    </div>
+  </div>
+  <!-- 多个简历弹窗 -->
+  <div class="moreResume">
+    <div class="mr-content">
+      <img src="{#$templets_skin#}images/job/close_icon.png" class="mr-close">
+      <div class="mr-title">
+        <div>
+          <img src="{#$templets_skin#}images/job/warning_icon.png">
+          <p>默认简历<span>个人简历1？</span>正在审核中</p>
+        </div>
+        <p>请稍后尝试</p>
+      </div>
+      <div class="mr-btn">
+        <div class="change">更换简历</div>
+        <div class="close">好的</div>
+      </div>
+    </div>
+    <div class="mr-select">
+      <img src="{#$templets_skin#}images/job/close_icon.png" class="mr-close">
+      <p class="mrs-title">请选择简历后投递</p>
+      <div class="mrs-select">
+        <span>投递简历：</span>
+        <div class="mrs-input">
+          <input type="text" placeholder="请选择简历" readonly>
+          <i></i>
+          <ul></ul>
+        </div>
+      </div>
+      <div class="mrs-btn">
+        <div class="cancel">取消</div>
+        <div class="confirm">确认投递</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>

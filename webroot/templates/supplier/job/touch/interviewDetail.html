@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>面试详情</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/invitationDetail.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var id = '{#$smarty.get.id#}'; //面试id
+        var company_all_addr = '{#json_encode($company_all_addr)#}'
+        var type = '{#$smarty.get.type#}'
+    </script>
+</head>
+<body>
+    <div class="page" id="page" v-cloak >
+        <div class="header alignLeft">
+            <!-- ,{'white_arr':infoType === 1 && !popInfoDetail.invitation_state} -->
+            <div :class="['header-l',{'white_arr':invitationDetail.state == 1 && invitationDetail.stating && (new Date().valueOf() <= (invitationDetail.date * 1000)) }]">
+                <a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+            </div>
+            <div class="header-address">
+                <span></span>
+            </div>
+
+        </div>
+        <div class="bg_blue" v-if="invitationDetail.state == 1 && invitationDetail.stating && (new Date().valueOf() <= (invitationDetail.date * 1000))"></div>
+        <div class="bg_ligntblue" v-else-if="(invitationDetail.state === 3 || invitationDetail.state === 4) || (invitationDetail.state == 1 && (new Date().valueOf() > (invitationDetail.date * 1000)))"></div>
+        <div class="bg_grey" v-else></div>
+        <div :class="['pageCon' ]" v-if="invitationDetail ">
+            <div class="invitationStateBox">
+                <!-- 待面试 -->
+                <div class="invitationState" v-if="invitationDetail.state == 1 && invitationDetail.stating && (new Date().valueOf() <= (invitationDetail.date * 1000))">
+                    <div class="lText">
+                        <h2>待面试</h2>
+                        <p v-html="timeStrToDate(invitationDetail.date,1)"></p>
+                    </div>
+                    <div class="resolve_btnBox">
+                        <a href="javascript:;" class="btn_resolve btn_remark"  @click="showSlidePop = true; showType='marked'" >标注</a>
+                        <a href="javascript:;" class="btn_resolve" @click="showSlidePop = true; showType = 'changeTime'">更改时间</a>
+                    </div>
+
+                </div>
+
+                <!-- 超时 -->
+                <div class="invitationState invitation_state0" v-else-if="invitationDetail.state == 1 && invitationDetail.stating  && (new Date().valueOf() > (invitationDetail.date * 1000))">
+                    <div class="lText">
+                        <h2>面试记录</h2>
+                        <p>该面试时间已过，暂未标注处理</p>
+                    </div>
+                    <div class="resolve_btnBox">
+                        <a href="javascript:;" class="btn_resolve" @click="showSlidePop = true; showType='marked'">面试标注</a>
+                    </div>
+
+                </div>
+
+                <!-- 沟通 -->
+                <div class="invitationState invitation_state0" v-else-if="invitationDetail.state === 3 ">
+                    <div class="lText">
+                        <h2>沟通offer</h2>
+                        <p>已通过面试，沟通中</p>
+                    </div>
+                    <div class="resolve_btnBox">
+                        <a href="javascript:;" class="btn_resolve" @click="showSlidePop = true; showType='marked'">更改状态/标注</a>
+                    </div>
+
+                </div>
+                <div class="invitationState invitation_state0" v-else-if=" invitationDetail.state === 4  && invitationDetail.rz_state != 2">
+                    <template v-if="invitationDetail.rz_date * 1000 > (new Date().valueOf())">
+                        <div class="lText">
+                            <h2>待入职</h2>
+                            <p>入职时间：<span v-html="timeStrToDate(invitationDetail.rz_date,2)"></span><a href="javascript:;" class="reInvite"  @click="showSlidePop= true; showType = 'ruzhi'" v-if="pageFrom"> 更改/取消></a></p>
+                        </div>
+                        <div class="resolve_btnBox" v-if="!pageFrom">
+                            <a href="javascript:;" class="btn_resolve clock_btn" @click="showSlidePop= true; showType = 'ruzhi'">更改入职信息</a>
+                        </div>
+                        <div class="resolve_btnBox" v-else>
+                            <a href="javascript:;" class="btn_resolve " @click="showSlidePop = true; showType='marked'">面试状态/标注</a>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <div class="lText">
+                            <h2>入职记录</h2>
+                            <p>入职时间：<span v-html="timeStrToDate(invitationDetail.rz_date,2)"></span><a href="javascript:;" class="reInvite"  @click="showSlidePop= true; showType = 'ruzhi'" v-if="pageFrom"> 更改/取消></a></p>
+                        </div>
+                        <div class="resolve_btnBox" v-if="!pageFrom">
+                            <a href="javascript:;" class="btn_resolve clock_btn" @click="showSlidePop= true; showType = 'ruzhi'">更改入职信息</a>
+                        </div>
+                        <div class="resolve_btnBox" v-else>
+                            <a href="javascript:;" class="btn_resolve " @click="showSlidePop = true; showType='marked'">面试状态/标注</a>
+                        </div>
+                    </template>
+
+                </div>
+                <div class="invitationState  invitation_state0" v-else>
+                    <div class="lText" v-if="invitationDetail.state === 6 || invitationDetail.state === 4">
+                        <h2>面试已取消</h2>
+                        <p v-if="invitationDetail.refuse_author">{{invitationDetail.refuse_author == 'company' ? '您' : '对方'}}取消了面试{{invitationDetail.refuse_msg ? '(理由：'+invitationDetail.refuse_msg+')': ''}}</p>
+                        <p v-else>对方未及时参加面试</p>
+                    </div>
+                    <template  v-if="invitationDetail.state === 5">
+                        <div class="lText">
+                            <h2>不合适</h2>
+                            <p>已面试，已标记不合适</p>
+                        </div>
+                        <div class="resolve_btnBox">
+                            <a href="javascript:;" class="btn_resolve btn_grey" @click="showSlidePop = true; showType='marked'">更改状态/标注</a>
+                        </div>
+                    </template>
+                    
+                </div>
+            </div>
+
+            <!-- 面试人的简历信息 -->
+            <div class="resumeInfoBox" v-if="invitationDetail && invitationDetail.resume">
+                <a :href="'{#getModuleConfig module='job' key='channelDomain'#}/resume?id=' + invitationDetail.resume.id" class="peopleInfo toMini" data-module="job" data-temp="resume" :data-id="invitationDetail.resume.id">
+                    <div class="photo"><img :src="invitationDetail.resume.photo_url" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                    <div class="peopleDetail">
+                        <h3>{{invitationDetail.resume.name}}</h3>
+                        <p><span>{{invitationDetail.resume.age}}岁</span><em v-if="invitationDetail.resume.age">|</em><span>{{invitationDetail.resume.edu_tallest_name}}</span><em v-if="invitationDetail.resume.edu_tallest_name">|</em><span>{{invitationDetail.resume.work_jy_name}}</span><em v-if="invitationDetail.resume.work_jy_name">|</em><span>{{invitationDetail.resume.edu_school}}</span></p>
+                    </div>
+                </a>
+                <div class="postInfo">
+                    <ul>
+                        <li>
+                            <label for="">面试岗位：</label>
+                            <a class="con toMini" :href="'{#getModuleConfig module='job' key='channelDomain'#}/job?id=' + invitationDetail.job.id" data-module="job" data-temp="job" :data-id="invitationDetail.job.id">
+                                <div class="salary"><b>{{ invitationDetail.job.mianyi ?'面议' : invitationDetail.job.show_salary}}</b><span v-if="invitationDetail.job.dy_salary > 12">· {{invitationDetail.dy_salary}}薪</span></div>
+                                <h3>{{invitationDetail.job.title}}</h3>
+                            </a>
+                        </li>
+                        <!-- <li class="noarr">
+                            <label for="">期望薪资：</label>
+                            <div class="con"><b class="salary">{{invitationDetail.resume.show_salary}}</b></div>
+                        </li> -->
+                        <li :class="[{'remark':invitationDetail.state == 3 },{'remark_black':invitationDetail.state == 4 }]"  @click="showSlidePop = true ; showType = 'showMark'; remark_msg = invitationDetail.remark.remark_invitation;remark_resume = invitationDetail.remark.remark_resume" >
+                            <label for="">面试备注：</label>
+                            <div class="con">
+                                <p v-if="invitationDetail.remark && invitationDetail.remark.remark_invitation">{{invitationDetail.remark.remark_invitation}}</p>
+                                <p v-else style="opacity: .5; color: #212121;">暂无面试标注</p>
+                            </div>
+                        </li>
+                        <li :class="[{'remark':invitationDetail.state == 1 && invitationDetail.stating},{'remark_black':invitationDetail.state == 4 }]" v-if="invitationDetail.remark && invitationDetail.remark.remark_resume" @click="showSlidePop = true ; showType = 'showMark';remark_msg = invitationDetail.remark.remark_invitation;remark_resume = invitationDetail.remark.remark_resume">
+                            <label for="">简历备注：</label>
+                            <div class="con">
+                                <p >{{invitationDetail.remark.remark_resume}}</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 面试地点 -->
+            <div class="interview_info">
+                <ul>
+                    <li v-if="invitationDetail.state > 1 || (new Date().valueOf() > (invitationDetail.date * 1000))">
+                        <label for="">面试时间：</label>
+                        <div class="con">
+                            <p><span v-html="timeStrToDate(invitationDetail.date,1)"></span><a href="javascript:;" class="reInvite" @click="showSlidePop = true; showType = 'changeTime'"  v-if="invitationDetail.state == 1 && invitationDetail.stating  && (new Date().valueOf() > (invitationDetail.date * 1000))"> 重约时间></a></p>
+                        </div>
+                    </li>
+                    <li>
+                        <label for="">面试地点：</label>
+                        <div class="con">
+                            <p>{{invitationDetail.place}}</p>
+                        </div>
+                    </li>
+                    <li v-if="invitationDetail.notice">
+                        <label for="">面试须知：</label>
+                        <div class="con">
+                            <p>{{invitationDetail.notice}}</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="bottomBox bottomFixed"  v-if="invitationDetail && invitationDetail.resume">
+                <a :class="['callPhone',{'hasCancel':invitationDetail.state == 2 || !invitationDetail.stating || invitationDetail.state == 5 || invitationDetail.state == 6 }]" :href="'tel:' + invitationDetail.resume.phone" >电话联系</a>
+            </div>
+        </div>
+
+        <!-- 弹窗 -->
+        <div class="popContainer">
+            <div class="mask_pop" v-if="showSlidePop" @click="showSlidePop = false"></div>
+
+            <!-- 修改面试时间 -->
+            <div :class="['bottomPopBox changeInterviewPop',{'showPop':showSlidePop && showType == 'changeTime'}]" >
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header">
+                    <h4>{{(new Date().valueOf() > (invitationDetail.date * 1000)) ? '重约面试时间' : '修改面试时间'}}</h4>
+                    <p class="errTip">务必与求职者达成一致后修改</p>
+                </div>
+                <div class="pop_con">
+                    <div class="leftDate">
+                        <ul>
+                            <li v-for="(item,ind) in dateArr" :class="{'on_chose':dateChose.day == item.dateStr}"  @click="dateChose.day = item.dateStr" v-html="timeStrToDate(item.dateStr)"></li>
+                        </ul>
+                    </div>
+                    <div class="timeChose">
+                        <ul>
+                            <li v-for="item in hourArr" :class="{'on_chose':item.hour === dateChose.hour}" @click="dateChose.hour = item.hour" v-if="checkTime(item.hour)">{{item.hourText}}</li>
+                        </ul>
+                        <ul>
+                            <li v-for="item in minArr" :class="{'on_chose':item.min === dateChose.min}" @click="dateChose.min = item.min"  v-if="checkTime('',item.min)">{{item.minText}}</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" :class="['btn_sure',{'disabled' : dateChose.min == '' && dateChose.hour == '' && dateChose.day == ''}]" @click="changeTime">确定修改</a>
+                </div> 
+            </div>
+
+
+            <!-- 添加标注 -->
+            <div :class="['bottomPop markBottom' ,{'showPop':showSlidePop && showType=='marked'}]">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header">
+                    <h4 v-if="remarkForm.markState != 6">面试备注<span>(仅自己可见)</span></h4>
+                    <h4 v-else>取消面试<span>(将通知求职者)</span></h4>
+                </div>
+                <div class="pop_con">
+                    <div class="state_invitation">
+                        <ul class="state_ul">
+                            <li v-for="(item,ind) in markArr"
+                                v-if="((new Date().valueOf() <= (invitationDetail.date * 1000)) || item.value !== 6) "
+                                :class="['state_' + item.value,{'on_chose':remarkForm.markState == item.value}]"
+                                @click="remarkForm.markState = item.value ">
+                                <div class="icon"><img
+                                        :src="'{#$templets_skin#}images/icon' + ind + (remarkForm.markState == item.value ? '_1':'') +'.png'"
+                                        alt=""></div>
+                                <p>{{item.labText}}</p>
+                            </li>
+                        </ul>
+
+                        <div class="inputBox" v-if="remarkForm.markState == 4" @click="datePop = true; dateType = 1">
+                            <label for="">添加入职时间<em>(选填)</em></label>
+                            <div class="inp">
+                                <input type="text" readonly
+                                    :value="remarkForm.joinDate ? transTimes(remarkForm.joinDate,2) : ''">
+                            </div>
+                        </div>
+                        <div class="formFields" style="margin-top: .3rem;" v-if="remarkForm.markState != 6 ">
+                            <van-field v-model="remarkForm.markText" rows="2" autosize type="textarea" maxlength="50"
+                                placeholder="可添加备注，最多50个字" show-word-limit />
+                        </div>
+                        <p class="errTip" v-if="remarkForm.markState == 6">务必先联系求职者，达成一致后才可取消</p>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" :class="['btn_sure',{'red_btn':remarkForm.markState == 6}]"
+                        @click="updateRemark()">{{remarkForm.markState == 6 ? '确定取消' : '确定'}}</a>
+                </div>
+            </div>
+
+            <!-- 更新标注 -->
+            <div :class="['bottomPop markBottom smBottomPop ' ,{'showPop':showSlidePop && (showType=='showMark')}]">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header">
+                    <h4>人才备注<span>(可编辑历史备注，仅我可见)</span></h4>
+                </div>
+                <div class="pop_con">
+                    <div class="state_invitation">
+                        <div class="invitation_reamrk remarkBox">
+                            <div class="labelBox">
+                                <h3>面试备注</h3>
+                                <p v-if="invitationDetail && invitationDetail.remark && invitationDetail.remark.remark_invitation_time">{{timeStrDate(invitationDetail.remark.remark_invitation_time,4).replace(/-/g,'/')}}</p>
+                            </div>
+                            <div class="formFields" >
+                                <van-field v-model="remark_msg" rows="2" autosize type="textarea" maxlength="50"
+                                    placeholder="可添加备注，最多50个字" show-word-limit />
+                            </div>
+                        </div>
+                        <div class="resume_reamrk remarkBox">
+                            <div class="labelBox">
+                                <h3>简历备注</h3>
+                                <p  v-if="invitationDetail && invitationDetail.remark && invitationDetail.remark.remark_resume_time">{{timeStrDate(invitationDetail.remark.remark_resume_time,4).replace(/-/g,'/')}}</p>
+                            </div>
+                            <div class="formFields" >
+                                <van-field v-model="remark_resume" rows="2" autosize type="textarea" maxlength="50"
+                                    placeholder="可添加备注，最多50个字" show-word-limit />
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" :class="['btn_sure']"
+                        @click="updateOldRemark()">确定</a>
+                </div>
+            </div>
+
+            <!-- 更改入职信息 -->
+            <div :class="['bottomPop ruzhiPop',{'showPop':showSlidePop && showType == 'ruzhi'}]">
+                <a href="javascript:;" class="close_pop" @click="showSlidePop = false"></a>
+                <div class="pop_header">
+                    <h4>入职信息<span>(仅供招聘方快速查阅入职安排）</span></h4>
+                </div>
+                <div class="pop_con">
+                    <ul class="labBox">
+                        <li v-for="item in stateArr" @click="ruzhiForm.rz_state = item.value" :class="['rzState_' + item.value,{'on_chose':item.value == ruzhiForm.rz_state}]">{{item.label}}</li>
+                    </ul>
+                    <div class="state_invitation">
+
+                        <div class="inputBox"  @click="datePop = true; dateType = 2">
+                            <label for="">入职时间：</label>
+                            <div class="inp" >
+                                <input type="text" readonly  :value="ruzhiForm.rz_date ? transTimes(ruzhiForm.rz_date,2) : ''">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pop_bottom">
+                    <a href="javascript:;" :class="['btn_sure']" @click="updateRemark(1)">确定</a>
+                </div>
+            </div>
+
+            
+            <!-- 时间选择 -->
+            <div class="date_mask mask_pop zIndex" v-show="datePop"></div>
+            <div :class="['bottomPop  datePicker',{'showPop':datePop}]">
+                <van-datetime-picker @confirm="sureDate" @cancel="hideDatePop" :min-date="minDate" round :title="(dateType === 1 ? '入职时间':'选择时间')" type="date" :value="new Date(dateType === 1 ? remarkForm.joinDate * 1000 : ruzhiForm.rz_date * 1000)"></van-datetime-picker>
+            </div>
+
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/invitationDetail.js?v={#$cfg_staticVersion#}"></script>
+</html>

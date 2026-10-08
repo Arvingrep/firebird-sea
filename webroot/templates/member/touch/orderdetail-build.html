@@ -1,0 +1,271 @@
+
+{#$stateInfo = ""#}
+{#if $detail_orderstate == 0#}
+	{#$stateInfo = $langData['siteConfig'][9][22]#}   {#* 未付款  *#}
+{#elseif $detail_orderstate == 1#}
+	{#$stateInfo = $langData['siteConfig'][41][36]#}   {#* 等待发货  *#}
+{#elseif $detail_orderstate == 3#}
+	{#$stateInfo = $langData['siteConfig'][9][37]#}   {#* 交易成功  *#}
+{#elseif $detail_orderstate == 6#}
+	{#if $detail_retState == 1#}
+		{#if $detail_expDate == 0#}
+			{#$stateInfo = $langData['siteConfig'][9][43]#}   {#* 卖家还未发货，申请退款中  *#}
+		{#else#}
+			{#$stateInfo = $langData['siteConfig'][9][42]#}   {#* 卖家已发货，申请退款中  *#}
+		{#/if#}
+	{#else#}
+		{#$stateInfo = $langData['siteConfig'][9][41]#}   {#* 已发货，等待收货  *#}
+	{#/if#}
+{#elseif $detail_orderstate == 7#}
+	{#$stateInfo = $langData['siteConfig'][9][34]#}   {#* 退款成功  *#}
+{#elseif $detail_orderstate == 10#}
+	{#$stateInfo = $langData['siteConfig'][6][15]#}   {#* 关闭  *#}
+{#/if#}
+	<dl class="info-section">
+		<dt>
+			{#* 当前订单状态  *#}
+			<span class="info-title">{#$langData['siteConfig'][19][318]#}：</span><em class="info-text">{#$stateInfo#}</em>
+			{#if $detail_orderstate == 7#}
+			&nbsp;&nbsp;{#$langData['siteConfig'][19][42]#}：{#$detail_retOkdate|date_format:"%Y-%m-%d %H:%M:%S"#}
+			{#/if#}
+			{#* 退款时间  *#}
+		</dt>
+
+		<!-- {#* 未付款 *#} -->
+		{#if $detail_orderstate == 0#}
+		<dd class="last">
+			<p>{#$langData['siteConfig'][20][61]#}</p> {#* 请您尽快付款，若未及时付款，系统将自动取消订单！ *#}
+		</dd>
+		{#/if#}
+
+		<!-- {#* 已付款 *#} -->
+		{#if $detail_orderstate == 1#}
+		<dd class="last">
+			<p>{#$langData['siteConfig'][20][62]#}</p> {#* 卖家发货前，您支付的钱款不会被打给卖家，请耐心等待卖家发货！ *#}
+		</dd>
+		{#/if#}
+
+
+		<!-- {#* 确认收货 || 退款成功 *#} -->
+		{#if $detail_orderstate == 6 || ($detail_orderstate == 7 && $detail_paydate != 0)#}
+		<dd class="last">
+
+			{#if ($detail_orderstate == 7 && $detail_paydate != 0) || $detail_retState == 1#}
+			<ul class="retUl">
+				<li><label>{#$langData['siteConfig'][19][43]#}：</label>{#$detail_retType#}</li> {#* 退款原因  *#}
+				<li><label>{#$langData['siteConfig'][19][44]#}：</label>{#$detail_retNote#}</li> {#* 退款说明  *#}
+				{#if $detail_retPics|@count > 0#}
+				<li class="retPics"><label>{#$langData['siteConfig'][19][45]#}：</label>  {#* 退款凭证  *#}
+					<div class="picbox">
+					{#foreach from=$detail_retPics item=pics key=k#}
+						<a href="{#$pics.path#}" target="_blank"><img src="{#changeFileSize url="{#$pics.path#}" type="small"#}" /></a>
+					{#/foreach#}
+					</div>
+				</li>
+				{#/if#}
+				<li><label>{#$langData['siteConfig'][19][46]#}：</label>{#$detail_retDate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>  {#* 申请时间  *#}
+			</ul>
+			{#/if#}
+
+			{#if $detail_retSnote != ""#}
+			<ul class="retUl store">
+				<li><label>{#$langData['siteConfig'][19][47]#}：</label>{#$detail_retSnote#}</li>  {#* 卖家回复  *#}
+				{#if $detail_retSpics|@count > 0#}
+				<li class="retPics"><label>{#$langData['siteConfig'][19][48]#}：</label>  {#* 回复凭证  *#}
+	          		<div class="picbox">
+	  					{#foreach from=$detail_retSpics item=pics key=k#}
+	  					<a href="{#$pics.path#}" target="_blank"><img src="{#changeFileSize url="{#$pics.path#}" type="small"#}" /></a>
+	  					{#/foreach#}
+	          		</div>
+				</li>
+				{#/if#}
+				<li><label>{#$langData['siteConfig'][19][49]#}：</label>{#$detail_retSdate|date_format:"%Y-%m-%d %H:%M:%S"#}</li>  {#* 回复时间  *#}
+			</ul>
+			{#/if#}
+
+			<div class="operation">
+				{#if $detail_orderstate == 6 && $detail_expDate != 0#}
+				<small>{#$langData['siteConfig'][19][707]#}：</small>{#* 或者  *#}<a class="btn sh" href="javascript:;">{#$langData['siteConfig'][6][45]#}</a>{#* 确认收货  *#}
+				{#elseif $detail_retOkdate != 0#}
+				<!-- <a class="btn" href="javascript:;">退款去向</a> -->
+				{#/if#}
+			</div>
+		</dd>
+		{#/if#}
+
+	</dl>
+
+
+	{#if ($detail_orderstate == 3 || $detail_orderstate == 4 || $detail_orderstate == 6 || $detail_orderstate == 7) && $detail_expDate != 0#}
+	<div class="info-block">
+		<div class="info-title">{#$langData['siteConfig'][19][62]#}</div>   {#* 快递信息  *#}
+		<div class="info-content">
+			<dl><dt>{#$langData['siteConfig'][19][63]#}：</dt><dd>{#$detail_expCompany#}</dd></dl>   {#* 快递公司  *#}
+			<dl><dt>{#$langData['siteConfig'][19][64]#}：</dt><dd>{#$detail_expNumber#}</dd></dl>   {#* 快递单号  *#}
+			<dl><dt>{#$langData['siteConfig'][19][65]#}：</dt><dd>{#$detail_expDate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>   {#* 发货时间  *#}
+			<dl>
+				<dt>{#$langData['siteConfig'][19][66]#}：</dt>   {#* 物流跟踪  *#}
+				<dd><a href="https://www.baidu.com/s?wd={#$detail_expCompany#} {#$detail_expNumber#}" target="_blank" style="color:#027cff;">{#$langData['siteConfig'][6][94]#}</a></dd>   {#* 点击查看详细  *#}
+			</dl>
+		</div>
+	</div>
+	{#/if#}
+
+
+	{#* 申请退款 *#}
+	{#if $detail_orderstate == 1 || ($detail_orderstate == 2 && $detail_paydate != 0) || ($detail_orderstate == 6 && $detail_retState == 0)#}
+	<div class="layer">
+		<div class="top fn-clear">
+      	<div class="top-l" id="typeback"><a href="javascript:;">{#$langData['siteConfig'][6][117]#}</a></div>    {#* 返回  *#}
+			<div class="top-c">{#$langData['siteConfig'][6][66]#}</div>    {#* 申请退款  *#}
+			<div class="top-r"></div>
+    	</div>
+		<div class="fn-clear">
+		    <div class="imgbox">
+		    	<div class="addimg">
+			        <ul class="fn-clear noimg" id="litpic">
+			        	<li class="add"><div id="filePicker" class="btn"></div></li>
+			        </ul>
+		    	</div>
+		    </div>
+		    <p class="uploader-btn"></p>
+		</div>
+    <dl class="inpbox">
+    	<dt><span>{#$langData['siteConfig'][19][43]#}</span></dt>    {#* 退款原因  *#}
+  		<dd class="selgroup">
+    		<select id="type" name="type">
+				<option value="">{#$langData['siteConfig'][7][2]#}</option>    {#* 请选择  *#}
+				<option value="{#$langData['siteConfig'][19][197]#}">{#$langData['siteConfig'][19][197]#}</option>    {#* 缺货  *#}
+				<option value="{#$langData['siteConfig'][19][198]#}">{#$langData['siteConfig'][19][198]#}</option>    {#* 未按约定时间发货  *#}
+				<option value="{#$langData['siteConfig'][19][199]#}">{#$langData['siteConfig'][19][199]#}</option>    {#* 协商一致退款  *#}
+				<option value="{#$langData['siteConfig'][19][200]#}">{#$langData['siteConfig'][19][200]#}</option>    {#* 拍错/多拍/不想要  *#}
+				<option value="{#$langData['siteConfig'][19][201]#}">{#$langData['siteConfig'][19][201]#}</option>    {#* 其他  *#}
+	        </select>
+    	</dd>
+  		<input type="hidden" name="typeid" id="typeid" value="">
+    </dl>
+    <dl class="inpbox">
+    	<dt><span>{#$langData['siteConfig'][19][44]#}</span></dt>    {#* 退款说明  *#}
+    	<dd><textarea placeholder="" name="" class="textarea" id="textarea"></textarea></dd>
+    </dl>
+	<div class="submit">
+		<a href="javascript:;" id="submit">{#$langData['siteConfig'][6][68]#}</a>    {#* 提交申请  *#}
+	</div>
+	<div class="error"></div>
+	</div>
+	{#/if#}
+
+  <div class="info-block">
+    <div class="info-title">{#$langData['siteConfig'][19][54]#}</div>    {#* 联系信息  *#}
+    <div class="info-content">
+    	{#* 收&nbsp;&nbsp;货&nbsp;人  *#}
+    	<dl><dt>{#$langData['siteConfig'][41][37]#}：</dt><dd>{#$detail_username#}</dd></dl>
+
+    	{#* 联系电话  *#}
+    	<dl><dt>{#$langData['siteConfig'][19][56]#}：</dt><dd>{#$detail_usercontact#}</dd></dl>
+
+    	{#* 送货地址  *#}
+    	<dl><dt>{#$langData['siteConfig'][19][57]#}：</dt><dd>{#$detail_useraddr#}</dd></dl>
+
+    	{#* 买家留言  *#}
+    	<dl><dt>{#$langData['siteConfig'][19][58]#}：</dt><dd>{#$detail_note#}</dd></dl>
+    </div>
+  </div>
+
+  <div class="info-block">
+  	<div class="info-title">{#$langData['siteConfig'][19][322]#}</div> {#* 购买信息  *#}
+  	<div class="shop-pro">
+  		{#foreach from=$detail_product item="product"#}
+      <div class="item" data-id="103">
+        <div class="domain fn-clear">
+					{#if $detail_store#}
+					<a href="{#$detail_store['domain']#}" class="name fn-left">{#$detail_store['title']#}</a>
+					{#else#}
+          <a href="javascript:;" class="name fn-left">{#$langData['siteConfig'][19][709]#}</a> {#* 官方直营  *#}
+					{#/if#}
+        </div>
+        <div class="info fn-clear">
+          <div class="imgbox fn-left">
+            <a href="{#getUrlPath service='shop' template='detail' id={#$product.id#}#}"><img src="{#changeFileSize url={#$product.litpic#} type='small'#}" alt=""></a>
+          </div>
+          <div class="txtbox">
+            <div class="title"><p>{#$product.title#}</p><span>{#echoCurrency type='symbol'#}{#$product.price#}</span></div>
+          </div>
+					{#if $detail_orderstate == 1 || ($detail_orderstate == 2 && $detail_paydate != 0) || ($detail_orderstate == 6 && $detail_retState == 0)#}
+          <div class="opbtn">
+            <a href="javascript:;" class="gray apply-refund-link">{#$langData['siteConfig'][9][65]#}</a> {#* 退款  *#}
+          </div>
+					{#/if#}
+					{#if $detail_orderstate == 0#}
+					<div class="opbtn">
+            <a href="{#$detail_payurl#}" class="gray apply-refund-link">{#$langData['siteConfig'][6][14]#}</a> {#* 付款  *#}
+          </div>
+					{#/if#}
+					{#if $detail_orderstate == 3#}
+					<div class="opbtn">
+            <a href="{#getUrlPath service='member' type='user' template='write-comment' module='build' id={#$id#}#}" class="gray apply-refund-link">{#if $detail_common == 1#}{#$langData['siteConfig'][8][2]#}{#else#}{#$langData['siteConfig'][19][365]#}{#/if#}</a> {#* 修改评价  *#}  {#* 评价  *#}
+          </div>
+					{#/if#}
+        </div>
+        <ul class="calculate">
+          <li><span>{#$langData['siteConfig'][19][324]#}</span><em>×{#$product.count#}</em></li> {#* 数量  *#}
+          <li><span>{#$langData['siteConfig'][19][325]#}</span><em>{#echoCurrency type='symbol'#}{#$product.logistic#}</em></li> {#* 运费  *#}
+          {#if $product.discount != 0#}
+  				<li><span>{#$langData['siteConfig'][19][326]#}</span><em>{#echoCurrency type='symbol'#}{#$product.logistic#}</em></li>  {#* 折扣  *#}
+  				{#/if#}
+
+          {#if $detail_orderstate != 0#}
+  					{#if $product.point > 0#}
+            <li><span>{#$cfg_pointName#}{#$langData['siteConfig'][19][327]#}</span><em>-{#echoCurrency type='symbol'#}{#$product.point/$cfg_pointRatio#}</em></li>  {#* 支付  *#}
+  					{#/if#}
+  					{#if $product.balance > 0#}
+						<li><span>{#$langData['siteConfig'][19][328]#}</span><em>-{#echoCurrency type='symbol'#}{#$product.balance#}</em></li>  {#* 余额支付  *#}
+  					{#/if#}
+			{#/if#}
+
+        </ul>
+      </div>
+
+  		{#/foreach#}
+  		<div class="sum">
+  			{#* 实付款  *#}
+  			<div class="right">{#$langData['siteConfig'][19][316]#}：<font class="fn-right">{#echoCurrency type='symbol'#}<strong>{#$detail_totalPayPrice#}</strong></font></span></div>
+  		</div>
+  	</div>
+  </div>
+
+	{#if $detail_store#}
+	<div class="info-block">
+		<div class="info-title">{#$langData['siteConfig'][19][708]#}</div>{#* 商家信息  *#}
+		<div class="info-content">
+			{#* 联&nbsp;&nbsp;系&nbsp;人  *#}
+			<dl><dt>{#$langData['siteConfig'][41][38]#}：</dt><dd>{#$detail_store['people']#}</dd></dl>
+
+			{#* 联系电话  *#}
+			<dl><dt>{#$langData['siteConfig'][19][56]#}：</dt><dd>{#$detail_store['tel']#}</dd></dl>
+
+			{#* 地&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;址  *#}
+			<dl><dt>{#$langData['siteConfig'][41][39]#}：</dt><dd>{#$detail_store['address']#}</dd></dl>
+		</div>
+	</div>
+	{#/if#}
+
+
+	<div class="info-block">
+		<div class="info-title">{#$langData['siteConfig'][19][319]#}</div>{#* 订单信息  *#}
+		<div class="info-content">
+			{#* 订单编号  *#}
+			<dl><dt>{#$langData['siteConfig'][19][50]#}：</dt><dd>{#$detail_ordernum#}</dd></dl>
+
+			{#* 下单时间  *#}
+			<dl><dt>{#$langData['siteConfig'][19][51]#}：</dt><dd>{#$detail_orderdate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>
+
+			{#* 付款方式  *#}
+			{#if $detail_paydate != 0#}
+			<dl><dt>{#$langData['siteConfig'][19][52]#}：</dt><dd>{#$detail_paytype#}</dd></dl>
+
+			{#* 付款时间  *#}
+			<dl><dt>{#$langData['siteConfig'][19][53]#}：</dt><dd>{#$detail_paydate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>
+			{#/if#}
+		</div>
+	</div>

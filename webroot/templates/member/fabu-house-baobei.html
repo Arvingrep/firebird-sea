@@ -1,0 +1,118 @@
+
+<style>
+	.w-form dl{margin-bottom:14px;}
+	.w-form .inp{padding:0; height:36px; padding-left:12px;}
+	.w-form .inp[readonly]{background:#F5F5F5; pointer-events:none;}
+	.w-form textarea.inp{width:680px; height:286px; box-sizing:border-box; padding-top:10px; resize:none;}
+	.w-form .inp#tel{box-sizing:border-box; width:269px;}
+	.w-form h4{color:#333; font-size:16px; font-weight:bold; padding-left:40px; margin-bottom:30px; margin-top:32px;}
+	.tip-inline.show{display:inline-block; color:#999;}
+	.showtip .tip-inline.show em{color:#F60;}
+</style>
+
+
+<dl class="fn-clear required">
+	<dt><span>*</span>所属楼盘：</dt>{#* 所属楼盘： *#}
+	<dd>
+		<input type="text" name="loupan" class="inp" id="loupan" size="30" maxlength="50" data-title="" value="{#$loupantitle#}" readonly />
+		<input type="hidden" name="loupanid" class="inp" id="loupanid"  value="{#$loupanid#}" />
+		<span class="tip-inline"></span>
+	</dd>
+</dl>
+<dl class="fn-clear required">
+	<dt><span>*</span>客户姓名：</dt>{#* 客户姓名： *#}
+	<dd>
+		<input type="text" name="username" class="inp" id="customername" size="30" maxlength="50" data-title="请输入客户姓名" placeholder="请输入客户姓名"/>
+		<span class="tip-inline"></span>
+	</dd>
+</dl>
+<dl class="fn-clear required">
+	<dt><span>*</span>客户电话：</dt>{#* 客户电话： *#}
+	<dd>
+		<input type="text" name="usertel" class="inp" id="customertel" size="30" maxlength="50" data-title="请输入客户电话" placeholder="请输入客户电话"/>
+		<span class="tip-inline"></span>
+	</dd>
+</dl>
+<dl class="fn-clear ">
+	<dt><span></span>备注说明：</dt>{#* 备注说明： *#}
+	<dd>
+		<textarea type="text" name="note" class="inp" id="desc" size="30"  data-title="请输入备注说明" placeholder="请输入备注说明"></textarea>
+	</dd>
+</dl>
+
+<!-- 分割线 -->
+<h4>联系方式</h4>
+<dl class="fn-clear required selectGroup showtip">
+	<dt><span>*</span>联系方式</dt>{#* 联系方式 *#}
+	<dd>
+		<span class="areaCode"><i>+86</i><s></s></span>
+		<input type="text" name="tel" class="inp" id="tel" size="30" maxlength="50" readonly placeholder="请输入联系方式" value="{#$userinfo.phone#}"  />
+		<span class="tip-inline">可在<em>经纪人资料</em>中修改</span>
+	</dd>
+</dl>
+<dl class="fn-clear required showtip">
+	<dt><span>*</span>联系人</dt>{#* 联系人 *#}
+	<dd>
+		<input type="text" name="jjr" class="inp" id="jjr" size="30" maxlength="50" value="{#$userinfo.nickname#}"  readonly placeholder="请输入联系人"  />
+
+	</dd>
+</dl>
+
+<script>
+  var userinfo = {
+    phone: '{#$userinfo.phone#}',
+    phoneCheck: {#$userinfo.phoneCheck#}
+  };
+  var detail = {
+    contact: '{#$detail_contact#}'
+  }
+
+</script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.coord.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.autocomplete.min.js"></script>
+<script type="text/javascript">
+	$(function(){
+		var form = $("#fabuForm");
+		$("#submit").click(function(){
+			var stop = false;
+			$(".required").each(function(){
+				var t = $(this);
+				var inp = t.find('input');
+				inp.each(function(){
+					var el = $(this);
+					if(el.val() == ''){
+						alert(el.attr('placeholder'));
+						stop = true;
+						return false;
+					}
+					if(el.attr('name') == 'usertel' || el.attr('name') == 'customertel'){
+						var reg = /^(13[0-9]|14[579]|15[0-3,5-9]|16[6]|17[0135678]|18[0-9]|19[89])\d{8}$/
+						if(!el.val().match(reg)){
+							alert('请输入正确的手机号');
+							stop = true;
+							return false;
+						}
+					}
+				});
+				if(stop) return false;
+			})
+			$.ajax({
+				url: masterDomain+"/include/ajax.php?service=house&action=loupanFenxiaobb",
+				type: "GET",
+				dataType: "jsonp",
+				data:form.serialize(),
+				success: function (data) {
+					alert(data.info);
+					location.href = "{#getUrlPath service='member' type='user' template='house_baobei'#}";
+				},
+				error:function () {
+					alert(data.info)
+				}
+			})
+			if(stop) return false;
+		})
+		$(".showtip").click(function(){
+			$(".tip-inline").addClass('show')
+		})
+	})
+</script>

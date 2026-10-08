@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>添加房源</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all"
+        href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/datetimepicker.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/base_info.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/addHouse.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}',
+            staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = '{#$cfg_hideUrl#}';
+        var cookiePre = '{#$cfg_cookiePre#}',
+            cfg_clihost = '{#$cfg_clihost#}';
+        var templets = '{#$templets_skin#}';
+
+        var buildtypenames = ['低层', '高层', '小高层', '联排别墅', '公寓']; //建筑类型
+        // var salestatenames = ['新盘待售','在售','尾盘','售罄']; //销售状态
+        // var existingnames = ['现房','期房']; //销售状态
+        var salestate = 0, //销售状态
+            existing = 0, //楼盘状态
+            buildtype = []; //物业类型
+        var thumbSize = '{#$thumbSize#}',
+            thumbType = "{#$thumbType#}", //缩略图配置
+            addrid = '{#$addrid#}',
+            addrListArr = '{#$addrListArr#}',
+            mapCity = "{#$mapCity#}",
+            subwayCity = 0;
+        var currid = 9;
+        var modelType = 'house';
+        var idArr = (window.location.href).split('?id=')
+        var id = idArr.length > 1 ? idArr[1] : '';
+        var loupanid = '{#$loupanid#}';
+        var salestatenames = ['公告', '样板间', '社区配套', '周边设施', '现场动态']; //销售状态
+        var allHouseType = JSON.parse('{#json_encode($apartment)#}')||[]; //户型总列表
+        var buildList = JSON.parse('{#json_encode($shapan)#}')||[]; //楼栋列表
+        buildList = buildList.map(item => {
+            if(!item['dyList']){ //单元号初始化
+                item['dyList']=[];
+            }
+            item['houseType']=[];
+            let arr=item.apartment.split(',');
+            allHouseType.map(res=>{
+                if(arr.includes(res.id)){
+                    item['houseType'].push(res); //有此户型，保存
+                }
+            })
+            return item
+        })
+    </script>
+</head>
+
+<body class="w1200">
+    <div id="page">
+        <!-- 头部 -->
+        {#include file="top.html"#}
+        <div class="conbox">
+            {#include file="left.html"#}
+            <!-- 右侧 -->
+            <div class="right_box">
+                <div class="rConBox">
+                    <h3 v-if="article_id==''">添加房源</h3>
+                    <h3 v-else>修改房源</h3>
+                    <div class="formbox huxingFormbox">
+                        <form action="" id="form">
+                            <div class="inpbox required" data-placeholder="请选择楼栋号">
+                                <label><em>* </em>选择楼栋</label>
+                                <div class="inp_div xs_inp selecte_box sel_inp">
+                                    <div class="inp w250">
+                                        <select v-model="buildActive" name="building">
+                                            <option value="" selected="selected" style="color:#B1B7CC">
+                                                请选择
+                                            </option>
+                                            <option :value="item.name" v-for="(item,index) in buildListData" :key="index">
+                                                {{item.name}}#
+                                            </option>
+                                        </select>
+                                        <s></s>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox required" data-placeholder="请选择单元号" v-if="buildItem">
+                                <label><em>* </em>单元号</label>
+                                <div class="inp_div xs_inp selecte_box sel_inp">
+                                    <div class="inp w250">
+                                        <select v-model="unitNumber" name="unit">
+                                            <option value="" style="color:#B1B7CC">请选择</option>
+                                            <option :value="item.name" v-for="(item,index) in buildItem.dyList" :key="item.id">
+                                                {{item.name}}
+                                            </option>
+                                        </select>
+                                        <s></s>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox required">
+                                <label><em>* </em>房号</label>
+                                <div class="inp_div">
+                                    <div class="inp w250">
+                                        <input type="text" name="number" v-model="houseNumber" placeholder="请输入房号" >
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox required" data-placeholder="请选择户型" v-if="buildItem">
+                                <label><em>* </em>关联户型</label>
+                                <div class="inp_div xs_inp selecte_box sel_inp">
+                                    <div class="inp w250">
+                                        <select v-model="houseId" name="houseType">
+                                            <option value="" selected="selected" style="color:#B1B7CC">请选择</option>
+                                            <option :value="item.id" v-for="(item,index) in houseListData">
+                                                {{item.title}}
+                                            </option>
+                                        </select>
+                                        <s></s>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox required">
+                                <label><em>* </em>活动价格</label>
+                                <div class="inp_div xs_inp">
+                                    <div class="inp ">
+                                        <input type="text" name="price" v-model="priceNumber" placeholder="请输入活动价格">
+                                    </div>
+                                    <span class="dw">万元</span>
+                                </div>
+                            </div>
+                            <div class="inpbox required">
+                                <label><em>* </em>挂牌价</label>
+                                <div class="inp_div xs_inp">
+                                    <div class="inp ">
+                                        <input type="text" name="oldPrice" v-model="oldPrice" placeholder="请输入挂牌价">
+                                    </div>
+                                    <span class="dw">万元</span>
+                                </div>
+                            </div>
+                            <div class="inpbox required">
+                                <label><em>* </em>特价开始时间</label>
+                                <div class="inp_div sel_inp">
+                                    <div class="inp w250">
+                                        <input name="startTime" id="deliverdate" type="text" v-model="startTime" placeholder="请选择特价开始时间"><s></s>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox required">
+                                <label><em>* </em>特价结束时间</label>
+                                <div class="inp_div sel_inp">
+                                    <div class="inp w250">
+                                        <input name="endTime" id="opendate" type="text" v-model="endTime" placeholder="请选择特价结束时间"><s></s>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="javascript:;" class="submit" @click="submit">确认提交</a>
+                        </form>
+                        <div class="loading" v-show="loading"><s></s></div>
+                    </div>
+                </div>
+            </div>
+            <div class="foot">
+                <div class="foot-bottom">
+                    <div class="bottom wrap">
+                        版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div>{#$cfg_statisticscode#}</div>
+</body>
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap-datetimepicker.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/addHouse.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type='text/javascript'
+    src='{#$cfg_basehost#}/include/ueditor/ueditor.config.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/ueditor/ueditor.all.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/ueditor/135editor.js?v={#$cfg_staticVersion#}'></script>
+
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>招聘系统企业端</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/member/pub_supplier.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/base_info.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+            var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+            var hideFileUrl = '{#$cfg_hideUrl#}';
+            var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+            var templets = '{#$templets_skin#}';
+            var job_channel = '{#getModuleConfig module='job' key='channelDomain'#}';
+			var hasConfig = '{#$job_cid#}'; //是否是第一次配置
+			var certificateBoolean='{#getModuleConfig module='job' key='changeCheck'#}'
+			var site_map = '{#$site_map#}';
+			var mapChose = ''; //用来存放地图弹窗的选择的数据
+			var cityid = '{#$siteCityInfo.cityid#}'
+			var complete_business = {#if !$company_enterprise_type || !$company_enterprise_establish || !$company_enterprise_money || !$company_enterprise_people#}false{#else#}true{#/if#};
+			var directTo = {#if $smarty.get.to#}{#$smarty.get.to|string_format:"%d"#}{#else#}''{#/if#};
+			var cid = {#$job_cid|default:0#};
+			var changeCheck = {#getModuleConfig module='job' key='changeCheck'#}
+			</script>
+	</head>
+	<body class="w1200">
+		{#$pageTitle = '招聘系统企业端'#}
+		<!-- 头部 -->
+		{#include file="top.html" pageTitle=$pageTitle module='job' showMap='1'#}
+		<div id="page">
+
+            <div class="conbox">
+                <div class="left_box">
+					<ul v-cloak>
+						<li v-for=" (item,i) in navList"  :class="{'curr':i==currid || i === hoverid}"  @mouseover="hoverid = i" @mouseleave="hoverid = ''" @click.prevent="checkConfig(item,i)">
+							<a :href="i === 0 ? '{#$cfg_basehost#}' + item.link + '.html?direct=1' : item.link" >
+								<s v-if="i!=currid && i !== hoverid"><img :src="'{#$templets_skin#}images/'+(i+1)+'.png'" ></s>
+								<s v-else><img :src="'{#$templets_skin#}images/'+(i+1)+'_on.png'" ></s>
+								<span>{{item.txt}}</span>
+							</a>
+						</li>
+					</ul>
+				</div>
+				<!-- 右侧 -->
+				<div class="right_box">
+					{#if ($company_state==0||$company_state==2)&&$job_cid#}
+					<div {#if $company_state==0#}class="nocertificate" {#elseif $company_state==2#}class="refusecertificate"
+						{#else#}{#/if#}>
+						<img src="{#if $company_state==0#}{#$templets_skin#}images/tip_icon.png{#else#}{#$templets_skin#}images/warn_icon.png{#/if#}"
+							class="certificateimg">
+							{#if $company_state==0#}
+							企业资料审核中，部分招聘功能暂不可使用，正在进行中的简历、面试处理不受影响
+							{#else#}
+							企业资料审核未通过，拒绝原因：{#$company_refuse#}
+							{#/if#}
+					</div>
+					{#/if#}
+					<div class="rConBox">
+						<div class="tabBox fn-clear">
+							<span v-for="(tab,ind) in tabArr" :data-id="ind" :class="[{'curr':currTab == ind},{'noClick':	currTab != ind && !hasConfig}]" @click="currTab != ind && !hasConfig?warnb=true:goTab(ind)">{{tab}}</span>
+							<s></s>
+						</div>
+						<div class="formbox" v-loading="isload" v-cloak>
+							<el-form  :model="form"  label-width="138px" >
+								<!-- 基本资料 -->
+								<dl class="form_item" v-if="currTab == 0">
+									<dd class="warning" :style="warnb?'height:40px;margin-bottom: 12px;':'height:0px'"><s></s><span>温馨提示</span>请先完善企业基本信息</dd>
+									<dt>基本资料
+										<template v-if="changeCheck">
+											<span class="changeWarn" v-if="form.logo_url!=businessInfo.logo_url||form.title!=businessInfo.title||businessInfo.changeContent.logo.new&&!businessInfo.changeContent.logo.refuse||businessInfo.changeContent.title.new&&!businessInfo.changeContent.title.refuse"><s></s>{{!businessInfo.id?'完善企业基本信息后、即可发布职位、开启招聘！':form.logo_url!=businessInfo.logo_url||form.title!=businessInfo.title?'公司名称、LOGO属企业敏感信息，如有修改审核通过后即可显示':businessInfo.changeContent.logo.new||businessInfo.changeContent.title.new?'公司名称、LOGO属企业敏感信息，相关修改已提交，审核通过后即可显示':''}}</span>
+											<div class="err_tip refuseTip" v-if="(businessInfo.changeContent&&(businessInfo.changeContent.title.refuse||businessInfo.changeContent.logo.refuse)&&form.logo_url==businessInfo.logo_url&&form.title==businessInfo.title)&&infoNoWarn"><i class="el-icon-info"></i>公司名称（LOGO）修改未通过，未通过原因：{{businessInfo.changeContent.title.refuse}}{{businessInfo.changeContent.title.refuse&&businessInfo.changeContent.logo.refuse?';':''}}{{businessInfo.changeContent.logo.refuse}}<span class="noWarn" @click="refuseNoWarn('info')">不再提醒</span></div>
+										</template>
+									</dt>
+									<dd>
+										<el-form-item label="公司名称"  :required="true">
+											<el-input v-model="form.title" name="title" placeholder="请填写" class="bigInp"></el-input>
+											<p class="tip_inp">如想显示官方简称(如字节跳动)，可直接填写</p>
+										</el-form-item>
+										<el-form-item label="公司性质"  :required="true">
+											<el-select v-model="form.nature" placeholder="请选择" size="medium" class="medium_select">
+												<el-option v-for="item in baseConfig.nature" :label="item.typename" :value="Number(item.id)" :key="Number(item.id)"></el-option>
+											</el-select>
+											<div class="err_tip onError" v-if="error.name == 'nature' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请选择公司性质'}}</div>
+										</el-form-item>
+										<el-form-item label="公司规模"  :required="true">
+											<el-select v-model="form.scale" placeholder="请选择" size="medium" class="medium_select">
+												<el-option v-for="item in baseConfig.scale" :label="item.typename" :value="Number(item.id)" :key="Number(item.id)"></el-option>
+											</el-select>
+											<div class="err_tip onError" v-if="error.name == 'scale' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请选择公司规模'}}</div>
+										</el-form-item>
+										
+										<el-form-item label="经营行业"  :required="true" >
+											<el-select v-model="form.industry_pid" placeholder="请选择" size="medium" class="medium_select" @change="form.industry = ''">
+												<el-option v-for="item in industry" :label="item.typename" :value="Number(item.id)" :key="Number(item.id)"></el-option>
+											</el-select>
+											<el-select v-model="form.industry" placeholder="请选择" class="medium_select" v-if="industry_lower && industry_lower.length">
+												<el-option v-for="item in industry_lower" :label="item.typename":value="item.id" :key="item.id"></el-option>
+											</el-select>
+											<div class="err_tip onError" v-if="error.name == 'industry' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请选择经营行业'}}</div>
+										</el-form-item>
+										<el-form-item label="公司LOGO"  :required="true" >
+											<el-upload :action="uploadAction"  data-name="logo" class="uploadBtn"  accept=".png,.jpg,.jpeg"  name="Filedata" :show-file-list="false" :on-success="handleSuccess"  :on-change="handleChange" :on-progress="handlePogress">
+												<div class="file_add" v-if="!form.logo_url" >
+													<p  :data-form="form.logo_url">上传公司logo</p>
+												</div>
+												<div class="prviewImg" v-else>
+													<img :src="form.logo_url" alt="">
+													<p class="resetImg" @click="handleRemove" >重新上传</p>
+												</div>
+												<div class="err_tip onError" v-if="error.name == 'nature' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请上传公司LOGO'}}</div>
+												<p class="tip_inp" v-if="error.name != 'logo'"  style="transform:translateY(-8px);">上传logo图片，推荐尺寸500*500像素</p>
+											</el-upload>
+											
+										</el-form-item>
+									</dd>
+								</dl>
+								<!-- 工商信息 -->
+								<dl class="form_item" v-if="currTab == 1">
+									<dt>工商信息<div class="err_tip changeTip" v-if="!businessInfo.changeGs||(businessInfo.changeContent.business_license.new&&!businessInfo.changeContent.business_license.refuse)||(businessInfo.changeContent.full_name.new&&!businessInfo.changeContent.full_name.refuse)||form.full_name!=businessInfo.full_name||form.business_license_url!=businessInfo.business_license_url"><i class="el-icon-info"></i>{{!businessInfo.changeGs?'未查询到工商信息，请手动完善信息，或确认企业全称正确后重新查询':form.full_name!=businessInfo.full_name||form.business_license_url!=businessInfo.business_license_url?'企业名称、营业执照属企业敏感信息，如有修改审核通过后即可显示':businessInfo.changeContent.business_license.new||businessInfo.changeContent.full_name.new?'企业名称（营业执照）修改已提交，审核通过后即可显示':''}}</div><div class="err_tip refuseTip" v-if="((businessInfo.changeContent.business_license.refuse||businessInfo.changeContent.full_name.refuse)&&form.full_name==businessInfo.full_name&&form.business_license_url==businessInfo.business_license_url)&&businessNoWarn"><i class="el-icon-info"></i>企业名称（营业执照）修改未通过，未通过原因：{{businessInfo.changeContent.business_license.refuse}}{{businessInfo.changeContent.full_name.refuse&&businessInfo.changeContent.business_license.refuse?';':''}}{{businessInfo.changeContent.full_name.refuse}}<span class="noWarn" @click="refuseNoWarn('business')">不再提醒</span></div></dt>
+									<dd>
+										<el-form-item label="企业名称"  :required="true">
+											<el-input v-model="form.full_name" :disabled="!changeBusiness" name="title" placeholder="请填写" class="bigInp"></el-input>
+											<a href="javascript:;" class="btn_cha" v-if="(!businessInfo.config && !businessInfo.config.gsName) && ( !form.enterprise_type && !form.enterprise_establish && !form.enterprise_money &&  !form.enterprise_people)" @click="getGS_info">查询信息</a>
+											<div class="err_tip onError" v-if="error.name == 'full_name' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请填写企业名称'}}</div>
+										</el-form-item>
+										
+										<el-form-item label="企业类型"  :required="true" >
+											<el-input v-if="!changeBusiness" v-model="form.enterprise_type" :disabled="!changeBusiness" name="enterprise_type" placeholder="请填写" class="bigInp"></el-input>
+											<el-select v-else v-model="form.enterprise_type" placeholder="请选择" class="bigInp">
+												<el-option v-for="item in baseConfig.nature" :label="item.typename" :value="item.typename" :key="item.id"></el-option>
+											</el-select>
+											<div class="err_tip onError" v-if="error.name == 'enterprise_type' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请填写企业类型'}}</div>
+										</el-form-item>
+										<el-form-item label="成立日期"  :required="true" >
+											<!-- <el-input v-model="form.enterprise_establish" :disabled="!changeBusiness" name="enterprise_establish" placeholder="请填写" class="bigInp"></el-input> -->
+											<el-date-picker v-model="form.enterprise_establish" type="date"  :picker-options="pickerOptions" :disabled="!changeBusiness"  name="enterprise_establish"  value-format="timestamp" :class="['bigInp datePick']" suffix-icon="el-icon-arrow-down" type="date" placeholder="选择日期" :default-value="testDay" onclick="$('.el-date-picker__header-label').eq(0).trigger('click')"> </el-date-picker>
+											<div class="err_tip onError" v-if="error.name == 'enterprise_establish' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请填写成立日期'}}</div>
+										</el-form-item>
+										<el-form-item label="注册资本"  :required="true" >
+											<el-input v-model="form.enterprise_money" :disabled="!changeBusiness" name="enterprise_money" placeholder="请填写" class="bigInp"><em slot="suffix">万元</em></el-input>
+											<div class="err_tip onError" v-if="error.name == 'enterprise_money' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请填写注册资本'}}</div>
+										</el-form-item>
+										<el-form-item label="法定代表人"   :required="true" >
+											<el-input v-model="form.enterprise_people" :disabled="!changeBusiness" name="enterprise_people" placeholder="请填写" class="bigInp"></el-input>
+											<div class="err_tip onError" v-if="error.name == 'enterprise_people' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请填写法定代表人'}}</div>
+										</el-form-item>
+										<p class="changeTip" v-if="(complete&&(businessInfo && businessInfo.config && businessInfo.config.gsName || (form.enterprise_type || form.enterprise_establish || form.enterprise_money || form.enterprise_people))&&!changeBusiness)">以上数据来源：{{businessInfo.changeGs ? '企业自行填报' : businessInfo.config.gsName}}<span v-if="!businessInfo.changeGs"><img src="/static/images/job/businInfoFrom_icon.png?v={#$cfg_staticVersion#}" alt=""></span><a href="javascript:;" class="changeBusiness" v-if="hasConfig" @click="changeBusiness = true" style="margin-left: 12px;">信息有误？手动修改</a></p>
+									</dd>
+								</dl>
+								<!-- 资质认证 -->
+								<dl class="form_item" v-if="(currTab === 1 && hasConfig ) || (currTab == 0 && !hasConfig) || (changeBusiness &&  currTab ===1 )">
+									<dt>资质认证{#if $job_cid&&$company_state#}<span style="color: #A6A6A6;font-size: 12px;font-weight: 100;margin-left: 12px;" v-show="businessInfo&&businessInfo.full_name!=form.full_name&&changeBusiness">企业名称已修改，请重新认证</span>{#/if#}</dt>
+									<dd>
+										<el-form-item label="企业全称"  :required="true" v-if="currTab == 0">
+											<el-input v-model="form.full_name" name="title" placeholder="请填写" class="bigInp"></el-input>
+											<div class="err_tip onError" v-if="error.name == 'full_name' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请填写企业名称'}}</div>
+											<p class="tip_inp" v-else-if="error.name != 'full_name'">请正确填写企业全称，以同步工商信息</p>
+										</el-form-item>
+										<el-form-item label="营业执照认证"  :required="true" class="licence" >
+											<el-upload :action="uploadAction"  data-name="licence" class="uploadBtn"  accept=".png,.jpg,.jpeg"  name="Filedata" :show-file-list="false" :on-success="handleSuccess" :on-change="handleChange" :on-progress="handlePogress" :disabled="Boolean(!changeBusiness &&(businessInfo.id||businessInfo.full_name==form.full_name)||(changeBusiness&&businessInfo.full_name==form.full_name&&businessInfo.state==1 && businessInfo.certification) )">
+												<div solt="default" class="file_add" v-if="(businessInfo.state==1&&businessInfo.full_name!=form.full_name&&form.business_license_url==businessInfo.business_license_url)||(!businessInfo.id&&!form.business_license_url)" >
+													<p  :data-form="form.business_license_url">上传营业执照</p>
+												</div>
+												<div class="prviewImg" slot-scope="{file}" v-else>
+													<img :src="form.business_license_url" alt="营业执照" onerror="this.src='/static/images/404.jpg'" >
+													<p class="resetImg" v-if="!businessInfo.certification && (changeBusiness  || (businessInfo.state!=1||businessInfo.full_name!=form.full_name))||(!businessInfo.id&&form.business_license_url) ">重新上传</p>
+													<p class="hadcertificate" :style="businessInfo.state==1?'opacity:1':'opacity:0'" v-else-if="businessInfo.certification && businessInfo.state==1 && businessInfo.full_name == form.full_name">已认证</p>
+													<!-- <el-progress class="progress" v-else :text-inside="true" :stroke-width="14" stroke-linecap="square" :percentage="successCount"></el-progress> -->
+												</div>
+											</el-upload>
+											<div class="err_tip onError" v-if="error.name == 'business_license' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请上传营业执照'}}</div>
+											<p  class="tip_inp" v-else-if="error.name != 'business_license'">营业执照需在有效期内，若无营业执照可上传组织机构代码证<br>仅用于平台验证企业身份{{(changeBusiness&&(businessInfo.state!=1||businessInfo.full_name!=form.full_name))||(!businessInfo.id&&form.business_license_url)?'，请放心上传':''}}</p>
+										</el-form-item>
+									</dd>
+								</dl>
+								
+								<!-- 联系方式 -->
+								<dl class="form_item formItem_2"  v-if="currTab == 2">
+									<dt>联系方式</dt>
+									<dd>
+										<el-form-item label="招聘联系人"  :required="true" class="">
+											<div class="groupBox">
+												<div class="inpGroup">
+													<el-input v-model="form.people"  name="people" placeholder="请填写联系人称呼" class="bigInp"></el-input>
+													<el-input v-model="form.people_job"  name="people_job" placeholder="请填写职位，如：HR" class="bigInp"></el-input>
+												</div>
+												<div class="headIconBox">
+													<div class="photoBox">
+														<img :src="form.people_pic_url" alt="" v-if="form.people_pic || form.people_pic_url" onerror="this.src='/static/images/noPhoto_100.jpg'">
+														<img :src="'/static/images/supplier/headicon_' + form.random_people_pic" alt="" v-else-if="form.random_people_pic != ''" onerror="this.src='/static/images/noPhoto_100.jpg'">
+														<span class="text">头像</span>
+														<div class="pbtns">
+															<el-upload :action="uploadAction"  data-name="avatar" class="uploadBtn"  accept=".png,.jpg,.jpeg" :limit="1" name="Filedata" :show-file-list="false" :on-success="handleSuccess" :on-progress="handlePogress" :on-change="handleChange"><div class="btn_up_photo">上传</div></el-upload>
+															<a href="javascript:;" class="changPhoto" @click="changePhoto" style="opacity: 0; pointer-events:none;">换一个</a>
+														</div>
+													</div>
+												</div>
+											</div>
+											<div class="err_tip onError" v-if="error.name == 'people' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请完善联系人信息'}}</div>
+										</el-form-item>
+										<el-form-item label="联系电话"  :required="true">
+											<el-input v-model="form.contact" name="contact" placeholder="请填写" class="bigInp" maxlength="11"></el-input>
+											<div class="err_tip onError" v-if="error.name == 'contact' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请输入联系电话'}}</div>
+										</el-form-item>
+										<!-- <el-form-item label="电子邮箱" >
+											<el-input v-model="form.email" name="email" placeholder="(选填)" class="bigInp"></el-input>
+										</el-form-item> -->
+										<el-form-item label="公司官网" >
+											<el-input v-model="form.site" name="contact_web" placeholder="(选填)" class="bigInp"></el-input>
+										</el-form-item>
+										<el-form-item label="公司地址" :required="true">
+											<el-cascader  v-model="form.addrid_list" ref="cascaderRefArea"	:props="props" :options="options" collapse-tags   @change="changeArea"  @expand-change="changeMapAreaText"></el-cascader>
+											<div class="address_box">
+												<el-input v-model="form.address" name="address" placeholder="请填写详细地址" class="bigInp"></el-input>
+												<input type="hidden" name="lng" :value="form.lng">
+												<input type="hidden" name="lat" :value="form.lat">
+												<a href="javascript:;" class="mapPop_btn" @click="showMapPop('company')"></a>
+											</div>
+											<div class="err_tip onError" v-if="error.name == 'address' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请完善公司地址信息'}}</div>
+										</el-form-item>
+										<el-form-item label="工作地址" >
+											<!-- <el-input v-model="form.jobAddrArr" name="contact_web" placeholder="(选填)" class="bigInp"></el-input> -->
+											<div class="jobAddrList">
+												<ul class="jobAddr_ul" v-if="jobAddrList.length">
+													<li v-for="item in jobAddrList">
+														<div class="jobAddr" @click="showMapPop('jobAddress',item)">{{item.addrName? item.addrName.join('/'):''}}     {{item.address}}</div>
+														<div class="btn_groups">
+															<el-button type="text" size="mini" class="edit_btn" @click="showMapPop('jobAddress',item,1)">编辑</el-button>
+															<el-button type="text" size="mini" class="del_btn" @click="showConfirmDel(item)">删除</el-button>
+														</div>
+													</li>
+												</ul>
+												<a href="javascript:;" class="addJobAddr" @click="showMapPop('jobAddress')"><s></s>添加工作/面试地址</a>
+												<p class="tip">如企业有多个工作地址，可在此处添加/管理，发布职位、邀请面试时可直接快速选择</p>
+											</div>
+										</el-form-item>
+									</dd>
+								</dl>
+
+								<!-- 公司介绍 -->
+								<dl class="form_item formItem_3"  v-if="currTab == 3">
+									<dt>公司介绍</dt>
+									<dd>
+										<el-form-item label="员工福利">
+											<div class="labsBox">
+												<span v-for="lab in baseConfig.welfare" :data-id="lab.id" :class="{'on_chose': form.welfare.indexOf(lab.id) > -1}" @click="choseTab(lab.id)">{{lab.typename}}</span>
+											</div>
+										</el-form-item>
+										<el-form-item label="工作时间" :required="true">
+											<el-time-picker
+												@change="changeWorkTime"
+												@focus="changetext"
+												class="timePicker"
+												value-format="HH:mm"
+												format="HH:mm"
+												is-range
+												v-model="timePicker"
+												range-separator="-"
+												start-placeholder="请选择"
+												end-placeholder="请选择"
+												placeholder="选择时间范围"
+												:editable="false">
+											</el-time-picker>
+
+											<el-checkbox name="rest_flag" v-model="rest_flag">双休</el-checkbox>
+											<el-checkbox name="rest_flag" v-model="rest_flag_single" >单休</el-checkbox>
+											<el-checkbox v-model="work_over" >不加班</el-checkbox>
+										</el-form-item>
+										<el-form-item label="公司简介">
+											<el-input type="textarea" class="textarea" v-model="form.body" placeholder="可填写公司简介、产品介绍、业绩成果等（限2000字）" maxlength="2000"
+											show-word-limit></el-input>
+											<!-- <div class="textarea">
+												<div class="text_inp" @input="checkLength" v-html="form.body" placeholder="可填写公司简介、产品介绍、业绩成果等（限2000字）" contenteditable="true"></div>
+												<span class="len"><em>{{maxlength}}</em>/2000</span>
+											</div> -->
+										</el-form-item>
+									</dd>
+								</dl>
+
+								<!-- 企业相册 -->
+								<dl class="form_item formItem_4" v-if="currTab == 4">
+									<dt>企业相册</dt>
+									<dd>
+										
+										<el-form-item label="企业相册"  :required="true" class="pics" >
+											<div class="prviewImg" v-for="(pic,index) in fileListShow">
+												<img :src="pic.turl" alt="">
+												<a href="javascript:;" class="del_btn" @click="removeItem(index,pic)">删除</a>
+												<div class="progress" v-if="pic.uid" :data-uid="pic.uid"><span></span></div>
+											</div>
+											<el-upload ref="uploadPics" :action="uploadAction"  data-name="pics" class="uploadBtn"  accept=".png,.jpg,.jpeg"  name="Filedata"  multiple :on-success="handleSuccessFileList"  :before-upload="beforeUpload" :on-change="handleListProgress" :file-list="fileList" :before-remove="beforeRemove" :show-file-list="false" :on-remove="handleRemove" :http-request="upFileList" :limit="20" :on-exceed="exceedTip">
+												<div class="file_add" >
+													<p>上传图片</p>
+												</div>
+											</el-upload>
+											<div class="err_tip onError" v-if="error.name == 'pics' && error.onError"><i class="el-icon-info"></i>{{error.tip?error.tip:'请上传图片完善企业相册'}}</div>
+											<p  class="tip_inp" v-else-if="error.name != 'pics' " style="display:block; clear: both;" >图片比例4:3，推荐尺寸960*720像素、1200*900像素，最多上传20张</p>
+										</el-form-item>
+									</dd>
+								</dl>
+
+								<!-- 底部 -->
+								<el-row>
+									<template v-if="!hasConfig && currTab == 1">
+										<el-button type="primary" class="btn_submit"  @click="currTab = 2">确认无误，下一步</el-button>
+										<a href="javascript:;" class="changeBusiness" @click="changeBusiness = true">信息有误？手动修改</a>
+									</template>
+									<el-button type="primary" class="btn_submit" :loading="loading" v-else-if="changeBusiness||currTab != 1" @click="submitConfig">{{loading ? '正在提交' : '确认提交'}}</el-button>
+								</el-row>
+							</el-form>
+							
+						</div>
+					</div>
+				</div>
+
+            </div>
+			
+			<!-- <el-dialog class=" dialogBox" custom-class="mapAreaBox" :center="true" width="740" title="添加工作地址、定位" :visible="true">
+				<div class="mapContainer">
+					<div class="mapSearch">
+						<div class="mapSearchInp">
+							<div class="addridBox" v-if="mapAreaText">
+								<span class="areaTextShow">{{mapAreaText}}</span>
+								<el-cascader ref="cascaderAddr" v-model="mapArea" :props="props" :options="options" collapse-tags  @change="changeMapArea" @expand-change="changeMapAreaText"></el-cascader>
+							</div>
+							<div class="inputBox">
+								<input type="text" id="address_detail" placeholder="请输入详细地址">
+							</div>
+							<input type="hidden" id="lng" value="120.592412">
+							<input type="hidden" id="lat" value="31.303564">
+							<el-button type="primary" class="btn_posi" @click="rePosi">自动定位</el-button>
+						</div>
+					</div>
+					<div id="map"></div>
+					<div class="moveBtn"></div>
+				</div>	
+				<div class="btns_tips">
+					<p>请确保详细地址和定位无误 <em>(可点击地图手动调整定位)</em></p>
+					<el-button class="btn_sure" type="primary" size="medium">确认</el-button>
+				</div>
+			</el-dialog> -->
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+		<div>{#$cfg_statisticscode#}</div>
+		
+		
+	</body>
+	<script>
+		var site_map = "{#$site_map#}", site_map_key = '{#$site_map_key#}';
+		var site_map_apiFile = '{#$site_map_apiFile#}'
+	</script>
+	<script type="text/javascript" src="{#$templets_skin#}js/base_info.js?v={#$cfg_staticVersion#}"></script>
+</html>

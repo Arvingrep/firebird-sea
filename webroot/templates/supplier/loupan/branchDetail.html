@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>分销公司</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/branchDetail.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = '{#$cfg_hideUrl#}';
+        var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+        var templets = '{#$templets_skin#}';
+        var loupanid = '{#$loupanid#}';
+        var modelType = 'house';
+        var atpage = 1, totalCount = 0, pageSize = 10;
+        var branchid = '{#$smarty.get.id#}'
+        var memberDomain = '{#$member_userDomain#}'
+        var currid = 84;
+        var grant = '{#$grant#}';
+    </script>
+</head>
+<body>
+    <div id="page">
+        <!-- 头部 -->
+        {#include file="top.html"#}
+        <div class="conbox">
+            <!-- 左侧导航 -->
+            {#include file="left.html"#}
+            <div class="right_box">
+                <div class="rConBox noBg">
+                    <!-- 统计信息 -->
+                    <div class="staticsContainerBox">
+                         <!--合作中  inCooperation -->
+                        <div :class="`staticsConBox ${distributorInfo.status == 1 ? 'inCooperation' : ''}`">
+                            <div class="disflex cooperDetail a-c j-b">
+                                <div class="infobox disflex a-c ">
+                                    <div class="logo"><img :src="distributorInfo.logoUrl" onerror="this.src='{#$templets_skin#}images/default_logo.png'" alt=""></div>
+                                    <div class="info">
+                                        <div class="tit" >
+                                            <span>{{distributorInfo.name}}</span>
+                                            <!-- status1,status2 -->
+                                            <label :class="`status${distributorInfo.status == 2 ? 1 : (distributorInfo.status == 1 ? '' : '2' )}`">{{distributorInfo.status == 1 ? '合作中' : '暂停合作'}}</label>
+                                        </div>
+                                        <p>{{distributorInfo.shortName}}</p>
+                                    </div>
+                                </div>
+                                <div class="infobox disflex a-c">
+                                    <div class="fzr">负责人：<span>{{distributorInfo.people}}</span><em class="phone">{{distributorInfo.phone}}</em></div>
+                                    <a href="javascript:;" @click="updateCooperation" :class="`el-button ${distributorInfo.status == 1 ? 'stopCooper' : 'startCooper'} disflex a-c j-c`" >{{distributorInfo.status != 1 ? '开始合作' : '暂停合作'}}</a>
+                                    <!-- <a href="javascript:;" class="el-button startCooper disflex a-c j-c" v-else>开始合作</a> -->
+
+                                    <el-popover
+                                        placement="bottom-end"
+                                        width="180"
+                                        popper-class="optionPopover"
+                                        :visible-arrow="false"
+                                        trigger="hover">
+                                        <div class="options">
+                                            <div class="opt" @click="confirmDelBranch()">删除</div>
+                                            <div class="opt" @click="changePsd()">重置密码</div>
+                                        </div>
+                                        <a href="javascript:;" slot="reference" class="moreOpt">···</a>
+                                    </el-popover>
+                                </div>
+                            </div>
+                            <div class="staticsCon" v-if="distributorInfo.status == 1">
+                                <div class="staticsItem" v-for="item in staticsList" v-if="item.title">
+                                    <div class="textShow">
+                                        <h6>{{item.title}}</h6>
+                                        <h4>{{item.count}}<i v-if="item.isNew && item.count"></i></h4>
+                                    </div>
+                                    <div class="icon">
+                                        <img :src="`{#$templets_skin#}images/${item.icon}?v={#$cfg_staticVersion#}`" alt=""></img>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="rConBox">
+                    <div class="tabHeaderBox disflex j-b a-c">
+                        <div class="tabBox fn-clear">
+                            <span v-for="(tab,ind) in tabArr" :data-id="ind" @click="tabChange(ind)" :class="[{'curr':currTab == ind},{'noClick':	currTab != ind}]">{{tab}}</span>
+                            <s></s>
+                        </div>
+                        <div class="btn_lab" v-if="currTab == 0">
+                            <a href="javascript:;" class="copy" @click="copyScheme">复制分销方案</a>
+                            <a href="javascript:;" class="paste" @click="pasteScheme">粘贴分销方案</a>
+                        </div>
+                    </div>
+                    <div class="tabConBox">
+                        <el-form v-if="currTab == 0" class="tabCon" label-width="130px" :rules="rules" :model="formScheme" ref="formScheme">
+                            <div class="formPart part1" >
+                                <el-form-item label="设置佣金" prop="commissionFee">
+                                    <el-input class="lgInp " placeholder="请填写" v-model="formScheme.commissionFee" type="number" step="any" @change="autoFixNote">
+                                        <em slot="suffix" class="suffix_text" >{{formScheme.commissionType != 2 ? '%' : '{#echoCurrency type="short"#}/套'}}</em>
+                                    </el-input>
+                                    <span :class="`radio ${num == formScheme.commissionType ? 'onCheck' : ''}`" @click="formScheme.commissionType = num" v-for="num in 2">
+                                        <i></i>
+                                        <em>{{num == 1 ? '百分比' : '固定金额'}}</em>
+                                    </span>
+                                </el-form-item>
+                                <el-form-item label="佣金说明" prop="commissionNote">
+                                    <el-input type="textarea" v-model="formScheme.commissionNote" placeholder="请填写" class="lgarea"></el-input>
+                                    <div class="btn_lab">
+                                        <a href="javascript:;" class="save_mod" @click="saveModel('commissionNote')">存为模板</a>
+                                        <a href="javascript:;" class="use_mod" @click="useModel('commissionNote')" v-if="modelData && modelData.commissionNote">使用模板</a>
+                                    </div>
+                                </el-form-item>
+                                <el-form-item label="分销截止时间" prop="endTime">
+                                    <el-date-picker class="lgInp"
+                                        type="date"
+                                        value-format="yyyy-MM-dd"
+                                        :picker-options="pickerOptions"
+                                        v-model="formScheme.endTime"
+                                        @change="endTimeChange"
+                                        placeholder="请选择">
+                                    </el-date-picker>
+                                    <span class="form_tip">到期分销活动自动下架，不可再提交新报备</span>
+                                </el-form-item>
+                            </div>
+                            <div class="formPart">
+                                <div class="part_tit">
+                                    <h4>代理规则
+                                        <div class="btn_lab">
+                                            <a href="javascript:;" class="save_mod" @click="saveModel('rules')">存为模板</a>
+                                            <a href="javascript:;" class="use_mod" @click="useModel('rules')">使用模板</a>
+                                        </div>
+                                    </h4>
+                                </div>
+                                <el-form-item label="报备等待期" prop="reportWaitTime">
+                                    <el-input class="Inp " placeholder="请填写" v-model.number="formScheme.reportWaitTime">
+                                        <em slot="suffix" class="suffix_text" >分钟</em>
+                                    </el-input>
+                                    <span class="form_tip">等待期过后才可带看</span>
+                                </el-form-item>
+                                <el-form-item label="报备有效期"  prop="reportIntervalDay">
+                                    <el-select  class="Inp " v-model="formScheme.reportStartType" placeholder="请选择">
+                                        <el-option
+                                            v-for="item in reportOptions"
+                                            :key="item.value"
+                                            :label="item.label"
+                                            :value="item.value">
+                                        </el-option>
+                                    </el-select>
+                                    <el-input class="Inp " placeholder="请填写" v-model.number="formScheme.reportIntervalDay">
+                                        <em slot="suffix" class="suffix_text" >天</em>
+                                    </el-input>
+                                    <span class="form_tip">超出有效期未带看，报备无效</span>
+                                </el-form-item>
+                                <el-form-item label-width="0" prop="dealIntervalDay" class="noLabel">
+                                    <div class="el-form-label el-form-item__label" style="width: 130px;">
+                                        <label class="lab">带看保护时间</label>
+                                        <p>(成交有效期)</p>
+                                    </div>
+                                    <el-select  class="Inp " v-model="formScheme.dealStartType" placeholder="请选择">
+                                        <el-option
+                                            v-for="item in dealOptions"
+                                            :key="item.value"
+                                            :label="item.label"
+                                            :value="item.value">
+                                        </el-option>
+                                    </el-select>
+                                    <el-input class="Inp" placeholder="请填写" v-model="formScheme.dealIntervalDay">
+                                        <em slot="suffix" class="suffix_text" >天</em>
+                                    </el-input>
+                                    <span class="form_tip">超出有效期未成交或认购，报备无效</span>
+                                </el-form-item>
+                                <!-- <div class="el-form-item  is-required">
+                                    <div class="el-form-label el-form-item__label" style="width: 130px;">
+                                        <label>带看保护时间</label>
+                                        <p>(成交有效期)</p>
+                                    </div>
+                                    <div class="el-form-item__content">
+                                        <el-select  class="Inp " v-model="formScheme.dealStartType" placeholder="请选择">
+                                            <el-option
+                                                v-for="item in dealOptions"
+                                                :key="item.value"
+                                                :label="item.label"
+                                                :value="item.value">
+                                            </el-option>
+                                        </el-select>
+                                        <el-input class="Inp" placeholder="请填写" v-model="formScheme.dealIntervalDay">
+                                            <em slot="suffix" class="suffix_text" >天</em>
+                                        </el-input>
+                                        <span class="form_tip">超出有效期未成交或认购，报备无效</span>
+                                    </div>
+                                </div> -->
+                                <div class="el-form-item  is-required">
+                                    <div class="el-form-item__label" style="width: 130px;">
+                                        <span>报备号码</span> 
+
+                                        <el-popover
+                                            placement="bottom-start"
+                                            trigger="hover"
+                                            popper-class="formTipPopper"
+                                            :offset="-98"
+                                            width="400">
+                                            <div class="txtbox">
+                                                <div class="txt"><span>全号：</span>报备在任意进度失效，客户都将自动进入内部客户池，不可再报备</div>
+                                                <div class="txt"><span>前3后4：</span>带看时提交全号，在此之前失效可重新报备；带看后未成交自动进入内部客户池，不可再报备</div>
+                                            </div>
+                                            <i slot="reference" class="icon tip_icon"></i>
+                                        </el-popover>
+                                    </div>
+                                    <div class="el-form-item__content">
+                                        <span :class="`radio noMarLeft ${(num == 1 ? 1 : 2) == formScheme.reportPhoneType ? 'onCheck' : ''}`" @click="formScheme.reportPhoneType = (num == 1 ? 1 : 2)" v-for="num in 2">
+                                            <i></i>
+                                            <em>{{num == 1 ? '前3后4' : '全号'}}</em>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="el-form-item  is-required">
+                                    <div class="el-form-item__label" style="width: 130px;">
+                                        <span>成交更新权限</span> 
+
+                                        <el-popover
+                                            placement="bottom-start"
+                                            trigger="hover"
+                                            popper-class="formTipPopper"
+                                            :offset="-98"
+                                            width="400">
+                                            <div class="txtbox">
+                                                <div class="txt"><span>成交更新权限：</span>开启后分销公司负责人可提交成交信息，后续审核流程不变</div>
+                                            </div>
+                                            <i slot="reference" class="icon tip_icon"></i>
+                                        </el-popover>
+                                    </div>
+                                    <div class="el-form-item__content">
+                                        <span :class="`radio noMarLeft ${(num == 1 ? 1 : 0) == formScheme.uploadCert ? 'onCheck' : ''}`" @click="formScheme.uploadCert = (num == 1 ? 1 : 0)" v-for="(num) in 2">
+                                            <i></i>
+                                            <em>{{num == 1 ? '开启' : '关闭'}}</em>
+                                        </span>
+                                    </div>
+                                </div>
+                                <el-form-item label="带看说明">
+                                    <el-input type="textarea" v-model="formScheme.reportVisitNote" placeholder="如：仅需带看，前台领取到访单，成交15天内结算" class="dk_area"></el-input>
+                                    
+                                </el-form-item>
+                                <el-form-item label="注意事项">
+                                    <el-input  v-model="formScheme.reportTips" placeholder="如：必须提交到访视频…等需要强调的要求" class="llgInp"></el-input>
+                                    
+                                </el-form-item>
+                            </div>
+                            <div class="formPart" v-if="!schemeInfo.length">
+                                <div class="part_tit">
+                                    <h4>报备联系人
+                                        <div class="btn_lab">
+                                            <a href="javascript:;" class="save_mod" @click="saveModel('reportUid')">存为模板</a>
+                                            <a href="javascript:;" class="use_mod" v-if="modelData && modelData.reportUid" @click="useModel('reportUid')">使用模板</a>
+                                        </div>
+                                    </h4>
+                                </div>
+                                <el-form-item label="联系人">
+                                    <div class="plistbox">
+                                        <div class="box_header disflex a-c j-b">
+                                            <div class="box_title">共{{showUserArr.length}}人</div>
+                                            <a href="javascript:;" class="edit" @click="showReportUserPop()">编辑</a>
+                                        </div>
+                                        <div class="list">
+                                            <div class="item disflex a-c j-b" v-for="(item,index) in showUserArr">
+                                                <div class="info disflex a-c">
+                                                    <div class="photo"><img :src="item.avatar" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                                    <div class="name">{{item.realname}}</div>
+                                                </div>
+                                                <span class="icon el-icon-close del_btn" @click="delReportUser(index)"></span>
+                                            </div>
+                                            <a href="javascript:;" class="add_btn el-icon-plus disflex a-c j-c" @click="showReportUserPop"></a>
+                                        </div>
+                                    </div>
+                                </el-form-item>
+                            </div>
+                            <el-button type="primary" class="btn_save" @click="saveSchemeInfo()">保存</el-button>
+                        </el-form>
+
+                        <template v-else-if="currTab == 1">
+                            {#include file="addBranch_form.html"#}
+                        </template>
+                        <template v-else-if="currTab == 2">
+                            <el-form class="tabCon" label-width="130px" style="margin-top: 20px;">
+                                <div class="formPart" >
+                                    <div class="part_tit">
+                                        <h4>报备联系人
+                                            <div class="btn_lab">
+                                                <a href="javascript:;" class="save_mod" @click="saveModel('reportUid')">存为模板</a>
+                                                <a href="javascript:;" class="use_mod" v-if="modelData && modelData.reportUid" @click="useModel('reportUid')">使用模板</a>
+                                            </div>
+                                        </h4>
+                                    </div>
+                                    <el-form-item label="联系人">
+                                        <div class="plistbox">
+                                            <div class="box_header disflex a-c j-b">
+                                                <div class="box_title">共{{showUserArr.length}}人</div>
+                                                <a href="javascript:;" class="edit" @click="showReportUserPop()">编辑</a>
+                                            </div>
+                                            <div class="list">
+                                                <div class="item disflex a-c j-b" v-for="(item,index) in showUserArr">
+                                                    <div class="info disflex a-c">
+                                                        <div class="photo"><img :src="item.avatar" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                                        <div class="name">{{item.realname}}</div>
+                                                    </div>
+                                                    <span class="icon el-icon-close del_btn" @click="delReportUser(index)"></span>
+                                                </div>
+                                                <a href="javascript:;" class="add_btn el-icon-plus disflex a-c j-c" @click="showReportUserPop"></a>
+                                            </div>
+                                        </div>
+                                    </el-form-item>
+                                </div>
+                                <el-button type="primary" class="btn_save" @click="saveSchemeInfo()">保存</el-button>
+                            </el-form>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="foot">
+            <div class="foot-bottom">
+                <div class="bottom wrap">
+                    版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+                </div>
+            </div>
+        </div>
+        <!-- 弹窗 -->
+        <div class="allPopContainer">
+            <div class="popBox">
+                <div :class="['pop_mask',{'show':showPop}] "></div>
+                <!-- 报备联系人 -->
+                <div :class="['reportUserPop Popbox',{'show':showPop}]">
+                    <div class="pop_head disflex a-c j-b">
+                        <h2>报备联系人</h2>
+                        <a href="javascript:;" class="close_pop el-icon-close" @click="showPop = false;"></a>
+                    </div>
+                    <div class="pop_con disflex">
+                        <div class="pop_leftCon">
+                            <div class="pop_con_hedder">
+                                <h3>添加联系人</h3>
+                                <div class="disflex a-c  pop_form">
+                                    <div class="inputBox">
+                                        <el-input v-model="filterForm.keyword" prefix-icon="el-icon-search" clearable placeholder="搜索成员">
+                                            <el-select class="position_select" v-model="filterForm.gid" slot="append" placeholder="全部职务" @change="reGetUserList">
+                                                <el-option :label="item.name" :value="item.id" v-for="item in groupList"></el-option>
+                                            </el-select>
+                                        </el-input>
+
+                                    </div>
+                                    <a href="javascript:;" class="addMember" @click="showTeamPop = true">
+                                        <i class="el-icon el-icon-plus"></i>
+                                        <span>新增成员</span>
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="pop_con_table">
+                                <div class="table">
+                                    <div class="th disflex a-c">
+                                        <div class="td info">姓名</div>
+                                        <div class="td role">职务</div>
+                                        <div class="td choose alignCenter"><el-checkbox :value="reportUidArr.length == contactList.length" @change="val => chooseReport('all',val)"></el-checkbox></div>
+                                    </div>
+                                    <div class="tbody">
+                                        <div class="tr disflex a-c" v-for="(item,index) in contactList" :key="index">
+                                            <div class="td info disflex a-c">
+                                                <div class="photo"><img :src="item.avatar" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                                <div class="name">{{item.realname}}</div>
+                                            </div>
+                                            <div class="td role">{{item.gname}}</div>
+                                            <div class="td choose alignCenter"><el-checkbox @change="val => chooseReport(item,val)" :value="reportUidArr.includes(item.id)"></el-checkbox></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pop_rightCon">
+                            <div class="pop_con_hedder disflex a-c j-b">
+                                <h3>已添加<em>{{reportUserArr.length}}人</em></h3>
+                                <a href="javascript:;" class="clear" v-if="reportUserArr && reportUserArr.length" @click="clearReportUser()">清空</a>
+                            </div>
+                            <div class="pop_con_list">
+                                <div class="chose_list">
+                                    <div class="chose_item disflex a-c j-b" v-for="(item,ind) in reportUserArr">
+                                        <div class="info disflex a-c">
+                                            <div class="photo"><img :src="item.avatar"  onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                                            <div class="name">{{item.realname}}</div>
+                                        </div>
+                                        <a href="javascript:;" class="del el-icon-close disflex a-c j-c" @click="removeUser(item,ind)"></a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pop_foot disflex a-c j-e">
+                        <el-button class="cancel" @click="showPop = false">取消</el-button>
+                        <el-button class="confirm" type="primary" @click="confirmChoose()">确定</el-button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="popBox" v-if="showTeamPop" style="position: relative; z-index: 11;">
+                <div :class="['popMask',{'show':showTeamPop}]" v-if="showTeamPop"></div>
+                <!-- 添加编辑成员 -->
+                <div :class="`popConBox ${showTeamPop ? 'show' : ''}`">
+                    <div class="popHeader">
+                        <h3>添加团队成员</h3>
+                        <a href="javascript:;" class="close_pop" @click="showTeamPop = false;"></a>
+                    </div>
+                    <div class="popCon disflex">
+                        <div class="flexLeft formbox">
+                            <div :class="`form_item el-form-item ${error_param && error_param == 'realName' ? 'is-error' : ''}`" >
+                                <label for=""><i>*</i>姓名</label>
+                                <div class="inpbox">
+                                    <el-input placeholder="请填写" v-model="teamFormData.realName" @focus="error_param = ''"></el-input>
+                                </div>
+                            </div>
+                            <div :class="`form_item el-form-item ${error_param && error_param == 'phone' ? 'is-error' : ''}`"  >
+                                <label for=""><i>*</i>手机号</label>
+                                <div class="inpbox">
+                                    <el-input placeholder="请填写" v-model="teamFormData.phone" @focus="error_param = ''"></el-input>
+                                    <p>手机号将用于成员账号登录</p>
+                                </div>
+                            </div>
+                            <div class="form_item">
+                                <label for="">登录密码</label>
+                                <div class="inpbox">
+                                    <el-input :placeholder="teamFormData.id ? '如需修改可填写':'初始密码：123456'" v-model="teamFormData.password"></el-input>
+                                </div>
+                            </div>
+                            <div class="form_item">
+                                <label for="">头像</label>
+                                <div class="uploadBox disflex">
+                                    <div :class="`upload_btn ${teamFormData.avatar ? 'hasImg' : ''}`">
+                                        <input type="file" accept="image/*" name="fileData" @change="e => fileChange(e,'avatar')">
+                                        <template v-if="teamFormData.avatar">
+                                            <img :src="teamFormData.avatar_url" alt="" >
+                                            <p class="reUpload">重新上传</p>
+                                        </template>
+                                    </div>
+                                    <p class="tip">推荐尺寸300*300px</p>
+                                </div>
+                            </div>
+                            <div class="form_item">
+                                <label for="">微信号</label>
+                                <div class="inpbox">
+                                    <el-input placeholder="请填写" v-model="teamFormData.wechat"></el-input>
+                                </div>
+                            </div>
+                            <template v-if="teamFormData.sale == 1">
+                                <div class="form_item">
+                                    <label for="">微信二维码</label>
+                                    <div class="uploadBox  disflex">
+                                        <div :class="`upload_btn wechatUpload ${teamFormData.qr ? 'hasImg' : ''}`">
+                                            <input type="file" accept="image/*" name="fileData" @change="e => fileChange(e,'qr')">
+                                            <template v-if="teamFormData.qr">
+                                                <img :src="teamFormData.qr_url" alt="" >
+                                                <p class="reUpload">重新上传</p>
+                                            </template>
+                                        </div>
+                                        <p class="tip">推荐尺寸640*640px</p>
+                                    </div>
+                                </div>
+                                <div class="form_item">
+                                    <label for="">带看次数</label>
+                                    <div class="inpbox sminp">
+                                        <el-input placeholder="带客户看房次数" v-model="teamFormData.view">
+                                            <span class="txt" slot="suffix" >次</span>
+                                        </el-input>
+                                    </div>
+                                </div>
+                                <div class="form_item">
+                                    <label for="">成交次数</label>
+                                    <div class="inpbox sminp">
+                                        <el-input placeholder="本楼盘ta的成交次数" v-model="teamFormData.deal">
+                                            <span class="txt" slot="suffix" >次</span>
+                                        </el-input>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="flexRight zwConBox">
+                            <h4>分配职务</h4>
+                            <div class="zwBox">
+                                <el-select class="selectbox" v-model="teamFormData.gid" placeholder="请选择" @change="val => checkPermission(val)">
+                                    <el-option
+                                      v-for="item in groupList.filter(val => val.id != '')"
+                                      :key="item.id"
+                                      :label="item.name"
+                                      :value="item.id">
+                                    </el-option>
+                                </el-select>
+                                <div class="qxBox" v-if="chosedPermission.length && teamFormData.gid ">
+                                    <h6>当前职务权限为：</h6>
+                                    <div class="qxList">
+                                        <div class="checkbox disabled" v-for="item in chosedPermission">
+                                            <el-checkbox :checked="true">{{item.name}}</el-checkbox>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="popFoot">
+                        <div class="btnsRight">
+                            <a href="javascript:;" class="btn_confirm btn" @click="submitData">确定</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/branchDetail.js?v={#$cfg_staticVersion#}"></script>
+</html>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#$langData['siteConfig'][19][860]#} </title>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/withdraw_log_detail.css?v={#$cfg_staticVersion#}" media="all" />
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/vant/vant.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+	var id = '{#$id#}'
+	var hideFileUrl = '{#$cfg_hideUrl#}';
+	var wxconfig  = {
+		appId: '{#$wxjssdk_appId#}',
+		timestamp: '{#$wxjssdk_timestamp#}',
+		nonceStr: '{#$wxjssdk_nonceStr#}',
+		signature: '{#$wxjssdk_signature#}',
+		wxjssdk_url: '{#$wxjssdk_url#}',
+	}
+	var wxminiPath_withdraw = 'wxMiniprogram://{#$miniProgramId#}/{#$miniProgramAppid#}';
+	var template = '{#$template#}'
+</script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+</head>
+
+<body>
+
+    {#include file="top.html" pageTitle="提现记录详情"#}
+
+    <div id="page" v-cloak>
+			<div class="schedule same" v-cloak v-if="!detail.id">
+				<ul>
+					<li>
+						<div class="scheduleText">
+							<span><img src="{#$templets_skin#}images/withdraw/withdrawDetail_1.png" alt=""></span>
+							<span>提现申请已提交{#if $state != 6 && $state != 1#}，审核中{#/if#}</span>
+						</div>
+						<span>{#echoCurrency type='symbol'#}{#$amount#}</span>
+					</li>
+					<li>
+						<div class="progress-bar">
+							{#if $state == 0 || $state == 3#}
+							<div class="progress50"></div>
+							{#else#}
+							<div class="progress100"></div>
+							{#/if#}
+						</div>
+					</li>
+					<li>
+						<div class="scheduleText">
+							<!-- 审核中 -->
+							{#if $state == 0 || $state == 3#}
+							<span class="noPass"><img src="{#$templets_skin#}images/withdraw/withdrawDetail_2.png" alt=""></span>
+							<!-- 审核拒绝 -->
+							{#elseif $state == 2#}
+							<span><img src="{#$templets_skin#}images/withdraw/withdrawDetail_3.png" alt=""></span>
+							<!-- 审核成功 -->
+							{#elseif $state == 1 || $state == 6#}
+							<span><img src="{#$templets_skin#}images/withdraw/withdrawDetail_2.png" alt=""></span>
+							{#/if#}
+								
+							{#if $state == 0#}
+							<span>预计3个工作日到账</span>
+							{#elseif $state == 2#}
+							<span style="color: #FB3927">抱歉，审核未通过</span>
+							{#elseif $state == 1#}
+							<span>提现成功！</span>
+							{#elseif $state == 3#}
+							<span>打款中...</span>
+							{#elseif $state == 6#}
+							<span>审核通过，请尽快确认收款</span>
+							{#/if#}
+						</div>
+					</li>
+				</ul>
+			</div>
+			<div class="schedule same" v-cloak v-else>
+				<ul>
+					<li>
+						<div class="scheduleText">
+							<span><img src="{#$templets_skin#}images/withdraw/withdrawDetail_1.png" alt=""></span>
+							<span>提现申请已提交{{detail.state != 6 && detail.state != 1 ? '，审核中' : ''}}</span>
+						</div>
+						<span>{#echoCurrency type='symbol'#}{#$amount#}</span>
+					</li>
+					<li>
+						<div class="progress-bar">
+							<div class="progress50" v-if="detail.state == 0 || detail.state == 3"></div>
+							<div class="progress100" v-else></div>
+						</div>
+					</li>
+					<li>
+						<div class="scheduleText">
+							<span class="noPass" v-if="detail.state == 0 || detail.state == 3"><img src="{#$templets_skin#}images/withdraw/withdrawDetail_2.png" alt=""></span>
+							<span v-else-if="detail.state == 2"><img src="{#$templets_skin#}images/withdraw/withdrawDetail_3.png" alt=""></span>
+							<span v-else-if="detail.state == 1 || detail.state == 6"><img src="{#$templets_skin#}images/withdraw/withdrawDetail_2.png" alt=""></span>
+
+							<span v-if="detail.state == 0">预计3个工作日到账</span>
+							<span v-else-if="detail.state == 2" style="color: #FB3927">抱歉，审核未通过</span>
+							<span v-else-if="detail.state == 1">提现成功！</span>
+							<span v-else-if="detail.state == 3">打款中...</span>
+							<span v-else-if="detail.state == 6">审核通过，请尽快确认收款</span>
+						</div>
+					</li>
+				</ul>
+			</div>
+			<div class="line same"></div>
+			<div class="info same" v-if="detail.id" v-cloak>
+				<div class="infoTitle">提现信息</div>
+        		<!-- 支付宝 -->
+				<ul v-if="detail.bank == 'alipay'">
+					<li>
+						<span>提现方式</span>
+						<span>支付宝</span>
+					</li>
+					<li>
+						<span>收款账号</span>
+						<span>{{detail.cardnum}}</span>
+					</li>
+					<li>
+						<span>收款人姓名</span>
+						<span>{{detail.cardname}}</span>
+					</li>
+					<li>
+						<span>申请时间</span>
+						<span>{{detail.tdate}}</span>
+					</li>
+					<li>
+						<span>提现金额</span>
+						<span>{{detail.amount}}</span>
+					</li>
+					<li>
+						<span>手续费用</span>
+						<span>{{detail.shouxuprice}}</span>
+					</li>
+					<li v-if="detail.state != 2">
+						<span>提现说明</span>
+						<span style="word-break: break-all">{{detail.note}}</span>
+					</li>
+					<li v-if="detail.state == 2">
+						<span>拒绝原因</span>
+						<span style="color:#F6262F">{{detail.note}}</span>
+					</li>
+
+					<template v-else-if="detail.state == 1">
+						<template v-if="detail.shouxuprice">
+							<li>
+								<span>实际到账</span>
+								<span>{{detail.price}}</span>
+							</li>
+							<li>
+								<span>到账时间</span>
+								<span>{{detail.rdate}}</span>
+							</li>
+						</template>
+						<template v-if="detail.receipt">
+							<li>
+								<span>电子回单</span>
+								<span><a target="_blank" :href="`${detail.receipt}`" style="color: #017BFF;">点击查看</a></span>
+							</li>
+						</template>
+					</template>	
+				</ul>
+
+				<!-- 微信 -->
+				<ul v-if="detail.bank == 'weixin'">
+					<li>
+						<span>提现方式</span>
+						<span>微信</span>
+					</li>
+					<li>
+						<span>申请时间</span>
+						<span>{{detail.tdate}}</span>
+					</li>
+					<li>
+						<span>提现金额</span>
+						<span>{{detail.amount}}</span>
+					</li>
+					<li>
+						<span>手续费用</span>
+						<span>{{detail.shouxuprice}}</span>
+					</li>
+					<li v-if="detail.state != 2">
+						<span>提现说明</span>
+						<span style="word-break: break-all">{{detail.note}}</span>
+					</li>
+					<li v-if="detail.state == 2">
+						<span>拒绝原因</span>
+						<span style="color:#F6262F">{{detail.note}}</span>
+					</li>
+					<template v-else="detail.state == 1">
+						
+						<template v-if="detail.shouxuprice">
+							<li>
+								<span>实际到账</span>
+								<span>{#$price#}</span>
+							</li>
+							<li>
+								<span>到账时间</span>
+								<span>{#$rdate#}</span>
+							</li>
+						</template>
+						<li v-if="detail.receipt">
+							<span>电子回单</span>
+							<span><a target="_blank" :href="`${detail.receipt}`" style="color: #017BFF;">点击查看</a></span>
+						</li>
+					</template>
+				</ul>
+
+				<ul v-else>
+					<li>
+						<span>提现方式</span>
+						<span>银行卡</span>
+					</li>
+					<li>
+						<span>提现银行</span>
+						<span>{#$bank#}</span>
+					</li>
+					{#if $bankName !=''#}
+					<li>
+						<span>开户行</span>
+						<span>{#$bankName#}</span>
+					</li>
+					{#/if#}
+					<li>
+						<span>收款账号</span>
+						<span>{#$cardnum#}</span>
+					</li>
+					<li>
+						<span>收款人姓名</span>
+						<span>{#$cardname#}</span>
+					</li>
+					<li>
+						<span>申请时间</span>
+						<span>{#$tdate#}</span>
+					</li>
+					<li>
+						<span>提现金额</span>
+						<span>{#$amount#}</span>
+					</li>
+					<li>
+						<span>手续费用</span>
+						<span>{#$shouxuprice#}</span>
+					</li>
+					<li>
+						<span>提现说明</span>
+						<span style="word-break: break-all">{#$note#}</span>
+					</li>
+					{#if $state == 2#}
+					<li>
+						<span>拒绝原因</span>
+						<span style="color:#F6262F">{#$note#}</span>
+					</li>
+					{#elseif $state == 1#}
+					{#if $shouxuprice#}
+					<li>
+						<span>实际到账</span>
+						<span>{#$price#}</span>
+					</li>
+					<li>
+						<span>到账时间</span>
+						<span>{#$rdate#}</span>
+					</li>
+					{#/if#}
+					{#/if#}
+				</ul>
+			</div>
+			
+			<div class="btnBox" v-if="detail.state == 6 && detail.bank == 'weixin'">
+				<a href="javascript:;" class="btn_submit" @click="btnClick()">确认收款</a>
+			</div>	
+		</div>					
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/withdraw_log_detail.js?v={#$cfg_staticVersion#}"></script>
+
+</body>
+</html>

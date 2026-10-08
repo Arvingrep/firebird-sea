@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>修改价格</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/shop_changeprice.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script><script type="text/javascript">
+
+var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+var hideFileUrl = {#$cfg_hideUrl#};
+var fabuUrl = '{#getUrlPath service='member' template='fabu' action='shop' typeid='%typeid%' param="{#if $id != ""#}do=edit{#/if#}"#}';
+
+var orderid   = '{#$detail_id#}';
+var totalPayPrice = {#if $detail_changetype == 1 #}{#$detail_changeprice#}{#else#}{#$detail_totalPayPrice#}{#/if#}; //剩余需要支付的总金额
+var totalLogistic = {#if $detail_changetype == 1 #}{#$detail_changelogistic#}{#else#}{#$detail_logistic#}{#/if#}; //运费  未优惠之前的价格
+var totalpointprice = {#if $detail_changetype == 1 #}0{#else#}{#$detail_pointprice#}{#/if#}; //使用积分抵扣的价格
+</script>
+</head>
+<body>
+
+  <!-- 头部 s -->
+  {#$pageTitle = '修改价格'#}
+  {#$pageRight = "<a href='javascript:;' class='notMenu'></a>"#}
+  {#include file="../../../siteConfig/touch_top.html"#}
+  <div class="changeTop">
+    <div class="changeTip"><i></i><span>修改商品总价将均摊至单件商品价格</span></div>
+    <div class="priceItem">
+      <label>商品总价<br/><em>(不含运费)</em></label>
+      <div class="price zongjia" data-totalprice="{#if $detail_changetype == 1 #}{#$detail_changeprice - $detail_changelogistic#}{#else#}{#$detail_totalPayPrice - $detail_logistic#}{#/if#}"><em>{#echoCurrency type='symbol'#}</em><input type="number" id="totalprice" value="{#if $detail_changetype == 1 #}{#$detail_changeprice - $detail_changelogistic#}{#else#}{#$detail_totalPayPrice - $detail_logistic#}{#/if#}" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')"></div>
+    </div>
+    <div class="priceItem">
+      <label>运费</label>
+      <div class="price">
+        <em>{#echoCurrency type='symbol'#}</em>
+        <input type="number" id="logistic" value="{#if $detail_changetype == 1 #}{#$detail_changelogistic#}{#else#}{#$detail_logistic#}{#/if#}" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+      </div>
+      <div class="free" data-price="{#$detail_logistic#}"><s></s>免运费</div>
+    </div>
+    <input type="hidden" id="fakeprice">
+    <input type="hidden" id="fakelogistic">
+  </div>
+
+  <div class="changeMid">
+    <h2 class="tit">订单商品</h2>
+    <div class="goodWrap">
+      {#if $detail_product#}
+      {#$totalCount_org = 0#}
+      {#foreach from=$detail_product item=pro#}
+      <div class="goodItem" data-id="{#$pro.porderid#}" data-p="{#$pro.price#}" data-c="{#$pro.count#}">
+        <div class="goodInfo">
+          <div class="goodImg"><img src="{#$pro.litpic#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/good_default.png';"></div>
+          <div class="goodTxt">
+            <h3>{#$pro.title#}</h3>
+
+            <p class="guige">{#if $pro.specation#}{#$pro.specation#}{#/if#}</p>
+
+            <p class="market">单价:{#echoCurrency type='symbol'#}{#$pro.yprice#}&nbsp;&nbsp;<span style="{#if $pro.count > 1#}color:#333;{#/if#}">数量:{#$pro.count#}</span></p>
+          </div>
+        </div>
+        <div class="goodPrice">
+          <span>下单价:</span>
+          <strong data-price="{#$pro.price * $pro.count#}" data-count="{#$pro.price#}" data-count1="{#$pro.count#}"  class="xdprice">{#echoCurrency type='symbol'#}{#$pro.price * $pro.count#}</strong>
+          <div class="inpBox"><em>{#echoCurrency type='symbol'#}</em><input type="number" placeholder="修改价格" class="afterprice" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')"></div>
+        </div>
+      </div>
+      {#$totalCount_org = $totalCount_org + $pro.price * $pro.count#}
+      {#/foreach#}
+      {#/if#}
+    </div>
+  </div>
+
+  <div class="changeBot">
+    <div class="allPrice" data-oprice="{#$totalCount_org#}">
+      <p class="myprice"><span>{#echoCurrency type='symbol'#}</span><strong id="priceAll">{#if $detail_changetype == 1 #}{#$detail_changeprice#}{#else#}{#$detail_totalPayPrice#}{#/if#}</strong></p>
+      <p class="pricetip"><span>改后总价</span><em>(含运费{#echoCurrency type="symbol"#}<s></s>)</em></p>
+    </div>
+    <a href="javascript:;" class="sureChange">确定修改</a>
+  </div>
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script src="{#$templets_skin#}js/shop_changeprice.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

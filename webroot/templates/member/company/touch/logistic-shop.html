@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="{#$cfg_soft_lang#}">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+	<title>{#if $do == "add"#}添加运费模版{#elseif $id#}编辑运费模版{#else#}运费模板{#/if#}</title>
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link href="{#$templets_skin#}css/mobiscroll.css" rel="stylesheet" type="text/css">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/logistic-shop.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+	<script src="{#$templets_skin#}js/mobiscroll.js" type="text/javascript"></script>
+	<script src="{#$templets_skin#}js/mobiscroll.select.js" type="text/javascript"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = {#$cfg_hideUrl#};
+		var logEditUrl = "{#getUrlPath service='member' template='logistic' action='shop' id='%id%'#}";
+		var editId = '{#$id#}';
+
+		var logisticArea_arr = '{#$deliveryarea#}';
+		var logisticAreaJson;
+		var logisticArr = [];
+		if(logisticArea_arr!=''){
+			logisticAreaJson = JSON.parse(logisticArea_arr);
+			for(let i in logisticAreaJson){
+				var item = logisticAreaJson[i];
+				logisticArr.push(item)
+			}
+		}
+
+		var freeArr = '{#$specify#}';
+		var freeArrAreaJson;
+		var freeArea_arr = [];
+		if(freeArr!=''){
+			freeArrAreaJson = JSON.parse(freeArr);
+			for(let i in freeArrAreaJson){
+				var item = freeArrAreaJson[i];
+				freeArea_arr.push(item)
+			}
+		}
+
+
+		var noFreeaArr = {#if $nospecify!=''#}{#$nospecify#}{#else#}[]{#/if#};
+
+
+	</script>
+</head>
+<body>
+{#if $do == "add"#}
+{#$pageTitle = '添加运费模版'#}
+{#elseif $id#}
+{#$pageTitle = '编辑运费模版'#}
+{#else#}
+{#$pageTitle = '运费模版'#}
+{#/if#}
+{#include file="top.html"#}
+{#if $do == "add" || $id != 0#}
+<div class="confirmTab" style="{#if $do!='add'#}pointer-events: none{#/if#}">
+	<ul>
+		<li class="{#if $logistype == 0#}active{#/if#}"><a href="javascript:;" data-id="0">快递邮寄</a></li>
+		<li class="{#if $logistype == 1#}active{#/if#}"><a href="javascript:;" data-id="1">商家配送</a></li>
+	</ul>
+</div>
+
+<form action="/include/ajax.php?service={#$module#}&action={#if $id != 0#}logisticEdit&id={#$id#}{#else#}logisticAdd{#/if#}" id="fabuForm" data-url="{#getUrlPath service="member" template="logistic" action="$module"#}">
+<input type="hidden" name="logistype" value="{#$logistype#}" id="logistype">
+<input type="hidden" name="cityid" value="{#$siteCityInfo['cityid']#}" id="cityid">
+<div class="container">
+	<div class="comCon {#if $logistype == 0#}comShow{#/if#}">
+		<div class="comBox">
+			<!-- 模板名称 -->
+			<dl class="fn-clear inpbox">
+				<dt><label for="title">模板名称</label></dt>
+				<dd><input type="text" name="title" class="title" size="39" maxlength="50" value="{#$title#}" placeholder="请输入" /></dd>
+			</dl>
+			<dl class="radiobox fn-clear calcPr" data-type="radio">
+				<dt><label for="">计价方式</label></dt>
+				<dd>
+					<div class="radio" data-title="请选择">
+						<span data-id="0" {#if $valuation == 0#} class="curr"{#/if#}><i></i><em>{#$langData['siteConfig'][26][111]#}</em></span>
+						<span data-id="1" {#if $valuation == 1#} class="curr"{#/if#}><i></i><em>{#$langData['siteConfig'][26][112]#}</em></span>
+						<span data-id="2" {#if $valuation == 2#} class="curr"{#/if#}><i></i><em>{#$langData['siteConfig'][26][113]#}</em></span>
+						<input type="hidden" name="valuation" id="calcPr" value="{#if $valuation #}{#$valuation#}{#else#}0{#/if#}">
+					</div>
+                    <div class="nopsmod">注意：团购套餐类型的商品只能使用按件数计价的方式</div>
+				</dd>
+			</dl>
+			<dl class="delivery_fee delivery_area peisong" data-id="0">
+				<dt>配送运费及区域</dt>
+				<dd>
+					<div class="feeWrap">
+						<div class="feeBox">
+							<div class="psArea">
+								<span>可配送区域</span>
+								<div class="choseArea disabled">
+									<input type="text" class="areaSt" readonly value="默认全国">
+								</div>
+
+							</div>
+							<div class="comdl">
+								<span class="comtxt1">首件(件)</span>
+								<div class="areaNum">
+									<em class="rec disabled"></em>
+									<div><input type="text" class="shouNum" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" name="express_start" value="1"></div>
+									<em class="plus"></em>
+								</div>
+							</div>
+							<div class="comdl">
+								<span>运费(元)</span>
+								<div class="areaNum">
+									<em class="rec disabled"></em>
+									<div><input type="text" class="shoufee" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')" name="express_postage" value="0"></div>
+									<em class="plus"></em>
+								</div>
+							</div>
+							<div class="comdl">
+								<span class="comtxt2">续件(件)</span>
+								<div class="areaNum">
+									<em class="rec disabled"></em>
+									<div><input type="text" class="xuNum" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" name="xj" value="1"></div>
+									<em class="plus"></em>
+								</div>
+							</div>
+							<div class="comdl">
+								<span>续费(元)</span>
+								<div class="areaNum">
+									<em class="rec disabled"></em>
+									<div><input type="text" class="xufee" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')" name="express_postageplus" value="0"></div>
+									<em class="plus"></em>
+								</div>
+							</div>
+
+
+						</div>
+					</div>
+					<div class="areafeeAdd comfeeAdd"><a href="javascript:;"><i></i>增加配送区域</a></div>
+				</dd>
+			</dl>
+
+		</div>
+		<div class="comBox">
+			<dl class="delivery_fee delivery_area baoyou {#if $freeArea && $freeArea=='1'#}active{#/if#}" data-id="0">
+				<dt><span>指定包邮</span><s class="switch {#if $freeArea && $freeArea=='1'#}active{#/if#}"></s></dt>
+				<dd {#if !$freeArea || $freeArea==0#}class="fn-hide"{#/if#}>
+					<div class="feeWrap">
+					</div>
+					<div class="baoyoufeeAdd comfeeAdd"><a href="javascript:;"><i></i>增加配送区域</a></div>
+				</dd>
+				<input type="hidden" name="freeArea" id="freeArea" value="{#if $freeArea#}{#$freeArea#}{#else#}0{#/if#}">
+			</dl>
+
+			<dl class="delivery_fee delivery_area nopeis {#if $opennospecify && $opennospecify==1#}active{#/if#}" data-id="0">
+				<dt><span>指定区域不配送</span><s class="switch {#if $opennospecify && $opennospecify==1#}active{#/if#}"></s></dt>
+				<dd {#if !$opennospecify || $opennospecify==0#}class="fn-hide"{#/if#}>
+					<div class="feeWrap">
+						<div class="feeBox">
+							<div class="psArea">
+								<span>选择不配送地区</span>
+								<div class="choseArea">
+									<input type="text" placeholder="请选择" class="areaSt" readonly>
+									<i class="arr"></i>
+
+								</div>
+
+							</div>
+						</div>
+				</dd>
+				<input type="hidden" name="noFreeArea" id="noFreeArea" value="{#if $opennospecify#}{#$opennospecify#}{#else#}0{#/if#}">
+			</dl>
+		</div>
+		<div class="comBox">
+			<dl class="yfNote">
+				<dt>运费说明</dt>
+				<dd>
+					<div class="textarea knowCont" contenteditable="true" placeholder="填写运费说明">{#$note#}</div>
+				</dd>
+			</dl>
+		</div>
+
+	</div>
+	<div class="comCon {#if $logistype == 1#}comShow{#/if#}">
+		<div class="comBox">
+			<!-- 模板名称 -->
+			<dl class="fn-clear inpbox">
+				<dt><label for="title">模板名称</label></dt>
+				<dd><input type="text" name="title" class="title" size="39" maxlength="50" value="{#$title#}" placeholder="请输入" /></dd>
+			</dl>
+			<dl class="radiobox fn-clear valuation" data-type="radio" data-required="1">
+				<dt><label for="">起送价/配送模式</label></dt>
+				<dd>
+					<div class="radio" data-title="请选择">
+						<span data-id="0" {#if $delivery_fee_mode == 0#}class="curr"{#/if#}><i></i><em>固定配送费/起送价</em></span>
+						<span data-id="1" {#if $delivery_fee_mode == 1#}class="curr"{#/if#}><i></i><em>按距离</em></span>
+						<input type="hidden" name="delivery_fee_mode" id="valuation" value="0">
+					</div>
+				</dd>
+			</dl>
+
+			<dl class="delivery_fee delivery_fix {#if $delivery_fee_mode == 1#}fn-hide{#/if#}" >
+				<dt>设置固定起送价和配送费</dt>
+				<dd>
+					<div class="feeBox">
+						<div class="comdl">
+							<span>固定起送价</span><input type="text" placeholder="请输入价格" id="fixbasic" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')" name="basicprice" value="{#$basicprice#}"><em class="unit">{#echoCurrency type='short'#}</em>
+						</div>
+						<div class="comdl">
+							<span>固定配送费</span><input type="text" placeholder="请输入价格" id="fixfee" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')" name="express_postage" value="{#$express_postage#}"><em class="unit">{#echoCurrency type='short'#}</em>
+						</div>
+						<div class="comdl">
+							<span>最远配送距离</span><input type="text" placeholder="请输入最远距离" id="fixjuli" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')" name="express_juli" value="{#$express_juli#}"><em class="unit">km</em>
+						</div>
+						<div class="manj">
+							<span>满</span><input type="text" placeholder="请输入价格" id="fixover" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')" name="preferentialMoney" value="{#$preferentialMoney#}"><em class="sunit">免配送费</em><s class="switch active"></s>
+						</div>
+
+					</div>
+					<input type="hidden" id="openFree" value="1" name="openFree" value="{#$openFree#}">
+				</dd>
+			</dl>
+			<dl class="delivery_fee delivery_random {#if $delivery_fee_mode == 0#}fn-hide{#/if#}">
+				<dt>设置不同配送距离的外送费和起送价</dt>
+				<dd>
+					<div class="feeWrap">
+						{#foreach from=$range_delivery_fee_valuearr item=v#}
+						<div class="feeBox">
+							<div class="feeDel"></div>
+							<div class="psjuli">
+								<span>配送距离</span>
+								<input type="text" placeholder="请输入距离" class="juliSt" value="{#$v[0]#}" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+								<em class="sunit">公里</em>
+								<i class="zhi"></i>
+								<input type="text" placeholder="请输入距离" class="juliEd" value="{#$v[1]#}" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+								<em class="sunit">公里</em>
+
+							</div>
+							<div class="comdl">
+								<span>外送费</span><input type="text" placeholder="请输入价格" class="ranfee" value="{#$v[2]#}" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')"><em class="unit">{#echoCurrency type='short'#}</em>
+							</div>
+							<div class="comdl">
+								<span>起送价</span><input type="text" placeholder="请输入价格" class ="ranbasic" value="{#$v[3]#}" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')"><em class="unit">{#echoCurrency type='short'#}</em>
+							</div>
+
+						</div>
+						{#/foreach#}
+					</div>
+					<div class="ranfeeAdd"><a href="javascript:;"><i></i>增加不同距离外送费</a></div>
+				</dd>
+			</dl>
+
+
+
+		</div>
+		<div class="comBox">
+			<dl class="yfNote">
+				<dt>运费说明</dt>
+				<dd>
+					<div class="textarea knowCont" contenteditable="true" placeholder="填写运费说明">{#$note#}</div>
+				</dd>
+			</dl>
+		</div>
+	</div>
+</div>
+<div class="addBtn">
+	<a href="javascript:;">{#if $id#}提交修改{#else#}立即添加{#/if#}</a>
+</div>
+</form>
+<!-- 加载页面效果 -->
+<div class="loadIcon"></div>
+<!-- 选择地区弹窗 s-->
+<div class="areaMask"></div>
+<div class="areaAlert">
+	<div class="area_head">
+		<a href="javascript:;" class="cancel_btn">取消</a>
+		<div class="htitle">选择地区</div>
+		<a href="javascript:;" class="sure_btn">确定</a>
+	</div>
+	<div class="areaWrap">
+
+	</div>
+</div>
+<!-- 选择地区弹窗 e-->
+{#else#}
+<div class="logList">
+	<div class="loading">加载中...</div>
+</div>
+<div class="addLog">
+	<a href="{#getUrlPath service='member' template='logistic' action='shop' param='do=add'#}">添加运费模版</a>
+</div>
+{#/if#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/logistic-shop.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

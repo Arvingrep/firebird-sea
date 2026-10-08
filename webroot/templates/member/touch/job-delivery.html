@@ -1,0 +1,122 @@
+{#$pageTitle = '我的投递'#}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$pageTitle#}</title>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/job-delivery.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var memberDomain = '{#$member_userDomain#}'
+    </script>
+</head>
+<body>
+    <div class="header alignLeft">
+		<div class="header-l">
+				<a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+			</div>
+		<div class="header-address">
+            <span>我的投递</span>
+        </div>
+		
+	</div>
+
+    <div class="page" id="page" v-cloak>
+        <div class="tabBox">
+            <ul>
+                <li :data-id="item.id" v-for="item in tabList" :class="{'on_chose':currOnTab == item.id} " @click="currOnTab = item.id">{{item.tit}}<em v-if="item.noread" :class="item.id == 3 ? 'num' : 'dot'">{{item.id == 3 ? item.noread : ''}}</em></li>
+            </ul>
+            <i class="line" :style="'left:'+tabOffLeft+'px;'"></i>
+        </div>
+
+        <div class="container">
+            <div class="resumeTab">
+                <span :class="{'on_chose':batch === 0}" @click="changeBacth(0)">单投 <em>{{batch0}}</em></span>
+                <span :class="{'on_chose':batch === 1}"  @click="changeBacth(1)">批量投 <em>{{batch1}}</em></span>
+            </div>
+            <div class="tdListBox">
+                <ul>
+                    <li v-for="item in tdList" @click="showtdPopInfo(item)">
+                        <a :href="item.postState >= 3 ? '{#$member_userDomain#}/post_detail.html?type='+(item.invition_id ? 'invitation' : 'delivery' )+'&id=' + (item.invition_id  ? item.invition_id  : item.id) : 'javascript:;'" :class="['tdInfoBox', {'cancel_td':item.state == 2 || item.state == 3 }]">
+                            <div :class="'td_state state' + item.postState" :key="item.id">
+                                <div class="left_info">
+                                    <s><img :src="'{#$templets_skin#}images/job/td_icon_' + item.postState +'.png'" alt=""></s>
+                                    <h4 v-if="item.postState == 0">已投递</h4>
+                                    <h4 v-else-if="item.postState == 1">被查看</h4>
+                                    <h4 v-else-if="item.postState == 2">有意向</h4>
+                                    <h4 v-else-if="item.postState == 3">邀面试</h4>
+                                    <h4 v-else-if="item.postState == 4">不合适</h4>
+                                    <span class="td_time">{{timeStrToDate(item.newTime)}}</span>
+                                </div>
+                                <div class="right_info" v-if="(item.state == 2 || item.state == 3) && item.postState == 3"><span>{{item.state == 2 ? '已取消' : '已回绝'}}</span></div>
+                            </div>
+                            <div class="td_post">
+                                <h2><span class="title">{{item.job.title}}</span><span class="salary">{{item.job.show_salary}}<s v-if="item.job.dy_salary > 12"> · {{item.job.dy_salary}}<b>薪</b></s></span></h2>
+                                <p class="typename">{{item.job.type}}<span class="addr" v-if="item.job.job_addr_detail && item.job.job_addr_detail.addrName && item.job.job_addr_detail.addrName.length">{{item.job.job_addr_detail.addrName[item.job.job_addr_detail.addrName.length - 1]}}</span></p>
+                                <p class="company">{{item.companyTitle}}</p>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+                <div class="loadingText" v-if="!isload && tdList.length">{{loadEnd ? '没有更多了' : '下拉加载更多'}}</div>
+                <div class="noData" v-else-if="loadEnd && !tdList.length">
+                    <div class="noDataImg"><img src="{#$templets_skin#}images/job/noData.png" alt=""></div>
+                    <h4>暂无记录</h4>
+                    <p>快去投递心仪的职位吧</p>
+                </div>
+                <div class="loadingText" v-else>加载中...</div>
+    
+            </div>
+            <div :class="['mask_tdInfo',{'showMask':showtdPop}]" @click="showtdPop = false"></div>
+            <div :class="['tdPop',{'showPop':showtdPop}]">
+                <div class="pop_head">
+					<h2>投递情况</h2>
+					<a href="javascript:;" class="close_pop" @click="showtdPop = false"></a>
+				</div>
+                <div class="pop_con" v-if="popInfoDetail">
+                    <div class="td_company">
+                        <a class="tdComInfo toMini" :href="popInfoDetail.companyUrl"  data-module="job"  data-temp="company" :data-id="popInfoDetail.cid">
+                            <div class="clogo"><img :src="popInfoDetail.companyLogo" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+                            <div class="cinfo">
+                                <h4>{{popInfoDetail.companyTitle}}</h4>
+                                <p><span>{{popInfoDetail.companyNature}}</span><em> | </em><span>{{popInfoDetail.companyScale}}</span><em> | </em><span>{{popInfoDetail.companyIndustry}}</span></p>
+                            </div>
+                        </a>
+                        <a :class="['td_post',{'toMini':popInfoDetail.job.state === 1 &&  !popInfoDetail.job.off &&  !popInfoDetail.job.del}]" data-module="job"  data-temp="job" :data-id="popInfoDetail.job.id" :href="popInfoDetail.job.state === 1 &&  !popInfoDetail.job.off &&  !popInfoDetail.job.del ? popInfoDetail.job.url  : 'javascript:;'" @click="toPostLink(popInfoDetail.job)">
+                            <div class="text_con">
+                                <label for="">投递职位：</label>
+                                <span class="salary">{{popInfoDetail.job.show_salary}} {{popInfoDetail.job.dy_salary > 12 ?'· ' + popInfoDetail.job.dy_salary : ''}}<b v-if="popInfoDetail.job.dy_salary > 12">薪</b></span>
+                                <span class="ptitle">{{popInfoDetail.job.title}}</span>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="td_process">
+                        <ul>
+                            <li v-for="(item,ind) in popInfoDetail.postNum">
+                                <s class="dot"></s>
+                                <div class="process_con">
+                                    <h2>{{item.titleText}}</h2>
+                                    <p>{{item.time}} {{item.tipText}}</p>
+                                </div>
+                            </li>
+                            
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<script src="{#$templets_skin#}js/job-delivery.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

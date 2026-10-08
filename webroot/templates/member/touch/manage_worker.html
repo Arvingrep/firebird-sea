@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+  <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+  <title>管理我的发布</title>
+  <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+  <script src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+  <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+  <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+  <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" media="all" />
+  <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage_worker.css?v={#$cfg_staticVersion#}" media="all" />
+  <script>
+    var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+    var memberDomain = '{#$member_userDomain#}'
+  </script>
+</head>
+<body>
+  
+  {#include file="top.html" pageTitle='管理我的发布'#}
+  <div id="page">
+    <div class="pageData" v-if="pgList.length > 0 || qiuzhi_list.length > 0 ||  loading">
+      <!-- <div class="fabu_user"><b>{#$userinfo.nickname#}</b>的发布</div> -->
+      <div class="fabuContainer">
+        <div class="fabuTabBox" v-if="!notab">
+          <span :class="{'on_chose':currOn == 1} " @click="currOn = 1">招聘信息</span>
+          <span :class="{'on_chose':currOn == 2} " @click="currOn = 2">求职信息</span>
+        </div>
+        <!-- <div class="fabuTabBox fixedTop">
+          <span class="on_chose">招聘信息</span>
+          <span>求职信息</span>
+        </div> -->
+        <div class="fabuListBox">
+          <ul v-if="currOn === 2" class="qiuzhi_list">
+            <li v-for="item in qiuzhi_list">
+              <a :href="item.url" class="fbInfo">
+                <div class="infoDetail">
+                  <h2>{{item.title}}</h2>
+                  <div class="labBox">{{item.age}}岁  {{item.education_name}}   {{item && item.experience_name ? item.experience_name + '经验' : ''}}</div>
+                </div>
+                <div class="fbOptBox">
+                  <div class="leftInfo">
+                    <span>{{item.nickname}}</span><em>|</em>
+                    <span class="fbdate" v-if="item.state == 1">{{timetrans(item.pubdate)}}</span>
+                    <span class="fbstate" v-else-if="item.state == 0" @click.prevent.stop="showTip(0)">审核中</span>
+                    <span class="fbstate" v-else @click.prevent.stop="showTip(1)">审核拒绝{{item.refuse ? ':' + item.refuse : ''}}</span>
+                  </div>
+                  <div class="btn_groups">
+                    <button class="edit_btn" @click.prevent.stop="toEdit(item.id)">编辑</button>
+                    <button class="del-btn"  @click.prevent.stop="delInfo(item.id)">删除</button>
+                  </div>
+                </div>
+              </a>
+            </li>
+            <div class="loading" >{{loading ? '加载中' : (isload_qiuzhi ? '下拉加载更多' :  (qiuzhi_list.length == 0 ? '暂无数据' : '没有更多了'))}}</div>
+          </ul>
+          <ul v-else >
+            <li v-for="item in pgList">
+              <a :href="item.url" class="fbInfo" v-if="item" >
+                <div class="infoDetail">
+                  <h2>{{item.title}} </h2>
+                  <div class="salaryShow"><b>{{item.min_salary}}-{{item.max_salary}}</b>{#echoCurrency type=short#}</div>
+                  <div class="labBox">{{item.education_name}}  {{item && item.experience_name ? item.experience_name + '工作经验' : ''}}</div>
+                </div>
+                <div class="fbOptBox">
+                  <div class="leftInfo">
+                    <span>{{item.nickname}}</span>
+                    <em>|</em>
+                    <span class="fbdate" v-if="item.state == 1">{{timetrans(item.pubdate)}}</span>
+                    <span class="fbstate" v-else-if="item.state == 0" @click.prevent.stop="showTip(0)">审核中</span>
+                    <span class="fbstate" v-else @click.prevent.stop="showTip(1)">审核拒绝{{item.refuse ? ':' + item.refuse : ''}}</span>
+                  </div>
+                  <div class="btn_groups">
+                    <button class="edit_btn"  @click.prevent.stop="toEdit(item.id)">编辑</button>
+                    <button class="del-btn" @click.prevent.stop="delInfo(item.id)">删除</button>
+                  </div>
+                </div>
+              </a>
+            </li>
+            <div class="loading" >{{loading ? '加载中' : (isload ? '下拉加载更多' :  (pgList.length == 0 ? '暂无数据' : '没有更多了'))}}</div>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="noData" v-else>
+      <div class="noData_img"><img src="{#$templets_skin#}images/job/noData_job.png" alt=""></div>
+      <div class="noData_text">
+        <h4>您还未发布过招工或求职信息</h4>
+        <p>快速发布免登录<br/> 轻松招人才 找好工作！</p>
+      </div>
+      <div class="btn_group">
+        <a href="{#$member_userDomain#}/fabu_post_seek.html" class="btn_qz">发布求职</a>
+        <a href="{#$member_userDomain#}/fabu_worker_seek.html" class="btn_zp">发布招聘</a>
+      </div>
+    </div>
+  </div>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/manage_worker.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

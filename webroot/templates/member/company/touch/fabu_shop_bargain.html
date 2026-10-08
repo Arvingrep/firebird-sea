@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="{#$cfg_soft_lang#}">
+    <title>砍价狂欢</title>{#*砍价狂欢*#}
+    <meta name="wap-font-scale" content="no">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu_shop_tuan.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript"  src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.deferred.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<!--    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>-->
+
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+        var modelType = '{#$module#}';
+        var id = '{#$id#}';
+        var editId = '{#$id#}';
+        var beforeDays = 580;//提前多久参加活动
+        var backUrl = '{#getUrlPath service='member' template='shop_huodong'#}';
+        var specifiVal = "{#if !$detail_specifiVal#}[]{#else#}{#$detail_specifiVal#}{#/if#}";//多规格
+        var goodidVal      = "{#$detail_goodid#}";
+        var huodongArr = [];
+    </script>
+</head>
+<body>
+    
+{#$pageTitle = "砍价狂欢"#}{#*砍价狂欢*#}
+{#$pageLeft = '<div class="header-l"><a href="javascript:;" class="goBack"></a></div>'#}
+    {#include file="top.html"#}
+<h3 class="tuanTip">同一商品，同一时段只能参加一个活动，商家需合理安排！</h3>
+<div class="container">
+    <form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=shop&action=huodongJoin&oper={#if $id#}update&hid={#$id#}{#else#}add{#/if#}" data-url="{#getUrlPath service='member' template='manage-shop' param="stype=activity&title=活动管理"#}">
+        <div class="chooseGoods" data-url="{#getUrlPath service='member' template='shop_goodlist'#}">
+            {#if $id#}
+            <div class="goodImg"><img src="{#$detail_litpic#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+            <div class="goodInfo"><h4>{#$detail_title#}</h4></div>
+            {#else#}
+            <span class="first">请先选择报名商品</span><i class="arr"></i>
+            {#/if#}
+        </div>
+        <input type="hidden" name="hdtype" value="bargain" id="hdtype">
+        <input type="hidden" name="typeid" id="typeid" value="{#$typeid#}" />
+        <input type="hidden" name="id" id="goodsId" value="{#$detail_goodid#}">
+    <div class="contentWrap">
+        <ul class="info {#if !$id#}disabled {#/if#}">
+            <li class="fn-clear">
+                <span class="name"><label for="market">现价</label></span>{#*原价*#}
+                <input type="text" value="{#if $detail_price#}{#echoCurrency type='symbol'#}{#$detail_price#}{#/if#}" id="market" placeholder="请先选择商品" autocomplete="off" readonly>
+                <input type="hidden" name="market" id="marketVal" value="{#$detail_price#}">
+            </li>
+            
+            
+
+            <li class="fn-clear kucun">
+                <span class="name"><label for="inventory"><em class="star">*</em>活动库存</label></span>{#* 活动库存*#}
+                <span class="fn-right un">{#$langData['siteConfig'][21][10]#}</span>{#*件*#}
+                <input type="number" name="inventory" value="{#$detail_huodonginventory#}" id="inventory"  placeholder="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
+            </li>
+
+            <li class="fn-clear">
+                <span class="name"><label for="maxnum"><em class="star">*</em>每人限购</label></span>{#* 每人限购*#}
+                <span class="fn-right un">次</span> {#* 次*#}
+                <input type="number" name="maxnum" value="{#$detail_limit#}" id="maxnum"  placeholder="该商品每人可发起砍价次数" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
+            </li>
+            <li class="fn-clear hdTime {#if $id#}noChange_{#/if#}">
+                <span class="name"><label for="startdate"><em class="star">*</em>开始时间</label></span>{#* 开始时间*#}
+                <i class="arr"></i>
+                <input mbsc-input type="text" name="startdate" value="{#$detail_ktime|date_format:'%Y-%m-%d %H:%M:%S'#}" id="startdate"  placeholder="请选择" readonly>
+            </li>
+
+            <li class="fn-clear hdTime {#if $id#}noChange_{#/if#}">
+                <span class="name"><label for="enddate"><em class="star">*</em>结束时间</label></span>{#* 结束时间*#}
+                <i class="arr"></i>
+                <input mbsc-input type="text" name="enddate" value="{#$detail_etime|date_format:'%Y-%m-%d %H:%M:%S'#}" id="enddate"  placeholder="请选择" readonly>
+            </li>
+        </ul>
+        <ul class="info {#if !$id#} disabled {#/if#} info2">
+            <li class="{#if $id#}noChange_{#/if#}">
+                <div class="pinTop fn-clear">
+                    <span class="name"><label for="hdprice"><em class="star">*</em>底价</label></span>{#* 底价*#}
+                    <div class="pintuanPrice">
+                        <span class="fn-right un">{#echoCurrency type='short'#}</span>
+                        <input type="text" name="hdprice" value="{#$detail_huodongprice#}" id="hdprice" placeholder="" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')" {#if $id#}readonly{#/if#}>
+                    </div>
+                </div>
+                <!-- 存放多规格 -->
+                <div class="pinBot">
+                </div>         
+            </li>
+            <li class="fn-clear {#if $id#}noChange_{#/if#}" >
+                <span class="name"><label for="allnum"><em class="star">*</em>需砍总次数</label></span>{#* 需砍总次数*#}
+                <span class="fn-right un">次</span> {#* 次*#}
+                <input type="number" name="allnum" value="{#$detail_huodongnumber#}" id="allnum"  placeholder="砍至底价需几人帮砍" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" {#if $id#}readonly{#/if#}>
+            </li> 
+
+            {#*未到底价可以下单*#}
+            <li class="fn-clear {#if $id#}noChange_{#/if#}">
+                <span class="name"><em class="star">*</em>砍价规则</span>{#*砍价规则*#}
+                <div class="radio radioBox bargainrule">
+                    
+                    <div class="active{#if $detail_barruletype==1#} chose_btn{#/if#}">
+                        <div class="check_left">
+                            <span class="check_icon_round"></span>
+                        </div>
+                        <a href="javascript:;" data-id = "1">自由设置</a>{#*自由设置*#}
+                    </div>
+                    <div class="active{#if $detail_barruletype==0#} chose_btn{#/if#}">
+                        <div class="check_left">
+                            <span class="check_icon_round"></span>
+                        </div>
+                        <a href="javascript:;" data-id = "0">程序随机</a>{#*程序随机*#}
+                    </div>
+                    <input type="hidden" name="bargainrule" value="{#$detail_barruletype#}" id="bargainrule" />
+                </div>
+
+            </li>
+
+        </ul>
+        {#*未到底价不可以下单*#}
+        <!-- <div class="bargain-info">
+            <h2>砍价规则</h2>
+
+        </div> -->
+
+        <!-- 程序随机 s-->
+        <div class="bargain-info3 {#if $detail_barruletype ==1#}fn-hide{#/if#}">
+            <p>{#if $shopbargainingnomone ==0#}用户随时可购买，程序将随机自动砍价 {#else#} 用户需砍至底价才可购买，程序将随机自动砍价 {#/if#}</p>
+        </div>
+        <!-- 程序随机 e-->
+            
+        <!-- 自由设置 s-->    
+        <div class="bargain-info2 {#if $detail_barruletype ==0#} fn-hide{#/if#}">
+            <h2>设置规则<a href="javascript:;">查看示例</a></h2>
+            <p class="bargaintip">用户随时可购买，<em>商家可自由设置每次砍价区间可砍金额，避免风险。</em></p>
+            <div class="kanWrap">
+                <a href="javascript:;" class="deleteKan"></a>
+                <ul>
+                    {#if $detail_barrule && is_array($detail_barrule)#}
+                        {#foreach from=$detail_barrule item=list#}
+                        <li>
+                            <div>
+                                <input type="hidden" class="startKan" value="{#$list.min#}">
+                                <span class="kanspan">{#$list.min#}</span>
+                                <span class="dao">刀</span>
+                            </div>
+                            <em>至</em>
+                            <p class="endP"><input type="number" class="endKan" value="{#$list.max#}"  onkeyup="this.value=this.value.replace(/[^0-9]/g,'');"><i>刀</i></p>
+                            <em>砍至</em>
+                            <p class="priceP"><i>{#echoCurrency type='symbol'#}</i><input type="text" class="priceKan"  value="{#$list.money#}" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')"></p>
+
+                        </li>
+                        {#/foreach#}
+                    {#else#}
+                        <li>
+                            <div>
+                                <input type="hidden" class="startKan"  value="1">
+                                <span class="kanspan">1</span>
+                                <span class="dao">刀</span>
+                            </div>
+                            <em>至</em>
+                            <p class="endP"><input type="number" class="endKan"  onkeyup="this.value=this.value.replace(/[^0-9]/g,'');"><i>刀</i></p>
+                            <em>砍至</em>
+                            <p class="priceP"><i>{#echoCurrency type='symbol'#}</i><input type="text" class="priceKan"  onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')"></p>
+
+                        </li>
+                    {#/if#}
+                </ul>
+            </div>
+            <div class="addKan">
+                <a href="javascript:;">+添加区间</a>
+            </div>
+        </div>
+        <!-- 自由设置 e-->
+    </div>
+    
+
+    
+    <div class="fabu_btn"> <span class="btn">提交报名</span> </div>{#*提交报名*#}
+    </form>
+</div>
+
+<!-- 砍价规则示例弹窗 s-->
+<div class="commask"></div>
+<div class="bargainAlert">
+    <div class="bargainItem">
+        <dl class="fn-clear">
+            <dt><span><em class="star">*</em>原价</span></dt>
+            <dd><span>698</span>{#echoCurrency type='short'#}</dd>
+        </dl>
+    </div>
+    <div class="bargainItem">
+        <dl class="fn-clear">
+            <dt><span><em class="star">*</em>底价</span></dt>
+            <dd><span>148</span>{#echoCurrency type='short'#}</dd>
+        </dl>
+    </div>
+    <div class="bargainItem">
+        <dl class="fn-clear">
+            <dt><span><em class="star">*</em>需砍总次数</span></dt>
+            <dd><span>99</span>次</dd>
+        </dl>
+    </div>
+    <div class="bargainItem">
+        <ul>
+            <li>
+                <span class="kanspan">1</span>
+                <span class="dao">刀</span>
+                <em>至</em>
+                <p class="endP">1<i>刀</i></p>                   
+                <em>砍至</em>
+                <p class="priceP"><i>{#echoCurrency type='symbol'#}</i>580.00</p> 
+            </li>
+            <li>
+                <span class="kanspan">2</span>
+                <span class="dao">刀</span>
+                <em>至</em>
+                <p class="endP">3<i>刀</i></p>                   
+                <em>砍至</em>
+                <p class="priceP"><i>{#echoCurrency type='symbol'#}</i>495.00</p> 
+            </li>
+            <li>
+                <span class="kanspan">4</span>
+                <span class="dao">刀</span>
+                <em>至</em>
+                <p class="endP">8<i>刀</i></p>                   
+                <em>砍至</em>
+                <p class="priceP"><i>{#echoCurrency type='symbol'#}</i>295.88</p> 
+            </li>
+        </ul>
+    </div>
+    <i class="kanIcon"></i>
+
+    <h3>设定砍价区间可砍金额，也可只设置前几刀价格，未设置部分程序自动随机</h3>
+    <p class="bargaintip2">（小提示：开砍前几刀砍掉金额越大越能激发用户继续砍价的欲望哦）</p>
+    <a href="javascript:;" class="closeBargain">好的，知道了</a>
+</div>
+<!-- 砍价规则示例弹窗 e-->
+
+<!-- 跳转弹窗 s-->
+<div class="commask2"></div>
+<div class="jumpAlert">
+    <h2>重新选择报名商品？</h2>
+    <h3>重选商品后，当前商品已填内容将清空</h3>
+    <ul class="fn-clear">
+        <li class="canceljump">取消</li>
+        <li class="surejump">确认</li>
+    </ul> 
+</div>
+<!-- 跳转弹窗 e-->
+
+<script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}'
+    };
+</script>
+<script src="//res.wx.qq.com/open/js/jweixin-1.3.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<!-- 选择时间-->
+<script type="text/javascript" src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fabu_shop_huodong.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

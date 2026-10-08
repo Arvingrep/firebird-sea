@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{#$title#}</title>
+<meta name="apptitle" content="{#$title#}">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<script src="/static/js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<link rel="stylesheet" type="text/css" href="/static/css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="/static/js/core/jquery-2.1.1.min.js"></script>
+<script type="text/javascript" src="/static/js/ui/html2canvas.js"></script>
+<script src="/static/js/ui/jquery.qrcode.min.js?v={#$cfg_staticVersion#}"></script>
+<style type="text/css">
+	body,html{background: #f0c785;height: 100%;}
+	.pagebox{height: 100%; width: 100%; background: #f0c785; box-sizing: border-box; padding-top: 2rem; overflow:hidden;}
+	.container{margin:0 .3rem 1.5rem; min-height: 8rem; border-radius: .18rem; background: #fff; position: relative; box-sizing: border-box; border: solid 1px #fff; pointer-events: none; z-index: 9}
+	.container s{content: ''; display: block; width: 1.6rem; height: 1.6rem; background: #f0c785 url(/api/payment/fomopay_paynow/images/pay_quan.png) no-repeat center/.8rem auto; border-radius: 50%;  margin: -.8rem auto 0; box-sizing: border-box; border: solid .2rem #fff;}
+	.container h2{font-size: .36rem; text-align: center; color: #333; }
+	.container h2 span{font-size: .26rem; color: rgb(255,0,36); font-family: moneyNumber; vertical-align: middle; margin-bottom: .06rem; display: inline-block;}
+	.container h2 span b{font-size: .4rem; font-weight: bold;}
+	.container p{font-size: .26rem; text-align: center; color: #333;}
+	.qrCon{border-bottom: dashed 1px #f0c785; padding-bottom: .5rem; position: relative;}
+	.qrCon em{content: ''; display: block; width: .3rem; height: .3rem; background: #f0c785; position: absolute; bottom: -.15rem; left: -.15rem; border-radius: .15rem;}
+	.qrCon .right{left: auto; right: -.15rem;}
+	.qrBox{width: 3rem; height: 3rem; background: #f5f5f5; margin: .5rem auto;}
+	/* .btn_to_save{display: block; margin:.32rem .5rem; height: .88rem; border-radius: .44rem; color: #fff;  background-image: linear-gradient(37deg ,#EECE9D, #E4BF86); text-align: center; font-size: .28rem; line-height: .88rem;} */
+	.btn_to_save{text-align: center; color: #999; font-size: .22rem; line-height: .88rem; text-align: center; display: block; margin:.32rem .5rem; pointer-events: all;}
+	img{width: 100%; position: fixed; left: 0; right: 0; top: 0; opacity: 0}
+</style>
+<script type="text/javascript">
+	var staticPath = "{#$cfg_staticPath#}";
+	var ordertype = '{#$ordertype#}'
+	var wxconfig = {
+			"appId": '{#$wxjssdk_appId#}',
+			"timestamp": '{#$wxjssdk_timestamp#}',
+			"nonceStr": '{#$wxjssdk_nonceStr#}',
+			"signature": '{#$wxjssdk_signature#}',
+			"description": '我在{#$cfg_shortname#}下了订单，请帮我付个款吧~',
+			"title": '代付款申请',
+			"imgUrl": '{#$cfg_basehost#}/templates/member/touch/images/daipay.png',
+			"link": '{#getUrlPath service="member" type="user" template="daipay" param="module={#$service#}&ordernum={#$ordernum#}&peerpay=1"#}',
+	};
+	var codeUrl = '{#$codeUrl#}';
+</script>
+</head>
+<body>
+	<div class="pagebox">
+		<div class="container">
+			<s></s>
+			<div class="qrCon">
+				<h2>支付金额 <span>{#echoCurrency type="symbol"#}<b>{#$order_amount#}</b></span></h2>
+				<p>订单编号：{#$ordernum#}</p>
+				<div class="qrBox"></div>
+				<em class="left"></em>
+				<em  class="right"></em>
+			</div>
+			<a href="javascript:;" class="btn_to_save">长按保存到相册</a>
+		</div>
+	</div>
+	<input type="hidden" id="service" name="service" value="{#$service#}">
+	<input type="hidden" id="ordernum" name="ordernum" value="{#$ordernum#}">
+</body>
+<script>
+	$(function() {
+		$(".qrBox").qrcode({
+		 render: window.applicationCache ? "table" : "canvas",
+		 width: $(".qrBox").width(),
+		 height: $(".qrBox").height(),
+		 text: codeUrl
+	 });
+
+	 html2canvas(document.querySelector("body"), {
+           //'backgroundColor':'#fff',
+           'backgroundColor':'transparent',
+           'useCORS':true,
+				   'dpi': window.devicePixelRatio * 2,
+				   'scale': 2,
+           'scrollY': 0,
+           'scrollX': 0,
+           'taintTest':true,
+           // 'timeout': 500 // 加载延时
+		}).then(function(canvas){
+			var a = canvasToImage(canvas);
+			$('.pagebox').append(a);
+
+		});
+		function canvasToImage(canvas) {
+		    var image = new Image();
+				image.setAttribute("crossOrigin",'anonymous')
+				var imageBase64 = canvas.toDataURL("image/png",1);
+        image.src = imageBase64;
+				$('.btn_to_save').attr('download',imageBase64)
+				$('.btn_to_save').attr('href',imageBase64)
+				utils.setStorage("huoniao_poster" , imageBase64);
+	      return image;
+		}
+
+		//长按
+		  var flags=1  //设置长按标识符
+		  var timeOutEvents=0;
+		  $(".pagebox img").on({
+		      touchstart: function(e){
+		          if(flags){
+		              clearTimeout(timeOutEvents);
+		              timeOutEvents = setTimeout("longPress()",800);
+		          }
+		          // e.preventDefault();
+		      },
+		      touchmove:function () {
+		          clearTimeout(timeOutEvents);
+		          timeOutEvents = 0;
+		      },
+		      touchend:function () {
+		          flags=1;
+		      }
+
+		  });
+
+			//长按执行的方法
+		 	function longPress(){
+		 	    var imgsrc = $(".pagebox").find('img').attr('src');
+		 	    if(imgsrc==''||imgsrc==undefined){
+		 	        alert(langData['siteConfig'][44][94]);//下载失败，请重试
+		 	        return 0
+		 	    }
+		 	    flag=0;
+		 	    setupWebViewJavascriptBridge(function(bridge) {
+		 	        bridge.callHandler(
+		 	            'saveImage',
+		 	            {'value': 'huoniao_poster'},
+		 	            function(responseData){
+		 	                if(responseData == "success"){
+		 	                    setTimeout(function(){
+		 	                        flags=1;
+		 	                    }, 200)
+		 	                }
+		 	            }
+		 	        );
+		 	    });
+		 	}
+		var device = navigator.userAgent;
+		var isWeixin = device.toLowerCase().indexOf('micromessenger') != -1;
+
+		$(".btn_to_save").click(function() {
+			var t = $(this);
+			if(isWeixin){
+				wx.config({
+	            debug: false,
+	            appId: wxconfig.appId,
+	            timestamp: wxconfig.timestamp,
+	            nonceStr: wxconfig.nonceStr,
+	            signature: wxconfig.signature,
+	            jsApiList: ['onMenuShareTimeline', 'onMenuShareAppMessage', 'onMenuShareQQ', 'onMenuShareWeibo', 'onMenuShareQZone', 'openLocation', 'scanQRCode','downloadImage','getLocalImgData'],
+	            openTagList: ['wx-open-launch-app','wx-open-launch-weapp'] // 可选，需要使用的开放标签列表，例如['wx-open-launch-app']
+	        });
+				wx.ready(function(){
+
+					wx.downloadImage({
+					  serverId: t.attr('href'), // 需要下载的图片的服务器端ID，由uploadImage接口获得
+					  isShowProgressTips: 1, // 默认为1，显示进度提示
+					  success: function (res) {
+					    var localId = res.localId; // 返回图片下载后的本地ID
+					    // alert('成功')
+
+					  }
+					});
+
+				})
+			}
+
+			setupWebViewJavascriptBridge(function(bridge) {
+	        bridge.callHandler(
+	            'saveImage',
+	            {'value': 'huoniao_poster'},
+	            function(responseData){
+	                if(responseData == "success"){
+	                    setTimeout(function(){
+	                        flag=1;
+	                    }, 200)
+	                }
+	            }
+	        );
+	    });
+		})
+
+		setTimeout(function () {
+			var timer = setInterval(function () {
+
+				// var type = 1;
+				// if ($('#service').val() == 'member' || $('#service').val() == 'video') {
+				// 	type = 3;
+				// }
+
+				$.ajax({
+					type: 'POST',
+					async: false,
+					url: '/include/ajax.php?service=member&action=tradePayResult&order=' + $("#ordernum").val(),
+					dataType: 'json',
+					success: function (str) {
+						if (str.state == 100 && str.info != "") {
+							clearInterval(timer);
+							//如果已经支付成功，则跳转到指定页面
+							location.href = str.info;
+						}
+					}
+				});
+			}, 2000);
+		}, 3000)
+
+
+	})
+</script>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>微信自动回复</title>
+<link rel="stylesheet" href="/static/css/ui/jquery.chosen.css">
+<link rel="stylesheet" href="/static/css/admin/chosen.min.css">
+{#$cssFile#}
+<style media="screen">
+    .list dl {margin: 0; padding: 15px 0; border-bottom: 1px solid #d9d9d9;}
+    .list dl:hover {background: rgb(255, 251, 227); border-bottom: 1px solid rgb(255, 224, 191);}
+    .list dt, .list dd {float: left; margin: 0; padding: 0;}
+    .list .tr .sel, .list .tr .media {float: none; text-align: left; line-height: 20px;}
+    .list .tr .media {margin-top: 5px;}
+    .list .tr .sel label {display: inline-block; margin: 0; margin-right: 20px;}
+</style>
+</head>
+
+<body>
+<div class="alert alert-success" style="margin:10px 10px 0;"><button type="button" class="close" data-dismiss="alert">×</button>该功能支持自定义关键字和关联网站搜索服务，系统会优先匹配自定义关键字，如果没有匹配上，会再使用搜索服务！<br />配置教程：<a href="https://help.kumanyun.com/help-50-11.html" target="_blank">https://help.kumanyun.com/help-50-11.html</a></div>
+
+{#if $wechatArr#}
+<div class="search" style="position:relative; margin-top: 10px;">
+    <label for="">分站切换</label>
+    <select class="chosen-select" id="cityId" style="width: 150px;">
+        {#foreach from=$wechatArr item=item key=key#}
+        <option value="{#$key#}"{#if $cityid == $key#} selected{#/if#}>{#$item.cityname#}</option>
+        {#/foreach#}
+    </select>
+    <span class="refuse routerTips" style="margin: 0; display: inline-block!important;" data-toggle="tooltip" data-placement="bottom" data-original-title="已为{#$wechatArr|count#}个分站配置了微信独立公众号，城市分站高级设置中绑定独立公众号后才会有此功能"><i class="icon-question-sign" style="margin-top: 3px;"></i></span>
+    {#if $cityid#}
+    <button type="button" class="btn" id="copyDefaultConfig" style="margin-left: 50px;">复制总站配置</button>
+    {#/if#}
+</div>
+{#/if#}
+
+  <form action="" method="post" name="editform" id="editform" class="editform" style="padding-bottom: 10px;{#if !$esState && $userType == 3#} display: none;{#/if#}">
+    <input type="hidden" name="token" id="token" value="{#$token#}" />
+    <div class="thead" style="margin-top: 0;">&nbsp;&nbsp;关联网站搜索服务配置</div>
+      <dl class="clearfix" style="margin-top: 10px;">
+        <dt><label>服务状态：</label></dt>
+        <dd class="radio">
+          {#html_radios name="autoReplyWithSiteSearchState" values=$autoReplyWithSiteSearchValues checked=$autoReplyWithSiteSearchStateChecked output=$autoReplyWithSiteSearchStateNames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="autoReplyWithSiteSearchModule">关联内容：</label></dt>
+        <dd>
+          <select name="autoReplyWithSiteSearchModule" id="autoReplyWithSiteSearchModule">
+            {#foreach from=$moduleList item=module#}
+            <option value="{#$module.value#}"{#if $autoReplyWithSiteSearchModule == $module.value#} selected{#/if#}>{#$module.title#}</option>
+            {#/foreach#}
+          </select>
+          {#if $userType != 3#}
+          <p style="padding-left: 0; font-size: 12px; padding-top: 10px; color: #999;">选择<code>全站搜索</code>需要启用搜索优化功能，<a href="siteConfig/elasticSearch.php" id="elasticSearch">去开启>></a>，如果没有开启，系统将自动关联商家内容！</p>
+          {#/if#}
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="autoReplyWithSiteSearchTitle">回复标题：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="autoReplyWithSiteSearchTitle" id="autoReplyWithSiteSearchTitle" value="{#$autoReplyWithSiteSearchTitle#}" />
+          <p style="padding-left: 0; font-size: 12px; padding-top: 10px; color: #999;">如：查看与[$keyword]相关的$count条内容<br />其中<code>$keyword</code>是用户输入的关键字，<code>$count</code>是查询到的信息数量，请控制在25个字以内！</p>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="autoReplyWithSiteSearchDescption">回复描述：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="autoReplyWithSiteSearchDescption" id="autoReplyWithSiteSearchDescption" value="{#$autoReplyWithSiteSearchDescption#}" />
+          <p style="padding-left: 0; font-size: 12px; padding-top: 10px; color: #999;">如：xx同城为您提供全方位本地生活服务解决方案~<br />请控制在35个字以内！</p>
+        </dd>
+      </dl>
+  </form>
+
+<ul class="thead clearfix" style="position:relative; top:20px; left:0; right:0; margin-top: 10px !important;;">
+  <li class="row3">&nbsp;</li>
+  <li class="row30 left">关键字</li>
+  <li class="row50 left">响应内容</li>
+  <li class="row17 left">操作</li>
+</ul>
+
+<form class="list mb50" id="list" style="margin-top: 20px;">
+  <dl class="tr clearfix">
+      <dt class="row3">&nbsp;</dt>
+      <dt class="row30">关注后自动回复</dt>
+      <dd class="row50">
+          <div class="sel hide"><label><input type="radio" name="subscribeType" value="1" checked>自定义</label><label><input type="radio" name="subscribeType" value="2">微信素材</label></div>
+          <textarea name="subscribe" id="subscribe" class="input-xxlarge" rows="5" placeholder="请输入响应内容">{#$wechatSubscribe#}</textarea>
+          <div class="media hide"><label>{#if $wechatSubscribeMedia#}素材ID【{#$wechatSubscribeMedia#}】{#/if#}</label><a href="javascript:;">选择素材</a></div>
+          <input type="hidden" name="subscribeMedia" value="{#$wechatSubscribeMedia#}">
+      </dd>
+      <dd class="row17">&nbsp;</dd>
+  </dl>
+  {#foreach from=$list item=l key=k#}
+  <dl class="tr clearfix" data-id="{#$l.id#}">
+    <input type="hidden" name="ids[]" value="{#$l.id#}" />
+    <dt class="row3">&nbsp;</dt>
+    <dt class="row30"><input type="text" class="input-large" name="keyword[]" placeholder="关键字" value="{#$l.key#}"></dt>
+    <dd class="row50">
+        <div class="sel hide"><label><input type="radio" name="type[{#$k#}]" value="1" checked>自定义</label><label><input type="radio" name="type[{#$k#}]" value="2">微信素材</label></div>
+        <textarea name="body[]" class="input-xxlarge" rows="5" placeholder="请输入响应内容">{#$l.body#}</textarea>
+        <div class="media hide"><label>{#if $l.media#}素材ID【{#$l.media#}】{#/if#}</label><a href="javascript:;">选择素材</a></div>
+        <input type="hidden" name="media[]" value="{#$l.media#}">
+    </dd>
+    <dd class="row17"><a href="javascript:;" class="del" title="删除">删除</a></dd>
+  </dl>
+  {#/foreach#}
+  <div class="tr clearfix">
+    <div class="row3"></div>
+    <div class="row80 left"><a href="javascript:;" class="add-type" style="display:inline-block; margin-left: 0;" id="addNew">新增关键字</a></div>
+  </div>
+</form>
+<div class="fix-btn"><button type="button" class="btn btn-success" id="saveBtn">保存</button></div>
+
+<script>
+  var adminPath = "{#$adminPath#}", cityid = {#$cityid#};
+</script>
+{#$jsFile#}
+</body>
+</html>

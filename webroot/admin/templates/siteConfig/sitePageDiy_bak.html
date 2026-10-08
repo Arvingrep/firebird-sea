@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>大首页自定义</title>
+<link rel="stylesheet" href="/static/css/core/base.css">
+<link rel="stylesheet" href="/static/css/ui/element_ui_index.css">
+<link rel="stylesheet" href="/static/css/ui/pickr.min.css">
+<link rel="stylesheet" href="/static/css/admin/siteConfigPage.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="/static/css/ui/swiper.min_4.2.2.css">
+
+<script language="javascript" type="text/javascript">
+    var thumbSize = '{#$thumbSize#}', thumbType = "{#$thumbType#}", adminPath = "{#$adminPath#}", modelType = action = "{#$action#}", cfg_staticVersion = '{#$cfg_staticVersion#}';
+    var cfg_attachment = '{#$cfg_attachment#}';
+
+    var masterDomain = '{#$cfg_basehost#}';
+   var memberDomain = '{#$userDomain#}';
+   var businessUrl = '{#$busiDomain#}';
+   var branchUrl = '{#$userDomain#}/workPlatform.html'
+   window.onbeforeunload = function(){
+     if(optAction){
+       return ("还没有完成,确认退出吗?");
+     }
+   }
+   var defaultPath = '/static/images/admin/siteConfigPage/defaultImg/';
+   var sitePageData = '{#json_encode($sitePageData)#}'
+   var config = {#$config#};
+   var hotLine = '{#$cfg_hotline#}';
+   var cfg_pointName = '{#$cfg_pointName#}';
+   var cfg_bonusName = '{#$cfg_bonusName#}';
+   var hotLine = '{#$cfg_hotline#}';
+   var infoName = "{#getModuleTitle name='info'#}";
+   var sfcarName = "{#getModuleTitle name='sfcar'#}";
+   var tiebaName = "{#getModuleTitle name='tieba'#}";
+   var circleName = "{#getModuleTitle name='circle'#}";
+   var articleName = "{#getModuleTitle name='article'#}";
+   var platform = '{#if $smarty.get.cityid && !$smarty.get.platform#}h5{#else#}{#$smarty.get.platform#}{#/if#}'; //当前终端
+   var cityid = '{#$smarty.get.cityid#}'; //当前分站
+   var changePage = '{#$smarty.get.change#}'; //切换页面而来
+   var waimaiQuan = '{#getUrlPath service='waimai' template='getQuan'#}'
+   var shopQuan = '{#getUrlPath service='shop' template='getQuan'#}'
+</script>
+</head>
+
+<body>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <div class="page" id="page" v-cloak  >
+
+        <div class="headBox">
+            <div class="h3">
+                <a href="javascript:;"  class="back"></a> 
+                <s class="line1"></s>
+                <a href="javascript:;"  class="backHome"></a>
+                <span>首页自定义</span>
+                <!-- <a :class="['lastStep changeStep disabled', {'disabled':!allChangeSteps || allChangeSteps.length == 0}]" href="javascript:;">撤回</a>
+                <a :class="['resetChange changeStep', {'disabled':!allChangeSteps || allChangeSteps.length == 0}]" href="javascript:;">重做</a> -->
+
+                <!-- 城市分站 和 平台设置 -->
+                <div class="setConBox">
+                    <label for="">正在编辑：</label>
+                    <template v-if="sitePageData && sitePageData.default">
+
+                        <div class="citySetBox setBox" @click="changeCityPop = true">
+                            <span>{{curr_cp['city'] ? curr_cp['city'].name : '全站默认'}}</span><i class="el-icon el-icon-arrow-down "></i>
+                        </div>
+                        <!--  @click="changeCityPop = true" -->
+                        <div :class="['platformSetBox setBox',{'disabled':noSetPlatform}]" @click="showChangePop">
+                            <div class="platform_curr" v-if="curr_cp['platform']">
+                                <s><img :src="'/static/images/admin/siteConfigPage/'+curr_cp['platform'].id+'.png'" alt=""></s>
+                                <span>{{curr_cp['platform'].name}}</span>
+                            </div>
+                            <div class="platform_curr" v-else>
+                                <template  v-for="item in terminalList" >
+                                    <s v-if="item.buy"><img :src="'/static/images/admin/siteConfigPage/'+item.id+'.png'" alt=""></s>
+                                </template>
+                            </div>
+                            <i class="el-icon el-icon-arrow-down "></i>
+                        </div>
+                    </template>
+                    <template v-else>
+
+                        <div class="citySetBox setBox disabled" @click="showMessageTip">
+                            <span>默认全站</span><i class="el-icon el-icon-arrow-down "></i>
+                        </div>
+                        <div class="platformSetBox setBox disabled" @click="showMessageTip">
+                            <div class="platform_curr" v-if="terminalList.length > 0">
+                                <template v-for="item in terminalList">
+                                    <s v-if="item.buy"><img :src="'/static/images/admin/siteConfigPage/'+item.id+'.png'" alt=""></s>
+                                </template>
+                            </div>
+                            <div class="platform_curr" v-else>
+                                <template v-for="item in terminalList" >
+                                    <template v-if="item.buy">
+                                        <s><img :src="'/static/images/admin/siteConfigPage/'+item.id+'.png'" alt=""></s>
+                                        <span>{{item.name}}</span>
+                                    </template>
+                                </template>
+                            </div>
+                            <i class="el-icon el-icon-arrow-down "></i>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <div class="btnsGroup">
+                <a href="javascript:;" class="preview" @click="saveAllData(1)"><s></s>预览</a>
+                
+                <el-popover
+                    width="320"
+                    placement="bottom-end"
+                    popper-class="blackConfirm"	
+                    v-model="showFirstTooltip"
+                    trigger="manual">
+                    <h6>可批量设置同步此模板到其他分站、终端</h6>
+                    <div class="btns_box">
+                        <span @click="showFirstTooltip = false">好的</span>
+                    </div>
+                    <el-button v-if="sitePageData.default == 1 && currPlatform || currCityid" slot="reference" class="advanceSetBtn" @click="advanceSetPopShow">{{advancsFormData.hasSet ? '已开启批量同步' : '发布高级选项'}}</el-button>
+                </el-popover>
+
+                <a href="javascript:;" class="save" @click="saveAllData()" >保存</a>
+                <div class="success_tip"><s></s>
+                    <p>保存成功</p>
+                </div>
+                <div class="error_tip"><s></s>
+                    <p>请补全未完善信息！</p>
+                </div>
+                <div class="mask_preview" v-show="preveiw " @click="preveiw = false"></div>
+                <div :class="['previewBox',{'morePlatform':!currPlatform}]" v-show="preveiw">
+                    <div class="adQrBox" v-if="checkTerminal('app') && (currPlatform == 'app' || !currPlatform) ">
+                        <div class="qrBox"><img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent('{#$cfg_basehost#}?preview=1&appIndex=1&platform=app&cityid={#$smarty.get.cityid#}')" alt=""></div>
+                        <h5>APP端</h5>
+                        <p><a href="{#$masterDomain#}/mobile.html" target="_blank">{#$cfg_shortname#}APP端</a>扫码</p>
+                    </div>
+                    <div class="miniQrBox" v-if="checkTerminal('wxmini') && (currPlatform == 'wxmini' || !currPlatform) ">
+                        <div class="qrBox"><img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent( '{#$cfg_basehost#}?preview=1&appIndex=1&platform=wxmini&cityid={#$smarty.get.cityid#}')" alt=""></div>
+                        <h5>微信小程序</h5>
+                        <p>使用微信扫码</p>
+                    </div>
+                    <div class="h5QrBox" v-if="currPlatform == 'h5' || !currPlatform ">
+                        <div class="qrBox"><img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent('{#$cfg_basehost#}?preview=1&appIndex=1&platform=h5&cityid={#$smarty.get.cityid#}')" alt=""></div>
+                        <h5>h5端</h5>
+                        <p>使用微信扫码</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+    
+        <div class="containBox">
+            <!-- 左侧数据 -->
+            {#include file="sitePageDiy/leftSide.html"#}
+    
+    
+    
+    
+            <!-- 中间内容 -->
+            <div class="midContainer" @click="showPageSet">
+                <a href="javascript:;" class="hidebtn">
+                    <span class="hideLine" @click="showLine = !showLine" >{{showLine ? '隐藏辅助线' : '显示辅助线'}}</span>
+                </a>
+                <div class="noClickMask" v-show="selfDefine == 0"  @click.stop="openError"></div>
+                <!-- 左侧按钮 -->
+                <div class="opPage_btns" v-if="onPageComp.length">
+                   
+                    <el-tooltip class="item" effect="dark"  content="点这里可返回首页编辑" placement="right">
+                        <span :class="['btn_l',{'on_chose': ![29,22].includes(currEditPart) || (currEditPart == 29 && !compPopShow)}]" @click="currEditPart = 1">首页</span>
+                    </el-tooltip>
+                    <span @click="toEditOnePage(29)" :class="['btn_l',{'on_chose': currEditPart == 29 && compPopShow}]" v-if="onPageComp.indexOf(29) > -1">弹窗</span>
+                    <span @click="toEditOnePage(22)"  :class="['btn_l',{'on_chose': currEditPart == 22}]" v-if="onPageComp.indexOf(22) > -1">悬浮按钮</span>
+                </div>
+                <div class="optBox">
+                    <el-tooltip class="item" effect="dark" content="复制组件" placement="left-start">
+                        <div :class="['copyBtn',,{'disabled':([0,1,2,3,4,5,15,20,21,22,23,24,25,26].includes(currEditPart))}]" @click="copyPart"></div>
+                    </el-tooltip>
+                    <el-tooltip class="item" effect="dark"content="页面设置" placement="left-start">
+                        <div :class="['setAllBtn']"  @click="currEditPart = 0;scrollTop()" ></div>
+                    </el-tooltip>
+                </div>
+                <div :class="['midConBox',{'moreIndex2':showPop},{'transTop':currEditPart == 0}]">
+                    <div class="pageShow">
+                        <div class="pagebox">
+                            
+                            <div class="line_phone" v-show="showLine">
+                                <span>全面屏</span>
+                            </div>
+                            <div class="line_phone line_phone_standard" v-show="showLine">
+                                <span>标准屏</span>
+                            </div>
+                            <div :class="['pageCon customCon',{'noBlueBorder':!pageEditShow }] " @click="changeBorde">
+                                <!-- 模板展示的 -->
+                                <div :class="['truePage',{'toImg':fullscreenLoading}]" id="toCanvas" :style="'background-color:'+ pageSetFormData.style.bgColor +';'" @click="currEditPart = 1">
+                                    <!-- 头部电池信息 -->
+                                    <div :class="['pagetop']" ><img src="{#$cfg_basehost#}/static/images/admin/phone_head.png" alt=""></div>
+                                    <!-- 搜索背景 -->
+                                    <div :class="['searchBg',{'arcBg':(searchColFormData.bgMask == 2)}]" :style="getObjStyle(searchColFormData,'searchBg')">
+                                        <div :class="{'gradient':(searchColFormData.bgMask == 1)}" :style="'background: linear-gradient(180deg, transparent 0%, '+pageSetFormData.style.bgColor+' 100%)'"></div>
+                                    </div>
+
+                                    <!-- 上滚样式  上滚之后 定位在顶部  只做一行显示-->
+                                    <div class="pageTop " id="pageTop" v-show="currEditPart == 0"  :style="'background-color:'+pageSetFormData.style.headBg+';'">
+                                        <!-- 搜索框 显示-->
+                                        <div class="searchConBox">
+                                            <div class="flexbox" :style="'padding:0  '+ (searchColFormData.style.marginLeft / 2) +'px;'" >
+                                                <div class="flex_l">
+                                                    <!-- 左侧logo -->
+                                                    <!--  -->
+                                                    <div class="logobox" v-if="searchColFormData.showMods.includes(1) && searchColFormData.logo.path  && searchColFormData.logo.position == 'left' && pageSetFormData.search.showLeftMods && pageSetFormData.search.showLeftMods.indexOf('logo') > -1">
+                                                        <img :src="pageSetFormData.search.logo.path ?pageSetFormData.search.logo.path : searchColFormData.logo.path">
+                                                    </div>
+    
+                                                    <!-- 城市 -->
+                                                    <div class="cityInfo" v-if="searchColFormData.showMods.includes(5) && pageSetFormData.search.showLeftMods && pageSetFormData.search.showLeftMods.indexOf('city') > -1">
+                                                        <s class="posi"  v-if="searchColFormData.city.styletype == 1" >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"  width="20px" height="24px"  viewBox="0 -8 30 36" preserveAspectRatio="xMinYMin meet" > <path fill-rule="evenodd"  :fill="(pageSetFormData.search.style.cityColor ? pageSetFormData.search.style.cityColor : searchColFormData.city.iconColor)" d="M12.494,-0.003 C5.598,0.006 0.009,5.836 -0.006,13.032 C-0.006,19.979 8.930,29.997 12.494,29.997 C16.060,29.997 24.995,19.979 24.995,13.032 C24.981,5.836 19.392,0.006 12.494,-0.003 ZM7.985,12.524 C7.974,10.035 9.984,8.010 12.475,8.000 C14.967,7.988 16.993,9.997 17.003,12.484 C17.014,14.972 15.005,16.998 12.515,17.008 C12.507,17.008 12.501,17.008 12.496,17.008 C10.015,17.006 7.999,15.003 7.985,12.524 Z"/> </svg>
+                                                        </s>
+                                                        <span :class="{'smCity': searchColFormData.showMods.includes(1) && searchColFormData.logo.path && searchColFormData.logo.position == 'left'}" :style="'color:' + (pageSetFormData.search.style.cityColor ? pageSetFormData.search.style.cityColor : searchColFormData.city.iconColor) + ';'">{{curr_cp['city'] && curr_cp['city'].name ? curr_cp['city'].name : '某分站'}}</span>
+                                                        <s class="arr" v-if="searchColFormData.city.styletype == 2" >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="14px" height="7px"  viewBox="0 0 12 12" preserveAspectRatio="xMinYMin meet"  > <path fill-rule="evenodd"  :fill="(pageSetFormData.search.style.cityColor ? pageSetFormData.search.style.cityColor : searchColFormData.city.iconColor)" d="M6.976,6.990 C6.625,6.990 6.272,6.895 6.026,6.661 L0.522,2.509 C-0.128,1.992 -0.179,1.103 0.321,0.543 C0.871,-0.066 1.823,-0.114 2.420,0.354 L6.976,3.757 L11.526,0.354 C12.178,-0.161 13.127,-0.066 13.627,0.543 C14.179,1.150 14.076,2.042 13.428,2.509 L7.927,6.661 C7.673,6.895 7.323,6.990 6.976,6.990 L6.976,6.990 Z"/> </svg>
+
+                                                        </s>
+                                                    </div>
+    
+                                                </div>
+                                                
+    
+                                                <!-- 搜索框 一行-->
+                                                <div class="searchInpBox" :style="(pageSetFormData.search.style.borderColor ? 'border:solid 1.5px '+pageSetFormData.search.style.borderColor+';' : '') + (pageSetFormData.search.style.bgColor || searchColFormData.searchCon.style.background ? 'background:'+(pageSetFormData.search.style.bgColor ? pageSetFormData.search.style.bgColor : searchColFormData.searchCon.style.background )+';': '') + 'height:'+(searchColFormData.searchCon.style.height / 2) + 'px; border-radius:'+(searchColFormData.searchCon.style.borderRadius / 2)+'px;' ">
+                                                    <div :class="['searchInp',{'noBtns':(!searchColFormData.showMods.includes(2) || !searchColFormData.searchImg.path) && !searchColFormData.showMods.includes(4) }]">
+                                                        <s class="search_icon">
+                                                            <!-- <em :style="(searchColFormData.searchCon.style.iconColor || pageSetFormData.search.style.iconColor ? 'filter: drop-shadow(14px 0 0 '+(pageSetFormData.search.style.iconColor ? pageSetFormData.search.style.iconColor : searchColFormData.searchCon.style.iconColor)+');transform:translateX(-100%);' : '')"> -->
+                                                                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="14px" height="14px" viewBox="0 0 28 28" preserveAspectRatio="xMinYMin meet" > <path fill-rule="evenodd"  :fill="searchColFormData.searchCon.style.iconColor ||  pageSetFormData.search.style.iconColor ? (pageSetFormData.search.style.iconColor ? pageSetFormData.search.style.iconColor : searchColFormData.searchCon.style.iconColor) : 'rgb(173, 174, 178)'" d="M4.193,12.111 C4.193,7.726 7.813,4.159 12.251,4.159 C16.694,4.159 20.307,7.726 20.307,12.111 C20.307,16.501 16.694,20.071 12.251,20.071 C7.806,20.071 4.193,16.501 4.193,12.111 ZM24.471,22.259 L21.114,18.971 C22.617,17.083 23.525,14.703 23.525,12.111 C23.525,5.973 18.466,0.973 12.247,0.973 C6.025,0.973 0.972,5.973 0.972,12.111 C0.972,18.254 6.036,23.253 12.247,23.253 C14.686,23.253 16.940,22.474 18.783,21.173 L22.190,24.509 C22.501,24.821 22.914,24.975 23.325,24.975 C23.735,24.975 24.149,24.821 24.460,24.509 C25.100,23.889 25.100,22.887 24.471,22.259 Z"/> </svg>
+
+                                                            </em></s>
+                                                        <!-- 有搜索推荐词 -->
+                                                        <template v-if="searchKeysNum > 0">
+                                                            <el-carousel height="30px" direction="vertical" :autoplay="true">
+                                                                <el-carousel-item v-for="(item,ind) in searchColFormData.searchCon.keysArr" v-if="item.type" :key="'recKey' + ind">
+                                                                    <span class="recKey" :style="(pageSetFormData.search.style.textColor || searchColFormData.searchCon.style.color ? 'color:'+(pageSetFormData.search.style.textColor ? pageSetFormData.search.style.textColor : searchColFormData.searchCon.style.color)+';' : '')">{{ item.key }}</span>
+                                                                </el-carousel-item>
+                                                            </el-carousel>
+                                                        </template>
+                                                        <template v-else-if="searchPlace > 0">
+                                                            <span  class="recKey" :style="(pageSetFormData.search.style.textColor || searchColFormData.searchCon.style.color ? 'color:'+(pageSetFormData.search.style.textColor ? pageSetFormData.search.style.textColor : searchColFormData.searchCon.style.color)+';' : '')" v-for="(item,ind) in searchColFormData.searchCon.keysArr" v-if="!item.type">{{item.key}}</span>
+                                                        </template>
+                                                        <template v-else >
+                                                            <span  class="recKey" :style="(pageSetFormData.search.style.textColor || searchColFormData.searchCon.style.color ? 'color:'+(pageSetFormData.search.style.textColor ? pageSetFormData.search.style.textColor : searchColFormData.searchCon.style.color)+';' : '')" >搜索关键词</span>
+                                                        </template>
+
+                                                    </div>
+                                                    <div class="search_btns" v-if="(searchColFormData.showMods.includes(2) && searchColFormData.searchImg.path) || searchColFormData.showMods.includes(4)">
+                                                        <a href="javascript:;" v-if="searchColFormData.showMods.includes(2) && searchColFormData.searchImg.path && pageSetFormData.search.searchIcon" class="searchByImg" ><img :style="(pageSetFormData.search.style.searchIcon || searchColFormData.searchImg.iconColor ?  'filter: drop-shadow(24px 0 0 '+(pageSetFormData.search.style.searchIcon ? pageSetFormData.search.style.searchIcon : searchColFormData.searchImg.iconColor)+');transform:translateX(-100%);' : '')" :src="searchColFormData.searchImg.path" alt=""></a>
+    
+                                                        <a href="javascript:;" v-if="searchColFormData.showMods.includes(4) && pageSetFormData.search.searchBtn" :class="['btn_search',{'style1':searchColFormData.searchBtn.styletype === 1}]" :style="getObjStyle(searchColFormData,'searchBtn')"><s v-if="searchColFormData.searchBtn.styletype === 2" :style="'background:'+searchColFormData.searchBtn.style.background+';'"></s>搜索</a>
+                                                    </div>
+                                                </div>
+    
+                                                <div class="flex_r">
+                                                    <div class="rbtns">
+                                                        <ul>
+                                                            <li v-for="(item,bind) in pageSetFormData.search.rightBtns.rbtns" :class="{'smText':searchColFormData.rtBtns.txtStyle == 1}" v-show="item.show">
+                                                                <div class="icon"><img :style="item.iconColor ? 'filter: drop-shadow(24px 0 0 '+ item.iconColor +'); transform:translateX(-100%);':''" :src="item.newIcon ? item.newIcon : (item.icon ? item.icon : '/static/images/admin/siteMemberPage/default_icon2.png')" alt="" onerror="this.src='/static/images/admin/siteMemberPage/default_icon2.png'"></div>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+    
+                                                    <!-- 右侧logo -->
+                                                    <div class="logobox" v-if="searchColFormData.showMods.includes(1) && pageSetFormData.search.rightBtns.logo.show && searchColFormData.logo.path && searchColFormData.logo.position == 'right'">
+                                                        <img :style="pageSetFormData.search.rightBtns.logo.color ? 'filter: drop-shadow(24px 0 0 '+pageSetFormData.search.rightBtns.logo.color+'); transform:translateX(-24px);':''" :src="pageSetFormData.search.rightBtns.logo.path ? pageSetFormData.search.rightBtns.logo.path : searchColFormData.logo.path">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    
+                                    <div :class="['allShowCon',{'onPageShow':currEditPart == 29 && compPopShow || (currEditPart == 22)}] " :style="currEditPart == 0 ? 'transform:translateY('+(searchColFormData.layout == 2 ? '-30' : '0')+'px);':''">
+                                        <!-- 搜索框 显示-->
+                                        {#include file="sitePageDiy/search/search_show.html"#}
+                                        <!-- 只有头部组件 -->
+                                        <div class="topComp">
+                                            <template  v-for=" (modCon,modInd) in showContainerArr.filter(item => {return [2,3,4].indexOf(item.id) > -1}) ">
+
+                                                <div v-if="modCon.id != 4 || (modCon.id == 4 && modCon.content.styletype == 4)" :class="['modConBox partBox',{'bottomDel':modCon.id == 4 && modCon.content.styletype == 4},{'currEditPart':modInd == currEditInd && (modCon.id == currEditPart ) }]" :style="topSetStyle(modCon)" @click="toEditPart(modCon,modInd)" >
+                                                    <template v-if="![11,28].includes(modCon.id) && (currDelPart == modCon.id || currDelPart != 4 || currDelPart != 3)" >
+                                                        <el-popover popper-class="alertPop" :visible-arrow="false" :value="modInd == currDelInd && currEditPart != 22 && showPop" @show="showPop = true" @hide="showPop = false" >
+                                                            <div class="text_con">
+                                                                <h4>确认删除该组件？</h4>
+                                                            </div>
+                                                            <div class="alertBtn">
+                                                                <a href="javascript:;" class="cancel" @click="showPop = false"><s></s><span>取消</span></a>
+                                                                <a href="javascript:;" class="sure" @click="delModBox(modInd)"><s></s><span>确定</span></a>
+                                                            </div>
+                                                            <div @click.stop="currDelPart = modCon.id; currDelInd = modInd" :class="['del_btn',{'show':currDelInd == modInd && showPop && currDelPart == modCon.id}]" slot="reference"><s></s>删除</div>
+                                                        </el-popover>
+                                                    </template>
+    
+                                                    <!-- 顶部图标  显示-->
+                                                    {#include file="sitePageDiy/topBtns/topBtns_show.html"#}
+                                                    
+                                                    <template v-if="modCon.id == 4 && modCon.content.styletype == 4">
+                                                        <!-- 轮播图  显示-->
+                                                        {#include file="sitePageDiy/swiper/swiper_show.html"#}
+                                                    </template>
+                                                    
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <div class="sortBox containerArrBox" data-sort="showContainerArr" data-drag=".partBox" data-filter=".filterOrder" :style="topSetStyle()">
+                                            <template v-for="(modCon,modInd) in showContainerArr">
+
+                                                <div 
+                                                    :data-ind="modInd" 
+                                                    :data-kid="modCon.id" 
+                                                    :class="['modConBox partBox',{'filterOrder':[2,3,29,22].indexOf(modCon.id)  > -1 || (modCon.id == 4 && modCon.content.styletype == 4) || checkOrderCan(modCon,modInd)},{'currEditPart':modInd == currEditInd && (modCon.id == currEditPart || (modCon.id == 11 && currEditPart == 28)) },{'labelModConBox': modCon.id == 11},{'halfPartBox':['qianggou','kanjia','miaosha','pintuan'].includes(modCon.typename) && modCon.content.styletype == 1},checkHalfInd(modInd),{'partPopBox':modCon.id == 29},{'partHoverBox':modCon.id == 22}]" 
+                                                    :data-id="modInd" @click="toEditPart(modCon,modInd)" 
+                                                    :key="'allSort_' + modCon.id + '_' +(modCon.sid ? modCon.sid : 0)" 
+                                                    v-show="modCon.id != 29 || (compPopShow && currEditPart == 29)"
+                                                    :style="[16,17,18,19].includes(modCon.id) && modCon.content.styletype == 1 ? 'margin-top:'+(modCon.content.style.marginTop / 2)+'px;' : ''">
+                                                    <template v-if="![11,28,3,29,22].includes(modCon.id)">
+                                                       
+                                                        <el-popover popper-class="alertPop" :visible-arrow="false" :value="modInd == currDelInd && showPop" @show="showPop = true" @hide="showPop = false">
+                                                            <div class="text_con">
+                                                                <h4>确认删除该组件？</h4>
+                                                            </div>
+                                                            <div class="alertBtn">
+                                                                <a href="javascript:;" class="cancel" @click="showPop = false"><s></s><span>取消</span></a>
+                                                                <a href="javascript:;" class="sure" @click="delModBox(modInd)"><s></s><span>确定</span></a>
+                                                            </div>
+                                                            <div @click.stop="currDelPart = modCon.id; currDelInd = modInd" :class="['del_btn',{'show':currDelInd == modInd && showPop && currDelPart == modCon.id}]" slot="reference"><s></s>删除</div>
+                                                        </el-popover>
+                                                    </template>
+                                                    <template v-if="modCon.id == 4 && modCon.content.styletype != 4">
+                                                        <!-- 轮播图  显示-->
+                                                        {#include file="sitePageDiy/swiper/swiper_show.html"#}
+                                                    </template>
+    
+                                                    <!-- 导航按钮组 -->
+                                                    {#include file="sitePageDiy/sNav/sNav_show.html"#}
+            
+                                                    <!-- 普通按钮组 -->
+                                                    {#include file="sitePageDiy/btns/btns_show.html"#}
+            
+                                                    <!-- 展播链接 -->
+                                                    {#include file="sitePageDiy/advLinks/advLinks_show.html"#}
+            
+                                                    <!-- 消息通知 -->
+                                                    {#include file="sitePageDiy/msg/msg_show.html"#}
+        
+                                                    <!-- 分隔标题 -->
+                                                    {#include file="sitePageDiy/title/title_show.html"#}
+    
+                                                    <!-- 关注公众号 -->
+                                                    {#include file="sitePageDiy/wechat/wechat_show.html"#}
+    
+                                                    <!-- 瓷片广告 -->
+                                                    {#include file="sitePageDiy/adv/adv_show.html"#}
+    
+                                                    <!-- 优惠券 -->
+                                                    {#include file="sitePageDiy/quan/quan_show.html"#}
+        
+                                                    <!-- 商城营销组件 -->
+                                                    {#include file="sitePageDiy/shopMarket/shopMarket_show.html"#}
+    
+                                                    <!-- 商品组 商家组-->
+                                                    {#include file="sitePageDiy/pros/pros_show.html"#}
+            
+                                                    <!-- 切换标题 -->
+                                                    {#include file="sitePageDiy/label/label_show.html"#}
+                                                    
+                                                    <!-- 弹窗 -->
+                                                    {#include file="sitePageDiy/pop/pop_show.html"#}
+                                                    <!-- 悬浮按钮 -->
+                                                    {#include file="sitePageDiy/hoverBtns/hoverBtns_show.html"#}
+                                                </div>     
+                                            </template>
+                                        </div>
+
+                                        <div class="pop"></div>
+
+                                    </div>
+                                    <div class="public_bottom" @click="showConfirmModel">
+                                        <ul :class="'gridbox' + bottomNavs.length" :style="'grid-template-columns:repeat('+bottomNavs.length+',1fr);' "> 
+                                            <li v-for="(item,ind) in bottomNavs" :class="[{'fabu':item.fabu}]">
+                                                <div class="icon_box"><img :src="(ind == 0) ? item.icon_h : item.icon" alt=""></div>
+                                                <p v-if="!item.fabu">{{item.name}}</p>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <p class="tip_page" v-show="showLine">一屏高度参考机型为iPhoneX~15</p>
+
+                               
+                            </div>
+                        </div>
+        
+        
+                    </div>
+
+                </div>
+            </div>
+    
+    
+    
+    
+    
+            <!-- 右侧内容 -->
+            <div class="allRightBoxContainer" @click="pageEditShow = true">
+                <div class="noClickMask" v-show="selfDefine == 0"  @click.stop="openError"></div>
+                
+                <!-- 搜索栏 s -->
+                {#include file="sitePageDiy/search/search_set.html"#}
+                <!-- 搜索栏 e -->
+
+
+
+                <!-- 轮播图 s -->
+                {#include file="sitePageDiy/swiper/swiper_set.html"#}
+                <!-- 轮播图 e -->
+
+
+
+                <!-- 导航按钮组 s -->
+                {#include file="sitePageDiy/sNav/sNav_set.html"#}
+                <!-- 导航按钮组 e -->
+
+
+                <!-- 普通按钮组 s -->
+                {#include file="sitePageDiy/btns/btns_set.html"#}
+                <!-- 普通按钮组 e -->
+
+                <!-- 顶部图标组 s  -->
+                {#include file="sitePageDiy/topBtns/topBtns_set.html"#}
+                <!-- 顶部图标组 e  -->
+
+
+                <!-- 展播链接 s -->
+                {#include file="sitePageDiy/advLinks/advLinks_set.html"#}
+                <!-- 展播链接 e -->
+
+
+                <!-- 消息通知s -->
+                {#include file="sitePageDiy/msg/msg_set.html"#}
+                <!-- 消息通知e -->
+
+                <!-- 关注公众号 s -->
+                {#include file="sitePageDiy/wechat/wechat_set.html"#}
+                <!-- 关注公众号 e -->
+
+                <!-- 瓷片广告 s-->
+                {#include file="sitePageDiy/adv/adv_set.html"#}
+                <!-- 瓷片广告 e-->
+
+                <!-- 分隔标题 -->
+                {#include file="sitePageDiy/title/title_set.html"#}
+
+
+
+                <!-- 切换标签 s -->
+                {#include file="sitePageDiy/label/label_set.html"#}
+                <!-- 切换标签 e -->
+
+                <!-- 数据列表 -->
+                {#include file="sitePageDiy/label/list_set.html"#}
+
+
+                <!-- 优惠券 s-->
+                {#include file="sitePageDiy/quan/quan_set.html"#}
+
+                <!-- 优惠券 e-->
+
+
+                <!-- 商城营销 -->
+                {#include file="sitePageDiy/shopMarket/shopMarket_set.html"#}
+
+
+
+                <!-- 商品组 / 商家组 -->
+                {#include file="sitePageDiy/pros/pros_set.html"#}
+                
+                
+                <!-- 弹窗 -->
+                {#include file="sitePageDiy/pop/pop_set.html"#}
+                
+                 <!-- 悬浮按钮 -->
+                 {#include file="sitePageDiy/hoverBtns/hoverBtns_set.html"#}
+
+
+                <!-- 页面设置  ,{'show':currEditPart === 0}-->
+                <div :class="['rightCon',{'show':currEditPart === 0}] " v-cloak>
+                    <div class="financeContainer modBox">
+                        <div class="title">页面设置</div>
+                        <div class="financeStyle">
+                            <div class="modstyleBox titleSetBox">
+                                <h2 class="stitle">页面设置</h2>
+                                <div class="flexItem pageColorPicker">
+                                    <div class="cPicker">
+                                        <label for="">头部颜色</label>
+                                        <el-color-picker  class="colorpicker" v-model="pageSetFormData.style.headBg"  @active-change="(value) => activeChangeColor(value,'pageSetFormData.style.headBg')"></el-color-picker>
+                                    </div>
+                                    <div class="cPicker">
+                                        <label for="">页面背景</label>
+                                        <el-color-picker popper-class="borderColorPicker"  @change="value => pickerChangeColor(value,'pageSetFormData.style.bgColor')" class="colorpicker" v-model="pageSetFormData.style.bgColor"  @active-change="(value) => activeChangeColor(value,'pageSetFormData.style.bgColor')"></el-color-picker>
+                                        <div class="pic_upload" v-if="checkSwiperTop()">
+                                            <div class="clear_btn" @click="pageSetFormData.style.bgImg = ''"></div>
+                                            <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" id="pageSetFormData_bg_filedata" data-type="pageSetFormData_bg" class="fileUp">
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                            <!-- 样式设置 -->
+                            <div class="modstyleBox contentSetBox">
+                                <h2 class="stitle">搜索栏 <span> *用户上划页面后，固定在顶部的内容</span></h2>
+                                <div class="sContent">
+                                    <dl class="setbox" v-if="searchColFormData.showMods.includes(1) || searchColFormData.showMods.includes(5)">
+                                        <dt><h5>左侧</h5></dt>
+                                        <dd class="style_item">
+                                            <div class="style_options">
+                                                <label for="">保留显示：</label>
+                                                <div class="item_con" v-if="pageSetFormData.search && Array.isArray(searchColFormData.showMods)">
+
+                                                    <!-- 搜索框设置过logo 即searchColFormData.logo.path不为空 并且logo在左侧才会显示 -->
+                                                    <el-checkbox v-show="searchColFormData.showMods.indexOf(1) > -1 && searchColFormData.logo.position == 'left' && searchColFormData.logo.path" :value="Array.isArray(pageSetFormData.search.showLeftMods) && pageSetFormData.search.showLeftMods.indexOf('logo') > -1" @change="value => changeLeftMods(value,'logo')">Logo</el-checkbox>
+                                                    <el-checkbox v-show="searchColFormData.showMods.indexOf(5) > -1" :value="Array.isArray(pageSetFormData.search.showLeftMods) && pageSetFormData.search.showLeftMods.indexOf('city') > -1 " @change="value => changeLeftMods(value,'city')">选择城市</el-checkbox>
+                                                </div>
+                                            </div>
+                                            <div class="style_options" v-show="searchColFormData.showMods.indexOf(1) > -1 && searchColFormData.logo.position == 'left' && pageSetFormData.search.showLeftMods && Array.isArray(pageSetFormData.search.showLeftMods) && pageSetFormData.search.showLeftMods.indexOf('logo') > -1" >
+                                                <label for="" style="align-self:flex-start; padding-top:6px;">logo：</label>
+                                                <div class="img_up fn-clear">
+                                                    <div :class="['upbtn vip_icon',{'hasup':(pageSetFormData.search.logo.path || searchColFormData.logo.path )}]">
+                                                        <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" id="pageSetFormData_logo_filedata" data-type="pageSetFormData_logo">
+                                                        <img :src="pageSetFormData.search.logo.path ? pageSetFormData.search.logo.path :  searchColFormData.logo.path" alt="" v-if="(pageSetFormData.search.logo.path ? pageSetFormData.search.logo.path :  searchColFormData.logo.path)">
+                                                        <span v-show="(pageSetFormData.search.logo.path ? pageSetFormData.search.logo.path :  searchColFormData.logo.path)">更换图片</span>
+                                                    </div>
+                                                </div>
+                                                <div class="imgText">
+                                                    <p class="tip backStep" @click="pageSetFormData.search.logo.path = searchColFormData.logo.path"><s class="rsetIcon"></s>恢复默认logo</p>
+                                                </div>
+                                            </div>
+                                            <div class="style_options" v-show="searchColFormData.showMods.indexOf(1) > -1 && searchColFormData.logo.position == 'left' && pageSetFormData.search.showLeftMods && Array.isArray(pageSetFormData.search.showLeftMods) && pageSetFormData.search.showLeftMods.indexOf('logo') > -1"  >
+                                                <label for="">logo颜色：</label>
+                                                <div class="colorpickerBox">
+                                                    <el-color-picker  class="colorpicker" v-model="pageSetFormData.search.logo.color" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.logo.color')"></el-color-picker>
+                                                </div>
+                                                <div class="colorShowBox">
+                                                    <span class="single">#</span>
+                                                    <input type="text" class="colorShow" :value="(pageSetFormData.search.logo.color).replace('#','')" @change="changeColor('pageSetFormData.search.logo.color')" maxlength="6">
+                                                    <button @click="resetColor('pageSetFormData.search.logo.color')">重置</button>
+                                                </div>
+                                            </div>
+                                            <div class="style_options" v-show="pageSetFormData.search.showLeftMods && Array.isArray(pageSetFormData.search.showLeftMods) && pageSetFormData.search.showLeftMods.indexOf('city') > -1" >
+                                                <label for="">城市文本：</label>
+                                                <div class="colorpickerBox">
+                                                    <el-color-picker  class="colorpicker" v-model="pageSetFormData.search.style.cityColor" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.style.cityColor')"></el-color-picker>
+                                                </div>
+                                                <div class="colorShowBox">
+                                                    <span class="single">#</span>
+                                                    <input type="text" class="colorShow" :value="(pageSetFormData.search.style.cityColor).replace('#','')" @change="changeColor('pageSetFormData.search.style.cityColor')" maxlength="6">
+                                                    <button @click="resetColor('pageSetFormData.search.style.cityColor')">重置</button>
+                                                </div>
+                                            </div>
+                                        </dd>
+                                    </dl>
+                                    
+                                    <dl class="setbox">
+                                        <dt><h5>搜索框</h5></dt>
+                                        <dd class="style_item">
+                                            <div class="style_options" v-if="(searchColFormData.showMods.includes(2) ) || searchColFormData.showMods.includes(4)">
+                                                <label for="">保留显示：</label>
+                                                <div class="item_con" >
+                                                    <el-checkbox v-show="searchColFormData.showMods.includes(4)" :value="searchColFormData.showMods.includes(4) && pageSetFormData.search.searchBtn" @change="val => changeSearchCol(val,4)">搜索按钮</el-checkbox>
+                                                    <el-checkbox v-show="searchColFormData.showMods.includes(2)" :value="searchColFormData.showMods.includes(2) && pageSetFormData.search.searchIcon" @change="val => changeSearchCol(val,2)">搜图图标</el-checkbox>
+                                                </div>
+                                            </div>
+                                            <div class="style_options" >
+                                                <label for="">搜索栏：</label>
+                                                <div class="colorpickerBox">
+                                                    <el-color-picker  class="colorpicker" v-model="pageSetFormData.search.style.bgColor" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.style.bgColor')"></el-color-picker>
+                                                </div>
+                                                <div class="colorShowBox">
+                                                    <span class="single">#</span>
+                                                    <input type="text" class="colorShow" :value="(pageSetFormData.search.style.bgColor).replace('#','')" @change="changeColor('pageSetFormData.search.style.bgColor')" maxlength="6">
+                                                    <button @click="resetColor('pageSetFormData.search.style.bgColor')">重置</button>
+                                                </div>
+                                            </div>
+                                            <div class="style_options" >
+                                                <label for="">边框：</label>
+                                                <div class="colorpickerBox">
+                                                    <el-color-picker  class="colorpicker" v-model="pageSetFormData.search.style.borderColor" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.style.borderColor')"></el-color-picker>
+                                                </div>
+                                                <div class="colorShowBox">
+                                                    <span class="single">#</span>
+                                                    <input type="text" class="colorShow" :value="(pageSetFormData.search.style.borderColor).replace('#','')" @change="changeColor('pageSetFormData.search.style.borderColor')" maxlength="6">
+                                                    <button @click="resetColor('pageSetFormData.search.style.borderColor')">重置</button>
+                                                </div>
+                                            </div>
+                                            <div class="style_options" >
+                                                <label for="">搜索图标：</label>
+                                                <div class="colorpickerBox">
+                                                    <el-color-picker  class="colorpicker" v-model="pageSetFormData.search.style.iconColor" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.style.iconColor')"></el-color-picker>
+                                                </div>
+                                                <div class="colorShowBox">
+                                                    <span class="single">#</span>
+                                                    <input type="text" class="colorShow" :value="(pageSetFormData.search.style.iconColor).replace('#','')" @change="changeColor('pageSetFormData.search.style.iconColor')" maxlength="6">
+                                                    <button @click="resetColor('pageSetFormData.search.style.iconColor')">重置</button>
+                                                </div>
+                                            </div>
+                                            <div class="style_options" >
+                                                <label for="">文本颜色：</label>
+                                                <div class="colorpickerBox">
+                                                    <el-color-picker  class="colorpicker" v-model="pageSetFormData.search.style.textColor" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.style.textColor')"></el-color-picker>
+                                                </div>
+                                                <div class="colorShowBox">
+                                                    <span class="single">#</span>
+                                                    <input type="text" class="colorShow" :value="(pageSetFormData.search.style.textColor).replace('#','')" @change="changeColor('pageSetFormData.search.style.textColor')" maxlength="6">
+                                                    <button @click="resetColor('pageSetFormData.search.style.textColor')">重置</button>
+                                                </div>
+                                            </div>
+                                            <div class="style_options" v-if="searchColFormData.searchImg && searchColFormData.searchImg.path">
+                                                <label for="">搜图图标：</label>
+                                                <div class="colorpickerBox">
+                                                    <el-color-picker  class="colorpicker" v-model="pageSetFormData.search.style.searchIcon" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.style.searchIcon')"></el-color-picker>
+                                                </div>
+                                                <div class="colorShowBox">
+                                                    <span class="single">#</span>
+                                                    <input type="text" class="colorShow" :value="(pageSetFormData.search.style.searchIcon).replace('#','')" @change="changeColor('pageSetFormData.search.style.searchIcon')" maxlength="6">
+                                                    <button @click="resetColor('pageSetFormData.search.style.searchIcon')">重置</button>
+                                                </div>
+                                            </div>
+                                        </dd>
+                                    </dl>
+
+                                    <dl class="setbox" v-if="(pageSetFormData.search.rightBtns.rbtns && pageSetFormData.search.rightBtns.rbtns.length) || (searchColFormData.showMods.indexOf(1) > -1 && searchColFormData.logo.position == 'right')">
+                                        <dt><h5>右侧</h5></dt>
+                                        <dd class="style_item">
+                                            <div class="style_options">
+                                                <label for="">选择内容：</label>
+                                                <div class="item_con rbtnImg">
+                                                    <template v-for="(item,iconInd) in pageSetFormData.search.rightBtns.rbtns">
+                                                        <div :class="['img_icon',{'onChose':iconInd == currRightIcon}]"  @click="currRightIcon = iconInd">
+                                                            <img :style="searchColFormData.bgType == 'color' ? 'background-color:'+(searchColFormData.style.bgColor)+';' : ''" :src="item.icon ? item.icon : '/static/images/admin/siteMemberPage/default_icon2.png' " onerror="thia.src='/static/images/404.jpg'">
+                                                        </div>
+                                                    </template>
+                                                    <div :class="['img_icon',{'onChose':currRightIcon == pageSetFormData.search.rightBtns.rbtns.length}]"  @click="currRightIcon = pageSetFormData.search.rightBtns.rbtns.length" v-if="searchColFormData.showMods.indexOf(1) > -1 && searchColFormData.logo.position == 'right'" >
+                                                        <img :src="searchColFormData.logo.path">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- 右侧按钮 -->
+                                            <template v-for="(btn,btind) in pageSetFormData.search.rightBtns.rbtns" >
+                                                <div class="optionsBox" v-show="btind == currRightIcon">
+
+                                                    <div class="style_options">
+                                                        <label>设置：</label>
+                                                        <div class="split_options radioBox">
+                                                            <span :class="{'on_chose':btn.show}" @click=" btn.show = true" ><s></s>保留显示</span>
+                                                            <span :class="{'on_chose':!btn.show}" @click=" btn.show = false"><s></s>不显示</span>
+                                                        </div>
+                                                    </div>
+                                                    <template v-if="btn.show">
+
+                                                        <div class="style_options" >
+                                                            <label for="" style="align-self:flex-start; padding-top:6px;">图标：</label>
+                                                            <div class="img_up fn-clear">
+                                                                <div :class="['upbtn vip_icon',{'hasup':(btn.icon || btn.newIcon )}]">
+                                                                    <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" :id="'pageSetFormData_'+ btind +'_filedata'" :data-type="'pageSetFormData_' + btind">
+                                                                    <img :src="btn.newIcon ? btn.newIcon : btn.icon" alt="" v-if="(btn.newIcon ? btn.newIcon :  btn.icon)">
+                                                                    <span v-show="(btn.newIcon ? btn.newIcon :  btn.icon)">更换图片</span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="imgText" >
+                                                                <p class="tip backStep" v-show="btn.newIcon != ''"><s class="rsetIcon" @click="btn.newIcon = '';"></s>恢复默认图标</p>
+                                                            </div>
+                                                        </div>
+                                                        <div class="style_options">
+                                                            <label for="">图标颜色：</label>
+                                                            <div class="colorpickerBox">
+                                                                <el-color-picker  class="colorpicker" v-model="btn.iconColor" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.rightBtns.rbtns.'+btind+'.iconColor')"></el-color-picker>
+                                                            </div>
+                                                            <div class="colorShowBox">
+                                                                <span class="single">#</span>
+                                                                <input type="text" class="colorShow" :value="(btn.iconColor).replace('#','')" @change="changeColor('pageSetFormData.search.rightBtns.rbtns.'+btind+'.iconColor')" maxlength="6">
+                                                                <button @click="resetColor('pageSetFormData.search.rightBtns.rbtns.'+btind+'.iconColor')">重置</button>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+
+                                            <!-- 右侧logo -->
+                                            <template v-if="searchColFormData.showMods.indexOf(1) > -1 && searchColFormData.logo.position == 'right' && currRightIcon == pageSetFormData.search.rightBtns.rbtns.length">
+
+                                                <div class="style_options">
+                                                    <label>设置：</label>
+                                                    <div class="split_options radioBox">
+                                                        <span :class="{'on_chose':pageSetFormData.search.rightBtns.logo.show}" @click=" pageSetFormData.search.rightBtns.logo.show = true"><s></s>保留显示</span>
+                                                        <span :class="{'on_chose':!pageSetFormData.search.rightBtns.logo.show}" @click=" pageSetFormData.search.rightBtns.logo.show = false"><s></s>不显示</span>
+                                                    </div>
+                                                </div>
+                                                <div class="style_options" >
+                                                    <label for="" style="align-self:flex-start; padding-top:6px;">图标：</label>
+                                                    <div class="img_up fn-clear">
+                                                        <div :class="['upbtn vip_icon',{'hasup':(pageSetFormData.search.rightBtns.logo.path || searchColFormData.logo.path )}]">
+                                                            <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" id="pageSetFormData_logo1_filedata" data-type="pageSetFormData_logo1">
+                                                            <img :src="pageSetFormData.search.rightBtns.logo.path ? pageSetFormData.search.rightBtns.logo.path :  searchColFormData.logo.path" alt="" v-if="(pageSetFormData.search.rightBtns.logo.path ? pageSetFormData.search.rightBtns.logo.path :  searchColFormData.logo.path)">
+                                                            <span v-show="(pageSetFormData.search.rightBtns.logo.path ? pageSetFormData.search.rightBtns.logo.path :  searchColFormData.logo.path)">更换图片</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="imgText">
+                                                        <p class="tip backStep"  @click="pageSetFormData.search.rightBtns.logo.path = searchColFormData.logo.path"><s class="rsetIcon"></s>恢复默认logo</p>
+                                                    </div>
+                                                </div>
+                                                <div class="style_options" >
+                                                    <label for="">logo颜色：</label>
+                                                    <div class="colorpickerBox">
+                                                        <el-color-picker  class="colorpicker" v-model="pageSetFormData.search.logo.color" @active-change="(value) => activeChangeColor(value,'pageSetFormData.search.logo.color')"></el-color-picker>
+                                                    </div>
+                                                    <div class="colorShowBox">
+                                                        <span class="single">#</span>
+                                                        <input type="text" class="colorShow" :value="(pageSetFormData.search.logo.color).replace('#','')" @change="changeColor('pageSetFormData.search.logo.color')" maxlength="6">
+                                                        <button @click="resetColor('pageSetFormData.search.logo.color')">重置</button>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+
+                            <!-- 间距设置 -->
+                            <div class="marginSetBox" >
+                                <h2 class="stitle"  @click="showMarginSet = !showMarginSet">全局样式</h2>
+                                <el-collapse-transition>
+                                    <div class="style_item" >
+                                        <div class="sContent">
+                                            <div class="style_options">
+                                                <label for="">组件间隔：</label>
+                                                <el-slider tooltip-class="tooltip_show"  :show-tooltip="showTooltip" v-model="pageSetFormData.style.marginTop" :min="0" :max="40" @input="(value) => changeAllSlide(value,'marginTop')"></el-slider>
+                                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                                    <input type="number" class="colorShow" @input="checkMax(0,40,'pageSetFormData.style.marginTop')" :value="pageSetFormData.style.marginTop">
+                                                    <span class="single back">px</span>
+                                                </div>
+                                            </div>
+                                            <div class="style_options">
+                                                <label for="">左右间距：</label>
+                                                <el-slider tooltip-class="tooltip_show"  :show-tooltip="showTooltip" v-model="pageSetFormData.style.marginLeft"  :min="0" :max="40" @input="(value) => changeAllSlide(value,'marginLeft')"></el-slider>
+                                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                                    <input type="number" class="colorShow" @input="checkMax(0,40,'pageSetFormData.style.marginLeft')" :value="pageSetFormData.style.marginLeft" >
+                                                    <span class="single back">px</span>
+                                                </div>
+                                            </div>
+                                              
+                                        </div>
+                                    </div>
+                                </el-collapse-transition>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+            </div>
+    
+        </div>
+
+        <!-- v-show="fullscreenLoading" -->
+        <div class="loadMask" v-show="fullscreenLoading">
+            <div class="loadBox">
+                <div class="loadIcon"><svg viewBox="25 25 50 50" class="circular"><circle cx="50" cy="50" r="20" fill="none" class="path"></circle></svg></div>
+                <div class="loadText">{{saveType ? '生成预览中':'保存页面中'}}</div>
+            </div>
+        </div>
+        <!-- 弹出层 -->
+        {#include file="sitePageDiy/allPop.html"#}
+    </div>
+
+</body>
+<script src="/static/js/vue/vue.js"></script>
+<script src="/static/js/image-main-color.js"></script>
+<script src="/static/js/ui/Sortable.js"></script>
+<script src="/static/js/ui/element_ui_index.js"></script>
+<script src="/static/js/core/jquery-2.1.1.min.js"></script>
+<script src="/static/js/ui/pickr.min.js"></script>
+<script src="/static/js/ui/swiper.min_4.2.2.js"></script>
+<script src="/static/js/ui/jquery.ajaxFileUpload.js"></script>
+<script src="/static/js/admin/sitePgaeDiyDefault.js?v={#$cfg_staticVersion#}"></script>
+<script src="/static/js/admin/html2canvas.js"></script>
+<script src="/static/js/admin/siteConfigPage.js?v={#$cfg_staticVersion#}"></script>
+</html>

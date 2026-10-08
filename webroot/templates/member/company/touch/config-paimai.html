@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu-paimai.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}../../touch/css/gz-fabu.css?v={#$cfg_staticVersion#}">
+
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <title>{#if $do#}入驻店铺{#else#}修改店铺{#/if#}</title>
+    <script>
+        var id = '{#$id#}';
+        var type = '{#$detail_typeid#}';
+        var typename = '{#$detail_typename#}';
+        var address = '{#$detail_address#}';
+        var addrid = '{#$detail_addrid#}';
+        var cityid = '{#$detail_cityid#}';
+        var wechatcode = '{#$detail_wechatcode#}';
+        var tel = '{#$detail_tel#}';
+        var lng = '{#$detail_lng#}';
+        var lat = '{#$detail_lat#}';
+        var memberUrl = '{#$member_userDomain#}';
+    </script>
+</head>
+<body>
+    {#if $do#}
+    {#$pageTitle = '入驻店铺'#}
+    {#else#}
+    {#$pageTitle = '修改店铺'#}
+    {#/if#}
+    
+    <h2>{#$test#}</h2>
+    {#$pageRight = "<a href='javascript:;' class='notMenu'></a>"#}
+    <div class="gz-address">
+        <div class="gz-addr-wrap" id="gzAddNewObj">
+            {#include file="../../../siteConfig/touch_top.html"#} 
+    
+            <div class="fabuContainer" id="fabuContainer">
+                <van-form @submit="onSubmit">
+                    
+                   
+                   
+                   
+                    <van-cell-group>
+                        
+                        <!-- <van-field
+                            readonly
+                            clickable
+                            label="选择分类"
+                            :value="formData.stypename"
+                            placeholder="请选择"
+                            @click="showPicker = true"
+                            :rules="[{ required: true, message: '请选择商品分类' }]"
+                            is-link
+                        ></van-field>
+                        <van-popup v-model="showPicker" round position="bottom" >
+                            <van-picker
+                              title="选择分类"
+                              show-toolbar
+                              :columns="typeList"
+                              text-key="typename"
+                              :value="formData.typeid"
+                              @cancel="showPicker = false"
+                              @confirm="onConfirmType"
+                            />
+                          </van-popup> -->
+                       
+                          <van-field
+                            v-model="formData.tel"
+                            name="tel"
+                            label="电话"
+                            type="tel"
+                            placeholder="请输入联系电话"
+                        ></van-field>
+                          <van-field
+                            v-model="formData.wechatcode"
+                            name="wechatcode"
+                            label="微信号"
+                            type="text"
+                            placeholder="请输入微信号"
+                        ></van-field>
+                       
+                            <!-- 选择区域 s -->
+                            <div class="ChoiceBox">
+                                <span>{#$langData['siteConfig'][19][27]#}</span>
+                                <dl class="gz-addr-seladdr chose_area gz-no-sel" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_addrid split=' '#}"  data-id="{#$detail_addrid#}" data-addrname="{#if $detail_addrid#}{#getPublicParentInfo tab='site_area' id=$detail_addrid type='typename' split=' '#}{#else#}请选择{#/if#}">
+                                    <dd><p class="city">{#if $detail_addrid#}{#getPublicParentInfo tab='site_area' id=$detail_addrid type='typename' split=' '#}{#else#}省市区县(乡镇){#/if#}</p>
+                                    <input type="hidden" name="addrid" id="addrid" :value="formData.addrid">
+                                    <input type="hidden" name="cityid" id="cityid" :value="formData.cityid">
+                                </dl>
+                                <div class="map_detail" @click="toAddress">
+                                    <s></s>
+                                    <em>定位</em>
+                                    <input type="hidden" id="lnglat" name="lnglat" :value="formData.lng +','+ formData.lat">
+                                </div>
+
+                            </div>
+                            <!-- 选择区域 e-->
+                          <van-field
+                            v-model="formData.address"
+                            name="address"
+                            label="详细地址"
+                            type="text"
+                            placeholder="请输入详细地址"
+                        ></van-field>
+                        <input type="hidden" name="lng" :value="formData.lng">
+                        <input type="hidden" name="lat" :value="formData.lat">
+                        </van-cell-group>
+               
+        
+                    <van-cell><van-button round block type="info" native-type="submit">提交</van-button></van-cell>
+                </van-form>
+
+                
+            </div>
+        </div>
+        <!-- 区域选择弹出层  -->
+        <div class="gz-sel-addr gz-sel-addr-hide" id="gzSelAddr">
+            <div class="gz-sel-addr-header">
+                <a href="javascript:;" class="cancelAddrid" id="gzSelAddrCloseBtn">取消</a>
+                <h3>选择区域</h3>
+                <a href="javascript:;" class="sureAddrid">确定</a>
+            </div>
+            <ul class="gz-sel-addr-nav"></ul>
+            <div class="gz-sel-addr-list"></div>
+        </div>
+    
+        <div class="gz-sel-addr-mask"></div>
+    </div>
+
+<script src="{#$templets_skin#}js/shop-gz-info.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/config-paimai.js?v={#$cfg_staticVersion#}"></script>
+
+</body>
+</html>

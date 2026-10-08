@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{#$langData['siteConfig'][35][1]#}</title>{#* 推广二维码 *#}
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fenxiao_code.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        //如果没有菜单内容，则隐藏APP端右上角菜单
+        if (device.indexOf('huoniao') > -1 && ($('.dropnav').size() == 0 || $('#navlist').size() == 0)) {
+            setTimeout(function(){
+                setupWebViewJavascriptBridge(function(bridge) {
+                    bridge.callHandler('hideAppMenu', {}, function(){});
+                });
+            }, 500);
+        }
+    </script>
+</head>
+<body>
+{#include file="../../siteConfig/touch_top.html" pageTitle={#$langData['siteConfig'][35][1]#}#}{#* 推广二维码 *#}
+<div class="container">
+    <div class="top">
+        <div class="code-box">
+            <div class="code-img"><img src="/include/qrcode.php?type=fenxiao&data={#$cfg_basehost#}/register.html?fromShare={#$userinfo.userid#}" alt=""></div>
+            <p>{#$langData['siteConfig'][35][17]#}</p>{#* 打开手机扫一扫 *#}
+        </div>
+    </div>
+    <div class="btn-box"> <a class="btn" href="{#getUrlPath service="member" type="user" template="fenxiao_code_poster"#}">{#$langData['siteConfig'][35][18]#}</a></div>{#* 生成专属海报 *#}
+    <div class="content">
+        <p>{#$cfg_fenxiaoNote|replace:"\n\r":'</p><p>'|replace:"\n":'</p><p>'#}</p>
+    </div>
+
+<script>
+{#if !$cfg_fenxiaoQrType#}
+$(function(){
+	$.ajax({
+		url: "/include/ajax.php",
+		type: "POST",
+		data: {
+			service: 'siteConfig',
+			action: 'getWeixinQrPost',
+			module: 'siteConfig',
+			type: 'fenxiao',
+			aid: '0',
+			title: '邀请你一起加入~',
+			description: '{#$userinfo['nickname']#}正在使用{#$cfg_shortname#}，点击加入=>',
+			imgUrl: '{#$cfg_share#}',
+			link: '{#$cfg_basehost#}/register.html?fromShare={#$userinfo.userid#}'
+		},
+		async: false,
+		dataType: "json",
+		success: function (response) {
+			if(response.state == 100){
+				$('.code-img img').attr('src', '/include/qrcode.php?type=fenxiao&data=' + response.info);
+			}
+		},
+		error: function (xhr, status, error) {
+
+		}
+	});
+});
+{#/if#}
+
+var staticPath = '{#$cfg_staticPath#}';
+var wxconfig = {
+    "appId": '{#$wxjssdk_appId#}',
+    "timestamp": '{#$wxjssdk_timestamp#}',
+    "nonceStr": '{#$wxjssdk_nonceStr#}',
+    "signature": '{#$wxjssdk_signature#}',
+    "description": '{#$userinfo['nickname']#}正在使用{#$cfg_shortname#}，点击加入=>',
+    "title": '邀请你一起加入~',
+    "imgUrl": '{#$cfg_share#}',
+    "link": '{#$cfg_basehost#}/register.html?fromShare={#$userinfo.userid#}',
+};
+document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+</div>
+</body>
+</html>

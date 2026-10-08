@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#$langData['siteConfig'][19][712]#}</title>  {#* 微信支付 *#}
+<script type="text/javascript" src="https://res.wx.qq.com/open/js/jweixin-1.3.2.js"></script>
+<script type="text/javascript" src="/static/js/core/jquery-2.1.1.min.js"></script>
+</head>
+
+<body onload="callpay()">
+<script type="text/javascript">
+ var returnurl = '{#$returnUrl#}';
+ var isRunUrl=function(url){
+        return new Promise(function (resolve, reject) {
+            // 测试链接连通性, 主要检测404错误
+            // 由于AJAX通常无法区分404和跨域问题
+            // 所以只能用script 或者 link标签
+            // link比script更容易捕获错误
+            var dom= document.createElement('link');
+            dom.href = url;
+            dom.rel = 'stylesheet';
+            document.head.appendChild(dom);
+            dom.onload = function () {
+                document.head.removeChild(dom);
+                resolve();
+            }
+            dom.onerror = reject;
+        });
+    }
+ 
+function IsLoad(url,fun){
+       $.ajax({
+           url: url,
+           type: 'GET',
+           success: function(response) {
+               if($.isFunction(fun) && response.indexOf('error-page') <= -1 && response.indexOf('error-page') <= -1){
+                   fun(true);
+               }else{
+                  fun(false);
+               }
+           },
+           error:function () {
+               if($.isFunction(fun)){
+                   fun(false);
+               }
+           }
+       });
+   }
+    
+//调用微信JS api 支付
+function jsApiCall(){
+
+    var jsApiParameters = {#if $jsApiParameters#}{#$jsApiParameters#}{#else#}''{#/if#};
+    var openId = '{#$openId#}';
+    var url_param = '{#$url_param#}';
+    var wx_miniprogram;
+    wx.miniProgram.getEnv(function (res) {
+        wx_miniprogram = res.miniprogram;
+    });
+    //小程序
+    if(typeof jsApiParameters == 'string' && jsApiParameters){ // 参数是string时需要转换一下
+        jsApiParameters = JSON.parse(jsApiParameters);
+    }
+    if(window.__wxjs_environment == 'miniprogram' || wx_miniprogram){
+        var params = ''
+        if(openId){
+            params = '?openid=' + openId + '&timestamp='+jsApiParameters.timeStamp+'&nonceStr='+jsApiParameters.nonceStr+'&signType='+jsApiParameters.signType+'&paySign='+encodeURIComponent(jsApiParameters.paySign)+'&prepay_id='+(jsApiParameters.package).replace('prepay_id=', '')+'&returnUrl='+encodeURIComponent('{#$returnUrl#}');
+        }else{
+            params = '?openid=' + openId + '&param=' + url_param
+            alert(openId,params)
+        }
+        
+        var path = '/pages/pay/pay'+params;
+        wx.miniProgram.redirectTo({url: path});
+
+    //公众号
+    }else{
+        WeixinJSBridge.invoke(
+            'getBrandWCPayRequest',
+            jsApiParameters ? jsApiParameters : {},
+            function(res){
+                // alert(JSON.stringify(res))
+                //成功
+                if(res.err_msg == "get_brand_wcpay_request:ok" ) {
+                    // alert('1{#$returnUrl#}');
+                    window.location.replace('{#$returnUrl#}')
+                }else{
+                     
+                    // 
+                    // window.location.replace('{#$returnUrl#}');
+                    var failUrl = '{#$orderurl#}';
+                    if(failUrl != ''){
+                        IsLoad(failUrl,function(res){
+                           if(res){
+                               window.location.replace(failUrl)
+                           }else{
+                              history.back(-1);
+                                setTimeout(function(){
+                                    window.location.replace('{#$cfg_basehost_#}');
+                                }, 1000);
+                           }
+                       });
+                        
+                    }else{
+                        // alert('4');
+                        history.back(-1);
+                        setTimeout(function(){
+                            window.location.replace('{#$cfg_basehost_#}');
+                        }, 1000);
+                    }
+                }
+                //统一再跳转到支付页面，由支付页面验证是否支付成功！
+            }
+        );
+  }
+}
+
+function callpay(){
+    console.log(document.referrer)
+  if (typeof WeixinJSBridge == "undefined"){
+      if( document.addEventListener ){
+          document.addEventListener('WeixinJSBridgeReady', jsApiCall, false);
+      }else if (document.attachEvent){
+          document.attachEvent('WeixinJSBridgeReady', jsApiCall);
+          document.attachEvent('onWeixinJSBridgeReady', jsApiCall);
+      }
+  }else{
+      jsApiCall();
+  }
+}
+</script>
+</body>
+</html>

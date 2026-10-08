@@ -1,0 +1,411 @@
+{#if $do == "add" || $id != 0#}
+{#if $do == "add"#}
+{#$pageTitle = $langData['siteConfig'][26][106]|cat:" - "|cat:$cfg_webname#}
+{#else#}
+{#$pageTitle = $langData['siteConfig'][26][107]|cat:" - "|cat:$cfg_webname#}
+{#/if#}
+{#include file="head.html"#}
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/logistic.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/admin/font-awesome.min.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/admin/ace-fonts.min.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/admin/ace.min.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js"></script>
+<script src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var id = {#$id#};
+	var manageUrl = '{#getUrlPath service="member" template="logistic" action="$module"#}';
+
+	var valuation = '{#$valuation#}'
+	var freeArea  = '{#$freeArea#}'
+	var opennospecify  = '{#$opennospecify#}'
+
+	var logisticArea_arr = '{#$deliveryarea#}';
+	var logisticAreaJson;
+	var logisticArr = [];
+	if(logisticArea_arr!=''){
+		logisticAreaJson = JSON.parse(logisticArea_arr);
+		for(let i in logisticAreaJson){
+			var item = logisticAreaJson[i];
+			logisticArr.push(item)
+		}
+	}
+
+	var freeArr = '{#$specify#}';
+	var freeArrAreaJson;
+	var freeArea_arr = [];
+	if(freeArr!=''){
+		freeArrAreaJson = JSON.parse(freeArr);
+		for(let i in freeArrAreaJson){
+			var item = freeArrAreaJson[i];
+			freeArea_arr.push(item)
+		}
+	}
+
+
+	var noFreeaArr = {#if $nospecify!=''#}{#$nospecify#}{#else#}[]{#/if#};
+	var active = '{#$logistype#}';
+	var feemodeval = '{#$delivery_fee_mode#}';
+</script>
+<style>
+	html{height:auto !important; overflow:auto;}
+	.head{position:fixed; top:0; left:0; right:0; min-width:1200px;}
+	.sidebar{position:fixed; top:50px; bottom:0; left:0;}
+	.main{overflow:inherit !important; margin-top:50px;padding-left: 210px;}
+</style>
+</head>
+
+{#$pageCurr = "logistic_{#$module#}"#}
+
+<body>
+{#include file="headSidebar.html"#}
+
+<div class="main">
+	<div class="container fn-clear">
+		<div class="confirmTab">
+			<strong><font style="color: #FF0000">*</font>运费类型：</strong>
+			{#if $do == 'add'#}
+			<ul>
+				<li class="{#if $logistype == 0#}active{#/if#}" data-id="0"><a href="javascript:;"><i><s></s></i>快递邮寄</a></li>
+				<li class="{#if $logistype == 1#}active{#/if#}" data-id="1"><a href="javascript:;"><i><s></s></i>商家配送</a></li>
+			</ul>
+			{#else#}
+			<ul>
+				{#if $logistype == 0#}<li class="{#if $logistype == 0#}active{#/if#}" data-id="0"><a href="javascript:;"><i><s></s></i>快递邮寄</a></li>
+				{#else#}
+				<li class="{#if $logistype == 1#}active{#/if#}" data-id="1"><a href="javascript:;"><i><s></s></i>商家配送</a></li>
+				{#/if#}
+			</ul>
+			{#/if#}
+			
+		</div>
+		<div class="w-form">
+			
+			<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service={#$module#}&action={#if $id != 0#}logisticEdit&id={#$id#}{#else#}logisticAdd{#/if#}&b=1">
+				<input type="hidden" name="logistype" value="{#$logistype#}" id="logistype">
+				<div class="comCon comShow" v-if="active == 0">
+					<h2 class="tit1">快递运费设置</h2>
+					<dl class="fn-clear fn-hide">
+						<dt><span>*</span>{#$langData['siteConfig'][19][892]#}：</dt>
+						<dd>
+							<select class="chosen-select" id="cityid" name="cityid" style="width: auto; min-width: 150px;" data-title="{#$langData['siteConfig'][20][585]#}">
+								<option selected="" value="0">{#$langData['siteConfig'][7][2]#}</option>  {#* 请选择 *#}
+								{#siteConfig action="addr" return="city"#}
+								<option value="{#$city.id#}" {#if $cityid == $city.id#} selected{#/if#}>{#$city.typename#}</option>
+								{#/siteConfig#}
+							</select>
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+					<!-- 模板名称 -->
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['siteConfig'][19][547]#}：</dt>
+						<dd>
+							<input type="text" name="title" class="inp title" size="39" maxlength="50" value="{#if $logistype == 0#}{#$title#}{#/if#}"  data-title="请输入模板名称"/>
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+					<!-- 运费说明 -->
+					<dl class="fn-clear">
+						<dt>运费说明：</dt>
+						<dd>
+							<textarea class="text content" name="content"  maxlength="200" value="{#if $logistype == 0#}{#$note#}{#/if#}" data-title="请输入运费说明">{#if $logistype == 0#}{#$note#}{#/if#}</textarea>
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+
+
+
+					<div id="freight">
+						<dl class="fn-clear">
+							<dt><span>*</span>{#$langData['siteConfig'][26][110]#}：</dt>
+							<dd>
+								<div class="radio valuation">
+									<span data-id="0" @click="valuation = 0"{#if $valuation == "" || $valuation == 0#} class="curr"{#/if#} >{#$langData['siteConfig'][26][111]#}</span>
+									<span data-id="1" @click="valuation = 1" {#if $valuation == 1#} class="curr"{#/if#}>{#$langData['siteConfig'][26][112]#}</span>
+									<span data-id="2" @click="valuation = 2"{#if $valuation == 2#} class="curr"{#/if#}>{#$langData['siteConfig'][26][113]#}</span>
+									<input type="hidden" name="valuation" id="valuation" :value="valuation">
+								</div>
+                                <span class="tip-inline focus" style="display: inline-block;"><s></s>注意：团购套餐类型的商品只能使用按件数计价的方式</span>
+							</dd>
+						</dl>
+						<!-- 配送运费及区域 -->
+						<dl class="fn-clear" data-required="1">
+							<dt><span>*</span>配送运费及区域：</dt>
+							<dd>
+								<table class="logi_tb">
+									<colgroup> <col width="30%"> <col width="15%"> <col width="15%"> <col width="15%"> <col width="15%"> <col width="10%"> </colgroup>
+									<thead v-cloak>
+										<tr data-type="0" v-if="valuation == 0"> <th>可配送区域</th> <th>首件</th> <th>运费({#echoCurrency type="short"#})</th> <th>续件</th> <th>续费({#echoCurrency type="short"#})</th> <th>操作</th> </tr>
+										<tr data-type="1" v-if="valuation == 1"> <th>可配送区域</th> <th>首件重量(kg)</th> <th>运费({#echoCurrency type="short"#})</th> <th>续件重量(kg)</th> <th>续费({#echoCurrency type="short"#})</th> <th>操作</th> </tr>
+										<tr data-type="2" v-if="valuation == 2"> <th>可配送区域</th> <th>首件体积(m³)</th> <th>运费({#echoCurrency type="short"#})</th> <th>续件体积(m³)</th> <th>续费({#echoCurrency type="short"#})</th> <th>操作</th> </tr>
+									</thead>
+									<tbody v-cloak>
+										<tr v-for="(item,i) in logisticArea_arr">
+											<td >
+													<el-cascader v-if="i != 0" v-model="item.area"	:props="props" :options="options" collapse-tags clearable filterable></el-cascader>
+												<!-- <div class="selectBox"  > -->
+													<!-- <s class="arr"></s> -->
+													<!-- <input v-else type="text" name="addr[]"  placeholder="请选择" "> -->
+												<!-- </div> -->
+												<span v-else>默认全国</span>
+											</td>
+
+											<td>
+												<div class="inpbox">
+													<input type="text" name="express_start" v-model="item.express_start" @input="checkInp(logisticArea_arr,i,'express_start','int')">
+													<div class="btn_group">
+														<i class="add" @click="item.express_start++"></i>
+														<i :class="['sub', {'noClick':item.express_start <= 1}]" @click="item.express_start--;item.express_start = item.express_start<1?1: item.express_start"></i>
+													</div>
+												</div>
+											</td>
+											<td>
+												<div class="inpbox">
+													<input type="text" name="express_postage" v-model="item.express_postage" @input="checkInp(logisticArea_arr,i,'express_postage')">
+													<div class="btn_group">
+														<i class="add" @click="item.express_postage++"></i>
+														<i :class="['sub', {'noClick':item.express_postage <= 0}]"  @click="item.express_postage--;item.express_postage = item.express_postage<0?0: item.express_postage" ></i>
+													</div>
+												</div>
+											</td>
+											<td>
+												<div class="inpbox">
+													<input type="text" name="xj" v-model="item.express_plus" @input="checkInp(logisticArea_arr,i,'express_plus','int')">
+													<div class="btn_group">
+														<i class="add" @click="item.express_plus++"></i>
+														<i :class="['sub', {'noClick':item.express_plus<=1}]" @click="item.express_plus--; item.express_plus = item.express_plus<1?1: item.express_plus;"></i>
+													</div>
+												</div>
+											</td>
+											<td>
+												<div class="inpbox">
+													<input type="text" name="express_postageplus"  v-model="item.express_postageplus" @input="checkInp(logisticArea_arr,i,'express_postageplus')">
+													<div class="btn_group">
+														<i class="add" @click="item.express_postageplus++"></i>
+														<i :class="['sub', {'noClick':item.express_postageplus <= 0}]"@click="item.express_postageplus--; item.express_postageplus = item.express_postageplus<0?0: item.express_postageplus;"></i>
+													</div>
+												</div>
+											</td>
+											<td><a href="javascript:;" v-if="i!=0" class="del_btn" @click="del_tb(logisticArea_arr,i)">删除</a></td>
+										</tr>
+									</tbody>
+								</table>
+								<a href="javascript:;" class="add_logi_tr" @click="addAreaLogi(2)">添加配送区域</a>
+							</dd>
+						</dl>
+					</div>
+
+					<!-- 指定地区包邮 -->
+					<div class="freeArea">
+						<dl class="fn-clear">
+							<dt>指定包邮：</dt>
+							<dd>
+								<div class="radio ">
+									<span  :class="{'curr':!freeArea}" @click="freeArea = 0">关闭</span>
+									<span  :class="{'curr':freeArea}" @click="freeArea = 1">开启</span>
+									<input type="hidden" name="freeArea" id="freeArea" :value="freeArea">
+								</div>
+							</dd>
+						</dl>
+						<dl class="fn-clear" v-show="freeArea">
+							<dt></dt>
+							<dd>
+								<table class="logi_tb">
+									<colgroup> <col width="35%"> <col width="25%"> <col width="25%"> <col width="15%"> </colgroup>
+									<thead>
+										<tr>
+											<th>选择地区</th>
+											<th>最低购买件数</th>
+											<th>最低购买金额（{#echoCurrency type='short'#}）</th>
+											<th>操作</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr v-for="(item,i) in freeArr">
+											<td><el-cascader v-model="item.area"  	:props="props" :options="options"  collapse-tags clearable filterable></el-cascader></td>
+											<td>
+												<div class="inpbox">
+												<input type="text" name="preferentialStandard" @input="checkInp(freeArr,i,'preferentialStandard','int')" v-model="item.preferentialStandard">
+												<div class="btn_group">
+													<i class="add" @click="item.preferentialStandard++"></i>
+													<i :class="['sub', {'noClick':item.preferentialStandard <= 1}]" @click="item.preferentialStandard--;item.preferentialStandard = item.preferentialStandard>=1?item.preferentialStandard: 1"></i>
+												</div>
+											</div>
+										</td>
+											<td>
+												<div class="inpbox">
+												<input type="text" name="preferentialMoney" v-model="item.preferentialMoney" @input="checkInp(freeArr,i,'preferentialMoney')">
+												<div class="btn_group">
+													<i class="add" @click="item.preferentialMoney++"></i>
+													<i :class="['sub', {'noClick':item.preferentialMoney <= 0.01}]" @click="item.preferentialMoney--;item.preferentialMoney = item.preferentialMoney<0?0.01: parseFloat(item.preferentialMoney.toFixed(2))"></i>
+												</div>
+											</div>
+										</td>
+										<td><a href="javascript:;" v-if="i > 0" class="del_btn" @click="del_tb(freeArr,i)">删除</a></td>
+										</tr>
+									</tbody>
+								</table>
+								<a href="javascript:;" class="add_logi_tr" @click="addAreaLogi(1)">添加指定包邮区域</a>
+							</dd>
+						</dl>
+					</div>
+
+					<!-- 指定区域不配送 -->
+					<dl class="fn-clear">
+						<dt>指定区域不配送：</dt>
+						<dd>
+							<div class="radio ">
+								<span  :class="{'curr':!noFreeArea}" @click="noFreeArea = 0">关闭</span>
+								<span  :class="{'curr':noFreeArea}" @click="noFreeArea = 1">开启</span>
+								<input type="hidden" name="noFreeArea" id="noFreeArea" :value="noFreeArea">
+							</div>
+							<div style="clear:both;" v-show="noFreeArea" ><el-cascader  v-model="noFreeAreaArr"  :props="props" :options="options"  collapse-tags clearable filterable></el-cascader></div>
+						</dd>
+					</dl>
+				</div>	
+				<div class="comCon comShow" v-if="active == 1">
+					<h2 class="tit1">商家同城配送运费设置</h2>
+					<!-- 模板名称 -->
+					<dl class="fn-clear" data-required="1">
+						<dt><span>*</span>{#$langData['siteConfig'][19][547]#}：</dt>
+						<dd>
+							<input type="text" name="title" class="inp title" size="39" maxlength="50" value="{#if $logistype == 1#}{#$title#}{#/if#}" data-title="请输入模板名称"/>
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+					<!-- 运费说明 -->
+					<dl class="fn-clear">
+						<dt>运费说明：</dt>
+						<dd>
+							<textarea class="text content" name="content" maxlength="200" value="{#if $logistype == 1#}{#$note#}{#/if#}" data-title="请输入运费说明">{#$note#}</textarea>
+							<span class="tip-inline"></span>
+						</dd>
+					</dl>
+					<dl class="fn-clear">
+						<dt><span>*</span>起送价、配送模式：</dt>
+						<dd>
+							<select name="delivery_fee_mode" id="delivery_fee_mode" class="input-large">
+		                      <option value="1" :selected="feemodeval == 1?'selected':''">按距离</option>
+		                      <option value="0" :selected="feemodeval == 0?'selected':''">固定配送费/起送价</option>
+		                    </select>
+		                    <div class="delivery_fee_mode widget-box" id="delivery_fee_mode0" v-if="feemodeval == 0">
+				                <div class="widget-header"><h5>固定起送价和配送费</h5></div>
+			                  	<div class="widget-body">
+			                    	<div class="widget-main">
+			                      		<div class="form-group fn-clear">
+			                        		<label for="fixbasic" style="width: 100px"><span  class="required" style="color: #f00">*</span>固定起送价</label>
+			                        		<input size="10" maxlength="10" name="basicprice" id="fixbasic" type="text" value="{#$basicprice#}" data-title="请输入固定起送价"><span>{#echoCurrency type='short'#}</span>
+			                        		<span class="tip-inline"></span>
+			                      		</div>
+			                      		<div class="form-group fn-clear">
+			                        		<label for="fixfee" style="width: 100px"><span  class="required" style="color: #f00">*</span>固定配送费</label>
+			                        		<input size="10" maxlength="10" name="express_postage" id="fixfee" type="text" value="{#$express_postage#}" data-title="请输入固定配送费">
+			                        		<span class="required">{#echoCurrency type='short'#}</span>
+			                        		<span class="tip-inline"></span>
+			                      		</div>
+			                      		<div class="form-group fn-clear">
+			                        		<label for="fixjuli" style="width: 100px">最远配送距离</label>
+			                        		<input size="10" maxlength="10" name="express_juli" id="fixjuli" type="text" value="{#$express_juli#}" data-title="请输入最远配送距离">
+			                        		<span class="required">公里</span>
+			                        		<span class="tip-inline"></span>
+			                      		</div>
+
+			                      		<div class="form-group fn-clear">
+			                        		<label style="width: 100px">
+			                          			<input name="openFree" value="1" type="checkbox" class="ace" checked="">
+			                          			<span class="lbl"> 满</span>
+			                        		</label>
+			                        		<label>
+			                          			<input size="10" maxlength="10" name="preferentialMoney" id="fixover" type="text" value="{#$preferentialMoney#}">
+			                         			 <span class="lbl"> {#echoCurrency type='short'#}免配送费 </span>
+			                        		</label>
+			                        		<span class="tip-inline">5555</span>
+			                      		</div>
+			                      		<div class="tip"  style="font-size: 12px; color: #999; line-height: 1.5em;">商品选择运费模板时，1、如选择了商家配送+快递邮寄模板，则超出最大配送距离时将由快递寄送；2、如仅选择了商家配送模板，则超出最大配送距离将不可下单</div>
+			                    	</div>
+			                  	</div>
+			                </div>
+			                <div class="delivery_fee_mode widget-box" id="delivery_fee_mode1"  v-if="feemodeval == 1">
+								<div class="widget-header"><h5>设置不同配送距离的外送费和起送价</h5></div>
+								<div class="widget-body">
+									<div class="widget-main ">
+									  	<div class="lievf">
+									    	<div class="btn btn-sm btn-success addrangedeliveryfee">添加不同距离外送费</div>
+									    	<div class="clear"></div>
+									  	</div>
+										{#foreach from=$range_delivery_fee_valuearr item=v#}
+									    <div class="rangedeliveryfee rangedeliveryfeeblock">
+									    配送距离<input type="text" style="width:80px;" class="juliSt" value="{#$v[0]#}">公里至<input type="text" style="width:80px;" class="juliEd" value="{#$v[1]#}">公里，外送费<input type="text" style="width:80px;" class="ranfee" value="{#$v[2]#}">元，起送价<input type="text" style="width:80px;" class="ranbasic" value="{#$v[3]#}">元<div class="deleterangedeliveryfee" title="删除自定义显示项">删除</div>
+									  	</div>
+									  	{#/foreach#}
+									    <div id="rangedeliveryfeecontent"></div>
+									  	<div style="clear:both;"></div>
+									  	<div class="tip" style="font-size: 12px; color: #999; line-height: 1.5em;">商品选择运费模板时，1、如选择了商家配送+快递邮寄模板，则超出以上填写配送距离时将由快递寄送；2、如仅选择了商家配送模板，则超出以上距离将不可下单</div> </div>
+								</div>
+							</div>
+						</dd>
+					</dl>
+				</div>
+				
+				
+					<dl class="fn-clear">
+						<dt>&nbsp;</dt>
+						<dd><button class="submit" @click.prevent="submit">{#if $id == 0#}{#$langData['shop'][1][7]#}{#else#}{#$langData['siteConfig'][6][122]#}{#/if#}</button></dd>
+					</dl>
+
+				</form>
+			</div>
+			
+
+			</div>
+		</div>
+	</div>
+</div>
+
+{#include file="footer.html"#}
+<script type="text/javascript">
+	var valuation = "{#if $valuation == ""#}0{#else#}{#$valuation#}{#/if#}"; //计费方式
+</script>
+
+<script type="text/javascript" src="{#$templets_skin#}js/fabu.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/logisticAdd.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>
+
+{#else#}
+{#$pageTitle = $langData['siteConfig'][19][452]|cat:" - "|cat:$cfg_webname#}
+{#include file="head.html"#}
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/logistic.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript">
+	var module = '{#$module#}';
+	var editUrl = '{#getUrlPath service="member" template="logistic" action="$module" id="%id%"#}';
+</script>
+</head>
+
+{#$pageCurr = "logistic_{#$module#}"#}
+
+<body>
+{#include file="headSidebar.html"#}
+
+<div class="main">
+	<div class="nav-tabs fn-clear">
+		<ul class="fn-clear">
+			<li class="active"><a href="javascript:;">{#$langData['siteConfig'][19][452]#}</a></li>
+		</ul>
+		<a href="{#getUrlPath service='member' template='logistic' action='shop' param='do=add'#}" class="btn add">{#$langData['siteConfig'][26][106]#}</a>
+	</div>
+	<div class="container fn-clear">
+		<div class="list">
+			{#include file="logistic-$module.html"#}
+		</div>
+	</div>
+</div>
+
+{#include file="footer.html"#}
+<script type="text/javascript" src="{#$templets_skin#}js/logistic.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>
+{#/if#}

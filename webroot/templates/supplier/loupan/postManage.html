@@ -1,0 +1,126 @@
+<!-- 团队管理 -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>职务管理</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+        <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/postManage.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+        <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+		    var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+		    var hideFileUrl = '{#$cfg_hideUrl#}';
+		    var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+			var templets = '{#$templets_skin#}';
+			var protypelist = {#if $protypelist#} {#$protypelist#} {#else#} '' {#/if #}; //物业类型
+			var salestatenames = ['新盘待售','在售','尾盘','售罄']; //销售状态
+			var existingnames = ['现房','期房']; //销售状态
+			var salestate = '{#$detail_salestate#}',   //销售状态
+				existing = '{#$detail_existing#}',   //楼盘状态
+				protype = {#if is_array($detail_protype)#} {#json_encode($detail_protype,true)#} {#else#} '{#$detail_protype#}' {#/if#};   //物业类型
+			var thumbSize = '{#$thumbSize#}', thumbType = "{#$thumbType#}",  //缩略图配置
+				addrid = '{#$addrid#}', addrListArr = '{#$addrListArr#}', mapCity = "{#$mapCity#}", subwayCity = 0;
+			var subwayarr = {#if $detail_subwayarr#}{#$detail_subwayarr#} {#else#}''{#/if#};
+
+			var loupanid = '{#$loupanid#}';
+			var modelType = 'house';
+            var currid = 3
+		</script>
+</head>
+<body class="w1200">
+    <div id="page">
+        <!-- 头部 -->
+        {#include file="top.html"#}
+        <div class="conbox">
+            <!-- 左侧导航 -->
+            {#include file="left.html"#}
+            <div class="right_box">
+                <div class="wx_tip">
+                    <i></i>温馨提示：请确保分销各流程均有人审核，否则流程将无法顺利进行
+                </div>
+                <div class="rConBox">
+                    <h3>职务管理</h3>
+                    <div class="ListContainer">
+                        <div class="headbox">
+                            <div class="left_list">
+                                <div class="btn add_member" @click="addPost">新增职务</div>
+                            </div>
+                        </div>
+                        <div class="listbox tablebox">
+                            <div class="titlebox thead">
+                                <!-- <div class="col15 cell alignRight">用户昵称</div>
+  								<div class="col15 cell alignRight">联系电话</div>
+  								<div class="col1 cell alignCenter">客户数量</div>
+  								<div class="col1 cell alignCenter">当前跟进</div>
+  								<div class="col2 cell alignRight">权限</div>
+  								<div class="col1 cell alignRight">状态</div>
+  								<div class="col2 cell alignRight">操作</div> -->
+
+                                <div class="col15 cell alignRight">职务名称</div>
+                                <div class="col25 cell alignRight">权限/设置</div>
+                                <div class="col5 cell alignRight">分销权限</div>
+                                <div class="col1 cell alignCenter">操作</div>
+                            </div>
+                            <ul class="tbody">
+                                <li class="table_row " v-for="(item,ind) in postList">
+                                    <div class="col15 cell alignRight">
+                                        <el-input v-if="edit_ind == ind && is_edit" placeholer="输入职务名..." @change="updatePost(item.id)" v-model="item.name"></el-input>
+                                        <h3 class="htitle" v-else>{{item.name}} 
+                                            <i class="edit_icon" v-if="item.lock != '1'" @click="is_edit = true; edit_ind = ind"></i>
+                                            <el-popover
+                                            v-else
+                                            popper-class="tipConBox"
+                                            placement="bottom-start"
+                                            width="358"
+                                            trigger="hover">
+                                            <div class="tipCon">
+                                                <span>置业顾问：</span>默认职务不可修改、删除，其人员将显示在楼盘详情页，客户可查看并联系
+                                            </div>
+                                            <i class="tip_icon" slot="reference"></i>
+                                            </el-popover>
+                                        </h3>
+                                    </div>
+                                    <div class="col25 cell alignRight">
+                                        <!-- 权限设置 -->
+                                        <div class="qxSetBox moreMargin">
+                                            <el-checkbox :checked="item.permission.indexOf(qx.id) > -1" v-for="qx in qxList" @change="val => changeVal(val,qx.id,'permission',ind)">{{qx.name}}</el-checkbox>
+                                        </div>
+                                    </div>
+                                    <div class="col5 cell alignRight">
+                                        <div class="qxSetBox ">
+                                            <el-checkbox @change="val => changeVal(val,qx.id,'mpermission',ind)" :checked="item.mpermission.indexOf(qx.id) > -1" v-for="qx in fxqxList">{{qx.name}}</el-checkbox>
+                                        </div>
+                                        <div class="saveBtn" v-if="item.id && isChange && edit_ind == ind" @click="changePerssion">保存</div>
+                                    </div>
+                                    <div class="col1 cell alignCenter">
+                                        <div class="btns disflex">
+                                            <el-popconfirm
+                                            :title="`确认删除${item.name}？`"
+                                            @confirm="confirmDel(ind)"
+                                            >
+                                            <a href="javascript:;" class="del" v-if="item.lock != '1'" slot="reference" >删除</a>
+                                            </el-popconfirm>
+                                            
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/postManage.js?v={#$cfg_staticVersion#}"></script>
+</html>

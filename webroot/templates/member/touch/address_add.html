@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<title>{#if $addressid#}修改{#else#}新建{#/if#}收货地址</title>
+<meta name="apptitle" content="{#if $addressid#}修改{#else#}新建{#/if#}收货地址">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_basehost#}/templates/member/touch/css/gz-fabu.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/address_add.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<!-- <script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script> -->
+	{#$paramStr = ''#}
+	{#foreach from=$logitcpros item=kk key="k"#}
+
+	{#$paramStr = $paramStr|cat: '&pros[]='|cat:$kk#}
+	{#/foreach#}
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#getModuleConfig module='shop' key='channelDomain'#}',staticPath = '{#$cfg_staticPath#}';
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+	jQuery = $;
+	//var sercImg = '{#$image#}';
+	var hideFileUrl = '{#$cfg_hideUrl#}', atlasSize = 5 * 1024 *1024, atlasMax = 1;
+    var modelType = 'siteConfig';
+    var confirmUrl = '{#getUrlPath service='shop' template='confirm-order' param="addresid=%adrid%&adsid=%adid%&$urlParam"#}';
+	var adrUrl = '{#getUrlPath service='member' type="user" template='address' param="logitcpros={#$logitcpros#}&$urlParam"#}';
+	var addressid = "{#$addressid#}";
+	var listUrl = '{#$member_userDomain#}/address.html';
+	var paramCurr = '{#$urlParam#}';
+	var memberUrl = '{#$member_userDomain#}';
+	var autoLocation = false;
+	var logitcpros = '{#json_encode($logitcpros)#}'
+</script>
+</head>
+
+<body>
+	<div class="loadIcon "></div>
+<div class="gz-address">
+    <div class="gz-addr-wrap" id="gzAddNewObj">	
+    	{#if $addressid#}
+    	{#$pageTitle = '修改收货地址'#}
+    	{#else#}
+    	{#$pageTitle = '新建收货地址'#}
+    	{#/if#}
+		<!-- 头部 -->
+		{#include file="../../siteConfig/touch_top.html" pageTitle=$pageTitle#}
+		<div class="wrap">
+			<form action="" class="adrform">
+				<ul class="edit">
+					<li>
+						<label for="person">{#$langData['siteConfig'][19][33]#}</label>
+						<span><input type="text" name="person" id="person" placeholder="请填写收货人姓名" value="{#$adddetail['person']#}"></span>
+					</li>
+
+					<li>
+						<label for="mobile">{#$langData['siteConfig'][3][6]#}</label>
+						<div class="mobbox">
+							<span class="areacode_span"><label>+{#$internationalPhoneSection[0]['code']#}</label></span>
+							<input type="tel" name="mobile" id="mobile" placeholder="请填写收货人手机号" value="{#$adddetail['mobile']#}">
+							<input type="hidden" name="areaCode" id="areaCode" value="{#if $adddetail['areaCode']#}{#$adddetail['areaCode']#}{#else#}{#$internationalPhoneSection[0]['code']#}{#/if#}">
+						</div>
+						
+					</li>
+					<li>
+						<label for="">所在地区</label>
+						<div class="chosePosiadr">
+							<dl class="gz-addr-seladdr chose_area {#if !$adddetail['addrid']#}gz-no-sel{#/if#}" data-action="area" data-ids="{#getPublicParentInfo tab='site_area' id=$adddetail['addrid'] split=' '#}"  data-id="{#$adddetail['addrid']#}" data-addrname="{#if $adddetail['addrid']#}{#getPublicParentInfo tab='site_area' id=$adddetail['addrid'] type='typename' split=' '#}{#else#}请选择{#/if#}">
+								<dd><p class="city">{#if $adddetail['addrid']#}{#getPublicParentInfo tab='site_area' id=$adddetail['addrid'] type='typename' split=' '#}{#else#}省市区县，点击"定位”选择地区{#/if#}</p>
+	                            <input type="hidden" id="addrid" name="addrid" value="{#$adddetail['addrid']#}"></dd>
+							</dl>
+							<div class="map_detail">
+								<s></s>
+								<em>定位</em>
+								<input type="hidden" id="lnglat" name="lnglat" value="{#$adddetail['lnglat']#}" />
+							</div>
+						</div>
+					</li>
+					<li>
+						<label for="">详细地址</label>
+
+						<div class="txt textarea " id="addr" contenteditable="true" placeholder="街道、楼牌号等">{#$adddetail['address']#}</div>
+						
+					</li>
+				</ul>
+				<div class="spotWrap">
+					<div class="selftxt" id="spot" contenteditable="true" placeholder="试试粘贴地址、手机号、收件人姓名，自动识别填写收货信息"></div>
+					<div class="fn-clear" id="up_logo" style="visibility: hidden">
+	                    <div class="uptip"><s></s><em>图片识别</em></div>
+	                    <!-- <div class="logoshow" style="display: none;"><img src="{#if $telDetail['litpic'] #}{#$telDetail['litpic']#}{#else#}{#$staticFile#}/images/noimg.png {#/if#}" alt="" data-url=""></div> -->
+
+
+	                    <input type="hidden" name="logo" value="" id="logo">
+
+	                </div>
+	                <div class="spotOper">
+                    	<a href="javascript:;" class="spotCancel">取消</a>
+                    	<a href="javascript:;" class="spotSure">识别</a>
+                    </div>
+				</div>
+				<input type="hidden" name="default" id="setDefault" value="{#$adddetail['default']|default:0#}">
+				<input type="hidden" name="id" id="gzAddrEditId" value="{#$addressid#}">
+			</form>
+			<div class="setDefault">
+				<div><h2>设为默认地址</h2><p>提醒：每次下单会默认推荐使用该地址</p></div>
+				<span class="switch {#if $adddetail['default'] == 1#} active {#/if#}"></span>
+			</div>
+			<div class="addAddress">
+				{#if $urlParam && $urlParam != "from=addrlist" && strpos($urlParam,"from=addrlist") === false#}
+					{#if strpos($urlParam,"from=order")#}
+					<a href="javascript:;" class="saveBtn" data-module="shop">保存并使用</a>
+					{#else#}
+					<a href="javascript:;" class="saveBtn">保存并使用</a>
+					{#/if#}
+				{#else#}
+				<a href="javascript:;" class="saveBtn fromList">保存</a>
+				{#/if#}
+				{#if $addressid != 0#}
+				<a href="javascript:;" class="delBtn">删除</a>
+				{#/if#}
+			</div>
+
+		</div>
+		
+	</div>
+    <!-- 区域选择弹出层  -->
+    <div class="gz-sel-addr gz-sel-addr-hide" id="gzSelAddr">
+        <div class="gz-sel-addr-header">
+            <a href="javascript:;" class="cancelAddrid" id="gzSelAddrCloseBtn">取消</a>
+            <h3>选择区域</h3>
+            <a href="javascript:;" class="sureAddrid">确定</a>
+        </div>
+        <ul class="gz-sel-addr-nav"></ul>
+        <div class="gz-sel-addr-list"></div>
+    </div>
+
+    <div class="gz-sel-addr-mask"></div>
+</div>
+
+	<!--地图s-->
+	<div class="pageitem" id="map">
+		<div class="lead">
+			<p></p>
+			<input type="text" id="searchAddr" placeholder="{#$langData['siteConfig'][20][411]#}">
+		</div>
+		<div class="map">
+			<div id="mapdiv"></div>
+			<span class="mapcenter"></span>
+		</div>
+
+		<div class="mapresults">
+			<ul></ul>
+			<!-- <a href="javascript:;" class="elseStreet">没有找到您的建筑物？请点击这里！</a> -->
+		</div>
+	</div>
+	<!--地图e-->
+	<!-- 区号弹出层 s-->
+	<div class="popl_box anum_box">
+    
+	    <h2>选择地区<a href="javascript:;" class="back">返回</a></h2> 
+	    <div class="areacodeList" id="areacodeList">
+	      <ul>
+	      </ul>
+	    </div>
+	</div>
+	<div class="mask-code"></div>
+	<!-- 区号弹出层 e-->
+	<div class="spotSuc"><i></i><span>识别成功！</span></div>
+	<script>
+		var cityName = '{#$siteCityInfo['name']#}';
+		var cityid = '{#$siteCityInfo['cityid']#}';
+	</script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}	
+<script src="{#$cfg_staticPath#}js/webuploader/webuploader.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+
+<script src="{#$cfg_basehost#}/templates/member/touch/js/upload.js?v={#$cfg_staticVersion#}"></script>
+<!-- <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+<script>
+  // VConsole 默认会挂载到 `window.VConsole` 上
+  var vConsole = new window.VConsole();
+</script> -->
+<script src="{#$templets_skin#}js/address_add.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/gz-info.js?v={#$cfg_staticVersion#}"></script>
+<!-- <script src="{#$templets_skin#}js/addr_chose_1.js?v={#$cfg_staticVersion#}"></script> -->
+ 
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$shop_description#}',
+		"title": '{#$shop_title#}',
+		"imgUrl": '{#getModuleConfig module='shop' key='logoUrl'#}',
+		"link": '{#getModuleConfig module='shop' key='channelDomain'#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+</body>
+</html>

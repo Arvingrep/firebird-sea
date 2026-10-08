@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>房产经纪</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all"
+        href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_plus_2.9.0.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/brokerManage.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/topNav/topNav.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}components/leftNav/leftNav.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue-3.5.12.min.js"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0_zh-cn.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/ui/element_plus_2.9.0.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var masterDomain = '{#$cfg_basehost#}';
+        var staticVersion = '{#$cfg_staticVersion#}'; //版本号
+        var logoUrl = '{#getModuleConfig module='house' key='logoUrl'#}';
+        var templets_skin = '{#$templets_skin#}';
+        var member_busiDomain = "{#$member_busiDomain#}";
+        var channelDomain = "{#getModuleConfig module='house' key='channelDomain'#}";
+    </script>
+</head>
+
+<body>
+    <div class="navPage Shell" id="brokerManage" v-cloak>
+        <!-- 顶部导航 -->
+        <top-nav :user-info="userInfo" :company-info="companyInfo"></top-nav>
+        <!-- 左侧导航 -->
+        <template v-if="userInfo.uid">
+            <left-nav type="broker" :active-index="2" :user-info="userInfo" :company-info="companyInfo"
+                v-if="companyInfo.type==0"></left-nav>
+            <left-nav type="distribute" :active-index="2" :user-info="userInfo" :company-info="companyInfo"
+                v-else></left-nav>
+        </template>
+        <!-- 内容 -->
+        <div class="boxContent">
+            <div class="b-main">
+                <!-- 顶部功能区 -->
+                <div class="bm-nav">
+                    <!-- tab切换 -->
+                    <div class="bmn-left">
+                        <div :class="['bmnl-item',{'active':tabConfig.active==0}]" @click="tabFunction.change(0)">
+                            <span class="text">经纪人管理</span>
+                        </div>
+                        <div :class="['bmnl-item',{'active':tabConfig.active==1}]" @click="tabFunction.change(1)">
+                            <span class="text">入驻申请</span>
+                            <span class="statistic" v-if="listConfig.applyCount">{{listConfig.applyCount}}</span>
+                        </div>
+                    </div>
+                    <!-- 筛选/添加 -->
+                    <div class="bmn-right">
+                        <!-- 职务 -->
+                        <el-select v-model="filterConfig.duty" placeholder="全部职务" class="newReport" clearable
+                            @change="getBroker" v-if="tabConfig.active==0">
+                            <template v-for="item in filterConfig.dutyOption" :key="item.id">
+                                <el-option :label="item.label" :value="item.value">
+                                </el-option>
+                            </template>
+                        </el-select>
+                        <!-- 状态 -->
+                        <el-select v-model="filterConfig.status" placeholder="全部状态" class="newReport" clearable
+                            @change="getEnter" v-else>
+                            <template v-for="item in filterConfig.statusOption" :key="item.id">
+                                <el-option :label="item.label" :value="item.value">
+                                </el-option>
+                            </template>
+                        </el-select>
+                        <!-- 搜索 -->
+                        <el-input v-model="filterConfig.keywords" placeholder="姓名、电话" class="bmnr-phone"
+                            @change="searchFn" v-if="tabConfig.active==0">
+                            <template #suffix>
+                                <img src="{#$cfg_staticPath#}images/f_search.png?v={#$cfg_staticVersion#}"
+                                    class="bmnrp-icon" @click="searchFn" />
+                            </template>
+                        </el-input>
+                        <!-- 添加成员 -->
+                        <el-popover v-model:visible="addMemberConfig.pop" trigger="click" placement="bottom"
+                            width="530px" :show-arrow="false">
+                            <template #default>
+                                <div class="bmnr-create">
+                                    <div class="create" @click="addMemberForm.pop = true">
+                                        <img src="{#$cfg_staticPath#}images/f_add.png?v={#$cfg_staticVersion#}" />
+                                        <span>创建成员账号</span>
+                                    </div>
+                                    <div class="link">
+                                        <div class="tip">或通过链接邀请：</div>
+                                        <div class="copy">
+                                            <div class="show">{{addMemberForm.inviteLink||'成员获得链接，自己填写资料'}}</div>
+                                            <div class="btn" @click="addMemberConfig.copyFn">复制链接</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <template #reference>
+                                <div class="bmnr-add">
+                                    <img src="{#$templets_skin#}images/addWhite.png?v={#$cfg_staticVersion#}" />
+                                    <span>添加成员</span>
+                                </div>
+                            </template>
+                        </el-popover>
+                    </div>
+                </div>
+                <!-- 表格（经纪人管理） -->
+                <el-table :data="listConfig.list" header-cell-class-name="bm-header" cell-class-name="bm-cell"
+                    class="bm-table" v-loading="tableConfig.loading" v-if="tabConfig.active==0">
+                    <template v-for="(item,index) in tableConfig.broker" :key="item.id">
+                        <el-table-column :prop="item.prop" :align="item.align" :class="`bmt-item ${item.prop}`"
+                            :min-width="item.width"
+                            v-if="item.show||(companyInfo.type==0&&['customer','customerFollowing','customerUnfollow'].includes(item.prop))||(companyInfo.type==1&&['report','showIt','deal','brokerage'].includes(item.prop))">
+                            <template #header>
+                                <div class="bmti-head">{{item.label}}</div>
+                            </template>
+                            <template #default="data">
+                                <!-- 经纪人姓名 -->
+                                <div :class="['bmti-name',{'invalid':data.row.status==2}]" v-if="item.prop=='name'">
+                                    <img :src="data.row.photo" @error="$event.target.src=errorPhoto" />
+                                    <span>{{data.row.name||'-'}}</span>
+                                    <div class="label"
+                                        v-if="data.row.on_site==1&&(companyInfo.type==1||companyInfo.type!=1&&companyInfo.upload_cert==1)">
+                                        驻场
+                                    </div>
+                                </div>
+                                <!-- 联系电话 -->
+                                <div :class="['bmti-phone',{'invalid':data.row.status==2}]"
+                                    v-else-if="item.prop=='phone'">
+                                    <img src="{#$templets_skin#}images/telBlue.png?v={#$cfg_staticVersion#}" />
+                                    <span>{{data.row.phone||'-'}}</span>
+                                </div>
+                                <!-- 职务 -->
+                                <div :class="['bmti-duty',{'invalid':data.row.status==2}]"
+                                    v-else-if="item.prop=='duty'">
+                                    {{data.row.leaderName}}
+                                </div>
+                                <!-- 客户数量 -->
+                                <div :class="['bmti-statics',{'invalid':data.row.status==2}]"
+                                    v-else-if="item.prop=='customer'">
+                                    {{data.row.customer||'-'}}
+                                </div>
+                                <!-- 当前跟进 -->
+                                <div :class="['bmti-statics',{'invalid':data.row.status==2}]"
+                                    v-else-if="item.prop=='customerFollowing'">
+                                    {{data.row.customerFollowing||'-'}}
+                                </div>
+                                <!-- 未跟进 -->
+                                <div :class="['bmti-statics',{'invalid':data.row.status==2}]"
+                                    v-else-if="item.prop=='customerUnfollow'">
+                                    {{data.row.customerUnfollow||'-'}}
+                                </div>
+                                <!-- 报备 -->
+                                <div class="bmti-statics" v-else-if="item.prop=='report'">
+                                    {{data.row.reportTotal||'0'}}
+                                </div>
+                                <!-- 带看 -->
+                                <div class="bmti-statics" v-else-if="item.prop=='showIt'">
+                                    {{data.row.reportTotal3||'0'}}
+                                </div>
+                                <!-- 成交 -->
+                                <div :class="['bmti-statics',{'invalid':data.row.status==2}]"
+                                    v-else-if="item.prop=='deal'">
+                                    {{data.row.reportTotal6||'0'}}
+                                </div>
+                                <!-- 佣金 -->
+                                <div class="bmti-brokerage" v-else-if="item.prop=='brokerage'">
+                                    {{data.row.commissionTotal||'0'}}
+                                </div>
+                                <!-- 状态 -->
+                                <div :class="['bmti-status',{'stop':data.row.status!=1}]"
+                                    v-else-if="item.prop=='status'">
+                                    {{data.row.status==1?'正常':'停用'}}
+                                </div>
+                                <!-- 操作 -->
+                                <div class="bmti-btns" v-else>
+                                    <div class="edit" @click="memberEditConfig.popFn(data.row)">编辑</div>
+                                    <div class="site" @click="setSiteFn(data.row.on_site==1?0:1,data.row.id)"
+                                        v-if="companyInfo.type==1||companyInfo.type!=1&&companyInfo.upload_cert==1">
+                                        {{data.row.on_site==1?'取消驻场':'设为驻场'}}
+                                    </div>
+                                    <div class="switch" @click="operateConfig.popFn(1,data.row)"
+                                        v-if="data.row.status==1">
+                                        停用
+                                    </div>
+                                    <div class="switch" @click="operateConfig.item=data.row;operateConfig.switchFn(1)"
+                                        v-else>
+                                        启用
+                                    </div>
+                                    <div class="delete" @click="operateConfig.popFn(2,data.row)">删除</div>
+                                </div>
+                            </template>
+                        </el-table-column>
+                    </template>
+                </el-table>
+                <!-- 表格（入驻申请） -->
+                <el-table :data="listConfig.list" header-cell-class-name="bm-header" cell-class-name="bm-cell"
+                    class="bm-table" v-loading="tableConfig.loading" v-else>
+                    <template v-for="(item,index) in tableConfig.enter" :key="item.id">
+                        <el-table-column :prop="item.prop" :align="item.align" :class="`bmt-item ${item.prop}`"
+                            v-if="item.prop!='id_card'&&item.prop!='cert'||(item.prop=='id_card'||item.prop=='cert')&&companyInfo.type==1">
+                            <template #header>
+                                <div class="bmti-head">{{item.label}}</div>
+                            </template>
+                            <template #default="data">
+                                <!-- 姓名 -->
+                                <div :class="['bmti-name',{'invalid':data.row.join_status==3}]"
+                                    v-if="item.prop=='name'">
+                                    <img :src="data.row.photo" @error="$event.target.src=errorPhoto" />
+                                    <span>{{data.row.name||'-'}}</span>
+                                </div>
+                                <!-- 联系电话 -->
+                                <div class="bmti-phone" v-else-if="item.prop=='phone'">
+                                    <img src="{#$templets_skin#}images/telBlue.png?v={#$cfg_staticVersion#}" />
+                                    <span>{{data.row.phone||'-'}}</span>
+                                </div>
+                                <!-- 身份证 -->
+                                <div class="bmti-card" v-else-if="item.prop=='id_card'">
+                                    <span v-if="!data.row.id_card">未上传</span>
+                                    <template v-else>
+                                        <el-image :src="item" show-progress fit="cover"
+                                            :preview-src-list="data.row.identityArr" preview-teleported
+                                            v-for="(item,index) in data.row.identityArr" :key="index"
+                                            :initial-index="index">
+                                            <template #error>
+                                                <img :src="errorImage" style="display: block;" />
+                                            </template>
+                                        </el-image>
+                                    </template>
+                                </div>
+                                <!-- 执业资格认证 -->
+                                <div class="bmti-cert" v-else-if="item.prop=='cert'">
+                                    <span v-if="!data.row.cert">未上传</span>
+                                    <template v-else>
+                                        <el-image :src="item" show-progress fit="cover"
+                                            :preview-src-list="data.row.certArr" preview-teleported
+                                            v-for="(item,index) in data.row.certArr" :key="index"
+                                            :initial-index="index">
+                                            <template #error>
+                                                <img :src="errorImage" style="display: block;" />
+                                            </template>
+                                        </el-image>
+                                    </template>
+                                </div>
+                                <!-- 申请时间 -->
+                                <div class="bmti-time" v-else-if="item.prop=='join_time'">
+                                    {{timeChange(data.row.join_time,{ Y: 1, M: 1, D: 1, h: 1, m: 1, s: 0, connect: '-'
+                                    })||'-'}}
+                                </div>
+                                <!-- 状态 -->
+                                <div class="bmti-state" v-else-if="item.prop=='join_status'">
+                                    <div class="success" v-if="data.row.join_status==2">已通过</div>
+                                    <div class="fail" v-else-if="data.row.join_status==3">未通过</div>
+                                    <div class="wait" v-else>待处理</div>
+                                </div>
+                                <!-- 操作 -->
+                                <div class="bmti-operate" v-else-if="data.row.join_status==1">
+                                    <div class="success" @click="operateConfig.item=data.row;operateConfig.aduitFn(1)">
+                                        通过
+                                    </div>
+                                    <div class="fail" @click="operateConfig.popFn(3,data.row)">驳回</div>
+                                </div>
+                            </template>
+                        </el-table-column>
+                    </template>
+                </el-table>
+                <!-- 添加团队成员 -->
+                <el-dialog v-model="addMemberForm.pop" :lock-scroll="false" :show-close="false"
+                    :close-on-click-modal="false" :close-on-press-escape="false" width="620" class="bm-form"
+                    :style="`height:${!addMemberForm.hasRegister?'746px':'396px'}`">
+                    <template #header>
+                        <div class="bmf-header">
+                            <span>{{memberEditConfig.edit?'编辑':'添加'}}团队成员</span>
+                            <img src="{#$cfg_staticPath#}images/close_2.png?v={#$cfg_staticVersion#}"
+                                @click="addMemberForm.pop=false" />
+                        </div>
+                    </template>
+                    <template #default>
+                        <el-form class="bmf-form" :ref="res=>{addMemberForm.ref=res;}" :model="addMemberForm.data"
+                            :rules="addMemberForm.rules">
+                            <!-- 姓名 -->
+                            <el-form-item label="姓名" label-width="140px" prop="name" class="item">
+                                <el-input v-model="addMemberForm.data.name" placeholder="请填写" class="inputitem" />
+                            </el-form-item>
+                            <!-- 手机号（添加） -->
+                            <el-form-item label="手机号" label-width="140px" :show-message="false" prop="phone"
+                                class="item phone" v-if="!memberEditConfig.edit">
+                                <template #label>
+                                    <div class="selfLabel">手机号</div>
+                                </template>
+                                <el-input v-model="addMemberForm.data.phone" placeholder="请填写" class="inputitem">
+                                    <template #prefix>
+                                        <el-select v-model="addMemberForm.data.areaCode" suffix-icon=""
+                                            style="width: 54px;">
+                                            <el-option v-for="item in addMemberForm.phoneCode" :key="item.code"
+                                                :label="item.label" :value="item.code">
+                                            </el-option>
+                                        </el-select>
+                                    </template>
+                                </el-input>
+                            </el-form-item>
+                            <!-- 手机号（编辑） -->
+                            <el-form-item label="手机号" label-width="140px" :show-message="false" prop="phone"
+                                class="item phone" v-else>
+                                <template #label>
+                                    <div class="selfLabel">手机号</div>
+                                </template>
+                                <el-input v-model="addMemberForm.data.phone" placeholder="请填写" class="inputitem">
+                                </el-input>
+                            </el-form-item>
+                            <div class="tip warn" v-if="addMemberForm.hasRegister">该手机号已注册，直接邀请ta加入</div>
+                            <div class="tip warn" v-else-if="addMemberForm.phoneVerify">{{addMemberForm.phoneVerify}}
+                            </div>
+                            <div class="tip" v-else>手机号将用于成员账号登录</div>
+                            <template v-if="!addMemberForm.hasRegister">
+                                <!-- 登录密码 -->
+                                <el-form-item label="登录密码" label-width="140px" class="item">
+                                    <el-input v-model="addMemberForm.data.password"
+                                        :placeholder="memberEditConfig.edit?'如需修改可填写':'初始密码：hh123456'"
+                                        class="inputitem" />
+                                </el-form-item>
+                                <!-- 头像 -->
+                                <el-form-item label="头像" label-width="140px" class="item photo">
+                                    <el-upload :ref="res=>{uploadConfig.photo.ref=res}" :limit="1" :auto-upload="false"
+                                        :show-file-list="false" :on-change="uploadConfig.photo.fn"
+                                        :on-exceed="uploadConfig.photo.coverFn" accept="image/*">
+                                        <div style="display: flex;align-items: flex-start;">
+                                            <div class="hasBtn" v-if="uploadConfig.photo.file.turl">
+                                                <img :src="uploadConfig.photo.file.turl" />
+                                                <span>重新上传</span>
+                                            </div>
+                                            <div class="uploadBtn" v-loading="uploadConfig.photo.loading" v-else>
+                                                <img
+                                                    src="{#$cfg_staticPath#}images/f_add.png?v={#$cfg_staticVersion#}" />
+                                            </div>
+                                            <div class="uploadTip">推荐尺寸300*300px</div>
+                                        </div>
+                                    </el-upload>
+                                </el-form-item>
+                                <!-- 微信号 -->
+                                <el-form-item label="微信号" label-width="140px" class="item">
+                                    <el-input v-model="addMemberForm.data.wechat" placeholder="请填写" class="inputitem" />
+                                </el-form-item>
+                                <!-- 微信二维码 -->
+                                <el-form-item label="微信二维码" label-width="140px" class="item wxcode">
+                                    <el-upload :ref="res=>{uploadConfig.wxCode.ref=res}" :limit="1" :auto-upload="false"
+                                        :show-file-list="false" :on-change="uploadConfig.wxCode.fn"
+                                        :on-exceed="uploadConfig.wxCode.coverFn" accept="image/*">
+                                        <div style="display: flex;align-items: flex-start;">
+                                            <div class="hasBtn" v-if="uploadConfig.wxCode.file.turl">
+                                                <img :src="uploadConfig.wxCode.file.turl" />
+                                                <span>重新上传</span>
+                                            </div>
+                                            <div class="uploadBtn" v-loading="uploadConfig.wxCode.loading" v-else>
+                                                <img
+                                                    src="{#$cfg_staticPath#}images/f_add.png?v={#$cfg_staticVersion#}" />
+                                            </div>
+                                            <div class="uploadTip">推荐尺寸640*640px</div>
+                                        </div>
+                                    </el-upload>
+                                </el-form-item>
+                            </template>
+                        </el-form>
+                    </template>
+                    <template #footer>
+                        <div class="bmf-footer" v-loading="addMemberForm.loading"
+                            @click="memberEditConfig.edit?editMemberFn():addMemberFn()"
+                            v-if="!addMemberForm.hasRegister">
+                            <div>确认</div>
+                        </div>
+                        <div class="bmf-footer" v-loading="addMemberForm.loading" @click="addMemberConfig.copyFn"
+                            v-else>
+                            <div>复制邀请链接</div>
+                        </div>
+                    </template>
+                </el-dialog>
+                <!-- 二次弹窗提示 -->
+                <el-dialog v-model="operateConfig.pop" :lock-scroll="false" :show-close="false" class="bm-pop">
+                    <template #header>
+                        <div class="bmp-header">
+                            <span>确认{{operateConfig.type==1?'停用':operateConfig.type==2?'删除':'驳回'}}</span>
+                            <img src="{#$cfg_staticPath#}images/close_2.png?v={#$cfg_staticVersion#}"
+                                @click="operateConfig.pop=false" />
+                        </div>
+                    </template>
+                    <template #default>
+                        <div>
+                            确认{{operateConfig.type==1?'停用':operateConfig.type==2?'删除':'驳回'}}用户{{operateConfig.item.name}}？
+                        </div>
+                        <el-input v-model="operateConfig.reason" :autosize="{ minRows: 4}" resize="none" autosize
+                            type="textarea" placeholder="请填写驳回原因" style="margin-top: 10px;"
+                            v-if="operateConfig.type==3" />
+                    </template>
+                    <template #footer>
+                        <div class="bmp-footer">
+                            <div class="cancel" @click="operateConfig.pop=false">取消</div>
+                            <div class="confirm" v-loading="operateConfig.loading"
+                                @click="operateConfig.type==1?operateConfig.switchFn(2):operateConfig.type==2?operateConfig.deleteFn():operateConfig.aduitFn(2)">
+                                确定
+                            </div>
+                        </div>
+                    </template>
+                </el-dialog>
+                <!-- 分页 -->
+                <el-pagination background hide-on-single-page layout="prev, pager, next" prev-text="上一页" next-text="下一页"
+                    :page-size="listConfig.pageSize" :total="listConfig.pageInfo.totalCount" @current-change="pagingFn"
+                    class="bm-pagination" v-if="listConfig.pageInfo?.totalCount">
+                </el-pagination>
+            </div>
+            <div class="b-copyright">
+                版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.
+            </div>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="module" src="{#$templets_skin#}js/brokerManage.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

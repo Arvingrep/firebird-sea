@@ -1,0 +1,226 @@
+<script>
+	var customFabuCheckPhone = true;
+	var geetest = '{#$cfg_geetest#}', service = '{#$module#}';
+	var userinfo = {
+		phone: '{#$userinfo.phone#}',
+		phoneCheck: {#$userinfo.phoneCheck#}
+	};
+	var detail = {
+		contact: '{#$detail_contact#}'
+	}
+</script>
+<div class="page input_info">
+		<div>
+			{#$pageTitle = {#$langData['homemaking'][0][2]#}#}   {#*发布服务 *#}
+			{#include file="top.html"#}
+
+			<!--顶部标题e-->
+			<!--表单部分s-->
+			<div class="content-box">
+				<!--表单部分s-->
+				<div class="content-box">
+					<form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=homemaking&action={#if $do == "edit"#}edit&id={#$id#}{#else#}put{#/if#}" data-url="{#getUrlPath service='member'  template='manage' action='homemaking'#}">
+
+						<!--房源图片-->
+						<div class="img_box">
+							<h3><span>*</span>{#$langData['homemaking'][2][23]#}</h3>	{#* 服务图片 *#}
+							<ul class="uploader-list" id="fileList">
+								{#foreach from=$detail_pics key=k item="pic"#}
+								<li id="WU_FILE_0_1_{#$k#}" class="thumbnail imgshow_box litpic">
+									<div class="img_show">
+										<img src="{#$pic.path#}" data-val="{#$pic.pathSource#}" data-url="{#$pic.path#}" data-des="{#$pic.info#}">
+									</div>
+									<i class="del_btn">+</i>
+								</li>
+								{#/foreach#}
+								<li class="upload_btn" id="uploadbtn">
+									<div id="filePicker" class="webuploader-container">
+										<img src="{#$templets_skin#}images/add.png" />
+										<p>{#$langData['homemaking'][2][24]#}</p>	{#* 上传照片 *#}
+										<p>{#$langData['homemaking'][8][67]#}{#$atlasMax#}{#$langData['homemaking'][8][68]#}</p>
+									</div>
+								</li>
+
+								<div class="kong"></div>
+							</ul>
+							<input type="hidden" name="pics" value="" id="pics" class="imglist-hidden">
+						</div>
+
+						<!--房源详情-->
+
+						<dl class="detail_house">
+							{#* 分类 *#}
+							<dd class="classify"  onclick="showNav()">
+								<div class="left_label">
+									<label><span>*</span>{#$langData['homemaking'][2][25]#}</label>
+								</div>
+								<div class="right_value">
+									<span class="choose"><span class="text">{#if $detail_typeid#}{#$detail_typename#}{#else#}{#$langData['homemaking'][2][28]#}{#/if#}</span><i></i></span> 	  {#* 请选择 *#}
+								</div>
+								<input type="hidden" name="typeid" id="typeid" value="{#$detail_typeid#}" />
+							</dd>
+
+							{#* 标题 *#}
+							<dd class="fabu_title">
+								<div class="left_label">
+									<label><span>*</span><label for="fabu_jz_title">{#$langData['homemaking'][2][26]#}</label></label>
+								</div>
+								<div class="right_value">
+									 <input type="text" placeholder="{#$langData['homemaking'][2][29]#}" id="fabu_jz_title" name="title" value="{#$detail_title#}">		{#* 请填写标题 *#}
+								</div>
+							</dd>
+
+							{#* 地区 *#}
+							<dd class="posi_house">
+								<div class="left_label">
+									<label><span>*</span><label for="addrid">{#$langData['homemaking'][2][27]#}</label></label>
+								</div>
+								<div class="right_value ">
+									<dl class="inpbox fn-clear gz-addr-seladdr" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_addrid split=' '#}" data-id="{#$detail_addrid#}">
+										<dd ><p><font style="color:#a6a6a6">{#if $detail_addrid#}{#getPublicParentInfo tab='site_area' id=$detail_addrid type='typename' split='/'#}{#else#}{#$langData['homemaking'][2][28]#}{#/if#}</font></p><i></i></dd>  {#* 请选择 *#}
+										<input type="hidden" name="addrid" id="addrid" value="{#$detail_addrid#}" />
+										<input type="hidden" name="cityid" id="cityid" value="{#$detail_cityid#}" />
+									</dl>
+								</div>
+							</dd>
+						</dl>
+						<dl class="or_type">
+							<dd >
+								{#* 免费预约 *#}
+								<p class="surep">
+						            <input value="0" {#if $detail_homemakingtype == "" || $detail_homemakingtype == 0#}checked{#/if#} type="radio" name="homemakingtype" id="free_ord">
+						            <label for="free_ord">{#$langData['homemaking'][0][21]#}</label>
+						        </p>
+						        {#* 预付金 *#}
+						        <p class="surep">
+						            <input value="1" {#if $detail_homemakingtype == 1#} checked{#/if#} type="radio" name="homemakingtype" id="pay_ord">
+						            <label for="pay_ord">{#$langData['homemaking'][2][6]#}</label>
+						        </p>
+						        {#* 实价 *#}
+						        <p class="surep">
+						            <input value="2" {#if $detail_homemakingtype == 2#} checked{#/if#} type="radio" name="homemakingtype" id="payall_ord">
+						            <label for="payall_ord">{#$langData['homemaking'][2][30]#}</label>
+						        </p>
+							</dd>
+
+							{#* 请填写价格 *#}  {#* 元 *#}
+							<dd class="or_price {#if $detail_homemakingtype == ""|| $detail_homemakingtype == 0 #}fn-hide{#/if#}" {#if $detail_homemakingtype == 1 || $detail_homemakingtype == 2 #}style="display: block;"{#/if#}>
+								<div>
+						        	<input type="text" value="{#$detail_price#}" name="price" placeholder="{#$langData['homemaking'][2][31]#}" id="or_price"><span> {#$langData['homemaking'][2][35]#}</span>
+						        </div>
+							</dd>
+						</dl>
+						<dl class="or_type">
+							<dd >
+								{#* 家政 *#}
+								{#foreach from=$homemakingTag_state key="k" item=tag#}
+								<p class="surep">
+						            <input type="radio" name="flag[]" id="flag{#$k#}"  value="{#$tag.name#}" {#if $tag.active#} checked{#/if#}>
+						            <label for="flag{#$k#}">{#$tag.name#}</label>
+								</p>
+								{#/foreach#}
+							</dd>
+						</dl>
+
+						<dl class="house_title">
+							<dt>{#$langData['homemaking'][1][22]#}</dt>		{#* 服务详情 *#}
+							{#* 请描述服务内容、收费标准等信息 *#}
+							<dd><textarea name="note" placeholder="{#$langData['homemaking'][2][41]#}" id="fuwu_detail">{#$detail_note#}</textarea></dd>
+						</dl>
+						<dl class="ways_contact">
+
+							{#* 联系人 *#}
+							<dd>
+								<div class="left_label">
+									<label><span>*</span><label for="contact_man">{#$langData['homemaking'][2][36]#}</label></label>
+								</div>
+								<div class="right_value">
+									{#* 请输入2-6个字 *#}
+									 <input type="text" placeholder="{#$langData['homemaking'][2][42]#}" id="contact_man" value="{#if $detail_username != ""#}{#$detail_username#}{#else#}{#$userinfo.nickname#}{#/if#}" name="username">
+								</div>
+							</dd>
+
+							{#* 手机号 *#}
+							<dd>
+								<div class="left_label">
+									<label><span>*</span><label for="contact">{#$langData['homemaking'][2][37]#}</label></label>
+								</div>
+								<div class="right_value">
+									{#* 请输入手机号 *#}
+									 <input type="text" placeholder="{#$langData['homemaking'][2][43]#}" id="contact" value="{#if $detail_contact != ""#}{#$detail_contact#}{#else#}{#$userinfo.phone#}{#/if#}" name="contact">
+								</div>
+							</dd>
+
+							{#* 发送验证码 *#}
+							<!-- <dd class="confirm_phone fn-hide test_code">
+								<div class="left_label">
+									<label><p class="test_btn"><button type="button">{#$langData['homemaking'][2][38]#}</button></p></label>
+								</div>
+								<div class="right_value">
+									{#* 请输入验证码 *#}
+									 <input type="text" class="codes" placeholder="{#$langData['homemaking'][2][44]#}" name="testcode"　id="phone_confirm">
+								</div>
+
+							</dd>
+ -->
+							{#* 更改联系方式需重新验证 *#}
+							<dd class="changephone">
+
+								<p class="changephone_tip">! {#$langData['homemaking'][2][39]#}</p>
+							</dd>
+						</dl>
+						<input type="hidden" name="codetype" value="1">
+						<div class="fabu_jz">
+							<p class="sub_btn">{#if $do == "edit"#}{#$langData['homemaking'][10][24]#}{#else#}{#$langData['homemaking'][2][40]#}{#/if#}</p>		{#* 发布 *#}
+						</div>
+
+						<input type="hidden" name="codetype" value="1">
+
+					</form>
+				</div>
+				<!--表单部分e-->
+			</div>
+
+		</div>
+
+
+		<!--所在地弹出层-->
+		<div class="gz-sel-addr gz-sel-addr-hide" id="gzSelAddr">
+		    <div class="gz-sel-addr-header">
+		        <h3>{#$langData['siteConfig'][7][2]#}</h3>		{#* 请选择 *#}
+		        <button class="gz-sel-addr-close" id="gzSelAddrCloseBtn"></button>
+		    </div>
+		    <ul class="gz-sel-addr-nav"></ul>
+		    <div class="gz-sel-addr-list"></div>
+		</div>
+
+		<div class="gz-sel-addr-mask"></div>
+
+		<div class="error"></div>
+
+<!--分类弹出层-->
+
+
+<div class="nav-mask"></div>
+<div class="nav-container">
+	<div class="nav-content">
+		<div class="top nav_header">
+			<h3 class="go_back"><i></i><span>{#$langData['homemaking'][3][14]#}</span></h3>	{#* 分类 *#}
+		</div>
+		<ul class="nav-second">
+			{#loop service="homemaking" action="type" return="type"#}
+			<li>
+				<p data-id="{#$type.id#}">{#$type.typename#}</p>
+				<div class="nav-third">
+					<h3 data-id="{#$type.id#}"><img src="{#$templets_skin#}images/house_service/go.png">{#$type.typename#}</h3>
+					<ul>
+						{#loop service="homemaking" action="type" type={#$type.id#} return="childtype"#}
+						<li><p data-id="{#$childtype.id#}">{#$childtype.typename#}</p></li>
+						{#/loop#}
+					</ul>
+				</div>
+			</li>
+			{#/loop#}
+		</ul>
+	</div>
+</div>

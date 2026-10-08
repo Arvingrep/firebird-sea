@@ -1,0 +1,979 @@
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+<script>
+	var staticPath = "{#$cfg_staticPath#}"
+	var totalPoint = 0;
+	var masterDomain = "{#$cfg_basehost#}", totalBalance = {#$userinfo.money|default:0#}, pointRatio = {#$cfg_pointRatio#}, pointName = '{#$cfg_pointName#}',service='{#$service#}',usepoint ='{#$usepoint#}';
+	if(service == 'awardlegou' &&usepoint !=0){
+		totalPoint = {#$usepoint|default:0#};
+	}else{
+		totalPoint = {#$userinfo.point|default:0#}
+	}
+	var curDown = true; //无倒计时
+  var serviceTime = '{#$smarty.now#}';
+  var jsTime = (new Date()).valueOf();
+  var timeOffset = serviceTime*1000 - jsTime;
+	var usermoney = '{#$userinfo.money#}';
+	var orderurl = '';
+	var checkpay = false;
+</script>
+<style>
+	/* 新版支付样式 */
+	.payMask,.payCancelMask{position: fixed; top: 0; left: 0; bottom: 0;;right: 0; background: rgba(0,0,0,.8); z-index: 1000003; display:none;}
+	.payPop{position: fixed; left: 0; right: 0; bottom: 0;  border-radius: .4rem .4rem 0 0; background: #fff; z-index: 1000004; transform: translateY(100%); transition:transform .3s ease-in-out; min-height:6.2rem; }
+	.payPop .payInfoShow{height: 2.62rem; box-sizing: border-box; display: flex; align-items: center; justify-content: center; flex-direction: column; position: absolute; left: 0; right: 0;top: 0;}
+	.payPop .payInfoShow h2{font-size: .36rem; color: #000; font-weight: bold;}
+	.payPop .payInfoShow h2 b{font-size: .64rem; font-family: moneyNumber}
+	.payPop .payInfoShow p{color: #666; font-size: .26rem;}
+	.payPop .payListBox{padding-top: 2.62rem; max-height: 5.12rem; overflow: hidden; padding-bottom: 1.5rem;}
+	.payPop .payListBox ul{max-height: 5.12rem; overflow: auto;}
+	.payPop .payListBox li{margin: 0 .4rem; border-top: solid 1px #f5f5f7; display: flex; align-items: center; height:.96rem; color: #151515; font-size: .28rem; justify-content: space-between;}
+	.payPop .payListBox li .check-item-img{width: .4rem; height: .4rem; margin-right: .13rem;}
+	.payPop .payListBox li .check-item-img img{display: block; width: .4rem; height: .4rem; object-fit: cover;}
+	.payPop .payListBox li .left_item{display: flex; align-items: center; }
+	.payPop .payListBox li .check-item-right{position: relative;}
+	.payPop .payListBox li .check-item-right input[type="radio"]{opacity: 0; position: absolute; left: 0;right: 0; bottom: 0; top: 0;}
+	.payPop .payListBox li .check-item-right .checkbox-icon-round{display: block; width: .4rem; height: .4rem; box-sizing: border-box; border: solid 1px #ddd; border-radius: 50%}
+	.payPop .payListBox li.paychosed .check-item-right .checkbox-icon-round{background: url(/static/images/chosed.png) no-repeat center/cover; border: none}
+	.payPop .btn_pay{position: absolute; left: .3rem; right: .3rem; bottom: .4rem; border-radius: .44rem; height: .88rem;background: linear-gradient(-90deg, #F6252F 0%, #FF4621 100%); font-size: .32rem; color: #fff; font-weight: bold; text-align: center; line-height: .88rem;}
+	.payPop .close_pay_pop{position: absolute; display: block; width: .44rem; height: .44rem; background: url(/templates/member/touch/images/pay/close.png) no-repeat center/cover; top: .36rem; left: .36rem;}
+	.payPop .payListBox li:not(.disabled_pay) .investMoney{display: none;}
+	.payPop .disabled_pay .investMoney{font-size: .3rem ;color: #F82C2C; font-weight: bold; display: block;}
+	.payPop .disabled_pay.check-item .check-item-right{display: none;}
+	.payPop .disabled_pay.check-item .left_item{opacity: .6;}
+	.payCancelMask{background:rgba(0,0,0,.3);display: none;}
+	.payCancelPop{width: 6.2rem; height: 3.3rem; border-radius: .3rem; box-shadow: 0 .1rem .5rem 0 rgba(0, 0, 0, 0.06); z-index: 1000006;  position: absolute; left: 0; right: 0; margin: auto; top:-1.7rem; background: #fff; display: none; animation:popup .3s; transform-origin:center !impotrant;}
+	.payCancelPop h4{font-size: .34rem; color: #151515; font-weight: bold; text-align: center; padding-top: .44rem; margin-bottom: .24rem;}
+	.payCancelPop p{color: #97989C; font-size: .24rem; margin: 0 .66rem .42rem; text-align: center; }
+	.payCancelPop .payBtns{display: flex; align-items: center; justify-content: center;}
+	.payCancelPop a{ width: 2.3rem; height: .76rem; border-radius: .38rem; text-align: center; font-size: .28rem; color: #F6252F; font-weight: bold; display: flex; align-items: center; justify-content: center; margin: 0 .1rem}
+	.payCancelPop a.cancelPay{border: solid 1px #F6262E}
+	.payCancelPop a.keepPay{ background: linear-gradient(-90deg, #F6252F 0%, #FF4621 100%); color: #fff;}
+
+
+	/* 密码支付弹窗 */
+	.payPwdPop{min-height: 8.8rem; border-radius: .4rem .4rem 0 0; background: #fff; position: fixed; left: 0; right: 0; bottom: 0; z-index: 100001;padding-bottom: env(safe-area-inset-bottom); transform: translateY(100%);transition: transform .3s;}
+	.setPwdPop{min-height: 10.4rem;}
+	.payPwdPop>h4{font-size: .48rem; color: #212121; font-weight: bold; text-align: center; padding-top: .4rem;}
+	.payPwdPop a.payBackBtn{display: block; width: .44rem; height: .44rem; background: url(/templates/member/touch/images/pay/arr_back.png) no-repeat center/cover; position: absolute; left: .5rem; top: .5rem;}
+	.payPwdPop .payPwdBox{margin: 0 .62rem; margin-top: .8rem;}
+	.payPwdPop .payPwdBox p{color: #151515; font-size: .26rem; margin-bottom: .12rem;}
+	.payPwdPop .payPwdBox .payPwdInp ul{display: flex; align-items: center; border-radius: 6px; border: solid 1px #E2E2E2;}
+	.payPwdPop .payPwdBox .payPwdInp ul li{width: 1.06rem;height: 1.04rem; border-right: solid 1px #E2E2E2;display: flex; align-items: center; justify-content: center; font-size: .48rem; color: #333; font-weight: bold;}
+	.payPwdPop .payPwdBox .payPwdInp ul li:last-of-type{border: none;}
+	.payPwdPop .payPwdBox .fpwtbox{text-align: right; font-size:.26rem;  margin-top: .1rem}
+	.payPwdPop .payPwdBox .fpwtbox a{color:#97989C;}
+	.payPwdPop .payPwdBox .spwtbox{margin-top: .28rem}
+	.payPwdPop .payPwdBox .spwtbox p{color: #999; font-size: .22rem; line-height: .3rem;}
+	.payPwdPop .setPwdUp{display: block; margin: 0 .55rem; line-height: .88rem; border-radius: .44rem; background: linear-gradient(-90deg, #F6252F 0%, #FF4621 100%); color: #fff; font-weight: bold; font-size: .32rem; text-align: center; margin-top: .4rem;}
+	.num_keyboard{height: 3.98rem; background-color: #eee;  padding-top: .3rem; position: fixed; left: 0; right: 0; bottom: 0; padding-bottom: env(safe-area-inset-bottom); z-index: 100001;  transition: transform .3s;transform: translateY(100%);}
+	.num_ul {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 0 .23rem; }
+	.num_ul li{display: flex; font-size: .5rem; color: #333; align-items: center; justify-content: center; width: 2.29rem; height: .88rem; border-radius: .1rem; background-color: #fff; margin-bottom: .09rem; box-shadow: 0 .02rem 0 0 rgba(109, 109, 109, 0.14); -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;}
+	.num_ul li.nobg{background: none; box-shadow: none;}
+	.num_ul li:active{background-color: #ccc !important;}
+	.num_ul li.del{background: url(/templates/member/touch/images/pay/del_num.png) no-repeat center/.6rem;}
+	.payLoading{display: block; width: 1.1rem; height: 1.1rem; border-radius: .3rem;  background: rgba(0,0,0,.9) ; background-size: .5rem; position: fixed; left: 0; right: 0; margin: auto; top: 50%; z-index: 100001}
+	.payLoading::before{content: ''; background: url(/templates/member/touch/images/login/loading.png) no-repeat center; background-size: .5rem; position: absolute; left: 0; right: 0; margin: auto; top: 0; bottom: 0; animation:rotate_ 1s infinite linear;}
+	.popErrAlert p{border-radius:.2rem; background:rgba(0,0,0,.95);}
+	.payBeforeLoading{display: none; width: 1.1rem; height: 1.1rem; border-radius: .3rem;  background: rgba(0,0,0,.9) ; background-size: .5rem; position: fixed; left: 0; right: 0; margin: auto; top: 50%; z-index: 999999999;}
+	.payBeforeLoading::before{content: ''; background: url(/templates/member/touch/images/loading.png) no-repeat center; background-size: .5rem; position: absolute; left: 0; right: 0; margin: auto; top: 0; bottom: 0; animation:rotate_ 1s infinite linear;}
+	@keyframes rotate_{
+		0%{ transform: rotate(0deg);}
+		50%{ transform: rotate(180deg);}
+		100%{ transform: rotate(360deg);}
+	}
+</style>
+<div id="payPage">
+	<div class="payBeforeLoading"></div>
+	<!-- 支付遮罩 -->
+	<div class="payMask"></div>
+	<!-- 支付弹窗 -->
+	<div class="payPop" >
+		<div class="payLoading" v-show="loading"></div>
+		<!-- 支付金额 -->
+		<div class="payInfoShow">
+			<h2><span>{#echoCurrency type="symbol"#}</span><b id="amout">0.00</b></h2>
+			<p>支付时间:<span class="payCutDown"><em>00</em>:<em>00</em>:<em>00</em></span></p>
+		</div>
+		<div class="payListBox">
+			<input type="hidden" name="paypwd" :value="paypwd" id="paypwd">
+			<ul>
+				<!-- disabled_pay 余额不足时 -->
+				{#if $userinfo.money > 0#}
+				<li class="check-item" id="balance" data-balance="{#$userinfo.money#}" data-code="money">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/balance.png"></div>
+						<div class="check-item-txt"><h3>{#$langData['siteConfig'][46][53]#} ({#$langData['siteConfig'][26][76]#}: {#echoCurrency type="symbol"#}<span class="count_num">{#$userinfo.money#}</span>)</h3></div>
+
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="balance"><span class="checkbox-icon-round"></span></div>
+					<a class="investMoney" href="{#$member_userDomain#}/deposit.html?paytype=deposit">充值</a>
+				</li>
+				{#/if#}
+				{#siteConfig action="payment"#}
+				{#if $row.pay_code == "fomopay_wxpay"#}
+				<li class="check-item" id="fomopaypObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/wxpay.png"></div>
+						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>  {#* 推荐智慧城市用户使用  *#}
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="{#$row.pay_code#}"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#/if#}
+				{#if $row.pay_code == "fomopay_paynow"#}
+				<li class="check-item" id="fomopaypObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/fomopay_paynow/images/fomopay_paynow.png"></div>
+						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>  {#* 推荐智慧城市用户使用  *#}
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="{#$row.pay_code#}"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#/if#}
+
+				{#if $row.pay_code == 'bytemini'#}
+				<li class="check-item" id="bytemini" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/bytemini/bytemini.png"></div>
+						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="bytemini"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#/if#}
+				{#if $row.pay_code == "devpay"#}
+				<li class="check-item" id="devpayObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/devpay/devpay.png"></div>
+						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>  {#* 推荐智慧城市用户使用  *#}
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="devpay"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#/if#}
+				{#if $row.pay_code == "rfbp_icbc"#}
+				<li class="check-item" id="rfbp_icbcObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/rfbp_icbc/rfbp_icbc.png"></div>
+						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="rfbp_icbc"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#/if#}
+				{#if $row.pay_code == "baidumini"#}
+				<li class="check-item" id="baiduminiObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/api/payment/baidumini/baidumini.png"></div>
+						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="baidumini"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#/if#}
+				{#if $row.pay_code == "qqmini"#}
+				<li class="check-item" id="qqminiObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/wxpay.png"></div>
+						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="qqmini"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#/if#}
+				{#if $row.pay_code == "wxpay"#}
+				<li class="check-item" id="wxpayObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/wxpay.png"></div>
+						<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][712]#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="wxpay"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#elseif $row.pay_code == "globalalipay"#}
+				<li class="check-item" id="alipayObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/alipay.png"></div>
+						<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][713]#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="globalalipay"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#elseif $row.pay_code == "alipay"#}
+				<li class="check-item" id="alipayObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/alipay.png"></div>
+						<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][713]#}</h3></div>
+					</div>
+
+					<div class="check-item-right"><input type="radio" name="paytype" value="alipay"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#elseif $row.pay_code == "paypal"#}
+				<li class="check-item" id="paypalObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/paypal.png"></div>
+						<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][714]#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="paypal"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#elseif $row.pay_code == "yabandpay_wxpay"#}
+				<li class="check-item" id="wxpayObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/wxpay.png"></div>
+						<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][712]#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="yabandpay_wxpay"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#elseif $row.pay_code == "yabandpay_alipay"#}
+				<li class="check-item" id="alipayObj" data-code="{#$row.pay_code#}">
+					<div class="left_item">
+						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/alipay.png"></div>
+						<div class="check-item-txt"><h3>{#$langData['siteConfig'][19][713]#}</h3></div>
+					</div>
+					<div class="check-item-right"><input type="radio" name="paytype" value="yabandpay_alipay"><span class="checkbox-icon-round"></span></div>
+				</li>
+				{#/if#}
+				{#/siteConfig#}
+
+			</ul>
+		</div>
+		<a href="javascript:;" class="close_pay_pop" @click="closePayPop"></a>
+		<a href="javascript:;" class="btn_pay" @click="paySubmit(0)">立即付款</a>
+
+		<!-- 取消支付 -->
+		<div class="payCancelMask"></div>
+		<div class="payCancelPop">
+			<h4>确定放弃本次付款？</h4>
+			<p>您的订单在<span class="daojs_order"></span>内未支付将被取消， 请尽快完成支付</p>
+			<div class="payBtns"><a href="javascript:;" class="cancelPay" @click="cancelpay">放弃</a><a href="javascript:;" class="keepPay" @click="keeppay">继续支付</a></div>
+		</div>
+
+		<!-- 密码弹窗 -->
+		{#if $userinfo.paypwdCheck != 0#}
+		<div class="payPwdPop">
+			<a href="javascript:;" class="payBackBtn" @click="payBack"></a>
+			<h4>输入支付密码</h4>
+			<div class="payPwdBox">
+				<p>请输入6位数字密码确认支付</p>
+				<div class="payPwdInp">
+					<ul>
+						<li v-for="n in 6">
+							<em v-if="paypwd[n-1]">•</em>
+						</li>
+					</ul>
+				</div>
+				<div class="fpwtbox"><a href="{#getUrlPath service='member' type='user' template='security-paypwdEdit'#}" class="fpwt">{#$langData['siteConfig'][5][2]#}?</a></div>{#* 忘记密码 *#}
+			</div>
+		</div>
+		{#else#}
+		<div class="payPwdPop setPwdPop">
+			<a href="javascript:;" class="payBackBtn" @click="payBack"></a>
+			<h4>设置支付密码</h4>
+			<div class="payPwdBox">
+				<p>请输入6位数字密码确认支付</p>
+				<div class="payPwdInp">
+					<ul>
+						<li v-for="n in 6">
+							<em v-if="paypwd[n-1]">•</em>
+						</li>
+					</ul>
+				</div>
+				<div class="spwtbox">
+					<p>·避免使用连续或重复的数字，类似“123456”“112233”</p>
+					<p>·避免使用手机号、证件号中的连续数字</p>
+				</div>
+			</div>
+			<a href="javascript:;" class="setPwdUp" @click="setPayPwd">确定并支付</a>
+		</div>
+		{#/if#}
+		<div class="num_keyboard">
+			<ul class="num_ul">
+				<li>1</li>
+				<li>2</li>
+				<li>3</li>
+				<li>4</li>
+				<li>5</li>
+				<li>6</li>
+				<li>7</li>
+				<li>8</li>
+				<li>9</li>
+				<li class="nobg"></li>
+				<li>0</li>
+				<li class="del nobg" @click="delNum"></li>
+			</ul>
+		</div>
+	</div>
+
+	<form action="{#$cfg_basehost#}/include/ajax.php" method="get" id="publicpayform">
+		<input type="hidden" name="service"  id="pservice" value="" />
+		<input type="hidden" name="action"   id="paction" value="pay" />
+		<input type="hidden" name="ordertype"   id="pordertype" value="" />
+		<input type="hidden" name="paytype"   id="ppaytype" value="" />
+		<input type="hidden" name="ordernum" id="pordernum" value="" />
+		<input type="hidden" name="final" id="pfinal" value="" />
+		<input type="hidden" name="peerpay"  id="ppeerpay" value="" />
+		<!--会员充值相关-->
+		<input type="hidden" name="level"  id="plevel" value="" />
+		<input type="hidden" name="day"  id="pday" value="" />
+		<input type="hidden" name="daytype"  id="pdaytype" value="" />
+
+		<!--商家入驻相关-->
+
+		<input type="hidden" name="action_1"  id="action_1" value="" />
+		<input type="hidden" name="action_2"  id="action_2" value="" />
+
+		<!--保障金相关-->
+		<input type="hidden" name="amount"  id="pamount" value="" />
+	</form>
+</div>
+
+<script>
+	var pwdCheck = '{#$userinfo.paypwdCheck#}';
+
+	var payDevice = navigator.userAgent;
+
+ 	// 倒计时
+	var payPopCutDown = null;
+	var classAdd = false;
+ 	$('body').delegate('.publicpaybtn','touchstart',function(e){
+ 		if(payPopCutDown){
+ 			clearInterval(payPopCutDown)
+ 		}
+ 		if(!$(this).hasClass('paotuipaybtn')){
+	 		if((typeof(depositPrice)!="undefined" && depositPrice != 0) || typeof(depositPrice)=="undefined"){
+	 		 $(".payBeforeLoading").show();
+	 		}
+ 		}
+ 		setTimeout(function(){
+ 			var block = $(".payMask").css('display') == 'block';
+ 			if(!block && $(".confirmPop").length == 0){
+ 				$('.publicpaybtn').click();
+ 			}
+ 		},1000)
+
+ 	})
+
+	if(navigator.userAgent.toLowerCase().match(/micromessenger/)){
+		$("#alipayObj").remove();
+	}
+
+	if(navigator.userAgent.toLowerCase().match(/Alipay/i)=="alipay"){
+		$("#qqminiObj ,#wxpayObj").remove();
+	}
+
+	$(".payListBox ul li").eq(0).addClass('paychosed');  //默认第一个选中
+
+
+
+
+ function payCutDown(type,EndDate){
+
+	 //验证是否支付成功，如果成功跳转到指定页面
+	 if(navigator.userAgent.toLowerCase().indexOf('huoniao') > -1){
+		 setTimeout(function(){
+			 timer_trade = setInterval(function(){
+				 $.ajax({
+					 type: 'POST',
+					 async: false,
+					 url: '/include/ajax.php?service=member&action=tradePayResult&order='+ordernum,
+					 dataType: 'json',
+					 success: function(str){
+						 if(str.state == 100 && str.info != ""){
+							 clearInterval(timer_trade);
+							 // if(device.indexOf('huoniao_Android') > -1) {
+							 //     setupWebViewJavascriptBridge(function (bridge) {
+							 //         bridge.callHandler('pageClose', {}, function (responseData) {
+							 //         });
+							 //     });
+							 //     location.href = str.info;
+							 // }else{
+							 location.href = str.info + (str.info.indexOf('?') > -1 ? '&' : '?') + 'currentPageOpen=1';
+							 // }
+						 }
+					 }
+				 });
+			 }, 2000);
+		 }, 3000)
+	 }
+
+ 	  $(".payBeforeLoading").hide();
+ 	  if($('#balance').is(':hidden')){
+ 	  	$("#balance").removeClass('paychosed').addClass('disabled_pay');
+ 	  }
+	  payPopCutDown = setInterval(function () {
+		 var nowDate = (new Date()).valueOf() + timeOffset;
+		 timeArea = EndDate * 1000 - nowDate;
+		 if(!classAdd){
+			 if(Number($("#balance").attr('data-balance') )< Number($("#amout").text())){
+		 		$("#balance").removeClass('paychosed').addClass('disabled_pay');
+		 		$(".payListBox ul li").eq(1).addClass('paychosed').siblings('li').removeClass('paychosed');  //默认第一个选中
+		 		classAdd = true;
+
+		 	}else{
+		 		$("#balance").removeClass('disabled_pay')
+		 	}
+		 }
+		 if(timeArea <= 0){
+		 	if(typeof (cutDown) != 'undefined'){
+
+				clearInterval(cutDown);
+			}
+		 }
+		 leftd = Math.floor(timeArea/(1000*60*60*24)),  //计算天数
+		 lefth = Math.floor(timeArea/(1000*60*60)%24),  //计算小时数
+		 leftm = Math.floor(timeArea/(1000*60)%60),  //计算分钟数
+		 lefts = Math.floor(timeArea/1000%60);  //计算秒数
+
+		 var dataStr,daojishiStr;
+
+		 if(lefth == 0 && leftm == 0){
+			 daojishiStr = lefts +'秒'
+		 }else if(lefth == 0){
+			 daojishiStr = leftm+'分';
+		 }else{
+			 daojishiStr = lefth+'小时'+leftm+'分';
+		 }
+		 $(".daojs_order").html(daojishiStr)
+
+		 dataStr = '<em class="phh">'+(lefth>9?lefth:"0"+lefth)+'</em>:<em class="pmm">'+(leftm>9?leftm:"0"+leftm)+'</em>:<em class="pss">'+(lefts>9?lefts:"0"+lefts)+'</em>'
+		 $(".payCutDown").html(dataStr);
+		 
+
+	 },1000);
+
+ }
+
+
+	var payVue = new Vue({
+		el:"#payPage",
+		data:{
+			paypwd:[],
+			loading:false,
+			pwdCheck:Number(pwdCheck), //是否设置过支付密码
+		},
+		mounted(){
+			var tt = this;
+			// 切换支付方式
+			$('.payListBox li').click(function() {
+				var t = $(this);
+				if(!t.hasClass('disabled_pay')){
+					t.addClass('paychosed').siblings('li').removeClass('paychosed');
+				}
+			});
+			// 数字键
+			$(".num_keyboard li:not(.nobg)").off('click').bind('click',function(){
+				var t = $(this),txt = t.text();
+				if(tt.paypwd.length <= 6){
+					tt.paypwd.push(txt);
+				}
+			})
+
+
+
+		},
+		methods:{
+			// 关闭支付弹窗
+			closePayPop:function() {
+				var tt = this;
+				$(".payCancelMask,.payCancelPop").css('display','block');
+				if($('.publicpaybtn').hasClass('disabled')){
+				 $('.publicpaybtn').removeClass('disabled').text('去支付')
+				}
+				if($('.daojs_order').text() == ''){
+					// payCutDown(1,);
+				}
+
+
+			},
+
+			// 继续支付
+			keeppay:function() {
+				$(".payCancelMask,.payCancelPop").css('display','none');
+			},
+
+			// 取消支付
+			cancelpay:function() {
+				$(".payCancelMask,.payCancelPop").css('display','none');
+				$(".payMask").hide();
+				$('.payPop').css('transform','translateY(100%)');
+				$("html").removeClass('noscroll');
+				if(typeof(timer_trade) != 'undefined'){
+					clearInterval(timer_trade);
+				}
+				clearInterval(payPopCutDown);
+
+			},
+
+			// 返回上一页
+			payBack:function() {
+				var tt = this;
+				$(".payPwdPop,.num_keyboard").css("transform","translateY(100%)");
+				tt.paypwd = [];
+			},
+			// 支付提交
+			paySubmit:function(check) {
+				var tt = this;
+				var et = event.currentTarget;
+				// check是否需要验证密码
+				var useBalance = 0;
+				var payType = $(".payListBox li.paychosed").attr('data-code');
+				$("#payPage .btn_pay").attr('href','javascript:;'); //去除链接
+				var alertpopOptions = {
+			          btnCancel:'确定',
+			          title:langData['shop'][2][23],
+			          btnColor:'#222',
+			          noSure:true,
+			          isShow:true
+			      }
+			      
+				if(typeof(payType) == 'undefined'){
+					alertpopOptions['title'] = '请选择支付方式';
+					confirmPop(alertpopOptions);
+					return false;
+				}
+				if(!check && $("#balance").hasClass('paychosed')){
+					tt.checkPwdPopShow();
+					if(typeof(ordertype)!='undefined' && ordertype!=''){
+
+						$("#pordertype").val(ordertype);
+					}
+					$("#payform input[name='useBalance']").val(1)
+				}else{
+
+					var ordertypestr  = '&action=pay';
+
+					var param = '';
+
+					if(typeof(ordertype) !='undefined' && ordertype !=''){
+
+							ordertypestr = '&action='+ordertype+'&ordertype='+ordertype;
+
+							if(ordertype == 'promotion'){
+								ordertypestr += '&amount='+order_amount;
+							}
+
+							if(ordertype == 'refreshTop'){
+								service = 'siteConfig';
+								/*用户充值*/
+								ordertypestr = '&ordertype='+ordertype+'&action='+ordertype;
+
+								/*刷新置顶*/
+								var module  = $("#refreshTopForm input[name='module']").val();
+								var act  	= $("#refreshTopForm input[name='act']").val();
+								var aid  	= $("#refreshTopForm input[name='aid']").val();
+								var amount  = $("#refreshTopForm input[name='amount']").val();
+								var config  = $("#refreshTopForm input[name='config']").val();
+								var type 	= $("#refreshTopForm input[name='type']").val();
+								var tourl   = $("#refreshTopForm input[name='tourl']").val();
+								var titleblod  = $("#refreshTopForm input[name='titleblod']").val();
+								var titlered   = $("#refreshTopForm input[name='titlered']").val();
+
+								$("#paction").val('refreshTop');
+
+								$("#publicpayform").append(
+										'<input type="hidden" name="module"  value="'+module+'" />' +
+										'<input type="hidden" name="act"   	  value="'+act+'" />' +
+										'<input type="hidden" name="aid"   value="'+aid+'" />' +
+										'<input type="hidden" name="amount"   value="'+amount+'" />' +
+										'<input type="hidden" name="config"   value="'+config+'" />' +
+										'<input type="hidden" name="type"   value="'+type+'" />' +
+										'<input type="hidden" name="tourl"  value="'+tourl+'" />'
+								);
+
+								ordertypestr += '&module='+module+'&act='+act+'&aid='+aid+'&amount='+amount+'&config='+config+'&type='+type+'&tourl='+tourl+'&titleblod='+titleblod+'&titlered='+titlered;
+							}else if (ordertype == 'payEncourage'){
+								service = 'siteConfig';
+								/*用户激励*/
+								ordertypestr = '&ordertype='+ordertype+'&action='+ordertype;
+
+								/*用户激励*/
+								var module  = $("#payEncourage input[name='module']").val();
+								var act  	= $("#payEncourage input[name='act']").val();
+								var aid  	= $("#payEncourage input[name='aid']").val();
+								var amount  = $("#payEncourage input[name='amount']").val();
+								var config  = $("#payEncourage input[name='config']").val();
+								var type 	= $("#payEncourage input[name='type']").val();
+								var tourl   = $("#payEncourage input[name='tourl']").val();
+								var titleblod  = $("#payEncourage input[name='titleblod']").val();
+								var titlered   = $("#payEncourage input[name='titlered']").val();
+
+								$("#paction").val('payEncourage');
+
+								$("#publicpayform").append(
+										'<input type="hidden" name="module"  value="'+module+'" />' +
+										'<input type="hidden" name="act"   	  value="'+act+'" />' +
+										'<input type="hidden" name="aid"   value="'+aid+'" />' +
+										'<input type="hidden" name="amount"   value="'+amount+'" />' +
+										'<input type="hidden" name="config"   value="'+config+'" />' +
+										'<input type="hidden" name="type"   value="'+type+'" />' +
+										'<input type="hidden" name="tourl"  value="'+tourl+'" />'
+								);
+
+								ordertypestr += '&module='+module+'&act='+act+'&aid='+aid+'&amount='+amount+'&config='+config+'&type='+type+'&tourl='+tourl+'&titleblod='+titleblod+'&titlered='+titlered;
+								console.log(ordertypestr);
+							}else if(ordertype == 'fabuPay'){
+
+								/*发布支付*/
+
+								$("#payform input[name='createtype']").val(0);
+								$("#payform input[name='paytype']").val(payType);
+								 param  = $("#payform ").serialize();
+
+								ordertypestr +='&ordertype=fabuPay';
+							}
+
+							ordertypestr += '&final=1';
+					}
+
+					if (typeof(upordertype) !='undefined' && upordertype !='') {
+						/*用户升级*/
+						var level = $("#plevel").val();
+						var day = $("#pday").val();
+						var daytype = $("#pdaytype").val();
+
+
+						ordertypestr += '&level='+level+'&day='+day+'&daytype='+daytype+'&ordertype='+upordertype+'&final=1';
+
+						if(upordertype == 'upgrade_filter_user'){
+							ordertypestr += '&action=upgrade';
+						}
+					}
+
+					if($('#action_1').val() !=''){
+						/*商家入驻*/
+						ordertypestr  = "&action=joinBusinessPay&action_1=checkJoinPayAmount&action_2=joinBusinessPay";
+
+					}
+
+					if($("#pordertype").val() == 'paotui'){
+						ordertypestr  = '&action=paotuipay'
+					}
+
+					var peerpay = $("#ppeerpay").val();
+					if (peerpay ==1) {
+						ordertypestr += '&peerpay=1&peerpayfinal=1';
+					}
+
+					if(service == 'shop'){
+						var addressid = $("#address").val();
+
+						ordertypestr +='&final=1&addressid='+addressid;
+
+					}
+
+					var appcall = payType=='wxpay'?'wechatPay':(payType=='alipay'?'aliPay':'')
+					if(service == 'waimai' && typeof(shopid)!="undefined"){
+						console.log('清除购物车')
+						utils.removeStorage("wm_cart_"+shopid)
+					}
+
+					if(payType == 'money' || (payType == 'wxpay' && !navigator.userAgent.toLowerCase().match(/micromessenger/) || (payType == 'alipay' && navigator.userAgent.toLowerCase().indexOf('huoniao') > -1) )){
+
+						if(payType == 'money'){
+							payType = "money&useBalance=1&balance="+order_amount+"&paypwd="+tt.paypwd.join('');
+						}
+
+						var if_app = '';
+						if (navigator.userAgent.toLowerCase().indexOf('huoniao') > -1) {
+							if_app = '&app=1';
+						}
+						$(".payBeforeLoading").show();
+						checkpay = true;
+						$.ajax({
+							url: "/include/ajax.php?service="+service+ordertypestr+"&addressid="+addressid+"&paytype="+payType+"&ordernum="+ordernum+if_app,
+							type: "POST",
+							data:param,
+							dataType: "json",
+							success: function (data) {
+								if(data && data.state == 100){
+
+									$(".payCancelMask,.payCancelPop").css('display','none');
+									$(".payMask").hide();
+									$('.payPop,.payPwdPop,.num_keyboard').css('transform','translateY(100%)');
+									$("html").removeClass('noscroll');
+									$(".payBeforeLoading").hide();
+									if(navigator.userAgent.toLowerCase().indexOf('huoniao') <= -1){
+									  window.location.replace(data.info);
+
+									}else{
+										if($('.publicpaybtn').hasClass('disabled')){
+										 $('.publicpaybtn').removeClass('disabled').text('去支付')
+										}
+										if(payType.indexOf('money') <= -1){
+											tt.appPay(data.info,appcall)
+										}else{
+											window.location.replace(data.info);
+										}
+
+									}
+									
+								}else{
+									showErrAlert(data.info);//订单不存在
+									$(".pay_check_pwd").addClass('noClick');
+								}
+							},
+							error: function(){
+								showErrAlert(langData['siteConfig'][6][203]);//网络错误，请重试！
+							}
+						});
+
+					}else{
+
+						$("#pservice").val(service);
+						if (typeof(ordertype) !='undefined') {
+							/*用户充值*/
+							$("#pordertype").val(ordertype);
+							$("#pfinal").val(1);
+						}
+
+						if (typeof(upordertype) !='undefined') {
+							/*用户升级*/
+							$("#pordertype").val(upordertype);
+							$("#pfinal").val(1);
+						}
+						$("#ppaytype").val(payType);
+						$("#pordernum").val(ordernum);
+
+						// $("#publicpayform").submit();
+						var addressid = $("#address").val();
+						$(".payCancelMask,.payCancelPop").css('display','none');
+						$(".payMask").hide();
+						$('.payPop').css('transform','translateY(100%)');
+						$("html").removeClass('noscroll');
+						$("#payPage .btn_pay").attr('href',masterDomain + "/include/ajax.php?"+ $("#publicpayform").serialize()+"&addressid="+addressid)
+						setTimeout(function(){
+							$("#payPage .btn_pay").attr('href','javascript:;')
+						},1500)
+						if(payType != 'money'){
+							setTimeout(function(){
+								window.location.href = orderurl;
+							},3000)
+						}
+					}
+
+				}
+
+			},
+			// 余额支付 验证密码
+			checkPwdPopShow:function() {
+				$(".payPwdPop").css('transform',"translateY(0)");
+				setTimeout(function() {
+					$(".num_keyboard").css('transform',"translateY(0)");
+				},100)
+			},
+
+			// 清除输入的密码
+			delNum:function(){
+				var tt = this;
+				tt.paypwd.pop();
+			},
+
+			// 设置支付密码
+			setPayPwd:function() {
+				var tt = this;
+			      if(tt.loading) return false;
+			      if(tt.paypwd.length != 6){
+			        showErrAlert('请输入新密码');
+			        return false;
+			      }
+			      tt.loading = true;
+			      param = "pay1="+tt.paypwd.join('')+"&pay2="+tt.paypwd.join('');
+			      axios({
+						method: 'post',
+						url: "/include/ajax.php?service=member&action=updateAccount&do=paypwdAdd", // 加随机数防止缓存,
+			        	data:param,
+				  }).then((response)=>{
+							var data = response.data;
+			        if(data && data.state == 100){
+			        	tt.payBack()
+			          showErrAlert(data.info);
+								tt.paySubmit(1);
+
+			        }else{
+			          showErrAlert(data.info);
+								tt.loading = false;
+			        }
+				})
+			},
+
+			// 微信或者小程序
+			jsApiCall:function(jsApiParameters){
+				var tt = this;
+				var wx_miniprogram;
+				wx.miniProgram.getEnv(function (res) {
+				    wx_miniprogram = res.miniprogram;
+				});
+
+				var jsApiParameters = tt.jsApiParameters
+
+				//小程序
+				if(window.__wxjs_environment == 'miniprogram' || wx_miniprogram){
+				    var params = '?timestamp='+jsApiParameters.timeStamp+'&nonceStr='+jsApiParameters.nonceStr+'&signType='+jsApiParameters.signType+'&paySign='+encodeURIComponent(jsApiParameters.paySign)+'&prepay_id='+(jsApiParameters.package).replace('prepay_id=', '')+'&returnUrl='+encodeURIComponent('{#$returnUrl#}');
+				    var path = '/pages/pay/pay'+params;
+				    wx.miniProgram.redirectTo({url: path});
+
+				//公众号
+				}else{
+				    tt.onBridgeReady()
+				}
+			},
+
+			// 微信支付
+			onBridgeReady:function(){
+				var tt = this;
+				var jsApiParameters = tt.jsApiParameters
+				WeixinJSBridge.invoke(
+				    'getBrandWCPayRequest', {
+				         "appId":jsApiParameters.appId,     //公众号ID，由商户传入
+				         "timeStamp":jsApiParameters.timeStamp,         //时间戳，自1970年以来的秒数
+				         "nonceStr":jsApiParameters.nonceStr, //随机串
+				         "package":jsApiParameters.package,
+				         "signType":jsApiParameters.signType,         //微信签名方式：
+				         "paySign":jsApiParameters.paySign //微信签名
+				      },
+				      function(res){
+				      if(res.err_msg == "get_brand_wcpay_request:ok" ){
+				      // 使用以上方式判断前端返回,微信团队郑重提示：
+				            //res.err_msg将在用户支付成功后返回ok，但并不保证它绝对可靠。
+				      }
+				});
+
+			},
+
+			// 支付宝支付
+			tradePay:function(tradeNO) {
+				var tt = this;
+		        tt.ready(function(){
+		             // 通过传入交易号唤起快捷调用方式(注意tradeNO大小写严格)
+		             AlipayJSBridge.call("tradePay", {
+									 tradeNO: tradeNO
+		             }, function (data) {
+		                 log(JSON.stringify(data));
+		                 if ("9000" == data.resultCode) {
+		                     log("支付成功");
+		                 }
+		             });
+		        });
+		    },
+
+		    // 调起客户端支付
+		    appPay(orderInfo,appCall){
+		    	var tt = this;
+				setupWebViewJavascriptBridge(function(bridge) {
+					isOpen = true;
+					bridge.callHandler(appCall, {
+						"orderInfo": orderInfo
+					}, function(responseData){
+						// if(responseData == 'fail'){
+						// 	window.location.href = orderurl;
+						// }
+					});
+				});
+
+				setTimeout(function(){
+					window.location.href = orderurl;
+				},3000)
+			}
+
+		},
+		watch:{
+			paypwd:function() {
+				var tt = this;
+				if(tt.pwdCheck && tt.paypwd.length == 6){  //密码输入6位
+					$("#paypwd").val(tt.paypwd.join(''));
+					$('.payBeforeLoading').show();
+					var paramstr = '';
+					ordertype = $("#pordertype").val();
+
+					if(typeof(siteservice) !='undefined'){
+						if(ordertype == 'refreshTop') {
+							var type = $("#refreshTopForm input[name='type']").val();
+							var module = $("#refreshTopForm input[name='module']").val();
+							var act = $("#refreshTopForm input[name='act']").val();
+							var aid = $("#refreshTopForm input[name='aid']").val();
+							var amount = $("#refreshTopForm input[name='amount']").val();
+							var ordertype = $("#refreshTopForm input[name='action']").val();
+
+							service = siteservice;
+							paramstr = "&type=" + type + "&module=" + module + "&act=" + act + "&aid=" + aid + "&amount=" + amount + "&ordertype=" + ordertype;
+						}
+
+					}
+					ordertype = $("#pordertype").val();
+
+					if(ordertype!='' && typeof(ordertype) != 'undefined'){
+
+							paramstr = '&ordertype='+ordertype;
+					}
+
+					if(ordertype == 'fabuPay'){
+
+						module = $("#module").val();
+						/*发布支付*/
+
+						paramstr = '&module='+module+'&ordertype=fabuPay';
+					}
+					if(service == 'member'){
+
+						if(typeof(upordertype) !='undefined'){
+
+							paramstr = "&ordertype="+upordertype;
+						}
+					}
+
+					var actionstr = 'checkPayAmount';
+					if($('#action_1').val() !=''){
+						/*商家入驻*/
+						paramstr  = "&action_1=checkJoinPayAmount&action_2=joinBusinessPay";
+
+						actionstr = 'checkJoinPayAmount';
+					}
+
+					var peerpay = $("#ppeerpay").val();
+					var addressid = $("#address").val();
+
+					if (peerpay ==1) {
+						actionstr += '&peerpay=1';
+					}
+					if(ordertype == 'paotui'){
+
+						actionstr += '&paotui=1';
+					}
+					$.ajax({
+						url: "/include/ajax.php?service="+service+"&action="+actionstr+"&ordernum="+ordernum+"&paypwd="+tt.paypwd.join('')+"&useBalance=1&addressid="+addressid+"&balance="+order_amount+paramstr,
+						type: "POST",
+						dataType: "json",
+						success: function (data) {
+							$('.payBeforeLoading').hide();
+							if(data && data.state == 100){
+								// $.ajax({
+								// 	url: "/include/ajax.php?service="+service+"&action=pay&paytype=money&ordernum="+ordernum+"&useBalance=1&balance="+order_amount+"&paypwd="+tt.paypwd,
+								// 	type: "POST",
+								// 	dataType: "json",
+								// 	success: function (data) {
+								// 		if(data && data.state == 100){
+								//
+								// 			window.location.href = data.info;
+								// 		}else{
+								// 			alert(data.info);//订单不存在
+								// 			$(".pay_check_pwd").addClass('noClick');
+								// 		}
+								// 	},
+								// 	error: function(){
+								// 		alert(langData['siteConfig'][6][203]);//网络错误，请重试！
+								// 	}
+								// });
+								tt.paySubmit(1)
+							}else{
+								if(actionstr == 'checkPayAmount'){
+									tt.paypwd = [];
+								}
+								showErrAlert(data.info);//订单不存在
+
+							}
+						},
+						error: function(){
+							showErrAlert(langData['siteConfig'][6][203]);//网络错误，请重试！
+							$(".pay_check_pwd").addClass('noClick');
+						}
+					});
+
+				}
+			}
+		}
+
+	})
+</script>

@@ -1,0 +1,153 @@
+{#$pageTitle = $langData['siteConfig'][11][12]|cat:" - "|cat:$cfg_webname#}
+{#include file="head.html"#}
+
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/admin/datetimepicker.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu_shop_huodong.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript">
+	var id = "{#$id#}";
+	var specifiVal = '{#if !$detail_specifiVal#}[]{#else#}{#$detail_specifiVal#}{#/if#}';//多规格
+	var eskuArr = '{#if !$detail_specificationArr#}[]{#else#}{#$detail_specificationArr#}{#/if#}';//编辑--多规格
+	var eskuList = '{#if !$detail_specifiList#}[]{#else#}{#$detail_specifiList#}{#/if#}';//编辑--多规格
+	var proType = '{#if $detail_promotype == 1#}1{#else#}0{#/if#}'; //0表示电商商品,1表示团购商品
+	
+</script>
+</head>
+
+{#$pageCurr = "fabu_shop_secKill"#}
+
+<body>
+{#include file="headSidebar.html"#}
+
+<div class="main">
+	<div class="nav-tabs fn-clear">
+		<ul class="fn-clear">
+			<li class="active"><a href="{#getUrlPath service="member" template="fabu_shop_secKill"#}">特价秒杀-活动报名</a></li>
+		</ul>
+	</div>
+	<div class="container fn-clear">
+		<div class="w-form shop_hdCom shop_secKill">
+			<h3 class="tuanTip">同一商品，同一时段只能参加一个活动，商家需合理安排！</h3>
+			<form action="/include/ajax.php?service=shop&action=huodongJoin&oper={#if $id#}update&hid={#$id#}{#else#}add{#/if#}" id="fabuForm" name="fabuForm" data-url="{#getUrlPath service='member' template='shop_hasjoin'#}">
+				<input type="hidden" name="hdtype" value="secKill" id="hdtype">
+				<input type="hidden" name="typeid" id="typeid" value="{#$typeid#}" />
+				<dl class="fn-clear goodsDl">
+					<dt>选择报名商品：</dt>
+					<dd>
+						<div class="goodsCon">
+							{#if $id#}
+							<div class="goodImg"><img src="{#$detail_litpic#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+							<div class="goodInfo"><h4>{#$detail_title#}</h4></div>
+							{#/if#}
+							
+						</div>
+						{#if !$id#}
+						<a href="javascript:;" class="chooseGoods">请选择商品</a>
+						{#/if#}
+						<input type="hidden" name="id" id="goodsId" value="{#$detail_goodid#}">
+					</dd>
+				</dl>
+				<dl class="fn-clear yuanLi">
+					<dt>原价：</dt>
+					<dd>
+						<input type="text" value="{#if $detail_mprice#}{#echoCurrency type='symbol'#}{#$detail_mprice#}{#/if#}" id="market" placeholder="请先选择商品" readonly class="inp {#if !$id#}disabled{#/if#}" data-title="请先选择商品">
+	            		<input type="hidden" name="market" id="marketVal" >
+	            		<span class="tip-inline"></span>
+					</dd>
+				</dl>
+				<dl class="fn-clear" data-required="1">
+					<dt><label for="hdprice"><em class="star">*</em>秒杀价：</label></dt>
+					<dd id="speList">
+						
+						<div class="pinTop">
+							{#if !$id#}
+							<input type="text" readonly class="inp disabled" id="fakeInp"  placeholder="请先选择商品" data-title="请先选择商品">
+							{#/if#}
+							
+							<div class="pintuanPrice input-append" {#if !$detail_specifiVal && $detail_huodongprice#}style="display:block;"{#/if#}>
+			                    <input type="text" name="hdprice" value="{#$detail_huodongprice#}" class="" id="hdprice" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')" data-title="请输入秒杀价">
+			                    <span class="add-aft">{#echoCurrency type='short'#}</span>
+			                </div>
+			                
+			                <span class="tip-inline"></span>
+
+			            </div>
+						
+			            <!-- 存放多规格 -->
+			            <div class="pinBot">
+			            	<p class="pintip">多规格商品需单个设置拼购价与活动库存</p>
+			            	<div class="speTab"><table><thead></thead><tbody></tbody></table></div>
+		  					<a href="javascript:;" class="piliang">批量填写</a>
+			            </div> 
+					</dd>
+				</dl>
+				<dl class="fn-clear kucun" data-required="1">
+					<dt><label for="hdinventory"><em class="star">*</em>活动库存：</label></dt>
+					<dd>
+						<div class="input-append">
+		                    <input type="text" name="inventory" value="{#$detail_huodonginventory#}" id="hdinventory" placeholder="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" data-title="请输入活动库存">
+		                    <span class="add-aft">{#$langData['siteConfig'][21][10]#}</span>{#*件*#}
+		                </div>
+		                <span class="tip-inline"></span>
+					</dd>
+				</dl>
+
+				<dl class="fn-clear" data-required="1">
+					<dt><label for="maxnum"><em class="star">*</em>每人限购：</label></dt>
+					<dd>
+						<div class="input-append">
+		                    <input type="text" name="maxnum" value="{#$detail_limit#}" id="maxnum" placeholder="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" data-title="请输入每人限购数量">
+		                    <span class="add-aft">{#$langData['siteConfig'][21][10]#}</span>{#*件*#}
+		                </div>
+		                <span class="tip-inline"></span>
+					</dd>
+				</dl>
+				<dl class="fn-clear">
+					<dt><em class="star">*</em>活动时间：</dt>
+					<dd class="form_datetime">
+						<div class="input-append form_datetime">
+				          	<input class="commonHdtime startTime" type="text" name="startdate" id="kstime" value="{#$detail_ktime|date_format:'%Y-%m-%d %H:%M:%S'#}" placeholder="请选择开始时间" readonly />
+				          	<span class="add-aft"><i class="icon-time"></i></span>
+				        </div>
+				        <em class="hdtimeTip">至</em>
+				        <div class="input-append form_datetime">
+				          	<input class="commonHdtime endTime" type="text" name="enddate" id="ketime" value="{#$detail_etime|date_format:'%Y-%m-%d %H:%M:%S'#}" placeholder="请选择结束时间" readonly/>
+				          	<span class="add-on"><i class="icon-time"></i></span>
+				        </div>
+				        <span class="tip-inline"></span>
+					</dd>
+				</dl>
+				<dl class="fn-clear">
+					<dt>&nbsp;</dt>
+					<dd><button class="submit" id="submit">{#if !$id#}立即报名{#else#}立即保存{#/if#}</button></dd>
+				</dl>
+			</form>
+		</div>
+		
+		
+	</div>
+
+</div>
+<div class="mask_pl"></div>
+<div class="link_pro">
+	<a href="javascript:;" class="cancel_btn"></a>
+	<h1>选择商品</h1>
+	<div class="search_box">
+		<s></s>
+	    <input type="text" id="search_pro" placeholder=" 搜索商品">  
+	    <i class="clear"></i>
+	</div>
+	<div class="pro_box">
+		<ul data-type="shop">
+			
+		</ul>
+	</div>
+</div>
+{#include file="footer.html"#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap-datetimepicker.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fabu.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/fabu-shop-huodong.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

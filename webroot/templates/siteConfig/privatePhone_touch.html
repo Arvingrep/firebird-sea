@@ -1,0 +1,272 @@
+
+<script>
+    var geetest = {#$cfg_geetest#} ; //是否开启极验
+    var cfg_smsLogin_state = '{#$cfg_smsLoginState#}' ; //是否短信验证
+    var cfg_privateNumber_state = '{#$cfg_privatenumberState#}'; //是否开启隐私保护通话
+    var cfg_payPhoneState = '{#$cfg_payPhoneState#}'; //是否开启付费查看电话
+    var if_login =  {#if $userinfo && $userinfo.userid#}1{#else#}0{#/if#}; //是否登录
+    var phoneCheck = {#if $userinfo.phoneCheck#}{#$userinfo.phoneCheck#}{#else#}0{#/if#};
+    var userRealPhone = '{#$userinfo.phone#}' ; //号码
+    var userPhone = '{#$userinfo.phoneEncrypt#}' ; //号码加密
+    var cfg_payPhone = '{#$cfg_payPhone#}'
+</script>
+
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/vant/index.css">
+<!-- 
+
+    1.不需要显示区号，区号默认86
+    2.切换其他电话时,更换绑定的手机
+    3.未登录时显示登录，登录之后显示绑定手机
+ -->
+ 
+ <div class="private_phone_container" id="private_phone_container" v-cloak >
+    {#*
+     <div class="private_phone_mask"></div>
+     <div class="private_phone_pop">
+     
+         <!-- 未注册/登录 -->
+         <div class="private_phone_loginBox">
+             <div class="private_phone_header">
+                 <h3>请先登录/注册</h3>
+                 <p>为保护您的隐私，验证手机号登录后将为您使用虚拟号码拨出</p>
+                 <a href="javascript:;" class="close_private_phone_pop"></a>
+             </div>
+             <div class="private_phone_form">
+                 <div class="private_phone_inputBox">
+                     <input type="tel" placeholder="请输入手机号" name="tel" >
+                 </div>
+                 <div class="private_phone_inputBox">
+                     <input type="tel" placeholder="请输入验证码" name="tel" maxlength="6">
+                     <a href="javascript:;" class="pp_getCode" >获取验证码</a>
+                    
+                 </div>
+                 <van-button type="default">登录</van-button>
+             </div>
+         </div>  
+     
+     </div>
+     *#}
+
+     
+     <!-- :safe-area-inset-bottom="true"  -->
+     <button style="display: none;" id="codeButton" type="button" ref="codeButton"></button> 
+    
+
+     <!-- 扫码进入页面s -->
+     <van-popup class="private_phone_pop"
+     v-if="byScanIn"
+     :close-on-click-overlay="false"
+     v-model="showPrivateScanPop" 
+     closeable
+     close-icon="close"
+     position="bottom"
+     :round="true"
+     close-icon="{#$cfg_staticPath#}/images/close_private_phone.png"
+     :style="{ height: '6.3rem' }">
+        <div class="private_phone_header">
+            <h3>请使用{{scan_userPhone}}拨打</h3>
+            <p>我们将为您使用虚拟号码拨出<span class="changePhone" @click="showPrivatePop = true;showKeyBoard=true; changePhone=true;">使用其他号码？</span></p>
+        </div> 
+        <div class="private_phone_toCallBox">
+            <h2>{{scan_private_phone}}</h2>
+            <p v-if="scan_cutDown">电话<span class="private_phone_cutDown" >{{scan_cutDown}}</span>后失效，请尽快拨打</p>
+            <p v-else>请稍后，虚拟号码获取中...</p>
+        </div>
+        <div class="private_phone_btnbox">
+
+            <van-button type="default" size="large" round  class="private_phone_callbtn"   color="linear-gradient(-90deg, #156FED 0%, #2B84FF 100%)" @click="callPhone(scan_private_phone)">立即拨打</van-button>
+            <p class="concat_tip">联系我时，请说是在<span>{#$cfg_shortname#}</span>上看到的，谢谢！</p>
+        </div>
+     </van-popup>
+     <!-- 扫码进入页面e -->
+
+
+     <!-- 底部弹出层 验证/登录  -->
+     <van-popup class="private_phone_pop"
+            :close-on-click-overlay="false"
+            v-model="showPrivatePop" 
+            closeable
+            close-icon="close"
+            position="bottom"
+            :round="true"
+            close-icon="{#$cfg_staticPath#}/images/close_private_phone.png"
+            :style="{ height: '10.3rem' }"
+         >
+         
+         <div class="private_phone_header" v-if="!if_login">
+            <h3>请先登录/注册</h3>
+            <p>为保护您的隐私，验证手机号登录后将为您使用虚拟号码拨出</p>
+        </div> 
+
+        <!-- 验证手机号 -->
+        <div class="private_phone_header" v-else-if="!phoneCheck">
+            <h3>为保护您的隐私，请先绑定手机</h3>
+            <p>验证后将为您使用虚拟号码拨出</p>
+        </div> 
+
+        <!-- 修改绑定的手机号 -->
+        <div class="private_phone_header" v-else-if="phoneCheck">
+            <h3>验证手机号</h3>
+            <p>为保护您的隐私，验证手机号后将为您使用虚拟号码拨出</p>
+        </div> 
+        <div class="private_phone_form">
+
+            <van-field
+            :class="['private_phone_inputBox',{'onFocus':showKeyBoard}]"
+            readonly
+            clickable
+            :value="telphone"
+            placeholder="请输入手机号"
+            @touchstart.stop="showKeyBoard = true; showKeyBoard2 = false;">
+            
+            <div slot="input" :class="['private_phone_inputbox',{'placeholder':!telphone}] " @touchstart.stop="showKeyBoard = true; showKeyBoard2 = false;"> {{telphone}} <span class="placeholderText">请输入手机号</span> <span v-if="showKeyBoard" class="blink">|</span> </div>
+        
+            </van-field>
+            <van-number-keyboard
+            :transition="false"
+            v-model="telphone"
+            :show="showKeyBoard"
+            @blur="showKeyBoard = false"
+           :hide-on-click-outside="false"
+            ></van-number-keyboard>
+            <div class="private_phone_inputBox">
+                <van-field
+                :class="['codeInp',{'onFocus':showKeyBoard2}]"
+                readonly
+                clickable
+                :value="phoneCode"
+                placeholder="请输入手机验证码"
+                maxlength="6"
+                @touchstart.stop="showKeyBoard2 = true; showKeyBoard = false;"
+                >
+                <div slot="input" :class="['private_phone_inputbox',{'placeholder':!phoneCode}] "  @touchstart.stop="showKeyBoard2 = true; showKeyBoard = false;"> {{phoneCode}} <span class="placeholderText">请输入手机验证码</span> <span v-if="showKeyBoard2" class="blink">|</span> </div>
+            
+            </van-field>
+                <a href="javascript:;" class="pp_getCode" @click="getPhoneMsg">获取验证码</a> 
+            </div>
+            <van-number-keyboard
+            :transition="false"
+            v-model="phoneCode"
+            :show="showKeyBoard2"
+            @blur="showKeyBoard2 = false"
+            :hide-on-click-outside="false"
+            ></van-number-keyboard>
+            
+            <van-button type="default" size="large" round  class="private_phone_btn"   color="linear-gradient(-90deg, #156FED 0%, #2B84FF 100%)" :disabled="!telphone || !phoneCode" v-if="!if_login" @click="loginBefore">登录</van-button>
+            <van-button type="default" size="large" round  class="private_phone_btn" @click="bindPhone"   color="linear-gradient(-90deg, #156FED 0%, #2B84FF 100%)" :disabled="!telphone || !phoneCode" v-else-if="!phoneCheck">确定</van-button>
+            <van-button type="default" size="large" round  class="private_phone_btn" @click="useOtherPhone"   color="linear-gradient(-90deg, #156FED 0%, #2B84FF 100%)" :disabled="!telphone || !phoneCode" v-else>确定</van-button>
+        </div>
+    </van-popup>
+
+
+
+    <!-- 确认弹窗登录 -->
+    <van-popup class="ConfirmPop" v-model="showConfirmPop" round :close-on-click-overlay="false">
+        <div class="private_phone_box">
+            <p>进行下一步前，请先阅读并同意</p>
+            <p>
+            <a href="{#getUrlPath service='siteConfig' template='protocol' title='自定义隐私政策'#}" target="_blank">《自定义隐私政策》</a>及<a href="{#getUrlPath service='siteConfig' template='protocol' title='用户服务协议'#}" target="_blank">《用户服务协议》</a>
+            </p>
+        </div>
+        <div class="private_phone_btnGroup">
+            <van-button color="#E1E1E1" type="default" round plain class="private_phone_refuse" @click="showConfirmPop = false">不同意</van-button>
+            <van-button color="linear-gradient(-90deg, #156FED 0%, #2B84FF 100%)" round @click="lohin_by_msg" :loading="loading" loading-text="登录中">同意并继续</van-button>
+        </div> 
+    </van-popup>
+
+
+    <!-- 拨打隐私电话弹窗 -->
+    <van-popup class="private_phone_pop" 
+        :close-on-click-overlay="false"
+        v-model="showCallPop" 
+        closeable
+        close-icon="close"
+        position="bottom"
+        :round="true"
+        close-icon="{#$cfg_staticPath#}/images/close_private_phone.png"
+        :style="{ height: '6.3rem' }">
+
+        <div class="private_phone_header">
+            <h3>请使用{{userPhone}}拨打</h3>
+            <p>我们将为您使用虚拟号码拨出<span class="changePhone" @click="showPrivatePop = true;showKeyBoard=true; changePhone=true;">使用其他号码？</span></p>
+        </div> 
+
+        <div class="private_phone_toCallBox">
+            <h2>{{!private_phone ? '加载中~' : private_phone}}</h2>
+            <p v-if="cutDown">电话<span class="private_phone_cutDown" >{{cutDown}}</span>后失效，请尽快拨打</p>
+            <p v-else>请稍后，虚拟号码获取中...</p>
+        </div>
+        <div class="private_phone_btnbox">
+
+            <van-button type="default" size="large" round  class="private_phone_callbtn"   color="linear-gradient(-90deg, #156FED 0%, #2B84FF 100%)" @click="callPhone(private_phone)">立即拨打</van-button>
+            <p class="concat_tip">联系我时，请说是在<span>{#$cfg_shortname#}</span>上看到的，谢谢！</p>
+        </div>
+    </van-popup>   
+
+    <!-- webdiv 小程序拨打电话 -->
+    <!-- 选择支付方式 弹窗（付费，广告） -->
+    <div :class="{'rewardadvPop':true, 'rewardadvShow':showRewardPop}" v-if="cfg_payPhone.wxmini">
+        <div class="rewardAdvContent">
+            <div class="rewardAdvCon">
+                <div class="rewardClose" @click="showRewardPop = false">×</div>
+                <div class="h3">看广告免费获取联系方式</div>
+                <div class="p">{{!cfg_payPhone.payPhone_entrance ? '观看广告，或直接付费获取对方联系电话' : '观看广告免费获取对方联系电话'}}</div>
+            </div>
+            <div class="btns_group">
+                <div class="btn_pay" v-if="!cfg_payPhone.payPhone_entrance" @click="callByPay">
+                    <div class="txt" >直接付费</div>
+                    <div class="span">
+                        <span class="symbol">{{ currency.symbol }}</span>
+                        <span class="amount" v-if="payInfo.state == 100">{{ payInfo.info.order_amount }}</span>
+                    </div>
+                </div>
+                <div class="btn_watch" @click="callBgAdv"> 
+                    <div class="txt">免费获取</div>
+                    <img class="img" src="/static/images/miniprograme/payPop/video_icon.png"/>
+                </div>
+            </div>
+        </div>
+        <div class="rewardAdvMask" data-type="close" @click="showRewardPop = false"></div>
+    </div>
+
+    <div class="loading" v-if="loading"></div>
+    
+ </div>
+
+<!-- 付费查看电话弹窗 -->
+<div class="payPhone_container" id="payPhone_container" v-cloak >
+    <van-popup class="private_phone_pop" 
+        :close-on-click-overlay="false"
+        v-model="showPayPhonePop" 
+        closeable
+        close-icon="close"
+        position="bottom"
+        :round="true"
+        close-icon="{#$cfg_staticPath#}/images/close_private_phone.png"
+        :style="{ height: '6.3rem' }">
+
+        <div class="private_phone_header">
+            <h3>已获取联系方式，请尽快拨打</h3>
+            <p>温馨提示，您可截图保存联系方式到相册</p>
+        </div> 
+
+        <div class="private_phone_toCallBox">
+            <h2>{{payPhoneNumber}}</h2>
+            <p>{{payPhoneTitle}}</p>
+        </div>
+        <div class="private_phone_btnbox">
+            <van-button type="default" size="large" round  class="private_phone_callbtn"   color="linear-gradient(-90deg, #156FED 0%, #2B84FF 100%)" @click="callPhone(payPhoneNumber)">立即拨打</van-button>
+            <p class="concat_tip">联系我时，请说是在<span>{#$cfg_shortname#}</span>上看到的，谢谢！</p>
+        </div>
+    </van-popup>
+</div>
+{#if $cfg_geetest#}
+{#if $cfg_geetest == 1#}
+<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+ <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/vant/vant.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/privatePhone_touch.js?v={#$cfg_staticVersion#}"></script>

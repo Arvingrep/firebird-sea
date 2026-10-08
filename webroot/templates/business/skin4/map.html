@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{#if $seo_title != ""#}{#$seo_title#}{#else#}地图找商家{#/if#}-{#$business_title#}</title>
+<meta name="keywords" content="{#$house_keywords#}" />
+<meta name="description" content="{#$house_description#}" />
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/core/base.css?V={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/jquery.mCustomScrollbar.min.css" media="all" />
+<link rel="stylesheet" href="{#$templets_skin#}css/public.css?V={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/map.css?V={#$cfg_staticVersion#}">
+<script charset="UTF-8" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$house_channelDomain#}';
+
+    var criticalPoint = 1240, criticalClass = "w1200";
+    $("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+    var cookiePre = '{#$cfg_cookiePre#}';
+</script>
+</head>
+<body>
+<!--顶部菜单 s-->
+<div class="top">
+    <div class="wrap topbar fn-clear">
+        {#if $userinfo#}
+            {#$userDomain = $member_userDomain#}
+            {#if $userinfo.userType == 2#}
+            {#$userDomain = $member_busiDomain#}
+            {#/if#}
+            <ul class="logreg" id="navLoginBefore">
+                <li><a href="{#$userDomain#}" target="_blank">{#$userinfo.nickname#}</a></li>
+                <li><a href="{#$cfg_basehost#}/logout.html">安全退出</a></li>
+            </ul>
+        {#else#}
+            <ul class="logreg" id="navLoginBefore">
+                <li><a href="javascript:;" id="login">登录</a></li>
+                <li><a href="{#$cfg_basehost#}/register.html">注册</a></li>
+            </ul>
+        {#/if#}
+
+        <ul class="topbarlink">
+            <li class="index"><a href="{#$business_channelDomain#}">首页</a></li>
+            {#$n=1#}
+            {#siteConfig action="siteModule" return="module" type="1"#}
+            {#if $n<=10#}
+            <li class="index"><a href="{#$module.url#}">{#$module.name#}</a></li>
+            {#/if#}
+            {#$n=$n+1#}
+            {#/siteConfig#}
+        </ul>
+    </div>
+</div>
+
+<!--顶部菜单 end-->
+
+<div class="header">
+    <h1 class="logo">
+        <a href="{#if $business_channelDomain#}{#$business_channelDomain#}{#else#}{#$cfg_basehost#}{#/if#}" title="{#if $business_channelName#}{#$business_channelName#}{#else#}{#$cfg_webname#}{#/if#}"><img src="{#if $business_logoUrl#}{#$business_logoUrl#}{#else#}{#$cfg_weblogo#}{#/if#}" alt=""></a>
+    </h1>
+
+    <div class="topInfo">
+        <div class="loginbox">
+        <!-- <span class="siteCityInfo">上海</span> -->
+        <span class="changeCityBtn">
+            <div class="msearch"><a href="javascript:;">{#$siteCityInfo['name']#}<i></i></a></div>
+            <!-- 「<a href="javascript:;">切换城市</a>」 -->
+            <div class="changeCityList">
+                <p class="setwidth"></p>
+                <div class="boxpd">
+                    <div class="sj"><i></i></div>
+                    <div class="box">
+                        <div class="content fn-clear">
+                            <p class="tit">请选择您所在的城市：</p>
+                            <ul>
+
+                               {#siteConfig action='siteCity' return='city' module={#$service#}#}
+                                <li><a href="{#$city.url#}" title="{#$city.name#}"{#if $siteCityInfo.domain == $city.domain#} class="curr"{#/if#} data-domain='{#$city|@json_encode#}'>{#$city.name#}<s><img src="{#$cfg_basehost#}/static/images/changecity_curr.png" /></s></a></li>
+                              {#/siteConfig#}
+                            </ul>
+                        </div>
+                        <div class="morecontent fn-hide">
+                            <dl class="hot">
+                                <dt>热门</dt>
+                                <dd></dd>
+                            </dl>
+                            <div class="more">
+                                <dl class="pytit">
+                                    <dt>城市</dt>
+                                    <dd></dd>
+                                </dl>
+                                <div class="list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </span>
+        </div>
+    </div>
+    <div class="tel"><i></i>{#$cfg_hotline#}</div>
+</div>
+
+
+<!-- 商家地图 s-->
+<div class="map-box wrap">
+    <div class="zoom-ctrl">
+        <span class="zoom-plus">+</span>
+        <span class="zoom-minus">-</span>
+    </div>
+
+    <div class="map" id="map"></div>
+    <div class="sidebar">
+        <div class="map-os" title="收起左栏"><i></i></div>
+        <div class="search-box">
+            <input type="text" name="keywords" id="skey" placeholder="输入商家名称...">
+            <span id="sbtn"><i></i></span>
+        </div>
+
+        <ol class="f-o">
+            <li class="qu_btn"><span>分类</span><i></i></li>
+        </ol>
+
+        <div class="listes">
+            <div class="business-list"><p class="loading">加载中...</p></div>
+        </div>
+
+        <div class="filter">
+            <div class="category">
+                <ul class="qu">
+                    <li data-id="" class="active">不限</li>
+                    {#business action="type" return='bjtype' son='1' #}
+                    <li data-id="{#$bjtype.id#}">{#$bjtype.typename#}</li>
+                    {#/business#}
+                </ul>
+            </div>
+            <div class="catelist">
+                <ul class="catelist-item show">
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- 商家地图 e-->
+<script>
+    var g_conf = {
+            "cityName": "{#$siteCityInfo['name']#}",   //当前城市
+            "mapWrapper": "map",  //地图区块
+            "minZoom": 11,        //地图最大zoom
+            "sjMin": 0,           //均价最小值
+            "sjMax": 30000,       //均价最大值
+
+            //关键字
+            "keywords": "{#$keywords#}"
+
+            //筛选
+            ,"filter": []
+
+            //排序
+            ,"orderby": 0
+
+            ,"typeid": ''
+    };
+</script>
+<!-- 多语言 -->
+<script src="/include/json.php?action=lang"></script>  
+<script type="text/javascript" src="{#$site_map_apiFile#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery-ui-autocomplete.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.mCustomScrollbar.min.js"></script>
+<script charset="UTF-8" src="{#$cfg_staticPath#}js/common.js?V={#$cfg_staticVersion#}"></script>
+<script charset="UTF-8" src="{#$cfg_staticPath#}js/ui/jquery.SuperSlide.2.1.1.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/map_{#$site_map#}.js?V={#$cfg_staticVersion#}"></script>
+</body>
+</html>

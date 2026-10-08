@@ -1,0 +1,352 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>{#if $do == "edit"#}{#$langData['sfcar'][2][1]#}{#else#}{#$langData['sfcar'][2][0]#}{#/if#}</title>  {#* 修改顺风车-发布顺风车 *#}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobileSelect.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu-pay.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$cfg_basehost#}/templates/member/touch/css/gz-fabu.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu-sfcar.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/hitch-calendar.css?v={#$cfg_staticVersion#}" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.deferred.js" type="text/javascript"></script>
+<script type="text/javascript">
+  var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+
+  var hideFileUrl = {#$cfg_hideUrl#};
+
+  var modelType = '{#$module#}';
+  var thumbSize = {#$thumbSize#}, thumbType = '{#$thumbType#}', atlasSize = {#$atlasSize*1024*1024#}, atlasType = '{#$atlasType#}', atlasMax = 5;
+  var userinfo = {
+      phone: '{#$userinfo.phone#}',
+      phoneCheck: '{#$userinfo.phoneCheck#}',
+  };
+  var cityId = "{#$siteCityInfo['cityid']#}"
+  var customFabuCheckPhone = true,geetest = {#$cfg_geetest#};
+  var id = {#$detail_id|default:0#};
+  var fabuSuccessUrl = '{#getUrlPath service='member' type='user' templates='fabusuccess' module={#$module#} id='%id%'#}';
+  var fabuUrl        = '{#getUrlPath service='member' type='user' templates='manage-sfcar' #}';
+  var st = '{#$insertselect#}';//判断出发地和目的地是选择的 还是输入的
+ var tagId ="{#if ($detail_type==0 || $detail_type =='') && $detail_usetype ==0 #}1{#elseif ($detail_type==0 || $detail_type =='') && $detail_usetype ==1 #}2{#elseif $detail_type==1 && $detail_usetype ==1 #}4{#else#}3{#/if#}";
+  var detail = {
+      tel: '{#$detail_tel#}'
+  }
+  var tagArr={#json_encode(explode(',',$detail_tag))#};
+  var doEdit ='{#if $do == "edit"#}1{#else#}0{#/if#}';
+
+  var auto_location = {#$cfg_auto_location|default:1#}
+</script>
+</head>
+<body>
+    {#if $do == "edit"#}
+    {#$pageTitle = $langData['siteConfig'][6][142]#}
+    {#else#}
+    {#$pageTitle = $langData['siteConfig'][6][143]#}
+    {#/if#}
+    {#include file="top.html"#}
+<div class="gz-address">
+  <div class="gz-addr-wrap" id="gzAddNewObj">
+    <div class="main">
+      <div class="tab-ul">
+        <ul  class="{#if $do=="edit"#}editUl{#/if#}" >
+          {#* 我是车主 *#}
+          <li data-type="1" {#if $do=="edit" && $detail_type ==0#} style="display: none;" {#/if#} class="ownerFabu {#if $detail_type ==1 || $detail_type == '' #}active{#/if#}"><strong>{#$sfcar_displayConfig[1]['title']#}</strong></li>
+          {#* 我要用车 *#}
+          <li data-type="0" {#if $do=="edit" && $detail_type ==1#} style="display: none;" {#/if#} class="userFabu {#if $detail_type == 0 && $detail_type != ''#} active {#/if#}"><strong>{#$sfcar_displayConfig[0]['title']#}</strong></li>
+
+        </ul>
+      </div>
+      <form name="fabuForm" id="fabuForm" method="post" action="/include/ajax.php?service=sfcar&action={#if $do == "edit"#}edit&id={#$id#}{#else#}put{#/if#}" data-url="{#getUrlPath service='member' type='user' template='manage' action='sfcar'#}">
+        {#if $insertselect == 1#}
+        <!-- 出发地 s -->
+        <div class="place">
+            {#* 选择出发地 -- 详细地址(选填)*#}
+            <div class="start">
+                <p class="startAddr gz-addr-seladdr" data-ids="{#getPublicParentInfo tab='site_area' id=$u_addrid split=' '#}" data-id="{#if $u_addrid#}{#$u_addrid#}{#/if#}" data-action="area" data-just="1" data-any="1">{#if $detail_startaddr#} {#$detail_startaddr#} {#else#} {#$langData['sfcar'][0][37]#}{#/if#}</p>
+                <div class="startAdress fakeTXT" {#if $detail_startAdress#} style="display: block;"{#/if#} contenteditable="true" data-placeholder="{#$langData['sfcar'][0][39]#}">{#$detail_startAdress#}</div>
+                <input type="hidden" name="addrid" id="sAddr" value="{#$detail_startaddrid#}">
+                <input type="hidden" name="lnglat" id="lnglat" value="{#$detail_lnglat#}">
+            </div>
+            {#* 选择目的地 -- 详细地址(选填)*#}
+            <div class="end">
+
+                <p class="endAddr gz-addr-seladdr" data-ids="{#getPublicParentInfo tab='site_area' id=$u_addrid split=' '#}" data-id="{#if $u_addrid#}{#$u_addrid#}{#/if#}" data-action="area" data-just="1" data-any="1">{#if $detail_endaddr#} {#$detail_endaddr#}{#else#}{#$langData['sfcar'][0][38]#}{#/if#}</p>
+                <div class="endAdress fakeTXT" {#if $detail_endAddress#} style="display: block;"{#/if#} contenteditable="true" data-placeholder="{#$langData['sfcar'][0][39]#}">{#$detail_endAddress#}</div>
+                <input type="hidden" name="addrid" id="eAddr" value="{#$detail_endaddrid#}">
+            </div>
+        </div>
+        <!-- 出发地 e -->
+        {#else#}
+        <!-- 出发地 s -->
+        <div class="placeInp">
+            {#* 请填写出发地 *#}
+            <div class="start">
+              <i></i>
+              <span class="fakeinp" {#if $do=="edit"#}style="display: none;"{#/if#}>{#$langData['sfcar'][2][36]#}</span>
+              <div class="inputStart comInpu" contenteditable="true" data-placeholder="{#$langData['sfcar'][2][36]#}" {#if $do=="edit"#} style="display: block;"{#/if#}>{#$detail_startaddr#} {#$detail_startAdress#}</div>
+              <input type="hidden" name="startaddr" id="sAddrInp" value="{#$detail_startaddr#}">
+              <input type="hidden" name="startAdress" id="sAddressInp" value="{#if $detail_startAdress#}{#$detail_startAdress#}{#/if#}">
+            </div>
+            {#* 请填写目的地*#}
+            <div class="end">
+              <i></i>
+              <span class="fakeinp" {#if $do=="edit"#}style="display: none;"{#/if#}>{#$langData['sfcar'][2][37]#}</span>
+              <div class="inputEnd comInpu" contenteditable="true" data-placeholder="{#$langData['sfcar'][2][37]#}" {#if $do=="edit"#} style="display: block;"{#/if#}>{#$detail_endaddr#} {#$detail_endAddress#}</div>
+              <input type="hidden" name="endaddr" id="eAddrInp" value="{#$detail_endaddr#}">
+              <input type="hidden" name="endAddress" id="eAddressInp" value="{#if $detail_endAddress#}{#$detail_endAddress#}{#/if#}">
+            </div>
+        </div>
+        <!-- 出发地 e -->
+        {#/if#}
+        <!-- 途径地点 s -->
+        <input type="hidden" name="way" id="way" value="">
+        <div class="route fn-clear" {#if $detail_type ==0 && $detail_type!=''#} style="display: none;" {#/if#} >
+          <span class="routeNum"><em class="num">{#if $detail_accessaddray#}{#count($detail_accessaddray)#}{#else#}0{#/if#}</em>/10</span>
+          {#* 途径地点 -- 选填*#}
+          <h2 class="com-title">{#$langData['sfcar'][0][41]#}<em class="route-tip">?</em><span>({#$langData['sfcar'][0][40]#})</span></h2>
+          {#if $detail_accessaddray#}
+            {#foreach from=$detail_accessaddray key=k item=i#}
+            <div class="route-div has">
+              {#* 添加途径地点*#}
+              <input type="text" placeholder="{#$langData['sfcar'][0][42]#}" class="com-input" value="{#$i#}">
+              <i class="del-route"></i>
+            </div>
+            {#/foreach#}
+          {#else#}
+            <div class="route-div">
+              {#* 添加途径地点*#}
+              <input type="text" placeholder="{#$langData['sfcar'][0][42]#}" class="com-input" value="">
+            </div>
+          {#/if#}
+
+        </div>
+        <!-- 途径地点 e -->
+        <!-- 出发时间 s -->
+        <div class="startTime">
+          <label class="daychose {#if $detail_missiontype ==1#} checked {#/if#}" {#if $detail_type ==0 && $detail_type !=''#} style="display: none;" {#/if#} >{#$langData['sfcar'][0][16]#}</label> {#* 天天发车*#}
+          {#* 出发时间*#}
+          <h2 class="com-title">{#$langData['sfcar'][0][26]#}</h2>
+          <div class="timeStart">
+            {#* 请选择出发日期 --- 时间(选填)*#}
+            {#if $detail_missiontype ==0#}
+            <input type="text"  type="hidden" placeholder="{#$langData['sfcar'][0][43]#}" id="more_date" readonly value="{#$detail_ymd#}" {#if $detail_his#}class="hastime"{#/if#}>
+            {#/if#}
+            <s class="s1" {#if $detail_his && $detail_missiontype == 0#}style="display: block;"{#/if#}></s>
+            <input type="text" placeholder="{#$langData['sfcar'][0][44]#}" id="clockChose" {#if $detail_missiontype ==1 ||($detail_missiontype ==0 && $detail_his)#} style="display: inline-block;"  {#/if#} readonly class="clock" value="{#$detail_his#}">
+            <s class="s2"></s>
+          </div>
+        </div>
+        <!-- 出发时间 e -->
+        <!-- 用途 s-->
+        <div class="use">
+          {#* 用途*#}
+          <h2 class="com-title">{#$langData['sfcar'][0][45]#}</h2>
+          <div class="zs_btn {#if $detail_usetype ==1#} click {#/if#} ">
+            <i></i>
+            <ul class="fn-clear">
+              <li {#if $detail_usetype ==0 || $detail_usetype==''#} class="curr" {#/if#} data-type="0">{#$langData['sfcar'][0][46]#}</li> {#* 载人*#}
+              <li {#if $detail_usetype ==1#} class="curr" {#/if#} data-type="1">{#$langData['sfcar'][0][47]#}</li> {#* 载货*#}
+            </ul>
+          </div>
+
+          <div class="people" {#if $detail_usetype ==1#}  style="display: none;"{#/if#}>
+            {#* 请填写乘坐人数 --人 *#}
+            <input type="number" placeholder="{#$langData['sfcar'][0][4]#}" class="com-input peopleNum" name="" value="{#if $detail_type == 0 || $detail_type==''#}{#$detail_number#}{#else#}{#$detail_carseat#}{#/if#}">
+            <span>({#if $detail_type == 0 || $detail_type==''#}{#$langData['siteConfig'][13][32]#}{#else#}{#$langData['sfcar'][0][70]#}{#/if#})</span>
+          </div>
+          <div class="carType-div" {#if $detail_usetype ==1 && $detail_type ==1#} style="display: block;" {#/if#} data-id="{#$detail_cartype#}">
+            {#* 请选择车型*#}
+            <input type="text" placeholder="{#$langData['sfcar'][0][6]#}" class="com-input" readonly="" value="{#$detail_cartypename#}">
+            <s></s>
+          </div>
+
+          <input type="hidden" name="use" id="yongtu">
+        </div>
+        <!-- 用途 e-->
+        <!-- 联系人 s-->
+        <div class="contact-man">
+          {#* 联系人*#}
+          <h2 class="com-title">{#$langData['siteConfig'][19][642]#}</h2>
+          <div class="phone">
+            <span class="areacode_span">
+              <label for="">+{#if $detail_areaCode != "" && $detail_areaCode != "86" #}{#$detail_areaCode#}{#else#}{#$internationalPhoneSection[0]['code']#}{#/if#}</label>
+            </span>
+            <input type="text" placeholder="{#$langData['siteConfig'][21][185]#}" id="contact" name="tel" value="{#if $detail_tel != ""#}{#$detail_tel#}{#else#}{#$userinfo.phone#}{#/if#}">  {#*请填写手机号 *#}
+            <input type="hidden" name="areaCode" id="areaCode" value="{#if $detail_areaCode != "" && $detail_areaCode != "86" #}{#$detail_areaCode#}{#else#}{#$internationalPhoneSection[0]['code']#}{#/if#}">
+          </div>
+          {#if !$sfcar_fabuCheckPhone#}
+          <div class="code fn-clear test_code"{#if $detail_tel && $detail_tel != $userinfo.phone#} style="display: block;"{#/if#}>
+            <div class="test_btn">
+              <input type="text" name="testcode" id="code" placeholder="{#$langData['siteConfig'][20][540]#}"> {#*请填写验证码 *#}
+              <button type="button" class="getCodes">{#$langData['siteConfig'][19][736]#}</button> {#*获取 *#}
+            </div>
+          </div>
+          {#/if#}
+          <input type="text" placeholder="{#$langData['siteConfig'][20][345]#}" class="com-input" id="contactName" value="{#if $detail_username != ""#}{#$detail_username#}{#else#}{#$userinfo.nickname#}{#/if#}">  {#*请填写联系人 *#}
+        </div>
+        <!-- 联系人 e-->
+        <!-- 标签 s-->
+        <div class="tag">
+          {#*标签  选填*#}
+          <h2 class="com-title">{#$langData['sfcar'][0][48]#}<span>({#$langData['sfcar'][0][40]#})</span></h2>
+
+          <div class="tag-div">
+            {#*请选择标签 *#}
+            <input type="text" placeholder=" {#if $detail_tagarr#} {#else#}{#$langData['sfcar'][0][49]#}{#/if#}" class="com-input" readonly="">
+            <s></s>
+            <p class="chose-tag {#if $detail_tagarr#}hasTag{#/if#}">
+                {#if $detail_tagarr#}
+                   {#foreach from=$detail_tagarr key=a item=b#}
+                   <span data-id="{#$b['id']#}" data-name="{#$b['typename']#}">{#$b['typename']#}<i class="del-tag"></i></span>
+                   {#/foreach#}
+                {#/if#}
+            </p>
+          </div>
+        </div>
+        <!-- 标签 s-->
+        <!-- 备注说明 s-->
+        <div class="note">
+          {#*备注说明 -- 选填 *#}
+          <h2 class="com-title">{#$langData['sfcar'][0][35]#}<span>({#$langData['sfcar'][0][40]#})</span></h2>
+          <div class="con">
+              <textarea name="note" id="note" placeholder="{#$langData['sfcar'][0][50]#}">{#$detail_note#}</textarea>{#*例如：携带几件行李，最早/最晚出发时间/可随时出发，或其他需要补充说明的情况 *#}
+          </div>
+        </div>
+        <!-- 备注说明 e-->
+
+        <!-- 添加照片 s-->
+        <div class="img_box">
+          {#*添加照片 -- 选填 *#}
+          <h2 class="com-title">{#$langData['sfcar'][0][51]#}<span>({#$langData['sfcar'][0][40]#})</span></h2>
+          <ul class="uploader-list fn-clear" id="fileList">
+            {#foreach from=$detail_piclsit key=k item=i#}
+                <li id="WU_FILE_1_{#$k#}" class="thumbnail imgshow_box {#if $k==0#}litpic{#/if#}"><div class="img_show"><img src="{#changeFileSize url="{#$i['picpath']#}" type="small"#}" data-val="{#$i['pic']#}" data-url="{#changeFileSize url="{#$i['picpath']#}" type="small"#}"></div><i class="del_btn">+</i></li>
+            {#/foreach#}
+
+            <li class="upload_btn sfcarUpload" id="uploadbtn">
+                <div id="filePicker" class="webuploader-container">
+                    <img src="{#$templets_skin#}images/hitch/add.png" />
+                    <p>{#$langData['car'][3][3]#}</p>{#*上传照片 *#}
+                    <p class="img-tip">({#$langData['siteConfig'][39][9]|replace:'1':'五'#})</p>{#*最多1张 *#}
+                </div>
+            </li>
+            <div class="kong"></div>
+        </ul>
+        <input type="hidden" name="imglist" id="pics" value="{#$detail_pics#}" class="imglist-hidden">
+        </div>
+        <!-- 添加照片 e-->
+      </form>
+    </div>
+
+
+  </div>
+  <div class="gz-sel-addr gz-sel-addr-hide" id="gzSelAddr">
+    <div class="gz-sel-addr-header">
+      <h3>{#$langData['siteConfig'][7][2]#}</h3>
+      <button class="gz-sel-addr-close" id="gzSelAddrCloseBtn"></button>
+    </div>
+    <ul class="gz-sel-addr-nav"></ul>
+    <div class="gz-sel-addr-list"></div>
+  </div>
+
+  <div class="gz-sel-addr-mask"></div>
+</div>
+<div class="submit save">
+  <a href="javascript:;" id="submit">{#if $do=="edit"#}提交{#else#}{#$langData['siteConfig'][11][0]#}{#/if#}</a>{#*发布 *#}
+</div>
+<div class="error"></div>
+<!-- 区号弹出层 s -->
+  <div class="popl_box anum_box">
+    {#* 选择地区  *#}
+    <h2>{#$langData['siteConfig'][40][1]#}<a href="javascript:;" class="back">{#$langData['siteConfig'][6][117]#}</a></h2> {#*返回 *#}
+    <div class="areacodeList" id="areacodeList">
+      <ul>
+      </ul>
+    </div>
+  </div>
+<!-- 区号弹出层 e -->
+<div class="mask-code"></div>
+<!-- 标签弹出层 s-->
+<div class="comm-mask"></div>
+<div class="tag-alert">
+  <div class="tag-title">
+    {#*清除 *#}
+    <a href="javascript:;" class="clearAll">{#$langData['sfcar'][0][52]#}</a>
+    {#*添加标签 *#}
+    <h2>{#$langData['sfcar'][0][53]#}<span><em class="tagNum">0</em>/<em class="">3</em></span></h2>
+    {#*确定 *#}
+    <a href="javascript:;" class="sure">{#$langData['siteConfig'][6][1]#}</a>
+  </div>
+  <ul class="fn-clear">
+
+
+  </ul>
+</div>
+<!-- 标签弹出层 e-->
+<!-- 途径地点弹出层 s-->
+<div class="route-alert">
+  {#*途径地点 -- 添加途径地点，可以让更多顺路乘客看到你的发车信息哦~*#}
+  <h1>{#$langData['sfcar'][0][41]#}</h1>
+  <p>{#$langData['sfcar'][0][60]#}</p>
+  <a href="javascript:;" class="know">{#$langData['sfcar'][0][61]#}</a> {#*好的，知道了 *#}
+</div>
+<!-- 途径地点弹出层 e-->
+<!-- 选择车型 s-->
+<div class="car-alert">
+  <div class="car-title">
+    <a href="javascript:;" class="cancel">{#$langData['siteConfig'][6][12]#}</a>  {#*取消 *#}
+    <h2>{#$langData['sfcar'][0][62]#}</h2>  {#*选择车型 *#}
+    <a href="javascript:;" class="confirm">{#$langData['siteConfig'][6][1]#}</a>  {#*确定 *#}
+  </div>
+  <ul class="fn-clear">
+    {#loop service="sfcar" action="item" return="item" type="5" #}
+    <li data-id="{#$item['id']#}" {#if $item['id'] == $detail_cartype#} class="checked" {#/if#}>{#$item['typename']#}</li>
+    {#/loop#}
+
+  </ul>
+</div>
+<!-- 选择车型 e-->
+<div class="mask"></div>
+<div class="date-wrap">
+
+</div>
+{#include file="fabu-pay.html"#}
+<script type="text/javascript">
+
+  var wxconfig = {
+    "appId": '{#$wxjssdk_appId#}',
+    "timestamp": '{#$wxjssdk_timestamp#}',
+    "nonceStr": '{#$wxjssdk_nonceStr#}',
+    "signature": '{#$wxjssdk_signature#}'
+  };
+</script>
+<script src="//res.wx.qq.com/open/js/jweixin-1.3.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+<!-- 多语言 -->
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+{#include file="../../siteConfig/public_location.html"#}
+<!-- 验证码 -->
+{#if $cfg_geetest#}
+{#if $cfg_geetest == 1#}
+<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+{#/if#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script type="text/javascript" src="{#$templets_skin#}js/hitch-message.js?v={#$cfg_staticVersion#}"></script>
+<!-- 选择弹窗 -->
+<script type="text/javascript" src="{#$templets_skin#}js/mobileSelect.js?v={#$cfg_staticVersion#}" ></script>
+<!-- 区域 -->
+<script type="text/javascript" src="{#$templets_skin#}js/gzsfcar-info.js?v={#$cfg_staticVersion#}"></script>
+<!-- 上传图片 -->
+<script src="{#$cfg_staticPath#}js/webuploader/webuploader.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/upload-img-sfcar.js?v={#$cfg_staticVersion#}"></script>
+<!-- 日历 -->
+<script type="text/javascript" src="{#$templets_skin#}js/hitch-calendar.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/fabu.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/fabu-pay.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/fabu-sfcar.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+</body>
+</html>

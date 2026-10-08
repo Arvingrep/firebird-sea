@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="{#$cfg_soft_lang#}">
+  <title>{#$langData['siteConfig'][41][50]#}</title> {#* 养老服务 *#}
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+  <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/fabu.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/pension.css?v={#$cfg_staticVersion#}">
+  <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+  <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+  <script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+  <script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+    var module = 'pension';
+    var userId = `{#$userinfo.userid#}`;
+    var imgError = `{#$cfg_staticPath#}images/404.jpg?v={#$cfg_staticVersion#}`;
+    var memberUrl = `{#getUrlPath service='member'#}`; //店铺配置页面
+    if (!userId) {
+      location.href = `${masterDomain}/login.html`;
+    }
+  </script>
+</head>
+
+<body>
+  <div id="vue" v-cloak>
+    <!-- 页面载入loading -->
+    <div class="loading" v-if="false">页面加载中...</div>
+    <div :class="['Shell',{'app':appBoolean}]" v-if="detail.id">
+      <!-- 商家信息 -->
+      <div class="companyDetail">
+        <div class="c-nav">
+          <img src="{#$templets_skin#}images/back-r.png?v={#$cfg_staticVersion#}" class="cn-left" @click="backFn">
+          <img src="{#$templets_skin#}images/shop/set-icon.png?v={#$cfg_staticVersion#}" class="cn-right"
+            @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+        </div>
+        <div class="c-info">
+          <div class="ci-left">
+            <img :src="detail.logo||imgError" class="cil-logo" @error="detail.logo=imgError">
+            <div class="cil-info">
+              <div class="title">{{detail.name}}</div>
+              <div class="tip">
+                <span>商家版到期 {{detail.endTime}}</span>
+                <div @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">续费
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ci-right" @click="linkTo(detail.homepage)">
+            <img src="{#$templets_skin#}images/houseWhite.png?v={#$cfg_staticVersion#}">
+            <span>我的主页</span>
+          </div>
+        </div>
+        <div class="c-data">
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.apply.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.apply.yesterday}}</div>
+            <div class="cdi-text">今日申请(人)</div>
+          </div>
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.appoint.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.appoint.yesterday}}</div>
+            <div class="cdi-text">今日预约(人)</div>
+          </div>
+          <div class="cd-item">
+            <div class="cdi-time">昨日{{detail.statistics.click.yesterday}}</div>
+            <div class="cdi-number">{{detail.statistics.click.yesterday}}</div>
+            <div class="cdi-text">今日客流(人)</div>
+          </div>
+        </div>
+      </div>
+      <!-- 长者信息库 -->
+      <div class="oldPeople" @click="linkTo(`{#getUrlPath service='pension' template='list'#}`)">
+        <div class="o-info">
+          <div class="oi-title">长者信息库</div>
+          <div class="oi-bar"></div>
+          <div class="oi-tip">主动了解老人信息，邀请入住</div>
+          <img src="{#$templets_skin#}images/pension/arrowTransparent.png?v={#$cfg_staticVersion#}">
+        </div>
+      </div>
+      <!-- 管理 -->
+      <div class="manageList">
+        <!-- 跳转 -->
+        <div class="manageItem">
+          <div class="m-left" @click="linkTo(`{#getUrlPath service='member' template='booking-pension'#}`)">
+            <div class="ml-right">
+              <div :class="['title',{'dot':describeInfo>0}]">预约参观</div>
+              <div class="tip">参观日预约</div>
+            </div>
+            <img src="{#$templets_skin#}images/pension/calendar.png?v={#$cfg_staticVersion#}" class="ml-pic">
+          </div>
+          <div class="m-right" @click="linkTo(`{#getUrlPath service='member' template='pension-award'#}`)">
+            <div class="mr-right">
+              <div :class="['title',{'dot':applyInfo>0}]">入住申请</div>
+              <div class="tip">有奖入住申请</div>
+            </div>
+            <img src="{#$templets_skin#}images/pension/leave.png" class="mr-pic">
+          </div>
+        </div>
+        <!-- 公司其他信息 -->
+        <div class="otherInfo">
+          <div class="o-item" @click="linkTo(`{#getUrlPath service='member' template='config-pension'#}`)">
+            <div class="oi-left">
+              <img src="{#$templets_skin#}images/pension/config.png?v={#$cfg_staticVersion#}">
+              <span>机构信息</span>
+            </div>
+            <!-- 审核中 -->
+            <div class="oi-audit" v-if="detail.state==0">商家资料审核中</div>
+            <!-- 审核拒绝 -->
+            <div class="oi-refuse" v-else-if="detail.state==2">商家资料审核未通过</div>
+            <div class="oi-right" v-else>
+              <span>机构简介/收费标准等</span>
+              <img src="{#$templets_skin#}images/pension/arrowGray.png?v={#$cfg_staticVersion#}">
+            </div>
+          </div>
+          <div class="o-item" @click="linkTo(`{#getUrlPath service='member' template='pension-invitation'#}`)">
+            <div class="oi-left">
+              <img src="{#$templets_skin#}images/pension/message.png?v={#$cfg_staticVersion#}">
+              <span>我的邀请记录</span>
+            </div>
+            <div class="oi-right">
+              <span>客户维护</span>
+              <img src="{#$templets_skin#}images/pension/arrowGray.png?v={#$cfg_staticVersion#}">
+            </div>
+          </div>
+        </div>
+        <!-- 续费标签 -->
+        <div class="continueLabel" v-if="detail.continue">
+          <div class="c-left">
+            <div class="title">商家版即将到期</div>
+            <div class="tip">续费套餐，续享全部商家服务</div>
+          </div>
+          <div class="c-btn" @click="linkTo(`{#getUrlPath service='member' template='servicemeal'#}`)">
+            <span>查看/续费</span>
+            <img src="{#$templets_skin#}images/newRight.png?v={#$cfg_staticVersion#}">
+          </div>
+        </div>
+      </div>
+      <!-- 公司管理项 -->
+      <div class="orderList">
+        <div class="l-title">常用功能</div>
+        <div class="l-list">
+          <div class="ll-item" @click="linkTo(`{#$cfg_basehost#}/mobile.html`)" v-if="!appBoolean">
+            <img src="{#$templets_skin#}images/pension/shield.png?v={#$cfg_staticVersion#}">
+            <div>下载APP</div>
+          </div>
+          <div class="ll-item" @click="linkTo(`tel:${detail.hotline}`)">
+            <img src="{#$templets_skin#}images/pension/headset.png?v={#$cfg_staticVersion#}">
+            <div>客服帮助</div>
+          </div>
+          <div class="ll-item app_show" @click="linkTo(`{#getUrlPath service='member' type='user' template='setting'#}`)">
+            <img src="{#$templets_skin#}images/set_icon_green.png?v={#$cfg_staticVersion#}" onerror="this.src='/static/images/404.jpg'" />
+            <div>系统设置</div>
+          </div>
+        </div>
+      </div>
+      <template v-if="!appBoolean">
+        {#include file="../../../siteConfig/touch_bottom_5.0.html" active="fourthicon" bottom_module="pension"#}
+      </template>
+    </div>
+    <!-- 页面载入失败提示 -->
+    <div class="Warn" v-else-if="!loadingb">
+      <div class="w-tip">
+        <img src="{#$cfg_staticPath#}images/notfindempty.png?v={#$cfg_staticVersion#}" class="wt-pic">
+        <div class="wt-title">{{info}}</div>
+        <div class="wt-btn" @click="linkTo(`{#getUrlPath service='member' type='user' template='enter_contrast'#}`)">
+          确定
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script src="{#$templets_skin#}js/pension.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

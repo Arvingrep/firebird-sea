@@ -1,0 +1,189 @@
+<div id="ds_page">
+  <div class="ds_success">
+    <s></s>
+    <div class="ds_tip">
+      <h4>打赏成功！</h4>
+      <p>感谢您的支持~</p>
+    </div>
+  </div>
+  <div class="dsMask" @click="close_ds_pop"></div>
+  <div class="dsPop">
+    <a href="javascript:;" class="close_ds_pop" @click="close_ds_pop"></a>
+    <s class="ds_icon2"></s>
+    <h2><s class="ds_icon1"></s>打赏支持 <span>喜欢就打赏支持一下小编吧~</span></h2>
+    <div class="dsPopCon">
+      <div class=" ds_info fn-clear">
+        <div class="leftDs">打赏金额<span :class="{'ds_clear':ds_num > 0}">{#echoCurrency type="symbol"#}<b>{{ds_num}}</b></span></div>
+        <div class="rightp">打赏最多不超过{#$limit|default:500#}{#echoCurrency type="short"#}，<a href="{#getUrlPath service='siteConfig' template='protocol' title='打赏须知'#}" target="_blank">打赏须知</a></div>
+      </div>
+      <ul class="ds_numChose" v-cloak>
+        <li :data-ds="ds" v-for="ds in ds_Arr.slice(0,5)" @mouseover="ds_num = ds"  @click="showPayPop(ds)">
+          <p>打赏</p>
+          <div class="ds_num">{#echoCurrency type="symbol"#}<b>{{ds}}</b></div>
+        </li>
+        <li>
+          <div class="ds_toInp" v-show="!ds_inp">
+            <p>打赏</p>
+            <a href="javascript:;" class="pop_more_num" @click="inputShow">其他金额</a>
+          </div>
+          <div class="dsInp" v-show="ds_inp">
+            <!--  -->
+            <div class="dsinput"   ><span contenteditable="false">{#echoCurrency type="symbol"#}</span>
+              <b class="ds_num_s" contenteditable="true" @input="check_dsNum">88</b>
+              <!-- <input-txt v-model="ds_num"></input-txt> -->
+            </div>
+            <a href="javascript:;" class="pop_ds_btn" @click="showPayPop(0)">立即打赏</a>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{#include file="{#$HUONIAOROOT#}/templates/member/public-pay-pop.html"#}
+
+<script type="text/javascript">
+
+  usermoney ='{#$userinfo.money#}';
+  var rewardLimit = {#$limit|default:500#};
+
+  var order_amount = ordernum = order_sn = '';
+  var timer_trade = null;
+  function getC(el){
+    el = el[0]; // jquery 对象转dom对象
+    el.focus();
+    var range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    var sel = window.getSelection();
+    //判断光标位置，如不需要可删除
+    if(sel.anchorOffset!=0){
+    return;
+    };
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  var ds_vue = new Vue({
+    el:"#ds_page",
+    data:{
+      ds_num:0,  //打赏金额
+      ds_Arr:{#if $option#}{#$option|json_encode#}{#else#}[1,2,5,10,20]{#/if#},
+      ds_inp:0,  //自定义打赏显示
+    },
+    methods:{
+      // 显示打赏输入框
+      inputShow:function() {
+        var tt = this;
+        tt.ds_num = 0;
+        tt.ds_inp = 1;
+        tt.ds_num = 88;
+        $(".dsinput b").focus();
+      },
+
+      // 自定义数字
+      check_dsNum(){
+        var tt = this;
+        var el = event.currentTarget;
+        var num = $(el).text();
+        $(el).text(num.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1'));
+        if($(el).text() >= rewardLimit){
+          $(el).text(rewardLimit)
+          num = rewardLimit;
+        }
+
+        tt.ds_num = num;
+        // console.log(tt.ds_num)
+        getC($(el))
+      },
+
+
+      // 关闭弹窗
+      close_ds_pop(){
+        $(".dsMask,.dsPop").hide();
+      },
+
+      // 显示支付弹窗
+      showPayPop(ds,change){
+        var tt  = this;
+        // 获取最新的.ds_num_s值
+        if (!ds || change) {
+            var latestValue = $(".ds_num_s").text();
+            var num = latestValue.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1');
+            if(num >= rewardLimit){
+            num = rewardLimit;
+            }
+            tt.ds_num = num;
+            ds = num;
+        } else if(ds){
+            tt.ds_num = ds;
+        }
+        // 提交打赏订单
+        axios({
+          method: 'post',
+          url: '/include/ajax.php?service='+service+'&action=reward&aid='+aid+'&amount='+ds,
+        })
+        .then((response)=>{
+          var data = response.data;
+          var info = data.info;
+          var datainfo = [];
+          for(var k in info) {
+            datainfo.push(k+'='+info[k]);
+          }
+          var cutDown ;
+          if(!change){
+            cutDown = setInterval(function () {
+              $(".payCutDown").html(payCutDown(info.timeout));
+            },1000)
+
+            $("#amout").text(info.order_amount);
+            $(".payMask,.payPop").show();
+
+            if (usermoney * 1 < info.order_amount * 1) {
+
+              $("#moneyinfo").text('余额不足，');
+              $("#moneyinfo").closest('.pay_item').addClass('disabled_pay')
+            }else{
+              $("#moneyinfo").text('可用');
+              $("#moneyinfo").closest('.pay_item').removeClass('disabled_pay')
+            }
+
+            if (monBonus * 1 < info.order_amount * 1) {
+
+              $("#bonusinfo").text('余额不足，');
+              $("#bonusinfo").closest('.pay_item').addClass('disabled_pay')
+            }else{
+              $("#bonusinfo").text('');
+              $("#bonusinfo").closest('.pay_item').removeClass('disabled_pay')
+            }
+
+            if(timer_trade != null){
+              clearInterval(timer_trade);
+            }
+
+          }
+          //验证是否支付成功，如果成功跳转到指定页面
+
+
+          timer_trade = setInterval(function(){
+            $.ajax({
+              type: 'POST',
+              // async: false,
+              url: '/include/ajax.php?service=member&action=tradePayResult&type=1&order='+ordernum,
+              dataType: 'json',
+              success: function(str){
+                if(str.state == 100 && str.info != ""){
+                  //如果已经支付成功，则跳转到指定页面
+                  location.href = str.info;
+                }
+              }
+            });
+
+          }, 2000);
+          ordernum     = info.ordernum;
+          order_amount = info.order_amount;
+          var src = masterDomain + '/include/qrPay.php?' + datainfo.join('&');
+          $('#payQr img').attr('src', masterDomain + '/include/qrcode.php?data=' + encodeURIComponent(src));
+        })
+      },
+    },
+  })
+</script>

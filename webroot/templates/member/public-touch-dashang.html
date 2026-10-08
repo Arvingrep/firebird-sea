@@ -1,0 +1,183 @@
+<style>
+  .dsMask,.dsPop{display: none}
+  [v-cloak]{display: none !important;}
+</style>
+<div id="ds_page" v-cloak>
+  <div class="dsMask"></div>
+  <div :class="['dsPop',{'toTop':ds_inp}]" v-cloak>
+    <a href="javascript:;" class="close_ds_pop" @click="close_ds_pop"></a>
+    <div class="ds_title">
+      <h4>打赏支持</h4>
+      <p>喜欢就打赏支持一下小编吧~</p>
+    </div>
+    <div class="dsPopCon">
+      <div class=" ds_info">
+        <div class="leftDs">打赏金额</div>
+        <div class="rightp">打赏最多不超过{#$limit|default:100#}{#echoCurrency type="short"#}，<a href="{#getUrlPath service='siteConfig' template='protocol' title='打赏须知'#}" target="_blank">打赏须知</a></div>
+      </div>
+      <ul class="ds_numChose" v-cloak>
+        <li :data-ds="ds" :class="[{'ds_pay publicpaybtn': ds == ds_num},'{#if $cfg_iosVirtualPaymentState#}iOS_miniprogram_nocash{#/if#}']" v-for="ds in ds_Arr.slice(0,3)" @click="ds_num = ds; ds_inp = 0;ds_num_in = []; payPop(ds_num);" >
+          <p>打赏</p>
+          <div class="ds_num">{#echoCurrency type="symbol"#}<b>{{ds}}</b></div>
+        </li>
+        <li :class="[{'ds_pay': ds_inp}]">
+          <div class="ds_toInp" v-show="!ds_inp">
+            <p>打赏</p>
+            <a href="javascript:;" class="pop_more_num" @click="ds_inp = 1;ds_num = 0;">其他金额</a>
+          </div>
+          <div class="dsInp" v-show="ds_inp">
+            <!--  -->
+            <div class="dsinput"><span>{#echoCurrency type="symbol"#}</span><b class="ds_num_s">{{dsNum}}</b></div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div :class="['ds_keyboard',{'toTop':ds_inp}]" v-cloak>
+    <ul>
+      <li @click="numIn" v-for="i in 9" :data-id="i">{{i}}</li>
+      <li @click="numIn" data-id="0" class="ds_wmore">0</li>
+      <li @click="numIn" data-id=".">.</li>
+    </ul>
+    <div class="rightDs_btns">
+      <a href="javascript:;" class="ds_delNum" @click="ds_delNum"></a>
+      <a href="javascript:;" :data-ds="ds_inp" :class="['ds_sure' ,{'noClick': Number(dsNum)==0 || dsNum=='.'},{'publicpaybtn': ds_inp}]" @click="payPop(dsNum);">确定</a>
+    </div>
+  </div>
+</div>
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+<script type="text/javascript">
+  var usermoney = '{#$userinfo.money#}'
+  var rewardLimit = {#$limit|default:100#};
+  var timer_trade = null;
+  var ds_vue = new Vue({
+    el:"#ds_page",
+    data:{
+      ds_num:0,  //打赏金额
+      ds_Arr:{#if $option#}{#$option|json_encode#}{#else#}[1,2,5,10,20]{#/if#},
+      ds_inp:0,  //自定义打赏显示ds_numChose
+      ds_num_in:[],
+      dsNum:'',
+    },
+    mounted(){
+    //   console.log(111)
+      // showSuccessTip('打赏成功','感谢您的支持~','/static/images/pay/ds_touch_3.png')
+    },
+    methods:{
+      // 输入打赏
+      numIn:function() {
+        var tt = this;
+        var el = event.currentTarget;
+        var num = $(el).attr('data-id');
+        if(tt.ds_num_in.indexOf('.') <= -1 || num != '.'){
+          tt.ds_num_in.push(num);
+        }
+      },
+
+      // 删除输入的数字
+      ds_delNum:function() {
+        var tt = this;
+        tt.ds_num_in.pop();
+      },
+
+      // 关闭弹窗
+      close_ds_pop:function() {
+        var tt = this;
+        tt.ds_inp = 0;
+        $(".dsMask,.dsPop").hide();
+        $('html').removeClass('noscroll');
+      },
+      // 提交订单
+      payPop:function(num) {
+        var tt = this;
+        newsid = $(".dsPop").attr('data-id') != undefined ? $(".dsPop").attr('data-id') : newsid;
+        axios({
+          method: 'post',
+          url: '/include/ajax.php?service='+service+'&action=reward&aid='+newsid+'&amount='+num,
+        })
+        .then((response)=>{
+            var data = response.data;
+            var info = data.info;
+            tt.close_ds_pop();
+            $(".payBeforeLoading").hide()
+            payCutDown('reward',info.timeout,info);
+
+            $("#amout").text(info.order_amount);
+            $('.payMask').show();
+            $('.payPop').css('transform','translateY(0)');
+            //
+            // if(usermoney*1 < info.order_amount *1){
+            //
+            //   $("#moneyinfo").text('余额不足，');
+            // }
+            if (usermoney * 1 < info.order_amount * 1) {
+
+            $("#moneyinfo").text('余额不足，');
+            $("#moneyinfo").closest('.check-item').addClass('disabled_pay')
+            }else{
+            $("#moneyinfo").text('可用');
+            $("#moneyinfo").closest('.check-item').removeClass('disabled_pay')
+            }
+            if(monBonus * 1 < info.order_amount * 1  &&  bonus * 1 >= info.order_amount * 1){
+                $("#bonusinfo").text('额度不足，可用');
+                $("#bonusinfo").closest('.check-item').addClass('disabled_pay')
+            }else if( bonus * 1 < info.order_amount * 1){
+            $("#bonusinfo").text('余额不足，可用');
+            $("#bonusinfo").closest('.check-item').addClass('disabled_pay')
+            }else{
+            $("#bonusinfo").text('可用');
+            $("#bonusinfo").closest('.check-item').removeClass('disabled_pay')
+            }
+
+            if(timer_trade != null){
+                clearInterval(timer_trade);
+            }
+
+            //验证是否支付成功，如果成功跳转到指定页面
+
+
+            // timer_trade = setInterval(function(){
+            //     $.ajax({
+            //     type: 'POST',
+            //     // async: false,
+            //     url: '/include/ajax.php?service=member&action=tradePayResult&type=1&order='+ordernum,
+            //     dataType: 'json',
+            //     success: function(str){
+            //         if(str.state == 100 && str.info != ""){
+            //         //如果已经支付成功，则跳转到指定页面
+            //         location.href = str.info;
+            //         }
+            //     }
+            //     });
+
+            // }, 2000);
+            ordernum     = info.ordernum;
+            order_amount = info.order_amount;
+
+        })
+
+      },
+    },
+    watch:{
+      ds_num_in:function() {
+        var tt = this;
+        tt.dsNum = tt.ds_num_in.join('');
+        if(tt.dsNum.toString().split('.').length > 1 && tt.dsNum.toString().split('.')[1].length>2){
+          tt.ds_num_in.pop();
+        }
+        if(tt.dsNum.split('.')[0].length > 1 && tt.dsNum.split('.')[0] == 0){
+          tt.ds_num_in.pop();
+        }
+      },
+      dsNum:function() {
+        var tt = this;
+        // console.log(tt.dsNum)
+        if(Number(tt.dsNum) > rewardLimit){
+          tt.dsNum = rewardLimit;
+          tt.ds_num_in = rewardLimit.split('');
+        }
+      }
+    }
+  })
+</script>

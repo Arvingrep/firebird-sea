@@ -1,0 +1,1300 @@
+<!-- 弹出层 -->
+<div class="allPopBox largePopBox" v-show="showDropMenuPop || linkSetPop || modNavPop || dataChosePop || listChosePop || quanlistPop || citySetPop || changeCityPop || advanceSetPop || changeModulePop || msgListPop || modelPreviewPop || titleSetPop || dyLogoSetPop">
+    <div :class="['pop_mask',{'show':showDropMenuPop || linkSetPop || modNavPop || dataChosePop || listChosePop || quanlistPop || citySetPop || changeCityPop || advanceSetPop || changeModulePop || msgListPop || modelPreviewPop}]" ></div>
+    <div :class="['popBox dropPopBox',{'show':showDropMenuPop}]">
+        <div class="pop_header">
+            <h3>下拉选项编辑</h3>
+            <a href="javascript:;" class="close_pop" @click="showDropMenuPop = false"></a>
+        </div>
+        <div class="pop_con">
+            <div class="formbox">
+                <div class="formItem">
+                    <div class="leftlab"><label for="">选择样式：</label></div>
+                    <div class="labelFor ">
+                        <div class="radioBox">
+                            <span :class="{'onChose':dropMenu.styletype == 1}" @click="dropMenu.styletype = 1"><s></s>样式一</span>
+                            <span :class="{'onChose':dropMenu.styletype == 2}" @click="dropMenu.styletype = 2"><s></s>样式二</span>
+                        </div>
+                        <div class="styleShow">
+                            <div class="dropNavBox">
+                                <div :class="['dropNav', {'dropStyle2':dropMenu.styletype == 2}]">
+                                    <ul v-if="dropMenu.linkArr && dropMenu.linkArr.length <= 0">
+                                        <li><s></s><span>扫一扫</span></li>
+                                        <li><s></s><span>快捷发布</span></li>
+                                        <li><s></s><span>优惠券</span></li>
+                                    </ul>
+                                    <ul v-else>
+                                        <li v-for="(item,ind) in dropMenu.linkArr"><s><img :src="item.icon ? item.icon : '/static/images/admin/siteMemberPage/default_icon2.png'" onerror="this.src='/static/images/404.jpg'"></s><span>{{item.text ? item.text : '按钮' + numArr[ind]}}</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="formItem">
+                    <div class="leftlab">
+                        <label for="">设置内容：</label>
+                        <p>图标/名称/交互</p>
+                    </div>
+                    <div class="labelFor ">
+                        <ul>
+                            <li class="drop" v-for="(item,ind) in dropMenu.linkArr">
+                                <div :class="['icon_drop',{'hasIcon':item.icon}]">
+                                    <img v-if="item.icon" :src="item.icon" onerror="this.src='/static/images/404.jpg'">
+                                    <div class="upload_icon">
+                                        <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" :id="'dropMenu_'+ind+'_filedata'" :data-type="'dropMenu_'+ind">
+                                    </div>
+                                </div>
+                                <div class="text_drop">
+                                    <el-input :placeholder="'按钮' + (ind + 1)" v-model="item.text"></el-input>
+                                </div>
+                                <div class="link_drop">
+                                    <el-input v-if="item.linkInfo.type == 2" :placeholder="(item.linkInfo.type == 1 ? '请添加链接':'请添加号码')" readonly :value="item.linkInfo.type == 2 ? '扫码' : item.linkInfo.linkText">
+                                        <i slot="prefix" :class="['el-input__icon inp_icon',{'inp_icon_scan':item.linkInfo.type == 2},{'inp_icon_tel':item.linkInfo.type == 4}] "></i>
+                                    </el-input>
+                                    <el-input v-else :placeholder="(item.linkInfo.type == 1 ? '请添加链接':'请添加号码')" v-model="item.link">
+                                        <i slot="prefix" :class="['el-input__icon inp_icon',{'inp_icon_scan':item.linkInfo.type == 2},{'inp_icon_tel':item.linkInfo.type == 4}] "></i>
+                                        <i slot="suffix" v-if="item.linkInfo.type == 1" class="choseLink" @click="changeLink('dropMenu.linkArr.' + ind + '.link')">选择</i>
+                                    </el-input>
+                                </div>
+                                <a href="javascript:;" class="delLink" @click="addDropLink(ind,'del')"></a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="formItem" v-if="dropMenu.linkArr.length < 8">
+                    <div class="leftlab"></div>
+                    <div class="labelFor ">
+                        <ul class="btns_addLink">
+                            <li @click=" addDropLink(1)">链接</li>
+                            <li @click="addDropLink(4)">打电话</li>
+                            <li @click="addDropLink(2)" v-if="!hasScanBtn">扫码</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="pop_foot">
+            <a href="javascript:;" class="cancel_btn" @click="showDropMenuPop = false;">取消</a>
+            <a href="javascript:;" class="sure_btn" @click="sureDropSet">确认</a>
+        </div>
+    </div>
+
+    <!-- 选择链接 -->
+    <template v-if="linkSetPop">
+        <div class="largePop linkSetBox" v-show="linkSetPop">
+            <div class="pop_header">
+                <a href="javascript:;" class="close_pop" @click="linkSetPop = false;"></a>
+                <h4>链接选择器</h4>
+            </div>
+            <div class="pop_con">
+                <div class="left_tab">
+                    <ul>
+                        <!-- 设置下拉菜单的链接时不需要显示自定义和扫码 -->
+                        <template v-if="!showDropMenuPop">
+                            <li :class="{'on_chose': linkSetForm.slefSet == 1}" @click="linkSetForm.slefSet = 1">自定义</li>
+                            <li :class="{'on_chose': linkSetForm.slefSet == 2}" @click="linkSetForm.slefSet = 2">扫码</li>
+                        </template>
+                        <li :class="{'on_chose': !linkSetForm.slefSet}" @click="linkSetForm.slefSet = 0">常用链接</li>
+                    </ul>
+                </div>
+                <div class="right_con">
+                    <!-- 自定义 -->
+                    <div class="slefSetBox setBox" v-show="linkSetForm.slefSet == 1">
+                        <div class="setCon" >
+                            <div class="linkType radioBox">
+                               <span :class="{'on_chose':linkSetForm.linkType === 0}" @click="linkSetForm.linkType = 0; "><s></s>跳转链接</span>
+                               <span :class="{'on_chose':linkSetForm.linkType === 1}" @click="linkSetForm.linkType = 1;" ><s></s>拨打电话</span>
+                            </div>
+                            <div class="linkBox">
+                                <div class="linkInp" v-show="!linkSetForm.linkType">
+                                    <div class="label">链接地址:</div>
+                                    <el-input placeholder="请输入链接" v-model="linkSetForm.selfLink"><i slot="prefix" class="el-input__icon el-icon-link"></i></el-input>
+                                </div>
+                                <div class="linkInp" v-show="linkSetForm.linkType">
+                                    <div class="label">拨打电话:</div>
+                                    <el-input placeholder="请输入电话" v-model="linkSetForm.selfTel"><i slot="prefix" class="el-input__icon el-icon-tel"></i></el-input>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 扫码 -->
+                    <div class="slefSetBox setBox" v-show="linkSetForm.slefSet == 2">
+                        <div class="setCon scanShow" >
+                            <h4><s></s>站内扫码</h4>
+                            <div class="imgShow">
+                                <div class="scanImg"><img src="/static/images/admin/siteConfigPage/scan_img.png" alt=""></div>
+                            </div>
+                            <div class="textShow">
+                                <h6>扫码可识别商品编码、团购券等</h6>
+                                <p>*App与小程序端支持扫码功能，H5端将隐藏入口</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="defaultSetBox setBox" v-show="!linkSetForm.slefSet">
+                        <div class="setCon">
+                            <div class="searchBox">
+                                <el-input placeholder="搜索链接" v-model="keywords" @keyup.enter.native="toSearch" >
+                                    <i class="el-icon-clear el-input__icon" v-show="keywords" slot="suffix" @click="keywords = ''; toSearch()">
+                                  </i></el-input><span :class="['search_btn',{'onSearch':keywords}]" @click="toSearch">搜索</span>
+                            </div>
+                            <div class="linkList listGroup" >
+                                <dl class="group" v-for="group in searchList" v-show="searchList && searchList.length">
+                                    <dt class="group_name" v-if="group.listName">{{group.listName}}</dt>
+                                    <dd class="group_list">
+                                        <ul class="fn-clear">
+                                            <li v-for="link in group.list" @click="choseLink(link)">{{link.linkText}}</li>
+                                        </ul>
+                                    </dd>
+                                </dl>
+                                <div class="noData" v-show="!searchList || searchList.length == 0">
+                                    <p>暂无数据</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> 
+            </div> 
+            <div class="pop_foot">
+                <div class="btnsGroup">
+                    <a href="javascript:;" class="cancel"  @click="linkSetPop = false;">取消</a>
+                    <a href="javascript:;" class="sure" @click="sureChangeLink">确定</a>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template >
+        <!-- 导航模块内容修改 -->
+        <div class="largePop modNavPopBox" v-show="modNavPop">
+            <div class="pop_header">
+                <h4>模块导航管理</h4>
+                <a href="javascript:;" class="close_pop" @click="getOriginModule"></a>
+            </div>
+            <div class="pop_con">
+                <div class="nav_tableBox">
+                    <div class="nav_thead">
+                        <ul class="nav_tr">
+                            <li class="nav_td row5"></li>
+                            <li class="nav_td row10 alignCenter" >模块</li>
+                            <li class="nav_td row12">导航名</li>
+                            <li class="nav_td row22">链接</li>
+                            <li class="nav_td row10 alignCenter">图标</li>
+                            <li class="nav_td row31 flexItem"><span class="platform">显示开关</span><em></em><span class="miniparogram">小程序</span></li>
+                            <li class="nav_td row10 alignCenter">操作</li>
+                        </ul>
+                    </div>
+                    <div class="nav_tbody sortBox" data-sort="allModules" data-drag=".nav_tr" data-filter=".el-input input" data-handle="">
+                        <ul class="nav_tr" v-for="(nav,ind) in allModules" v-show="!nav.del" :data-id="ind" :key="'nav_'+nav.id" >
+                            <li class="nav_td row5 alignCenter">
+                                <div class="order_btn">
+                                    <img src="/static/images/admin/order_icon.png" alt="">
+                                </div>
+                            </li>
+                            <li class="nav_td row10 ">
+                                <div :class="['nav_name',{'warning':!nav.title}]"><span>{{nav.title ? nav.title : '自定义'}}</span></div>
+                            </li>
+                            <li class="nav_td row12">
+                                <div class="nav_title">
+                                    <el-input placeholder="请输入标题" v-model="nav.subject"></el-input>
+                                </div>
+                            </li>
+                            <li class="nav_td row22">
+                                <div class="nav_link">
+                                    <el-input value="自动生成，无须修改" readonly v-if="nav.title"></el-input>
+                                    <el-input placeholder="请输入链接" v-model="nav.link" v-else ></el-input>
+                                </div>
+                            </li>
+                            <li class="nav_td row10 alignCenter">
+                                <div class="nav_icon">
+                                    <div :class="['add_icon',{'hasup':nav.iconurl}]">
+                                        <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp" :id="'nav_'+ind+'_filedata'" :data-type="'nav_'+ind">
+                                        <input type="hidden" name="" v-model="nav.icon">
+                                        <template v-if="nav.iconurl">
+                                            <img :src="nav.iconurl" onerror="this.src='/static/images/404.jpg'" alt="">
+                                            <span>更换</span>
+                                        </template>
+                                    </div>
+    
+                                </div>
+                            </li>
+                            <li class="nav_td row31">
+                                <div class="switchBox">
+                                    <div class="switch platform">
+                                        <div :class="['checkbox',{'on_chose':nav.h5}]"  @click="nav.h5 = nav.h5 ? 0 : 1">
+                                            <el-checkbox :value="Boolean(nav.h5)" @change="nav.h5 = nav.h5 ? 0 : 1">h5</el-checkbox>
+                                        </div>
+                                        <div :class="['checkbox',{'on_chose':nav.android}]"  @click="nav.android = nav.android ? 0 : 1">
+                                            <el-checkbox :value="Boolean(nav.android)" @change="nav.android = nav.android ? 0 : 1">安卓</el-checkbox>
+                                        </div>
+                                        <div :class="['checkbox',{'on_chose':nav.ios}]"  @click="nav.ios = nav.ios ? 0 : 1">
+                                            <el-checkbox :value="Boolean(nav.ios)" @change="nav.ios = nav.ios ? 0 : 1">苹果</el-checkbox>
+                                        </div>
+                                        <div :class="['checkbox',{'on_chose':nav.harmony}]"  @click="nav.harmony = nav.harmony ? 0 : 1">
+                                            <el-checkbox :value="Boolean(nav.harmony)" @change="nav.harmony = nav.harmony ? 0 : 1">鸿蒙</el-checkbox>
+                                        </div>
+                                    </div>
+                                    <em></em>
+                                    <div class="switch">
+                                        <div :class="['checkbox',{'on_chose':nav.wx}]" @click="nav.wx = nav.wx ? 0 : 1">
+                                            <el-checkbox :value="Boolean(nav.wx)" @change="nav.wx = nav.wx ? 0 : 1">微信</el-checkbox>
+                                        </div>
+                                        <div :class="['checkbox',{'on_chose':nav.dy}]" @click="nav.dy = nav.dy ? 0 : 1">
+                                            <el-checkbox :value="Boolean(nav.dy)" @change="nav.dy = nav.dy ? 0 : 1">抖音</el-checkbox>
+                                        </div>
+                                    </div>
+                                    <em style="margin-left: 20px;"></em>
+                                    <div class="switch">
+                                        <div :class="['checkbox',{'on_chose':nav.h5 && nav.wx && nav.dy && nav.android && nav.ios && nav.harmony}]" >
+                                            <el-checkbox :value="Boolean(nav.h5 && nav.wx && nav.dy && nav.android && nav.ios && nav.harmony)" @change="(value) => choseAllPlat(value,ind)" >全部</el-checkbox>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li class="nav_td row10 alignCenter">
+                                <div class="del_nav" v-if="!nav.title" @click="removeNav(ind)"></div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="pop_foot">
+                <a href="javascript:;" class="add_module" @click="addNav">自定义链接</a>
+                <div class="btnsgroup">
+                    <a href="javascript:;" class="cancel_btn" @click="getOriginModule">取消</a>
+                    <a href="javascript:;" class="sure_btn" @click="saveNewModules">确认保存</a>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template v-if="dataChosePop">
+        <div class="pop_mask show" style="z-index:101;" v-if="listChosePop "></div>
+        <!-- 选择数据来源 -->
+        <div class="largePop dataFromPopBox" v-show="dataChosePop">
+            <div class="pop_header">
+                <a href="javascript:;" class="close_pop" @click="dataChosePop = false;"></a>
+                <h4>选择数据来源<span class="tip" v-if="checkCurrChose()"><i class="el-icon-info"></i>修改后，列表数据、样式将全部重置！</span></h4>
+            </div>
+            <div class="pop_con" v-if="currEditPart != 9">
+                <div class="item" v-for="d of dataArr">
+                    <dl>
+                        <dt>{{d.name}}</dt>
+                        <dd>
+                            <span :class="{'chosed':(checkChoseArrIn().includes(item.id))}" v-for="(item,ind) in filterObj(d)" @click="choseShowObj(item,d)">{{item.text}}</span>
+                        </dd>
+                    </dl>
+                    <a href="javascript:;" class="allChose" v-if="labelFormData.labsArr[currChosed_pid].type == 2 && !editSource" @click="choseShowObj('',d)">{{checkHasChoseAll(d.list) ? '取消全选':'全选'}}</a>
+                </div>
+            </div>
+            <div class="pop_con" v-else>
+                <div class="item">
+                    <dl>
+                        <dt>{{dataArr['shop'].name}}</dt>
+                        <dd>
+                            <span :class="{'chosed':(checkChoseArrIn().includes(item.id))}" v-for="(item,ind) in dataArr['shop'].list" @click="choseShowObj(item,dataArr['shop'])">{{item.text}}</span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            <div class="pop_foot">
+                <div class="btnsGroup">
+                    <a href="javascript:;" class="cancel_btn" @click="dataChosePop = false;">取消</a>
+                    <a href="javascript:;" class="sure_btn" @click="confirmLabCon" v-if="currEditPart != 9">{{listChosePop ? '确定':'确认保存'}}</a>
+                    <a href="javascript:;" class="sure_btn" @click="confirmProsCon" v-else>确认保存</a>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template v-if="listChosePop">
+
+        <!-- 选中数据列表/筛选数据 -->
+        <div class="largePop listPopBox" v-show="listChosePop">
+            <div class="pop_header">
+                <a href="javascript:;" class="close_pop" @click="listChosePop = false;listChange = ''"></a>
+                <h4>{{listPopData.popType == 1 ? '动态数据控制器' : '选择显示数据'}}<span v-if="!listPopData.popType == 1">所有分站都将显示所选数据</span></h4>
+               
+            </div>
+            <div class="pop_con" v-if="(listFormData && listFormData.showObj && currEditPart == 28) || [16,17,18,19,9,10].includes(currEditPart)">
+                <div class="shaiBox flexBox" v-if="listPopData.popType == 1">
+                    <div class="flex_l" v-if="currEditPart == 28">
+                        <div class="selectItem disabled dataType" v-if="currCityid && curr_cp['city'] && ['job','sfcar'].includes[listPopData.showObj.service] "><span>{{curr_cp['city'].name}}</span></div>
+                        <!-- @click="showlabConPop(listFormData.currInd,listFormData.currCInd)" -->
+                        <div :class="['selectItem dataType',{'disabled': currEditPart != 28}]"  @click="showDataSource(listFormData.currInd,listFormData.currCInd)"><s></s><span>{{listPopData.showObj && listPopData.showObj.id ? (['info','circle','sfcar','tieba','business','article'].includes(listPopData.showObj.service) ? '其他' : dataArr[listPopData.showObj.service].name) +'-'+listPopData.showObj.text : '选择数据来源'}}</span></div>
+                    
+                        <div class="orderbyBox">
+                            <template v-for="(order,ind) in listPopData.orderArr">
+                                <span :class="{'onChose': listPopData.paramObj.orderby == order.value}" @click="changeOrder(order.value)">{{order.text}}{{order.value == 1 ? '最高' : (order.value ? '' : '排序')}}</span>
+                                <em v-if="ind < listPopData.orderArr.length">/</em> 
+                            </template>
+                        </div>
+                    </div>
+                    <div class="flex_l" v-else>
+                        <div class="selectItem disabled dataType" v-if="currCityid && curr_cp['city']"><span>{{curr_cp['city'].name}}</span></div>
+                        <div class="selectItem dataType">
+                            <s></s>
+                            <span v-if="currEditPart == 16">商城-秒杀</span> 
+                            <span v-else-if="currEditPart == 17">商城-拼团</span> 
+                            <span v-else-if="currEditPart == 18">商城-砍价</span> 
+                            <span v-else-if="currEditPart == 19">商城-限时抢购</span> 
+                            <span v-else-if="currEditPart == 9">{{prosFormData.dataObj.modArr[currProEdit].interface.service == 'shop' ? ('商城-' + prosFormData.dataObj.modArr[currProEdit].interface.text) : '商家'}}</span>
+                            <span v-else-if="currEditPart == 10">{{busisFormData.dataObj.modArr[currBusiEdit].interface.service == 'shop' ? ('商城-' + busisFormData.dataObj.modArr[currBusiEdit].interface.text) : '商家'}}</span>
+                        </div>
+                        <el-cascader v-if="!listPopData.service ||listPopData.service == 'business'"
+                            class="selectItem" 
+                            :show-all-levels="false"
+                            v-model="listPopData.paramObj.typeArr"
+                            :props="{label:'title', value:'id', children:'lower'}"
+                            filterable
+                            popper-class="classify"
+                            @change="(value) => typeChange('listPopData',value)"
+                            :options="allTypeList[listPopData.service ? listPopData.service : 'business']">
+                            <template slot-scope="{ node,data }">
+                                <span>{{ data.title ? data.title : '全部'}}</span>
+                            </template>
+                        </el-cascader>
+                        <div class="orderbyBox">
+                            <template v-for="(order,ind) in shopFormData.orderby">
+                                <span :class="{'onChose': listPopData.paramObj.orderby == order.value}" @click="changeOrder(order.value)">{{order.text}}{{order.value == 1 ? '最高' : (order.value ? '' : '排序')}}</span>
+                                <em v-if="ind < shopFormData.orderby.length">/</em> 
+                            </template>
+                        </div>
+                    </div>
+                    <div class="flex_r"> <span class="reset">重置条件</span> </div>
+                </div>
+                <div class="shaiBox flexBox" v-else>
+                    <div class="flex_l" v-if="currEditPart == 28">
+                        <!-- @click="showlabConPop(listFormData.currInd,listFormData.currCInd)"  此处切换数据有问题  待调整 先隐藏 -->
+                        <div class="selectItem dataType" ><s></s><span>{{listPopData.showObj && listPopData.showObj.id ? (['info','circle','sfcar','tieba','business','article'].includes(listPopData.showObj.service) ? '其他' : dataArr[listPopData.showObj.service].name) +'-'+listPopData.showObj.text : '选择数据来源'}}</span> </div>
+    
+                        <!-- <el-select  placeholder="商品分类" class="selectItem" v-show="listFormData.addType == 1" v-model="listFormData.dataObj.interface.type">
+                            <el-option :value="1">111</el-option>
+                            <el-option :value="2">222</el-option>
+                        </el-select> -->
+                        <div class="searechInp">
+                            <el-input placeholder="请输入搜索关键字" @keyup.enter.native="toSearchList" v-model="listPopData.paramObj.keywords"></el-input>
+                            <a href="javascript:;" class="btn_search" @click="toSearchList()">搜索</a>
+                        </div>
+                        <div class="orderbyBox" >
+                            <!-- 此处需要判断当前所选模块的order -->
+                            <template v-for="(order,ind) in listPopData.orderArr">
+                                <span :class="{'onChose': listPopData.paramObj.orderby == order.value}"  @click="changeOrder(order.value)">{{order.text}}</span>
+                                <em v-if="ind < listPopData.orderArr.length">/</em> 
+                            </template>
+                        </div>
+                    </div>
+                    <div class="flex_l" v-else>
+                        <div class="selectItem dataType">
+                            <s></s>
+                            <span v-if="currEditPart == 16">商城-秒杀</span> 
+                            <span v-else-if="currEditPart == 17">商城-拼团</span> 
+                            <span v-else-if="currEditPart == 18">商城-砍价</span> 
+                            <span v-else-if="currEditPart == 19">商城-限时抢购</span> 
+                            <span v-else-if="currEditPart == 9">{{prosFormData.dataObj.modArr[currProEdit].interface.service == 'shop' ? ('商城-' + prosFormData.dataObj.modArr[currProEdit].interface.text) : '商家'}}</span>
+                            <span v-else-if="currEditPart == 10">{{busisFormData.dataObj.modArr[currBusiEdit].interface.service == 'shop' ? ('商城-' + busisFormData.dataObj.modArr[currBusiEdit].interface.text) : '商家'}}</span>
+                        </div>
+    
+                        <!-- <el-select  placeholder="商品分类" class="selectItem" v-show="listFormData.addType == 1" v-model="listFormData.dataObj.interface.type">
+                            <el-option :value="1">111</el-option>
+                            <el-option :value="2">222</el-option>
+                        </el-select> -->
+                        <div class="searechInp">
+                            <el-input placeholder="商品名称/编码/商家" @keyup.enter.native="toSearchList" v-model="listPopData.paramObj.keywords"></el-input>
+                            <a href="javascript:;" class="btn_search" @click="toSearchList()">搜索</a>
+                        </div>
+                        <div class="orderbyBox" >
+                            <template v-for="(order,ind) in shopFormData.orderby">
+                                <span :class="{'onChose': listPopData.paramObj.orderby == order.value}"  @click="changeOrder(order.value)">{{order.text}}</span>
+                                <em v-if="ind < shopFormData.orderby.length">/</em> 
+                            </template>
+                        </div>
+                    </div>
+                    <div class="flex_r"> <span class="reset" v-if="listPopData.popType == 1">重置条件</span> </div>
+                </div>
+                <div :class="['tableBox',{'chose_tableBox' : listPopData.popType !== 1},'table' + listPopData.service,{'tablehouse':currEditPart == 17 || currEditPart == 18}]">
+                    <div class="table" v-show="(!listPopData.showChoseList ? listPopData.showListArr : listPopData.chosedList ).length">
+                        <div class="thead">
+                            <div class="tr" v-if="listPopData.service == 'shop'">
+                                <div class="td detail">
+                                    <template v-if="listPopData.popType == 1">
+                                        当前商品<span>列表将依据筛选条件动态更新，以下为当前数据情况</span>
+                                    </template>
+                                    <template v-else>商品</template>
+                                </div>
+                                <div class="td business">商家</div>
+                                <div :class="['td' ,{'price':currEditPart != 17 && currEditPart != 18}]">价格</div>
+                                <div class="td price" v-if="currEditPart == 17">拼团价</div>
+                                <div class="td price" v-else-if="currEditPart == 18">底价</div>
+                                
+                                <div class="td stock">库存</div>
+                                <div class="td opt"  v-if="listPopData.popType !== 1">操作</div>
+                            </div>
+                            <div class="tr" v-else>
+                                <div class="td detail">
+                                    <template v-if="listPopData.popType == 1">
+                                        当前信息<span>列表将依据筛选条件动态更新，以下为当前数据情况</span>
+                                    </template>
+                                    <template v-else>信息</template>
+                                </div>
+                                <template v-if="listPopData.service == 'house'">
+                                    <div class="td business" >发布人</div>
+                                    <div class="td stock">类型</div>
+                                    <div class="td price">价格</div>
+                                    <div class="td update">更新时间</div>
+                                </template>
+                                <template v-else-if="listPopData.service == 'job'">
+                                    <div class="td business" >联系人</div>
+                                    <div class="td price" v-if="listPopData.showObj && listPopData.showObj.action != 'qzList'">薪资</div>
+                                    <div class="td price" v-else></div>
+                                    <div class="td update">更新时间</div>
+                                </template>
+                                <template v-else-if="listPopData.service == 'article' || listPopData.service == 'tieba' ">
+                                    <div class="td business" >媒体</div>
+                                    <div class="td stock">分类</div>
+                                    <div class="td update">更新时间</div>
+                                </template>
+                                <template v-else-if="listPopData.service == 'sfcar'">
+                                    <div class="td business" >联系人</div>
+                                    <div class="td"></div>
+                                    <div class="td update">更新时间</div>
+                                </template>
+                                <template v-else-if="listPopData.service == 'business'">
+                                    <div class="td business" >分类</div>
+                                    <div class="td score">评分</div>
+                                    <div class="td update">所在地区</div>
+                                </template>
+                                <template v-else>
+                                    <div class="td business" >联系人</div>
+                                    <div class="td score">信息分类</div>
+                                    <div class="td update">更新时间</div>
+                                </template>
+                                <div class="td opt"  v-if="listPopData.popType !== 1">操作</div>
+                            </div>
+                        </div>
+                        <div class="tbody">
+                            <template v-for="(item,ind) in (!listPopData.showChoseList ? listPopData.showListArr : listPopData.chosedList )">
+                               
+                                <!-- failure 下架、失效才显示 -->
+                                <div class="tr " v-if="listPopData.service == 'shop'">
+                                    <div class="td detail">
+                                        <b class="pro_ind"  v-if="listPopData.popType == 1">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                        
+                                        <div class="picbox">
+                                            <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'">
+                                            <div class="mask_img">已下架</div>
+                                        </div>
+                                        <!-- 团只有选择全部商品是才会显示 -->
+                                        <h4><span class="tuan fn-hide">团</span>{{item.title}}</h4>
+                                    </div>
+                                    <div class="td business"><p>{{item.storeTitle}}</p></div>
+                                    <div :class="['td' ,{'price':currEditPart != 17 && currEditPart != 18}]"><b>￥{{parseFloat(item.price)}}</b></div>
+                                    <div class="td price" v-if="currEditPart == 17">{{item.huodongprice}}</div>
+                                    <div class="td price" v-else-if="currEditPart == 18">{{item.floorprice}}</div>
+                                    <div class="td stock" v-if="![16,17,18,19].includes(currEditPart)">{{item.store > 999 ? '999+' : item.store}}</div>
+                                    <div class="td stock" v-else>{{item.huodonginventory > 999 ? '999+' : item.huodonginventory}}</div>
+                                    <div class="td opt" v-if="listPopData.popType !== 1">
+                                        <!-- <a v-if="listChange" href="javascript:;" :class="['chose',{'disabled':item.id == listChange}]">更换</a>
+                                        <template v-else>
+                                        </template> -->
+                                        <a href="javascript:;" class="chose" v-if="!checkChosed(item.id,listPopData.chosedList)" @click="choseListData(item)"> 选择</a>
+                                        <a href="javascript:;" class="chose hasChosed" v-else  @click="choseListData(item)">已选</a>
+                                    </div>
+                                </div>
+                                <div class="tr" v-else>
+                                    <!-- 此处非商家数据 均显示在列表数据中 -->
+                                    <template v-if="listPopData.service == 'house'">
+                                        <div class="td detail">
+                                            <b class="pro_ind"  v-if="listPopData.popType == 1">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                            
+                                            <div class="picbox">
+                                                <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'">
+                                                <div class="mask_img">已下架</div>
+                                            </div>
+                                            <h4>{{item.title}}</h4>
+                                        </div>
+                                        <div class="td business" v-if="listPopData.showObj.action != 'loupanList'">{{item.nickname ? item.nickname : (item.username ? item.username : '') }}</div>
+                                        <div class="td business" v-else>{{item.investor}}</div>
+                                        <div class="td stock">{{listPopData.showObj.text}}</div>
+                                        <div class="td price" v-if="listPopData.showObj.action == 'zuList'">{{item.price}}元/月</div>
+                                        <div class="td price" v-else-if="listPopData.showObj.action == 'loupanList'">
+                                            <template v-if="item.price != '0'">
+                                                <b>{{item.price}}</b>{{item.ptype != 1 ? '万/套' : '元/平' }}
+                                            </template>
+                                            <template v-else><b>待定</b></template>
+                                        </div>
+                                        <div class="td price" v-else-if="listPopData.showObj.action == 'saleList'">{{item.unitprice}}元/m<sup>2</sup></div>
+                                        <div class="td price" v-else-if="listPopData.showObj.action == 'communityList' ">
+                                            <div class="price" v-if="item.price != '0'" >
+                                                <span><b>{{item.price}}</b>元/平</span>
+                                            </div>
+                                            <div class="price"  v-else><b>待定</b></div>
+                                        </div>
+                                        <div class="td price" v-else>
+                                            <div class="price" v-if="item.price != '0'" >
+                                                <span v-if="item.type !== 1"><b>{{item.price}}</b>元/月</span>
+                                                <span v-else><b>{{item.price}}</b>万</span>
+                                            </div>
+                                            <div class="price"  v-else><b>面议</b></div>
+                                        </div>
+                                        
+                                        <div class="td update">{{listPopData.showObj.action == 'loupanList' || listPopData.showObj.action == 'communityList'? transTimes(item.opendate,2):transTimes(item.pubdate,2)}}</div>
+                                    </template>
+                                    <template v-else-if="listPopData.service == 'job'">
+                                        <div class="td detail">
+                                            <b class="pro_ind"  v-if="listPopData.popType == 1">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                            <h4>{{item.title}}</h4>
+                                        </div>
+                                        <div class="td business" v-if="listPopData.showObj.action == 'postList'">{{item.companyDetail.title}}</div>
+                                        <div class="td business" v-else>{{item && item.nickname ? item.nickname : ''}}</div>
+                                        <div class="td price" v-if="listPopData.showObj.action == 'postList'">{{item.show_salary}}</div>
+                                        <div class="td price" v-else-if="listPopData.showObj.action == 'pgList'">{{item.min_salary}}{{item.min_salary && item.max_salary ? '-' : ''}}{{item.max_salary}}</div>
+                                        <div class="td price" v-else></div>
+                                        <div class="td update">{{transTimes(item.pubdate,2)}}</div>
+                                    </template>
+                                    <template v-else-if="listPopData.service == 'article' ">
+                                        <div class="td detail">
+                                            <b class="pro_ind"  v-if="listPopData.popType == 1">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                            
+                                            <div class="picbox" v-if="item.litpic">
+                                                <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'">
+                                                <!-- <div class="mask_img">已下架</div> -->
+                                            </div>
+                                            <h4>{{item.title}}</h4>
+                                        </div>
+                                        <div class="td business" >{{item.source}}</div>
+                                        <div class="td stock">{{Array.isArray(item.typeName) ? item.typeName.join('/') : item.typeName}}</div>
+                                        <div class="td update">{{transTimes(item.pubdate,2)}}</div>
+                                    </template>
+                                    <template v-else-if="listPopData.service == 'tieba' ">
+                                        <div class="td detail">
+                                            <b class="pro_ind"  v-if="listPopData.popType == 1">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                            
+                                            <div class="picbox" v-if="item.imgGroup && item.imgGroup.length">
+                                                <img :src="item.imgGroup[0]" onerror="this.src='/static/images/404.jpg'">
+                                                <!-- <div class="mask_img">已下架</div> -->
+                                            </div>
+                                            <div class="picbox noImg" v-else><span>{{item.title[0]}}</span></div>
+                                            <h4>{{item.title}}</h4>
+                                        </div>
+                                        <div class="td business" >{{item.source}}</div>
+                                        <div class="td stock">{{Array.isArray(item.typename) ? item.typename.join('/') : item.typename}}</div>
+                                        <div class="td update">{{transTimes(item.pubdate,2)}}</div>
+                                    </template>
+                                    <template v-else-if="listPopData.service == 'sfcar'">
+                                        <div class="td detail">
+                                            <b class="pro_ind"  v-if="listPopData.popType == 1">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                            <h4>{{item.startaddr}} ———— {{item.endaddr}}</h4>
+                                        </div>
+                                        <div class="td business" >{{item.tel}}</div>
+                                        <div class="td"></div>
+                                        <div class="td update">{{item.pubdatetime}}</div>
+                                    </template>
+                                    <template v-else-if="listPopData.service == 'business'">
+                                        <div class="td detail">
+                                            <b class="pro_ind"  v-if="listPopData.popType == 1">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                            <div class="picbox" v-if="item.logo">
+                                                <img :src="item.logo" onerror="this.src='/static/images/404.jpg'">
+                                                <!-- <div class="mask_img">已下架</div> -->
+                                            </div>
+                                            <h4>{{item.title}}</h4>
+                                        </div>
+                                        <div class="td business" >{{Array.isArray(item.typename) ? item.typename.join('/') : item.typename}}</div>
+                                        <div class="td score">{{item.rating}}</div>
+                                        <div class="td update">{{item.addrname[item.addrname.length - 1]}}</div>
+                                    </template>
+                                    <template v-else>
+                                        <div class="td detail">
+                                            <b class="pro_ind"  v-if="listPopData.popType == 1">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                            <div class="picbox" v-if="item.litpic">
+                                                <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'">
+                                                <!-- <div class="mask_img">已下架</div> -->
+                                            </div>
+                                            <h4>{{item.title}}</h4>
+                                        </div>
+                                        <div class="td business" >{{item && item.member && item.member.nickname ? item.member.nickname : ''}}</div>
+                                        <div class="td score">{{item.typename}}</div>
+                                        <div class="td update">{{transTimes(item.pubdate,2)}}</div>
+                                    </template>
+                                    <div class="td opt" v-if="listPopData.popType !== 1">
+                                        <!-- <a v-if="listChange" href="javascript:;" :class="['chose',{'disabled':item.id == listChange}]">更换</a>
+                                        <template v-else>
+                                        </template> -->
+                                        <a href="javascript:;" class="chose" v-if="!checkChosed(item.id,listPopData.chosedList)" @click="choseListData(item)"> 选择</a>
+                                        <!-- 更换时 只能切换一个 -->
+                                        <a href="javascript:;"  v-else-if="!listChange" @click="choseListData(item)" :class="['chose hasChosed']">已选</a>
+                                        <a href="javascript:;"  v-else :class="['chose hasChosed',{'disabled':item.id !== listChange && listChange}]">已选</a>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    
+                    <div class="table_empty" v-show="(!listPopData.showChoseList ? listPopData.showListArr : listPopData.chosedList ).length == 0">
+                        <div class="empty_img"><img src="/static/images/admin/siteConfigPage/list_empty.png" alt=""></div>
+                        <p>暂无相关数据，请调整筛选条件</p>
+                    </div>
+                    
+                </div>
+                <div :class="['pageInfoBox',{'alignLeft':listPopData.popType !== 1}]">
+                    <el-pagination v-if="!listPopData.showChoseList"
+                    :hide-on-single-page="listPopData.totalCount == 10 ? true : false"
+                    :current-page="listPopData.currPage"
+                    :page-sizes="[10, 20, 30, 40]"
+                    :pager-count="5"
+                    :page-size="listPopData.pageSize"
+                    @current-change="pageChage"
+                    @size-change="pageSizeChange"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="Number(listPopData.totalCount)">
+                    </el-pagination>
+                    <div class="choseInfo" v-if="listPopData.popType !== 1">
+                        <span class="btn_show" v-show="listPopData.chosedList.length" @click="listPopData.showChoseList = !listPopData.showChoseList">{{listPopData.showChoseList ? '返回列表' : '查看全部已选'}}</span>
+                        <a :class="['btn_chose',{'noBorder':listPopData.showChoseList}]" @click="choseAllList"><span v-if="!listPopData.showChoseList">全选</span> <em>{{listPopData.chosedList.length}}</em>/{{countLimit(currEditPart)}}</a>
+                    </div>
+                </div>
+            </div>
+    
+            <div class="pop_foot">
+                <div class="btnsGroup">
+                    <!-- <a href="javascript:;" class="cancel_btn" @click="dataChosePop = false;">取消</a> -->
+                    <a href="javascript:;" class="cancel_btn" @click="listChosePop = false;listChange = ''">取消</a>
+                    <a href="javascript:;" class="sure_btn" @click="confirmTabCon">确认保存</a>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template v-if="quanlistPop">
+        
+        <div class="largePop quanListPopBox listPopBox" v-show="quanlistPop">
+            <div class="pop_header">
+                <a href="javascript:;" class="close_pop" @click="quanlistPop = false;"></a>
+                <h4>选择优惠券</h4>
+            </div>
+            <div class="pop_con">
+                <div class="shaiBox flexBox">
+                    <div class="flex_l">
+                        <el-select  placeholder="模块" class="selectItem" v-model="quanPopData.module" @change="changeQuanModule">
+                            <el-option value="shop" label="商城">商城</el-option>
+                            <el-option value="waimai"  label="外卖">外卖</el-option>
+                        </el-select>
+                        <el-select  placeholder="类型" class="selectItem" v-model="quanPopData.interface.gettype" @change="changeQuanType" v-show="quanPopData.module == 'shop'">
+                            <el-option value="" label="全部"></el-option>
+                            <!-- <el-option :value="1"  label="商品"></el-option> -->
+                            <el-option :value="3" label="平台券"></el-option>
+                            <el-option :value="2"  label="商家券"></el-option>
+                        </el-select>
+                        <el-select  placeholder="类型" class="selectItem" v-model="quanPopData.interface.getype" @change="changeQuanType" v-show="quanPopData.module == 'waimai'">
+                            <el-option value="" label="全部"></el-option>
+                            <el-option :value="1"  label="平台券"></el-option>
+                            <!-- <el-option :value="2"  label="推荐"></el-option> -->
+                            <el-option :value="3" label="商家券"></el-option>
+                        </el-select>
+                        <div class="searechInp">
+                            <el-input placeholder="券名/店铺名" @keyup.enter.native="toQuanList" v-model="quanPopData.keyword"></el-input>
+                            <a href="javascript:;" class="btn_search" @click="toQuanList()">搜索</a>
+                        </div>
+                    </div>
+                </div>
+    
+                <div :class="['tableBox','chose_tableBox']">
+                    <div class="table">
+                        <div class="thead">
+                            <div class="tr">
+                                <div class="td detail">券名</div>
+                                <div class="td business">商家</div>
+                                <div class="td price">面额</div>
+                                <div class="td stock">门槛</div>
+                                <div class="td opt">操作</div>
+                            </div>
+                        </div>
+                        <div class="tbody">
+                            <template v-for="(item,ind) in quanPopData.quanList">
+                                <div class="tr " v-if="quanPopData.module == 'waimai'">
+                                    <div class="td detail">
+                                        <span :class="'quantype quan'+ item.shoptype">{{item.shoptype == '0' ? '平台券':'店铺券'}}</span>
+                                        <span>{{item.name}}</span>
+                                    </div>
+                                    <div class="td business"><p>{{item.shopname && item.shopids > 0 ?  item.shopname : '\u005c' }}</p></div>
+                                    <div class="td price"><b style="color:#FF3333;">{{parseFloat(item.money)}}元</b></div>
+                                    <div class="td stock">{{item.basic_price > 0  ? ('满' +  parseFloat(item.basic_price) + '可用') : '无限制'}}</div>
+                                    <div class="td opt">
+                                        <a href="javascript:;" class="chose" v-if="!checkQuanChosed(item.id,quanPopData.chosedList)" @click="choseQuan(item)"> 选择</a>
+                                        <a href="javascript:;" :class="['chose hasChosed',{'disabled':changeQuanInfo && (changeQuanInfo.quanInfo.id != item.id || changeQuanInfo.quanInfo.service != 'waimai' ) }]" v-else  @click="choseQuan(item)">已选</a>
+                                    </div>
+                                </div>
+                                <div class="tr " v-else>
+                                    <div class="td detail">
+                                        <span :class="'quantype quan'+ item.bear">{{item.bear == '1' ? '平台券':'店铺券'}}</span>
+                                        <span>{{item.name}}</span>
+                                    </div>
+                                    <div class="td business"><p>{{item.storename ?  item.storename : '\u005c' }}</p></div>
+                                    <div class="td price"><b style="color:#FF3333;">{{parseFloat(item.promotio)}}{{item.promotiotype == '1' ? '折':'元'}}</b></div>
+                                    <div class="td stock">{{item.basic_price > 0  ? ('满' +  parseFloat(item.basic_price) + '可用') : '无限制'}}</div>
+                                    <div class="td opt">
+                                        <a href="javascript:;" class="chose" v-if="!checkQuanChosed(item.id,quanPopData.chosedList)" @click="choseQuan(item)"> 选择</a>
+                                        <a href="javascript:;" :class="['chose hasChosed',,{'disabled':changeQuanInfo && (changeQuanInfo.quanInfo.id != item.id || changeQuanInfo.quanInfo.service != 'shop' )}]" v-else  @click="choseQuan(item)">已选</a>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="table_empty" v-show="!quanPopData.quanList.length ">
+                        <div class="empty_img"><img src="/static/images/admin/siteConfigPage/list_empty.png" alt=""></div>
+                        <p>暂无相关优惠券，请调整筛选条件</p>
+                    </div>
+                </div>
+                <div class="pageInfoBox">
+                    <el-pagination 
+                    :current-page="quanPopData.page"
+                    :page-sizes="[10, 20, 30, 40]"
+                    :pager-count="5"
+                    :page-size="10"
+                    @current-change="quanPageChange"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="quanPopData.totalCount">
+                    </el-pagination>
+                </div>
+                
+            </div>
+            <div class="pop_foot">
+                <div class="btnsGroup">
+                    <!-- <a href="javascript:;" class="cancel_btn" @click="dataChosePop = false;">取消</a> -->
+                    <a href="javascript:;" class="cancel_btn" @click="quanlistPop = false;changeQuanInfo = ''">取消</a>
+                    <a href="javascript:;" class="sure_btn" @click="confirmQuanCon">确认保存</a>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 资讯、公告数据选择弹窗 -->
+    <template v-if="msgListPop">
+        <!-- 选中数据列表/筛选数据 -->
+        <div class="largePop listPopBox msgListPop" v-show="msgListPop">
+            <div class="pop_header">
+                <a href="javascript:;" class="close_pop" @click="msgListPop = false;"></a>
+                <h4>动态数据控制器</h4>
+               
+            </div>
+            <div class="pop_con" >
+                <div class="shaiBox flexBox">
+                    <div class="flex_l" >
+                        <el-select v-model="msgPopData.msgType" class="msgType" placeholder="请选择" @change="announceChange">
+                            <span class="icon_link el-icon" slot="prefix"></span>
+                            <el-option v-for="item in msgType" 
+                                :key="item.type"
+                                :label="item.text"
+                                :value="item.type" v-if="item.type != 4" >
+                            </el-option>
+                        </el-select>
+                        <el-cascader
+                            class="selectItem" v-show="msgPopData.msgType == 3"
+                            :show-all-levels="false"
+                            v-model="msgPopData.typeidArr"
+                            :props="{label:'typename', value:'id', children:'lower'}"
+                            filterable
+                            ref="msgType"
+                            popper-class="classify"
+                            @change="(value) => typeChange('msgPopData',value)"
+                            :options="allTypeList['article']">
+                            <template slot-scope="{ node,data }">
+                                <span>{{ data.title ? data.title : '不限'}}</span>
+                            </template>
+                        </el-cascader>
+                        <div class="orderbyBox" v-if="msgPopData.msgType == 3">
+                            <template v-for="(order,ind) in msgOrderList">
+                                <span :class="{'onChose': msgPopData.orderby == order.id}" @click="changeMsgOrder(order.id,'msgPopData')">{{order.text}}</span>
+                                <em v-if="ind < msgOrderList.length">/</em> 
+                            </template>
+                        </div>
+                        <div class="orderbyBox" v-else>
+                            <span>默认按时间排序</span>
+                        </div>
+                    </div>
+                    <div class="flex_r"> <span class="reset" v-show="msgPopData.msgType == 3" @click="msgPopData.typeid = ''; msgPopData.typeidArr = [];typeChange('msgPopData',[])">重置条件</span> </div>
+                </div>
+                <div :class="['tableBox']">
+                    <div class="table" >
+                        <div class="thead">
+                            
+                            <div class="tr">
+                                <div class="td detail">当前信息<span>列表将依据筛选条件动态更新，以下为当前数据情况</span></div>
+                                <div class="td business">分类</div>
+                                <div class="td update">更新时间</div>
+                            </div>
+                        </div>
+                        <div class="tbody">
+                            <div class="tr" v-for="(item,ind) in msgPopData.dlistArr">
+
+                                <div class="td detail">
+                                    <b class="pro_ind">{{(listPopData.currPage - 1) * (listPopData.pageSize) +  ind + 1}}</b>
+                                    <div class="info" v-html="item.text ? item.text : item.title"></div>
+                                </div>
+                                <div class="td business">{{item.typeName && item.typeName.length ? item.typeName[item.typeName.length - 1] : '-'}}</div>
+                                <div class="td update">{{transTimes(item.pubdate,2)}}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table_empty" v-show="msgPopData.dlistArr && msgPopData.dlistArr.length == 0">
+                        <div class="empty_img"><img src="/static/images/admin/siteConfigPage/list_empty.png" alt=""></div>
+                        <p>暂无相关数据，请调整筛选条件</p>
+                    </div>
+                    
+                </div>
+                <!-- <div class="pageInfoBox">
+                    
+                    <el-pagination v-if="!listPopData.showChoseList"
+                    :hide-on-single-page="true"
+                    :current-page="listPopData.currPage"
+                    :page-sizes="[10, 20, 30, 40]"
+                    :pager-count="5"
+                    :page-size="listPopData.pageSize"
+                    @current-change="pageChage"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="Number(listPopData.totalCount)">
+                    </el-pagination>
+                    <div class="choseInfo" v-if="listPopData.popType !== 1">
+                        <span class="btn_show" @click="listPopData.showChoseList = !listPopData.showChoseList">{{listPopData.showChoseList ? '返回列表' : '查看全部已选'}}</span>
+                        <a :class="['btn_chose',{'noBorder':listPopData.showChoseList}]" @click="choseAllList"><span v-if="!listPopData.showChoseList">全选</span> <em>{{listPopData.chosedList.length}}</em>/{{countLimit(currEditPart)}}</a>
+                    </div>
+                </div> -->
+            </div>
+    
+            <div class="pop_foot">
+                <div class="btnsGroup">
+                    <!-- <a href="javascript:;" class="cancel_btn" @click="dataChosePop = false;">取消</a> -->
+                    <a href="javascript:;" class="cancel_btn" @click="msgListPop = false;">取消</a>
+                    <a href="javascript:;" class="sure_btn" @click="confirmMsgCon">确认保存</a>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 同步分站弹窗 -->
+    <div class="citySetPopBox" v-if="citySetPop">
+        <div class="citySetPop  " v-show="citySetPop">
+            <div class="pop_header">
+                <h4>以下分站已单独设置模板，是否需要同步此版本？</h4>
+                <p>可勾选需要同步的分站<span @click="choseCitySetAll">全选</span></p>
+                <a href="javascript:;" class="close_pop" @click="citySetPop = false;"></a>
+            </div>
+            <div class="pop_con">
+                <div class="tscrollBox">
+                    <table>
+                        <tbody>
+                            <tr v-for="group in arrToGroup(cityCustomList,5)">
+                                <td v-for="item in group"><el-checkbox  :value="cityidChosed.includes(item.cid)" :label="item.name" @change="val => changeChosedCity(val,item)"></el-checkbox></td>
+                                <td v-for="num in (group.length < 5 ? (5 - group.length) : 0)"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="pop_foot">
+                <a href="javascript:;" class="cancel_btn" @click="citySetPop = false">取消</a>
+                <a href="javascript:;" class="confirm_btn" @click="saveAllData()">{{cityidChosed.length ? '确认发布':'忽略并发布'}}</a>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 切换平台或者分站 -->
+    <template v-if="changeCityPop">
+        <div :class="['largePop changeCityPlatPop',{'cityModule_con':linkToType == 'cityModule'},{'noPlatformSet':!(showPlatformSet || linkToType != 'cityModule')}]" v-show="changeCityPop">
+            <div class="pop_header">
+                <div class="cpTabBox">
+                    <span :class="['defaultModule',{'on_chose':linkToType == 'defaultModule'}]" @click="changeLinkType('defaultModule')">全站默认模板</span>
+                    <span :class="['cityModule',{'on_chose':linkToType == 'cityModule'}]" @click="changeLinkType('cityModule')">分站页面</span>
+                    <!-- <span :class="['defaultModule',{'on_chose':linkToType == 'defaultModule'}]" @click="linkToType = 'defaultModule'; currChosedCity = ''; currChosePlatform = {}">全站默认模板</span>
+                    <span :class="['cityModule',{'on_chose':linkToType == 'cityModule'}]" @click="linkToType = 'cityModule'; ">分站页面</span> -->
+                </div>
+                <div class="searchCityInp" v-show="linkToType == 'cityModule'">
+                    <el-autocomplete
+                    class="inline-input"
+                    v-model="cityKey"
+                    :fetch-suggestions="querySearch"
+                    placeholder="请输入内容"
+                    :trigger-on-focus="false"
+                    prefix-icon="el-icon-search"
+                    :clearable="true"
+                    :popper-class="noMatchCity ? 'noMatchCityPop' : ''"
+                    @select="handleSelect"
+                    >
+                     <template slot-scope="{ item }">
+                        <div class="name" v-if="!noMatchCity">{{ item.name }}</div>
+                        <div class="name" v-else>{{ item.default }}</div>
+                      </template>
+                    </el-autocomplete>
+                </div>
+                <a href="javascript:;" class="close_pop" @click="changeCityPop = false; currChosed_cp = {};linkToType = 'defaultModule'; currChosedCity = ''"></a>
+            </div>
+            <div :class="['pop_con']">
+                <!-- 选择城市分站 -->
+                <div class="siteCityListBox">
+                    <div class="pyList">
+                        <ul>
+                            <li v-for="(item,ind) in (Object.keys(siteCityList).sort())" :data-py="item"  @click="cityScrollTo(item)" :class="{'on_chose':ind == 0}">{{item.toLocaleUpperCase()}}</li>
+                        </ul>
+                    </div>
+                    <div class="siteCityList">
+                        <ul class="cityList">
+                            <li class="pyCityList" >
+                                <div class="py">热门</div>
+                                <div class="city">
+                                    <span v-for="city in hotCity" :class="{'on_chose':currChosedCity == city.cityid}" @click="choseCityPlatform(city,'city')">{{city.name}}</span>
+                                </div>
+                            </li>
+                            <li class="pyCityList" v-for="item in (Object.keys(siteCityList).sort())" :data-py="item">
+                                <div class="py">{{item.toLocaleUpperCase()}}</div>
+                                <div class="city">
+                                    <span v-for="city in siteCityList[item]" :class="{'on_chose':currChosedCity == city.cityid}"  @click="choseCityPlatform(city,'city')">{{city.name}}</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 选择终端 -->
+                <div class="terminalChoseBox" v-show="showPlatformSet || linkToType != 'cityModule'">
+                    <label for="">选择终端</label>
+                    <ul>
+                        <li :class="[{'on_chose':terminal.id == currChosePlatform},terminal.id]"  @click="choseCityPlatform(terminal)" v-for="terminal in terminalList" v-show="terminal.buy"><i class="icon"><img :src="'/static/images/admin/siteConfigPage/'+(terminal.id)+'.png'" alt=""></i><span>{{terminal.name}}</span></li>
+                        <!-- <li :class="[{'on_chose':terminal.id == currChosePlatform},terminal.id]" @click="currChosePlatform = terminal.id" v-for="terminal in terminalList"><i class="icon"><img :src="'/static/images/admin/siteConfigPage/'+(terminal.id)+'.png'" alt=""></i><span>{{terminal.name}}</span></li> -->
+                    </ul>
+                </div>
+            </div>
+            <div class="pop_foot">
+                <div class="currChose" v-if="currChosed_cp.city || currChosed_cp['platform']">已选：<span>{{currChosed_cp['city'] ? currChosed_cp['city'].name + '站' : ''}} {{currChosed_cp['city'] && currChosed_cp['platform'] ? '-' : ''}} {{currChosed_cp['platform'] ? currChosed_cp['platform'].name : ''}}</span></div>
+                <div v-else></div>
+                <div class="btns_group">
+                    <a href="javascript:;" class="cancel_btn" @click="changeCityPop = false; currChosed_cp = {};linkToType = 'defaultModule'; currChosedCity = '' ">取消</a>
+                    <!-- 此处判断待调 -->
+                    <a href="javascript:;" class="confirm_btn" @click="toSetOtherModule">{{currCityid == currChosedCity &&  currChosePlatform == currPlatform? '确定':'确定切换'}}</a>
+                </div>
+            </div>
+        </div>
+    </template>
+
+
+    <!-- 高级选项 -->
+    <template v-if="advanceSetPop">
+        <div class="largePop advanceSetPop" v-show="advanceSetPop">
+            <div class="pop_header">
+                <h4>发布高级选项</h4>
+                <p><i class="el-icon el-icon-info"></i><span>批量设置同步此模板到其他分站、终端</span></p>
+                <a href="javascript:;" class="close_pop" @click="closeAdvancePop"></a>
+            </div>
+            <div class="pop_con">
+                <div class="coverShowBox">
+                    <div class="coverShow"></div>
+                </div>
+                <div class="setConList">
+                    <div class="scrollCon">
+
+                        <h6>批量同步<span>{{curr_cp.city ? curr_cp.city.name : '默认全站'}}{{curr_cp.city && curr_cp.platform ? ' - ' : ''}}{{curr_cp.platform ? curr_cp.platform.name : ''}}</span>到：</h6>
+    
+                        <!-- 分站选择 -->
+                        <div class="siteCityChoseBox setCon">
+                            <h5>选择分站 <span class="tip_city _tip fn-hide"><s></s><em>请选择分站</em></span></h5>
+                            <div class="setShow">
+                                
+                                <el-popover
+                                    placement="bottom"
+                                    width="640"
+                                    v-model="changeCityPover"
+                                    :visible-arrow="false"
+                                    :offset="-30"
+                                    popper-class="cityChosePop"
+                                    trigger="click">
+                                    <div class="siteCityListBox">
+                                        <div class="pyList">
+                                            <ul>
+                                                <li v-for="(item,ind) in (Object.keys(siteCityList).sort())" :data-py="item"  @click="cityScrollTo(item)" :class="{'on_chose':ind == 0}">{{item.toLocaleUpperCase()}}</li>
+                                            </ul>
+                                        </div>
+                                        <div class="siteCityList">
+                                            <ul class="cityList">
+                                                <li class="pyCityList" >
+                                                    <div class="py">热门</div>
+                                                    <div class="city">
+                                                        <span v-for="city in hotCity" :class="{'on_chose':checkHasChoseCity(city.cityid)}" @click="choseCityKeyAdv(city)">{{city.name}}</span>
+                                                    </div>
+                                                </li>
+                                                <li class="pyCityList" v-for="item in (Object.keys(siteCityList).sort())" :data-py="item">
+                                                    <div class="py">{{item.toLocaleUpperCase()}}</div>
+                                                    <div class="city">
+                                                        <span v-for="city in siteCityList[item]" :class="{'on_chose':checkHasChoseCity(city.cityid)}"  @click="choseCityKeyAdv(city)">{{city.name}}</span>
+                                                    </div>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div :class="['selectBox',{'focusBox':changeCityPover || citySearchFocus}]" slot="reference">
+                                        <div class="hasSelect" placeholder="请选择">
+                                            <el-tag v-for="(item,ind) in advancsFormData.citys"  :key="item.id"  closable color="#F2F7FF" :hit="false" @close="removeChoseCity(ind)">{{item.name}}</el-tag>
+    
+                                            <el-autocomplete
+                                            v-model="cityKeyAdv"
+                                            :fetch-suggestions="querySearch"
+                                            :placeholder="advancsFormData.citys && advancsFormData.citys.length ? '' : '请选择'"
+                                            :trigger-on-focus="false"
+                                            :clearable="true"
+                                            :popper-class="noMatchCity ? 'noMatchCityPop' : ''"
+                                            @click.stop="changeCityPover = (changeCityPover ? false : true)"
+                                            @focus.stop="citySearchFocus = true; " 
+                                            @blur.stop="citySearchFocus = false; " 
+                                            @input="cityKeyChange"
+                                            @select="choseCityKeyAdv"
+                                            >
+                                            <template slot-scope="{ item }">
+                                                <div class="name">{{ item.name }}</div>
+                                                <div class="noCity" v-if="noMatchCity">{{item.default}}</div>
+                                            </template>
+    
+                                            </el-autocomplete>
+                                        </div>
+                                        <i class="el-icon el-icon-arrow-down"></i>
+                                    </div>
+                                </el-popover>
+    
+                                <p class="mayChose">可能想选：<span v-for="city in (cityMayChose.slice(0,(cityMayChose.length > 8 ? 8 : cityMayChose.length)))" @click="choseCityKeyAdv(city)">{{city.name}}</span></p>
+                            </div>
+                        </div>
+    
+    
+                        <!-- 终端选择 -->
+                        <div class="platformChoseBox setCon">
+                            <h5>选择终端 <span class="tip_platform  fn-hide  _tip"><s></s><em>请选择终端</em></span></h5>
+                            <div class="setShow">
+                                <ul>
+                                    <li v-for="item in terminalList" :class="{'on_chose':advancsFormData.plats.find(obj => {return obj.id == item.id})}" @click="chosePlatformAdv(item)" v-show="item.buy">{{item.name}}</li>
+                                </ul>
+                            </div>
+                        </div>
+    
+                        <!-- 同步设置 -->
+                        <div class="stepChoseBox setCon">
+                            <h5>同步设置</h5>
+                            <div class="setShow">
+    
+                                <label for="">已单独设置模板的页面：</label>
+                                <div class="split_options radioBox">
+                                    <span :class="{'onChose':!advancsFormData.cover}" @click="advancsFormData.cover = 0"><s></s>保留原模板</span>
+                                    <span :class="{'onChose':advancsFormData.cover}" @click="advancsFormData.cover = 1"><s></s>覆盖</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btns_group">
+                        <a href="javascript:;" class="fb_btn" v-if="advancsFormData.plats && advancsFormData.plats.length && advancsFormData.citys && advancsFormData.citys.length" @click="directSave()">直接发布并同步</a>
+                        <a href="javascript:;" class="fb_btn cancel_btn" v-else @click="closeAdvancePop">取消</a>
+                        <!-- !advancsFormData.plats || !advancsFormData.plats.length || !advancsFormData.citys || !advancsFormData.citys.length -->
+                        <a href="javascript:;" :class="['cn_btn',{'disabeld':(!advancsFormData.plats || !advancsFormData.plats.length || !advancsFormData.citys || !advancsFormData.citys.length) }]" @click="confirmAdvance">确定</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 更换模板弹窗 -->
+    <template v-if="changeModulePop">
+        <div class="largePop changeModulePop advanceSetPop">
+            <div class="pop_header">
+                <h4>选择模板</h4>
+                <p><i class="el-icon el-icon-info"></i><span>更换模板后，您之前编辑的内容将不被保存</span></p>
+                <a href="javascript:;" class="close_pop" @click="changeModulePop = false"></a>
+            </div>
+            <div class="pop_con">
+                <div class="left_tab">
+                    <ul>
+                        <li :class="{'on_chose': showModelType == 1}" @click="showModelType = 1">我的模板</li>
+                        <li :class="{'on_chose': showModelType == 0}" @click="showModelType = 0">官方模板</li>
+                    </ul>
+                </div>
+                <div class="right_tabCon">
+                    <!-- 我的模板 -->
+                    <div class="myModelList" v-if="showModelType == 1">
+                        <div class="cityplatBox">
+                            <div :class="['allCityTabBox',{'defaultShow':!cityplatform}]">
+                                <span @click="cityplatform = 0; choseCityModelPlatform(modelPlatform)">系统默认</span>
+                                <span @click="cityplatform = 1; choseCityModelPlatform(modelPlatform) " >分站模板</span>
+                                <s class="line"></s>
+                            </div>
+                            <div class="allCityConBox">
+                                <!-- 城市分站切换 -->
+                                <div class="siteCityChoseBox" v-show="cityplatform && Object.keys(cityDiyList) && Object.keys(cityDiyList).length">
+                                    <label for="">选择分站</label>
+                                    <div class="siteCityChoseCon">
+                                        <el-popover
+                                            placement="bottom"
+                                            width="640"
+                                            v-model="changeCityPover"
+                                            :visible-arrow="false"
+                                            popper-class="cityChosePop"
+                                            trigger="click">
+                                            <div class="siteCityListBox">
+                                                <div class="pyList">
+                                                    <ul>
+                                                        <li v-for="(item,ind) in (Object.keys(cityDiyList).sort())" :data-py="item"  @click="cityScrollTo(item)" :class="{'on_chose':ind == 0}">{{item.toLocaleUpperCase()}}</li>
+                                                    </ul>
+                                                </div>
+                                                <div class="siteCityList">
+                                                    <ul class="cityList">
+                                                        <li class="pyCityList" >
+                                                            <div class="py">热门</div>
+                                                            <div class="city">
+                                                                <span v-for="city in cityDiyHot" :class="{'on_chose':currCityDiyChose.cityid == city.cityid}" @click="choseDiyCity(city)">{{city.name}}</span>
+                                                            </div>
+                                                        </li>
+                                                        <li class="pyCityList" v-for="item in (Object.keys(cityDiyList).sort())" :data-py="item">
+                                                            <div class="py">{{item.toLocaleUpperCase()}}</div>
+                                                            <div class="city">
+                                                                <span v-for="city in cityDiyList[item]" :class="{'on_chose':currCityDiyChose.cityid == city.cityid}"  @click="choseDiyCity(city)">{{city.name}}</span>
+                                                            </div>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                            <div :class="['selectBox',{'focusBox':changeCityPover || citySearchFocus}]" slot="reference">
+                                                <div class="hasSelect" placeholder="请选择">
+            
+                                                    <el-autocomplete
+                                                    v-model="currCityDiyChose.name"
+                                                    :fetch-suggestions="querySearchModel"
+                                                    placeholder="请选择"
+                                                    :trigger-on-focus="false"
+                                                    :clearable="true"
+                                                    :popper-class="noMatchCity ? 'noMatchCityPop' : ''"
+                                                    @click.stop="changeCityPover = (changeCityPover ? false : true)"
+                                                    @focus.stop="citySearchFocus = true; " 
+                                                    @blur.stop="citySearchFocus = false; " 
+                                                    @input="cityKeyChange"
+                                                    @select="choseDiyCity"
+                                                    >
+                                                    <template slot-scope="{ item }">
+                                                        <div class="name">{{ item.name }}</div>
+                                                        <div class="noCity" v-if="noMatchCity">{{item.default}}</div>
+                                                    </template>
+            
+                                                    </el-autocomplete>
+                                                </div>
+                                                <i class="el-icon el-icon-arrow-down"></i>
+                                            </div>
+                                        </el-popover>
+                                        <p class="mayChose" v-if="cityDiyMayChose && cityDiyMayChose.length">可能想选：<span v-for="city in cityDiyMayChose.slice(0,cityDiyMayChose.length > 8 ? 8 : cityDiyMayChose.length)" @click="choseDiyCity(city)">{{city.name}}</span></p>
+                                    </div>
+                                </div>
+                                <!-- 选择终端 -->
+                                <div class="terminalChoseBox">
+                                    <label for="">选择终端</label>
+                                    <ul>
+                                        <!-- && sitePageData['dymini'] == 0  && sitePageData['wxmini'] == 0  && sitePageData['app'] == 0 -->
+                                        <li :class="[{'on_chose':terminal.id == modelPlatform},terminal.id,{'disabeld':currCityDiyChose.platform && checkHasModel(terminal.id) || (!cityplatform && sitePageData[terminal.id] == 0 && sitePageData['dymini'] == 0  && sitePageData['wxmini'] == 0  && sitePageData['app'] == 0)}]"  @click="choseCityModelPlatform(terminal)" v-for="terminal in terminalList" v-show="terminal.buy">
+                                            <div class="li_left"><i class="icon"><img :src="'/static/images/admin/siteConfigPage/'+(terminal.id)+'.png'" alt=""></i><span>{{terminal.name}}</span></div>
+                                            <span v-if="(currCityDiyChose && currCityDiyChose.platform && checkHasModel(terminal.id)) || (!cityplatform && sitePageData[terminal.id] == 0 && sitePageData['dymini'] == 0  && sitePageData['wxmini'] == 0  && sitePageData['app'] == 0)">{{cityplatform ? '未设置模板':'同H5'}}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modelShowBox">
+                            <h6>模板预览</h6>
+                            <div class="modShow">
+                                <div class="modImg"></div>
+                            </div>
+                            <a href="javascript:;" :class="['useModel',{'disabled':!currChoseModel}]" @click="userModel">使用模板</a>
+                        </div>
+                    </div>
+
+                    <!-- 官方模板 -->
+                    <div class="modelList" v-else>
+                        <h6>官方模板</h6>
+                        <ul>
+                            <li class="newModel" v-if="sitePageData['default'] != 1" @click="changeModulePop = false">
+                                <div class="icon el-icon-plus"></div>
+                                <p>新建空白页面</p>
+                            </li>
+                            <template>
+                                <li class="model_li"  v-for="(item,ind) in modelsArr">
+                                    <div class="model">
+                                        <img :alt="item.tplname" :src="masterDomain + '/templates/diy/theme/' + item.directory + '/preview.jpg'">
+                                        <div class="ueBox">
+                                            <span class="preview_mod" @click="currModelShow = item; modelPreviewPop = true"></span>
+                                            <span class="use_mod" @click="choseModelPre(item)">使用模板</span>
+                                        </div>
+                                    </div>
+                                    <div class="modelInfo">
+                                        <h3>{{item.tplname}}</h3>
+                                        <!-- <p>h5</p> -->
+                                    </div> 
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </template>
+
+    <!-- 模板预览 -->
+    <template v-if="modelPreviewPop ">
+        <div class="pop_mask show" style="z-index:101;" v-if="changeModulePop"></div>
+        <div class="modelPreviewPop largePop">
+            <div class="pop_header">
+                <h4>模板预览</h4>
+                <a href="javascript:;" class="close_pop" @click="modelPreviewPop = false"></a>
+            </div>
+            <div class="pop_con" v-if="currModelShow && currModelShow.directory">
+                <div class="model_show">
+                    <img :src="masterDomain + '/templates/diy/theme/' + currModelShow.directory + '/preview_large.jpg'" alt="">
+                </div>
+            </div>
+        </div>
+    </template>
+
+
+    <!-- 温馨提示 网站管理平台-系统-站点信息 -->
+    <template v-if="titleSetPop">
+        <div class="pop_mask show" style="z-index:101;" v-if="titleSetPop"></div>
+        <div class="titleSetPop largePop">
+            <div class="pop_header">
+                <h4>温馨提示</h4>
+                <a href="javascript:;" class="close_pop" @click="titleSetPop = false"></a>
+            </div>
+            <div class="pop_con">
+                <p class="title_tip">*网站简称可在<a target="_blank" href="../siteConfig/siteConfig.php">网站管理平台-系统-站点信息</a>中设置</p>
+                <div class="imgShow">
+                    <img src="/static/images/admin/siteConfigPage/net_guide.png" alt="">
+                </div>
+            </div>
+            <div class="pop_foot">
+                <a href="javascript:;" class="btn_confirm" @click="titleSetPop = false">好的，我知道了</a>
+            </div>
+        </div>
+    </template>
+    <!-- 温馨提示 网站管理平台-系统-站点信息 -->
+    <template v-if="dyLogoSetPop">
+        <div class="pop_mask show" style="z-index:101;" v-if="dyLogoSetPop"></div>
+        <div class="dyLogoSetPop largePop">
+            <div class="pop_header">
+                <h4>温馨提示</h4>
+                <a href="javascript:;" class="close_pop" @click="dyLogoSetPop = false"></a>
+            </div>
+            <div class="pop_con">
+                <p class="title_tip">Logo可在<span>抖音开发平台-小程序-基本信息</span>设置</p>
+                <p class="title_tip">抖音开发平台链接：<a target="_blank" href="https://developer.open-douyin.com/">https://developer.open-douyin.com/</a></p>
+                <div class="imgShow">
+                    <img src="/static/images/admin/siteConfigPage/dy_guide.png" alt="">
+                </div>
+            </div>
+            <div class="pop_foot">
+                <a href="javascript:;" class="btn_confirm" @click="dyLogoSetPop = false">好的，我知道了</a>
+            </div>
+        </div>
+    </template>
+</div>
+
+

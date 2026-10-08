@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html {#if $getopenid == 'admin_login'#}class='admin_login'{#/if#}>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#$langData['siteConfig'][37][95]#}</title>  {#* 扫码登录 *#}
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css" media="all" />
+<style>
+a {outline:0}
+h1,h2,h3,h4,h5,h6,p {margin:0;font-weight:400}
+a img,fieldset {border:0}
+html {font-family:"Microsoft Yahei";color:#fff;{#if !$notclose#}background-color:rgb(51,51,51);{#/if#}padding-top:50px;}
+.admin_login {padding-top: 0;}
+.impowerBox,.impowerBox .status_icon,.impowerBox .status_txt {display:inline-block;vertical-align:middle}
+.impowerBox {line-height:1.6;position:relative;width:100%;z-index:1;text-align:center}
+.impowerBox .title {text-align:center;font-size:20px}
+.mini .impowerBox .title {color: #373737;}
+.admin_login .impowerBox .title {font-size: 16px; color: #303133; font-family: PingFang SC,microsoft yahei,"Helvetica Neue",Helvetica,Arial,sans-serif;}
+.admin_login .impowerBox .title strong {font-weight: 500; color: #1973FF;}
+#qrcode {width:250px;border:1px solid #E2E2E2; background: #fff; padding: 15px; margin: 15px auto 0;}
+.mini #qrcode {width: 150px; height: 150px;}
+.admin_login #qrcode {border: 0; padding: 0; margin: 23px auto 0; width: 200px; height: 200px;}
+.impowerBox .info {width:280px;margin:0 auto}
+.admin_login .impowerBox .info {display: none;}
+.impowerBox .status {padding:7px 14px;text-align:left}
+.impowerBox .status.normal {margin-top:15px;background-color:#232323;border-radius:100px;-moz-border-radius:100px;-webkit-border-radius:100px;box-shadow:inset 0 5px 10px -5px #191919,0 1px 0 0 #444;-webkit-box-shadow:inset 0 5px 10px -5px #191919,0 1px 0 0 #444}
+.mini .impowerBox .status.normal {background: #fff; box-shadow: none; -webkit-box-shadow: none; color: #373737;}
+.impowerBox .status.status_browser {text-align:center}
+.impowerBox .status p {font-size:13px}
+.impowerBox .status_icon {margin-right:5px}
+.impowerBox .status_txt p {top:-2px;position:relative;margin:0}
+.impowerBox .icon38_msg {display:inline-block;width:38px;height:38px}
+.impowerBox .icon38_msg.succ {background:url(/static/images/wxlogin.png) 0 -46px no-repeat}
+.impowerBox .icon38_msg.warn {background:url(/static/images/wxlogin.png) 0 -87px no-repeat}
+</style>
+</head>
+
+<body{#if $notclose#} class="mini"{#/if#}>
+<div class="main impowerBox">
+	<div class="loginPanel normalPanel">
+		<div class="title">{#if $getopenid == 'admin_login'#}<strong>微信</strong>扫码，安全登录{#else#}{#$langData['siteConfig'][2][3]#}{#/if#}</div>  {#* 扫码登录 *#}
+		<div class="waiting panelContent">
+			<div class="wrp_code"><div id="qrcode"></div></div>
+			<div class="info">
+				<div class="status status_browser js_status normal" id="wx_default_tip">
+                    {#if $getopenid#}
+                    <p>请使用微信扫描二维码授权登录</p>
+                    {#else#}
+	                <p>{#$langData['siteConfig'][20][75]#}</p>  {#* 请使用微信/APP扫描二维码登录 *#}
+                    {#/if#}
+                    <p>“{#if $cfg_shortname == ""#}{#$cfg_webname#}{#else#}{#$cfg_shortname#}{#/if#}”</p>
+	            </div>
+	            <div class="status status_succ js_status normal" style="display:none" id="wx_after_scan">
+	                <i class="status_icon icon38_msg succ"></i>
+	                <div class="status_txt">
+	                    <h4>{#$langData['siteConfig'][37][96]#}</h4>  {#* 扫描成功 *#}
+	                    <p>{#$langData['siteConfig'][37][97]#}</p>  {#* 欢迎您使用扫码登录！ *#}
+	                </div>
+	            </div>
+	        </div>
+		</div>
+	</div>
+</div>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.qrcode.min.js"></script>
+<script>
+$(function(){
+  var myCanvas = document.createElement('canvas');
+  var qrtype = 'table';
+  if (myCanvas.getContext){
+    qrtype = 'canvas';
+  }
+	//二维码
+	$("#qrcode").qrcode({
+		render: qrtype,
+		width: {#if $notclose#}{#if $getopenid == 'admin_login'#}200{#else#}150{#/if#}{#else#}250{#/if#},
+		height: {#if $notclose#}{#if $getopenid == 'admin_login'#}200{#else#}150{#/if#}{#else#}250{#/if#},
+		text: '{#$cfg_basehost#}/api/login.php?type=wechat&getopenid={#$getopenid#}&qr={#$state#}'
+	});
+
+
+	function checkLogin(c) {
+    $.ajax({
+        type: "GET",
+        url: "{#$cfg_basehost#}/include/ajax.php?service=siteConfig&action=checkWxlogin&getopenid={#$getopenid#}&state={#$state#}",
+        dataType: "jsonp",
+        success: function(data) {
+          if (data.state == 100) {
+            $(".js_status").hide();
+            $("#wx_after_scan").show();
+
+            if (top.location != location) {
+                top.location = "{#$loginRedirect#}";
+            } else {
+                window.close();
+                top.location = "{#$loginRedirect#}";
+            }
+          // 微信号已被其他用户绑定
+          } else if (data.state == 102){
+            {#if $getopenid == 'admin_login'#}
+            parent.hasBindOtherUser(data.sameConn);
+            {#else#}
+            window.opener.hasBindOtherUser(data.sameConn);
+            window.close();
+            {#/if#}
+            setTimeout(function(){
+                location.reload();
+            }, 2000);
+          } else {
+            setTimeout(checkLogin, 2000);
+          }
+        },
+        error: function(b, c, d) {
+            $("#wx_default_tip").html('<p>'+langData['siteConfig'][6][203]+'</p>');//网络错误，请重试！
+        }
+    })
+  }
+
+	setTimeout(checkLogin, 2000);
+
+});
+</script>
+</body>
+</html>

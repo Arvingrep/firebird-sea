@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+	<title>优惠活动</title>
+	<meta name="keywords" content="{#$cfg_keywords#}">
+	<meta name="description" content="{#$cfg_description#}">
+	<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+	<!-- <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}"> -->
+	<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$templets_skin#}css/huodong.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}',
+			staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = '{#$cfg_hideUrl#}';
+		var cookiePre = '{#$cfg_cookiePre#}',
+			cfg_clihost = '{#$cfg_clihost#}';
+		var templets = '{#$templets_skin#}';
+
+		var atpage = 1, totalCount = 0, pageSize = 8;
+		var currid = 5;
+		var loupanid = '{#$loupanid#}';
+	</script>
+</head>
+
+<body class="w1200">
+	<div id="page">
+		<!-- 头部 -->
+		{#include file="top.html"#}
+		<div class="conbox">
+			{#include file="left.html"#}
+			<!-- 右侧 -->
+			<div class="right_box">
+				<div class="rConBox">
+					<h3>优惠活动</h3>
+					<div class="ListContainer">
+						<div class="headbox">
+							<div class="left">
+								<a href="add_huodong.html" class="btn_add">发布活动</a>
+								<div class="publish">
+									<span>活动类型：</span>
+									<div :class="['item',{active:ptype==item.id}]" v-for="item in type" :key="item.id" @click="tabFn(item.id)">
+										{{item.title}}<template v-if="item.num>0">({{item.num}})</template>
+									</div>
+								</div>
+							</div>
+						</div>
+						<!-- 立减/返现/折扣 -->
+						<div class="listbox tablebox" v-if="ptype==1">
+							<div class="titlebox">
+								<div class="column1 cell head" style="width: 24%;">活动标题</div>
+								<div class="column2 cell head" style="width: 22%;">优惠有效期</div>
+								<div class="column3 cell head" style="width: 8%;">类型</div>
+								<div class="column4 cell head" style="width: 8%;">活动状态</div>
+								<div class="column4 cell head" style="width: 8%;">领取人数</div>
+								<div class="column4 cell head" style="width: 14%;">领取截止时间</div>
+								<div class="column5 cell head" style="width: 16%;">操作</div>
+							</div>
+							<ul v-cloak>
+								<li class="table_row" v-for="(item,i) in list">
+									<div class="column1 cell title" :data-index="i" style="width: 24%;">
+										<span>{{item.title}}</span>
+									</div>
+									<div class="column2 cell text" style="width: 22%;">
+										{{item.ktime.replaceAll('-','.')}}-{{item.etime.replaceAll('-','.')}}
+									</div>
+									<div class="column3 cell text" style="width: 8%;">
+										{{item.type==1?'看房专车':item.type==2?'立减':item.type==3?'折扣':item.type==4?'返现':'其他'}}
+									</div>
+									<div :class="['column6 cell text',{blue:item.status==1&&item.state==1},{orange:item.status==2&&item.state==1},{red:item.state==0||item.state==2}]" style="width: 8%;">
+										{{item.state==0?'审核中':item.state==2?'审核拒绝':item.status==1?'未开始':item.status==2?'活动中':'已结束'}}
+									</div>
+									<div class="column4 cell text" style="width: 8%;">{{item.hdTotal}}</div>
+									<div class="column4 cell text" style="width: 14%;">{{item.deadline||'-'}}</div>
+									<div class="column5 cell opt" style="width: 16%;">
+										<a :href="'add_huodong.html?id='+item.id" class="edit_btn"><s></s><span>编辑</span></a>
+										<a href="javascript:;" class="del_btn" @click="showPop(item.id,i)"><s></s><span>删除</span></a>
+									</div>
+								</li>
+							</ul>
+							<div class="noData" v-if="list.length == 0">加载中</div>
+						</div>
+						<!-- 专车/其他 -->
+						<div class="listbox tablebox" v-else>
+							<div class="titlebox">
+								<div class="column1 cell head" style="width: 36%;">活动标题</div>
+								<div class="column2 cell head" style="width: 24%;">活动报名时间</div>
+								<div class="column4 cell head" style="width: 10%;">活动状态</div>
+								<div class="column4 cell head" style="width: 10%;">报名人数</div>
+								<div class="column5 cell head" style="width: 20%;">操作</div>
+							</div>
+							<ul v-cloak>
+								<li class="table_row" v-for="(item,i) in list">
+									<div class="column1 cell title" :data-index="i" style="width: 36%;">
+										<span>{{item.title}}</span>
+									</div>
+									<div class="column2 cell text" style="width: 24%;">{{item.ktime}}-{{item.etime}}</div>
+									<div :class="['column6 cell text',{blue:item.status==1&&item.state==1},{orange:item.status==2&&item.state==1},{red:item.state==0||item.state==2}]" style="width: 10%;">
+										{{item.state==0?'审核中':item.state==2?'审核拒绝': item.status==1?'未开始':item.status==2?'活动中':'已结束'}}
+									</div>
+									<div class="column4 cell text" style="width: 10%;">{{item.hdTotal}}</div>
+									<div class="column5 cell opt" style="width: 20%;">
+										<a :href="'add_huodong.html?id='+item.id" class="edit_btn"><s></s><span>编辑</span></a>
+										<a href="javascript:;" class="del_btn" @click="showPop(item.id,i)"><s></s><span>删除</span></a>
+									</div>
+								</li>
+							</ul>
+							<div class="noData" v-if="list.length == 0">加载中</div>
+						</div>
+						<div class="pagination fn-clear"></div>
+
+					</div>
+
+					<div class="loading" v-if="loading"><s></s></div>
+
+					<!-- 弹窗 -->
+					<div class="pop_mask" @click="close_pop"></div>
+					<div class="Popbox confirm_del">
+						<h3>确定删除该资讯？</h3>
+						<p>一经删除，不可恢复，请谨慎操作</p>
+						<div class="btn_group"><a href="javascript:;" class="sure_del" @click="del_article()">确认删除</a><a href="javascript:;" class="cancel_del" @click="close_pop">取消删除</a></div>
+					</div>
+
+
+
+
+
+
+				</div>
+			</div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div>{#$cfg_statisticscode#}</div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/huodong.js?v={#$cfg_staticVersion#}"></script>
+</html>

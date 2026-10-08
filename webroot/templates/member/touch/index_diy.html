@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <title>{#$langData['siteConfig'][0][7]#} </title>
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vant/index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/index_diy.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <title>用户中心</title>
+    <script>
+        var config = {#$config#};
+        var cfg_hotLine = '{#$cfg_hotline#}'
+        var cookiePre = '{#$cfg_cookiePre|default:"HN_"#}';
+        var staticPath  = '{#$cfg_staticPath#}';
+        var businessUrl = '{#$member_busiDomain#}'
+        var setBtnLink = '{#$member_userDomain#}/setting';
+        var qiandaoBtnLink = '{#$member_userDomain#}/qiandao';
+        var msgBtnLink = '{#$member_userDomain#}/message';
+        var memberDomain = '{#$member_userDomain#}';
+        var masterDomain = '{#$cfg_basehost#}';
+        var userid = '{#$userinfo.userid#}';
+        var usertype = '{#$userinfo.userType#}'
+        var cfg_pointName = '{#$cfg_pointName#}';
+        var cfg_bonusName = '{#$cfg_bonusName#}';
+        var profileUrl = "{#getUrlPath service='member' type='user' template='profile'#}";
+        var fromMod = '{#$smarty.get.module#}'
+        if(typeof(wx) != 'undefined'){
+            wx.miniProgram.getEnv(function (res) {
+                wx_miniprogram = res.miniprogram;
+                if(wx_miniprogram){
+                    wx.miniProgram.redirectTo({url: '/pages/member/index/index'});
+                }
+            })
+        }
+
+        if(isBytemini){
+            setTimeout(function(){
+                tt.miniProgram.redirectTo({url: '/pages/member/index/index'});
+            }, 500);
+        }
+
+        var cfg_ios_review = {#$cfg_ios_shelf|default:0#};
+        var cfg_iosVirtualPaymentState = {#$cfg_iosVirtualPaymentState|default:0#}
+        var preview = '{#$smarty.get.preview#}'; //app 预览头部不加padding
+        var cfg_business_state = {#$cfg_business_state|default:1#};
+        var userid = '{#$userinfo.userid#}'
+        var appBoolean = {#$is_app|default:0#}; //app判断
+    </script>
+</head>
+<body class="{#if $smarty.get.preview#}previewPage{#/if#}">
+    <div class="pageBox " id="page" v-cloak @touchmove="touchStartMove" @touchend="touchEndMove" >
+        <div class="fixedTop" v-if="appBoolean"  :style="'background-color:'+ pageSet.style.background +';'">
+            <div class="top_header" :style="getStyle('pageTop','', pageSet)" >
+                <div :class="['flex_l',{'flexCenter':pageSet.layout === 1}]">
+                    <a :class="['infoBox',{'toMini' :  !memberComp.headLink ||  profileUrl.indexOf(memberComp.headLink) > -1}] " data-module="member" data-temp="profile/index" v-show="!pageSet.showType" :href="userid ? (memberComp.headLink && profileUrl.indexOf(memberComp.headLink) <= -1 ? memberComp.headLink : profileUrl) : loginUrl">
+                        <div class="photo"><img :src="userinfo.photo ? userinfo.photo : '/static/images/noPhoto_100.jpg'" onerror="this.src='/static/images/noPhoto_100.jpg'" alt=""></div>
+                        <h4 :style="'color:'+ pageSet.style.color +';'">{#if $userinfo.userid#}{#$userinfo.nickname#}{#else#}登录/注册{#/if#}</h4>
+                    </a>
+                    <div class="infoBox" v-show="pageSet.showType">
+                        <h4 :style="'color:'+ pageSet.style.color +';'">{{pageSet.title ? pageSet.title : '会员中心'}}</h4>
+                    </div>
+                </div>
+                <div class="flex_r">
+                    <ul class="btns"  v-show="pageSet.btns.showType !== 1" v-if="pageSet.btns.showType == 2"> 
+                        <li v-for="btn in pageSet.btns.list">
+                            <a  :href="(btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) :btn.link)" class="icon"><img :style="getStyle('pageBtn','',pageSet)" :src="btn.icon ? btn.icon : defaultIcon2 " alt=""></a>
+                        </li>
+                    </ul>
+                    <ul class="btns"  v-show="pageSet.btns.showType !== 1" v-else> 
+                        <li v-for="btn in memberComp.setBtns.btns">
+                            <a :href="(btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) :btn.link)" class="icon"><img :style="getStyle('pageBtn','',pageSet)"  :src="btn.icon ? btn.icon : defaultIcon2 " alt=""></a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div :class="['fixedTop webFixed '+ memberComp.themeType + 'Style']" :style="`background-color:${pageSet.style.bgImgColor};`" v-else-if="memberComp.theme !== 3" v-show="pageSet.h5FixedTop != 0 && memberComp.showHeader != 0">
+            <div class="flex_header" :style="'margin-left:'+ toREM(memberComp.cardStyle.marginLeft) +';margin-right:'+ toREM(memberComp.cardStyle.marginLeft)">
+                <div :class="['headerTop',{'lowerHead':!cfg_business_state || !memberComp.setBtns.btns.length}]" v-if="memberComp.showHeader !== 0">
+                    <a class="left_top"  :href="userid ? memberComp.branch.link : loginUrl" v-if="userinfo && userinfo.is_staff == 1 && memberComp.branchShow && cfg_business_state"  >
+                        <s class="icon"><img :src="memberComp.branch.icon" alt=""></s>
+                        <span>{{memberComp.branch.text}}</span>
+                    </a>
+                    <a class="left_top" :href="userid ? (isBusiness ? memberComp.business.link : enterUrl) : loginUrl" v-else-if="cfg_business_state"  >
+                        <s class="icon"><img :src="memberComp.business.icon" alt=""></s>
+                        <span>{{memberComp.business.text}}</span>
+                    </a>
+                    <span class="left_top" v-else></span>
+                    
+                    <div class="right_top" >
+                        <ul class="btns" > 
+                            <li v-for="btn in memberComp.setBtns.btns" :class="{'floatItem fn-clear':memberComp.setBtns.btnType === 2}" v-show="userinfo || (!userinfo && (btn.link.indexOf(setBtnLink) > -1 || btn.link.indexOf(qiandaoBtnLink) > -1) || btn.link.indexOf(msgBtnLink) > -1)">
+                                <a :href="btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) : btn.link">
+
+                                    <div :class="['icon',{'canWhite':btn.icon.indexOf('{#$cfg_basehost#}/static/images/admin/') === 0}]"><img :src="btn.icon ? btn.icon : defaultIcon2 " alt=""></div>
+                                    <p v-if="btn.text">{{btn.text}}</p>
+                                </a>
+                            </li>
+                        </ul>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 会员信息头部 -->
+        <div class="memberInfoBox">
+            <div class="memberBg" :style="getStyle('memberBg')"></div>
+            <div :class="['memberInfo ','memberInfo' + memberComp.theme,{'lightStyle':memberComp.themeType == 'light'}]"  >
+                <div v-if="memberComp.theme === 1 || memberComp.theme === 2 " :style="'margin-left:'+ toREM(memberComp.cardStyle.marginLeft) +';margin-right:'+ toREM(memberComp.cardStyle.marginLeft)">
+                    <div :class="['headerTop',{'lowerHead':!cfg_business_state || !memberComp.setBtns.btns.length}]" v-if="memberComp.showHeader !== 0">
+                        <a class="left_top"  :href="userid ? memberComp.branch.link : loginUrl" v-if="userinfo && userinfo.is_staff == 1 && memberComp.branchShow && cfg_business_state"  >
+                            <s class="icon"><img :src="memberComp.branch.icon" alt=""></s>
+                            <span>{{memberComp.branch.text}}</span>
+                        </a>
+                        <a class="left_top" :href="userid ? (isBusiness ? memberComp.business.link : enterUrl) : loginUrl" v-else-if="cfg_business_state"  >
+                            <s class="icon"><img :src="memberComp.business.icon" alt=""></s>
+                            <span>{{memberComp.business.text}}</span>
+                        </a>
+                        <span class="left_top" v-else></span>
+                        
+                        <div class="right_top" >
+                            <ul class="btns" > 
+                                <li v-for="btn in memberComp.setBtns.btns" :class="{'floatItem fn-clear':memberComp.setBtns.btnType === 2}" v-show="userinfo || (!userinfo && (btn.link.indexOf(setBtnLink) > -1 || btn.link.indexOf(qiandaoBtnLink) > -1) || btn.link.indexOf(msgBtnLink) > -1)">
+                                    <a :href="btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) : btn.link">
+    
+                                        <div :class="['icon',{'canWhite':btn.icon.indexOf('{#$cfg_basehost#}/static/images/admin/') === 0}]"><img :src="btn.icon ? btn.icon : defaultIcon2 " alt=""></div>
+                                        <p v-if="btn.text">{{btn.text}}</p>
+                                    </a>
+                                </li>
+                            </ul>
+                            
+                        </div>
+                    </div>
+                    <div v-else style="height: .2rem;" class="headerPlace"></div>
+                    <div :class="['memberInfoCon']" >
+                        
+                        <a :class="['mleftCon fn-clear',{'toMini' :  !memberComp.headLink ||  profileUrl.indexOf(memberComp.headLink) > -1}]" data-module="member" data-temp="profile/index" :href="userid ? (memberComp.headLink && profileUrl.indexOf(memberComp.headLink) <= -1 ? memberComp.headLink : profileUrl) : loginUrl">
+                            <div class="photoCon"><img src="{#if $userinfo#}{#$userinfo.photo#}{#else#}{#$cfg_staticPath#}/images/noPhoto_100.jpg{#/if#}" onerror="this.src='{#$cfg_staticPath#}/images/noPhoto_100.jpg'" alt=""></div>
+                            <div class="textCon">
+                                <h4>{#if $userinfo.userid#}{#$userinfo.nickname#}{#else#}登录/注册{#/if#}</h4>
+                                <div :class="'vipIcon lBox level_' + (userinfo.level <= 5 ? (!expireVip && userinfo.level ? userinfo.level : 0) : 5)" v-if="userinfo">
+                                    <s class="vip_icon" v-if="userinfo.levelIcon && !expireVip"><img :src="userinfo.levelIcon" alt=""></s>
+                                    <span>{{!expireVip ? userinfo.levelName : '普通会员'}}</span>
+                                </div>
+                            </div>
+                            <s class="arr"  v-show="!memberComp.qiandaoBtn.show"><em :style="'filter: drop-shadow(15px 0 0 '+ memberComp.qiandaoBtn.style.arr_color +');'"></em></s>
+                        </a>
+                        <div class="mrightCon" v-if="userinfo && memberComp.qiandaoBtn.show">
+                            <a class="rbtn" :href="memberComp.qiandaoBtn.link"
+                                :style="'background:'+ checkBgColor(memberComp.qiandaoBtn.style.background,memberComp.qiandaoBtn.style.opacity)+'; color:'+memberComp.qiandaoBtn.style.color+';'">
+                                <s><img :src=" memberComp.qiandaoBtn.icon" alt=""></s>
+                                <span>{{memberComp.qiandaoBtn.text}}</span>
+                            </a>
+                        </div> 
+                    </div>
+    
+                    <!-- 数字区域 -->
+                    <div class="dataCount" :style="getStyle('numberCountBox')">
+                        <ul >
+                            <template v-for="(item,ind) in checkArr(memberComp.numberCount.showItems,'numberCount',cfg_ios_review)">
+                                <li :style="'width:'+ (100 / (memberComp.numberCount.showItems.length >= 4 ? memberComp.numberCount.showItems.length : 4))+'%;'">
+                                    <a :href="userid ? item.link.replace('29',userid) : loginUrl">
+                                        <h4 :style="'color:'+ memberComp.numberCount.numberStyle.color+';'">
+                                            <span v-if="item.id !== 6 && item.id !== 8">{{userinfo[item.code] ? ((item.id === 4 || item.id === 5)  && userinfo[item.code] > 999 ? '999+' : userinfo[item.code]) : 0}}</span>
+                                            <span v-else>{{userinfo[item.code] > 999 ? (parseFloat((userinfo[item.code] / 10000).toFixed(2)) + 'w') : (userinfo[item.code] ? userinfo[item.code] : 0)}}</span>
+                                        </h4>
+                                        <p :style="'color:'+ memberComp.numberCount.titleStyle.color+';'">{{item.text}}</p>
+                                    </a>
+                                </li>
+                                <li class="line" :style="' opacity:.1; background:'+ (memberComp.themeType == 'dark' ? memberComp.numberCount.titleStyle.color : '#fff') +';'"  v-if="memberComp.numberCount.splitLine && ind <= (checkArr(memberComp.numberCount.showItems,'numberCount',cfg_ios_review).length - 2)"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+
+                <div v-else-if="memberComp.theme === 3">
+                    <div :class="['memberInfoCon']" :style="'margin:0 ' + toREM(memberComp.cardStyle.marginLeft)">
+                        <a :class="['mleftCon fn-clear',{'toMini' :  !memberComp.headLink ||  profileUrl.indexOf(memberComp.headLink) > -1}]" data-module="member" data-temp="profile/index" :href="userid ? (memberComp.headLink && profileUrl.indexOf(memberComp.headLink) <= -1 ? memberComp.headLink : profileUrl) : loginUrl">
+                            <div class="photoCon"><img :src="userinfo.photo ? userinfo.photo : '{#$cfg_basehost#}/static/images/noPhoto_100.jpg'" alt="" onerror="this.src='{#$cfg_basehost#}/static/images/noPhoto_100.jpg'"></div>
+                            <div class="textCon">
+                                <h4>{#if $userinfo.userid#}{#$userinfo.nickname#}{#else#}登录/注册{#/if#}</h4>
+                                <div :class="'vipIcon lBox level_' + (userinfo.level <= 5 ? (!expireVip && userinfo.level ? userinfo.level : 0) : 5)" v-if="userinfo">
+                                    <s class="vip_icon" v-if="userinfo.levelIcon && !expireVip"><img :src="userinfo.levelIcon" alt=""></s>
+                                    <span>{{!expireVip ? userinfo.levelName : '普通会员'}}</span>
+                                </div>
+                            </div>
+                            <s class="arr"  v-show="!memberComp.qiandaoBtn.show"><em :style="'filter: drop-shadow(.3rem 0 0 '+ memberComp.qiandaoBtn.style.arr_color +');'"></em></s>
+                        </a>
+                        <div class="mrightCon right_top" v-show="memberComp.qiandaoBtn.show" >
+                            <ul class="btns" > 
+                                <li v-for="btn in memberComp.setBtns.btns" :class="{'floatItem fn-clear':memberComp.setBtns.btnType === 2}">
+                                    <a :href="btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) : btn.link">
+                                        <div :class="['icon',{'canWhite':btn.icon.indexOf('{#$cfg_basehost#}/static/images/admin/') === 0}]"><img :src="btn.icon ? btn.icon : defaultIcon2 " alt=""></div>
+                                        <p v-if="btn.text">{{btn.text}}</p>
+                                    </a>
+                                </li>
+                            </ul>
+                            
+                        </div> 
+                    </div>
+                    
+                    <div class="dataCountBox" :style="'margin-left:'+toREM(memberComp.cardStyle.marginLeft)">
+                        <ul class="dataCount">
+                            <li v-for="(item,ind) in circleData">
+                                <a :href="userid ? (item.code == 'zan' ? (memberDomain + '/im/commt_list.html#zan') : (masterDomain + '/user/' + userid + '/' + item.code) ) : loginUrl">
+                                    <span v-if="item.code == 'zan'">{{item.num > 999 ? '999+' : item.num }}</span>
+                                    <span v-else>{{item.num >= 10000 ? parseFloat((item.num / 10000).toFixed(2)) + 'w' : item.num }}</span>
+                                    <em>{{item.text}}</em>
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="mrightCon " >
+                            <a class="rbtn" :href="userid ? memberComp.branch.link : loginUrl" v-if="userinfo && userinfo.is_staff == 1 && memberComp.branchShow && cfg_business_state" :style="'background:linear-gradient(90deg, '+ checkBgColor(memberComp.qiandaoBtn.style.background,memberComp.qiandaoBtn.style.opacity)+' 0%, '+ (memberComp.qiandaoBtn.style.background + '00')+' 100%); color:'+memberComp.qiandaoBtn.style.color+';'">
+                                <s class="icon"><img :src="memberComp.branch.icon" alt=""></s>
+                                <span>{{memberComp.branch.text}}</span>
+                            </a>
+                            <a class="rbtn" :href="userid ? (isBusiness ? memberComp.business.link : enterUrl) : loginUrl" v-else-if="cfg_business_state" :style="'background:linear-gradient(90deg, '+ checkBgColor(memberComp.qiandaoBtn.style.background,memberComp.qiandaoBtn.style.opacity)+' 0%, '+ (memberComp.qiandaoBtn.style.background + '00')+' 100%); color:'+memberComp.qiandaoBtn.style.color+';'">
+                                <s class="icon"><img :src="memberComp.business.icon" alt=""></s>
+                                <span>{{memberComp.business.text}}</span>
+                            </a>
+                        </div> 
+                    </div> 
+                </div>
+
+                <div v-else-if="memberComp.theme === 4">
+                    <!-- 头部 -->
+                    <div :class="['headerTop flexBox',{'lowerHead':!cfg_business_state || !memberComp.setBtns.btns.length}]" :style="'margin:0 ' + toREM(memberComp.cardStyle.marginLeft)" v-if="memberComp.showHeader !== 0">
+                        <a class="left_top" :href="userid ? memberComp.branch.link : loginUrl" v-if="userinfo && userinfo.is_staff == 1 && memberComp.branchShow && cfg_business_state">
+                            <s class="icon"><img :src="memberComp.branch.icon" alt=""></s>
+                            <span>{{memberComp.branch.text}}</span>
+                        </a>
+                        <a class="left_top" :href="userid ? (isBusiness ? memberComp.business.link : enterUrl) : loginUrl" v-else-if="cfg_business_state">
+                            <s class="icon"><img :src="memberComp.business.icon" alt=""></s>
+                            <span>{{memberComp.business.text}}</span>
+                        </a>
+                        <span class="left_top" v-else></span>
+                        
+                        <div class="right_top">
+                            <ul class="btns" > 
+                                <li v-for="btn in memberComp.setBtns.btns" :class="{'floatItem fn-clear':memberComp.setBtns.btnType === 2}" v-show="userinfo || (!userinfo && (btn.link.indexOf(setBtnLink) > -1 || btn.link.indexOf(qiandaoBtnLink) > -1) || btn.link.indexOf(msgBtnLink) > -1)">
+                                    <a :href="btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) : btn.link">
+    
+                                        <div :class="['icon',{'canWhite':btn.icon.indexOf('{#$cfg_basehost#}/static/images/admin/') === 0}]"><img :src="btn.icon ? btn.icon : defaultIcon2 " alt=""></div>
+                                        <p v-if="btn.text">{{btn.text}}</p>
+                                    </a>
+                                </li>
+                            </ul>
+                            
+                        </div>
+                    </div>
+                    <div v-else style="height: .2rem;" class="headerPlace"></div>
+                    <div :class="['memberInfoCon']" :style="'margin:0 0 0 ' + toREM(memberComp.cardStyle.marginLeft)">
+                        <a :class="['mleftCon fn-clear',{'toMini' :  !memberComp.headLink ||  profileUrl.indexOf(memberComp.headLink) > -1}]" data-module="member" data-temp="profile/index" :href="userid ? (memberComp.headLink && profileUrl.indexOf(memberComp.headLink) <= -1 ? memberComp.headLink : profileUrl) : loginUrl">
+                            <div class="photoCon"><img :src="userinfo.photo ? userinfo.photo : '{#$cfg_basehost#}/static/images/noPhoto_100.jpg'" alt="" onerror="this.src='{#$cfg_basehost#}/static/images/noPhoto_100.jpg'"></div>
+                            <div class="textCon">
+                                <h4>{#if $userinfo.userid#}{#$userinfo.nickname#}{#else#}登录/注册{#/if#}</h4>
+                                <ul class="dataCount" v-if="userid && userinfo">
+                                    <li v-for="(item,ind) in circleData" @click.prevent.stop="toUrl(userid ? (item.code == 'zan' ? (memberDomain + '/im/commt_list.html#zan') : (masterDomain + '/user/' + userid + '/' + item.code) ) : loginUrl)">
+                                        <span v-if="item.code == 'zan'">{{item.num > 999 ? '999+' : item.num }}</span>
+                                        <span v-else>{{item.num >= 10000 ? parseFloat((item.num / 1000).toFixed(1)) + 'w' : item.num }}</span>
+                                        <em>{{item.text}}</em>
+                                    </li>
+                                </ul>
+                            </div>
+                            <s class="arr" :style="'margin-right:'+toREM(memberComp.cardStyle.marginLeft)+';'" v-show="!memberComp.qiandaoBtn.show"><em :style="'filter: drop-shadow(15px 0 0 '+ memberComp.qiandaoBtn.style.arr_color +');'"></em></s>
+                        </a>
+                        <div class="mrightCon" v-show="memberComp.qiandaoBtn.show" >
+                            <a class="rbtn" :href="memberComp.qiandaoBtn.link" v-show="memberComp.qiandaoBtn.show" 
+                            :style="'background:linear-gradient(90deg, '+ checkBgColor(memberComp.qiandaoBtn.style.background,memberComp.qiandaoBtn.style.opacity)+' 0%, '+ (memberComp.qiandaoBtn.style.background + '00')+' 100%); color:'+memberComp.qiandaoBtn.style.color+';'">
+                                <s v-if="memberComp.qiandaoBtn.icon"><img :src=" memberComp.qiandaoBtn.icon" alt=""></s>
+                                <span>{{memberComp.qiandaoBtn.text}}</span>
+                            </a>
+                            
+                        </div> 
+                    </div>
+                </div>
+
+                <!-- 会员卡片 -->
+                <div class="vipCardContainer" :style=" ('margin:0 ' + toREM(memberComp.cardStyle.marginLeft))" v-if="!cfg_ios_review && !memberComp.vipCard.cardHide">
+                    <div :class="'vipCardCon vipCarCon' + memberComp.vipCard.theme" :style="getStyle('vipCardBox','margin')">
+                        <div :class="[{'vipCardStyle3':memberComp.vipCard.theme === 3}]"  :style="memberComp.vipCard.theme === 3 ? getStyle('vipCardBox','out') : ''" v-if="memberComp.vipCard.theme !== 2">
+                            <div class="vipCardBox vipCardStyle1  {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}" :style="getStyle('vipCardBox','inner')" >
+                                <div class="flexLeft">
+                                    <!-- 会员图标 -->
+                                    <!-- (userid && memberComp.vipCard.subtitle && memberComp.vipCard.subtitle.length == 1 && userinfo.level && memberComp.vipCard.subtitle[0].type == 1) ||  (memberComp.vipCard.subtitle && memberComp.vipCard.subtitle.length && memberComp.vipCard.subtitle[0].type != 1) -->
+                                    <div :class="['vipIconBox',{'hasLine' : memberComp.vipCard.subtitle.length > 1 || (memberComp.vipCard.subtitle.length == 1 && (memberComp.vipCard.subtitle[0].type != 1 || (userinfo && userinfo.level))) }]">
+                                        <template v-if="!userid || !userinfo.level || expireVip || memberComp.theme !== 4">
+                                            <div :class="['imgbox',{'canWhite':memberComp.vipCard.icon.indexOf('{#$cfg_basehost#}/static/images/admin/') > -1}]">
+                                                
+                                                <div class="vipicon" v-if="memberComp.vipCard.icon.indexOf('{#$cfg_basehost#}/static/images/admin/') > -1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="80px" height="32px" viewBox="0 0 80 32" preserveAspectRatio="xMinYMin meet" class="svg-content">
+                                                        <path fill-rule="evenodd" :fill="memberComp.vipCard.titleStyle.color" d="M13.500,30.000 C12.273,30.000 11.045,28.824 10.432,26.471 L0.000,0.002 L7.978,0.002 L15.342,18.236 L27.001,0.002 L35.593,0.002 L17.797,26.471 C15.955,29.412 14.727,30.000 13.500,30.000 ZM33.040,30.009 L37.942,-0.006 L45.583,-0.006 L40.680,30.009 L33.040,30.009 ZM79.775,11.404 C79.159,14.405 77.926,17.406 74.845,19.806 C72.381,21.607 69.299,22.807 66.220,22.807 L53.278,22.807 L52.046,30.009 L44.651,30.009 L47.117,15.005 L68.067,15.005 C69.299,15.005 69.916,14.405 70.532,13.805 C71.148,13.205 71.765,12.005 71.765,11.404 C71.765,10.204 71.765,9.604 71.148,9.004 C70.532,8.404 69.299,7.803 68.683,7.803 L47.733,7.803 L53.895,0.002 L69.299,0.002 C72.381,0.002 75.461,1.203 77.310,3.003 C79.775,6.003 80.392,9.004 79.775,11.404 L79.775,11.404 Z"/>
+                                                    </svg>
+                                                </div>
+                                                <img :src="memberComp.vipCard.icon" alt="" v-else>
+                                            </div>
+                                        </template>
+                                        <template v-else>
+                                            <div class="imgbox"><img :src="userinfo.levelIcon" alt=""></div>
+                                        </template>
+                                        <span :style="'color:'+ memberComp.vipCard.titleStyle.color +';'">{{!userinfo || !userinfo.level || expireVip || memberComp.theme !== 4 ? memberComp.vipCard.title : userinfo.levelName}}</span>
+                                    </div>
+    
+    
+                                    <!-- 会员滚动文字 -->
+                                    <template v-if="memberComp.vipCard.subtitle.length == 1 && memberComp.vipCard.subtitle[0].type == 1 && userinfo.level == 0"></template>
+                                    <div class="vipScrollBox" v-else-if="memberComp.vipCard.subtitle && memberComp.vipCard.subtitle.length > 0">
+                                        <van-swipe vertical :autoplay="2000" :show-indicators="false">
+                                            <template v-for="(item,ind) in memberComp.vipCard.subtitle" :key="ind" >
+                                                <van-swipe-item class="bitem" v-if="item.type !== 1 || (userinfo && checkVipLevel(userinfo))">
+                                                    <p v-if="item.type !== 1" :style="'color:'+ memberComp.vipCard.subStyle.color +';'">{{item.text}}</p>
+                                                    <p v-else-if="userinfo && checkVipLevel(userinfo)" :style="'color:'+ memberComp.vipCard.subStyle.color +';'"> {{checkVipLevel(userinfo)}} </p>
+                                                </van-swipe-item>
+                                            </template>
+                                        </van-swipe>
+                                    </div>
+                                </div>
+
+                                <a :href="userid ? (memberComp.vipCard.btnLink ? memberComp.vipCard.btnLink : upgradeUrl) : loginUrl" :class="['vip_btn  {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}',{'arrow_btn':memberComp.vipCard.btnStyle.styleType == 'arrow'}]" :style="getStyle('vipCardBtn')">
+                                    <span>{{!userinfo.level || expireVip ? memberComp.vipCard.btnText : "立即续费"}}</span>
+                                    <s><em class="icon" :style="getStyle('vipCardBtnArr')"></em></s>
+                                </a>
+                            </div>
+
+                            <!-- 样式3的财务信息 -->
+                            <div class=" financeInfo" v-if="memberComp.vipCard.theme === 3 && memberComp.financeCount.showItems.length > 0 && !cfg_ios_review">
+                                <ul>
+                                    <li v-for="item in checkArr(memberComp.financeCount.showItems,'financeCount')" :style="getStyle('financeInfo')"> <a :href="userid ? item.link : loginUrl" :style="getStyle('financeInfo',1)">{{item.text}}<b :style="'color:' +memberComp.financeCount.numberStyle.color">{{userinfo[item.code] ? userinfo[item.code] : 0}}</b> </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="vipCardStyle2 vipCardBox  {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}" :style="getStyle('vipCardBox')" v-else-if="memberComp.vipCard.theme === 2">
+                            <div class="flexLeft">
+
+                                <!-- 会员图标 -->
+                                <div class="vipIconBox">
+                                    <template v-if="!userid || !userinfo.level || expireVip || memberComp.theme !== 4">
+                                        <div :class="['imgbox',{'canWhite':memberComp.vipCard.icon.indexOf('{#$cfg_basehost#}/static/images/admin/') > -1}]">
+                                            
+                                            <div class="vipicon" v-if="memberComp.vipCard.icon.indexOf('{#$cfg_basehost#}/static/images/admin/') > -1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="80px" height="32px" viewBox="0 0 80 32" preserveAspectRatio="xMinYMin meet" class="svg-content">
+                                                    <path fill-rule="evenodd" :fill="memberComp.vipCard.titleStyle.color" d="M13.500,30.000 C12.273,30.000 11.045,28.824 10.432,26.471 L0.000,0.002 L7.978,0.002 L15.342,18.236 L27.001,0.002 L35.593,0.002 L17.797,26.471 C15.955,29.412 14.727,30.000 13.500,30.000 ZM33.040,30.009 L37.942,-0.006 L45.583,-0.006 L40.680,30.009 L33.040,30.009 ZM79.775,11.404 C79.159,14.405 77.926,17.406 74.845,19.806 C72.381,21.607 69.299,22.807 66.220,22.807 L53.278,22.807 L52.046,30.009 L44.651,30.009 L47.117,15.005 L68.067,15.005 C69.299,15.005 69.916,14.405 70.532,13.805 C71.148,13.205 71.765,12.005 71.765,11.404 C71.765,10.204 71.765,9.604 71.148,9.004 C70.532,8.404 69.299,7.803 68.683,7.803 L47.733,7.803 L53.895,0.002 L69.299,0.002 C72.381,0.002 75.461,1.203 77.310,3.003 C79.775,6.003 80.392,9.004 79.775,11.404 L79.775,11.404 Z"/>
+                                                </svg>
+                                            </div>
+                                            <img :src="memberComp.vipCard.icon" alt="" v-else>
+                                        </div>
+                                    </template>
+                                    <template v-else>
+                                        <div class="imgbox"><img :src="userinfo.levelIcon" alt=""></div>
+                                    </template>
+                                    <span :style="'color:'+ memberComp.vipCard.titleStyle.color +';'">{{!userinfo || !userinfo.level || expireVip || memberComp.theme !== 4 ? memberComp.vipCard.title : userinfo.levelName}}</span>
+                                </div>
+                                <!-- 会员滚动文字 -->
+                                <template v-if="memberComp.vipCard.subtitle.length == 1 && memberComp.vipCard.subtitle[0].type == 1 && userinfo.level == 0"></template>
+                                <div class="vipScrollBox" v-else-if="memberComp.vipCard.subtitle && memberComp.vipCard.subtitle.length > 0 && userinfo">
+                                    <van-swipe vertical :autoplay="2000" :show-indicators="false">
+                                        <template v-for="(item,ind) in memberComp.vipCard.subtitle" :key="ind" >
+                                            <van-swipe-item class="bitem" v-if="item.type !== 1 || (userinfo && checkVipLevel(userinfo))">
+                                                <p v-if="item.type !== 1" :style="'color:'+ memberComp.vipCard.subStyle.color +';'">{{item.text}}</p>
+                                                <p v-else-if="userinfo && checkVipLevel(userinfo)" :style="'color:'+ memberComp.vipCard.subStyle.color +';'"> {{checkVipLevel(userinfo)}} </p>
+                                            </van-swipe-item>
+                                        </template>
+                                    </van-swipe>
+                                </div>
+                            </div>
+                            <a :href="userid ? (memberComp.vipCard.btnLink ? memberComp.vipCard.btnLink : upgradeUrl) : loginUrl" :class="['vip_btn  {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide{#/if#}',{'arrow_btn':memberComp.vipCard.btnStyle.styleType == 'arrow'}]" :style="getStyle('vipCardBtn')">
+                                <span>{{!userinfo.level || expireVip ? memberComp.vipCard.btnText : "立即续费"}}</span>
+                                <s><em class="icon" :style="getStyle('vipCardBtnArr')"></em></s>
+                            </a>
+                        </div>
+                        <div class="btnsGroupBox " :style="getStyle('vipCardBox','radius')" v-if="memberComp.vipBtnsGroup.length > 0 && memberComp.theme != 1">
+                            <ul class="fn-clear">
+                                <li v-for="(btn,ind) in memberComp.vipBtnsGroup" :style="'width:'+(100 / memberComp.vipBtnsGroup.length)+'%; max-width:25%;'">
+                                    <a :href="userid ? (btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) : btn.link) : loginUrl">
+                                        <div class="icon"><img :src="btn.icon ? btn.icon : defaultIcon1" onerror="this.src = '/static/images/admin/siteMemberPage/default_icon1.png'" alt=""></div>
+                                        <p>{{btn.text ? btn.text : ('按钮' + (ind + 1))}}</p>
+                                    </a>
+                                </li> 
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="otherContainer" v-if="compArrs">
+            <div class="partBox" v-for="(obj,oInd) in compArrs">
+                <!-- 订单管理 -->
+                <div class="orderInfoBorderBox" v-if="obj.id == 2">
+                    <div class="orderInfoBox" :style="getStyle('orderInfoBox','', obj.content)">
+                        <div class="orderHeader" v-show="obj.content.title.show">
+                            <h4 :style="'color:'+  obj.content.title.style.color +';'">{{obj.content.title.text}}</h4>
+                            <a :href="userid ? (obj.content.more.linkInfo.linkText ? (obj.content.more.link.replace(29,userid)) : obj.content.more.link) : loginUrl" class="more" v-show="obj.content.more.showType == 0"  :style="'color:'+  obj.content.more.style.color +';'">{{obj.content.more.text}}<s v-if="obj.content.more.arr"><em :style="'filter: drop-shadow(.20rem 0 0 '+ obj.content.more.style.color +')'"></em></s></a>
+                        </div>
+                        <ul :class='[{"gridbox4":obj.content.showItems.length <= 4},{"gridbox5":obj.content.showItems.length >= 5}]'>
+                            <li v-for="(btn,ind) in checkArr(obj.content.showItems,'order',oInd)">
+                                <a :href="userid ? btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) : btn.link : loginUrl">
+                                    <div class="icon">
+                                        <span class="tipNum" :style="'background:'+  obj.content.tipNumStyle.background +';'" v-if="obj.content.showNumItems.indexOf(btn.id) > -1 && orderInfo[btn.code]">{{orderInfo[btn.code] <= 99 ? orderInfo[btn.code] : '99+' }}</span>
+                                        <img :src="btn.icon ? btn.icon : defaultIcon1" alt="">
+                                    </div>
+                                    <p :style="'color:'+  obj.content.btnStyle.color +'; font-size:'+toREM(obj.content.btnStyle.fontSize)+'; '">{{btn.btnText}}</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </div> 
+                </div>
+
+                <!-- 财务卡片 -->
+                <div class="orderInfoBorderBox" v-else-if="obj.id == 3" v-show="!cfg_ios_review">
+                    <div class="orderInfoBox" :style="getStyle('financeInfoBox','', obj.content)">
+                        <div class="orderHeader" v-show="obj.content.title.show">
+                            <h4 :style="'color:'+  obj.content.title.style.color +';'">{{obj.content.title.text}}</h4>
+                            <a :href="userid ? obj.content.more.linkInfo.linkText ? (obj.content.more.link.replace(29,userid)): obj.content.more.link : loginUrl" class="more" v-show="obj.content.more.show" :style="'color:'+  obj.content.more.style.color +';'">{{obj.content.more.text}}<s v-if="obj.content.more.arr"><em :style="'filter: drop-shadow(.20rem 0 0 '+ obj.content.more.style.color +')'"></em></s></a>
+                        </div>
+                        <ul :class="['financeInfo_ul', 'gridbox' + checkArr(obj.content.showItems,'financeCount').length]">
+                            <li v-for="(btn,ind) in checkArr(obj.content.showItems,'financeCount')">
+                                <a :href="userid ? (btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)):btn.link) : loginUrl">
+                                    <div class="numberShow" v-if="btn.id != 3 && btn.id != 1" :style="'color:'+ obj.content.numberStyle.color +';'">
+                                        <span>{#echoCurrency type="symbol"#}<b>{{(userinfo[btn.code] ? userinfo[btn.code] : 0).toString().split('.')[0]}}</b>.{{(userinfo[btn.code] ? userinfo[btn.code] : 0).toString().split('.').length > 1 ? (userinfo[btn.code] ? userinfo[btn.code] : 0).toString().split('.')[1] : '00'}}</span>
+                                    </div>
+                                    <div class="numberShow" v-else  :style="'color:'+ obj.content.numberStyle.color +';'">
+                                        <span><b>{{userinfo[btn.code] ? userinfo[btn.code] : 0}}</b></span>{{btn.id === 3 ? "张" : ""}}
+                                    </div>
+                                    <p :style="'color:'+ obj.content.textStyle.color +'; font-size:' +toREM(obj.content.textStyle.fontSize)+ ';'">{{btn.text}}</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </div> 
+                </div>
+
+                <!-- 图标组 -->
+                <div class="orderInfoBorderBox " v-else-if="obj.id == 4 && removeEmpty(obj.content.btns.list).length">
+                    <div class="orderInfoBox iconsInfoBox" :style="getStyle('iconsInfoBox','', obj.content)">
+                        <div class="orderHeader" v-show="obj.content.title.show">
+                            <h4 :style="'color:'+  obj.content.title.style.color +';'">{{obj.content.title.text ? obj.content.title.text : '标题文字'}}</h4>
+                            <a :href="userid ? ((obj.content.more.linkInfo.linkText ? (obj.content.more.link.replace(29,userid)) : obj.content.more.link)) : loginUrl" class="more" v-show="obj.content.more.show" :style="'color:'+  obj.content.more.style.color +';'">{{obj.content.more.text}}<s v-if="obj.content.more.arr"><em :style="'filter: drop-shadow(.20rem 0 0 '+ obj.content.more.style.color +')'"></em></s></a>
+                        </div>
+                        <ul :class='"gridbox" + (obj.content.column ? obj.content.column : 5) '>
+                            <li v-for="(btn,ind) in removeEmpty(obj.content.btns.list)" :class="{'noShow':btn.link.indexOf('/mobile') > -1}">
+                                <a :href="userid ? (btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)) : btn.link) : loginUrl">
+                                    <div class="icon">
+                                        <img :src="btn.icon ? btn.icon : '{#$cfg_basehost#}/static/images/admin/siteMemberPage/default_icon1.png' " alt="">
+                                    </div>
+                                    <p v-if="btn.text" :style="'color:'+obj.content.btns.style.color+'; font-size:' +toREM(obj.content.btns.style.fontSize)+ ';'">{{btn.text}}</p>
+                                    <p v-else class="placeholder">按钮{{ind + 1}}</p>
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="qiandao" v-if="userid" v-show="obj.content.qiandao.show" :style="'background:'+ obj.content.qiandao.style.background +';color:'+ obj.content.qiandao.style.color +';'">
+                            <s><img :src="obj.content.qiandao.icon" alt=""></s><span class="qtext" v-if="userinfo.qiandao && userinfo.qiandao.tips">{{userinfo.qiandao.tips}}</span>
+                            <a :href="qiandaoBtnLink" :style="'color:'+ obj.content.qiandao.style.color +';'" class="qbtn" :style="'border-color:'+ obj.content.qiandao.style.color +';'" >{{userinfo && userinfo.qiandao && userinfo.qiandao.today ? '已签到' : '去签到'}}</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 列表导航 -->
+                <div class="orderInfoBorderBox " v-else-if="obj.id == 5 && removeEmpty(obj.content.list).length">
+                    <div class="orderInfoBox listInfoBox" :style="getStyle('listInfoBox','', obj.content)">
+                        <ul class="list">
+                            <li  :style="'height:'+ toREM(obj.content.style.lineHeight) +';'" v-for="(btn,ind) in removeEmpty(obj.content.list)" :class="{'noShow':btn.link.indexOf('/mobile') > -1}">
+                                <a :href="userid ? (btn.linkInfo && btn.linkInfo.linkText ? (btn.link.replace(29,userid)):btn.link) : loginUrl" class="flex_li">
+                                    <div class="flex_l">
+                                        <div class="icon"><img :src="btn.icon ? btn.icon : '{#$cfg_basehost#}/static/images/admin/siteMemberPage/default_icon2.png'" alt=""></div>
+                                        <div class="text" :style="'color:' +obj.content.style.color+ ';'">{{btn.text ? btn.text : '文字' + (ind + 1) }}</div>
+                                    </div>
+                                    <div class="flex_r">
+                                        <span class="tip" :style="'color:' +obj.content.tipStyle.color+ ';'">{{btn.tip.text}}</span>
+                                        <s class="arr" ><em :style="' filter: drop-shadow(.24rem 0 0 ' +obj.content.tipStyle.color+ '); '"></em></s>
+                                    </div>
+                                    <s class="line" v-show="obj.content.splitLine" v-if="ind != (removeEmpty(obj.content.list).length - 1)"></s>
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="qiandao" v-if="userid" v-show="obj.content.qiandao.show" :style="'background:'+ obj.content.qiandao.style.background +';color:'+ obj.content.qiandao.style.color +';'">
+                            <s><img :src="obj.content.qiandao.icon" alt=""></s><span class="qtext"  v-if="userinfo.qiandao && userinfo.qiandao.tips">{{userinfo.qiandao.tips}}</span>
+                            <a :href="qiandaoBtnLink" class="qbtn" :style="'border-color:'+ obj.content.qiandao.style.color +';color:'+ obj.content.qiandao.style.color"  >去签到</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 关注公众号 -->
+                <div :class="['orderInfoBorderBox',{'customWechat':obj.content.custom}]"  v-else-if="obj.id == 6 && userinfo.wechat_subscribe === '0'">
+                    <div class="orderInfoBox wechatInfoBox" :style="getStyle('wechatInfo','', obj.content)">
+                        <template v-if="!obj.content.custom">
+                            <div class="flex_l">
+                                <div class="icon" v-show="obj.content.iconShow"><img :src="obj.content.icon" alt=""></div>
+                                <div class="text">
+                                    <h4 :style="'color:'+ obj.content['titleStyle'].color +';'">{{obj.content.title}}</h4>
+                                    <p :style="'color:'+ obj.content['subtitleStyle'].color +';'">{{obj.content.subtitle}}</p>
+                                </div>
+                            </div> 
+                            <div class="flex_r" >
+                                <span :style="'color:'+obj.content.btnStyle.color+';border-color:'+obj.content.btnStyle.color+';'" @click="wxGz = true">关注</span>
+                            </div>
+                        </template>
+                        <img :src="obj.content.image" v-else class="image" alt="" />
+                    </div>
+                </div> 
+
+
+                <!-- 瓷片广告 -->
+                <div :class="['orderInfoBorderBox']"  v-else-if="obj.id == 7 && checkEmpty(obj.content.list,obj.content.column).length">
+                    <div class="orderInfoBox advInfoBox" :style="'margin: '+ toREM(obj.content.style.marginTop) +' '+ toREM(obj.content.style.marginLeft) +' 0; height:'+  toREM(obj.content.style.height)">
+                        <div :class="'advList advList'+  obj.content.column" :style="'grid-template-columns: repeat('+obj.content.column+',1fr)'" v-if="obj.content.column !== 1">
+                            <div class="adv" v-for="adv in checkEmpty(obj.content.list,obj.content.column)" :style="'border-radius:'+  toREM(obj.content.style.borderRadius) +'; '">
+                                <a :href="(adv.linkInfo.linkText ? (adv.link.replace(29,userid)):adv.link)">
+                                    <img :src="adv.image" alt="" v-show="adv.image" :style="'height:'+  toREM(obj.content.style.height)+'; border-radius:'+ toREM(obj.content.style.borderRadius)">
+                                </a>
+                            </div>
+                        </div>
+
+                        <van-swipe  :show-indicators="true" :autoplay="2000" v-else  class="advList" :style="' border-radius:'+ toREM(obj.content.style.borderRadius)" >
+                            <van-swipe-item  class="adv" v-for="(adv,ind) in checkEmpty(obj.content.list,obj.content.column)"  :key="ind">
+                                <a :href="(adv.linkInfo.linkText ? (adv.link.replace(29,userid)):adv.link)">
+
+                                    <img :src="adv.image"alt=""  :style="'height:'+  toREM(obj.content.style.height)+';'">
+                                </a>
+                            </van-swipe-item>
+                        </van-swipe>
+                    </div>
+                </div> 
+
+                <!-- 分隔标题 -->
+                <div class=" orderInfoBorderBox" v-else-if="obj.id == 8">
+                    <div class="titleInfoBox" :style="getStyle('titleInfo','', obj.content)">
+                        <div class="place" v-show="obj.content.layout=== 1"></div>
+                        <div :class="['titleInfo',{'alignCenter':obj.content.layout=== 1}]">
+                            <div class="icon" v-show="obj.content.title.type == 2"><img :src="obj.content.title.icon" v-show="obj.content.title.icon" alt=""></div>
+                            <h4 :style="'font-weight:bold; font-size:'+toREM(obj.content.title.style.fontSize)+'; color:'+obj.content.title.style.color+';'">
+                                <span>{{obj.content.title.text ? obj.content.title.text : '标题'}}</span>
+                                <div class="tit_line" :style="'background:'+obj.content.title.style.borderColor+';'" v-show="obj.content.title.type === 1"></div>
+                            </h4>
+                        </div>
+                        <div class="moreInfo" v-if="obj.content.more.show" :style="'color:'+obj.content.more.style.color+';'">{{obj.content.more.text}}<s v-show="obj.content.more.arr"><em :style="'filter: drop-shadow(.24rem 0 0 '+ obj.content.more.style.color +')'"></em></s></div> 
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+        <div :class="{'backIndex':true,'hidePreviewBack': !previewBtn}" v-if="preview" @click="backToIndex">
+            <div class="close_preview"><img class="" :src="masterDomain + '/static/images/admin/siteConfigPage/white_close.png'"></div>
+            <div>退出预览模式</div>
+        </div>
+        <div class="wx_mask" v-show="wxGz" @click="wxGz = false"></div>
+        <div :class="['wxPopBox',{'show':wxGz}]" >
+            <h4>关注公众号</h4>
+            <div class="wxQRImg"><img src="{#$cfg_weixinQr#}" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+            <div class="con">
+                <h5>{#$cfg_wechatName#}官方微信</h5>
+                <p class="h5Show">长按识别或扫一扫，了解更多信息</p>
+                <p class="h5Hide">微信扫一扫，了解更多信息</p>
+            </div>
+        </div>
+    </div>
+    {#* 微信分享 *#}
+    {#$Share_description = {#$cfg_description#}#}
+    {#$Share_title = {#$langData['siteConfig'][0][7]#}#}
+    {#$Share_img = {#$cfg_weblogo#}#}
+    {#$Share_url = {#$member_userDomain#}#}
+    {#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+
+    {#include file="../../siteConfig/touch_bottom_5.0.html" active="fifthicon" bottom_module="siteConfig"#}
+</body>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/vant/vant.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/index_diy.js?v={#$cfg_staticVersion#}"></script>
+
+
+</html>

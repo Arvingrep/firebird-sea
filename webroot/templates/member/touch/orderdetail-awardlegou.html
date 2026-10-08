@@ -1,0 +1,416 @@
+
+<script>
+	var shCertify = "{#getUrlPath service='member' type='user' template='security-shCertify'#}";
+	//活动截止
+	var startDate = "{#strtotime($detail_paydate)#}",hdday = "{#$customCanceltime#}";
+	//自动确认收货
+	var expDate = "{#$detail_expDate#}",confirmDay = {#$confirmDay|default:'0'#};//发货时间和确认天数
+	//自动同意退款
+	var retDate = "{#$detail_retDate#}",customautotuikuan = {#$customautotuikuan|default:'0'#};
+	//自动同意退货
+	var customautotuihuo = {#$customautotuihuo|default:'0'#};
+	//自动关闭退货申请
+	var tongyidate = "{#$detail_tongyidate#}",customofftuikuan = {#$customofftuikuan|default:'0'#};
+	//退款提示
+	{#if $detail_orderstate ==5 && $userinfo['noawardlegoutime'] == ''#}
+	var refundTips = '{#$customWeichaononote#}';
+	{#elseif $detail_orderstate ==5 && $userinfo['noawardlegoutime'] != ''#}
+	var refundTips = '{#$customYichaononote#}';
+	{#elseif $detail_orderstate ==6 && $userinfo['noawardlegoutime'] == ''#}
+	var refundTips = '{#$customWeichaonote#}';
+	{#elseif $detail_orderstate ==6 && $userinfo['noawardlegoutime'] != ''#}
+	var refundTips = '{#$customYichaonote#}';
+	{#/if#}
+
+	$(function(){
+		$('.refundBtn').click(function(){
+			if(confirm(refundTips)){
+				location.href = "{#getUrlPath service='member' type='user' template='refund' module='awardlegou' id={#$id#}#}";
+			}
+		})
+	})
+</script>
+
+	{#*  判断倒计时类型  活动截止/自动确认收货/自动同意退款/自动同意退货/自动关闭退货申请 *#}
+
+	{#$djstype = ''#}
+	<!-- 活动截止 -->
+
+	{#if $detail_orderstate == 1#}
+		{#$djstype = 5#}
+	<!-- 未发货 申请退款中 自动同意退款 or  已退货 等待自动同意退款-->
+	{#elseif ($detail_orderstate == 5 && $detail_retState == 1) || ($detail_orderstate == 9 && $detail_retExpnumber!='' && $detail_retExpcompany!='')#}
+		{#$djstype = 1#}
+
+	<!-- 已发货 申请退款中 自动同意退货-->
+	{#elseif $detail_orderstate == 6 && $detail_retState == 1#}
+		{#$djstype = 2#}
+
+	<!-- 商家已发货 未申请退款 自动确认收货 -->
+	{#elseif $detail_orderstate == 6 && $detail_retState != 1#}
+		{#$djstype = 3#}
+
+	<!-- 商家已同意退货 未支付运费 -- 自动关闭退货申请-->
+	{#elseif $detail_orderstate == 9 && $detail_is_paytuikuanlogtic != 1#}
+		{#$djstype = 4#}
+
+	{#/if#}
+
+	<input type="hidden" value="{#$djstype#}" id="djstype">
+
+	<dl class="info-section {#if $detail_orderstate == 1 || $detail_orderstate == 0#}spe{#else#}new{#/if#}">
+		<dt>
+			<!-- 还需邀请人 -->
+			{#if $detail_orderstate == 0#}
+
+				{#* 当前订单状态  *#}
+				<span class="info-title">{#$langData['siteConfig'][19][318]#}：</span><em class="info-text">{#$detail_info#}</em>
+			{#elseif $detail_orderstate == 1#}
+				{#* 当前订单状态  *#}
+				<span class="info-title">{#$langData['siteConfig'][19][318]#}：</span><em class="info-text">等待活动成功还需邀请{#$detail_havenumber#}人，</em>
+				<div class="info-text speInfotxt">还剩<div class="time-item"><strong id="day_show">0</strong><span class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>截止</div>
+
+
+			<!-- 抽中 -- 未发货-->
+			{#elseif $detail_orderstate == 5#}
+				<!-- 申请退款中 -->
+				{#if $detail_retState == 1#}
+				<p class="infoP">已申请退款，请等待商家处理</p>
+				<div class="info-text">还剩<div class="time-item"><strong id="day_show">0</strong><span  class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动同意退款</div>
+				{#else#}
+				<p class="infoP">恭喜抽中乐购价购买资格！</p>
+				<div class="info-text">我们将尽快安排发货!</div>
+				{#/if#}
+
+			<!-- 抽中 -- 已发货--待收货-->
+			{#elseif  $detail_orderstate == 6#}
+				{#if $detail_retState == 1#}
+				<p class="infoP">已申请退货退款，请等待商家处理</p>
+				<div class="info-text">还剩<div class="time-item"><strong id="day_show">0</strong><span class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动同意退货</div>
+				{#else#}
+				<p class="infoP">恭喜抽中乐购价购买资格！</p>
+				<div class="info-text">已发货，还剩<div class="time-item"><strong id="day_show">0</strong><span class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动确认收货</div>
+				{#/if#}
+
+
+			<!-- 退款成功-->
+			{#elseif  $detail_orderstate == 7#}
+				<!-- 自己申请的退款 -->
+				{#if $detail_retState == 1#}
+				<p class="infoP speWait">退款成功</p>
+				{#else#}
+				<!-- 未抽中 被退款 -->
+				<p class="infoP">啊哦~未抽中乐购价购买资格</p>
+				<div class="info-text">已全额退款至账户钱包 </div>
+				{#/if#}
+
+			<!-- 已发货--商家已同意退货 -- 待支付运费--上门取件 -- 货物还未寄出 -->
+			{#elseif $detail_orderstate == 9#}
+				<!-- 已支付过运费 -->
+				{#if $detail_is_paytuikuanlogtic == 1#}
+					{#if $detail_retExpnumber!='' && $detail_retExpcompany!='' #}
+					<p class="infoP">已退货，请等待商家处理</p>
+					<div class="info-text">还剩<div class="time-item"><strong id="day_show">0</strong><span  class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动同意退款</div>
+					{#else#}
+					<p class="infoP speWait">待快递员上门取件</p>
+					{#/if#}
+				{#else#}
+				<!-- 未支付过运费 -->
+				<p class="infoP">待退货，请支付退货运费</p>
+					<div class="info-text">还剩<div class="time-item"><strong id="day_show">0</strong><span  class="dayhide">天</span><strong id="hour_show">0</strong><span>时</span><strong id="minute_show">0</strong><span>分</span><strong id="second_show">0</strong><span>秒</span></div>自动关闭退货申请</div>
+				{#/if#}
+
+
+			{#/if#}
+			{#* 退款时间  *#}
+		</dt>
+
+
+
+
+
+</dl>
+<dl class="giftDl">
+	<!-- 退款的  没买成功 -->
+	{#if (($detail_orderstate == 7 && $detail_rewardtype ==0) || ($detail_is_wining ==1 && $detail_rewardtype ==0)) && $detail_reward#}
+	<dd class="last award_tip">
+		<span>免费送</span>恭喜抽中实物礼品 -<em class=""> {#$detail_reward.title#} </em>
+	</dd>
+	{#/if#}
+
+	{#if ($detail_orderstate == 7 && $detail_rewardtype ==1) || ($detail_is_wining==1 && $detail_rewardtype ==1)#}
+		{#if $detail_is_receive ==0#}
+		<dd class="last award_tip">
+			<span>红包礼</span>恭喜你获得一个现金红包 -<em class="chai"> 立即拆红包 </em>
+		</dd>
+		{#else#}
+		<dd class="last award_tip">
+			<span>红包礼</span>抽中现金红包{#$detail_hongbaomoney#}{#echoCurrency type='short'#}！已存入<a class="ye" href="{#getUrlPath service='member' type='user' template='pocket' param="dtype=0"#}"> 账户余额 </a>
+		</dd>
+		{#/if#}
+
+	{#/if#}
+</dl>
+
+
+
+	{#if $detail_orderstate == 6 && $detail_expDate != 0#}
+	<div class="info-block kuaidi_info">
+		<div class="info-title">{#$langData['siteConfig'][19][62]#}</div>   {#* 快递信息  *#}
+		<div class="info-content">
+			<dl><dt>{#$langData['siteConfig'][19][63]#}：</dt><dd>{#$juhe_express_company.$detail_expCompany#}</dd></dl>   {#* 快递公司  *#}
+			<dl><dt>{#$langData['siteConfig'][19][64]#}：</dt><dd>{#$detail_expNumber#}</dd></dl>   {#* 快递单号  *#}
+			<dl><dt>{#$langData['siteConfig'][19][65]#}：</dt><dd>{#$detail_expDate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>    {#* 发货时间  *#}
+
+		</div>
+	</div>
+	{#/if#}
+	{#if $detail_orderstate == 7 && $detail_jpexpDate != 0#}
+	<div class="info-block kuaidi_info">
+		<div class="info-title">奖品{#$langData['siteConfig'][19][62]#}</div>   {#* 快递信息  *#}
+		<div class="info-content">
+			<dl><dt>{#$langData['siteConfig'][19][63]#}：</dt><dd>{#$juhe_express_company.$detail_jpexpCompany#}</dd></dl>   {#* 快递公司  *#}
+			<dl><dt>{#$langData['siteConfig'][19][64]#}：</dt><dd>{#$detail_jpexpNumber#}</dd></dl>   {#* 快递单号  *#}
+			<dl><dt>{#$langData['siteConfig'][19][65]#}：</dt><dd>{#$detail_jpexpDate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>    {#* 发货时间  *#}
+		</div>
+	</div>
+	{#/if#}
+
+  <div class="info-block">
+    <div class="info-title">{#$langData['siteConfig'][19][54]#}</div>    {#* 联系信息  *#}
+    <div class="info-content">
+    	{#* 收&nbsp;&nbsp;货&nbsp;人  *#}
+    	<dl><dt>{#$langData['siteConfig'][41][37]#}：</dt><dd>{#$detail_username#}</dd></dl>
+
+    	{#* 联系电话  *#}
+    	<dl><dt>{#$langData['siteConfig'][19][56]#}：</dt><dd>{#$detail_usercontact#}</dd></dl>
+
+    	{#* 送货地址  *#}
+    	<dl><dt>{#$langData['siteConfig'][19][57]#}：</dt><dd>{#$detail_useraddr#}</dd></dl>
+
+    	{#* 买家留言  *#}
+    	<!-- <dl><dt>{#$langData['siteConfig'][19][58]#}：</dt><dd>{#$detail_note#}</dd></dl> -->
+    </div>
+  </div>
+
+  <div class="info-block">
+  	<div class="info-title">{#$langData['siteConfig'][19][322]#}</div> {#* 购买信息  *#}
+  	<div class="shop-pro">
+      <div class="item" data-id="{#$detail_product.id#}">
+        <div class="info fn-clear">
+
+          <div class="imgbox fn-left">
+            <a href="{#getUrlPath service='awardlegou' template='detail' id={#$detail_proarr.id#}#}"><img src="{#changeFileSize url={#$detail_proarr.litpicpath#} type='small'#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></a>
+          </div>
+
+          <div class="txtbox">
+            <div class="title">{#$detail_proarr.title#}</div>
+			<span class="price_award">{#echoCurrency type='symbol'#}{#$detail_balance+$detail_payprice#} {#if $detail_point!=0#}+ {#$detail_point#}{#$cfg_pointName#}{#/if#}</span>
+          </div>
+			{#if ($detail_orderstate == 5 || $detail_orderstate == 6) && $detail_retState !=1#}
+			<div class="opbtn">
+	            <a href="javascript:;" class="red refundBtn">{#$langData['siteConfig'][9][65]#}</a> {#* 退款 *#}
+	        </div>
+	        {#elseif $detail_orderstate == 7#}
+			<div class="opbtn">
+	            <a href="javascript:;" class="red">{#$langData['siteConfig'][9][30]#}</a> {#* 已退款 *#}
+	        </div>
+	        {#elseif $detail_orderstate == 0#}
+			<div class="opbtn">
+	            <a href="{#getUrlPath service='awardlegou' template='pay' param="ordernum=$detail_ordernum"#}" class="red">{#$langData['siteConfig'][6][64]#}</a> {#* 立即付款 *#}
+	        </div>
+			{#/if#}
+        </div>
+        <ul class="calculate">
+          <li><span>{#$langData['siteConfig'][19][324]#}</span><em>×{#$detail_procount#}</em></li>  {#* 数量  *#}
+        </ul>
+      </div>
+
+<!--  		<div class="delivery">-->
+<!--  			<p>{#$langData['siteConfig'][17][40]#}<span>&yen;{#$detail_freight#}</span></p>  {#* 配送费  *#}-->
+<!--  		</div>-->
+<!--  		<div class="youhuiInfo">-->
+<!--  			{#foreach from=$detail_priceinfo item=hui#}-->
+<!--  			<p>{#$hui.body#}<span>-&yen;{#$hui.amount#}</span></p>-->
+<!--  			{#/foreach#}-->
+<!--  		</div>-->
+  		<div class="sum">
+  			{#* 总计  *#}
+  			<div class="right">{#$langData['siteConfig'][19][664]#}：<font class="fn-right">{#$langData['siteConfig'][19][371]#}：&yen;<strong>{#$detail_balance+$detail_payprice#}</strong>  {#if $detail_point!=0#}+ {#$cfg_pointName#}：<strong>{#$detail_point#}</strong>{#/if#}</font></div> {#* 现金  *#}
+  		</div>
+  	</div>
+  </div>
+
+	<div class="info-block">
+		<div class="info-title">{#$langData['siteConfig'][19][319]#}</div>{#* 订单信息  *#}
+		<div class="info-content">
+			{#* 订单编号  *#}
+			<dl><dt>{#$langData['siteConfig'][19][50]#}：</dt><dd>{#$detail_ordernum#}</dd></dl>
+
+			{#* 下单时间  *#}
+			<dl><dt>{#$langData['siteConfig'][19][51]#}：</dt><dd>{#$detail_orderdate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>
+
+			{#* 付款方式  *#}
+			<dl><dt>{#$langData['siteConfig'][19][52]#}：</dt><dd>{#$detail_paytype#}</dd></dl>
+
+			{#* 付款时间  *#}
+			<dl><dt>{#$langData['siteConfig'][19][53]#}：</dt><dd>{#$detail_paydate|date_format:"%Y-%m-%d %H:%M:%S"#}</dd></dl>
+
+		</div>
+	</div>
+
+	{#if $detail_expDate#}
+	<div class="info-block">
+		<div class="info-title">{#$langData['siteConfig'][26][127]#}</div>{#* 配送信息  *#}
+		<div class="info-content">
+			<dl><dt>{#$langData['siteConfig'][19][63]#}：</dt><dd>{#$juhe_express_company.$detail_expCompany#}</dd></dl>{#* 快递公司  *#}
+			<dl><dt>{#$langData['siteConfig'][19][64]#}：</dt><dd>{#$detail_expNumber#}</dd></dl>{#* 快递单号  *#}
+		</div>
+	</div>
+	{#/if#}
+
+
+	{#if $detail_orderstate == 1 #}
+	<div class="bottom_box">
+		<a href="javascript:;" class="btn_invite HN_PublicShare">继续邀请好友</a>
+	</div>
+	{#/if#}
+
+
+	<!-- 奖励红包 -- 没拆红包 -->
+	{#if $detail_rewardtype ==1 && $detail_is_receive ==0#}
+		<div class="bottom_box {#if $detail_orderstate == 9 && $detail_is_paytuikuanlogtic != 1#}spebox{#/if#}">
+		<!-- 商家未同意退货之前 -->
+		{#if $detail_orderstate != 9#}
+			{#if $detail_orderstate == 6#}
+			<a href="javascript:;" class="sureShou">确认收货</a>
+			{#/if#}
+			<a href="javascript:;" class="btn_invite chai {#if $detail_orderstate == 6#}specha{#/if#}">拆红包</a>
+		{#else#}
+			{#if $detail_is_paytuikuanlogtic != 1#}
+			<!-- 未支付过运费 spebox-->
+			<p class="payTiP">支付后快递员将联系您约定上门取件时间</p>
+			<a href="javascript:;" class="sureShou">确认收货</a>
+			<a href="javascript:;" class="payyf">支付运费<span>￥</span><strong>{#$detail_proarr['tuikuanlogtic']#}</strong></a>
+			{#/if#}
+		{#/if#}
+		</div>
+	{#else#}
+		<!-- 可以确认收货 或者需要支付运费 -->
+	    {#if ($detail_orderstate == 9 && $detail_is_paytuikuanlogtic != 1) || ($detail_orderstate != 9 &&$detail_orderstate == 6)#}
+		<div class="bottom_box {#if $detail_orderstate == 9 && $detail_is_paytuikuanlogtic != 1#}spebox{#/if#}">
+			<!-- 商家未同意退货之前 -->
+			{#if $detail_orderstate != 9#}
+				{#if $detail_orderstate == 6#}
+				<a href="javascript:;" class="sureShou">确认收货</a>
+				{#/if#}
+			{#else#}
+
+				{#if $detail_is_paytuikuanlogtic != 1#}
+				<!-- 未支付过运费 spebox-->
+				<p class="payTiP">支付后快递员将联系您约定上门取件时间</p>
+				<a href="javascript:;" class="sureShou">确认收货</a>
+				<a href="javascript:;" class="payyf">支付运费<span>￥</span><strong>{#$detail_proarr['tuikuanlogtic']#}</strong></a>
+				{#/if#}
+			{#/if#}
+		</div>
+		{#/if#}
+	{#/if#}
+
+
+	<!-- 拆红包 -->
+	<div class="hb_mask"></div>
+	<div class="hb_pop">
+		<div class="hb_title">
+			<span>现金<br/>红包</span>
+			<b>{#$detail_hongbaomoney#}<em>{#echoCurrency type="short"#}</em></b>
+		</div>
+		<div class="hb_text">
+			<div class="hb_h">
+				<h6>恭喜您领到</h6>
+				<h3>现金红包</h3>
+			</div>
+			<div class="bottom_show">
+				<p>红包已自动存入我的账户余额</p>
+				<a href="javascript:;" class="get_hb">开心收下</a>
+			</div>
+			<a href="javascript:;" class="hb_close"></a>
+		</div>
+	</div>
+
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+
+<script>
+	var ordernum1 = '{#$detail_ordernum#}';
+	$(function(){
+
+		$(".payyf").click(function () {
+
+			$.ajax({
+				url: masterDomain+"/include/ajax.php?service=awardlegou&action=logticpay",
+				type: 'post',
+				data: {'final':1,'paytuikuanlogtic':1,'ordernum':ordernum1},
+				dataType: 'json',
+				success: function(data){
+					if(data && data.state == 100){
+						sinfo = data.info;
+						service   = 'awardlegou';
+						$('#ordernum').val(sinfo.ordernum);
+						$('#paction').val('logticpay');
+
+
+						$("#amout").text(sinfo.order_amount);
+						$('.payMask').show();
+						$('.payPop').css('transform', 'translateY(0)');
+
+						// if (totalBalance * 1 < sinfo.order_amount * 1) {
+						//
+						// 	$("#moneyinfo").text('余额不足，');
+						//
+						// 	$('#balance').hide();
+						// }
+						if (totalBalance * 1 < sinfo.order_amount * 1) {
+
+							$("#moneyinfo").text('余额不足，');
+							$("#moneyinfo").closest('.check-item').addClass('disabled_pay')
+
+							$('#balance').hide();
+						}
+
+
+						if(monBonus * 1 < sinfo.order_amount * 1  &&  bonus * 1 >= sinfo.order_amount * 1){
+			              $("#bonusinfo").text('额度不足，');
+			              $("#bonusinfo").closest('.check-item').addClass('disabled_pay')
+			            }else if( bonus * 1 < sinfo.order_amount * 1){
+			              $("#bonusinfo").text('余额不足，');
+			              $("#bonusinfo").closest('.check-item').addClass('disabled_pay')
+			            }else{
+			              $("#bonusinfo").text('');
+			              $("#bonusinfo").closest('.check-item').removeClass('disabled_pay')
+			            }
+
+
+
+						ordernum = sinfo.ordernum;
+						order_amount = sinfo.order_amount;
+
+						payCutDown('', sinfo.timeout, sinfo);
+					}else{
+						alert(data.info);
+						if(data.info == '积分不足'){
+							window.location = pointurl;
+						}else if(data.info == '本次乐购活动参与人数已满，您可以自己发起乐购！'){
+							window.location = prourl;
+						}
+						t.removeClass('disabled');
+					}
+				},
+				error: function(){
+					alert('网络错误，请重试！');
+					t.removeClass('disabled');
+				}
+			})
+		});
+	});
+</script>

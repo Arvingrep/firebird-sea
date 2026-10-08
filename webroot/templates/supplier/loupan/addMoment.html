@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>添加楼盘时刻</title>
+    <meta name="keywords" content="{#$cfg_keywords#}">
+    <meta name="description" content="{#$cfg_description#}">
+    <link rel="stylesheet" type="text/css" media="all"
+        href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/datetimepicker.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/base_info.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/addMoment.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}',
+            staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = '{#$cfg_hideUrl#}';
+        var cookiePre = '{#$cfg_cookiePre#}',
+            cfg_clihost = '{#$cfg_clihost#}';
+        var templets = '{#$templets_skin#}';
+
+        var buildtypenames = ['低层', '高层', '小高层', '联排别墅', '公寓']; //建筑类型
+        // var salestatenames = ['新盘待售','在售','尾盘','售罄']; //销售状态
+        // var existingnames = ['现房','期房']; //销售状态
+        var salestate = 0, //销售状态
+            existing = 0, //楼盘状态
+            buildtype = []; //物业类型
+        var thumbSize = '{#$thumbSize#}',
+            thumbType = "{#$thumbType#}", //缩略图配置
+            addrid = '{#$addrid#}',
+            addrListArr = '{#$addrListArr#}',
+            mapCity = "{#$mapCity#}",
+            subwayCity = 0;
+        var currid = 6;
+        var modelType = 'house';
+        var idArr = (window.location.href).split('?id=')
+        var id = idArr.length > 1 ? idArr[1] : '';
+        var loupanid = '{#$loupanid#}';
+        var allHouseType = JSON.parse('{#json_encode($apartment)#}') || []; //户型总列表
+        var buildList = JSON.parse('{#json_encode($shapan)#}') || []; //楼栋列表
+        buildList = buildList.map(item => {
+            item['houseType'] = [];
+            let arr = item.apartment.split(',');
+            allHouseType.map(res => {
+                if (arr.includes(res.id)) {
+                    res['active'] = false;
+                    item['houseType'].push(res); //有此户型，保存
+                }
+            })
+            return {
+                ...item,
+                active: false //是否选中
+            }
+        })
+        var backsuccessFn = '';
+    </script>
+</head>
+
+<body class="w1200">
+    <div id="page">
+        <!-- 头部 -->
+        {#include file="top.html"#}
+        <div class="conbox" @click="buildShow=false;houseShow=false">
+            {#include file="left.html"#}
+            <!-- 右侧 -->
+            <div class="right_box" >
+                <div class="rConBox">
+                    <h3 v-if="article_id==''">添加楼盘时刻</h3>
+                    <h3 v-else>修改楼盘时刻</h3>
+                    <div class="formbox huxingFormbox">
+                        <form action="" id="form">
+                            <!-- 时刻类型 -->
+                            <div class="inpbox required">
+                                <label>时刻类型</label>
+                                <div class="inp_div radiobox">
+                                    <ul>
+                                        <li :class="{'chose':index==typeActive}" v-for="(item,index) in type"
+                                            :key="item.id" @click="typeActive=index">
+                                            <input type="radio" name="type" :value="item.id"
+                                                :checked="typeActive==index"><s></s>{{item.title}}
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <!-- 交房楼栋 -->
+                            <div class="inpbox" v-if="typeActive>1">
+                                <label for="">交房楼栋</label>
+                                <div class="inp_div">
+                                    <input type="text" name="buildings" v-model="buildId" hidden style="display: none;">
+                                    <div class="inp tags" @click.stop="buildShow=true;houseShow=false;">
+                                        <div class="placeholder text" v-if="!buildItem.length">选择楼栋</div>
+                                        <template v-else>
+                                            <div class="label" v-for="item in buildItem" :key="item.name"
+                                                @click.stop="item.active=!item.active;">
+                                                <span>{{item.name}}#</span>
+                                                <img src="{#$templets_skin#}images/del.png?v={#$cfg_staticVersion#}"
+                                                    class="nor" />
+                                                <img src="{#$templets_skin#}images/del_img.png?v={#$cfg_staticVersion#}"
+                                                    class="act" />
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <!-- item没有id，后端加id -->
+                                    <div :class="`list ${buildShow?'topShow':'topHide'}`" @click.stop>
+                                        <div :class="['item',{active:item.active}]"
+                                            v-for="(item,index) in buildListData" :key="item.id"
+                                            @click="item.active=!item.active;">
+                                            <span>{{item.name}}#</span>
+                                            <img src="{#$templets_skin#}images/check.png?v={#$cfg_staticVersion#}"
+                                                class="nor" />
+                                            <img src="{#$templets_skin#}images/check_chose.png?v={#$cfg_staticVersion#}"
+                                                class="act" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox" v-if="typeActive>1&&houseListData.length>0">
+                                <label for="">交房户型</label>
+                                <div class="inp_div">
+                                    <input type="text" name="houseType" v-model="houseId" hidden style="display: none;">
+                                    <div class="inp tags" @click.stop="buildShow=false;houseShow=true">
+                                        <div class="placeholder text" v-if="!houseItem.length">选择户型</div>
+                                        <template v-else>
+                                            <div class="label" v-for="item in houseItem" :key="item.id"
+                                                @click.stop="item.active=!item.active;">
+                                                <span>{{item.title}}</span>
+                                                <img src="{#$templets_skin#}images/del.png?v={#$cfg_staticVersion#}"
+                                                    class="nor" />
+                                                <img src="{#$templets_skin#}images/del_img.png?v={#$cfg_staticVersion#}"
+                                                    class="act" />
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <div :class="`list ${houseShow?'topShow':'topHide'}`" @click.stop>
+                                        <div :class="['item',{active:item.active}]"
+                                            v-for="(item,index) in houseListData" :key="item.id"
+                                            @click="item.active=!item.active;">
+                                            <span>{{item.title}}</span>
+                                            <img src="{#$templets_skin#}images/check.png?v={#$cfg_staticVersion#}"
+                                                class="nor" />
+                                            <img src="{#$templets_skin#}images/check_chose.png?v={#$cfg_staticVersion#}"
+                                                class="act" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox required">
+                                <label>交房时间</label>
+                                <div class="inp_div sel_inp" style="display: flex;align-items: center;">
+                                    <div class="inp time">
+                                        <input name="deliveryTime" id="hdStart" type="text" v-model="deliveryTime"
+                                            placeholder="请选择时间"><s></s>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox required">
+                                <label>添加图片</label>
+                                <div class="inp_div img_upload listImgBox">
+                                    <input type="hidden" name="images" v-model="imgSrc" class="imglist-hidden"
+                                        placeholder="请上传图片" />
+                                    <div class="imgbox">
+                                        <div :class="['upload_btn filePicker uploadinp',{hide:imgSrc}]" id="filePicker1"
+                                            data-type="thumb" data-count="1" data-size="{#$thumbSize#}" data-imglist="">
+                                            <s></s>
+                                            <p>点击上传图片</p>
+                                        </div>
+                                        <div class="imgShow">
+                                            <ul id="listSection1" class="listSection thumblist">
+                                                <li id="WU_FILE_has_0" class="pubitem" v-if="imgSrc&&article_id">
+                                                    <img :src="showImg" :data-val="imgSrc" :data-url="showImg">
+                                                    <a class="reupload li-rm" href="javascript:;">重新上传</a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inpbox required">
+                                <label>详情描述</label>
+                                <div class="inp_div">
+                                    <div class="inp_textarea xs_inp">
+                                        <textarea name="info" v-model="formInfo" placeholder="请输入该户型详细解析"></textarea>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <a href="javascript:;" class="submit" @click="submit">确认提交</a>
+                        </form>
+                        <div class="loading" v-show="loading"><s></s></div>
+                    </div>
+                </div>
+            </div>
+            <div class="foot">
+                <div class="foot-bottom">
+                    <div class="bottom wrap">
+                        版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div>{#$cfg_statisticscode#}</div>
+</body>
+
+<script type="text/javascript" src="{#$templets_skin#}js/publicUpload_v2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript"
+    src="{#$cfg_staticPath#}js/ui/bootstrap-datetimepicker.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/addMoment.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type='text/javascript'
+    src='{#$cfg_basehost#}/include/ueditor/ueditor.config.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/ueditor/ueditor.all.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/ueditor/135editor.js?v={#$cfg_staticVersion#}'></script>
+
+</html>

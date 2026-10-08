@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#$langData['waimai'][8][64]#}</title>{#* 订单详情 *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+		<script>
+			var local = '{#$local#}';
+			var templets = '{#$templets_skin#}';
+			var orderFinished = '{#$detail_orderFinished#}',  //没有坐标 的订单是完成的样式
+				order_chaoshi = '{#$detail_chaoshi#}',//订单是否完成
+				orderTop = '{#if ($detail_lng && $detail_lat) ||($detail_coordY && $detail_coordX)#}1{#else#}0{#/if#}',
+				ordernote = "{#$detail_note#}";
+			var shoplnglat = {#if $detail_coordY#}{"lng":'{#$detail_coordY#}',"lat":'{#$detail_coordX#}'}{#else#}{"lng":"{#$detail_store['lng']#}","lat":"{#$detail_store['lat']#}"}{#/if#},  //店铺坐标fechoCurrency
+			    userlnglat = {"lng":'{#$detail_lng#}',"lat":'{#$detail_lat#}'}; //店铺坐标
+			var shopainfo = {#if $detail_coordY#}{"lng":'{#$detail_coordY#}',"lat":'{#$detail_coordX#}','address':'{#if $ordertype==waimai#}{#$detail_shopaddr#}{#else if $ordertype==paotui#}{#$detail_buyaddress#}{#else#}{#$detail_store.address#}{#/if#}','title':'{#if $ordertype==waimai ||$ordertype==paotui#}{#$detail_shopname#}{#else#}{#$detail_store.address#}{#/if#}'}{#else#}{"lng":"{#$detail_store['lng']#}","lat":"{#$detail_store['lat']#}",'address':'{#if $ordertype==waimai#}{#$detail_shopaddr#}{#else if $ordertype==paotui#}{#$detail_buyaddress#}{#else#}{#$detail_store.address#}{#/if#}','title':'{#if $ordertype==waimai ||$ordertype==paotui#}{#$detail_shopname#}{#else#}{#$detail_store.address#}{#/if#}'}{#/if#};
+			var userainfo = {"lng":'{#$detail_lng#}',"lat":'{#$detail_lat#}','address':'{#$detail_address#}','title':'{#$detail_person#}'}
+			var sitemap ='{#$site_map#}';
+			var ordertype = '{#$ordertype#}'; //订单类型
+			var id = {#$detail_id#};
+			var ordernum = '{#$detail_ordernumstore#}';
+			var state = '{#$detail_state#}';
+			var tostoredate = '{#$detail_tostoredate#}'; //到店时间
+			var customIsopencode = '{#$customIsopencode #}'; //跑腿验证取货码开关：
+
+			var psIncome = '{#$detail_courier_get#}';  //配送费
+			var addition = '{#$detail_additionprice#}';   //加成
+			var orderType="{#$ordertype#}";
+		</script>
+	</head>
+	<body>
+		
+		<div id="pagebox" >
+			<div class="page_map" v-if="!order_finished && orderTop">
+				<transition name="fade">
+				<div v-if="!top_fixed" class="back_btn goBack" onclick="history.go(-1)"></div>
+			    </transition>
+				<div id="map"></div>
+			</div>
+			<div v-bind:class="['page_detail',{bottom_fixed:bottomfixed} ,{slideUpNow:!top_fixed} ,{orderend:(order_finished||!orderTop)}]">
+				<div class="bottom_group">
+					<div :class="['headbox',{'headshow':top_fixed||order_finished||!orderTop}]">
+						<a href="javascript:;" class="back_btn goBack" onclick="history.go(-1)"></a>
+						<h5>{#$langData['waimai'][8][64]#}</h5>{#* 订单详情 *#}
+					</div>
+					
+					<transition name="fade">
+
+						<div class="top_show" >
+							<div class="resetBox" style="transform: none;" v-if="!top_fixed && !order_finished && orderTop"><button type="button"  class="reset_map"  @click="rechange"></button></div>
+							{#if $ordertype=="waimai"#}
+							<div class="change_state"  v-if="!top_fixed && !order_finished && orderTop && (tostoredate==''|| tostoredate=='0')">
+								<p>{#$langData['waimai'][10][77]#}</p>  {#* 到店商家未出货？即将超时？可以先点到店哦→ *#}
+
+								<button class="btn_change" @click="changeState">{#$langData['waimai'][10][78]#}</button> {#* 我已到店 *#}
+							</div>
+							<div class="change_state"  v-if="!top_fixed && !order_finished && orderTop && (tostoredate!=''&& tostoredate!='0')">
+								<p>{#$langData['waimai'][10][79]|replace:"0":($detail_tostoredate|date_format:"%H:%M")#}</p>{#* 已更新到店时间，取货后不要忘记在店内点击下方【确认取货】 *#}
+							</div>
+							{#/if#}
+
+							<!-- 商家出餐 骑手没到-->
+							{#if ($detail_mealtime !='' || $detail_jijiangtime!='') &&  $ordertype=="waimai"#}
+							{#if $detail_mealtime !='' && $ordertype=="waimai" #}
+							<div class="change_state" v-if="tostoredate==''|| tostoredate=='0'">
+								 <p class="ring_tip">商家已出餐，请前往尽快取餐！</p>{#* 商家已出餐，请前往尽快取餐！*#}
+							</div>
+							{#/if#}
+								{#if $detail_jijiangtime!='' && $ordertype=="waimai" && $detail_mealtime!='' && $detail_mealtime!=0 #}
+							<div class="change_state" v-if="tostoredate!=''&& tostoredate!='0'" data-meal="{#$detail_mealtime#}">
+								<p class="ring_tip">订单即将超时，请尽快配送！</p>{#* 订单即将超时，请尽快配送！*#}
+							</div>
+								{#/if#}
+							{#/if#}
+						</div>
+
+
+					</transition>
+					<div class="orderInfo">
+						<div class="order_head {#if $ordertype=='paotui'#}{#if $detail_type==2#}bsong{#else#}bbuy{#/if#}{#/if#}" :style="addition>0?'border:none;':''">
+							<div class="order_info">
+								{#if $ordertype=="waimai"#}
+								{#$priceArr = "-"|explode:$detail_ordernumstore#}
+								<span class="order_num">#<em>{#$priceArr[1]#}</em></span>
+								{#else#}
+								<span class="order_num">#<em>{#substr($detail_ordernum,-4)#}</em></span>
+								{#/if#}
+								{#if $ordertype=="paotui"#}
+								{#if $detail_type=='1'#}
+								<span class="order_tip"><i>{#$langData['waimai'][10][9]#}</i>{#if $detail_price#}<em class="btip">{#$langData['waimai'][10][10]#}<b>{#$detail_price#}</b>{#echoCurrency type='short'#}</em>{#/if#}{#if $detail_tip!=0#}{#$langData['waimai'][10][11]#}{#echoCurrency type='symbol'#}{#$detail_tip#}{#/if#}</span>{#*  帮买 预计垫付 小费*#}
+								{#else#}
+								<span class="order_tip"><i>{#$langData['waimai'][10][8]#}</i>{#if $detail_tip!=0#}{#$langData['waimai'][10][11]#}{#echoCurrency type='symbol'#}{#$detail_tip#}{#/if#}</span>
+								{#/if#}
+								{#/if#}
+								{#if $ordertype=="waimai" && ($detail_state ==3 || $detail_state == 4 || $detail_state == 5)#}
+									{#if $detail_mealtime==''#}
+									 <span class="order_otherTip"><b>{#$detail_chucan_time#}分钟内</b> 出餐</span>
+									{#else if $detail_mealtime !='' && $detail_state != 5#}
+									<span class="order_otherTip"><b>商家已出餐</b> </span>
+									{#elseif $detail_state == 5#}
+									<span class="order_otherTip"><b>已取餐,订单配送中</b> </span>
+									{#/if#}
+								{#/if#}
+							</div>
+							{#if $detail_delivery_time || $detail_totime#}
+							<div class="order_right">
+								<div class="order_time" v-if="!order_finished ">
+									{#if $ordertype=='paotui'#}
+									<em>{#$langData['siteConfig'][17][47]|replace:'1分钟':$detail_totime#}</em> {#if $detail_type=='1'#}{#$langData['waimai'][10][13]#}{#else#}{#$langData['waimai'][10][19]#}{#/if#} {#* 送达、取货 *#}
+									{#else#}
+									<em>{#$langData['siteConfig'][17][47]|replace:'1':$detail_delivery_time#}</em> {#$langData['waimai'][10][13]#} {#* 送达 *#}
+									{#/if#}
+								</div>
+								<div class="order_time error" v-if="order_chaoshi && order_finished  ">
+									{#$langData['waimai'][10][80]#}{#* 订单超时 *#}
+								</div>
+								<div class="order_time " v-if="order_finished && !order_chaoshi">
+									{#$langData['waimai'][10][81]#}{#* 准时送达 *#}
+								</div>
+
+								<!-- <div class="ps_income" v-if="psIncome > 0">{#echoCurrency type="symbol"#}<b>{{psIncome}}</b></div> -->
+		
+<!--								<b class="ps_fee">{#echoCurrency type="symbol"#}{#$detail_courier_get#}</b>-->
+
+							</div>
+							{#else#}
+							<div class="order_right">
+								<div class="order_time" v-if="!order_finished ">
+									{#if $ordertype=='paotui'#}
+									<em>{#$langData['siteConfig'][17][47]|replace:'1':$detail_totime#}</em> {#$langData['waimai'][10][13]#} {#* 送达 *#}
+									{#else#}
+									<em>{#$langData['siteConfig'][17][47]|replace:'1':$detail_delivery_time#}</em> {#$langData['waimai'][10][13]#} {#* 送达 *#}
+									{#/if#}
+								</div>
+								<!-- <div class="ps_income" v-if="psIncome > 0">{#echoCurrency type="symbol"#}<b>{{psIncome}}</b></div> -->
+							</div>
+							{#/if#}
+						</div>
+						{#if $detail_additionprice !=0.00#}
+						<div class="addTip"  v-cloak v-if="!order_chaoshi">
+							<span>加成奖励</span>
+							<div class="addDetail"><span><b>{#$detail_needfenzhong#}分钟内</b>送达 额外奖励</span> <span class="count">{#echoCurrency type="symbol"#}<b>{#$detail_additionprice#}</b><span>	</div>
+						</div>
+						{#/if#}
+						<div class="order_detail">
+							<div class="order_start info_box fn-clear">
+								<div class="left_info" v-cloak>
+									<h4 >{#$langData['waimai'][10][14]#}</h4>{#* 取 *#}
+									<transition name="show">
+									<p v-if="!bottomfixed">{#$detail_julishop#}</p>
+									</transition>
+								</div>
+								{#if $ordertype=='waimai'#}
+								<div class="right_detail " data-lng="{#if $detail_coordY#}{#$detail_coordY#}{#else#}{#$detail_store['lng']#}{#/if#}" data-lat="{#if $detail_coordX#}{#$detail_coordX#}{#else#}{#$detail_store['lat']#}{#/if#}" data-title="{#$detail_store.title#}">
+									<p class="shop_name">{#$detail_shopname#}</p>
+									<h3 class="shop_detail">{#$detail_shopaddr#}</h3>
+									{#if $detail_shoptel#}<a v-if="!order_finished" href="tel:{#$detail_shoptel#}" class="telPhone"></a>{#/if#}
+								</div>
+								{#elseif $ordertype=='paotui'#}
+								{#if $detail_type==1#}
+								<div class="right_detail " data-type="{#$detail_type#}" data-lng="{#$detail_buylng#}" data-lat="{#$detail_buylat#}" data-title="{#$detail_store.title#}">
+									<p class="shop_name">{#$detail_shopname#}</p>
+									<h3 class="shop_detail">{#$detail_buyaddress#}</h3>
+									{#if $detail_shoptel#}<a v-if="!order_finished" href="tel:{#$detail_shoptel#}" class="telPhone"></a>{#/if#}
+								</div>
+								{#else#}
+								<div class="right_detail " data-type="{#$detail_type#}" data-lng="{#$detail_buylng#}" data-lat="{#$detail_buylat#}" data-title="{#$detail_store.title#}">
+									<p class="shop_name">{#$detail_person#}</p>
+									<h3 class="shop_detail">{#$detail_buyaddress#}</h3>
+									{#if $detail_tel#}<a v-if="!order_finished" href="tel:{#$detail_tel#}" class="telPhone"></a>{#/if#}
+								</div>
+								{#/if#}
+								{#else#}
+								<div class="right_detail " data-lng="{#if $detail_coordY#}{#$detail_coordY#}{#else#}{#$detail_store['lng']#}{#/if#}" data-lat="{#if $detail_coordX#}{#$detail_coordX#}{#else#}{#$detail_store['lat']#}{#/if#}" data-title="{#$detail_store.title#}">
+									<p class="shop_name">{#$detail_store.title#}</p>
+									<h3 class="shop_detail">{#$detail_store.address#}</h3>
+									{#if $detail_store.tel#}<a v-if="!order_finished" href="tel:{#$detail_store.tel#}" class="telPhone"></a>{#/if#}
+								</div>
+								{#/if#}
+								<transition name="fade">
+								<div class="juli" v-if="bottomfixed">{#$detail_juli#}</div>
+								</transition>
+							</div>
+							{#if $ordertype == 'shop'#}
+							<div class="order_end info_box  fn-clear" data-type="{#$ordertype#}">
+								<div class="left_info" v-cloak>
+									<h4 >{#$langData['waimai'][10][15]#}</h4>{#* 收 *#}
+									<p v-if="!bottomfixed">{#$detail_juliuser#}</p>
+								</div>
+								<div class="right_detail"  data-lng="{#$detail_lng#}" data-lat="{#$detail_lat#}" data-title="{#$detail_person#}">
+									<p class="shop_name">{#$detail_username#}</p>
+									<h3 class="shop_detail">{#$detail_address#}</h3>
+									{#if $detail_usercontact#}<a v-if="!order_finished" href="tel:{#$detail_usercontact#}" class="telPhone"></a>{#/if#}
+								</div>
+							</div>
+							<p v-if="!order_finished && order_note" class="order_remarks">{#$langData['siteConfig'][19][705]#}：{#$detail_note#}</p>
+							{#elseif $ordertype == 'paotui'#}
+							{#if $detail_type==1#}
+							<div class="order_end info_box  fn-clear" >
+								<div class="left_info" v-cloak>
+									<h4 >{#$langData['waimai'][10][15]#}</h4>{#* 收 *#}
+									<p v-if="!bottomfixed">{#$detail_juliuser#}</p>
+								</div>
+								<div class="right_detail"  data-lng="{#$detail_lng#}" data-lat="{#$detail_lat#}" data-title="{#$detail_person#}">
+									<p class="shop_name">{#$detail_person#}</p>
+									<h3 class="shop_detail">{#$detail_address#}</h3>
+									{#if $detail_tel#}<a v-if="!order_finished" href="tel:{#$detail_tel#}" class="telPhone"></a>{#/if#}
+								</div>
+							</div>
+							{#else#}
+							<div class="order_end info_box  fn-clear" >
+								<div class="left_info" v-cloak>
+									<h4 >{#$langData['waimai'][10][15]#}</h4>{#* 收 *#}
+									<p v-if="!bottomfixed">{#$detail_juliuser#}</p>
+								</div>
+								<div class="right_detail"  data-lng="{#$detail_lng#}" data-lat="{#$detail_lat#}" data-title="{#$detail_person#}">
+									<p class="shop_name">{#$detail_getperson#}</p>
+									<h3 class="shop_detail">{#$detail_address#}</h3>
+									{#if $detail_gettel#}<a v-if="!order_finished" href="tel:{#$detail_gettel#}" class="telPhone"></a>{#/if#}
+								</div>
+							</div>
+							{#/if#}
+							<p v-if="!order_finished && order_note" class="order_remarks">{#$langData['siteConfig'][19][705]#}：{#$detail_note#}</p>
+							{#else#}
+
+							<div class="order_end info_box  fn-clear" >
+								<div class="left_info" v-cloak>
+									<h4 >{#$langData['waimai'][10][15]#}</h4>{#* 收 *#}
+									<p v-if="!bottomfixed">{#$detail_juliuser#}</p>
+								</div>
+								<div class="right_detail"  data-lng="{#$detail_lng#}" data-lat="{#$detail_lat#}" data-title="{#$detail_person#}">
+									<p class="shop_name">{#$detail_person#}</p>
+									<h3 class="shop_detail">{#$detail_address#}</h3>
+									{#if $detail_tel#}<a v-if="!order_finished" href="tel:{#$detail_tel#}" class="telPhone"></a>{#/if#}
+								</div>
+							</div>
+							<p v-if="!order_finished && order_note" class="order_remarks">{#$langData['siteConfig'][19][705]#}：{#$detail_note#}</p>
+							{#/if#}
+						</div>
+						{#if ordertype=='waimai'#}
+						<transition name="fade">
+						<div v-if="!order_finished " class="btn_box">
+						<button v-if="detailstate=='4'" v-cloak class="sure_btn" data-state="5" @click="quhuo_sure">{#$langData['waimai'][10][20]#}</button>{#if $detail_state == 4#}{#/if#}{#* 确认取货 *#}
+						<button v-if="detailstate=='5'" v-cloak class="sure_btn" data-type="{#$ordertype#}" data-pt="{#$detail_type#}"  data-state="1" @click="quhuo_sure">{#$langData['waimai'][10][82]#}</button>{#if $detail_state == 5#}{#/if#}{#* 确认成功 *#}
+						</div>
+						</transition>
+						{#elseif $ordertype=='shop'#}
+						<transition name="fade">
+						<div v-if="!order_finished " class="btn_box">
+						{#if $detail_songdate ==0 && $detail_okdate == 0#}<button v-if="detailstate=='6'" v-cloak class="sure_btn" data-state="5" @click="quhuo_sure">{#$langData['waimai'][10][20]#}</button>{#/if#}{#* 确认取货 *#}
+						{#if $detail_songdate !=0 && $detail_okdate == 0#}<button v-if="detailstate=='6'" v-cloak class="sure_btn"  data-state="1" @click="quhuo_sure">{#$langData['waimai'][10][82]#}</button>{#/if#}{#* 确认成功 *#}
+						</div>
+						</transition>
+						{#else#}
+						<transition name="fade">
+						<div v-if="!order_finished " class="btn_box">
+						<button v-if="detailstate=='4'" v-cloak class="sure_btn" data-state="5" @click="quhuo_sure">{#$langData['waimai'][10][20]#}</button>{#if $detail_state == 4#}{#/if#}{#* 确认取货 *#}
+						<button v-if="detailstate=='5'" v-cloak class="sure_btn"  data-state="1" data-type="{#$ordertype#}" data-pt="{#$detail_type#}" @click="quhuo_sure">{#$langData['waimai'][10][82]#}</button>{#if $detail_state == 5#}{#/if#}{#* 确认成功 *#}
+						</div>
+						</transition>
+						{#/if#}
+					</div>
+					<p v-if="order_finished && order_note" class="order_remarks">{#$langData['siteConfig'][19][705]#}：{#$detail_note#}</p>
+				</div>
+
+				<transition name="show">
+					<div v-show="!bottomfixed" class="other_detail">
+						<dl class="dbox">
+							{#$totalPriceCount = 0#}
+							<dt>{#$langData['waimai'][10][83]#}</dt>{#* 商品清单 *#}
+							{#if $ordertype=="waimai"#}
+							{#foreach from=$detail_food item=food#}
+							<dd class="pdetail">
+								<div class="ptitle">{#$food.title#}{#if $food.ntitle#}<span>[{#$food.ntitle#}]</span>{#/if#}</div>
+								<div class="pcount">x{#$food.count#}</div>
+								<div class="pamount">{#echoCurrency type='symbol'#}{#$food.price * $food.count#}</div>
+							</dd>
+							{#$totalPriceCount = $totalPriceCount + $food.price * $food.count#}
+							{#/foreach#}
+							{#else if $ordertype=='shop'#}
+							{#foreach from=$detail_product item=food#}
+							<dd class="pdetail">
+								<div class="ptitle">{#$food.title#}<p style="font-size: .2rem">{#$food.speid#}{#$food.specation#}</p></div>
+								<div class="pcount">x{#$food.count#}</div>
+								<div class="pamount">{#echoCurrency type='symbol'#}{#$food.price#}</div>
+							</dd>
+							{#$totalPriceCount = $totalPriceCount + $food.price*$food.count + $food.logistic#}
+							{#/foreach#}
+							{#else#}
+							<!-- 跑腿商品清单 -->
+							<dd class="pdetail">
+							{#$detail_shop#}
+							</dd>
+							{#/if#}
+						</dl>
+						{#if $ordertype!='shop'#}
+						<dl class="dbox">
+							<dt>付款信息{#if $detail_paytype == $langData['siteConfig'][16][51]#}<em class="fee_state" style="font-size:.26rem; color: #EF2437; margin-left: .1rem">(待收取)</em></dt>{#/if#}
+							{#foreach from=$detail_priceinfo item=price#}
+							{#if $ordertype=='waimai'#}
+							{#if $price.type !='peisong_attach'#}
+							<dd class="pdetail phide_bak" >
+							
+								<div class="ptitle">{#$price.body#}</div>
+								{#/if#}
+								{#if $price.type=='fuwu' || $price.type=='peisong' || $price.type=='peisong_badWeather' || $price.type=='ktvip'  || $price.type=='dabao'#}
+								<div class="pamount" data-type="{#$price.type#}">{#echoCurrency type="symbol"#}{#floatval($price.amount|string_format:"%.2f")#}</div>
+								{#$totalPriceCount = $totalPriceCount + $price.amount#}
+								{#else if $price.type=='quan'#}
+								<div class="pamount" data-type="{#$price.type#}">{#$price.amount#}</div>
+								{#$totalPriceCount = $totalPriceCount + $price.amount#}
+								{#else#}
+								{#if $price.type !='peisong_attach'#}
+								<div class="pamount" data-type="{#$price.type#}">-{#echoCurrency type="symbol"#}{#floatval($price.amount|string_format:"%.2f")#}</div>
+								{#/if#}
+								{#/if#}
+								{#if $price.type =='manjian' || $price.type =='youhui' || $price.type =='shoudan' || $price.type =='auth_waimai' || $price.type =='auth_peisong'#}
+								{#$totalPriceCount = $totalPriceCount - $price.amount#}
+							</dd>
+							{#/if#}
+							{#else#}
+							<dd class="pdetail phide_bak">
+								<div class="ptitle">{#$price.name#}</div>
+								<div class="pamount">{#echoCurrency type="symbol"#}{#floatval($price.value|string_format:"%.2f")#}</div>
+								{#$totalPriceCount = $totalPriceCount + $price.value#}
+							</dd>
+							{#/if#}
+							{#/foreach#}
+							{#if $totalPriceCount < 0 #}
+							{#$totalPriceCount = 0#}
+							{#/if#}
+							<dd class="pdetail phide_bak">
+								{#* 付款方式 *#}
+								<div class="ptitle">{#$langData['siteConfig'][19][52]#}</div>
+								<div class="pamount">{#$detail_paytype#}</div>
+							</dd>
+							{#if $detail_paytype == $langData['siteConfig'][16][51]#}
+							<dd class="pdetail" style="font-weight: bold; color:#EF2437;">
+								<div class="ptitle">待收取</div>
+								<div class="pamount">{#echoCurrency type="symbol"#}{#floatval($totalPriceCount|string_format:"%.2f")#}</div>
+							</dd>
+							{#else#}
+							<dd class="pdetail" style="font-weight: bold;">
+								<div class="ptitle">实付</div>
+								<div class="pamount">{#echoCurrency type="symbol"#}{#floatval($totalPriceCount|string_format:"%.2f")#}</div>
+							</dd>
+							{#/if#}
+
+						</dl>
+						{#else#}
+						<dl class="dbox">
+							<dt>付款信息{#if $detail_paytype == $langData['siteConfig'][16][51]#}<em class="fee_state" style="font-size:.26rem; color: #EF2437; margin-left: .1rem">(待收取)</em></dt>{#/if#}
+							{#foreach from=$detail_priceinfo item=price#}
+							<dd class=" phide_bak">
+								{#if $price.type !='peisong_attach'#}
+								<div class="ptitle">{#$price.body#}</div>
+								<div class="pamount">-{#echoCurrency type="symbol"#}{#floatval($price.amount|string_format:"%.2f")#}</div>
+								{#$totalPriceCount = $totalPriceCount - $price.amount#}
+								{#/if#}
+							</dd>
+							{#/foreach#}
+							<dd class="pdetail  phide_bak">
+								{#* 付款方式 *#}
+								<div class="ptitle">{#$langData['siteConfig'][19][52]#}</div>
+								<div class="pamount">{#$detail_paytype#}</div>
+							</dd>
+							{#if $detail_paytype == $langData['siteConfig'][16][51]#}
+							<dd class="pdetail" style="font-weight: bold; color:#EF2437;">
+								<div class="ptitle">待收取</div>
+								<div class="pamount">{#echoCurrency type="symbol"#}{#floatval($totalPriceCount|string_format:"%.2f")#}</div>
+							</dd>
+							{#else#}
+							<dd class="pdetail" style="font-weight: bold;">
+								<div class="ptitle">实付</div>
+								<div class="pamount">{#echoCurrency type="symbol"#}{#floatval($totalPriceCount|string_format:"%.2f")#}</div>
+							</dd>
+							{#/if#}
+						</dl>
+						{#/if#}
+						<dl class="dbox">
+							<dt>{#$langData['waimai'][10][84]#}</dt>{#* 订单信息 *#}
+							<dd class="pdetail">
+								<div class="ptitle">{#$langData['waimai'][1][206]#}</div>{#* 订单编号 *#}
+								<div class="pamount">{#$detail_ordernum#}</div>
+							</dd>
+							<dd class="pdetail">
+								<div class="ptitle">{#$langData['waimai'][1][214]#}</div>{#* 下单时间 *#}
+								<div class="pamount">{#if $ordertype != 'shop'#}{#$detail_pubdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#else#}{#$detail_orderdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</div>
+							</dd>
+						</dl>
+
+						<dl class="dbox getCount">
+							<dt>{#$langData['waimai'][10][85]#}</dt>{#* 收入详情 *#}
+							<dd class="pdetail">
+								<div class="ptitle">{#$langData['waimai'][10][86]#}</div>{#* 基础配送 *#}
+								<div class="pamount">{#echoCurrency type='symbol'#}{#if $ordertype != 'shop'#}{#$detail_baseprice#}{#else#}{#$detail_pslogistic#}{#/if#}</div>
+							</dd>
+							{#if $detail_additionprice !=0.00#}
+							<dd class="pdetail">
+								<div class="ptitle">加成奖励({#$detail_needfenzhong#}分钟内完成可得)</div>{#* 小费 *#}
+								<div class="pamount">{#echoCurrency type='symbol'#}{#$detail_additionprice#}</div>
+							</dd>
+							{#/if#}
+							{#if $detail_tip#}
+							<dd class="pdetail">
+								<div class="ptitle">{#$langData['waimai'][10][11]#}</div>{#* 小费 *#}
+								<div class="pamount">{#echoCurrency type='symbol'#}{#$detail_tip#}</div>
+							</dd>
+							{#/if#}
+							{#if $detail_cptype == 2 && $detail_cpmoney > 0#}
+							<dd class="pdetail" style="color: #EF2437;">
+								<div class="ptitle">准时宝赔付</div>
+								<div class="pamount">-{#echoCurrency type='symbol'#}{#$detail_cpmoney#}</div>
+							</dd>
+							{#/if#}
+<!--							{#if $ordertype != 'shop'#}-->
+<!--							<dd class="pdetail">-->
+<!--								<div class="ptitle">平台服务费</div>-->
+<!--								<div class="pamount">-{#echoCurrency type='symbol'#}{#$detail_serviceprice#}</div>-->
+<!--							</dd>-->
+<!--							{#/if#}-->
+							<dd class="allcount">
+								<span class="allpay_tit">{#$langData['waimai'][10][87]#}</span>{#* 本单收入 *#}
+								<span class="allpay_num">{#echoCurrency type='symbol'#}{#if $ordertype != 'shop'#}{#$detail_peisongprice#}{#else#}{#$detail_tip + $detail_pslogistic#}{#/if#}</span>
+							</dd>
+<!--							<dd class="p_tip">{#$langData['waimai'][10][88]#}</dd>{#* 由您所在劳务公司发放，如有疑问请于所属劳务公司咨询 *#}-->
+						</dl>
+						{#if $ordertype=="waimai"#}
+						<dl class="arr_time dbox ">
+							<dt>{#$langData['waimai'][10][89]#} <span>{#$detail_yjtime|date_format:"%Y-%m-%d %H:%M:%S"#}</span></dt>{#* 预计送达 *#}
+							<dd class="time_show">
+								<ul class="timelist">
+
+									<li class="time_li">
+										<h3>{#if $detail_peidate#}{#$detail_peidate|date_format:"%H:%M"#}{#else#}-{#/if#}</h3>
+										<p>{#$langData['waimai'][10][90]#}</p>{#* 接单 *#}
+									</li>
+									<li class="time_li {#if $detail_chaoshi ==1 && $detail_totimediff > $detail_chucan_time#} chaoshi_li {#/if#}">
+										<h3>{#if $detail_tostoredate#}{#$detail_tostoredate|date_format:"%H:%M"#}{#else#}-{#/if#}</h3>
+										<p>{#$langData['waimai'][10][91]#}</p>{#* 到店 *#}
+									</li>
+
+
+									<li class="time_li {#if $detail_chaoshi ==1 && $detail_songdatediff > $detail_qstime#} chaoshi_li {#/if#}">
+										<h3>{#if $detail_songdate#}{#$detail_songdate|date_format:"%H:%M"#}{#else#}-{#/if#}</h3>
+										<p>{#$langData['waimai'][10][19]#}</p>{#* 取货 *#}
+									</li>
+
+									<li class="time_li {#if $detail_chaoshi ==1 && $detail_okdate#} chaoshi_li {#/if#}">
+										<h3>{#if $detail_okdate#}{#$detail_okdate|date_format:"%H:%M"#}{#else#}-{#/if#}</h3>
+										<p>{#$langData['waimai'][10][13]#}</p>{#* 送达 *#}
+									</li>
+
+								</ul>
+								{#if $detail_chaoshi ==1 && $detail_tostoredate #}
+							<dd class="ps_tip">{#if $detail_cdtype ==1 #}<p style="color: red;">{#$langData['waimai'][10][92]#}</p>{#else#}<p><i style="color: #EF2438;">{#$langData['waimai'][10][93]#}</i>,{#$langData['waimai'][10][94]#}</p> {#/if#}</dd>
+							{#/if#}
+							</dd>
+						</dl>
+						{#/if#}
+						{#if $ordertype !='shop' #}
+						<div class="btnsgroup" v-if="!order_finished" >
+							{#if $detail_state == 4#}{#if $ordertype =='waimai' && $detail_qsturennum>0#}<button type="button" class="zhuand" data-state="99" @click="zhuan_sure">{#$langData['waimai'][4][33]#}<em>({#$langData['waimai'][10][95]|replace:"1":$detail_qsturennum#})</em></button>{#* 转单 剩余1次 *#}
+							{#/if#}{#/if#}
+							<!-- <button type="button" v-if="detailstate=='4'"  v-cloak class="quhuo" data-state="5" @click="quhuo_sure">{#$langData['waimai'][10][20]#}</button>{#* 确认取货 *#} -->
+							<!-- <button v-if="detailstate=='5'" v-cloak  data-type="{#$ordertype#}" data-pt="{#$detail_type#}" type="button" class="quhuo" data-state="1" @click="quhuo_sure">{#$langData['waimai'][10][82]#}</button>{#if $detail_state == 5#}{#/if#}{#* 确认成功 *#} -->
+						</div>
+						{#else#}
+                            <div class="btnsgroup"></div>
+							<!-- {#if $ordertype =="shop"#}
+								<div :class="['btnsgroup',{'btmFixed':!orderTop}]" v-if="!order_finished" >
+								{#if  $detail_songdate ==0 && $detail_okdate == 0#}<button v-if="detailstate=='6'" v-cloak class="sure_btn" @click="quhuo_sure" data-state="5">{#$langData['waimai'][10][20]#}</button>{#/if#}{#* 确认取货 *#}
+								{#if  $detail_songdate !=0 && $detail_okdate == 0#}<button v-if="detailstate=='6'" v-cloak class="sure_btn"  data-state="1" @click="quhuo_sure">{#$langData['waimai'][10][82]#}</button>{#/if#}{#* 确认成功 *#}
+								</div>
+							{#/if#} -->
+
+						{#/if#}
+					</div>
+				</transition>
+
+				<transition name="pop" >
+				<alert-model v-if="mash_show" :btn="btns" :msg="alertmsg" :tit="alertit" :inp="ifinp"></alert-model>
+				</transition>
+				<div class="mask" v-if="mash_show" v-cloak></div>
+			</div>
+
+		</div>
+		<script src="{#$templets_skin#}js/axios.min.js"></script>
+		{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+		{#if $site_map=="baidu"#}
+		<script src="https://api.map.baidu.com/getscript?v=3.0&ak={#$site_map_baidu#}=&t=20200824135534"></script>
+		{#else if $site_map=="amap"#}
+		<script src="https://webapi.amap.com/maps?v=1.4.15&key={#$site_map_amap#}&plugin=AMap.Riding"></script>
+		{#else if $site_map == 'google'#}
+		<script src="{#$templets_skin#}js/markerwithlabel.js?v={#$cfg_staticVersion#}"></script>
+		{#/if#}
+		<script src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}"></script>
+	</body>
+</html>

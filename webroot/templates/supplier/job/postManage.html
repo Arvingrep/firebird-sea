@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>招聘系统企业端-职位管理</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/member/pub_supplier.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/postManage.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+            var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+            var hideFileUrl = '{#$cfg_hideUrl#}';
+            var cookiePre = '{#$cfg_cookiePre#}', cfg_clihost = '{#$cfg_clihost#}';
+            var templets = '{#$templets_skin#}';
+            var loupanid = '{#$loupanid#}';
+			var package_job = '{#$company_package_job|default:0#}'; //增值包
+			var canJobs = '{#if $company_combo_job == -1#}999999{#else#}{#$company_canJobs#}{#/if#}'; //可以上架的职位
+			var combo_id = '{#$company_combo_id#}'; //套餐id
+			var combo_job = '{#if $company_combo_job == -1#}999999{#else#}{#$company_combo_job#}{#/if#}'; //套餐上架次数
+			var combo_enddate = '{#$company_combo_enddate#}'; //套餐到期时间
+			var pcount = '{#$company_pcount#}'
+			var tab={#$smarty.get.tab|default:0#};
+		</script>
+	</head>
+	<body class="w1200">
+		{#$pageTitle = '招聘系统企业端'#}
+		<!-- 头部 -->
+		{#include file="top.html" pageTitle=$pageTitle module='job' showMap=2#}
+		<div id="page">
+            <div class="conbox" v-cloak>
+                <div class="left_box">
+					<ul v-cloak>
+						<li v-for=" (item,i) in navList" :class="{'curr':i==currid || i === hoverid}"  @mouseover="hoverid = i" @mouseleave="hoverid = ''">
+							<a :href="item.link" @click.prevent="checkConfig(item,i)">
+								<s v-if="i!=currid && i !== hoverid"><img :src="'{#$templets_skin#}images/'+(i+1)+'.png'" ></s>
+								<s v-else><img :src="'{#$templets_skin#}images/'+(i+1)+'_on.png'" ></s>
+								<span>{{item.txt}}</span>
+							</a>
+						</li>
+					</ul>
+				</div>
+				<div class="right_box">
+					<div class="rConBox" >
+						<h3>职位管理</h3>
+						<div class="tabBox" >
+							<ul v-cloak class="fn-clear">
+								<li v-for="tab in tabsArr" :class="{'curr':currTab == tab.id}" :data-id="tab.id"  @click="currTab = tab.id,state = tab.value">{{tab.text}}<span v-if="tab.count > 0">({{tab.count}})</span></li>
+							</ul>
+							<s></s>
+
+							<div class="searchBox">
+								<el-input
+									@keyup.enter.native="searchPost"
+									placeholder="搜索职位"
+									suffix-icon="el-icon-search"
+									v-model="keywords">
+								</el-input>
+								<el-button  type="primary" class=" el-icon-refresh refresh_post_btn" v-if="tabsArr[0].count && currTab == 0" @click="refreshAllPost">刷新全部{{tabsArr[0] ? '('+ tabsArr[0].count +')' : ''}}</el-button>
+								<el-button  type="primary" class=" el-icon-plus add_post_btn" @click="toEditLink('')">新增职位</el-button>
+							</div>
+						</div>
+						<div class="tableBox">
+							<template v-if="currTab == 0">
+								<el-table :data="tableData" style="width: 100%" ref="table" key='table1' v-loading="isload" @selection-change="selectionChange" @row-click="goLink">
+									<el-table-column
+									class-name="selection_item"
+									type="selection"
+									width="55">
+									</el-table-column>
+									<el-table-column prop="date" label="职位名称" min-width="250" >
+										<template slot-scope="scope">
+											<div :class="{'bottomPadding':scope.row.is_refreshing || scope.row.is_topping}">
+												<h3 class="postName">
+													<b v-if="!scope.row.mianyi">{{numCom(scope.row.min_salary)==numCom(scope.row.max_salary)?numCom(scope.row.min_salary):scope.row.min_salary&&scope.row.max_salary?numCom(scope.row.min_salary)+'-'+numCom(scope.row.max_salary):''}}{{scope.row.salary_type==2?'/小时':scope.row.dy_salary  > 12 ? '·'+scope.row.dy_salary+'薪 ' : ' '}}</b>
+													<b v-else>面议 </b>
+													{{scope.row.title}}
+												</h3>
+												<div class="opt_btns">
+													<a href="javascript:;" class="job_poster" @click.stop="posterFn(0,scope.row.id,scope.row.title,scope.row.show_salary)"><s></s>招聘海报</a>
+													<div class="btn">
+	
+														<el-popover
+															placement="bottom-start"
+															width="340"
+															popper-class="inviteQRcodePop"
+															trigger="hover">
+															<div class="qrCodeBox">
+																<el-divider content-position="center">转发分享职位</el-divider>
+																<div class="qrCode">
+																	<img :src="'/include/qrcode.php?data=' + scope.row.url" alt="">
+																</div>
+																<p><em>手机/微信</em>扫码转发到朋友圈</p>
+															</div>
+															<a href="javascript:;" class="job_share" slot="reference"><s></s>分享朋友圈</a>
+														</el-popover>
+													</div>
+												</div>
+												<div class="topFresh" v-if="scope.row.is_refreshing || scope.row.is_topping">
+													<div class="fresh_post post_manage" v-if="scope.row.is_refreshing && scope.row.refreshDetail && scope.row.refreshDetail.next"><label for="">智能刷新 · </label>下次刷新 <span>{{checkTime(scope.row.refreshDetail.next,4)}}</span>(<em v-if="scope.row.refreshDetail.start_date && scope.row.refreshDetail.end_date">{{checkTime(scope.row.refreshDetail.start_date,3)}} - {{checkTime(scope.row.refreshDetail.end_date,3)}}，</em><em v-if="scope.row.refreshDetail.limit_start && scope.row.refreshDetail.limit_end">{{scope.row.refreshDetail.limit_start}}-{{scope.row.refreshDetail.limit_end}},</em>共{{scope.row.refreshDetail.refresh_count}}次，剩余{{scope.row.refreshDetail.less}}次)</div>
+													<div class="top_post post_manage" v-if="scope.row.is_topping &&  scope.row.toppingDetail &&  scope.row.toppingDetail.top_start"><label for="">职位置顶 · </label> <span>{{checkTime(scope.row.toppingDetail.top_start,4)}}  - {{checkTime(scope.row.toppingDetail.top_end,4)}} </span>({{scope.row.toppingDetail.no_top && scope.row.toppingDetail.no_top.length ? scope.row.toppingDetail.no_top_zh.join('、') + '不置顶，' : ''}} 共{{scope.row.toppingDetail.top_total}}天)</div>
+												</div>
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column prop="date" label="招聘情况"min-width="300">
+										<template slot-scope="scope">
+											<div :class="{'bottomPadding':scope.row.is_refreshing || scope.row.is_topping}">
+												<div class="post_info fn-clear">
+													<ul class="fn-left">
+														<li>投递量 <em>{{scope.row.td}}</em></li>
+														<li>浏览量 <em>{{scope.row.click}}</em></li>
+														<li>被收藏 <em>{{scope.row.collected}}</em></li>
+													</ul>
+													<div class="fn-left">
+														<li>{{scope.row.nature}}</li>
+														<li>{{!scope.row.long_valid  ? '招聘截止 ' + timeTrans(scope.row.valid,2): '长期有效'}}</li>
+														<li>更新时间 {{timeTrans(scope.row.update_time,4)}}</li>
+													</div>
+												</div>
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column  prop="address" label="职位推广" min-width="160" header-align="center" align="center"> 
+										<template slot-scope="scope">
+											<div :class="{'bottomPadding':scope.row.is_refreshing || scope.row.is_topping}">
+												<div class="recOptBtns">
+													<el-popover
+														trigger="hover"
+														placement="bottom-start"
+														width="360">
+														<div class="hover_tip"><em style="color: #FF4F38;">职位置顶：</em>将在列表置顶显示并带置顶标识，强势曝光，抢占人才先机</div>
+														<div class="swicth_box"  slot="reference" @click.stop="showpopularPop(scope.row,1)">
+															<div :class="['toTop_btn swicth' ,{'on':scope.row.is_topping &&  scope.row.toppingDetail &&  scope.row.toppingDetail.top_end}]">
+																<div class="small_switch"><s class="switch_dot"></s></div>
+																<span>置顶</span>
+															</div>
+														</div>
+													</el-popover>
+													<el-popover
+														trigger="hover"
+														placement="bottom-start"
+														width="360">
+														<div class="hover_tip"><em>智能刷新：</em>设置每间隔一段时间自动刷新，置于列表前列，持续稳定曝光</div>
+														<div class="swicth_box"  slot="reference"  @click.stop="showpopularPop(scope.row,2)">
+															<div :class="['refresh_btn swicth' ,{'on':scope.row.is_refreshing &&  scope.row.refreshDetail &&  scope.row.refreshDetail.start_date}]">
+																<div class="small_switch"><s class="switch_dot"></s></div>
+																<span>智能刷新</span>
+															</div>
+														</div>
+													</el-popover>
+													
+												</div>
+											</div>
+										</template>
+									</el-table-column>
+									<el-table-column prop="address" label="操作" min-width="300" header-align="center" align="center">
+										<template slot-scope="scope">
+											<div :class="{'bottomPadding':scope.row.is_refreshing || scope.row.is_topping}">
+
+												<div class="optBtns">
+													<el-button type="plaint" class="goLink" round size="mini" @click.stop="toUrl(scope,1)">匹配</el-button>
+													<el-button type="plaint" class="edit_btn" round  size="mini" @click.stop="toUrl(scope,2)">编辑</el-button>
+													<el-button type="plaint" class="refresh_btn" round  size="mini" @click.stop="refreshPost(scope.row)">刷新</el-button>
+													<el-button type="text" slot="reference" size="small" class="grey off" @click.stop="offPostOnly(scope.row)">下架</el-button>
+													<!-- <el-popconfirm title="确定要下架这一职位？" class="confirmTip" @confirm="offPost(scope.row)" v-if="currTab != 2 && currTab != 3">
+													</el-popconfirm> -->
+													<el-button type="text" slot="reference" size="small" class="grey off" @click.stop="confirmDelPost(scope.row)">删除</el-button>
+												</div>
+											</div>
+											
+										</template>
+									</el-table-column>
+
+									<template slot="empty">
+										<div class="noData" v-if="!isload">
+											<img src="{#$templets_skin#}images/noData_post.png" alt="">
+											<p>暂无相关职位</p>
+										</div>
+										<p v-else>加载中</p>
+									</template>
+								</el-table>
+							</template>
+							<template v-else>
+								<el-table :data="tableData" style="width: 100%" ref="table" key='table2' v-loading="isload"  @selection-change="selectionChange"  @row-click="goLink">
+									<el-table-column 
+									type="selection"
+									width="55">
+									</el-table-column>
+									<el-table-column prop="date" label="职位名称"min-width="250">
+										<template slot-scope="scope">
+											<h3 class="postName">
+												<b v-if="!scope.row.mianyi">{{numCom(scope.row.min_salary)==numCom(scope.row.max_salary)?numCom(scope.row.min_salary):scope.row.min_salary&&scope.row.max_salary?numCom(scope.row.min_salary)+'-'+numCom(scope.row.max_salary):(numCom(scope.row.max_salary)||numCom(scope.row.min_salary))}}{{scope.row.salary_type==2?'/小时':scope.row.dy_salary>12 ? '·'+scope.row.dy_salary+'薪 ' : ' '}}</b>
+												<b v-else>面议 </b>
+												{{scope.row.title}}
+											</h3>
+										</template>
+									</el-table-column>
+									<el-table-column prop="number" label="招聘人数" min-width="120" header-align="center" align="center"> </el-table-column>
+									<el-table-column prop="address" :label="currTab==3?'下架时间':'截止日期'" min-width="120">
+										<template slot-scope="scope">
+											<span>{{currTab==3?timeTrans(scope.row.valid,2):(scope.row.long_valid?'长期有效':'招聘截止 '+timeTrans(scope.row.valid,2))}}</span>
+										</template>
+									</el-table-column>
+									<el-table-column prop="nature" label="职位性质" min-width="120" header-align="center" align="center"> </el-table-column>
+									<template v-if="currTab != 2 && currTab != 1 ">
+										<el-table-column prop="address" :label="currTab == 3 ? '最后更新': '更新时间'" min-width="120" header-align="center" align="center">
+											<template slot-scope="scope">
+												<p>{{timeTrans(scope.row.update_time,1)}}</p>
+											</template>	
+										</el-table-column>
+										<el-table-column prop="address" label="招聘数据" min-width="120" header-align="center" align="center"> 
+											<template slot-scope="scope">
+												<p class="job_data"><span>投递 <s>{{scope.row.td}}</s></span><em>|</em><span>浏览 <s>{{scope.row.click}}</s></span></p>
+											</template>	
+										</el-table-column>
+										<el-table-column v-if="currTab != 3 " prop="address" label="职位推广" min-width="160" header-align="left"> 
+											<template slot-scope="scope">
+												<div class="recOptBtns">
+													<el-popover
+														trigger="hover"
+														placement="bottom-start"
+														width="360">
+														<div class="hover_tip"><em>职位置顶：</em>将在列表置顶显示并带置顶标识，强势曝光，抢占人才先机</div>
+														<div class="swicth_box"  slot="reference">
+															<div :class="['toTop_btn swicth' ,{'on':scope.row.is_topping}]">
+																<div class="small_switch"><s class="switch_dot"></s></div>
+																<span>置顶</span>
+															</div>
+														</div>
+													</el-popover>
+													<el-popover
+														trigger="hover"
+														placement="bottom-start"
+														width="360">
+														<div class="hover_tip"><em>智能刷新：</em>设置每间隔一段时间自动刷新，置于列表前列，持续稳定曝光</div>
+														<div class="swicth_box"  slot="reference">
+															<div :class="['refresh_btn swicth' ,{'on':scope.row.is_refreshing}]">
+																<div class="small_switch"><s class="switch_dot"></s></div>
+																<span>智能刷新</span>
+															</div>
+														</div>
+													</el-popover>
+													
+												</div>
+											</template>
+										</el-table-column>
+										
+									</template>
+									<template v-if="currTab == 2">
+										<el-table-column prop="address" label="审核拒绝理由" min-width="160" header-align="left"> 
+											<template slot-scope="scope">
+												<p style="color:#5283CC;">{{scope.row.refuse_msg}}</p>
+											</template>
+										</el-table-column>
+									</template>
+									<template v-if="currTab == 1">
+										<el-table-column prop="address" label="审核状态" min-width="160" header-align="center" align="center"> 
+											<template slot-scope="scope">
+												<p style="color:#5283CC;">待审核</p>
+											</template>
+										</el-table-column>
+									</template>
+									<el-table-column prop="" label="操作" min-width="200" header-align="center" align="center">
+										<template slot-scope="scope">
+											<el-button type="text" size="small" v-if="currTab == 3" @click.stop="upPost(scope.row,'valid')" class="remarright">重新发布</el-button>
+											<el-button type="text" size="small" @click.stop="toEditLink(scope.row)" class="marright" :style="currTab==2?'margin-right:25px':'margin-right:18px'">{{currTab == 2 ? '修改' : '编辑'}}</el-button>
+											<el-button type="text" slot="reference" size="small" class="grey off" @click.stop="offPostOnly(scope.row,true)" v-if="currTab==1" style="margin-right: 18px;">取消上架</el-button>
+											<el-button type="text" slot="reference" size="small" class="grey off" @click.stop="confirmDelPost(scope.row)">删除</el-button>
+										</template>
+									</el-table-column>
+
+									<template slot="empty">
+										<div class="noData" v-if="!isload">
+											<img src="{#$templets_skin#}images/noData_post.png" alt="">
+											<p>暂无相关职位</p>
+										</div>
+										<p v-else>加载中</p>
+									</template>
+								</el-table>
+							</template>
+							
+							<div class="tableBottom fn-clear">
+								<div class="lOptBox">
+									<el-checkbox label="全选" @change="selectAll()" :value="tableData.length&&(optbultArr.length == tableData.length) ? true : false" :disabled="tableData.length==0?true:false"></el-checkbox>
+									<template v-if="currTab =='0'">
+										<el-button round size="small" @click="refreshPost()" :disabled="tableData.length==0?true:false" :class="tableData.length==0?'':'releasebtn'">批量刷新职位</el-button>
+										<el-button round size="small" @click="confirmOffPost()" :disabled="tableData.length==0?true:false" :class="tableData.length==0?'':'releasebtn'">批量下架职位</el-button>
+									</template>
+									<template v-else-if="currTab =='3'">
+										<el-button round size="small" @click="plUpPost()" :disabled="tableData.length==0?true:false" :class="tableData.length==0?'':'releasebtn'">批量上架职位</el-button>
+										<el-button  round size="small"@click="confirmDelPost()" :disabled="tableData.length==0?true:false" :class="tableData.length==0?'':'releasebtn'">批量删除职位</el-button>
+									</template>
+									<el-button v-else round size="small"@click="confirmDelPost()" :disabled="tableData.length==0?true:false" :class="tableData.length==0?'':'releasebtn'">批量删除职位</el-button>
+								</div>
+								<div class="pageBox">
+									<el-pagination
+									:hide-on-single-page="true"
+									background
+									layout="prev, pager, next"
+									:page-size="10"
+									prev-text="上一页"
+									next-text="下一页"
+									@current-change="changePage"
+									:total="totalCount">
+									</el-pagination>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="confirmTipBox">
+						<div class="title">温馨提示</div>
+						<div class="tipCon">
+							{#if $company_combo_id#}
+							<p>1、当前套餐共可上架<span>{#if $company_combo_job==-1#}无限{#else#}{#$company_combo_job+$company_package_job#}{#/if#}</span>条职位信息</p>
+							{#else#}
+							<p>1、当前未开通套餐，共可上架<span>{#$company_package_job#}</span>条职位信息</p>
+							{#/if#}
+							<p>2、请保证职位信息的真实性、合法性，并及时更新职位信息，如被举报或投诉，经确认发布的信息违反相关规定后，本站将会关闭贵公司的招聘服务，敬请谅解！</p>
+							<p>3、参加自动刷新的招聘职位：刷新后使招聘职位信息置于列表前端，自动定时刷新稳定曝光</p>
+							<p>4、参加置顶服务的招聘职位：我们将在列表置顶显示，并带置顶标识 ！</p>
+						</div>
+					</div>
+				</div>
+            </div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+			<!-- 海报弹窗 -->
+			<div class="poster" @click="posterFn(1)">
+				<!-- 生成海报 -->
+				<div class="p-produce" onclick="event.stopPropagation()">
+					<!-- 关闭按钮 -->
+					<img src="{#$templets_skin#}images/close.png" class="pp-close" @click="posterFn(1)" title="关闭">
+					<p class="pp-title">生成招聘海报</p>
+					<div class="pp-steps">
+						<div class="step1">
+							<ul>
+								<li class="active">
+									<div class="select"></div>
+									<span class="pp-postname"></span>
+									<div class="pp-postsalary"></div>
+								</li>
+							</ul>
+						</div>
+						<div class="step2">
+							<p class="title">选择模板生成</p>
+							<ul>
+								<li v-for="(item,index) in posterData" :key="item.id">
+									<img :src="item.litpic">
+									<div class="btn" @click="produceFn(item.id)">
+										<div>生成海报</div>
+									</div>
+								</li>
+							</ul>
+						</div>
+					</div>
+					<!-- 拖拽区域 -->
+					<div class="pp-drag"></div>
+				</div>
+				<!-- 保存海报 -->
+				<div class="p-save" onclick="event.stopPropagation()" @click="posterFn(2)">
+					<div class="pp-poster" onclick="event.stopPropagation()">
+						<div class="pp-loading">
+							<img src="{#$templets_skin#}images/loading.gif" class="loading">
+							<p>生成中...</p>
+						</div>
+						<div class="pp-show"><img src="" class="ppp-showimg" @load="loadFn()"></div>
+						<a @click="psaveFn" href="javascript:;">保存至本地</a>
+					</div>
+				</div>
+				<!-- 弹窗 -->
+				<div class="p-warning">
+					<p>温馨提示：8个以下职位展示效果更好</p>
+				</div>
+			</div>
+		</div>
+		<div>{#$cfg_statisticscode#}</div>
+	</body>
+	<script type="text/javascript" src="{#$templets_skin#}js/postManage.js?v={#$cfg_staticVersion#}"></script>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <title>微信公众号文章一键导入插件</title>
+  <script type="text/javascript" src="/static/js/core/jquery-1.8.3.min.js"></script>
+  <style>
+    html, body {
+      padding: 0;
+      margin: 0;
+    }
+	.btn {
+		background: url(../../themes/default/images/icons-all.gif) no-repeat;
+	    height: 24px;
+	    width: 96px;
+	    font-size: 12px;
+	    line-height: 24px;
+	    text-align: center;
+	    cursor: default;
+		border: 0;
+		margin-top: 5px;
+		outline: 0;
+		cursor: pointer;
+	}
+	.btn:hover {
+		background-position: 0 -30px;
+	}
+	#tips {display: none; font-style: normal;}
+  </style>
+</head>
+<body>
+	<div class="warp" style="padding-top: 20px;">
+	        <table cellpadding="0" cellspacing="0">
+				<tr>
+					<td colspan="2" class="format">
+	                    <span style="margin-left: 30px; display: block; padding-bottom: 10px;">提示：非公众号文章也可以导入哦~<em id="tips"><br />此功能依赖【一键转载】插件，请先购买并安装！<em></span>
+	                </td>
+				</tr>
+	            <tr height="60">
+	                <td colspan="2" class="format">
+	                    <span style="margin-left: 30px;">文章地址：</span>
+	                    <input style="width:315px; height: 30px;" id="url" type="text" value=""/>
+	                </td>
+	            </tr>
+				<tr>
+					<td colspan="2" class="format" align="right">
+	                    <button class="btn">立即导入</button>
+	                </td>
+				</tr>
+	        </table>
+	</div>
+<script type="text/javascript" src="../internal.js"></script>
+<script>
+$(function(){
+
+	if(typeof parent.adminPath !== 'undefined'){
+		$('#tips').show();
+	}
+
+	$('.btn').click(function(){
+		var t = $(this);
+		var url = $.trim($('#url').val());
+		if(url){
+
+			t.html('导入中...').attr('disabled', true);
+
+			$.ajax({
+				url: '/include/plugins/5/getInfo.php',
+				data: "v=editor&url=" + encodeURIComponent(url),
+				type: "POST",
+				dataType: "json",
+				success: function(data){
+					if(data.state == 100 && data.content){
+
+						editor.setContent(data.content);
+						dialog.close();
+
+					}else{
+
+						alert(data.info ? data.info : '要转载的网站内容解析失败！');
+						t.html('立即导入').attr('disabled', false);
+
+					}
+				},
+				error: function(){
+					alert('网络错误，导入失败！')
+					t.html('立即导入').attr('disabled', false);
+				}
+			})
+
+		}else{
+			alert('请输入要导入的文章地址！');
+			$('#url').focus();
+		}
+	})
+
+});
+</script>
+</body>
+</html>

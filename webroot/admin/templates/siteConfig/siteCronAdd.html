@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var adminPath = "{#$adminPath#}", type = "{#$type#}", day = "{#$day#}", hour = "{#$hour#}", minute = "{#$minute#}", now_type = "{#$now_type#}";
+</script>
+</head>
+
+<body>
+<form action="siteCron.php" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="action" id="action" value="{#$action#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="module">所属模块：</label></dt>
+    <dd>
+      <span id="moduleList">
+        <select name="module" id="module" class="input-medium">
+          <option value="">请选择所属频道</option>
+          {#foreach from=$moduleArr item=m#}
+          <option value="{#$m.name#}"{#if $module == $m.name#} selected{#/if#}>{#$m.title#}</option>
+          {#/foreach#}
+        </select>
+      </span>
+      <span class="input-tips"><s></s>请选择所属模块</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="title">任务名称：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="title" id="title" data-regex=".{1,30}" maxlength="30" value="{#$title#}" />
+      <span class="input-tips"><s></s>请输入任务名称，1-30个字</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>执行时间：</label></dt>
+    <dd>
+      <select id="type" name="type" class="input-small">
+        <option value="month">每月</option>
+        <option value="week">每周</option>
+        <option value="day">每日</option>
+        <option value="hour">每小时</option>
+        <option value="now">每隔</option>
+      </select>
+      <select id="day" name="day" class="input-small" style="display: none;">
+        <option value="1">1日</option><option value="2">2日</option><option value="3">3日</option><option value="4">4日</option>
+        <option value="5">5日</option><option value="6">6日</option><option value="7">7日</option><option value="8">8日</option>
+        <option value="9">9日</option><option value="10">10日</option><option value="11">11日</option><option value="12">12日</option>
+        <option value="13">13日</option><option value="14">14日</option><option value="15">15日</option><option value="16">16日</option>
+        <option value="17">17日</option><option value="18">18日</option><option value="19">19日</option><option value="20">20日</option>
+        <option value="21">21日</option><option value="22">22日</option><option value="23">23日</option><option value="24">24日</option>
+        <option value="25">25日</option><option value="26">26日</option><option value="27">27日</option><option value="28">28日</option>
+        <option value="29">29日</option><option value="30">30日</option><option value="31">31日</option>
+      </select>
+      <select id="week" name="week" class="input-small" style="display: none;">
+        <option value="1">周一</option>
+        <option value="2">周二</option>
+        <option value="3">周三</option>
+        <option value="4">周四</option>
+        <option value="5">周五</option>
+        <option value="6">周六</option>
+        <option value="0">周日</option>
+      </select>
+      <select id="hour" name="hour" class="input-small" style="display: none;">
+        <option value="0">0点</option><option value="1">1点</option><option value="2">2点</option><option value="3">3点</option>
+        <option value="4">4点</option><option value="5">5点</option><option value="6">6点</option><option value="7">7点</option>
+        <option value="8">8点</option><option value="9">9点</option><option value="10">10点</option><option value="11">11点</option>
+        <option value="12">12点</option><option value="13">13点</option><option value="14">14点</option><option value="15">15点</option>
+        <option value="16">16点</option><option value="17">17点</option><option value="18">18点</option><option value="19">19点</option>
+        <option value="20">20点</option><option value="21">21点</option><option value="22">22点</option><option value="23">23点</option>
+      </select>
+      <select id="minute" name="minute" class="input-small" style="display: none;">
+        <option value="0">00分</option>
+        <option value="10">10分</option>
+        <option value="20">20分</option>
+        <option value="30">30分</option>
+        <option value="40">40分</option>
+        <option value="50">50分</option>
+      </select>
+      <input class="input-mini" type="number" style="display: none;" name="now_time" id="now_time" min="1" onkeyup="value=value.replace(/\D+/ig,'')" value="" />
+      <select id="now_type" name="now_type" class="input-small" style="display: none;">
+        <option value="minute">分钟</option>
+        <option value="hour">小时</option>
+        <option value="day">天</option>
+      </select>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="file">执行文件：</label></dt>
+    <dd>
+      <span id="fileList">
+        <select name="file" id="file" class="input-xlarge">
+          <option value="">请选择执行文件</option>
+          {#html_options values=$fileName selected=$file output=$fileList#}
+        </select>
+      </span>
+      <span class="input-tips" style="display: inline-block;"><s></s>请选择任务PHP文件名称，您需要上传相应执行文件到 /include/cron/目录下</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>显示属性：</label></dt>
+    <dd class="radio">
+      {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+</form>
+
+{#$jsFile#}
+</body>
+</html>

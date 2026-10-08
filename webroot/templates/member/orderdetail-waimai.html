@@ -1,0 +1,496 @@
+<h2 class="subtitle">
+	{#$langData['siteConfig'][19][313]#}{#* 订单详情  *#}
+	<a href="{#getUrlPath service='member' type='user' template='order' module='waimai'#}">{#$langData['siteConfig'][10][16]#}</a>{#* 返回我的订单列表  *#}
+
+</h2>
+<script>
+	var detailID = {#$id#}, rates = {#$rates#},state = {#$detail_state#};
+	var lng = '{#$detail_lng#}',//收货人坐标
+	lat = '{#$detail_lat#}',//收货人坐标
+	coordX = '{#$detail_coordX#}',//店铺坐标
+	coordY = '{#$detail_coordY#}',//店铺坐标
+	pslat = '{#$detail_peisongpath_lat#}', //配送员坐标
+	pslng = '{#$detail_peisongpath_lng#}',//配送员坐标
+	pspath = '{#$detail_peisongpath#}';//配送路径
+	var person = {"lng":lng,"lat":lat};//收货人坐标
+	var shop = {"lng":coordY,"lat":coordX};//店铺坐标
+	var ps = {"lng":pslng,"lat":pslat};//配送员坐标
+	var usermoney = '{#$userinfo.money#}';
+
+
+</script>
+
+
+
+{#$stateInfo = ""#}
+{#if $detail_refrundstate == 1#}
+	{#$stateInfo = $langData['siteConfig'][9][30]#}{#* 已退款  *#}
+{#elseif $detail_state == 0#}
+	{#$stateInfo = $langData['siteConfig'][16][53]#}{#* 等待支付  *#}
+{#elseif $detail_state == 1#}
+	{#$stateInfo = $langData['siteConfig'][16][62]#}{#* 订单已完成  *#}
+{#elseif $detail_state == 2#}
+	{#$stateInfo = $langData['waimai'][7][111]#} {#* 等待商家接单  *#}
+{#elseif $detail_state == 3#}
+	{#$stateInfo = $langData['waimai'][7][112]#} {#* 商家已接单  *#}
+{#elseif $detail_state == 6 || $detail_state == 7#}
+	{#$stateInfo = $langData['waimai'][7][119]#}{#*  订单已取消  *#}
+{#/if#}
+{#if $detail_peisongid || $detail_peisongname != ''#}
+	{#if $detail_state == 4 #}
+	{#if $detail_tostoredate == 0#}
+	{#$stateInfo = $langData['waimai'][7][114]#} {#* 骑手已接单  *#}
+	{#else#}
+	{#$stateInfo = '骑手已到店'#}
+	{#/if#}
+	{#/if#}
+	{#if $detail_state == 5#}
+	{#$stateInfo = $langData['waimai'][7][116]#} {#* 骑手配送中  *#}
+	{#/if#}
+{#/if#}
+
+<dl class="info-section">
+	<dt>
+		<!--订单状态-->
+		<span class="info-title">{#$stateInfo#} ></span>
+		{#if $detail_state == 0#}
+			<div class="btn_group">
+				<!-- <a href="javascript:;" class="cancel_btn btn">{#$langData['siteConfig'][6][65]#}</a>    {#* 取消订单 *#} -->
+				<a href="javascript:;" class="btn btn-bg popPay" data-ordernum="{#$detail_ordernum#}">{#$langData['waimai'][8][10]#}</a>{#*  去付款  *#}
+			</div>
+		{#elseif $detail_state == 1#}
+			<div class="btn_group">
+				<a href="{#getUrlPath service='waimai'  template='shop' shopid="{#$detail_sid#}"#}" class="rebuy_btn">{#$langData['waimai'][7][118]#}</a>    {#* 再来一单 *#}
+				<a href="{#getUrlPath service='member' type='user' template='write-comment-waimai' id=$detail_id#}" class="btn btn-bg">{#$langData['siteConfig'][6][116]#}</a>    {#* 去评价 *#}
+			</div>
+		{#elseif $detail_state == 2#}
+			<div class="btn_group">
+				<a href="javascript:;" class="cancel_btn btn">{#$langData['siteConfig'][6][65]#}</a>    {#* 取消订单 *#}
+			</div>
+		{#elseif $detail_state == 3#}
+			<div class="btn_group">
+				{#if $detail_selftime==0#}
+		 		<a href="javascript:;" class="cancel_btn">{#$langData['siteConfig'][6][65]#}</a>    {#* 取消订单 *#}
+				{#/if#}
+		 		<a href="tel:{#$detail_shoptel#}" class="contact_btn btn-bg">{#$langData['waimai'][7][113]#}</a>    {#* 联系商家 *#}
+		 	</div>
+		{#elseif $detail_state == 4 || $detail_state == 5#}
+			<div class="btn_group">
+				<!-- <a href="javascript:;" class="cancel_btn">{#$langData['siteConfig'][6][65]#}</a>   {#* 取消订单 *#} -->
+				<a href="tel:{#$detail_peisongphone#}" class="contact_btn btn-bg">{#$langData['waimai'][7][115]#}</a>   {#* 联系骑手 *#}
+			</div>
+		{#elseif $detail_state == 6 || $detail_state == 7#}
+			<div class="btn_group">
+				<a href="{#getUrlPath service='waimai'  template='shop' shopid="{#$detail_sid#}"#}" class="btn rebuy_btn">{#$langData['waimai'][7][118]#}</a>   {#* 再来一单 *#}
+			</div>
+		{#/if#}
+
+	</dt>
+
+	{#if $detail_state == 0#}
+		<dd class="last">
+			<p>{#$langData['waimai'][7][110]|replace : '1' : '30'#}</p>{#* 请在1分钟内完成支付，超时将自动取消 *#}
+			<p class="cdown" id="cdown"><i></i>{#$langData['siteConfig'][16][53]#} <em>00:00</em></p>  {#* 等待支付 *#}
+
+		</dd>
+	{#elseif $detail_state == 1#}
+		<dd class="last">
+			<p>{#$langData['waimai'][7][117]#}</p>    {#* 感谢您对本平台的信任，欢迎再次光临。 *#}
+		</dd>
+	{#elseif $detail_state == 2#}
+		<dd class="last">
+			<p>{#$langData['waimai'][8][6]#}</p>{#*  请耐心等待商家确认  *#}
+		</dd>
+	{#elseif $detail_state == 3#}
+		<dd class="last">
+			<p>{#$langData['waimai'][8][7]#}</p>{#*  正在为您准备商品，如有疑问请电话联系商家  *#}
+			{#if $detail_selftime!=0#}
+			<p>请于{#date("Y-m-d H:i:s",$detail_selftime)#}取餐</p>
+          <p class="qxCode">取餐码：<em>{#$detail_qcma#}</em></p>
+			{#/if#}
+			<div class="map">
+			  <div id="map"></div>
+			</div>
+		</dd>
+	{#elseif $detail_state == 4#}
+		<dd class="last">
+			<p>({#$detail_peisonglogistic#}){#$langData['siteConfig'][16][59]|replace:"1":$detail_peisongname#}</p>{#* 配送员【1】正在赶往店铺为您取货 *#}
+		{#if $detail_peisongpath_lat && $detail_peisongpath_lng#}
+			<div class="map">
+			  <div id="map"></div>
+			</div>
+		{#/if#}
+		</dd>
+	{#elseif $detail_state == 5#}
+		<dd class="last">
+			<p>{#$langData['waimai'][8][9]#}</p>{#*  正在配送中，很快就能收到了哦  *#}
+			<!-- <div class="map_show"> -->
+				<div class="map">
+				  <div id="map" class="sub-map"></div>
+				</div>
+				<div class="mapPath">
+				  <div id="mapPath"></div>
+				  <div class="mapBtn">
+				    <button id="closeMap"></button>
+				    <button id="refreshMap"></button>
+				  </div>
+				</div>
+			<!-- </div> -->
+		</dd>
+	{#elseif $detail_state == 6 || $detail_state == 7#}
+		<dd class="last">
+			<p>{#$detail_failed#}</p>
+		</dd>
+	{#/if#}
+</dl>
+
+<div class="order_wrap">
+	<dl class="store-section fn-clear">
+		<dt><img src="{#$detail_shop_banner#}" alt=""></dt>
+		<dd class="info_dd">
+			<div class="store-title">
+				<h2 class="tit"><a href="{#getUrlPath service='waimai'  template='shop' shopid="{#$detail_sid#}"#}">{#$detail_shopname#}</a></h2>
+				<a href="tel:{#$detail_shoptel#}" class="contact_shop"><i></i>{#$detail_shoptel#}</a>
+			</div>
+			<div class="orderNum">{#$langData['siteConfig'][19][308]#}：{#$detail_ordernum#}</div>
+		</dd>
+		<dd class="collect_group ">
+			<!--判断店铺是否已收藏-->
+	        <a href="javascript:;" class="store-btn" data-id='{#$detail_sid#}'><button><em></em><span>收藏</span></button></a>
+		</dd>
+
+	</dl>
+	<div class="list_wrap fn-clear">
+		<div class="left_order fn-left">
+   		    {#* 商品 *#}  {#* 份数 *#}  {#* 小计 *#}
+      		<div class="left_table"><span>{#$langData['waimai'][1][43]#}</span><span class="fen">{#$langData['waimai'][8][66]#}</span><span class="ji">{#$langData['waimai'][7][36]#}</span></div>
+	     	<div class="car_list">
+	        	<div id="cartList">
+		        	{#foreach from=$detail_food item=food#}
+
+					{#$price =  $food.price#}
+		        	<div class="car_t1 fn-clear"><p class="car_title fn-clear"><span class="car_h1 fn-left">{#$food.title#}{#if $food.ntitle#}<br><small>{#$food.ntitle#}</small>{#/if#}</span><span class="car_h2 fn-left">{#$food.count#}</span><em class="fn-right car_h3">{#echoCurrency type='symbol'#}{#$food.count * $price#}</em></p></div>
+					{#/foreach#}
+		        </div>
+
+		        <div class="car_t2">
+		          <ul>
+		          	{#foreach from=$detail_priceinfo item=price#}
+					{#if $price.type == "dabao"#}
+		            <li id="dabao"><span class="spantit">{#$langData['waimai'][8][67]#}</span><em class="fn-right">{#echoCurrency type='symbol'#}<span id="dabaoPrice">{#$price.amount#}</span></em></li>	{#* 餐盒 *#}
+		            {#elseif $price.type == "peisong"#}
+		            <li id="peisong"><span class="spantit">{#$langData['waimai'][1][19]#}</span><em class="fn-right">{#echoCurrency type='symbol'#}<span id="peisongPrice">{#$price.amount#}</span></em></li>	{#* 配送费 *#}
+					
+		            {#elseif $price.type == "peisong_badWeather"#}
+		            <li id="peisong_badWeather"><span class="spantit">{#$price.body#}</span><em class="fn-right">{#echoCurrency type='symbol'#}<span id="peisong_badWeatherPrice">{#$price.amount#}</span></em></li>	{#* 配送费 *#}
+		            {#elseif $price.type == "fuwu"#}
+		            <li id="addservice"><span class="spantit">{#$price.body#}</span><em class="fn-right">{#echoCurrency type='symbol'#}<span id="fuwuPrice">{#$price.amount#}</span></em></li>
+		            {#/if#}
+	              	{#/foreach#}
+     				{#if $detail_zsbprice!='0'#}
+	            	<li id="zsb"><span class="spantit">{#$langData['siteConfig'][18][92]#}</span><em class="fn-right">{#echoCurrency type='symbol'#}<span id="zsbPrice">{#$detail_zsbprice#}</span></em></li>
+     				{#/if#}
+		          </ul>
+		        </div>
+
+		        <div class="car_t4">
+		          <ul>
+		          	{#foreach from=$detail_priceinfo item=price#}
+		          	{#if $price.type == "quan"#}
+		          	<li class="quan fn-clear hui" data-id=""><i class="icon_quan"></i><em>{#$langData['waimai'][2][36]#}</em><span>{#$price.amount#}</span></li>	 {#*  优惠券 *#}
+					{#elseif $price.type == "fan"#}
+		            <li class="fan fn-clear hui"><i class="icon_fan"></i><em>{#$langData['waimai'][7][32]#}</em><span>{#$price.body#}</span></li> {#* 满返商家优惠券 *#}
+		            {#/if#}
+		            {#/foreach#}
+                    {#if $detail_pointprice > 0#}
+					<li class="fan fn-clear hui"><i class="icon_jifen"></i><em>{#$cfg_pointName#}抵扣</em><span>{#$detail_pointprice#}</span></li>
+                    {#/if#}
+		          </ul>
+		        </div>
+
+		        <div class="car_t3">
+			        <ul>
+			          	{#foreach from=$detail_priceinfo item=price#}
+			          	{#if $price.type == "youhui" || $price.type == "manjian" || $price.type == "shoudan"#}
+			            <li class="hui"><i class="icon_zhe"></i>{#$price.body#}<span class="yprice">-{#echoCurrency type='symbol'#}{#$price.amount#}</span></li>
+			            {#elseif $price.type == "manjian"#}
+			            <li id="manjian" class="fn-hide hui"><i class="icon_jian">{#$price.body#}</i><span class="yprice">-{#echoCurrency type='symbol'#}{#$price.amount#}</span></li>
+			            {#elseif $price.type == "shoudan"#}
+			 			<li id="shou" class="fn-hide hui"><i class="icon_shou">{#$price.body#}</i><span class="yprice">-{#echoCurrency type='symbol'#}{#$price.amount#}</span></li>
+						{#elseif $price.type == "auth_waimai"#}
+						<li id="vip" class="hui"><span class="vip_icon"><i class="icon_vip"></i>会员享{#$userinfo.privilege['waimai']#}折</span><span class="yprice">-{#echoCurrency type='symbol'#}{#$price.amount#}</span></li>
+						{#elseif $price.type == "auth_peisong"#}
+						<li id="auth_peisong" class="hui"><span class="vip_icon"><i class="icon_vip"></i>{#$price.body#}</span><span class="yprice">-{#echoCurrency type='symbol'#}{#$price.amount#}</span></li>
+			 			{#/if#}
+			            {#/foreach#}
+			        </ul>
+		        </div>
+
+
+		        <div class="car_tprice">
+		        	{#*  实际支付 *#}
+		          <p class="price"><span>{#$langData['waimai'][8][75]#}：</span><em>{#echoCurrency type='symbol'#}</em><strong>{#$detail_amount#}</strong></p>
+		        </div>
+
+		     </div>
+		</div>
+		<div class="right-con fn-right" >
+			{#if $detail_selftime!=0#}
+			<!--自取信息 s-->
+			<div>
+				<h2 class="right-title">{#$langData['waimai'][7][126]#}</h2>{#*  自取信息 *#}
+				<ul>
+					<li>
+						<label>{#$langData['waimai'][7][125]#}：</label>
+						<span>{#date("Y-m-d H:i:s",$detail_selftime)#}</span>
+					</li>{#* 自取时间 *#}
+
+					<li>
+						<label>{#$langData['siteConfig'][19][56]#}：</label>
+						<span>{#$detail_tel#}</span>
+					</li>{#* 联系电话 *#}
+					<li>
+						<label>{#$langData['waimai'][7][98]#}：</label>
+						<span>{#$detail_shopaddr#}</span>
+					</li>{#* 商家地址 *#}
+				</ul>
+			</div>
+			<!--自取信息 e-->
+			{#else#}
+			<div>
+				<h2 class="right-title">{#$langData['siteConfig'][26][127]#}</h2>{#*  配送信息 *#}
+				<ul>
+					<li>
+						<label>{#$langData['siteConfig'][19][55]#}：</label>
+						<span>{#$detail_person#}</span>
+					</li>{#* 收货人 *#}
+
+					<li>
+						<label>{#$langData['siteConfig'][19][56]#}：</label>
+						<span>{#$detail_tel#}</span>
+					</li>{#* 联系电话 *#}
+					<li>
+						<label>{#$langData['siteConfig'][19][57]#}：</label>
+						<span>{#$detail_address#}</span>
+					</li>{#* 送货地址 *#}
+				</ul>
+				{#if $detail_peisongid#}
+				<ul>
+					<li>
+						<label>{#$langData['waimai'][7][122]#}：</label>
+						<span>{#$detail_delivery_service#}</span>
+					</li>{#* 配送方式 *#}
+					<li>
+						<label>{#$langData['waimai'][7][123]#}：</label> {#* 配送骑手 *#}
+
+						<span>{#$detail_peisongname#}<a href="tel:{#$detail_peisongphone#}" class="contact_shop"><i></i>{#$detail_peisongphone#}</a></span>
+					</li>
+				</ul>
+				{#/if#}
+			</div>
+			{#/if#}
+			<div>
+				<h2 class="right-title">{#$langData['siteConfig'][19][319]#}</h2>{#*  订单信息 *#}
+				<ul class="last-ul">
+					{#* 订单编号 *#}
+					<li>
+						<label>{#$langData['siteConfig'][19][50]#}：</label>
+						<span>{#$detail_ordernum#}</span>
+					</li>
+					{#* 下单时间 *#}
+					<li>
+						<label>{#$langData['siteConfig'][19][51]#}：</label>
+						<span>{#$detail_pubdate|date_format:"%Y-%m-%d %H:%M:%S"#}</span>
+					</li>
+					{#* 预订时间 *#}
+					{#if $detail_reservesongdate#}
+					<li>
+						<label>预订时间：</label>
+						<span>{#$detail_reservesongdate|date_format:"%Y-%m-%d %H:%M:%S"#}</span>
+					</li>
+					{#/if#}
+					{#* 付款方式 *#}
+					<li>
+						<label>{#$langData['siteConfig'][19][52]#}：</label>
+						<span>{#$detail_paytype#}</span>
+					</li>
+					{#* 订单状态 *#}
+					<li>
+						<label>{#$langData['siteConfig'][16][50]#}：</label>
+						<span> {#if $detail_state == 0#}
+						{#$langData['siteConfig'][9][22]#}    {#* 未付款 *#}
+						{#elseif $detail_state == 1#}
+						{#$langData['siteConfig'][6][3]#}    {#* 完成 *#}
+						{#elseif $detail_state == 2#}
+						{#$langData['siteConfig'][9][11]#}    {#* 待确认 *#}
+						{#elseif $detail_state == 3#}
+						{#$langData['siteConfig'][9][46]#}    {#* 待配送 *#}
+						{#elseif $detail_state == 4#}
+						{#$langData['siteConfig'][16][114]#}   {#*  已接单  *#}
+						{#elseif $detail_state == 5#}
+						{#$langData['siteConfig'][16][115]#}    {#*  配送中  *#}
+						{#elseif $detail_state == 6#}
+						{#$langData['siteConfig'][6][112]#}    {#*  取消支付  *#}
+						{#elseif $detail_state == 7#}
+						{#$langData['siteConfig'][9][47]#}     {#* 交易失败 *#}
+						{#/if#}</span>
+					</li>
+
+					{#* 订单备注 *#}
+					<li>
+						<label>{#$langData['siteConfig'][19][705]#}：</label>
+						<span>{#$detail_note#}</span>
+					</li>
+					{#* 退款状态 *#}
+					{#if $detail_refrundstate == 1#}
+					<li>
+						<label>{#$langData['waimai'][1][230]#}：</label>
+						<span> {#if $detail_refrundstate == 1#}
+						{#$langData['siteConfig'][9][30]#}    {#* 已退款 *#}
+						{#/if#}</span>
+					</li>
+					<li>
+						<label>{#$langData['waimai'][4][9]#}：</label>
+						<span> {#if $refrundamount > 0#}&yen;{#$refrundamount#}{#else#}{#$detail_priceamount#}{#/if#}</span>
+					</li>
+					<li>
+						<label>{#$langData['waimai'][6][12]#}：</label>
+						<span>{#$detail_refrundno#}</span>
+					</li>
+					<li>
+						<label>{#$langData['siteConfig'][19][42]#}：</label>
+						<span>{#$detail_refrunddate|date_format:"%m-%d %H:%M:%S"#}</span>
+					</li>
+					{#/if#}
+
+				</ul>
+			</div>
+
+		</div>
+
+
+	</div>
+</div>
+<!--订单跟踪s-->
+<div class="mask_pop"></div>
+<div class="pop_page">
+		<s class="cha"></s>
+		<h2>{#$langData['waimai'][7][127]#}</h2>   {#* 订单跟踪 *#}
+
+		<ul>
+		{#if $detail_state != 6 && $detail_state != 7#}
+			{#if $detail_state >= 0#}
+			<li class="pop_li fn-clear">
+				<div class="li_info">
+					<p class="left_state">{#$langData['siteConfig'][16][52]#}</p>{#* 订单已提交 *#}
+					<p class="right_time">{#$detail_pubdate|date_format:"%m-%d %H:%M"#}</p>
+				</div>
+				<div class="tip">{#$langData['siteConfig'][16][53]#}</div>{#* 等待支付 *#}
+
+			</li>
+			{#/if#}
+			{#if $detail_paytype == $langData['siteConfig'][16][51]#}  {#* 货到付款 *#}
+			<li class="pop_li fn-clear">
+				<div class="li_info">
+					<p class="left_state">{#$langData['siteConfig'][16][51]#}</p>{#* 货到付款 *#}
+					<p class="right_time">{#$detail_paydate|date_format:"%m-%d %H:%M"#}</p>
+				</div>
+				<div class="tip">{#$langData['siteConfig'][16][54]#}</div>{#* 等待商家确认 *#}
+			</li>
+			{#else#}
+				{#if $detail_state >= 2 || $detail_state == 1#}
+				<li class="pop_li fn-clear">
+					<div class="li_info">
+						<p class="left_state">{#$langData['siteConfig'][16][55]#}</p>{#* 支付成功 *#}
+						<p class="right_time">{#$detail_paydate|date_format:"%m-%d %H:%M"#}</p>
+					</div>
+					<div class="tip">{#$langData['siteConfig'][16][54]#}</div>{#* 等待商家确认 *#}
+				</li>
+				{#/if#}
+			{#/if#}
+
+			 {#if $detail_state >= 3 || $detail_state == 1#}
+			<li class="pop_li fn-clear">
+				<div class="li_info">
+					<p class="left_state">{#$langData['siteConfig'][16][56]#}</p>{#* 商家已确认 *#}
+					<p class="right_time">{#$detail_confirmdate|date_format:"%m-%d %H:%M"#}</p>
+				</div>
+				<div class="tip">{#$langData['siteConfig'][16][57]#}</div>{#* 正在为您准备商品，如有疑问请电话联系商家 *#}
+			</li>
+			{#/if#}
+
+			 {#if $detail_peisongid#}
+			   {#if $detail_state >= 4 || $detail_state == 1#}
+			   <li class="pop_li fn-clear">
+			   	<div class="li_info">
+			   		<p class="left_state">{#$langData['siteConfig'][16][58]#}</p>{#* 配送员已接单 *#}
+			   		<p class="right_time">{#$detail_peidate|date_format:"%m-%d %H:%M"#}</p>
+			   	</div>
+					<div class="tip">{#$langData['siteConfig'][16][59]|replace:"1":$detail_peisongname#}</div>{#* 配送员【1】正在赶往店铺为您取货 *#}
+			   </li>
+			   {#/if#}
+			{#if !empty($detail_tostoredate) && $detail_mealtime == 0#}
+				<li class="pop_li fn-clear">
+					<div class="li_info">
+						<p class="left_state">骑手已到店</p>
+						<p class="right_time">{#$detail_tostoredate|date_format:"%m-%d %H:%M"#}</p>
+					</div>
+					<div class="tip">等待店铺出餐</div>
+				</li>
+				{#/if#}
+			   {#if $detail_state >= 5 || $detail_state == 1#}
+			   <li class="pop_li fn-clear">
+					<div class="li_info">
+						{#* 配送员已取货 *#}
+						<p class="left_state">{#$langData['siteConfig'][16][60]#}</p>
+						<p class="right_time">{#$detail_songdate|date_format:"%m-%d %H:%M"#}</p>
+					</div>
+					<div class="tip">{#$langData['siteConfig'][16][61]#}</div>{#* 正在配送中，很快就能收到了哦 *#}
+			   </li>
+			   {#/if#}
+			 {#/if#}
+			 {#if $detail_state == 1#}
+			<li class="pop_li fn-clear">
+				<div class="li_info">
+					{#*  订单已完成  *#}
+					<p class="left_state">{#$langData['siteConfig'][16][62]#}</p>
+					<p class="right_time">{#$detail_okdate|date_format:"%m-%d %H:%M"#}</p>
+				</div>
+				<div class="tip">{#$langData['siteConfig'][16][63]#}</div>{#* 已送达，请给5分好评哦 *#}
+			</li>
+			 {#/if#}
+		{#else#}
+		<li class="pop_li fn-clear">
+			<div class="li_info">
+				<p class="left_state">{#$langData['waimai'][7][119]#}</p>{#* 订单已取消 *#}
+			</div>
+			<div class="tip">{#$detail_failed#}</div>{#* 等待支付 *#}
+		</li>
+		{#/if#}
+		</ul>
+</div>
+{#include file="{#$HUONIAOROOT#}/templates/member/public-pay-pop.html"#}
+<!--订单跟踪s-->
+<script>
+	var site_map = '{#$site_map#}'
+</script>
+<script type="text/javascript" src="{#if $site_map == 'baidu'#}{#$site_map_apiFile|replace:'2.0':'1.0'#}&type=webgl{#else#}{#$site_map_apiFile#}{#/if#}"></script>
+<script type="text/javascript">
+	$(function(){
+	  {#if $detail_state == 0#}
+	  var t = {#$detail_paylimittime#};
+	  function GetRTime(){
+	      var m = 0;
+	      var s = 0;
+	      if(t >= 0){
+	        m = Math.floor(t/60%60);
+	        s = Math.floor(t%60);
+	      t--;
+	      }
+		  $('#cdown em').html(m+':'+s)
+
+	    }
+	    setInterval(GetRTime,1000);
+	  {#/if#}
+	})
+</script>

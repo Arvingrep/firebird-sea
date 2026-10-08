@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <title>聊天记录</title>
+    <script type="text/javascript" src="/static/js/vue/vue-3.5.12.min.js"></script>
+    <script type="text/javascript" src="/static/js/vue/axios.min.js"></script>
+    <script type="text/javascript" src="/static/js/ui/element_plus_2.9.0_zh-cn.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="/static/js/ui/element_plus_2.9.0.js?v={#$cfg_staticVersion#}"></script>
+    <link rel="stylesheet" href="/static/css/ui/element_plus_2.9.0.css?v={#$cfg_staticVersion#}">
+    <style>
+        *{padding: 0;margin: 0;}
+        a{text-decoration: none;color: black;}
+        [v-cloak]{display: none !important;}
+        :root{--hoverTextColor: #3275FA;}
+        /* 换行"..."，默认两行 */
+        .ellipsis{display: -webkit-box;-webkit-line-clamp: 2;overflow: hidden;-webkit-box-orient: vertical;word-break: break-all;}
+        .detailPop{padding: 0;overflow: hidden;}
+        .detailPop .el-dialog__header{padding-bottom: 0;}
+        .d-header{display: flex;justify-content: space-between;align-items: center;height: 60px;box-sizing: border-box;border-bottom: 1px solid #DADEE5;padding: 0px 16px;}
+        .d-header div{font-weight: bold;font-size: 18px;color: #333333;}
+        .d-header img{width: 18px;height: 18px;cursor: pointer;}
+        .d-header img:hover{filter: invert(50%) sepia(69%) saturate(5667%) hue-rotate(206deg) brightness(93%) contrast(99%);}
+        .ddt-item.chat{display: flex;}
+        .ddt-item.chat .left{width: 405px;padding: 0px 20px 0px 12px;box-sizing: border-box;border-right: 1px solid #EAEFF6;flex-shrink: 0;}
+        .ddt-item.chat .left .total{height: 56px;display: flex;align-items: center;font-size: 15px;color: #00030D;}
+        .ddt-item.chat .left .total span{color: #3377FF;}
+        .ddt-item.chat .left .list{display: flex;flex-direction: column;gap: 10px;}
+        .ddt-item.chat .left .list .chatLog{min-height: 80px;background: #F5F7FA;border-radius: 6px;display: flex;flex-direction: column;justify-content: center;padding: 10px 16px;border: 1px solid #F5F7FA;box-sizing: border-box;cursor: pointer;}
+        .ddt-item.chat .left .list .chatLog.active,.ddt-item.chat .left .list .chatLog:hover{border: 1px solid #2672EC;}
+        .ddt-item.chat .left .list .chatLog .tip{font-size: 14px;color: #999999;margin-top: 14px;}
+        .ddt-item.chat .left .list .chatLog .text{display: flex;justify-content: space-between;align-items: baseline;}
+        .ddt-item.chat .left .list .chatLog .text .name{font-weight: bold;font-size: 15px;color: #2D2D2D;}
+        .ddt-item.chat .left .list .chatLog .text .time{font-size: 14px;color: #8F98A4;}
+        .ddt-item.chat .right{padding: 0px 30px 30px;width: 100%;box-sizing: border-box;}
+        .ddt-item.chat .right .title{height: 56px;display: flex;align-items: center;border-bottom: 1px solid #EAEFF6;width: 100%;font-weight: bold;font-size: 16px;color: #00030D;}
+        .ddt-item.chat .right .content{display: flex;flex-direction: column;padding-top: 16px;gap: 26px;}
+        .ddt-item.chat .right .content .log{display: flex;flex-direction: column;gap: 18px;justify-content: center;align-items: center;}
+        .ddt-item.chat .right .content .log .dateLabel{height: 30px;background: #E8E8EB;border-radius: 4px;display: inline-flex;align-items: center;justify-content: center;font-size: 13px;color: #999999;padding: 0 12px;margin-bottom: 8px;}
+        .ddt-item.chat .right .content .log .frag{display: inline-flex;width: 100%;align-items: flex-start;}
+        .ddt-item.chat .right .content .log .frag .name{font-size: 13px;color: #999999;}
+        .ddt-item.chat .right .content .log .frag .avatar{border-radius: 50%;object-fit: cover;width: 36px;height: 36px;margin-right: 10px;}
+        .ddt-item.chat .right .pagination{justify-content: flex-end;margin-top: 60px;}
+        .ci-content{background: #F5F7FA;border-radius: 6px;padding: 10px;margin-top: 8px;}
+        .ci-content.link .cic-right .doc{font-weight: bold;-webkit-line-clamp: 1;}
+        .ci-content.link .cic-right .description{font-size: 13px;color: #999999;-webkit-line-clamp: 4;}
+        .ci-content.card{min-width: 60%;}
+        .cic-card{display: flex;margin-top: 10px;}
+        .cic-card .photo{width: 56px;height: 56px;border-radius: 50%;margin-right: 10px;}
+        .cic-card .info .uname{font-size: 13px;}
+        .cic-card .info .uid{font-size: 12px;color: #999999;}
+        .ci-content.recommend .cic-title{border-bottom: solid 1px #e1e1e5;font-weight: bold;padding-bottom: 8px;}
+        .ci-content.link{display: flex;cursor: pointer;}
+        .cic-pic{width: 56px;height: 56px;object-fit: cover;margin-right: 10px;}
+        .cic-info .linkTitle{font-size: 14px;color: #3b3b3b;}
+        .cic-info .description{font-size: 13px;color: #999;}
+        .cic-info .other{font-size: 13px;color: #ff4e3b;}
+        .contentText{display: flex;align-items: flex-start;flex-direction: column;}
+        .cic-apply{color: #3377FF;}
+        .el-pagination ul{display: flex;}
+        .el-pagination div{margin: 0;}
+        .el-pagination .el-input__inner{border: 0 !important;}
+        .loadingText{height: 88px;display: flex;align-items: center;justify-content: center;}
+    </style>
+</head>
+
+<body>
+    <div class="Shell" id="chatList" v-cloak>
+        <!-- 4.聊天内容弹窗 -->
+        <el-dialog v-model="chatPop" width="800px" modal-class="chatMask" class="detailPop">
+            <template #header>
+                <div class="d-header">
+                    <div>聊天详情</div>
+                </div>
+            </template>
+            <div label="聊天记录" class="ddt-item chat" v-if="chatDetailData.length>0">
+                <div class="right">
+                    <div class="content">
+                        <div class="log" v-for="(item,index) in chatDetailData" :key="index">
+                            <div class="dateLabel">{{item.dateStr}}</div>
+                            <div class="frag" v-for="(itemc,indexc) in item.children" :key="indexc">
+                                <image :src="itemc.fphoto" @error="$event.target.src=errorPhoto" class="avatar"/>
+                                <div class="contentText">
+                                    <div class="name">{{itemc.fname}} {{itemc.timeStr}}</div>
+                                    <!-- 文本消息 -->
+                                    <div class="ci-content" v-if="itemc.type=='text'">{{itemc.content}}</div>
+                                    <!-- 图片 -->
+                                    <div class="ci-content" style="max-width: 45%;" v-else-if="itemc.type=='image'">
+                                        <el-image :src="itemc.content.turl||errorImage" :zoom-rate="1.2" :max-scale="7"
+                                            :min-scale="0.2" :preview-src-list="[itemc.content.turl||errorImage]"
+                                            fit="cover">
+                                        </el-image>
+                                    </div>
+                                    <!-- 语音 -->
+                                    <div class="ci-content card" v-else-if="itemc.type=='audio'">
+                                        <div>[语音]</div>
+                                        <audio controls class="cic-voice" class="voice">
+                                            <source :src="itemc.content.audioUrl"
+                                                :type="`audio/${itemc.content.audioUrl.split('.').reverse()[0]||'amr'}`" />
+                                            播放失败
+                                        </audio>
+                                    </div>
+                                    <!-- 视频 -->
+                                    <div class="ci-content" style="max-width: 45%;" v-else-if="itemc.type=='video'">
+                                        <div style="margin-bottom: 10px;">[视频]</div>
+                                        <video style="width: 100%;" controls>
+                                            <source :src="itemc.content.turl" />
+                                        </video>
+                                    </div>
+                                    <!-- 位置 -->
+                                    <div class="ci-content wx card" style="cursor: pointer;" @click="openMap(itemc.content)"
+                                        v-else-if="itemc.type=='mapshare'">
+                                        <div style="margin-bottom: 10px;">[位置]</div>
+                                        <img :src="itemc.content.mapimg" />
+                                        <div class="cic-title">{{itemc.content.name}}</div>
+                                        <div class="cic-tip">{{itemc.content.address}}</div>
+                                    </div>
+                                    <!-- 好友推荐 -->
+                                    <div class="ci-content recommend" v-else-if="itemc.type=='recfriend'">
+                                        <div class="cic-title">推荐好友</div>
+                                        <div class="cic-card">
+                                            <img :src="itemc.content.f_photo" @error="$event.target.src=errorPhoto" class="photo">
+                                            <div class="info">
+                                                <div class="uname">{{itemc.content.f_name}}</div>
+                                                <div class="uid">ID：{{itemc.content.f_id}}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 好友申请 -->
+                                    <div class="ci-content" v-else-if="itemc.type=='apply'">
+                                        <span class="cic-apply">好友申请-</span>{{itemc.content}}
+                                    </div>
+                                    <!-- 链接卡片 -->
+                                    <div class="ci-content link" @click="linkTo(itemc.content.link)" v-if="itemc.type=='link'">
+                                        <img :src="itemc.content.imgUrl" @error="$event.target.src=errorImage" class="cic-pic">
+                                        <div class="cic-info">
+                                            <div class="linkTitle ellipsis">{{itemc.content.title}}</div>
+                                            <div class="description ellipsis" v-if="itemc.content.description">{{itemc.content.description}}</div>
+                                            <div class="other" v-if="itemc.content.salary||itemc.content.price">{{itemc.content.salary||itemc.content.price}}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <el-pagination background layout="prev, pager, next,jumper,total,sizes" size="small" :pagerCount="4"
+                        v-model:page-size="chatPageSize" v-model:current-page="currPage" :page-sizes="[10, 20,30, 50, 100,200,500]"
+                        :total="chatDetailPage.totalCount" prev-text="上一页" next-text="下一页"
+                        @change="currPage=$event;chatDetail($event);" class="pagination pageSplit">
+                    </el-pagination>
+                </div>
+            </div>
+            <div class="loadingText" v-else>{{loadingDone?'暂无数据':'加载中...'}}</div>
+        </el-dialog>
+    </div>
+</body>
+<script>
+    const { createApp, ref, reactive, toRefs, watch, onMounted } = Vue; //1.vue引入
+    const { ElMessage, ElMessageBox } = ElementPlus;
+    var chatDetailApp = createApp({ //2.创建
+        setup() {
+            // 时间转换
+            let request = (data, url, headers = {}) => {
+                return new Promise((resolve, reject) => {
+                    let dataStr = '';
+                    if (typeof data == "object") {
+                        for (key in data) {
+                            dataStr += `${key}=${data[key]}&`
+                        }
+                    } else {
+                        dataStr = data;
+                    }
+                    axios({
+                        url: url || `../member/memberImChat.php?`,
+                        method: 'POST',
+                        data: dataStr,
+                        headers
+                    }).then(res => {
+                        resolve(res);
+                    }).catch(error => {
+                        reject(error);
+                    })
+                })
+            }
+            let timeChange = (time, config = { Y: 1, M: 1, D: 1, h: 1, m: 1, s: 1, connect: '-' }) => {
+                if (String(time).length < 13) {
+                    time *= 1000;
+                }
+                let targeTime = new Date(time);
+                let year = '';
+                if (config.Y) {
+                    year = `${targeTime.getFullYear()}${config.connect}`;
+                }
+                let month = '';
+                if (config.M) {
+                    month = `${targeTime.getMonth() + 1 < 10 ? `0${targeTime.getMonth() + 1}` : targeTime.getMonth() + 1}${config.D ? config.connect : ''}`;
+                }
+                let day = '';
+                if (config.D) {
+                    day = targeTime.getDate() < 10 ? `0${targeTime.getDate()}` : targeTime.getDate();
+                }
+                let hour = '';
+                if (config.h) {
+                    hour = `${targeTime.getHours() < 10 ? `0${targeTime.getHours()}` : targeTime.getHours()}${config.m ? ':' : ''}`;
+                }
+                let minute = '';
+                if (config.m) {
+                    minute = `${targeTime.getMinutes() < 10 ? `0${targeTime.getMinutes()}` : targeTime.getMinutes()}${config.s ? ':' : ''}`;
+                }
+                let second = '';
+                if (config.s) {
+                    second = targeTime.getSeconds() < 10 ? `0${targeTime.getSeconds()}` : targeTime.getSeconds();
+                }
+                return `${year}${month}${day} ${hour}${minute}${second}`
+            };
+            let errorImage = ref('/static/images/404.jpg');
+            let errorPhoto = ref('/static/images/default_user.jpg');
+            let pageId = ref({
+                fid:0,
+                tid:0
+            });
+            let chatPop = ref(true);
+            let loadingDone = ref(false);
+            let currPage = ref(1);
+            let chatDetailData = ref([]); //弹窗详情
+            let chatDetailPage = ref({});
+            let chatPageSize = ref(10);
+            let chatDetail = async (page) => {
+                loadingDone.value = false;
+                //数据重置
+                chatDetailData.value = [];
+                chatDetailPage.value = {};
+                //获取数据
+                let data = {
+                    dopost: 'getChatInfo',
+                    isread:-1,
+                    userid1: pageId.value.fid,
+                    userid2: pageId.value.tid,
+                    page: currPage.value,
+                    pagestep: chatPageSize.value
+                }
+                let result = await request(data);
+                loadingDone.value = true;
+                if (result.data.state == 100) {
+                    chatDetailPage.value = result.data.pageInfo;
+                    let info = result.data.list;
+                    for (let i = 0; i < info.length; i++) {
+                        let item = info[i];
+                        if (item.type == 'video') { //视频全屏预览
+                            item['show'] = false;
+                        }
+                        // 重新整合数据
+                        let itemDate = timeChange(item.time, { Y: 1, M: 1, D: 1, connect: '-' });
+                        let targetItem = chatDetailData.value.find(res => res.dateStr == itemDate);
+                        if (targetItem) {
+                            targetItem.children.push(item);
+                        } else {
+                            chatDetailData.value.push({
+                                dateStr: timeChange(item.time, { Y: 1, M: 1, D: 1, connect: '-' }),
+                                children: [item],
+                            });
+                        }
+                    }
+                }
+            }
+            watch(pageId,(newValue,oldValue)=>{ chatDetail(1); });
+            //打开位置
+            let openMap = (mapConfig) => {
+                let pageData = {
+                    ...mapSet,
+                    address: mapConfig.address,
+                    lat: mapConfig.lat,
+                    lng: mapConfig.lng,
+                    title: mapConfig.name,
+                };
+                let OpenMap_URL = '';
+                if (pageData.mapType == "baidu") {
+                    OpenMap_URL =
+                        `https://api.map.baidu.com/marker?location=${pageData.lat},${pageData.lng}&title=${encodeURIComponent(pageData.title)}&content=${encodeURIComponent(pageData.address)}&output=html`
+                } else if (pageData.mapType == "google") {
+                    OpenMap_URL =
+                        `https://maps.google.com/?q=${pageData.lat},${pageData.lng}&g=${encodeURIComponent(pageData.address)}+${encodeURIComponent(pageData.cityName)}`
+                } else if (pageData.mapType == "amap") {
+                    OpenMap_URL =
+                        `https://uri.amap.com/marker?position=${pageData.lng},${pageData.lat}&name=${encodeURIComponent(pageData.title)}`
+                }
+                open(OpenMap_URL);
+            }
+            // 打开新页面
+            let linkTo = targetUrl=>{
+                open(targetUrl);
+            }
+            //其他页面获取数据
+            let appData = reactive({
+                pageId,
+                chatPop,
+                chatDetailData,
+                chatDetailPage,
+                chatPageSize,
+                currPage,
+            });
+            //获取数据
+            window.getAppData = (name)=> { return appData[name]; }
+            //设置数据
+            window.setAppData = (name,val)=> { appData[name] = val; }
+            return {
+                errorImage,
+                errorPhoto,
+                chatPop,
+                chatDetailData,
+                chatDetailPage,
+                chatPageSize,
+                loadingDone,
+                currPage,
+                openMap,
+                chatDetail,
+                linkTo
+            }
+        },
+    });
+    chatDetailApp.use(ElementPlus, { locale: ElementPlusLocaleZhCn }); //3.使用ElementPlus
+    chatDetailApp.mount('#chatList'); //4.最后挂载vue
+</script>
+
+</html>

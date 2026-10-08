@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+	<title>沙盘信息</title>
+	<meta name="keywords" content="{#$cfg_keywords#}">
+	<meta name="description" content="{#$cfg_description#}">
+	<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+	<link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/datetimepicker.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$cfg_staticPath#}/css/ui/jquery.chosen.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" href="{#$templets_skin#}css/shapan.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}',
+			staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = '{#$cfg_hideUrl#}';
+		var cookiePre = '{#$cfg_cookiePre#}',
+			cfg_clihost = '{#$cfg_clihost#}';
+		var templets = '{#$templets_skin#}';
+
+		var buildtypenames = ['低层', '高层', '小高层', '联排别墅', '公寓']; //建筑类型
+		// var salestatenames = ['新盘待售','在售','尾盘','售罄']; //销售状态
+		// var existingnames = ['现房','期房']; //销售状态
+		var salestate = 0, //销售状态
+			existing = 0, //楼盘状态
+			buildtype = []; //物业类型
+		var thumbSize = '{#$thumbSize#}',
+			thumbType = "{#$thumbType#}", //缩略图配置
+			addrid = '{#$addrid#}',
+			addrListArr = '{#$addrListArr#}',
+			mapCity = "{#$mapCity#}",
+			subwayCity = 0;
+
+		var peitaoList = [];
+		var imglist = {"list1": '{#$imglist#}',};
+		var currid = 24;
+		var litpic = '{#$litpic#}';
+		var dataList = {#if $data#}{#json_encode($data)#} {#else#} [] {#/if#};
+		
+		var loupanid = '{#$loupanid#}';
+		var dotype = '{#if !$data && !$litpic#}add{#else#}edit{#/if#}';
+		var modelType = 'house';
+        var apartmentList = {#$apartment|json_encode#};
+	</script>
+</head>
+
+<body class="w1200">
+	<div id="page">
+		<!-- 头部 -->
+		{#include file="top.html"#}
+		<div class="conbox">
+			{#include file="left.html"#}
+			<!-- 右侧 -->
+			<div class="right_box">
+				<div class="rConBox">
+					<h3>沙盘信息</h3>
+					<div class="formbox ">
+						<form action="" id="form" class="fn-clear">
+							<div class="imgBox listImgBox">
+								<input type="text" name="litpic" id="litpic" value="{#$litpic#}" class="imglist-hidden" style="position:absolute; opacity:0;" placeholder="请上传图片" />
+								<div class="upload_img  uploadinp filePicker" v-show="!litpic"  id="filePicker1" data-type="card"  data-count="1"  data-imglist="">
+									<s></s>
+									<p>上传沙盘图片</p>
+
+								</div>
+								<ul id="listSection1" class="listSection drag_ul"></ul>
+								 <div id="dzshapan">
+									 <a class="reupload li-rm" v-show="litpic" href="javascript:;" @click="delimg" @mouseover="show_tip(1)" @mouseout="show_tip(0)">重新上传</a>
+									 <template>
+										 <div id="shapan-box" v-show="litpic!=''">
+											 <div id="shapan-obj"><img v-if="litpic" data-val="{#$litpic#}" src='{#$cfg_attachment#}{#$litpic#}' /></div>
+
+											 <div v-for="(d,i) in dataList" :class="['drag',{'on':currChosed==i},'drag_'+d.state]" :id="'drag_'+i"    :style="'top: '+d.coory+'px; left: '+d.coorx+'px; '"  @mouseover="drag(i)">{{d.name}}<i></i></div>
+										 </div>
+									 </template>
+
+								 </div>
+								 <div class="pop_tip">
+										<h5>更换沙盘图将为您保留当前楼栋信息</h5>
+										<p>请注意重新调整标注位置</p>
+								 </div>
+
+
+							</div>
+							<template>
+							<div class="leftCon" v-show="litpic!=''">
+								<ul class="tab_box" v-cloak>
+									<li :class="['tab tab_'+li.state,{'chosed':i == currChosed}]" v-for="(li,i) in dataList" :data-idx="i"  @click="currChosed = i">{{li.name ? li.name + '#' : ''}}<s @click.stop="del_lou(i)"></s></li>
+									<li id="add" @click="addHouse">+增加楼栋</li>
+								</ul>
+								<!-- <input  type="text" class="began" name="began" style="opacity:0; position:absolute;">
+								<input  type="text" class="end" name="end" style="opacity:0; position:absolute;"> -->
+								<div class="tab_list" >
+									<div :class="'form form_'+i" :data-id="i" :id="'sandtxt_'+i" v-for="(form,i) in dataList" v-show="i==currChosed">
+										<div class="inpbox">
+											<label for=""><em>*</em>楼栋号</label>
+											<div class="inp_div">
+												<div class="inp"><input type="text" name="name" onkeyup="this.value=this.value.replace(/\D/g,'')" v-model="form.name" placeholder="请输入楼栋号"><span>#</span></div>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for=""><em>*</em>销售状态</label>
+											<div class="inp_div radiobox">
+												<ul >
+													<li :class="{'chose':form.state==0}" @click="form.state = 0"><input type="radio" name="salestate1" value="0" :checked="form.state==0"><s></s>待开盘</li>
+													<li :class="{'chose':form.state==1}" @click="form.state = 1"><input type="radio" name="salestate1" value="1" :checked="form.state==1"><s></s>在售</li>
+													<li :class="{'chose':form.state==2}" @click="form.state = 2"><input type="radio" name="salestate1" value="2" :checked="form.state==2"><s></s>尾盘</li>
+													<li :class="{'chose':form.state==3}" @click="form.state = 3"><input type="radio" name="salestate1" value="3" :checked="form.state==2"><s></s>售罄</li>
+												</ul>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for="">户型</label>
+											<div class="inp_div">
+												<div class="inp selectBox disflex a-c" style=" width: 500px;">
+                                                    <!-- <select class="col-sm-2 chosen-select data9" name="apartment" v-model="form.apartment" data-placeholder="请选择该楼栋的户型，支持多选。" multiple="multiple" style="width:300px;">
+                                                        <option v-for="(apart,a) in apartmentArr" :value="apart.id">{{apart.title}}</option>
+                                                    </select> -->
+													
+													<template v-for="(hx,hx_ind) in form.apartment">
+														<div class="chosedItem" v-if="hx">
+															<div class="hx">{{checkHX_name(hx)}}</div>
+															<span class="del_hx" @click="delHX(form,hx_ind)"></span>
+														</div>
+													</template>
+													<input type="text" class="selInput" @focus="showPover = true" @blur="showPover = false" placeholder="请选择">
+													<div :class="`selectListBox ${showPover || prverClick?'show':''}`">
+														<div class="selectList">
+															<div :class="['sel_opt disflex a-c j-b',{'active' : form.apartment.includes(apart.id) }]" v-for="(apart,a) in apartmentArr" @click.stop.prevent="choseApart(apart,form)">
+																<div class="hx_info">
+																	<b class="apart_tit">{{apart.title}}</b>
+																	<em class="apart_hx">{{apart.room}}室{{apart.hall}}厅{{apart.guard}}卫 · {{apart.area}}㎡ </em>
+																</div>
+																<div class="chose"></div>
+															</div>
+														</div>
+													</div>
+                                                </div>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for="">单元</label>
+											<div class="inp_div ">
+												<ul class="tab_box dybox disflex">
+													<li class="dy_li disflex a-c" v-for="(dy,d) in form.dyList">
+														<input type="text" maxlength="6" onkeyup="this.value=this.value.replace(/\D/g,'')" v-model="dy.name" placeholder="请填写数字">
+														<!-- <span class="txt_count">{{dy.name.length}}/6</span> -->
+														<span class="del_icon" @click="delDY(form.dyList,d)"></span>
+													</li>
+													<li class="add" @click="addDY(form)">+增加单元</li>
+												</ul>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for=""><em>*</em>层数</label>
+											<div class="inp_div">
+												<div class="inp"><input type="text" name="floor" v-model="form.floor" placeholder="请输入层数"><span>层数</span></div>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for=""><em>*</em>户数</label>
+											<div class="inp_div">
+												<div class="inp"><input type="text" name="hushu" v-model="form.hushu" placeholder="请输入户数"><span>户数</span></div>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for=""><em>*</em>几梯几户</label>
+											<div class="inp_div">
+												<div class="inp xs_inp"><input type="text" name="ti" v-model="form.ti" placeholder="梯数"><span>梯</span></div>
+												<div class="inp xs_inp"><input type="text" name="hu" v-model="form.hu" placeholder="户数"><span>户</span></div>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for=""><em>*</em>均价</label>
+											<div class="inp_div">
+												<div class="inp"><input type="text" name="price" v-model="form.price" placeholder="请输入均价"><span>{#echoCurrency type='short'#}/{#echoCurrency type='areasymbol'#}</span></div>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for=""><em>*</em>开盘时间</label>
+											<div class="inp_div sel_inp">
+												<div class="inp"><input  type="text" class="began" name="began" v-model="form.began" placeholder="请选择开盘时间"><s></s></div>
+											</div>
+										</div>
+										<div class="inpbox">
+											<label for=""><em>*</em>交房时间</label>
+											<div class="inp_div sel_inp">
+												<div class="inp"><input  type="text" class="end" name="end" v-model="form.end"  placeholder="请选择交房时间"><s></s></div>
+											</div>
+										</div>
+									</div>
+									<a href="javascript:;" class="submit" @click="submit" v-show="dataList.length>0">确认提交</a>
+								</div>
+							</div>
+							</template>
+						</form>
+						<div class="loading" v-show="loading"><s></s></div>
+					</div>
+				</div>
+			</div>
+			<div class="foot">
+				<div class="foot-bottom">
+					<div class="bottom wrap">
+						版权所有 © {#$smarty.now|date_format:'%Y'#} {#$cfg_shortname#}. All rights reserved.<br />
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div>{#$cfg_statisticscode#}</div>
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.dragImg.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.event.drag-2.2.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap-datetimepicker.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery-ui-selectable.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/chosen.jquery.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/publicUpload_v2.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/shapan.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

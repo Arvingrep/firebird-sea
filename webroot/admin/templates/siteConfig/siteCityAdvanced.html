@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>城市分站高级设置</title>
+{#$cssFile#}
+<script>
+    var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}", adminPath = "{#$adminPath#}", modelType = action = "{#$action#}", cfg_staticVersion = '{#$cfg_staticVersion#}', cid = {#$cid#};
+</script>
+<style>
+    .advanced {margin-top: 10px; padding-bottom: 20px;}
+	.modulelist {position: relative; float: left; margin-left: 20px; width: 183px;}
+    .modulelist ul {padding: 0; margin: 0;}
+    .modulelist li {width: 85px; float: left; height: 35px; line-height: 35px; background: #c4c4c4; font-size: 14px; margin: 0 1px 1px 0; list-style: none;}
+    .modulelist li a {display: block; padding: 0 12px; color: #fff; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;}
+    .modulelist li.current {background: #2c75e9;}
+    .main {position: relative; overflow: hidden; padding-left: 15px;}
+    .tpl-list {padding: 0;}
+    .tpl-list h5 {margin: 0;}
+    .editform dt {width: 180px;}
+</style>
+</head>
+
+<body>
+<div class="alert alert-success" style="margin:10px 90px 0 20px"><button type="button" class="close" data-dismiss="alert">×</button>提示：此处配置留空不影响使用，系统将调用默认配置信息！</div>
+
+<form action="" method="post" name="editform" id="editform" class="advanced editform clearfix">
+    <input type="hidden" name="action" value="{#$action#}" />
+    <input type="hidden" name="cid" value="{#$cid#}" />
+    <input type="hidden" name="token" id="token" value="{#$token#}" />
+    <div class="modulelist">
+        <ul class="clearfix">
+            <li{#if $action == 'siteConfig'#} class="current"{#/if#}><a href="?cid={#$cid#}&action=siteConfig">系统设置</a></li>
+            <li{#if $action == 'business'#} class="current"{#/if#}><a href="?cid={#$cid#}&action=business">商家设置</a></li>
+            {#foreach from=$moduleArr item=m#}
+            <li{#if $action == $m.name#} class="current"{#/if#}><a href="?cid={#$cid#}&action={#$m.name#}" title="{#$m.title#}">{#$m.title#}</a></li>
+            {#/foreach#}
+        </ul>
+    </div>
+
+    <div class="main">
+		{#if $action != 'siteConfig' && $action != 'business'#}
+		<dl class="clearfix">
+            <dt><label for="state" class="sl">模块开关：</label></dt>
+            <dd>
+                <label><input type="radio" name="state" value="0"{#if !$config[$action]['state']#} checked{#/if#} />启用</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                <label><input type="radio" name="state" value="1"{#if $config[$action]['state']#} checked{#/if#} />停用</label>
+            </dd>
+        </dl>
+		{#/if#}
+
+
+        {#if $action == 'siteConfig'#}
+        <dl class="clearfix">
+            <dt><label for="webname" class="sl">seo标题：</label></dt>
+            <dd>
+                <input class="input-xxlarge" type="text" name="webname" id="webname" value="{#$config[$action]['webname']#}" data-regex=".*" />
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label for="keywords" class="sl">seo关键词：</label></dt>
+            <dd>
+                <input class="input-xxlarge" type="text" name="keywords" id="keywords" placeholder="一般不超过100个字" value="{#$config[$action]['keywords']#}" data-regex=".*" />
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label for="description" class="sl">seo描述：</label></dt>
+            <dd>
+                <textarea name="description" id="description" placeholder="一般不超过200个字" data-regex=".{0,200}">{#$config[$action]['description']#}</textarea>
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label class="sl">自定义LOGO：</label></dt>
+            <dd class="thumb fn-clear listImgBox fn-hide">
+                <div class="uploadinp filePicker thumbtn{#if $config[$action]['weblogo'] != ""#} hide{#/if#}" id="filePicker1" data-type="logo"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+                {#if $config[$action]['weblogo'] != ""#}
+                <ul id="listSection1" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$config[$action]['weblogo']#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$config[$action]['weblogo']#}" data-val="{#$config[$action]['weblogo']#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+                {#else#}
+                <ul id="listSection1" class="listSection thumblist fn-clear"></ul>
+                {#/if#}
+                <input type="hidden" name="litpic" value="{#$config[$action]['weblogo']#}" class="imglist-hidden" id="litpic">
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label for="hotline" class="sl">咨询热线：</label></dt>
+            <dd>
+                <input class="input-large" type="text" name="hotline" id="hotline" value="{#$config[$action]['hotline']#}" data-regex=".*" />
+            </dd>
+        </dl>
+
+        <dl class="clearfix">
+            <dt><label for="areaCode" class="sl">电话区号：</label></dt>
+            <dd>
+                <input class="input-small" type="text" name="areaCode" id="areaCode" value="{#$config[$action]['areaCode']#}" data-regex=".*" />
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label class="sl">版权信息：</label></dt>
+            <dd>
+                <script id="powerby" name="powerby" type="text/plain" style="width:95.4%; height:200px;">{#$config[$action]['powerby']#}</script>
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label for="statisticscode" class="sl">统计代码：</label></dt>
+            <dd>
+                <textarea name="statisticscode" id="statisticscode" style="width: 90%; height: 150px;" placeholder="在第三方网站上注册并获得统计代码">{#$config[$action]['statisticscode']#}</textarea>
+            </dd>
+        </dl>
+        {#else#}
+       
+        <dl class="clearfix">
+            <dt><label for="title" class="sl">seo标题：</label></dt>
+            <dd>
+                <input class="input-xxlarge" type="text" name="title" id="title" value="{#$config[$action]['title']#}" data-regex=".*" />
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label for="keywords" class="sl">seo关键词：</label></dt>
+            <dd>
+                <input class="input-xxlarge" type="text" name="keywords" id="keywords" value="{#$config[$action]['keywords']#}" data-regex=".*" />
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label for="description" class="sl">seo描述：</label></dt>
+            <dd>
+                <textarea name="description" id="description" placeholder="一般不超过200个字" data-regex=".{0,200}">{#$config[$action]['description']#}</textarea>
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label class="sl">自定义LOGO：</label></dt>
+            <dd class="thumb fn-clear listImgBox fn-hide">
+                <div class="uploadinp filePicker thumbtn{#if $config[$action]['logo'] != ""#} hide{#/if#}" id="filePicker1" data-type="logo"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+                {#if $config[$action]['logo'] != ""#}
+                <ul id="listSection1" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$config[$action]['logo']#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$config[$action]['logo']#}" data-val="{#$config[$action]['logo']#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+                {#else#}
+                <ul id="listSection1" class="listSection thumblist fn-clear"></ul>
+                {#/if#}
+                <input type="hidden" name="litpic" value="{#$config[$action]['logo']#}" class="imglist-hidden" id="litpic">
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt></dt>
+            <dd>
+                <span class="input-tips" style="display: block;"><s></s>注意：请先确认模块设置中是否开启了LOGO自定义选项！</span>
+            </dd>
+        </dl>
+        {#if $action == 'zhaopin'#}
+        <dl class="clearfix">
+            <dt><label for="title" class="sl">分享标题：</label></dt>
+            <dd>
+                <input class="input-xxlarge" type="text" name="share_title" id="title" value="{#$config[$action]['share_title']#}" data-regex=".*" />
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label class="sl">分享图片：</label></dt>
+            <dd class="thumb fn-clear listImgBox fn-hide">
+                <div class="uploadinp filePicker thumbtn{#if $config[$action]['share_pic'] != ""#} hide{#/if#}" id="filePicker2" data-type="share_pic"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+                {#if $config[$action]['share_pic'] != ""#}
+                <ul id="listSection2" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_2"><a href='{#$cfg_attachment#}{#$config[$action]['share_pic']#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$config[$action]['share_pic']#}" data-val="{#$config[$action]['share_pic']#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+                {#else#}
+                <ul id="listSection2" class="listSection thumblist fn-clear"></ul>
+                {#/if#}
+                <input type="hidden" name="share_pic" value="{#$config[$action]['share_pic']#}" class="imglist-hidden" id="share_pic">
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label for="title" class="sl">人才简历自动投递：</label></dt>
+            <dd>
+                <div class="optbox">
+                    <label><input type="radio" name="autoApply" value="0"{#if !$config[$action]['autoApply']#} checked{#/if#} />系统默认</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="autoApply" value="1"{#if $config[$action]['autoApply'] == 1#} checked{#/if#} />关闭</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="autoApply" value="2"{#if $config[$action]['autoApply'] == 2#} checked{#/if#} />开启</label>
+                </div>
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt><label for="title" class="sl">平台职位刷新：</label></dt>
+            <dd>
+                <div class="optbox">
+                    <label><input type="radio" name="autojobup" value="0"{#if !$config[$action]['autojobup']#} checked{#/if#} />系统默认</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="autojobup" value="1"{#if $config[$action]['autojobup'] == 1#} checked{#/if#} />关闭</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="autojobup" value="2"{#if $config[$action]['autojobup'] == 2#} checked{#/if#} />开启</label>
+                </div>
+            </dd>
+        </dl>
+        <div class="refreshConfig {#if $config[$action]['autojobup'] != 2#} hide{#/if#}">
+            <dl class="clearfix">
+                <dt><label for="title" class="sl">自动刷新范围：</label></dt>
+                <dd>
+                    <label><input type="radio" name="autojobrange" value="0"{#if !$config[$action]['autojobrange']#} checked{#/if#} />所有职位</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="autojobrange" value="1"{#if $config[$action]['autojobrange']#} checked{#/if#} />后台发布职位</label>
+                </dd>
+            </dl>
+            <dl class="clearfix">
+                <dt><label for="title" class="sl">自动刷新有效期：</label></dt>
+                <dd>
+                    <label><input type="radio" name="autojobperiod" value="7"{#if !$config[$action]['autojobperiod'] ||$config[$action]['autojobperiod'] == 7#} checked{#/if#} />7天</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="autojobperiod" value="15"{#if $config[$action]['autojobperiod'] == 15#} checked{#/if#} />15天</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="autojobperiod" value="30"{#if $config[$action]['autojobperiod'] == 30#} checked{#/if#} />30天</label>
+                </dd>
+            </dl>
+            <dl class="clearfix">
+                <dt><label for="title" class="sl">职位发布时间：</label></dt>
+                <dd>
+                    <label><input type="radio" name="postRefreshCreatePeriodShow" value="0"{#if !$config[$action]['postRefreshCreatePeriod'] || $config[$action]['postRefreshCreatePeriod'] == 0#} checked{#/if#} />不限制</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="postRefreshCreatePeriodShow" value="30"{#if $config[$action]['postRefreshCreatePeriod'] == 30#} checked{#/if#} />30天以内</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="postRefreshCreatePeriodShow" value="60"{#if $config[$action]['postRefreshCreatePeriod'] == 60#} checked{#/if#} />60天以内</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label><input type="radio" name="postRefreshCreatePeriodShow" value="1"{#if $config[$action]['postRefreshCreatePeriod'] != 30 && $config[$action]['postRefreshCreatePeriod'] && $config[$action]['postRefreshCreatePeriod'] != 60#} checked{#/if#} /><input class="input-small" type="number" name="postRefreshCreatePeriodInp" id="postRefreshCreatePeriodInp"  value="{#if $config[$action]['postRefreshCreatePeriod'] != 30 && $config[$action]['postRefreshCreatePeriod'] && $config[$action]['postRefreshCreatePeriod'] != 60#}{#$config[$action]['postRefreshCreatePeriod']#}{#/if#}" />天以内</label>
+                    <input type="hidden" name="postRefreshCreatePeriod" id="postRefreshCreatePeriod" value="{#$config[$action]['postRefreshCreatePeriod']#}">
+                </dd>
+            </dl>
+            <dl class="clearfix">
+                <dt><label for="title" class="sl">自动刷新频率：</label></dt>
+                <dd>
+                   <input type="number" name="autojobfrequency" value="{#$config[$action]['autojobfrequency']#}">
+                   小时
+                </dd>
+            </dl>
+        </div>
+        {#/if#}
+       
+        {#if $action != 'business'#}
+        <dl class="clearfix">
+            <dt><label for="hotline" class="sl">咨询热线：</label></dt>
+            <dd>
+                <input class="input-large" type="text" name="hotline" id="hotline" value="{#$config[$action]['hotline']#}" data-regex=".*" />
+                <span class="input-tips" style="display: inline-block;"><s></s>注意：请先确认模块设置中是否开启了咨询热线自定义选项！</span>
+            </dd>
+        </dl>
+        {#if $action == 'house'#}
+        <dl class="clearfix">
+            <dt><label class="sl">购房群二维码：</label></dt>
+            <dd class="thumb fn-clear listImgBox fn-hide">
+                <div class="uploadinp filePicker thumbtn{#if $config[$action]['qunQR'] != ""#} hide{#/if#}" id="filePicker2" data-type="qunQR"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+                {#if $config[$action]['qunQR'] != ""#}
+                <ul id="listSection2" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_2"><a href='{#$cfg_attachment#}{#$config[$action]['qunQR']#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$config[$action]['qunQR']#}" data-val="{#$config[$action]['qunQR']#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+                {#else#}
+                <ul id="listSection2" class="listSection thumblist fn-clear"></ul>
+                {#/if#}
+                <input type="hidden" name="qunQR" value="{#$config[$action]['qunQR']#}" class="imglist-hidden" id="qunQR">
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt></dt>
+            <dd>
+                <span class="input-tips" style="display: block;"><s></s>将展示在该城市所有楼盘主页引导入群</span>
+            </dd>
+        </dl>
+        {#/if#}
+        {#else#}
+        <dl class="clearfix">
+            <dt><label for="short_video_promote">短视频推广口令：</label></dt>
+            <dd>
+              <textarea class="input-xxlarge" rows="3" name="short_video_promote" id="short_video_promote" placeholder="复制抖音/快手等短视频平台的分享链接，用户访问商家店铺主页或者买单页面，会自动记录推广信息，打开抖音或者快手时会有弹窗推广信息展示！" data-regex=".{0,250}">{#$config[$action]['short_video_promote']#}</textarea>
+              <span class="input-tips"><s></s>商家可自定义推广信息</span>
+            </dd>
+          </dl>
+        {#/if#}
+        {#/if#}
+        <div id="tplList">
+            <dl class="clearfix">
+                <dt><label class="sl">模板风格：</label></dt>
+                <dd>
+                    <div class="tpl-list">
+                        <h5 class="stit"><span class="label label-info">电脑端：</span>{#if $action != 'siteConfig'#}<label class="routerTips" data-toggle="tooltip" data-placement="bottom" data-original-title="如果模板使用了自定义路由，请勾选此项，程序将不再对url地址做任何拦截处理，选择使用的模板名称前如果有vue标识，表示需要开启此项！"><input type="checkbox" id="router" name="router" value="1"{#if $config[$action]['router'] == 1#} checked{#/if#} />开启自定义路由 <i class="icon-question-sign"></i></label>{#/if#}</h5>
+                        <select class="copyTemplate" id="defaultTplList" data-type="">
+                            <option value="">请选择要复制的模板</option>
+                        </select>
+                        <ul class="clearfix" id="tplListUl"></ul>
+                        <input type="hidden" name="template" id="template" value="" />
+                    </div>
+                    <div class="tpl-list touch">
+                        <h5 class="stit"><span class="label label-warning">H5端：</span>{#if $action != 'siteConfig'#}<label class="routerTips" data-toggle="tooltip" data-placement="bottom" data-original-title="如果模板使用了自定义路由，请勾选此项，程序将不再对url地址做任何拦截处理，选择使用的模板名称前如果有vue标识，表示需要开启此项！"><input type="checkbox" id="touchRouter" name="touchRouter" value="1"{#if $config[$action]['touchRouter'] == 1#} checked{#/if#} />开启自定义路由 <i class="icon-question-sign"></i></label>{#/if#}</h5>
+                        <select class="copyTemplate" id="touchDefaultTplList" data-type="touch">
+                            <option value="">请选择要复制的模板</option>
+                        </select>
+                        <ul class="clearfix" id="touchTplListUl"></ul>
+                        <input type="hidden" name="touchTemplate" id="touchTemplate" value="{#$touchTemplate#}" />
+                    </div>
+                </dd>
+            </dl>
+        </div>
+
+
+    {#if $action  == 'waimai'#}
+
+    <dl class="clearfix">
+        <dt><label for="cityDispatch" class="sl">自动派单：</label></dt>
+        <dd>
+            <label><input type="checkbox" name="cityDispatch" value="1"{#if $config[$action]['cityDispatch']#} checked{#/if#} />停用</label>
+        </dd>
+    </dl>
+
+    <dl class="clearfix">
+        <dt><label for="paotuiServiceMoney">跑腿服务费：</label></dt>
+        <dd>
+            <input class="input-large" type="number" min="0" name="paotuiServiceMoney" id="paotuiServiceMoney" maxlength="2" value="{#$config[$action]['serviceMoney']#}" /> 元
+        </dd>
+    </dl>
+    <div class="split_line" style="margin: 20px 0; border-bottom: solid 1px #eee;" ></div>
+    <dl class="clearfix">
+        <dt><label for="badWeatherStateArr" class="sl">是否开启恶劣天气：</label></dt>
+        <dd>
+
+            {#foreach from=$badWeatherStateArr item="item" key="key"#}
+            <label><input type="radio" name="badWeatherState" value="{#$key#}"{#if $config[$action]['badWeatherState'] == $key#} checked{#/if#} />{#$item#}</label>{#if $key >= (count($badWeatherStateArr) - 1)#}&nbsp;&nbsp;&nbsp;&nbsp;{#/if#}
+            {#/foreach#}
+            <!-- <label><input type="radio" name="state" value="1"{#if $config[$action]['state']#} checked{#/if#} />停用</label> -->
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="paotuiServiceMoney">恶劣天气费用增加：</label></dt>
+        <dd>
+            <div class="input-append"><input class="span1 price" type="number" name="badWeatherMoney" value="{#$config[$action]['badWeatherMoney']#}"><span class="add-on">元</span></div>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="paotuiServiceMoney">开始时间：</label></dt>
+        <dd>
+            <input class="input-large" type="text" name="badWeatherStart" id="badWeatherStart" value="{#$config[$action]['badWeatherStart']#}" /> 
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="paotuiServiceMoney">结束时间：</label></dt>
+        <dd>
+            <input class="input-large" type="text" name="badWeatherEnd" id="badWeatherEnd" value="{#$config[$action]['badWeatherEnd']#}" /> 
+        </dd>
+    </dl>
+    {#/if#}
+
+
+    {#if $action == 'siteConfig'#}
+    <dl class="clearfix">
+        <dt><label>结算佣金比例：</label></dt>
+        <dd>
+            <div class="input-prepend input-append">
+                <span class="add-on">打赏佣金</span>
+                <input class="input-mini" type="text" name="fzrewardFee" value="{#$config[$action]['cfg_fzrewardFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">商家买单</span>
+                <input class="input-mini" type="text" name="fzbusinessMaidanFee" value="{#$config[$action]['cfg_fzbusinessMaidanFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+
+            {#if in_array("tuan", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">团购佣金</span>
+                <input class="input-mini" type="text" name="fztuanFee" value="{#$config[$action]['cfg_fztuanFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("travel", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">旅游佣金</span>
+                <input class="input-mini" type="text" name="fztravelFee" value="{#$config[$action]['cfg_fztravelFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("job", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">招聘佣金</span>
+                <input class="input-mini" type="text" name="fzjobFee" value="{#$config[$action]['cfg_fzjobFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("homemaking", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">家政佣金</span>
+                <input class="input-mini" type="text" name="fzhomemakingFee" value="{#$config[$action]['cfg_fzhomemakingFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("education", $installModuleArr)#}
+            <div class="input-prepend input-append">
+                <span class="add-on">教育佣金</span>
+                <input class="input-mini" type="text" name="fzeducationFee" value="{#$config[$action]['cfg_fzeducationFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div><br />
+            {#/if#}
+            {#if in_array("shop", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">商城佣金</span>
+                <input class="input-mini" type="text" name="fzshopFee" value="{#$config[$action]['cfg_fzshopFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("waimai", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">外卖佣金</span>
+                <input class="input-mini" type="text" name="fzwaimaiFee" value="{#$config[$action]['cfg_fzwaimaiFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">跑腿佣金</span>
+                <input class="input-mini" type="text" name="fzwaimaiPaotuiFee" value="{#$config[$action]['cfg_fzwaimaiPaotuiFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("huodong", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">活动佣金</span>
+                <input class="input-mini" type="text" name="fzhuodongFee" value="{#$config[$action]['cfg_fzhuodongFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("live", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">直播佣金</span>
+                <input class="input-mini" type="text" name="fzliveFee" value="{#$config[$action]['cfg_fzliveFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("video", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">视频佣金</span>
+                <input class="input-mini" type="text" name="fzvideoFee" value="{#$config[$action]['cfg_fzvideoFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            {#if in_array("awardlegou", $installModuleArr)#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">有奖乐购佣金</span>
+                <input class="input-mini" type="text" name="fzawardlegouFee" value="{#$config[$action]['cfg_fzawardlegouFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            {#/if#}
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">刷新置顶佣金</span>
+                <input class="input-mini" type="text" name="roofFee" value="{#$config[$action]['cfg_roofFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">房产经纪人套餐分佣</span>
+                <input class="input-mini" type="text" name="setmealFee" value="{#$config[$action]['cfg_setmealFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">发布信息佣金</span>
+                <input class="input-mini" type="text" name="fabulFee" value="{#$config[$action]['cfg_fabulFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">会员升级佣金</span>
+                <input class="input-mini" type="text" name="levelFee" value="{#$config[$action]['cfg_levelFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">商家入驻佣金</span>
+                <input class="input-mini" type="text" name="storeFee" value="{#$config[$action]['cfg_storeFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">分销商入驻佣金</span>
+                <input class="input-mini" type="text" name="fenxiaoFee" value="{#$config[$action]['cfg_fenxiaoFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">激励佣金</span>
+                <input class="input-mini" type="text" name="jiliFee" value="{#$config[$action]['cfg_jiliFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+            <div class="input-prepend input-append" style="display:block;">
+                <span class="add-on">付费查看电话佣金 </span>
+                <input class="input-mini" type="text" name="payPhoneFee" value="{#$config[$action]['cfg_payPhoneFee']#}">
+                <span class="add-on" style="display: inline-block;">%</span>
+            </div>
+        </dd>
+    </dl>
+    <div class="thead" style="margin-top: 20px;">&nbsp;&nbsp;绑定微信服务号</div>
+     <dl class="clearfix">
+      <dt><label>服务器URL：</label></dt>
+      <dd style="padding-top: 10px;">
+        <span style="font-size: 14px;">{#$cfg_basehost#}/api/weixin/?cityid={#$cid#}</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="wechatToken">服务器Token：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="wechatToken" id="wechatToken" value="{#if $config[$action]['wechatToken']#}{#$config[$action]['wechatToken']#}{#else#}huoniao{#/if#}" data-regex=".*" />
+        <span class="input-tips"><s></s>请输入服务器配置Token</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="wechatAppid">开发者AppID：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="wechatAppid" id="wechatAppid" value="{#$config[$action]['wechatAppid']#}" data-regex=".*" />
+        <span class="input-tips"><s></s>请输入开发者AppID</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="wechatAppsecret">开发者AppSecret：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="wechatAppsecret" id="wechatAppsecret" value="{#$config[$action]['wechatAppsecret']#}" data-regex=".*" />
+        <span class="input-tips"><s></s>请输入开发者AppSecret</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="wechatName" class="sl">服务号名称：</label></dt>
+        <dd>
+        <input class="input-xlarge" type="text" name="wechatName" id="wechatName" value="{#$config[$action]['wechatName']#}" data-regex=".*" />
+        <span class="input-tips"><s></s>请输入服务号名称</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="wechatCode" class="sl">微信号：</label></dt>
+        <dd>
+        <input class="input-xlarge" type="text" name="wechatCode" id="wechatCode" value="{#$config[$action]['wechatCode']#}" data-regex=".*" />
+        <span class="input-tips"><s></s>请输入微信号</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label class="sl">二维码：</label></dt>
+        <dd class="weixinQr">
+        <input name="wechatQr" type="hidden" id="wechatQr" value="{#$config[$action]['wechatQr']#}" />
+        <div class="spic{#if $config[$action]['wechatQr'] == ''#} hide{#/if#}">
+            <div class="sholder">{#if $config[$action]['wechatQr']#}<img src="/include/attachment.php?f={#$config[$action]['wechatQr']#}" />{#/if#}</div>
+            <a href="javascript:;" class="reupload"{#if $config[$action]['wechatQr']#} style="display: inline-block;"{#/if#}>重新上传</a>
+        </div>
+        <iframe src ="/include/upfile.inc.php?mod=siteConfig&type=card&obj=wechatQr" style="width:100%; height:25px;{#if $config[$action]['wechatQr']#} display:none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0" ></iframe>
+        </dd>
+    </dl>
+    <div class="thead" style="margin-top: 20px;">&nbsp;&nbsp;绑定微信小程序（使用该功能前，请先确认是否已经购买分站独立小程序服务，以及将该小程序绑定到微信开放平台！）</div>
+    <dl class="clearfix">
+        <dt><label for="miniProgramName" class="sl">小程序名称：</label></dt>
+        <dd>
+        <input class="input-xlarge" type="text" name="miniProgramName" id="miniProgramName" value="{#$config[$action]['miniProgramName']#}" data-regex=".*" />
+        <span class="input-tips"><s></s>请输入小程序名称</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="miniProgramAppid">小程序AppID：</label></dt>
+        <dd>
+            <input class="input-xlarge" type="text" name="miniProgramAppid" id="miniProgramAppid" value="{#$config[$action]['miniProgramAppid']#}" data-regex=".*" />
+            <span class="input-tips"><s></s>请输入小程序AppID</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="miniProgramAppsecret">小程序AppSecret：</label></dt>
+        <dd>
+            <input class="input-xlarge" type="text" name="miniProgramAppsecret" id="miniProgramAppsecret" value="{#$config[$action]['miniProgramAppsecret']#}" data-regex=".*" />
+            <span class="input-tips"><s></s>请输入小程序AppSecret</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="miniProgramId">原始ID：</label></dt>
+        <dd>
+            <input class="input-xlarge" type="text" name="miniProgramId" id="miniProgramId" value="{#$config[$action]['miniProgramId']#}" data-regex=".*" />
+            <span class="input-tips"><s></s>请输入小程序原始ID</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="title" class="sl">关联分站微信服务号：</label></dt>
+        <dd class="radio">
+            <div class="optbox">
+                <label><input type="radio" name="miniProgramBindWechat" value="0"{#if $config[$action]['miniProgramBindWechat'] == 0#} checked{#/if#} />未关联</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                <label><input type="radio" name="miniProgramBindWechat" value="1"{#if $config[$action]['miniProgramBindWechat'] == 1#} checked{#/if#} />已关联</label>
+            </div>
+            <div style="font-size: 12px; padding-top: 10px;">
+                关联后，微信模板消息将在独立微信服务号中发送，否则会用默认配置的微信服务号和小程序发送消息和跳转链接。
+                <br />
+                关联教程：登录微信服务号平台[<a href="https://mp.weixin.qq.com/" target="_blank">mp.weixin.qq.com</a>]，点击菜单“广告与服务”-“小程序管理”，添加要关联的小程序即可。
+            </div>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label class="sl">二维码：</label></dt>
+        <dd class="weixinQr">
+        <input name="miniProgramQr" type="hidden" id="miniProgramQr" value="{#$config[$action]['miniProgramQr']#}" />
+        <div class="spic{#if $config[$action]['miniProgramQr'] == ''#} hide{#/if#}">
+            <div class="sholder">{#if $config[$action]['miniProgramQr']#}<img src="/include/attachment.php?f={#$config[$action]['miniProgramQr']#}" />{#/if#}</div>
+            <a href="javascript:;" class="reupload"{#if $config[$action]['miniProgramQr']#} style="display: inline-block;"{#/if#}>重新上传</a>
+        </div>
+        <iframe src ="/include/upfile.inc.php?mod=siteConfig&type=card&obj=miniProgramQr" style="width:100%; height:25px;{#if $config[$action]['miniProgramQr']#} display:none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0" ></iframe>
+        </dd>
+    </dl>
+    <div class="thead" style="margin-top: 20px;">&nbsp;&nbsp;绑定微信支付商户（主要用于分站小程序超过50个后无法关联商户号的情况，如果启用了服务商，请勿绑定！）</div>
+    <dl class="clearfix">
+        <dt><label for="wxpayAppid" class="sl">服务号/小程序AppID：</label></dt>
+        <dd>
+        <input class="input-xlarge" type="text" name="wxpayAppid" id="wxpayAppid" value="{#$config[$action]['wxpayAppid']#}" data-regex=".*" />
+        <span class="input-tips"><s></s>请输入服务号或者小程序的APPID，需确保该appid与mchid有绑定关系。</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="wxpayAppSecret">服务号/小程序AppSecret：</label></dt>
+        <dd>
+            <input class="input-xlarge" type="text" name="wxpayAppSecret" id="wxpayAppSecret" value="{#$config[$action]['wxpayAppSecret']#}" data-regex=".*" />
+            <span class="input-tips"><s></s>请输入服务号或者小程序的AppSecret</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="wxpayMchid">商户号：</label></dt>
+        <dd>
+            <input class="input-xlarge" type="text" name="wxpayMchid" id="wxpayMchid" value="{#$config[$action]['wxpayMchid']#}" data-regex=".*" />
+            <span class="input-tips"><s></s>请输入微信支付商户号</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="wxpayKey">API密钥：</label></dt>
+        <dd>
+            <input class="input-xlarge" type="text" name="wxpayKey" id="wxpayKey" value="{#$config[$action]['wxpayKey']#}" data-regex=".*" />
+            <span class="input-tips"><s></s>请输入微信支付API密钥</span>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt>证书文件：</dt>
+        <dd style="padding-top: 10px; font-size: 14px;">请将商户API证书文件解压后上传到服务器目录 <code>{#$HUONIAOROOT#}/api/payment/wxpay/cert/{#$cid#}/</code> 中</dd>
+    </dl>
+    {#/if#}
+
+        <dl class="clearfix formbtn">
+            <dt>&nbsp;</dt>
+            <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+        </dl>
+    </div>
+</form>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

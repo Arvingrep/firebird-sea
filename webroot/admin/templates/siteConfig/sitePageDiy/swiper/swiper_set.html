@@ -1,0 +1,196 @@
+
+<!-- 轮播图 s -->
+<div :class="['rightCon',{'show':currEditPart == 4}]">
+    <div class="modBox swiperContainer">
+        <div class="title" v-if="currEditPart === 4">轮播图
+
+            <el-popover popper-class="alertPop resetPop" :value="currEditPart === 4 && showResetPop" @show="showResetPop = true" v-if="checkHasIn('swiper',4) && (!checkModelHasIn() || !checkCompInModel())">
+                <div class="text_con">
+                    <h4>确认重置该组件为默认样式？</h4>
+                </div>
+                <div class="alertBtn">
+                    <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                    <a href="javascript:;" class="sure" @click="resetItem('swiper')"><s></s><span>确定</span></a>
+                </div>
+                <span class="reset_btn" slot="reference" ><s></s>重置此项</span>
+            </el-popover>
+            <div class="reset_btn" v-else>
+                <span class="btn"><s></s>重置此项</span>
+                <div class="smPop">
+                    <ul class="subtit_options">
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 4 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认恢复上次保存样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('swiper',1)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">恢复上次保存</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 4 && showResetPop" v-if="checkModelHasIn() && checkCompInModel()" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认将该组件恢复成模板样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="reChangeToModel('swiper',4)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置模板样式</li> 
+                        </el-popover>
+                        <el-popover popper-class="alertPop resetPop maskPop" :value="currEditPart === 4 && showResetPop" @show="showResetPop = true" :visible-arrow="false" placement="top-end">
+                            <div class="text_con">
+                                <h4>确认将该组件恢复默认样式？</h4>
+                            </div>
+                            <div class="alertBtn">
+                                <a href="javascript:;" class="cancel" @click="showResetPop = false"><s></s><span>取消</span></a>
+                                <a href="javascript:;" class="sure" @click="resetItem('swiper',0)"><s></s><span>确定</span></a>
+                            </div>
+                            <li class="text" slot="reference">重置默认样式</li> 
+                        </el-popover>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+        <div class="modInfoStyle">
+            <div class="modstyleBox">
+                <h2 class="stitle">组件设置</h2>
+                <div class="column_chose fullwidth">
+                    <s :style="'left:'+(25*(swiperFormData.styletype - 1))+'%;'" v-if="swiperFormData.styletype > 1"></s>
+                    <s style="left:2px;" v-else></s>
+                    <span v-for="item in 4" @click="swiperFormData.styletype = item; styleChange('swiper',item); initSwiper() " class="slide4"><em>样式{{numArr[item - 1]}}</em></span>
+                </div>
+                <el-checkbox style="margin-top: 12px;" v-model="swiperFormData.showText">显示图片配文</el-checkbox>
+            </div>
+            <div class="modstyleBox contentSetBox">
+                <h2 class="stitle">内容设置</h2>
+                <div class="sContent">
+                    <div  class="btnsBox btn_item btnsSort sortBox"  data-drag=".item" data-sort="swiperFormData.litpics" data-filter="input">
+                        <div class="option_item item" v-for="(pic,ind) in swiperFormData.litpics" :data-id="ind" :key="'swiper_' + pic.path + '_' + pic.id">
+                            <s class="del_item" @click="delObj(ind)" v-if="swiperFormData.litpics.length > 1"></s>
+                            <s class="left_icon"><img src="/static/images/admin/order_icon.png" alt=""></s>
+                            <div class="item_con flex_r">
+                                <div class="img_up fn-clear">
+                                    <div :class="['upbtn fullW ',{'hasup':pic.path}]">
+                                        <input type="file" name="Filedata" accept=".png,.jpg,.jpeg" class="fileUp"  :id="'swiperImg_'+ind+'_filedata'" :data-type="'swiperImg_'+ind">
+                                        <img v-if="pic.path" :src="pic.path"  alt="">
+                                        <span>更换图片</span>
+                                    </div>
+                                    <div :class="['imgText',{'noBorder': !swiperFormData.showText}]">
+                                        <div class="inpbox" v-show="swiperFormData.showText">
+                                            <el-input   show-word-limit  placeholder="请输入文字内容" class="iconName" v-model="pic.text" ></el-input>
+                                        </div>
+                                        <div :class="['inpbox linkbox linkChose']"  @click="changeLink('swiperFormData.litpics.' + ind + '.link')">
+                                            <s>
+                                                <img v-if="pic.linkInfo.type == 4"  src="/static/images/admin/siteMemberPage/tel.png">
+                                                <img v-else src="/static/images/admin/link.png">
+                                            </s>
+                                            <input type="text" placeholder="请选择链接" class="iconLink" readonly :value="pic.linkInfo.linkText ? pic.linkInfo.linkText : pic.link">
+                                        </div>
+                                        
+                                        <p v-show="!swiperFormData.showText">建议图片宽度1080px，大小在1M以内</p>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                        <a href="javascript:;" class="add_more" @click="addNewObj"  ><s></s>添加图片</a>
+                    </div>
+                </div>
+            </div>
+            <div class="modstyleBox">
+                <h2 class="stitle">组件样式</h2>
+                <div class="style_item">
+                    <template v-if="swiperFormData.showText">
+                        <div class="style_options" v-if="swiperFormData.style.maskColor">
+                            <label for="">遮罩颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'swiperFormData.style.maskColor')"  v-model="swiperFormData.style.maskColor"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('swiperFormData.style.maskColor')"  :value="swiperFormData.style.maskColor.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('swiperFormData.style.maskColor')">重置</button>
+                            </div>
+                        </div>
+                        <div class="style_options" v-if="swiperFormData.style.color">
+                            <label for="">标题颜色：</label>
+                            <div class="colorpickerBox">
+                                <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'swiperFormData.style.color')"  v-model="swiperFormData.style.color"></el-color-picker>
+                            </div>
+                            <div class="colorShowBox">
+                                <span class="single">#</span>
+                                <input type="text" class="colorShow" @change="changeColor('swiperFormData.style.color')"  :value="swiperFormData.style.color.replace('#','')" spellcheck="false" maxlength="6">
+                                <button @click="resetColor('swiperFormData.style.color')">重置</button>
+                            </div>
+                        </div>
+                    </template>
+                    <div class="style_options" v-if="swiperFormData.style.dotColor">
+                        <label for="">选中指示：</label>
+                        <div class="colorpickerBox">
+                            <el-color-picker class="colorpicker" @active-change="(value) => activeChangeColor(value,'swiperFormData.style.dotColor')"  v-model="swiperFormData.style.dotColor"></el-color-picker>
+                        </div>
+                        <div class="colorShowBox">
+                            <span class="single">#</span>
+                            <input type="text" class="colorShow" @change="changeColor('swiperFormData.style.dotColor')"  :value="swiperFormData.style.dotColor.replace('#','')" spellcheck="false" maxlength="6">
+                            <button @click="resetColor('swiperFormData.style.dotColor')">重置</button>
+                        </div>
+                    </div>
+                    <div class="style_options" v-show="swiperFormData.styletype != 4" >
+                        <label for="">边框投影：</label>
+                        <div class="radioBox split_options ">
+                            <span :class="{'onChose':swiperFormData.shadowShow}" @click="swiperFormData.shadowShow = 1"><s></s>显示</span>
+                            <span :class="{'onChose':!swiperFormData.shadowShow}" @click="swiperFormData.shadowShow = 0"><s></s>不显示</span>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+            <!-- 间距设置 -->
+            <div class="marginSetBox modstyleBox" >
+                <h2 class="stitle">间距设置</h2>
+                <el-collapse-transition>
+                    <div class="style_item" >
+                        <div class="sContent">
+                            <div class="style_options">
+                                <label for="">圆角值：</label>
+                                <el-slider tooltip-class="tooltip_show"  v-model="swiperFormData.style.borderRadius" @change="swiperChange" :show-tooltip="showTooltip"  :min="0" :max="50"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;" >
+                                    <input type="number" class="colorShow"  @input="checkMax(0,50,'swiperFormData.style.borderRadius')" :value="swiperFormData.style.borderRadius">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <div class="style_options">
+                                <label for="">图片高度：</label>
+                                <el-slider tooltip-class="tooltip_show" :show-tooltip="showTooltip"  :step="8"  :min="100"  :max="500" @change="swiperChange" v-model="swiperFormData.style.height"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @change="checkMax(100,500,'swiperFormData.style.height')" :value="swiperFormData.style.height">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            
+                            <div class="style_options" v-show="swiperFormData.styletype != 4">
+                                <label for="">上间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="swiperFormData.style.marginTop" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,40,'swiperFormData.style.marginTop')" :value="swiperFormData.style.marginTop">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div>
+                            <!-- <div class="style_options">
+                                <label for="">左右间距：</label>
+                                <el-slider tooltip-class="tooltip_show" v-model="swiperFormData.style.marginLeft" @change="swiperChange" :show-tooltip="showTooltip"  :min="0" :max="40"></el-slider>
+                                <div class="colorShowBox" style="background-color: #E8EAEC;">
+                                    <input type="number" class="colorShow" @input="checkMax(0,40,'swiperFormData.style.marginLeft')" :value="swiperFormData.style.marginLeft">
+                                    <span class="single back">px</span>
+                                </div>
+                            </div> -->
+                        </div>
+                    </div>
+                </el-collapse-transition>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- 轮播图 e -->

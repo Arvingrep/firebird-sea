@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商家中心自定义设置</title>
+    <link rel="stylesheet" href="/static/css/core/base.css">
+    <link rel="stylesheet" href="/static/css/ui/element_ui_index.css">
+    <link rel="stylesheet" href="/static/css/ui/pickr.min.css">
+    <link rel="stylesheet" href="/static/css/admin/busiCenterDiy.css?v={#$cfg_staticVersion#}">
+    <script>
+        var thumbSize = '{#$thumbSize#}', thumbType = "{#$thumbType#}", adminPath = "{#$adminPath#}", modelType = action = "{#$action#}", cfg_staticVersion = '{#$cfg_staticVersion#}';
+        var masterDomain = '{#$cfg_basehost#}';
+        var memberDomain = '{#$userDomain#}';
+        var businessUrl = '{#$busiDomain#}';
+        var branchUrl = '{#$userDomain#}/workPlatform.html'
+        var optAction = false;
+        window.onbeforeunload = function(){
+            if(optAction){
+                return ("还没有完成,确认退出吗?");
+            }
+        }
+        var cfg_attachment = '{#$cfg_attachment#}';
+        var defaultPath = '{#$cfg_basehost#}/static/images/admin/siteConfigPage/defaultImg/';
+        var defaultPath_center = '{#$cfg_basehost#}/static/images/admin/siteMemberPage/defaultImg/';
+        var cfg_pointName = '{#$cfg_pointName#}'
+        var cfg_bonusName = '{#$cfg_bonusName#}'
+        var hotLine = '{#$cfg_hotline#}'
+        var sitePageData = '{#json_encode($sitePageData)#}'; //数据
+        var platform = '{#$smarty.get.platform#}'  //当前终端
+        var changePage = '{#$smarty.get.change#}'; //是从设置页面切换
+        var config = '{#$config|default:""#}'; 
+        config = config && config != '[]' ? JSON.parse(config) : {}; 
+        var cfg_business_state = {#$cfg_business_state|default:1#};
+        var installModuleArr = {#json_encode($installModuleArr)|default:[]#}
+        var job_channel = '{#getUrlPath service="job" #}'
+    </script>
+</head>
+<body>
+    <div class="page" id="page" v-cloak>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <!-- <div class="page_mask" v-if="showMask" ></div> -->
+        <div class="headBox">
+            <div class="h3">
+                <a href="javascript:;" target="_blank" class="backHome"></a> <s class="line1"></s><span>商家中心自定义设置</span>
+                <div class="setConBox">
+                    <label for="">正在编辑：</label>
+                    <div :class="['platformSetBox setBox',{'disabled':noSetPlatform}]" @click="showChangePop">
+                        <div class="platform_curr" v-if="currPlatform && currPlatform.id">
+                            <s><img :src="'/static/images/admin/siteConfigPage/'+currPlatform.id+'.png'" alt=""></s>
+                            <span>{{currPlatform.name}}</span>
+                        </div>
+                        <div class="platform_curr" v-else>
+                            <template  v-for="item in terminalList" >
+                                <s v-if="item.buy"><img :src="'/static/images/admin/siteConfigPage/'+item.id+'.png'" alt=""></s>
+                            </template>
+                        </div>
+                        <i class="el-icon el-icon-arrow-down "></i>
+                    </div>
+                </div>
+            </div>
+            <div class="btnsGroup">
+                <a href="javascript:;" v-show="currPlatform.id != 'dymini'" class="preview" @click="saveAllData(1)"><s></s>预览</a>
+                <el-popover
+                    width="320"
+                    placement="bottom-end"
+                    popper-class="blackConfirm"	
+                    v-model="showFirstTooltip"
+                    trigger="manual">
+                    <h6>可批量设置同步此模板到其他终端</h6>
+                    <div class="btns_box">
+                        <span @click="showFirstTooltip = false">好的</span>
+                    </div>
+                    <el-button  slot="reference" class="advanceSetBtn" v-if="currPlatform && currPlatform.id " @click="advanceSetPopShow">{{advancsFormData.hasSet ? '已开启批量同步' : '发布高级选项'}}</el-button>
+                </el-popover>
+                <a href="javascript:;" class="save" @click="saveAllData()">保存</a>
+                <div class="success_tip"><s></s>
+                    <p>保存成功</p>
+                </div>
+                <div class="error_tip"><s></s>
+                    <p>请补全未完善信息！</p>
+                </div>
+                
+                <!-- <div class="previewBox" v-show="preveiw">
+                    <div class="qrBox"><img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent(preveiwSet ?  preveiwSet : '加载中')" alt=""></div>
+                    <h5>扫描二维码预览</h5>
+                    <p>已同步至最新</p>
+                </div> -->
+                <div class="mask_preview" v-show="preveiw " @click="preveiw = false"></div>
+                <div :class="['previewBox',{'morePlatform':!currPlatform || !currPlatform.id}]" v-show="preveiw">
+                    <div class="adQrBox" v-if="checkTerminal('android') && (currPlatform.id == 'android' || !currPlatform || !currPlatform.id) ">
+                        <div class="qrBox">
+                            <div class="loadMask" v-if="previewMask">加载中...</div>
+                            <img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent('{#$busiDomain#}?preview=1&appIndex=1&platform=android')" alt="">
+                        </div>
+                        <h5>安卓端</h5>
+                        <p><a href="{#$masterDomain#}/mobile.html" target="_blank">{#$cfg_shortname#}APP端</a>扫码</p>
+                    </div>
+                    <div class="adQrBox" v-if="checkTerminal('ios') && (currPlatform.id == 'ios' || !currPlatform || !currPlatform.id) ">
+                        <div class="qrBox">
+                            <div class="loadMask" v-if="previewMask">加载中...</div>
+                            <img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent('{#$busiDomain#}?preview=1&appIndex=1&platform=ios')" alt="">
+                        </div>
+                        <h5>苹果端</h5>
+                        <p><a href="{#$masterDomain#}/mobile.html" target="_blank">{#$cfg_shortname#}APP端</a>扫码</p>
+                    </div>
+                    <div class="adQrBox" v-if="checkTerminal('harmony') && (currPlatform.id == 'harmony' || !currPlatform || !currPlatform.id) ">
+                        <div class="qrBox">
+                            <div class="loadMask" v-if="previewMask">加载中...</div>
+                            <img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent('{#$busiDomain#}?preview=1&appIndex=1&platform=harmony')" alt="">
+                        </div>
+                        <h5>鸿蒙端</h5>
+                        <p><a href="{#$masterDomain#}/mobile.html" target="_blank">{#$cfg_shortname#}APP端</a>扫码</p>
+                    </div>
+                    <div class="miniQrBox" v-if="checkTerminal('wxmini') && (currPlatform.id == 'wxmini' || !currPlatform || !currPlatform.id) ">
+                        <div class="qrBox">
+                            <div class="loadMask" v-if="previewMask">加载中...</div>
+                            <img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent( '/pages/packages/company/index/index?preview=1&appIndex=1&platform=wxmini')" alt="">
+                        </div>
+                        <h5>微信小程序</h5>
+                        <p>使用微信扫码</p>
+                    </div>
+                    <div class="h5QrBox" v-if="currPlatform.id == 'h5' || !currPlatform  || !currPlatform.id ">
+                        <div class="qrBox">
+                            <div class="loadMask" v-if="previewMask">加载中...</div>
+                            <img :src=" '{#$cfg_basehost#}/include/qrcode.php?data='+ encodeURIComponent('{#$busiDomain#}?preview=1&appIndex=1&platform=h5')" alt="">
+                        </div>
+                        <h5>h5端</h5>
+                        <p>使用微信扫码</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="containBox">
+            <!-- 左侧数据 -->
+            <div class="leftCon">
+                <!-- 是否采用自定义 -->
+                <dl class="modbox  fn-clear bujutype" data-type="bjtype">
+                    <dt>更换模板</dt>
+                    <dd data-val="1" class="on_chose" @click="modelChosePop = true">选择模板</dd>
+                </dl>
+
+                <dl class="modbox  fn-clear " data-type="">
+                    <dt>商家中心组件</dt>
+                    <template  v-for="(item,ind) in moduleOptions.slice(0,8)" >
+                        <dd :class="['icon_item']" @click="addModule(item)"  >
+                            <div class="icon"><img :src="defaultPath + (item.icon ? item.icon : ('mod_' + (item.id > 9 ? '' : '0') + (item.id))  )  + '.png'" alt=""></div>
+                            <p>{{item.text}}</p>
+                        </dd>
+                    </template>
+                </dl>
+                <dl class="modbox  fn-clear " data-type="">
+                    <dt>基础组件</dt>
+                    <template  v-for="(item,ind) in moduleOptions.slice(8,11)" >
+                        <dd :class="['icon_item']" @click="addModule(item)"  >
+                            <div class="icon"><img :src="defaultPath + (item.icon ? item.icon : ('mod_' + (item.id > 9 ? '' : '0') + (item.id))  )  + '.png'" alt=""></div>
+                            <p>{{item.text}}</p>
+                        </dd>
+                    </template>
+                </dl>
+                <dl class="modbox  fn-clear " data-type="">
+                    <dt>功能性组件</dt>
+                    <template  v-for="(item,ind) in moduleOptions.slice(11,moduleOptions.length)" >
+                        <dd :class="['icon_item']" @click="addModule(item)"  >
+                            <div class="icon"><img :src="defaultPath + (item.icon ? item.icon : ('mod_' + (item.id > 9 ? '' : '0') + (item.id))  )  + '.png'" alt=""></div>
+                            <p>{{item.text}}</p>
+                        </dd>
+                    </template>
+                </dl>
+            </div>
+            <!-- 中间内容 -->
+            <div class="midContainer">
+                <a href="javascript:;" class="hidebtn">
+                    <span class="hideLine" @click="showLine = !showLine" >{{showLine ? '隐藏辅助线' : '显示辅助线'}}</span>
+                </a>
+                <!-- 左侧按钮 -->
+                <div class="opPage_btns" >
+                    <!-- <el-tooltip class="item" effect="dark"  content="点这里可返回首页编辑" placement="right">
+                        <span :class="['btn_l',{'on_chose': ![29,22].includes(currEditPart) || (currEditPart == 29 && !compPopShow)}]" @click="currEditPart = 1">首页</span>
+                    </el-tooltip> -->
+                    <span :class="['btn_l',{'on_chose':showVipSet}]" @click="showVipSet  = true;currEditPart = currEditPart != 33 ? 'showSet' : 33" >已开通商家</span>
+                    <span :class="['btn_l',{'on_chose':!showVipSet}]" @click="showVipSet  = false;currEditPart = currEditPart != 33 ? 'showSet' : 33">未开通商家</span>
+                </div>
+                <div class="optBox">
+                    <el-tooltip class="item" effect="dark" content="复制组件" placement="left">
+                        <div :class="['copyBtn',,{'disabled':([30,33,36,21].includes(currEditPart) || isNaN(currEditPart) || (currEditPart == 35 && storeManFormData.isStore))}]" @click="copyPart"></div>
+                    </el-tooltip>
+                    <el-tooltip class="item" effect="dark"content="页面设置" placement="left">
+                        <div :class="['setAllBtn']"  @click="currEditPart = 'pageSet';scrollTop()" ></div>
+                    </el-tooltip>
+                </div>
+
+                <div :class="['midConBox',{'moreIndex2':showPop || moreIndex},{'transTop':currEditPart == 'pageSet' && (busiInfoFormData.showHeader || currPlatform.id == 'wxmini')}]">
+                    <div class="pageShow">
+                        <div class="pagebox">
+                            
+                            <div class="line_phone" v-show="showLine">
+                                <span>全面屏</span>
+                            </div>
+                            <div class="line_phone line_phone_standard" v-show="showLine">
+                                <span>标准屏</span>
+                            </div>
+                            <div :class="['pageCon customCon',{'noBlueBorder':!pageEditShow },{'webPageCon':['dymini','h5'].includes(currPlatform.id)},{'wxPageCon':['wxmini'].includes(currPlatform.id)}] " @click="changeBorde">
+                                <!-- 模板展示的 -->
+                                
+                                <div :class="['truePage',{'toImg':fullscreenLoading},{'vipSetPage':!showVipSet},{'showMask':showTipMask && !showVipSet}]" id="toCanvas"  >
+                                    <div :class="['bg_show',{'show':currEditPart == 'pageSet' && (busiInfoFormData.showHeader || currPlatform.id == 'wxmini' || currPlatform.id == 'app' )}]" :style="pageSetFormData.bgType == 'color' ? `background-color:${pageSetFormData.style.bgColor1};` : pageSetFormData.style.bgColor1 && pageSetFormData.style.bgColor2 ? `background:linear-gradient(180deg,${pageSetFormData.style.bgColor1} 0%, ${pageSetFormData.style.bgColor1} ${pageSetFormData.style.start || 0}%, ${pageSetFormData.style.bgColor2} calc(${pageSetFormData.style.start || 0}% + 70px),  ${pageSetFormData.style.bgColor2} 100%);` : ``"></div>
+                                    <div :class="['fixedTop',{'show':currEditPart == 'pageSet' && (busiInfoFormData.showHeader || currPlatform.id == 'wxmini' || currPlatform.id == 'app' )}]"  id="pageTop1" :style="'background:'+ pageSetFormData.style.background +';'" v-if="currPlatform.id != 'h5' && currPlatform.id != 'dymini'" >
+                                        <div :class="['pagetop']" ><img src="{#$cfg_basehost#}/static/images/admin/phone_head.png" alt=""></div>
+                                    <div class="header">
+                                            <div class="flex_header" v-if="currPlatform.id == 'dymini'" style="padding-top: 40px;">
+                                                <div class="flex_l">
+                                                    <div class="web_logo"><img src="{#$cfg_basehost#}/static/images/admin/siteConfigPage/dymini.png
+                                                        " alt=""></div>
+                                                    <h4 :style="(pageSetFormData.rBtns.showType == 0 && busiInfoFormData.rtBtns.btns.length && busiInfoFormData.showHeader) || (pageSetFormData.rBtns.showType == 2 && pageSetFormData.rBtns.btns.length)   ? '' : 'max-width: 240px;'">{#$cfg_shortname#}</h4>
+                                                </div>
+                                                <div class="flex_r"><img src="{#$cfg_basehost#}/static/images/admin/dy_btn.png" alt=""></div>
+                                            </div>
+                                        </div>
+                                        <div class="top_header" :style="`padding-left:${pageSetFormData.style.marginLeft / 2}px;padding-right:${pageSetFormData.style.marginLeft / 2}px; background-color:${pageSetFormData.style.background};padding-top: ${currPlatform.id == 'dymini' ? 0 : 42}px;`" >
+                                            <div :class="['flex_l',{'flexCenter':pageSetFormData.title.posi === 'center'}]">
+                                                <div class="infoBox" v-show="pageSetFormData.showType == 1">
+                                                    <div class="photo"><img src="/static/images/admin/siteConfigPage/defaultImg/busi_logo.png" alt=""></div>
+                                                    <h4 :style="`color:${pageSetFormData.title.style.color};${(pageSetFormData.rBtns.showType == 0 && busiInfoFormData.rtBtns.btns.length && busiInfoFormData.showHeader) || (pageSetFormData.rBtns.showType == 2 && pageSetFormData.rBtns.btns.length)   ? '' : 'max-width: 240px;'}`">承德汽车租赁有限公司</h4>
+                                                </div>
+                                                <div class="infoBox" v-show="pageSetFormData.showType == 2">
+                                                    <h4 :style="`color:${pageSetFormData.title.style.color};`">{{pageSetFormData.title.text || '商家中心'}}</h4>
+                                                </div>
+                                            </div>
+                                            <div class="flex_r" :style="`right:${pageSetFormData.style.marginLeft / 2}px; top:${currPlatform.id == 'dymini' ? 0 : 40}px;`" v-if="currPlatform.id != 'wxmini'">
+                                                <template >
+                                                    <ul class="btns"  v-if="pageSetFormData.rBtns.showType == 2"> 
+                                                        <li v-for="btn in pageSetFormData.rBtns.btns">
+                                                            <div class="icon">
+                                                                <svg class="filter" height="0" width="0" xmlns="http://www.w3.org/2000/svg" v-if="pageSetFormData.rBtns.style.color">
+                                                                    <defs>
+                                                                        <filter :id="btn.id">
+                                                                                <feColorMatrix type="matrix" :values="checkSvgColor(pageSetFormData.rBtns.style.color)"/>
+                                                                        </filter>
+                                                                    </defs>
+                                                                </svg>
+                                                                <img :style="`filter:url(#${btn.id});`" :src="btn.icon ? btn.icon : btnDefault2 " alt="">
+                                                            </div>
+                                                        </li>
+                                                    </ul>
+                                                    <ul class="btns"  v-else-if="pageSetFormData.rBtns.showType == 0"> 
+                                                        <li v-for="btn in busiInfoFormData.rtBtns.btns">
+                                                            <svg class="filter" height="0" width="0" xmlns="http://www.w3.org/2000/svg" v-if="pageSetFormData.rBtns.style.color">
+                                                                <defs>
+                                                                    <filter :id="btn.id">
+                                                                        <feColorMatrix type="matrix" :values="checkSvgColor(pageSetFormData.rBtns.style.color)" />
+                                                                    </filter>
+                                                                </defs>
+                                                            </svg>
+                                                            <div class="icon"><img :style="`filter:url(#${btn.id});`"  :src="btn.icon ? btn.icon : btnDefault "  alt=""></div>
+                                                        </li>
+                                                    </ul>
+                                                </template>
+                                            </div>
+                                            <div class="flex_r" v-else :style="`right:0; top:${currPlatform.id == 'dymini' ? 0 : 40}px;`" >
+
+                                                <div class="wx_btn"><img src="{#$cfg_basehost#}/static/images/admin/wx_btn.png" alt=""></div>
+                                            </div>
+                                        </div>                                   
+                                    </div>
+                                    <div :class="['webFixed '+ busiInfoFormData.themeType + 'Theme' ,{'show':currEditPart == 'pageSet'}]" :style="`background-color:${pageSetFormData.style.bgImgColor};`" v-else v-show="pageSetFormData.h5FixedTop && busiInfoFormData.showHeader">
+                                        <div class="flex_header">
+                                            <div class="headerBtn flexBet" :style="`padding-left:${busiInfoFormData.style.marginLeft / 2}px; padding-right:${busiInfoFormData.style.marginLeft / 2}px; padding-top:4px; padding-bottom:4px;`">
+                                                <!-- 左上 个人版 -->
+                                                <div class="flex_l">
+                                                    <div class="icon">
+                                                        <svg class="filter" height="0" width="0" xmlns="http://www.w3.org/2000/svg" v-if="busiInfoFormData.themeType == 'light'">
+                                                            <defs>
+                                                                <filter id="bicon">
+                                                                    <feColorMatrix type="matrix" :values="checkSvgColor('#ffffff')" />
+                                                                </filter>
+                                                            </defs>
+                                                        </svg>
+                                                        <img style="filter:url(#bicon)" :src="busiInfoFormData.business.icon" alt="">
+                                                    </div>
+                                                    <div class="txt">{{busiInfoFormData.business.text}}</div>
+                                                </div>
+                                                <!-- 右上 按钮 -->
+                                                <div class="flex_r" v-if="busiInfoFormData.rtBtns.btns.length">
+                                                    <div class="ul flexbox">
+                                                        <div :class="['li',{'smText':busiInfoFormData.rtBtns.txtStyle == 1}]" v-for="btn in busiInfoFormData.rtBtns.btns">
+                                                            <div class="icon">
+                                                                <img  :src="btn.icon || btnDefault" onerror="this.src = '/static/images/admin/siteMemberPage/default_icon2'" alt="">
+                                                            </div>
+                                                            <div class="text" v-if="busiInfoFormData.rtBtns.txtStyle">{{btn.text || '按钮'}}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 头部电池信息 -->
+                                    <div :class="['pagetop']" ><img src="{#$cfg_basehost#}/static/images/admin/phone_head.png" alt=""></div>
+                                    <div class="header">
+                                        <h4 v-if="currPlatform.id == 'h5'">商家中心</h4>
+                                        <div class="flex_header" v-else-if="currPlatform.id == 'dymini'">
+                                            <div class="flex_l">
+                                                <div class="web_logo"><img src="{#$cfg_basehost#}/static/images/admin/siteConfigPage/dymini.png
+                                                    " alt=""></div>
+                                                <h4>商家中心</h4>
+                                            </div>
+                                            <div class="flex_r"><img src="{#$cfg_basehost#}/static/images/admin/dy_btn.png" alt=""></div>
+                                        </div>
+                                    </div>
+                                    <div class="allShowCon" @mouseover="moreIndex = true" @mouseleave="moreIndex = false">
+                                        <div v-for="(modCon,modInd) in showContainerArr.slice(0,1)"
+                                            :data-ind="modInd" 
+                                            :data-kid="modCon.id" 
+                                            :data-id="modInd" 
+                                            :class="['modConBox partBox',{'currEditPart':modInd == currEditInd && modCon.id == currEditPart } ,{'filterSortBox':modCon.id == 30},{'disabledEdit':modCon.id != 33 && !showVipSet},{'maskShow':currEditPart == 'showSet' && modInd == maskInd && maskPart == modCon.id}]" @click="toEditPart(modCon,(showVipSet || isVIPInd == '' ? modInd : isVIPInd))">
+                                            <template v-if="modCon.id == 30">
+                                                <!-- 会员信息 s -->
+                                                {#include file="sitePageDiy/busiInfo/busiInfo_show.html"#}
+                                                <!-- 会员信息 e -->
+                                            </template>
+                                        </div>
+                                        <div class="sortBox otherSort"  data-sort="showContainerArr"  data-drag=".partBox" data-filter=".filterSortBox">
+                                            <template v-for="(modCon,modInd) in getOrder(showContainerArr)">
+                                                <div 
+                                                :data-ind="modInd" 
+                                                :data-kid="modCon.id" 
+                                                :data-id="modInd + '_' + modCon.id"  
+                                                :key="'allSort_' + modCon.id + '_' +(modCon.sid ? modCon.sid : 0)"
+                                                :class="['modConBox partBox',{'currEditPart':modCon.id == currEditPart && (modInd == currEditInd  && currEditPart != 30 || (modCon.id == 33 && !showVipSet && isVIPInd == currEditInd)) } ,{'filterSortBox':modCon.id == 30 || (!showVipSet && modCon.id != 33)},{'disabledEdit':modCon.id != 33 && !showVipSet},{'maskShow':currEditPart == 'showSet' && modInd == maskInd && maskPart == modCon.id}]" @click="toEditPart(modCon,(showVipSet || isVIPInd == '' ? modInd : isVIPInd))" v-show="( (modCon.id != 33 && (showVipSet || modCon.noVipShow)) || (modCon.id == 33 && (modCon.content.vipShow || !showVipSet)) )">
+                                                    <!-- 删除组件提示 -->
+                                                    <template v-if="modCon.id != 30">
+                                                        <el-popover popper-class="alertPop" :visible-arrow="false" :value="modInd == currDelInd && showPop" @show="showPop = true" @hide="showPop = false">
+                                                            <div class="text_con">
+                                                                <h4>确认删除该组件？</h4>
+                                                            </div>
+                                                            <div class="alertBtn">
+                                                                <a href="javascript:;" class="cancel" @click="showPop = false"><s></s><span>取消</span></a>
+                                                                <a href="javascript:;" class="sure" @click="delModBox(modInd,modCon.id)"><s></s><span>确定</span></a>
+                                                            </div>
+                                                            <div @click.stop="currDelPart = modCon.id; currDelInd = modInd" :class="['del_btn',{'show':currDelInd == modInd && showPop && currDelPart == modCon.id}]" slot="reference"><s></s>删除</div>
+                                                        </el-popover>
+                                                    </template>
+                                                    <template v-if="modCon.id == 30">
+                                                        <!-- 会员信息 s -->
+                                                        <!-- 会员信息 e -->
+                                                    </template>
+                                                    <template v-else-if="modCon.id == 32">
+                                                        <!-- 数据显示 s -->
+                                                        {#include file="sitePageDiy/dataCount/dataCount_show.html"#}
+                                                        <!-- 数据显示 e -->
+                                                    </template>
+    
+                                                    <template v-else-if="modCon.id == 35">
+                                                        <!-- 门店服务/按钮管理 s -->
+                                                        {#include file="sitePageDiy/storeMan/storeMan_show.html"#}
+                                                        <!-- 门店服务/按钮管理 e -->
+                                                    </template>
+    
+                                                    <template v-else-if="modCon.id == 34">
+                                                        <!-- 重点按钮 s -->
+                                                        {#include file="sitePageDiy/ibtns/ibtns_show.html"#}
+                                                        <!-- 重点按钮 e -->
+                                                    </template>
+    
+                                                    <template v-else-if="modCon.id == 36">
+                                                        <!-- 招聘管理 s -->
+                                                        {#include file="sitePageDiy/jobMan/jobMan_show.html"#}
+                                                        <!-- 招聘管理 e -->
+                                                    </template>
+                                                    <template v-else-if="modCon.id == 6">
+                                                        <!-- 瓷片广告位 s -->
+                                                        {#include file="sitePageDiy/busiAdv/adv_show.html"#}
+                                                        <!-- 瓷片广告位 e -->
+                                                    </template>
+                                                    <template v-else-if="modCon.id == 20">
+                                                        <!-- 消息通知 s -->
+                                                        {#include file="sitePageDiy/busiMsg/msg_show.html"#}
+                                                        <!-- 消息通知 e -->
+                                                    </template>
+                                                    <template v-else-if="modCon.id == 33 ">
+                                                        <!-- 商家会员 设置非会员状态或者 会员状态显示时 显示该设置 s -->
+                                                        {#include file="sitePageDiy/busiVip/busiVip_show.html"#}
+                                                        <!-- 商家会员  e -->
+                                                    </template>
+                                                    <template v-else-if="modCon.id == 7 ">
+                                                         <!-- 分隔标题 -->
+                                                         {#include file="sitePageDiy/busiTitle/title_show.html"#}
+                                                        <!-- 分隔标题  e -->
+                                                    </template>
+                                                    <template v-else-if="modCon.id == 21 ">
+                                                         <!-- 关注公众号 -->
+                                                        {#include file="sitePageDiy/busiWechat/wechat_show.html"#}
+                                                        <!-- 关注公众号  e -->
+                                                    </template>
+                                                    <template v-else-if="modCon.id == 37 ">
+                                                         <!-- 关注公众号 -->
+                                                        {#include file="sitePageDiy/listNav/listNav_show.html"#}
+                                                        <!-- 关注公众号  e -->
+                                                    </template>
+    
+                                                    <template v-else-if="modCon.id == 31">
+                                                        <!-- 订单设置 s -->
+                                                        {#include file="sitePageDiy/busiOrder/order_show.html"#}
+                                                        <!-- 订单设置 e -->
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                
+                                    
+                                    
+                                    
+                                    <div class="public_bottom" @click="showConfirmModel">
+                                        <ul :class="'gridbox' + bottomNavs.length" :style="'grid-template-columns:repeat('+bottomNavs.length+',1fr);' "> 
+                                            <li v-for="(item,ind) in bottomNavs" :class="[{'fabu':item.fabu}]">
+                                                <div class="icon_box"><img :src="(ind == 0) ? item.icon_h : item.icon" alt=""></div>
+                                                <p v-if="!item.fabu">{{item.name}}</p>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <p class="tip_page" v-show="showLine">标准屏参考机型为iPhone6-8，全面屏为iPhoneX及以上</p>
+
+                               
+                            </div>
+                        </div>
+        
+        
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- 右侧内容 -->
+            <div class="allRightBoxContainer" @click="pageEditShow = true">
+
+                <!-- 会员信息 s -->
+                {#include file="sitePageDiy/busiInfo/busiInfo_set.html"#}
+                <!-- 会员信息 e -->
+
+
+                <!-- 数据组 s -->
+                {#include file="sitePageDiy/dataCount/dataCount_set.html"#}
+                <!-- 数据组 e -->
+                
+                <!-- 门店服务/普通按钮组s -->
+                {#include file="sitePageDiy/storeMan/storeMan_set.html"#}
+                <!-- 门店服务/普通按钮组e -->
+
+                <!-- 重点按钮组 s -->
+                {#include file="sitePageDiy/ibtns/ibtns_set.html"#}
+                <!-- 重点按钮组 e -->
+
+                <!-- 招聘管理s -->
+                {#include file="sitePageDiy/jobMan/jobMan_set.html"#}
+                <!-- 招聘管理e -->
+
+                <!-- 消息通知s -->
+                {#include file="sitePageDiy/busiMsg/msg_set.html"#}
+                <!-- 消息通知e -->
+
+                <!-- 商家会员s -->
+                {#include file="sitePageDiy/busiVip/busiVip_set.html"#}
+                <!-- 商家会员e -->
+
+                <!-- 瓷片广告 s-->
+                {#include file="sitePageDiy/busiAdv/adv_set.html"#}
+                <!-- 瓷片广告 e-->
+
+                <!-- 分隔标题 s -->
+                {#include file="sitePageDiy/busiTitle/title_set.html"#}
+                <!-- 分隔标题 e -->
+
+                <!-- 关注公众号 s -->
+                {#include file="sitePageDiy/busiWechat/wechat_set.html"#}
+                <!-- 关注公众号 e -->
+
+
+                <!-- 列表导航 s -->
+                {#include file="sitePageDiy/listNav/listNav_set.html"#}
+                <!-- 列表导航 e -->
+
+                <!-- 商家会员页面设置 s -->
+                {#include file="sitePageDiy/busiPageSet.html"#}
+                <!-- 商家会员页面设置 e -->
+
+                <!-- 非会员显隐设置 s -->
+                {#include file="sitePageDiy/busiShowSet.html"#}
+                <!-- 非会员显隐设置 e -->
+
+                <!-- 订单设置 s -->
+                {#include file="sitePageDiy/busiOrder/order_set.html"#}
+                <!-- 订单设置 e -->
+
+            </div>
+        </div>
+        <div class="full_loadMask" v-show="fullscreenLoading">
+            <div class="loadBox">
+                <div class="loadIcon">
+                    <svg viewBox="25 25 50 50" class="circular">
+                        <circle cx="50" cy="50" r="20" fill="none" class="path"></circle>
+                    </svg>
+                </div>
+                <div class="loadText">{{saveType ? '生成预览中':'保存页面中'}}</div>
+            </div>
+        </div>
+        <!-- 弹窗部分 s -->
+        {#include file="sitePageDiy/busiPop.html"#}
+        <!-- 弹窗部分 e -->
+    </div>
+    <script src="/static/js/vue/vue.min.js"></script>
+    <script src="/static/js/ui/Sortable.js"></script>
+    <script src="/static/js/image-main-color.js"></script>
+    <script src="/static/js/ui/element_ui_index.js"></script>
+    <script src="/static/js/core/jquery-2.1.1.min.js"></script>
+    <script src="/static/js/admin/html2canvas.js"></script>
+    <script src="/static/js/admin/busiCenterDefault.js?v={#$cfg_staticVersion#}"></script>
+    <script src="/static/js/admin/busiCenterDiy.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

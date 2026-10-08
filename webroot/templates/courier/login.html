@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#$langData['siteConfig'][17][0]#}</title>
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/login.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobileSelect.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript">
+			var geetest = {#$cfg_geetest#};
+			var masterDomain = '{#$cfg_basehost#}';
+			var ftype = "phone";
+			var consult = '{#$cfg_agreeProtocol#}'; // 协议勾选
+
+			var thumbSize = {#$thumbSize#}, thumbType = '{#$thumbType#}', atlasSize = {#$atlasSize*1024*1024#}, atlasType = '{#$atlasType#}', atlasMax = 2;
+			var cityid = '{#$cityid#}';
+			var cityname = '{#$cityname#}'
+		</script>
+	</head>
+	<body>
+		<div class="pagebox" id="page">
+			<div id="" class="">
+				
+				<div class="page_login" id="login" v-if="login && !regsiter_success"  v-cloak>
+
+					<div class="aTopbox">
+						<button type="button"
+						v-for="tab in tabs"
+						v-bind:class="['tab-button', { active: currentTab === tab.id }]"
+						v-on:click="currentTab = tab.id">{{tab.name}}</button>
+					</div>
+					<div class="form-container">
+						<h3>{#$langData['waimai'][10][101]#}</h3>{#* 立即登录 开始接单 *#}
+						<!-- <transition name="slideRight"> -->
+						<div v-bind:class="['form-box']" v-if="currentTab ===tabs[0].id">
+							<input-txt type="text" placeholder="{#$langData['waimai'][10][102]#}" name="username" :value="userinfo.username"></input-txt>{#* 请输入用户名/手机号 *#}
+							<input-txt type="password" placeholder="{#$langData['siteConfig'][20][164]#}" name="password"  :value="userinfo.password"></input-txt>{#*请输入密码*#}
+
+							<btn-login>{#$langData['siteConfig'][2][0]#}</btn-login>{#* 登录 *#}
+						</div>
+						<!-- </transition> -->
+						<transition name="slideRight">
+						<div v-bind:class="['form-box']" v-if="currentTab ===tabs[1].id">
+							<input-txt type="text" placeholder="{#$langData['siteConfig'][20][239]#}" name="telphone" v-bind:areacode="areaCode"></input-txt>{#* 请输入手机号 *#}
+							<input-txt type="text" placeholder="{#$langData['siteConfig'][20][176]#}" name="captcha" ></input-txt>{#* 请输入验证码 *#}
+							<btn-login>{#$langData['siteConfig'][2][0]#}</btn-login>{#* 登录 *#}
+						</div>
+						</transition>
+
+					</div>
+
+
+				</div>
+				
+				<!-- 手机号注册 -->
+				<transition name="slideUp">
+				<div class="page_register" id="regester" v-if="!login && regsiter_success == 0"  v-cloak>
+					<div class="rTopbox" v-if="!reg_success">
+						
+						<button v-if="!toReg" type="button" id="close_page" @click="login = true;codetype = 2;"></button>
+						<button v-else type="button" id="close_page" onClick="history.go(-1)" class="goBack"></button>
+					
+					</div>
+					
+					<div class="reg_box" v-if="!regcheck && !reg_success">
+
+						<div class="form-container">
+							<h3>{#$langData['waimai'][10][103]#}</h3>{#* 注册成为骑手 *#}
+							<div class="form-box show">
+
+								<!-- <input-txt type="text" placeholder="{#$langData['waimai'][10][106]#}" name="sex" readonly="true"></input-txt> -->{#* 请选择性别 *#}
+
+								<!-- step 1   注册验证手机号 -->
+								<div class="phoneRegBox" v-show="!phone_reg" >
+									<input-txt type="text" placeholder="{#$langData['siteConfig'][20][239]#}" name="telphone" v-bind:areacode="areaCode"></input-txt>{#* 请输入手机号 *#}
+									<input-txt type="text" placeholder="{#$langData['siteConfig'][20][176]#}" name="captcha" ></input-txt>{#* 请输入验证码 *#}
+									<btn-login>{#$langData['siteConfig'][1][0]#}</btn-login>{#* 注册 *#}
+								</div>
+
+								<transition name="slideInUp">
+				    
+								<!-- step2 用户信息详情 -->
+								<div class="detailBox" v-show="phone_reg" v-cloak>
+									<input-txt label="姓名" type="text" placeholder="{#$langData['siteConfig'][20][268]#}" name="nickname" ></input-txt>{#* 请填写姓名 *#}
+									<input-txt type="text" label="性别"  placeholder="请选择性别" name="sex" readonly="true"></input-txt>{#* 请选择性别 *#}
+									<input-txt type="number" label="年龄"  placeholder="{#$langData['waimai'][10][105]#}" name="age" ></input-txt>{#* 请填写年龄 *#}
+									<input-txt type="text" label="学历"  placeholder="请选择学历" name="academic" readonly="true"></input-txt>{#* 请选择学历 *#}
+									<input-txt type="text" label="城市"  placeholder="请选择城市" name="city" readonly="true" :value="reg_info.city"></input-txt>{#* 请选择城市 *#}
+
+									<h3 class="title">实名认证</h3>
+									<input-txt type="text" label="身份证号"  placeholder="请输入身份证号" name="IDnumber"></input-txt>{#* 请选择学历 *#}
+
+									<div class="idCardback uploadImg">
+										<input type="hidden" name="idCardback" :value="reg_info.idCardback">
+										<div class="upBtn" id='filePicker1'>
+											<!-- <input type="file" id="cardback" class="fileData" accept=".gif,.jpeg,.jpg,.png" @change="checkCard"> -->
+											<div class="upimg"></div>
+											<p>请上传身份证人像面</p>
+										</div>
+									</div>
+									<div class="idCardfront uploadImg">
+										<input type="hidden" name="idCardfront" :value="reg_info.idCardfront">
+										<div class="upBtn" id='filePicker2'>
+											<!-- <input type="file" id="cardfront"  class="fileData" accept=".gif,.jpeg,.jpg,.png" @change="checkCard"> -->
+											<div class="upimg"></div>
+											<p>请上传身份证国徽面</p>
+											<input type="hidden" name="idCardfront" >
+										</div>
+									</div>
+									<btn-login>提交注册</btn-login>{#* 提交注册 *#}
+								</div>
+								</transition>
+							</div>
+						</div>
+					</div>
+					
+				    <transition name="slideInUp">
+					<div class="reg_box" v-if="regcheck && !reg_success">
+						<h3>请等待审核<br/>注册信息审核通过后即可接单哦 </h3>{#*  申请提交成功！<br/>注册信息审核通过后即可接单哦 *#}
+						<p>{#$langData['waimai'][10][108]#}</p>{#* 预计1-3个工作日内完成审核 *#}
+						<reg-info v-if="!login && regcheck"></reg-info>
+						<!-- 实名认证 -->
+						<div class="idCardBox">
+							<h5>实名认证材料</h5>
+							<div class="idCardShow">
+								<div class="idback idImg"><img :src="reg_info.idCardback" alt=""></div>
+								<div class="idfront idImg"><img :src="reg_info.idCardfront" alt=""></div>
+							</div>
+							<p><label for="">身份证号</label> {{reg_info.IDnumber}}</p>
+						</div>
+					</div>
+					</transition>
+					<div class="reg_box" v-if="reg_success">
+						<h3>{#$langData['waimai'][10][104]#} </h3>{#* 恭喜您成功注册成为骑手！<br/> 请设置登录密码  *#}
+						<!-- <p>{#$langData['waimai'][10][109]#}</p>{#* 您可以跳过此步骤，之后随时可在我的-设置中修改 *#} -->
+						<div class="form-container">
+							<div class="form-box show" style="position:relative; left: 0; right: 0">
+								<input-txt ref="psd" type="password" placeholder="{#$langData['waimai'][10][110]#}" name="password" ></input-txt>{#* 设置登录密码 *#}
+								<input-txt ref="rpsd" type="password" placeholder="{#$langData['waimai'][10][111]#}" name="sure_password"></input-txt>{#* 确认登录密码 *#}
+							</div>
+							<div class="btn_box">
+								<button type="button" class="save_psd" @click="save_psd">{#$langData['waimai'][10][112]#}</button>{#* 保存 *#}
+								<!-- <a href="/?service=waimai&do=courier&template=index">{#$langData['waimai'][10][113]#}</a>{#* 暂不设置 *#} -->
+							</div>
+						</div>
+					</div>
+				</div>
+			   </transition>
+			</div>
+
+			<div class="gz-sel-addr gz-sel-addr-hide" id="gzSelAddr">
+				<div class="gz-sel-addr-header">
+					<h3>{#$langData['siteConfig'][7][2]#}</h3>
+					<button class="gz-sel-addr-close" id="gzSelAddrCloseBtn"></button>
+				</div>
+				<ul class="gz-sel-addr-nav"></ul>
+				<div class="gz-sel-addr-list"></div>
+			</div>
+
+			<div class="gz-sel-addr-mask"></div>
+
+
+			<!-- 区号选择 -->
+			<div class="popl_mask" v-on:click="pop_hide"></div>
+			<div class="popl_box anum_box">
+				<h2>{#$langData['business'][1][4]#}   <a href="javascript:;" class="back" v-on:click="pop_hide">{#$langData['business'][1][5]#}</a></h2>     {#* 选择地区----返回 *#}
+				<div class="areaList" id="areaList"><ul>
+					{#siteConfig action='internationalPhoneSection' return="item"#}
+					<li data-cn="{#$item.name#}" data-code="{#$item.code#}" v-on:click="Changecode"><span>{#$item.name#}<span><em class="fn-right">+{#$item.code#}</em></li>
+					{#/siteConfig#}
+				</ul></div>
+			</div>
+
+			{#if $cfg_agreeProtocol#}
+			<p v-if="((!regcheck && !phone_reg) || login) && !reg_success && !regsiter_success" class="login_tip"  v-cloak>{#$langData['waimai'][10][114]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手注册协议'#}?from=wmsj">{#$langData['waimai'][10][115]#}</a>{#$langData['waimai'][10][116]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手隐私政策'#}?from=wmsj">{#$langData['waimai'][10][117]#}</a></p>{#* 登录/注册表示您已同意用户注册协议及隐私协议 *#}
+			{#else#}
+			<p v-if="((!regcheck && !phone_reg) || login ) && !reg_success && !regsiter_success  " :class="['login_tip','agree',{'gou':!noagree}]"   v-cloak><s @click="noagree = !noagree"></s>{#$langData['waimai'][10][114]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手注册协议'#}?from=wmsj">{#$langData['waimai'][10][115]#}</a>{#$langData['waimai'][10][116]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手隐私政策'#}?from=wmsj">{#$langData['waimai'][10][117]#}</a></p>{#* 登录/注册表示您已同意用户注册协议及隐私协议 *#}
+			{#/if#}
+
+			<!-- 协议弹窗 -->
+			<div class="pop_mask" @click="hidePop()"></div>
+			<div class="pop_agree" v-if="!login && regsiter_success == 0">
+				<div class="box">
+					<p class="agree">
+					  {#$langData['siteConfig'][55][66]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手隐私政策'#}" target="_blank">《隐私政策》</a>及<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手注册协议'#}" target="_blank">《注册协议》</a>
+					</p>
+				</div>
+				<div class="btn_group">
+					<a href="javascript:;" class="cancel" @click="hidePop()">{#$langData['siteConfig'][9][3]#}</a> {#* 拒绝 *#}
+					<a href="javascript:;" class="keep_login" @click="sureClick()">{#$langData['siteConfig'][6][2]#}</a> {#*  同意  *#}
+				</div>
+			</div>
+			<div class="pop_agree" v-if="login && !regsiter_success">
+				<div class="box">
+					<p class="agree">
+					  {#$langData['siteConfig'][55][7]#}<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手隐私政策'#}" target="_blank">《隐私政策》</a>及<a href="{#getUrlPath service='siteConfig' template='protocol' title='骑手注册协议'#}" target="_blank">《注册协议》</a>
+					</p>
+				</div>
+				<div class="btn_group">
+					<a href="javascript:;" class="cancel" @click="hidePop()">{#$langData['siteConfig'][9][3]#}</a> {#* 拒绝 *#}
+					<a href="javascript:;" class="keep_login" @click="sureClick()">{#$langData['siteConfig'][6][2]#}</a> {#*  同意  *#}
+				</div>
+			</div>
+		</div>
+
+        {#$rsaScript#}
+		{#if $cfg_geetest#}
+		{#if $cfg_geetest == 1#}
+		<script type="text/javascript" src="{#$cfg_secureAccess#}static.geetest.com/static/tools/gt.js"></script>
+		{#/if#}
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/captchaVerify.js?v={#$cfg_staticVersion#}"></script>
+		{#/if#}
+		<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+		<!-- <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.ajaxFileUpload.js"></script> -->
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/webuploader/webuploader.js"></script>
+		<script src="{#$templets_skin#}js/mobileSelect.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/login.js?v={#$cfg_staticVersion#}"></script>
+	</body>
+</html>

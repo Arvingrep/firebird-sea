@@ -1,0 +1,469 @@
+{#if $module == 'shop'#}
+{#if $type=='branch'#}
+{#include file="manage-$module-$type.html"#}
+{#else#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+	<title>{#$langData['siteConfig'][16][137]#}</title>
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage-shop.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = {#$cfg_hideUrl#};
+		var memberPage = true;
+		var module = '{#$module#}', atpage = 1, totalCount = 0, pageSize = 10, state = '{#$state#}', type = '{#$type#}';
+		var editUrl = '{#getUrlPath service="member" template="fabu" action="$module"#}';
+		var baoMurl = "{#getUrlPath service='member' template='shop_huodong'#}";
+		var hasbaoMurl="{#getUrlPath service='member' template='shop_hasjoin'#}";
+		var is_staff = '{#$userinfo.is_staff#}';
+        var shop_huodongopen = {#$shop_huodongopen|default:'[]'|json_encode#};
+	</script>
+	<style media="screen">
+		body {opacity: 1;padding-bottom: 1rem; padding-bottom: calc(1rem + constant(safe-area-inset-bottom));}
+		.fabuBtn {position: fixed; left: 0; bottom: 0; width: 100%; height: 1rem;}
+		.fabuBtn a {display: block; line-height: 1rem; background: #129bf0; text-align: center; font-size: .3rem; color: #fff;}
+	</style>
+
+</head>
+<body>
+
+<!-- 头部 s -->
+{#$pageTitle = $langData['siteConfig'][16][137]#}
+{#include file="../../../siteConfig/touch_top.html"#}
+{#if $shoptypexianshi == 1#}
+{#$pageUrl = "{#getUrlPath service='member' template='shop_type.html' param="modAdrr={#$shoptype#}"#}"#}
+{#else#}
+{#$pageUrl = "{#getUrlPath service='member' template='shop_modtype'#}"#}
+{#/if#}
+<!-- 头部 e -->
+
+<div class="tab">
+	<ul>
+		<li data-id="1" class="type curr"><a href="javascript:;">{#$langData['siteConfig'][19][555]#}<span id="audit">0</span></a></li>
+		<li class="type" data-id="0"><a href="javascript:;">{#$langData['siteConfig'][19][556]#}<span id="gray">0</span></a></li>
+		<li class="type" data-id="2"><a href="javascript:;">{#$langData['siteConfig'][19][557]#}<span id="refuse">0</span></a></li>
+	</ul>
+</div>
+<div class="navFilter fn-clear">
+	<div class="searchItem">
+		<s></s>
+		<input type="text" placeholder="搜索..." id="searchTit" enterkeyhint="search"  onkeypress="CheckformInfo()">
+	</div>
+	<div class="filterItem orderitem">
+		<span>最近更新</span><i></i>
+	</div>
+	<div class="filterItem typeitem"{#if $custom_huodongshoptypeopen == 1#} style="display: none;"{#/if#}>
+		<span>店铺分类</span><i></i>
+	</div>
+</div>
+<!-- 商品列表 s -->
+<div class="list" id="shopList"></div>
+<!-- 商品列表 e -->
+
+<div class="fabuBtn"><a href="{#$pageUrl#}">发布商品</a></div>
+<!-- 店铺分类列表 s-->
+<div class="maskAside"></div>
+<div class="asideType">
+	<h3>店铺分类</h3>
+	<div>
+		<p class="active"><a href="javascript:;" data-id="0">全部分类</a></p>
+		{#loop service="shop" action="category" return="type"#}
+		<p><a href="javascript:;" data-id="{#$type.id#}">{#$type.typename#}</a></p>
+		{#/loop#}
+		{#if $typesalestate == 1#}
+		<p><a href="javascript:;" data-id="tuan">本地团购</a></p>
+		{#/if#}
+	</div>
+</div>
+<!-- 店铺分类列表 e-->
+<!-- 删除弹窗 s-->
+<div class="delMask"></div>
+<div class="delAlert">
+	<div class="delAlertCon">
+		<div>
+			<h2 class="delTile">确定删除信息？</h2>
+			<p>一经删除不可恢复</p>
+		</div>
+		<ul class="fn-clear">
+			<li class="firLi"><a href="javascript:;" class="cancelDel">取消</a></li>
+			<li><a href="javascript:;" class="sureDel">确认</a></li>
+		</ul>
+	</div>
+</div>
+<!-- 删除弹窗 e-->
+<!-- 排序弹窗 s -->
+<div class="orderbyAlert">
+	<div>
+		<!-- <p class="active updateTime"><a href="javascript:;" data-id="5">更新时间由近到远</a></p>
+		<p class="upselfTime"><a href="javascript:;" data-id="7">上架时间由远到近</a></p>
+		<p class="upselfTime "><a href="javascript:;" data-id="8">上架时间由近到远</a></p>
+		<p class="createTime fn-hide"><a href="javascript:;" data-id="14">创建时间由近到远</a></p>
+		<p class="createTime fn-hide"><a href="javascript:;" data-id="13">创建时间由远到近</a></p>
+		<p><a href="javascript:;" data-id="9">库存由高到低</a></p>
+		<p><a href="javascript:;" data-id="10">库存由低到高</a></p> -->
+		<p class="active updateTime"><a href="javascript:;" data-id="5">最近更新</a></p>
+		<p class="upselfTime"><a href="javascript:;" data-id="8">最近上架销售</a></p>
+		<p class="upselfTime "><a href="javascript:;" data-id="7">最早上架销售</a></p>
+		<p class="createTime fn-hide"><a href="javascript:;" data-id="14">最近创建</a></p>
+		<p class="createTime fn-hide"><a href="javascript:;" data-id="13">最早创建</a></p>
+		<p><a href="javascript:;" data-id="9">库存最多</a></p>
+		<p><a href="javascript:;" data-id="10">库存最少</a></p>
+	</div>
+	<a href="javascript:;" class="cancelOr">取消</a>
+</div>
+<!-- 排序弹窗 e -->
+
+<script src="{#$templets_skin#}js/manage-shop.js?v={#$cfg_staticVersion#}" charset="utf-8"></script>
+</body>
+</html>
+{#/if#}
+{#else if $module == 'homemaking'#}
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{#$langData['homemaking'][0][29]#}</title>   {#* 家政服务管理 *#}
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage-homemaking.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+	<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}',hideFileUrl = {#$cfg_hideUrl#};
+		var module = '{#$module#}', atpage = 1, totalCount = 0, pageSize = 5, state = '{#$state#}', type = '{#$type#}';
+		var editUrl = '{#getUrlPath service="member" template="fabu" action="$module"#}';
+		var modelType = '{#$module#}', state = '{#$state#}', type = '{#$type#}', typeid = {#$typeid#}, uploadType = "thumb";
+	</script>
+</head>
+<body>
+<!-- 头部 s -->
+{#$pageTitle = {#$langData['homemaking'][1][36]#}#}   {#* 家政管理 *#}
+{#$pageRight = '<a href="javascript:;" class="notMenu"> </a>'#}
+{#include file="top.html"#}
+<!-- 头部 s -->
+
+<div class="content">
+	<div class="house-tab">
+		<div class="tab-box">
+			{#* 全部 *#}
+			<a href="javascript:;" class="active" data-state=""><span>{#$langData['siteConfig'][9][0]#}</span><s></s></a>
+			{#* 待审核 *#}
+			<a href="javascript:;" data-state="0"><span>{#$langData['siteConfig'][19][556]#}</span><em id="gray"></em><s></s></a>
+			{#* 审核通过 *#}
+			<a href="javascript:;" data-state="1"><span>{#$langData['siteConfig'][26][73]#}</span><em id="audit"></em><s></s></a>
+			{#* 审核拒绝 *#}
+			<a href="javascript:;" data-state="2"><span>{#$langData['siteConfig'][9][35]#}</span><em id="refuse"></em><s></s></a>
+		</div>
+	</div>
+
+	<div class="homemaking-list sale-list" id="list"></div>
+</div>
+
+<div class="fabuBtn"><a href="{#getUrlPath service='member'  template='fabu' action='homemaking'#}">{#$langData['homemaking'][7][12]#}</a></div> {#* 发布家政服务 *#}
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/manage-homemaking.js?{#$cfg_staticVersion#}"></script>
+</body>
+</html>
+{#else if $module == 'tuan'#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>{#$langData['siteConfig'][19][444]#}</title>
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage-tuan.css?v={#$cfg_staticVersion#}">
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+	<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}',hideFileUrl = {#$cfg_hideUrl#};
+		var module = '{#$module#}', atpage = 1, totalCount = 0, pageSize = 5, state = '{#$state#}', type = '{#$type#}';
+		var editUrl = '{#getUrlPath service="member" template="fabu" action="$module"#}';
+		var modelType = '{#$module#}', state = '{#$state#}', type = '{#$type#}', typeid = {#$typeid#}, uploadType = "thumb";
+	</script>
+</head>
+<body>
+<!-- 头部 s -->
+{#$pageTitle = $langData['siteConfig'][19][444]#}
+{#include file="../../../siteConfig/touch_top.html"#}
+<!-- 头部 e -->
+<div class="nav-tabs fn-clear">
+	<ul class="fn-clear">
+		<li class="navBC" data-id=""><a href="javascript:;">{#$langData['siteConfig'][19][391]#} (<span id="total">0</span>)</a></li>
+		<li data-id="1"><a href="javascript:;">出售中 (<span id="audit">0</span>)</a></li>
+		<li data-id="0"><a href="javascript:;">{#$langData['siteConfig'][9][21]#} (<span id="gray">0</span>)</a></li>
+		<li data-id="2"><a href="javascript:;">{#$langData['siteConfig'][9][35]#} (<span id="refuse">0</span>)</a></li>
+		<li data-id="6"><a href="javascript:;">已下架 (<span id="offshelf">0</span>)</a></li>
+	</ul>
+</div>
+<div class="TuanList">
+</div>
+<div class="fb_btn">
+	<a href="{#getUrlPath service='member' template='fabu' action='tuan'#}" class="btn add">{#$langData['siteConfig'][11][4]#}</a>
+</div>
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/manage-{#$module#}.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>
+{#else#}
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{#$langData['siteConfig'][11][12]#} - {#$cfg_webname#}</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage{#if $module != ''#}-{#$module#}{#/if#}.css?v={#$cfg_staticVersion#}">
+	<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+	<style media="screen">
+		body {opacity: 1;}
+		{#if $module == 'huodong'#}
+		.header .header-search a, .open.header .header-search a{background: none !important;}
+		{#/if#}
+	</style>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+		var hideFileUrl = {#$cfg_hideUrl#};
+		var module = '{#$module#}', atpage = 1, totalCount = 0, pageSize = 10, state = '{#$state#}', type = '{#$type#}';
+		var editUrl = '{#getUrlPath service="member" template="fabu" action="$module"#}';
+		//竞价默认价格，此值可在后台分类信息设置中修改
+		var bidDefault = 5;
+		//竞价默认增加预算价格，此值可在后台分类信息设置中修改
+		var bidDefaultAdd = 2;
+	</script>
+</head>
+<body>
+
+{#$backUrl = "{#getUrlPath service='member' template="index"#}"#}
+{#if $module == 'house'#}
+{#if $type == 'sale'#}
+{#$tit = $langData['siteConfig'][19][218]#}
+{#elseif $type == 'sp'#}
+{#$tit = $langData['siteConfig'][19][221]#}
+{#elseif $type == 'xzl'#}
+{#$tit = $langData['siteConfig'][19][220]#}
+{#elseif $type == 'zu'#}
+{#$tit = $langData['siteConfig'][19][219]#}
+{#elseif $type == 'cf'#}
+{#$tit = $langData['siteConfig'][19][761]#}
+{#/if#}
+{#$pageTitle = $langData['siteConfig'][6][22]|cat:$tit#}
+{#elseif $module == 'info'#}
+{#$pageTitle = $langData['siteConfig'][16][20]#}
+{#$pageUrl = "{#getUrlPath service='member' type="user" template='info'#}"#}
+{#$pageRight = "<a href='$pageUrl'>"|cat:$langData['siteConfig'][11][0]|cat:"</a>"#}
+{#elseif $module == 'article'#}
+{#$pageTitle = $langData['siteConfig'][16][17]#}
+{#$pageUrl = "{#getUrlPath service='member' type="user" action="fabu" template='article'#}"#}
+{#$pageRight = "<a href='$pageUrl'>"|cat:$langData['siteConfig'][11][0]|cat:"</a>"#}
+{#elseif $module == 'tieba'#}
+{#$pageTitle = $langData['siteConfig'][16][122]#}
+{#$pageUrl = "{#getUrlPath service='tieba' template='fabu'#}"#}
+{#$pageRight = "<a href='$pageUrl'>"|cat:$langData['siteConfig'][11][0]|cat:"</a>"#}
+{#elseif $module == 'huodong'#}
+{#$pageTitle = $langData['siteConfig'][10][3]#}
+{#$pageUrl = "{#getUrlPath service="huodong" template="fabu"#}"#}
+{#$pageRight = "<a href='$pageUrl'>"|cat:$langData['siteConfig'][11][0]|cat:"</a>"#}
+{#elseif $module == 'vote'#}
+{#$backUrl = "{#getUrlPath service='member' template='vote'#}"#}
+{#$pageTitle = "我的投票"#}
+{#else if $module == 'paimai'#}
+{#$pageTitle = "我的拍品"#}
+{#/if#}
+{#include file="top.html"#}
+
+<div class="tab">
+	{#if $module == "vote"#}
+	<ul>
+		<li data-id="" class="type curr"><a href="javascript:;">{#$langData['siteConfig'][19][391]#}</a></li>
+		<li class="type" data-id="1"><a href="javascript:;">{#$langData['siteConfig'][6][58]#}</a></li>
+		<li class="type" data-id="2"><a href="javascript:;">{#$langData['siteConfig'][19][507]#}</a></li>
+	</ul>
+	{#else#}
+	<ul{#if $module == 'huodong'#} data-url="{#getUrlPath service='huodong' template='fabu' param='id=%id'#}" data-reg="{#getUrlPath service='member' type='user' template='huodong-reg' id="%id"#}"{#/if#}>
+	<li data-id="" class="type curr"><a href="javascript:;">{#$langData['siteConfig'][19][391]#}</a></li>
+	{#if $module == 'paimai'#}
+	<li class="type" data-id="1,3,4,5"><a href="javascript:;">{#$langData['siteConfig'][19][392]#}</a></li>
+	{#else#}
+	<li class="type" data-id="1"><a href="javascript:;">{#$langData['siteConfig'][19][392]#}</a></li>
+	{#/if#}
+	<li class="type" data-id="0"><a href="javascript:;">{#$langData['siteConfig'][9][21]#}</a></li>
+	<li class="type" data-id="2"><a href="javascript:;">{#$langData['siteConfig'][9][35]#}</a></li>
+	</ul>
+	{#/if#}
+</div>
+<div class="count">
+	<ul>
+		<li>
+			{#if $module == 'house'#}
+			{#$langData['siteConfig'][20][256]|replace:'1':'<span id="total">0</span>'#}
+			{#elseif $module == 'info'#}
+			{#$langData['siteConfig'][20][257]|replace:'1':'<span id="total">0</span>'#}
+			{#elseif $module == 'article'#}
+			{#$langData['siteConfig'][20][258]|replace:'1':'<span id="total">0</span>'#}
+			{#elseif $module == 'tieba'#}
+			{#$langData['siteConfig'][20][259]|replace:'1':'<span id="total">0</span>'#}
+			{#elseif $module == 'huodong'#}
+			{#$langData['siteConfig'][20][260]|replace:'1':'<span id="total">0</span>'#}
+			{#/if#}
+		</li>
+		<li>
+			{#if $module == 'house'#}
+			{#$langData['siteConfig'][20][256]|replace:'1':'<span id="audit">0</span>'#}
+			{#elseif $module == 'info'#}
+			{#$langData['siteConfig'][20][257]|replace:'1':'<span id="audit">0</span>'#}
+			{#elseif $module == 'article'#}
+			{#$langData['siteConfig'][20][258]|replace:'1':'<span id="audit">0</span>'#}
+			{#elseif $module == 'tieba'#}
+			{#$langData['siteConfig'][20][259]|replace:'1':'<span id="audit">0</span>'#}
+			{#elseif $module == 'huodong'#}
+			{#$langData['siteConfig'][20][260]|replace:'1':'<span id="audit">0</span>'#}
+			{#/if#}
+		</li>
+		<li>
+			{#if $module == 'house'#}
+			{#$langData['siteConfig'][20][256]|replace:'1':'<span id="gray">0</span>'#}
+			{#elseif $module == 'info'#}
+			{#$langData['siteConfig'][20][257]|replace:'1':'<span id="gray">0</span>'#}
+			{#elseif $module == 'article'#}
+			{#$langData['siteConfig'][20][258]|replace:'1':'<span id="gray">0</span>'#}
+			{#elseif $module == 'tieba'#}
+			{#$langData['siteConfig'][20][259]|replace:'1':'<span id="gray">0</span>'#}
+			{#elseif $module == 'huodong'#}
+			{#$langData['siteConfig'][20][260]|replace:'1':'<span id="gray">0</span>'#}
+			{#/if#}
+		</li>
+		<li>
+			{#if $module == 'house'#}
+			{#$langData['siteConfig'][20][256]|replace:'1':'<span id="refuse">0</span>'#}
+			{#elseif $module == 'info'#}
+			{#$langData['siteConfig'][20][257]|replace:'1':'<span id="refuse">0</span>'#}
+			{#elseif $module == 'article'#}
+			{#$langData['siteConfig'][20][258]|replace:'1':'<span id="refuse">0</span>'#}
+			{#elseif $module == 'tieba'#}
+			{#$langData['siteConfig'][20][259]|replace:'1':'<span id="refuse">0</span>'#}
+			{#elseif $module == 'huodong'#}
+			{#$langData['siteConfig'][20][260]|replace:'1':'<span id="refuse">0</span>'#}
+			{#/if#}
+		</li>
+	</ul>
+</div>
+<!-- 列表 s -->
+<div class="house-list esf-list" id="list">
+
+	<!-- <div class="item fn-clear" data-id="1121">
+		<div class="item-img">
+			<a href="http://zt.215000.com/sz/shop/detail-1121.html">
+				<img src="https://upload.ihuoniao.cn//shop/thumb/large/2022/05/16/16526859791273.png?x-image-process=image/resize,m_fill,w_800,h_800">
+			</a>
+		</div>
+		<div class="item-txt">
+			<a href="http://zt.215000.com/sz/shop/detail-1121.html" class="item-tit">发布电商模板的商品</a>
+			<p class="hding"></p>
+			<p class="price">￥<em>40.00</em></p>
+			<p class="operate"><span>已售0</span><span>库存2400</span></p>
+		</div>
+		<p class="opWrap fn-clear">
+			<a href="javascript:;" class="offShelf"><i></i>下架</a>
+			<a href="http://zt.215000.com/b/fabu-shop.html?do=edit&amp;id=1121" class="edit"><i></i>编辑</a>
+		</p>
+	</div> -->
+</div>
+<!-- 列表 s -->
+
+{#if $module == 'huodong'#}
+<a href='{#getUrlPath service="member" template="huodong-join"#}' class="join-btn">{#$langData['siteConfig'][19][252]#}</a>
+{#/if#}
+{#if $module == 'paimai'#}
+<div class="fabuBtn"><a href="{#getUrlPath service="member" template="fabu" action="$module"#}">发布商品</a></div>
+{#/if#}
+
+<div class="bidJ-pay">
+	<div class="fn-clear"><a href="javascript:;" class="close fn-right"></a></div>
+	<div class="state1">
+		<p class="tit">{#$langData['siteConfig'][19][69]#}</p>
+		<ul class="day">
+			<li>1{#$langData['siteConfig'][13][6]#}</li><li class="on">3{#$langData['siteConfig'][13][6]#}</li><li>7{#$langData['siteConfig'][13][6]#}</li><li>15{#$langData['siteConfig'][13][6]#}</li><li>30{#$langData['siteConfig'][13][6]#}</li><li>90{#$langData['siteConfig'][13][6]#}</li>
+		</ul>
+		<div class="inpbox">
+			<span>{#$langData['siteConfig'][20][261]#}</span>
+			<input type="text" onkeyup="this.value=this.value.replace(/\D/g,'')" onafterpaste="this.value=this.value.replace(/\D/g,'')" id="dayCount">{#$langData['siteConfig'][13][6]#}
+		</div>
+		<div class="inpbox">
+			<span>{#$langData['siteConfig'][19][70]#}</span>
+			<input type="text" onkeyup="value=value.replace(/[^\d.]/g,'')" id="dayprice">{#echoCurrency type='short'#}
+		</div>
+		<div class="inpbox">
+			<span>{#$langData['siteConfig'][19][71]#}</span>
+			<span class="total" id="totalPrice">{#echoCurrency type='symbol'#}<em></em></span>
+		</div>
+	</div>
+	<div class="state2 fn-hide">
+		<div class="inpbox">
+			<span>{#$langData['siteConfig'][19][72]#}</span>
+			<font class="des" id="currPrice"></font>
+		</div>
+		<div class="inpbox">
+			<span>{#$langData['siteConfig'][19][73]#}</span>
+			<font class="des" id="bidEnd"></font>
+		</div>
+		<div class="inpbox">
+			<span>{#$langData['siteConfig'][19][74]#}</span>
+			<input type="text" onkeyup="value=value.replace(/[^\d.]/g,'')" class="bid-inp">
+		</div>
+		<div class="inpbox">
+			<span>{#$langData['siteConfig'][19][75]#}</span>
+			<font class="des total-price"></font>
+		</div>
+	</div>
+	<div class="bidbtn"><a href="javascript:;">{#$langData['siteConfig'][6][70]#}</a></div>
+</div>
+
+
+<!-- 选择支付方式 s -->
+<div class="paybox">
+	<div class="tit">{#$langData['siteConfig'][6][93]#}</div>
+	<ul>
+		{#siteConfig action="payment"#}
+		{#if $row.pay_code == "wxpay"#}
+		<li class="pay1" id="wxpay" data-type="wxpay">{#$langData['siteConfig'][19][712]#}<i class="radio"></i></li>
+		{#elseif $row.pay_code == "globalalipay"#}
+		<li class="pay2" id="globalalipay" data-type="globalalipay">{#$langData['siteConfig'][19][713]#}<i class="radio"></i></li>
+		{#elseif $row.pay_code == "alipay"#}
+		<li class="pay2" id="alipay" data-type="alipay">{#$langData['siteConfig'][19][713]#}<i class="radio"></i></li>
+		{#elseif $row.pay_code == "paypal"#}
+		<li class="pay4" id="paypal" data-id="paypal">{#$langData['siteConfig'][19][714]#} <i class="radio"></i></li>
+		{#/if#}
+		{#/siteConfig#}
+	</ul>
+	<a href="javascript:;" class="paybtn" data-url="{#$cfg_basehost#}/include/ajax.php?service={#$module#}&action=bid&aid=$aid&type={#$type#}&day=$day&price=$price&paytype=$paytype" data-url1="{#$cfg_basehost#}/include/ajax.php?service={#$module#}&action=bidIncrease&aid=$aid&type={#$type#}&price=$price&paytype=$paytype">{#$langData['siteConfig'][6][70]#}</a>
+</div>
+<!-- 选择支付方式 e -->
+
+<div class="mask"></div>
+
+</body>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script src="{#$templets_skin#}js/manage-{#$module#}.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>
+{#/if#}
