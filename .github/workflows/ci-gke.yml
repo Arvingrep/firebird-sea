@@ -48,16 +48,23 @@ jobs:
         run: |
           gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
 
-      - name: 4. 构建极简多阶段镜像并推送至 Google Artifact Registry (GAR)
+      - name: 4. 初始化 Docker Buildx 缓存加速引擎
+        uses: docker/setup-buildx-action@v3
+
+      - name: 5. 构建极简多阶段镜像并推送至 Google Artifact Registry (GAR)
         run: |
           IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-php:${{ github.sha }}"
           API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-api:${{ github.sha }}"
-          docker build -t $IMAGE_TAG -f deploy/docker/Dockerfile.web .
-          docker build -t $API_IMAGE_TAG -f deploy/docker/Dockerfile.api .
-          docker push $IMAGE_TAG
-          docker push $API_IMAGE_TAG
+          docker buildx build --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -t "$IMAGE_TAG" -f deploy/docker/Dockerfile.web .
+          docker buildx build --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -t "$API_IMAGE_TAG" -f deploy/docker/Dockerfile.api .
 
-      - name: 5. Helm 部署/更新 GKE 目标分站
+      - name: 6. Helm 部署/更新 GKE 目标分站
         run: |
           TARGET="${{ github.event.inputs.site_target || 'manila' }}"
           VALUES_FILE="deploy/helm/firebird-site/values-${TARGET}.yaml"
@@ -71,7 +78,7 @@ jobs:
             -f "$VALUES_FILE" \
             --set image.tag="${{ github.sha }}"
 
-      - name: 6. 触发 Telegram 手机上线闭环通知
+      - name: 7. 触发 Telegram 手机上线闭环通知
         if: success()
         run: |
           TARGET="${{ github.event.inputs.site_target || 'manila' }}"

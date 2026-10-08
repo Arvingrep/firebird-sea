@@ -1,20 +1,35 @@
 # ==============================================================================
-# 🔥 Coins.ph 汇率与中间件微服务 (Alpine 多阶段极小容器，目标体积 < 80MB)
+# 🔥 Coins.ph 汇率与中间件微服务 (Alpine 多阶段极小容器，安全非 Root & 极速构建)
 # ==============================================================================
 
-# Stage 1: Build & Prune
+# Stage 1: Build & Prune (依赖下载与安装)
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY services/api/package*.json ./
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
-# Stage 2: Minimal Runtime
+# 优先单独复制 package 定义，充分利用 Docker 缓存层
+COPY services/api/package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi \
+    && npm cache clean --force
+
+# Stage 2: Minimal Runtime (安全无特权运行时)
 FROM node:20-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/node_modules ./node_modules
-COPY services/api/src ./src
-COPY services/api/package.json ./
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+# 从构建层拷贝精简依赖与业务源码，统一收口为非 root 的 node 用户
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node services/api/src ./src
+COPY --chown=node:node services/api/package.json ./
+
+# 切换为标准无特权账号
+USER node
 
 EXPOSE 3000
+
+# 容器原生健康检查探针
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health || exit 1
+
 CMD ["node", "src/server.js"]

@@ -1,30 +1,52 @@
 # ==============================================================================
-# 🔥 火鸟门户 Web/PHP 极简生产容器 (Alpine 瘦身构建)
+# 🔥 火鸟门户 Web/PHP 极简生产容器 (Alpine 深度瘦身 & 安全加固版)
 # ==============================================================================
 
 FROM php:8.1-fpm-alpine
 
+# 1. 运行时依赖与编译依赖分离，编译完成后立即卸载构建工具以极致瘦身
 RUN apk add --no-cache \
-    nginx \
-    curl \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    libzip-dev \
-    oniguruma-dev \
+        nginx \
+        curl \
+        libpng \
+        libjpeg-turbo \
+        freetype \
+        libzip \
+        oniguruma \
+    && apk add --no-cache --virtual .build-deps \
+        $PHPIZE_DEPS \
+        libpng-dev \
+        libjpeg-turbo-dev \
+        freetype-dev \
+        libzip-dev \
+        oniguruma-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd pdo_mysql mysqli mbstring zip bcmath opcache \
-    && rm -rf /var/cache/apk/*
+    && apk del .build-deps \
+    && rm -rf /var/cache/apk/* /tmp/* /usr/share/man
+
+# 2. 生产级 PHP 与 OPcache 性能调优配置
+RUN { \
+        echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.interned_strings_buffer=16'; \
+        echo 'opcache.max_accelerated_files=20000'; \
+        echo 'opcache.revalidate_freq=2'; \
+        echo 'opcache.validate_timestamps=1'; \
+        echo 'opcache.fast_shutdown=1'; \
+        echo 'opcache.enable_cli=1'; \
+    } > /usr/local/etc/php/conf.d/opcache-recommended.ini \
+    && { \
+        echo 'expose_php = Off'; \
+        echo 'upload_max_filesize = 50M'; \
+        echo 'post_max_size = 50M'; \
+        echo 'memory_limit = 256M'; \
+    } > /usr/local/etc/php/conf.d/production.ini
 
 WORKDIR /var/www/html
 
-# 仅复制必要生产源码，排除构建下载与测试目录
-COPY webroot/ /var/www/html/
-COPY license/huoniao.php /var/www/html/include/huoniao.php
+# 3. 采用 --chown 复制源码，严禁二次 RUN chown -R 造成 Docker Layer 体积翻倍
+COPY --chown=www-data:www-data webroot/ /var/www/html/
+COPY --chown=www-data:www-data license/huoniao.php /var/www/html/include/huoniao.php
 
-# 运行权限控制
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html
-
-EXPOSE 80
+EXPOSE 80 9000
 CMD ["php-fpm"]
