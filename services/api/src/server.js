@@ -17,8 +17,8 @@ const coinsClient = new CoinsPhClient();
 app.use(cors());
 app.use(express.json());
 
-// 1. 健康检查
-app.get('/health', (req, res) => {
+// 1. 健康检查 (支持 /, /health 与 /api/health 路径)
+app.get(['/', '/health', '/api/health'], (req, res) => {
   res.json({
     status: 'online',
     timestamp: new Date().toISOString(),
