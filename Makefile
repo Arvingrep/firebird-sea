@@ -1,11 +1,11 @@
-.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release
+.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s
 
 help:
 	@echo "=========================================================="
 	@echo "🔥 火鸟模式东南亚（菲律宾）一人 AI 团队基地操作指令"
 	@echo "=========================================================="
 	@echo "  make setup            - 初始化基地目录与环境检查"
-	@echo "  make up               - 启动 LEMP + Redis + n8n 容器集群"
+	@echo "  make up               - 启动 LEMP + Redis + n8n + TG-Bot 容器集群"
 	@echo "  make down             - 停止容器集群"
 	@echo "  make logs             - 查看所有容器实时日志"
 	@echo "  make dispatch         - [分工1] 需求/语音脱水提炼为标准 Spec 并自动派单"
@@ -13,6 +13,9 @@ help:
 	@echo "  make verify           - 运行一人团队代码与 Docs-as-Code 校验卡点"
 	@echo "  make accept           - [分工3] 启动独立验收智能体 (Agent 2) 验收 (例: make accept TASK=TASK-001)"
 	@echo "  make release          - [分工4] 经独立验收通过后一键发布至 GKE 并自动归档 (例: make release TASK=TASK-001 SITE=manila)"
+	@echo "  make tg-bot           - 本地启动 Telegram 前哨调度服务 (端口 3001)"
+	@echo "  make test-tg          - 测试 Telegram 前哨服务 Webhook 与卡片接口"
+	@echo "  make test-k8s         - 测试 GKE Helm Chart 语法与多站点模板渲染"
 	@echo "  make clean-bloat      - 执行工程体系脱水剪枝，清理临时备份、大日志与悬挂镜像"
 	@echo "  make test-coins       - 测试 Coins.ph 官方行情深度与 HMAC-SHA256 鉴权引擎"
 	@echo "  make sync-gh          - 同步本地任务至 GitHub Project & BMAD UI 数据源"
@@ -91,5 +94,16 @@ release:
 clean-bloat:
 	@chmod +x scripts/clean-bloat.sh
 	@./scripts/clean-bloat.sh
+
+tg-bot:
+	@node services/tg-bot/src/server.js
+
+test-tg:
+	@node services/tg-bot/src/test.js
+
+test-k8s:
+	@chmod +x scripts/test-helm.sh
+	@./scripts/test-helm.sh
+
 
 

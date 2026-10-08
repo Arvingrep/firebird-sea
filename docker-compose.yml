@@ -79,6 +79,27 @@ services:
     networks:
       - firebird-net
 
+  # 6. Telegram Bot 前哨服务 (Zero-Dep Native Node.js)
+  tg-bot:
+    image: node:20-alpine
+    container_name: firebird-tg-bot
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: ["node", "services/tg-bot/src/server.js"]
+    ports:
+      - "3001:3001"
+    environment:
+      - TG_BOT_PORT=3001
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_ADMIN_CHAT_ID=${TELEGRAM_ADMIN_CHAT_ID:-}
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/tg-input
+    depends_on:
+      - n8n
+    networks:
+      - firebird-net
+
 networks:
   firebird-net:
     driver: bridge

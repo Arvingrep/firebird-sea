@@ -1,0 +1,44 @@
+name: CI Verify & Quality Gate
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ 'feat/**', 'fix/**' ]
+
+jobs:
+  verify-and-test:
+    name: 🛡️ 一人 AI 团队工程门禁与独立验收
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. 检出代码
+        uses: actions/checkout@v4
+
+      - name: 2. 配置 Node.js 20 运行环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 3. 执行 Dev Agent 防臃肿纯净度门禁
+        run: |
+          chmod +x scripts/dev-check.sh
+          ./scripts/dev-check.sh
+
+      - name: 4. 执行 Coins.ph 真实行情与 HMAC-SHA256 鉴权探针
+        run: |
+          node scripts/test-coins-ph.js
+
+      - name: 5. 启动独立验收智能体 (Agent 2) 红队验收
+        run: |
+          chmod +x scripts/agent-accept.sh
+          ./scripts/agent-accept.sh TASK-001
+
+      - name: 6. 验证 GKE Helm 多站点模板合成
+        run: |
+          chmod +x scripts/test-helm.sh
+          ./scripts/test-helm.sh
+
+      - name: 7. 检查工作区代码整洁度与脱水状态
+        run: |
+          chmod +x scripts/clean-bloat.sh
+          ./scripts/clean-bloat.sh

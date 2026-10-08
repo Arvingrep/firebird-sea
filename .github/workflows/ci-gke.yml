@@ -44,15 +44,18 @@ jobs:
           cluster_name: ${{ vars.GKE_CLUSTER_NAME }}
           location: asia-southeast1-a
 
-      - name: 3. 构建并推送至 Google Artifact Registry (GAR)
+      - name: 3. 构建极简多阶段镜像并推送至 Google Artifact Registry (GAR)
         run: |
           IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-php:${{ github.sha }}"
-          docker build -t $IMAGE_TAG -f docker/php/Dockerfile .
+          API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-api:${{ github.sha }}"
+          docker build -t $IMAGE_TAG -f deploy/docker/Dockerfile.web .
+          docker build -t $API_IMAGE_TAG -f deploy/docker/Dockerfile.api .
           docker push $IMAGE_TAG
+          docker push $API_IMAGE_TAG
 
       - name: 4. Helm 部署/更新 GKE 目标分站
         run: |
-          TARGET="${{ github.event.inputs.site_target || 'demo' }}"
+          TARGET="${{ github.event.inputs.site_target || 'manila' }}"
           VALUES_FILE="deploy/helm/firebird-site/values-${TARGET}.yaml"
           if [ ! -f "$VALUES_FILE" ]; then
             VALUES_FILE="deploy/helm/firebird-site/values.yaml"
@@ -63,3 +66,13 @@ jobs:
             --namespace default \
             -f "$VALUES_FILE" \
             --set image.tag="${{ github.sha }}"
+
+      - name: 5. 触发 Telegram 手机上线闭环通知
+        if: success()
+        run: |
+          TARGET="${{ github.event.inputs.site_target || 'manila' }}"
+          MSG="🎉 *【GKE 生产上线成功】*%0A城市分站: *${TARGET}*%0A版本 Commit: \`${{ github.sha }}\`%0A状态: *🟢 运行中*"
+          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && [ -n "${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}&text=${MSG}&parse_mode=Markdown" > /dev/null || true
+          fi

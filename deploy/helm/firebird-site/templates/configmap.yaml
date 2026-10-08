@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: firebird-nginx-{{ .Values.siteId }}
+  labels:
+    app: firebird-site
+    site: {{ .Values.siteId }}
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name {{ (index .Values.ingress.hosts 0).host | default "localhost" }};
+        root /var/www/html;
+        index index.php index.html;
+
+        # 东南亚高延迟连接优化
+        keepalive_timeout 65;
+        client_max_body_size 50M;
+
+        # 火鸟伪静态重写
+        location / {
+            try_files $uri $uri/ /index.php?$args;
+        }
+
+        # 静态资源缓存加速
+        location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|svg|woff2)$ {
+            expires 30d;
+            add_header Cache-Control "public, no-transform";
+        }
+
+        # PHP-FPM 反向代理到本地 9000 端口
+        location ~ \.php$ {
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            include fastcgi_params;
+            fastcgi_read_timeout 300;
+        }
+
+        # 禁止访问敏感隐藏文件
+        location ~ /\. {
+            deny all;
+        }
+    }
