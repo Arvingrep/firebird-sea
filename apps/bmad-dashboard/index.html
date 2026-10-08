@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BMAD 一人 AI 团队工程看板 | 火鸟模式东南亚落地系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at top left, #0f172a 0%, #020617 100%);
+      --surface: rgba(30, 41, 59, 0.7);
+      --surface-border: rgba(255, 255, 255, 0.08);
+      --surface-hover: rgba(51, 65, 85, 0.8);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    header {
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid var(--surface-border);
+      backdrop-filter: blur(12px);
+      background: rgba(15, 23, 42, 0.8);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-logo {
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 700;
+    }
+    .badge-sub {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    /* 实时汇率栏 */
+    .coins-ticker-bar {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      background: rgba(2, 6, 23, 0.6);
+      border: 1px solid var(--surface-border);
+      padding: 0.4rem 1rem;
+      border-radius: 0.75rem;
+      font-size: 0.85rem;
+    }
+    .ticker-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .ticker-val {
+      color: var(--success);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+
+    /* 分类标签栏 */
+    .filter-bar {
+      padding: 1rem 2rem 0;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      color: var(--text-muted);
+      padding: 0.4rem 0.9rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      background: var(--accent);
+      color: #020617;
+      border-color: var(--accent);
+      font-weight: 600;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    /* 看板大容器 */
+    .kanban-board {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1.25rem;
+      padding: 1.25rem 2rem 2rem;
+      overflow-x: auto;
+    }
+
+    .kanban-col {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 1rem;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      backdrop-filter: blur(8px);
+      min-width: 260px;
+    }
+
+    .col-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--surface-border);
+    }
+    .col-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .col-count {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* 任务卡片 */
+    .task-card {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--surface-border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .task-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .card-module {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 0.35rem;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+    }
+    .card-title {
+      font-size: 0.9rem;
+      font-weight: 500;
+      line-height: 1.4;
+      color: #e2e8f0;
+    }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.25rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.75rem;
+    }
+    .badge-report {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    /* 模态弹窗 */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modal-card {
+      background: #0f172a;
+      border: 1px solid var(--surface-border);
+      border-radius: 1rem;
+      width: 100%;
+      max-width: 600px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    .modal-body {
+      font-size: 0.9rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+      background: rgba(2, 6, 23, 0.6);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--surface-border);
+      max-height: 350px;
+      overflow-y: auto;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+    .btn-action {
+      background: var(--accent);
+      color: #020617;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">BMAD · Solo AI Board</div>
+      <span class="badge-sub">火鸟东南亚 (菲律宾) 闭环</span>
+    </div>
+
+    <!-- 实时 Coins.ph 汇率栏 -->
+    <div class="coins-ticker-bar" id="coins-ticker">
+      <div class="ticker-item">
+        <span>🇵🇭 Coins.ph 实时汇率:</span>
+        <span class="ticker-val" id="usdt-php-rate">1 USDT ≈ ₱ 62.88</span>
+      </div>
+      <div class="ticker-item">
+        <span style="color:var(--text-muted)">BTC:</span>
+        <span class="ticker-val" id="btc-php-rate">₱ 5,195,000</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 分类过滤器 -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterModule('ALL')">全部需求 (All)</button>
+    <button class="filter-btn" onclick="filterModule('PAYMENT')">💳 支付与双币 (Coins.ph/USDT)</button>
+    <button class="filter-btn" onclick="filterModule('LOCALIZATION')">🌐 多语言与本地化 (PHP/+63)</button>
+    <button class="filter-btn" onclick="filterModule('FRANCHISE')">🏢 城市分站与总代</button>
+    <button class="filter-btn" onclick="filterModule('GKE')">☸️ GKE 云原生部署与复制</button>
+  </div>
+
+  <!-- 看板 5 列矩阵 -->
+  <main class="kanban-board" id="kanban-container">
+    <!-- 动态渲染 5 列 -->
+  </main>
+
+  <!-- 详情与验收报告弹窗 -->
+  <div class="modal-overlay" id="task-modal" onclick="closeModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modal-task-title">任务详情</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-task-body">
+        正在读取任务内容...
+      </div>
+      <div class="modal-actions">
+        <button class="btn-action" onclick="runAcceptance()">🛡️ 独立红队验收</button>
+        <button class="btn-action" style="background:#475569;color:#fff;" onclick="closeModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const INITIAL_DATA = {
+      columns: [
+        { id: "backlog", title: "📋 需求池 (Backlog)", items: [
+          { id: "STORY-LOC-001", title: "菲律宾比索 ₱ 双币前台展示与 en-US / tl-PH 语言包挂载", module: "LOCALIZATION", status: "BACKLOG", priority: "HIGH" },
+          { id: "STORY-FRA-001", title: "马尼拉大都会分站配置与多二级域名隔离路由", module: "FRANCHISE", status: "BACKLOG", priority: "MEDIUM" }
+        ]},
+        { id: "in_progress", title: "🚧 编码实现 (In Progress)", items: [
+          { id: "TASK-002", title: "开发火鸟原生 USDT 支付插件，对接 Coins.ph 实时汇率引擎", module: "PAYMENT", status: "IN_PROGRESS", priority: "HIGH" }
+        ]},
+        { id: "in_qa", title: "🛡️ 独立验收 (In QA / Acceptance)", items: [
+          { id: "TASK-003", title: "Coins.ph Public & Private API 鉴权探针与余额验证", module: "PAYMENT", status: "IN_QA", priority: "HIGH" }
+        ]},
+        { id: "ready", title: "🚀 待发布上线 (Ready to Release)", items: [
+          { id: "STORY-GKE-001", title: "GKE Helm 最小 Demo 站编排与 values-manila.yaml 镜像就绪", module: "GKE", status: "READY", priority: "HIGH" }
+        ]},
+        { id: "done", title: "✅ 已上线闭环 (Done / Closed)", items: [
+          { id: "TASK-001", title: "下载解构火鸟官方旗舰版初始安装包，注入商业授权证书", module: "CORE", status: "DONE", report: "TASK-001-ACCEPTANCE.md" },
+          { id: "INIT-000", title: "一人 AI 团队基地环境初始化与双 Agent 验收协议落地", module: "CORE", status: "DONE", report: "INIT-ACCEPTANCE.md" }
+        ]}
+      ]
+    };
+
+    let activeFilter = 'ALL';
+
+    function renderBoard() {
+      const container = document.getElementById('kanban-container');
+      container.innerHTML = '';
+
+      INITIAL_DATA.columns.forEach(col => {
+        const filteredItems = col.items.filter(item => {
+          if (activeFilter === 'ALL') return true;
+          return item.module === activeFilter;
+        });
+
+        const colEl = document.createElement('div');
+        colEl.className = 'kanban-col';
+        colEl.innerHTML = `
+          <div class="col-header">
+            <div class="col-title">${col.title}</div>
+            <div class="col-count">${filteredItems.length}</div>
+          </div>
+          <div class="cards-list">
+            ${filteredItems.map(item => `
+              <div class="task-card" onclick="openTaskModal('${item.id}')">
+                <div class="card-top">
+                  <span class="card-id">${item.id}</span>
+                  <span class="card-module">${item.module}</span>
+                </div>
+                <div class="card-title">${item.title}</div>
+                <div class="card-footer">
+                  <span style="color:var(--text-muted)">优先级: ${item.priority || 'NORMAL'}</span>
+                  ${item.report ? '<span class="badge-report">🛡️ 验收通过</span>' : '<span style="color:#64748b">待验收</span>'}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        container.appendChild(colEl);
+      });
+    }
+
+    function filterModule(mod) {
+      activeFilter = mod;
+      document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      renderBoard();
+    }
+
+    function openTaskModal(id) {
+      document.getElementById('modal-task-title').innerText = `任务详情: ${id}`;
+      document.getElementById('modal-task-body').innerHTML = `
+        <p><strong>任务编号:</strong> ${id}</p>
+        <p><strong>执行角色:</strong> Dev Agent 编码 ➔ Acceptance Agent 独立红队验收</p>
+        <p><strong>验收标准:</strong> 遵循 <code>.agents/ACCEPTANCE_GATE.md</code> 自动化探针测试</p>
+        <p><strong>上线闭环:</strong> 验收通过自动同步 GitHub Project，触发 GKE 容器流水线。</p>
+      `;
+      document.getElementById('task-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('task-modal').style.display = 'none';
+    }
+
+    function runAcceptance() {
+      alert('已触发独立验收 Agent！正在运行 scripts/agent-accept.sh 进行攻击性探针测试...');
+      closeModal();
+    }
+
+    // 页面加载启动
+    renderBoard();
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec
+.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui
 
 help:
 	@echo "=========================================================="
@@ -11,7 +11,10 @@ help:
 	@echo "  make dispatch         - 需求/语音转标准 Spec 并自动拉分支"
 	@echo "  make bmad-spec        - 生成 BMAD 标准故事规范 (例: make bmad-spec EPIC=EPIC-PAY TITLE='USDT支付')"
 	@echo "  make verify           - 运行一人团队代码与 Docs-as-Code 校验卡点"
-	@echo "  make accept           - 启动独立验收智能体 (Agent 2) 进行红队质检验收 (例: make accept TASK=TASK-001)"
+	@echo "  make accept           - 启动独立验收智能体 (Agent 2) 验收 (例: make accept TASK=TASK-001)"
+	@echo "  make test-coins       - 测试 Coins.ph 官方行情深度与 HMAC-SHA256 鉴权引擎"
+	@echo "  make sync-gh          - 同步本地任务至 GitHub Project & BMAD UI 数据源"
+	@echo "  make bmad-ui          - 启动/查看本地 BMAD 可视化看板"
 	@echo "  make backlog          - 查看当前任务看板状态"
 	@echo "  make download-package - 执行第 1 步：从官方源下载旗舰版安装包"
 	@echo "  make extract-package  - 解压源码至 webroot 并注入商业授权证书"
@@ -49,6 +52,15 @@ verify:
 accept:
 	@chmod +x scripts/agent-accept.sh
 	@./scripts/agent-accept.sh $(TASK)
+
+test-coins:
+	@node scripts/test-coins-ph.js
+
+sync-gh:
+	@node scripts/github-sync.js
+
+bmad-ui: sync-gh
+	@open apps/bmad-dashboard/index.html 2>/dev/null || echo "请在浏览器打开: apps/bmad-dashboard/index.html"
 
 backlog:
 	@cat .agents/tasks/BACKLOG.md

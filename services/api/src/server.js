@@ -7,10 +7,12 @@ const {
   getCharge, 
   confirmChargePaid 
 } = require('./paymentManager');
+const { CoinsPhClient } = require('./coinsPhClient');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'DEMO_BOT_TOKEN_123456';
+const coinsClient = new CoinsPhClient();
 
 app.use(cors());
 app.use(express.json());
@@ -157,6 +159,59 @@ app.post('/api/payment/mock-webhook', (req, res) => {
     message: 'Payment simulated successfully',
     charge: result.charge
   });
+});
+
+// 7. Coins.ph 官方行情汇率 (Public API)
+app.get('/api/rates/coins-ph', async (req, res) => {
+  const symbol = req.query.symbol || 'USDTPHP';
+  try {
+    const ticker = await coinsClient.getTickerPrice(symbol);
+    const depth = await coinsClient.getOrderBook(symbol, 5);
+    res.json({
+      success: true,
+      data: {
+        symbol: ticker.symbol,
+        price: ticker.price,
+        orderBook: depth
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 8. 菲律宾比索 ➔ USDT 实时换算接口
+app.get('/api/rates/convert', async (req, res) => {
+  const php = parseFloat(req.query.php || '0');
+  if (php <= 0) {
+    return res.status(400).json({ success: false, error: 'Invalid php amount' });
+  }
+  try {
+    const result = await coinsClient.convertPhpToUsdt(php);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9. Coins.ph 账户余额查询 (Private API / HMAC-SHA256 鉴权)
+app.get('/api/wallet/coins-ph/balance', async (req, res) => {
+  try {
+    const balance = await coinsClient.getAccountBalance();
+    res.json({
+      success: true,
+      data: balance
+    });
+  } catch (err) {
+    res.status(400).json({ 
+      success: false, 
+      error: err.message,
+      tip: '请在 .env 中正确配置 COINS_PH_API_KEY 与 COINS_PH_API_SECRET' 
+    });
+  }
 });
 
 app.listen(PORT, () => {
