@@ -229,8 +229,87 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Not Found' }));
 });
 
+// --- 4. 长轮询监听 (getUpdates) ---
+// 本地容器无公网入口，Telegram 无法把 webhook 推到 localhost:3001，
+// 因此用 getUpdates 主动拉取（注释里一直声称的「长轮询」此前并未实现）。
+function tgApi(method, params = {}) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(params);
+    const req = https.request({
+      hostname: 'api.telegram.org',
+      port: 443,
+      path: `/bot${BOT_TOKEN}/${method}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(body)); } catch (e) { resolve({ ok: false, error: body }); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function dispatchUpdate(update) {
+  if (update.message) {
+    await handleIncomingMessage(update.message);
+  } else if (update.callback_query) {
+    const cb = update.callback_query;
+    if (cb.data === 'check_status') {
+      await handleIncomingMessage({ chat: cb.message.chat, text: '/status' });
+    }
+  }
+}
+
+async function startPolling() {
+  if (!BOT_TOKEN) {
+    console.log('ℹ️  [TG-BOT] 未配置 TELEGRAM_BOT_TOKEN，长轮询未启动（Mock 模式）');
+    return;
+  }
+  // 确保没有残留 webhook，否则 getUpdates 必 409；不丢弃积压（drop_pending_updates:false）
+  await tgApi('deleteWebhook', { drop_pending_updates: false }).catch(() => {});
+  let offset = 0;
+  console.log('🔄 [TG-BOT] 长轮询已启动 (getUpdates)，开始监听消息...');
+  for (;;) {
+    try {
+      const resp = await tgApi('getUpdates', {
+        offset,
+        timeout: 50,
+        allowed_updates: ['message', 'callback_query']
+      });
+      if (!resp.ok) {
+        const desc = resp.description || resp.error || '';
+        if (resp.error_code === 409 || /conflict/i.test(desc)) {
+          console.error('⚠️  [TG-BOT] getUpdates 409 冲突：同一 Bot Token 被别处占用（另一个轮询实例或 webhook）。暂停 15s 重试。');
+          await new Promise(r => setTimeout(r, 15000));
+          continue;
+        }
+        console.error('[TG-BOT] getUpdates 错误:', desc);
+        await new Promise(r => setTimeout(r, 5000));
+        continue;
+      }
+      for (const update of resp.result) {
+        offset = update.update_id + 1;
+        try { await dispatchUpdate(update); }
+        catch (e) { console.error('[TG-BOT] 处理更新异常:', e.message); }
+      }
+    } catch (e) {
+      console.error('[TG-BOT] 轮询网络异常:', e.message);
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+}
+
 server.listen(PORT, () => {
   console.log(`🤖 [TG-BOT] 前哨服务已在端口 ${PORT} 启动！`);
   console.log(`   - 接收 Webhook: POST http://localhost:${PORT}/webhook/telegram`);
   console.log(`   - 推送卡片接口: POST http://localhost:${PORT}/send-card`);
+  startPolling();
 });
