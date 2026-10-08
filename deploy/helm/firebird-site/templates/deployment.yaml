@@ -17,6 +17,16 @@ spec:
         app: firebird-site
         site: {{ .Values.siteId }}
     spec:
+      initContainers:
+        # Init: 从 firebird-php 镜像同步源码至共享卷，确保 Nginx 拥有完整静态资产
+        - name: init-webroot
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "cp -a /var/www/html/. /shared/ && chmod -R 777 /shared/data 2>/dev/null || true"]
+          volumeMounts:
+            - name: webroot-shared
+              mountPath: /shared
+
       containers:
         # Container 1: PHP-FPM 处理引擎
         - name: php-fpm
@@ -29,27 +39,46 @@ spec:
               value: "{{ .Values.database.host }}"
             - name: DB_NAME
               value: "{{ .Values.database.name }}"
+            - name: DB_USER
+              value: "{{ .Values.database.user | default "firebird_user" }}"
+            {{- if .Values.database.passwordSecretRef }}
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.passwordSecretRef }}
+                  key: {{ .Values.database.passwordSecretKey | default "password" }}
+            {{- else if .Values.database.password }}
+            - name: DB_PASS
+              value: "{{ .Values.database.password }}"
+            {{- end }}
             - name: REDIS_HOST
               value: "{{ .Values.redis.host }}"
             - name: DEFAULT_CURRENCY
               value: "{{ .Values.localization.defaultCurrency }}"
             - name: SITE_ID
               value: "{{ .Values.siteId }}"
+          volumeMounts:
+            - name: webroot-shared
+              mountPath: /var/www/html
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
 
-        # Container 2: Nginx 静态文件与反向代理 Sidecar
+        # Container 2: Nginx 静态文件与反向代理 Sidecar (挂载共享 webroot 直读 CSS/JS/图片)
         - name: nginx
           image: "{{ .Values.nginxImage.repository }}:{{ .Values.nginxImage.tag }}"
           imagePullPolicy: {{ .Values.nginxImage.pullPolicy }}
           ports:
             - containerPort: 80
           volumeMounts:
+            - name: webroot-shared
+              mountPath: /var/www/html
             - name: nginx-conf
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
 
       volumes:
+        - name: webroot-shared
+          emptyDir: {}
         - name: nginx-conf
           configMap:
             name: firebird-nginx-{{ .Values.siteId }}

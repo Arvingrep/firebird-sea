@@ -1,0 +1,51 @@
+{{- if .Values.api.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firebird-api-{{ .Values.siteId }}
+  labels:
+    app: firebird-api
+    site: {{ .Values.siteId }}
+spec:
+  replicas: {{ .Values.api.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: firebird-api
+      site: {{ .Values.siteId }}
+  template:
+    metadata:
+      labels:
+        app: firebird-api
+        site: {{ .Values.siteId }}
+    spec:
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: SITE_ID
+              value: "{{ .Values.siteId }}"
+            - name: DEFAULT_CURRENCY
+              value: "{{ .Values.localization.defaultCurrency }}"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+{{- end }}

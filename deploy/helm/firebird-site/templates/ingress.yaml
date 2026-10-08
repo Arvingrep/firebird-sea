@@ -4,13 +4,30 @@ kind: Ingress
 metadata:
   name: firebird-ingress-{{ .Values.siteId }}
   annotations:
-    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+    {{- if .Values.certificate.enabled }}
+    networking.gke.io/managed-certificates: {{ .Values.certificate.name | default (printf "firebird-ssl-cert-%s" .Values.siteId) | quote }}
+    {{- end }}
+    {{- if .Values.ingress.globalStaticIpName }}
+    kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.globalStaticIpName | quote }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   rules:
   {{- range .Values.ingress.hosts }}
     - host: {{ .host | quote }}
       http:
         paths:
+        {{- if $.Values.api.enabled }}
+          - path: /api/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: firebird-api-{{ $.Values.siteId }}
+                port:
+                  number: {{ $.Values.api.service.port | default 3000 }}
+        {{- end }}
         {{- range .paths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}

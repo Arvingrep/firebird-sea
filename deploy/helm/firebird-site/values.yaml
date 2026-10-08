@@ -23,12 +23,34 @@ service:
   type: ClusterIP
   port: 80
 
+# 伴生 Node.js 扩展微服务 (firebird-api)
+api:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-api"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    port: 3000
+  resources:
+    limits:
+      cpu: 300m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+certificate:
+  enabled: true
+  name: "" # 为空则自动使用 firebird-ssl-cert-<siteId>
+
 ingress:
   enabled: true
   className: "gce"
+  globalStaticIpName: "" # 如有 GCP 全局保留静态 IP 填入名称，为空则使用动态全局 IP
   annotations:
     kubernetes.io/ingress.class: "gce"
-    networking.gke.io/managed-certificates: "firebird-ssl-cert"
   hosts:
     - host: "demo.fh580.net"
       paths:
@@ -43,17 +65,20 @@ resources:
     cpu: 50m
     memory: 128Mi
 
-# 外部数据库连接 (GCP Cloud SQL 或共享 RDS)
+# 外部数据库连接 (集群内部 MySQL 或外部 GCP Cloud SQL)
 database:
-  host: "10.0.0.10"
+  host: "mysql.zxem.svc.cluster.local"
   port: 3306
   name: "firebird_demo"
   user: "firebird_user"
+  password: "firebirdpassword"
   passwordSecretRef: "firebird-db-secret"
+  passwordSecretKey: "password"
+  createSecret: true
 
-# 外部 Redis 缓存 (GCP Memorystore 或轻量 Redis)
+# 外部 Redis 缓存 (集群内部 Redis 或外部 GCP Memorystore)
 redis:
-  host: "10.0.0.20"
+  host: "redis.zxem.svc.cluster.local"
   port: 6379
 
 # 本地化配置

@@ -41,7 +41,7 @@ jobs:
       - name: 2. 配置 GKE 凭据
         uses: google-github-actions/get-gke-credentials@v2
         with:
-          cluster_name: ${{ vars.GKE_CLUSTER_NAME }}
+          cluster_name: ${{ vars.GKE_CLUSTER_NAME || 'zxem-prod-gke' }}
           location: asia-southeast1-a
 
       - name: 3. 配置 Docker 认证 Google Artifact Registry (GAR)
@@ -53,19 +53,23 @@ jobs:
 
       - name: 5. 构建极简多阶段镜像并推送至 Google Artifact Registry (GAR)
         run: |
-          IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-php:${{ github.sha }}"
-          API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-api:${{ github.sha }}"
+          GCP_PROJECT="${{ vars.GCP_PROJECT_ID || 'fh580-70533' }}"
+          IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:${{ github.sha }}"
+          API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${{ github.sha }}"
           docker buildx build --push \
+            --platform linux/amd64 \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             -t "$IMAGE_TAG" -f deploy/docker/Dockerfile.web .
           docker buildx build --push \
+            --platform linux/amd64 \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             -t "$API_IMAGE_TAG" -f deploy/docker/Dockerfile.api .
 
       - name: 6. Helm 部署/更新 GKE 目标分站
         run: |
+          GCP_PROJECT="${{ vars.GCP_PROJECT_ID || 'fh580-70533' }}"
           TARGET="${{ github.event.inputs.site_target || 'manila' }}"
           VALUES_FILE="deploy/helm/firebird-site/values-${TARGET}.yaml"
           if [ ! -f "$VALUES_FILE" ]; then
@@ -76,8 +80,10 @@ jobs:
           helm upgrade --install "firebird-${TARGET}" deploy/helm/firebird-site \
             --namespace default \
             -f "$VALUES_FILE" \
-            --set image.repository="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-php" \
-            --set image.tag="${{ github.sha }}"
+            --set image.repository="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php" \
+            --set image.tag="${{ github.sha }}" \
+            --set api.image.repository="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api" \
+            --set api.image.tag="${{ github.sha }}"
 
       - name: 7. 触发 Telegram 手机上线闭环通知
         if: success()
