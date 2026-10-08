@@ -1,0 +1,110 @@
+{
+  "name": "一人AI团队：TG语音随笔转GitHub-Issue与Project看板",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ]
+      },
+      "id": "node-tg-trigger",
+      "name": "1. 接收个人TG消息或语音",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.5-flash",
+        "prompt": "=你是敏捷开发产品秘书。请分析老板在TG发送的内容：\n\"{{ $json.message.text || $json.message.caption }}\"\n\n请输出标准JSON：\n{\n  \"title\": \"简洁标题\",\n  \"epic\": \"epic/payment|epic/localization|epic/franchise|epic/infra\",\n  \"priority\": \"p0-urgent|p1-high|p2-medium\",\n  \"body\": \"## 业务目标\\n...\\n\\n## 验收标准 (AC)\\n- [ ] AC 1: ...\"\n}"
+      },
+      "id": "node-ai-parse",
+      "name": "2. AI 结构化提炼 Spec",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "issue",
+        "operation": "create",
+        "owner": "={{ $env.GITHUB_OWNER || 'arvin' }}",
+        "repository": "={{ $env.GITHUB_REPO || 'firebird-sea' }}",
+        "title": "={{ $json.output.title }}",
+        "body": "={{ $json.output.body }}",
+        "labels": [
+          "={{ $json.output.epic }}",
+          "={{ $json.output.priority }}",
+          "status/backlog"
+        ]
+      },
+      "id": "node-gh-create-issue",
+      "name": "3. 创建 GitHub Issue 并打标",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('1. 接收个人TG消息或语音').item.json.message.chat.id }}",
+        "text": "=📋 *【BMAD 看板已入池】*\n\n📌 任务: *{{ $json.title }}*\n🏷️ 分类: `{{ $('2. AI 结构化提炼 Spec').item.json.output.epic }}`\n🔢 Issue: [#{{ $json.number }}]({{ $json.html_url }})\n\n💡 Dev Agent 已收到信号，进入 `In Progress` 队列！",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-tg-ack",
+      "name": "4. 回复手机 TG 确认卡片",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        950,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "1. 接收个人TG消息或语音": {
+      "main": [
+        [
+          {
+            "node": "2. AI 结构化提炼 Spec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. AI 结构化提炼 Spec": {
+      "main": [
+        [
+          {
+            "node": "3. 创建 GitHub Issue 并打标",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. 创建 GitHub Issue 并打标": {
+      "main": [
+        [
+          {
+            "node": "4. 回复手机 TG 确认卡片",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
