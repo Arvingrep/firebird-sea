@@ -1,4 +1,4 @@
-.PHONY: help setup up down restart logs ps clean download-package extract-package
+.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog
 
 help:
 	@echo "=========================================================="
@@ -10,6 +10,9 @@ help:
 	@echo "  make restart          - 重启容器集群"
 	@echo "  make logs             - 查看所有容器实时日志"
 	@echo "  make ps               - 查看运行中容器状态"
+	@echo "  make dispatch         - 需求/语音转标准 Spec 并自动拉分支 (例: make dispatch PROMPT='外卖USDT支付')"
+	@echo "  make verify           - 运行一人团队质量与 Docs-as-Code 校验卡点"
+	@echo "  make backlog          - 查看当前任务看板状态"
 	@echo "  make download-package - 执行第 1 步：从官方源下载旗舰版安装包"
 	@echo "  make extract-package  - 解压源码至 webroot 并注入商业授权证书"
 	@echo "=========================================================="
@@ -32,6 +35,16 @@ logs:
 
 ps:
 	docker compose ps
+
+dispatch:
+	@node scripts/dispatch-task.js "$(PROMPT)" $(MODULE) $(PRIORITY)
+
+verify:
+	@chmod +x scripts/verify-task.sh
+	@./scripts/verify-task.sh
+
+backlog:
+	@cat .agents/tasks/BACKLOG.md
 
 download-package:
 	@mkdir -p downloads
