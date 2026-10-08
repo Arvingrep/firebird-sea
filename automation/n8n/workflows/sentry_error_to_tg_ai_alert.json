@@ -1,0 +1,75 @@
+{
+  "name": "一人AI团队：Sentry异常告警经AI根因提炼推送TG",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sentry-alert-webhook",
+        "options": {}
+      },
+      "id": "node-sentry-webhook",
+      "name": "Sentry Webhook 接收",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.5-flash",
+        "prompt": "=请根据以下 Sentry 报错 payload 生成一句精简中文摘要给独立开发者老板：\n\nIssue Title: {{ $json.body.data.issue.title }}\nCulprit: {{ $json.body.data.issue.culprit }}\nMetadata: {{ JSON.stringify($json.body.data.issue.metadata) }}\n\n输出格式示例：\n⚠️ 【外卖结算页报错】汇率转换服务未响应，影响订单提交，已定位至 services/api/src/payment.ts:42"
+      },
+      "id": "node-ai-root-cause",
+      "name": "AI 提炼一句话根因",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        500,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.ALERT_TELEGRAM_CHAT_ID }}",
+        "text": "=🚨 *生产环境异常捕获 (AI 诊断)*\n\n{{ $json.output }}\n\n🔗 [查看 Sentry 详情]({{ $('Sentry Webhook 接收').item.json.body.data.issue.web_url }})",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-tg-alert-send",
+      "name": "推送至开发者个人TG",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        740,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "Sentry Webhook 接收": {
+      "main": [
+        [
+          {
+            "node": "AI 提炼一句话根因",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI 提炼一句话根因": {
+      "main": [
+        [
+          {
+            "node": "推送至开发者个人TG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

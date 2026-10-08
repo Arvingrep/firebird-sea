@@ -1,0 +1,105 @@
+{
+  "name": "一人AI团队：USDT入账与对账超时告警",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-status-webhook",
+        "options": {}
+      },
+      "id": "node-payment-webhook",
+      "name": "支付状态 Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.status }}",
+              "value2": "PAID"
+            }
+          ]
+        }
+      },
+      "id": "node-status-check",
+      "name": "是否支付成功",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        500,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.ALERT_TELEGRAM_CHAT_ID }}",
+        "text": "=💰 *【到账通知】USDT 支付已确认*\n\n• 订单编号: `{{ $json.body.order_id }}`\n• 支付金额: `{{ $json.body.amount_usdt }} USDT`\n• 交易 Hash: [TronScan 验证](https://tronscan.org/#/transaction/{{ $json.body.tx_hash }})\n• 对应业务: {{ $json.body.service_name }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-paid-tg",
+      "name": "发送到账通知",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        750,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.ALERT_TELEGRAM_CHAT_ID }}",
+        "text": "=⚠️ *【风控预警】待支付订单超时未匹配*\n\n• 订单编号: `{{ $json.body.order_id }}`\n• 预期金额: `{{ $json.body.expected_amount }} USDT`\n• 状态: 15分钟窗口已过期，请核对链上是否存在卡单或未归集情况。",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-timeout-tg",
+      "name": "发送超时预警",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        750,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "支付状态 Webhook": {
+      "main": [
+        [
+          {
+            "node": "是否支付成功",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "是否支付成功": {
+      "main": [
+        [
+          {
+            "node": "发送到账通知",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "发送超时预警",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
