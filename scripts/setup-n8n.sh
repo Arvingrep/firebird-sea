@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# 🔥 n8n 自动化中枢工作流自动挂载与同步脚本 (n8n Provisioning Script)
+# 🔥 n8n 自动化中枢工作流自动挂载与同步脚本 (支持 GKE 生产与本地双引擎)
+# 生产域名: https://n8n.k8shome.com (GKE namespace: n8n)
 # ==============================================================================
 
 set -euo pipefail
@@ -10,6 +11,7 @@ cd "$ROOT_DIR"
 
 echo "======================================================================"
 echo "⚙️  [基建: n8n 自动化] 正在同步与预加载一人团队核心工作流..."
+echo "    🎯 生产目标: https://n8n.k8shome.com (GKE 集群: zxem-prod-gke)"
 echo "======================================================================"
 
 WORKFLOW_DIR="automation/n8n/workflows"
@@ -19,49 +21,67 @@ if [ ! -d "$WORKFLOW_DIR" ]; then
     exit 1
 fi
 
-echo "📋 待加载的核心工作流清单:"
+echo "📋 待同步的核心工作流清单:"
 for wf in "$WORKFLOW_DIR"/*.json; do
     echo "   🔹 $(basename "$wf")"
 done
 
-# 如果 Docker 中的 n8n 容器处于运行状态，自动将工作流导入容器内
+# --- 1. 同步至 GKE 生产集群 n8n (https://n8n.k8shome.com) ---
+echo ""
+echo "☸️  [1/2] 正在检查 GKE 生产命名空间 n8n..."
+GKE_POD=$(kubectl get pod -n n8n -l app.kubernetes.io/name=n8n -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+if [ -n "$GKE_POD" ]; then
+    echo "   🚀 发现生产 Pod: [${GKE_POD}] (namespace: n8n)"
+    GKE_COUNT=0
+    for wf in "$WORKFLOW_DIR"/*.json; do
+        FILENAME="$(basename "$wf")"
+        kubectl cp "$wf" "n8n/${GKE_POD}:/tmp/${FILENAME}" > /dev/null 2>&1
+        if kubectl exec -n n8n "${GKE_POD}" -- n8n import:workflow --input="/tmp/${FILENAME}" > /dev/null 2>&1; then
+            echo "   ✅ [GKE] 成功注入: ${FILENAME}"
+            GKE_COUNT=$((GKE_COUNT + 1))
+        else
+            echo "   ⚠️  [GKE] 导入警告: ${FILENAME}"
+        fi
+    done
+    echo "   🎉 GKE 生产环境 (https://n8n.k8shome.com) 已同步 ${GKE_COUNT} 个工作流！"
+else
+    echo "   💡 未检测到 GKE n8n Pod，跳过云端注入。"
+fi
+
+# --- 2. 同步至本地 Docker n8n (如果正在运行) ---
+echo ""
+echo "🐳 [2/2] 正在检查本地 Docker 容器 firebird-n8n..."
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "firebird-n8n"; then
-    echo "📦 正在向运行中的 firebird-n8n 容器注入工作流..."
-    
-    # 获取 n8n 当前项目的 Project ID (默认为个人项目)
     PROJECT_ID=$(docker exec -u node firebird-n8n node -e '
       try {
         const sqlite3 = require("better-sqlite3");
         const db = new sqlite3("/home/node/.n8n/database.sqlite");
         const row = db.prepare("SELECT id FROM project WHERE type = ? LIMIT 1").get("personal");
         if (row) console.log(row.id);
-      } catch (e) {
-        // fallback
-      }
+      } catch (e) {}
     ' 2>/dev/null || true)
     
     PROJECT_FLAG=""
     if [ -n "$PROJECT_ID" ]; then
         PROJECT_FLAG="--projectId=${PROJECT_ID}"
-        echo "   👤 绑定所属工作空间: Project ID [${PROJECT_ID}]"
     fi
 
-    IMPORTED_COUNT=0
+    LOCAL_COUNT=0
     for wf in "$WORKFLOW_DIR"/*.json; do
         FILENAME="$(basename "$wf")"
-        docker cp "$wf" "firebird-n8n:/tmp/${FILENAME}"
+        docker cp "$wf" "firebird-n8n:/tmp/${FILENAME}" > /dev/null 2>&1
         if docker exec -u node firebird-n8n n8n import:workflow --input="/tmp/${FILENAME}" $PROJECT_FLAG > /dev/null 2>&1; then
-            echo "   ✅ 成功导入: ${FILENAME}"
-            IMPORTED_COUNT=$((IMPORTED_COUNT + 1))
-        else
-            echo "   ⚠️  导入异常: ${FILENAME}"
+            echo "   ✅ [Docker] 成功导入: ${FILENAME}"
+            LOCAL_COUNT=$((LOCAL_COUNT + 1))
         fi
     done
-    echo "🎉 n8n 工作流同步完成！共成功导入 ${IMPORTED_COUNT} 个核心自动化流程。"
+    echo "   🎉 本地容器环境同步完成 (共 ${LOCAL_COUNT} 个)。"
 else
-    echo "💡 提示: firebird-n8n 容器尚未启动。启动后可再次运行本脚本自动导入工作流。"
+    echo "   💡 本地 firebird-n8n 容器未运行，优先使用 GKE 生产实例。"
 fi
 
 echo "======================================================================"
-echo "🌐 访问 http://localhost:5678 查看并开启工作流 (Workflows)"
+echo "🌐 生产控制台: https://n8n.k8shome.com"
+echo "🌐 本地开发台: http://localhost:5678"
 echo "======================================================================"
