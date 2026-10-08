@@ -1,4 +1,4 @@
-.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui
+.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release
 
 help:
 	@echo "=========================================================="
@@ -8,10 +8,12 @@ help:
 	@echo "  make up               - 启动 LEMP + Redis + n8n 容器集群"
 	@echo "  make down             - 停止容器集群"
 	@echo "  make logs             - 查看所有容器实时日志"
-	@echo "  make dispatch         - 需求/语音转标准 Spec 并自动拉分支"
-	@echo "  make bmad-spec        - 生成 BMAD 标准故事规范 (例: make bmad-spec EPIC=EPIC-PAY TITLE='USDT支付')"
+	@echo "  make dispatch         - [分工1] 需求/语音脱水提炼为标准 Spec 并自动派单"
+	@echo "  make dev-check        - [分工2] 编码施工防臃肿门禁 (Zero-Dep & 代码脱水)"
 	@echo "  make verify           - 运行一人团队代码与 Docs-as-Code 校验卡点"
-	@echo "  make accept           - 启动独立验收智能体 (Agent 2) 验收 (例: make accept TASK=TASK-001)"
+	@echo "  make accept           - [分工3] 启动独立验收智能体 (Agent 2) 验收 (例: make accept TASK=TASK-001)"
+	@echo "  make release          - [分工4] 经独立验收通过后一键发布至 GKE 并自动归档 (例: make release TASK=TASK-001 SITE=manila)"
+	@echo "  make clean-bloat      - 执行工程体系脱水剪枝，清理临时备份、大日志与悬挂镜像"
 	@echo "  make test-coins       - 测试 Coins.ph 官方行情深度与 HMAC-SHA256 鉴权引擎"
 	@echo "  make sync-gh          - 同步本地任务至 GitHub Project & BMAD UI 数据源"
 	@echo "  make bmad-ui          - 启动/查看本地 BMAD 可视化看板"
@@ -77,3 +79,17 @@ extract-package:
 	@echo "🔑 正在注入官方商业授权证书 (huoniao.php)..."
 	@cp -f license/huoniao.php webroot/include/huoniao.php 2>/dev/null || cp -f license/huoniao.php webroot/huoniao.php
 	@echo "🎉 源码已解压就绪，授权文件已自动放置完成！"
+
+dev-check:
+	@chmod +x scripts/dev-check.sh
+	@./scripts/dev-check.sh
+
+release:
+	@chmod +x scripts/deploy-release.sh
+	@./scripts/deploy-release.sh $(TASK) $(SITE)
+
+clean-bloat:
+	@chmod +x scripts/clean-bloat.sh
+	@./scripts/clean-bloat.sh
+
+

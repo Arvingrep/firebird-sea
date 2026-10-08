@@ -100,3 +100,43 @@ sequenceDiagram
 ### 4. GKE 上线闭环的单键触发
 - GitHub Actions 监听 `main` 分支的合并，调用我们已编排好的 `deploy/helm/firebird-site` 进行自动部署。
 - 部署成功后，触发 GitHub Deployment Webhook 到 n8n，给你的手机 TG 发回最终确认。
+
+---
+
+## 三、 自动化落地的 4 个具体分工与“防臃肿处理机制 (Anti-Bloat Protocol)”
+
+> **一人 AI 团队的最大敌人是“隐性膨胀”**：
+> AI Agent 极度擅长生成代码，但也极度容易引入多余依赖、无效层级封装与僵尸文件；如果不做主动“脱水剪枝”，项目不出两周就会演化为难以维护的庞大泥潭。
+
+```mermaid
+flowchart TD
+    subgraph S1 [1. 需求前哨 (n8n)]
+        D1[随笔/语音输入] --> F1{需求脱水过滤器}
+        F1 -->|砍掉非核心修饰| P1[单一交付标准 Spec]
+        F1 -->|伪需求/脑暴| B1[归入冷冻池]
+    end
+
+    subgraph S2 [2. 编码施工 (Dev Agent)]
+        P1 --> C2[极简原生实现]
+        C2 --> N2[严格禁止无关依赖]
+    end
+
+    subgraph S3 [3. 独立质检 (Acceptance Agent)]
+        N2 --> G3{代码膨胀与死代码卡点}
+        G3 -->|增量超标/有冗余| R3[打回强令重构精简]
+        G3 -->|瘦身合格| A3[签发通过]
+    end
+
+    subgraph S4 [4. 云原生上线 (CI/CD)]
+        A3 --> M4[多阶段 Alpine 极小镜像]
+        M4 --> L4[日志自动轮转 & 看板自动归档]
+    end
+```
+
+| 自动化分工阶段 | 膨胀高发隐患 (Bloat Risks) | 落地自动化“脱水剪枝”策略 | 对应工程落地指令/工具 |
+| :--- | :--- | :--- | :--- |
+| **1. 需求录入期 (n8n + LLM)** | • 脑暴随口一说变成 10 个零碎任务<br>• 需求边界不断蔓延 (Scope Creep) | • **需求强制单点化**：LLM 提炼时只保留 1 个核心可验证目标，次要优化自动降为注释。<br>• **复用原生优先**：凡是火鸟系统原本具备的配置，禁止新建代码任务。 | `automation/n8n/workflows/tg_to_github_issues_project.json` (内置脱水 Prompt) |
+| **2. 编码施工期 (Dev Agent)** | • 随意 `npm install` 巨型三方库<br>• 过度设计：写 5 层抽象类封装简单功能<br>• 生成无用样板代码与冗余类型 | • **零冗余依赖守则 (Zero-Dep Rule)**：严禁引入未批准的依赖，优先 Node/PHP 标准库。<br>• **KISS 原则**：单一函数解决绝不用工厂类，严禁多余胶水代码。 | `.agents/RULES.md` (明确依赖禁令与精简要求) |
+| **3. 独立验收期 (Acceptance Agent)** | • 遗留 `.bak`、`test.php`、临时大日志<br>• 5 行逻辑写了 300 行死代码<br>• 缺少真实测试的自我催眠代码 | • **代码增量脱水审查**：单次 PR 超过 200 行增量即触发警报并审查冗余度。<br>• **死代码与垃圾扫描**：扫描未引用的函数、死循环、遗留日志与大文件。 | `scripts/agent-accept.sh`<br>`make accept TASK=...` |
+| **4. 发布运维期 (GKE / Docker)** | • 镜像包含编译工具链导致体积 > 1GB<br>• 日志打满磁盘导致 OOM / 磁盘爆满<br>• 看板数百张卡片堆积造成决策瘫痪 | • **Alpine 多阶段构建**：生产镜像剥离编译链，体积压缩至 < 100MB。<br>• **自动归档与剪枝**：已上线的 Issue 自动归入 `archive/`，`make clean-bloat` 一键清理临时构建。 | `deploy/helm/firebird-site`<br>`make clean-bloat` |
+

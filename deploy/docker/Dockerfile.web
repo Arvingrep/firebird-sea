@@ -1,0 +1,30 @@
+# ==============================================================================
+# 🔥 火鸟门户 Web/PHP 极简生产容器 (Alpine 瘦身构建)
+# ==============================================================================
+
+FROM php:8.1-fpm-alpine
+
+RUN apk add --no-cache \
+    nginx \
+    curl \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libzip-dev \
+    oniguruma-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) gd pdo_mysql mysqli mbstring zip bcmath opcache \
+    && rm -rf /var/cache/apk/*
+
+WORKDIR /var/www/html
+
+# 仅复制必要生产源码，排除构建下载与测试目录
+COPY webroot/ /var/www/html/
+COPY license/huoniao.php /var/www/html/include/huoniao.php
+
+# 运行权限控制
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html
+
+EXPOSE 80
+CMD ["php-fpm"]

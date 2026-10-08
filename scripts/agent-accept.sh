@@ -55,8 +55,14 @@ fi
 # --- 3. 规范与文档一致性审查 (Docs as Code) ---
 run_test "架构与解构文档存在性" "[ -f docs/internal/ARCHITECTURE.md ] && [ -f docs/internal/CODEBASE_STRUCTURE.md ]"
 run_test "支付插件规格文档完整性" "[ -f docs/internal/PAYMENT_PLUGIN_SPEC.md ]"
+run_test "东南亚本地化与总代理规范" "[ -f docs/internal/LOCALIZATION_PH.md ] && [ -f docs/internal/MASTER_FRANCHISE_ARCHITECTURE.md ]"
 
-# --- 4. 生成验收报告 ---
+# --- 4. 真实外部探针与防臃肿质检 (Anti-Bloat & Live Probes) ---
+run_test "Dev Agent 防臃肿纯净度门禁" "./scripts/dev-check.sh"
+run_test "Coins.ph 真实行情与 HMAC 鉴权探针" "node scripts/test-coins-ph.js"
+run_test "GKE 多站点 Helm 模板完整性" "[ -f deploy/helm/firebird-site/values-manila.yaml ] && [ -f deploy/helm/firebird-site/values-cebu.yaml ]"
+
+# --- 5. 生成验收报告 ---
 echo ""
 echo "📊 验收测试统计: 共 ${TOTAL_TESTS} 项, 通过: ${PASSED_TESTS}, 失败: ${FAILED_TESTS}"
 

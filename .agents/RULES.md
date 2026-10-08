@@ -41,3 +41,18 @@ firebird-sea/
 - **API 接口**：需具备标准 JSON 响应结构 `{ success: boolean, data?: any, error?: { code: string, message: string } }`。
 - **TG 免密鉴权**：凡受保护的接口必须校验 Telegram `initData` 的 HMAC-SHA256 签名，未通过者直接返回 401。
 - **双语与双币**：所有业务字段需支持多语言展示（zh / en），金额计算必须显式区分 `PHP`（法币单位，两位小数）与 `USDT`（加密货币，最高 6 位小数）。
+
+---
+
+## 4. 防臃肿代码准则 (Anti-Bloat Code Protocol)
+
+1. **零冗余依赖 (Zero-Dep Rule)**：
+   - 严禁擅自引入未批准的第三方重型 npm/composer 包（如仅为做一个 MD5/SHA256 引入大型库）。
+   - 优先使用 Node.js 原生 API (`node:crypto`, `node:https`, `node:fs`) 及 PHP 内置标准库。
+2. **KISS 原则与增量控制**：
+   - 杜绝过度设计（严禁为 10 行逻辑写 5 层抽象类或复杂工厂模式）。
+   - 单次提交代码增量原则上不超过 200 行，凡火鸟系统后台已有的配置项，严禁重新写代码造轮子。
+3. **零垃圾文件与死代码**：
+   - 严禁遗留 `.bak`、`test_*.php`、未引用的僵尸函数或生产环境调试输出（如 `console.log`, `var_dump`）。
+   - 任何开发任务完成后，必须通过 Acceptance Agent 审查；验收未通过前禁止合并。
+

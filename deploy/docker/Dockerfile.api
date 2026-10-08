@@ -1,0 +1,20 @@
+# ==============================================================================
+# 🔥 Coins.ph 汇率与中间件微服务 (Alpine 多阶段极小容器，目标体积 < 80MB)
+# ==============================================================================
+
+# Stage 1: Build & Prune
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY services/api/package*.json ./
+RUN npm ci --only=production
+
+# Stage 2: Minimal Runtime
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/node_modules ./node_modules
+COPY services/api/src ./src
+COPY services/api/package.json ./
+
+EXPOSE 3000
+CMD ["node", "src/server.js"]

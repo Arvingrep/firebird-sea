@@ -53,7 +53,14 @@ const taskFilePath = path.join(TASKS_DIR, taskFileName);
 const branchName = `feat/${taskId.toLowerCase()}-${safeSlug}`;
 const today = new Date().toISOString().split('T')[0];
 
-// 2. 自动生成标准结构化 Spec 文件
+// 2. 自动生成标准结构化 Spec 文件 (执行脱水剪枝)
+const nativeCheck = [];
+if (/分站|代理|城市/.test(rawPrompt)) nativeCheck.push('火鸟自带城市分站/总代理体系，优先复用原生城市ID与分成配置');
+if (/语言|翻译|英文|菲律宾语/.test(rawPrompt)) nativeCheck.push('火鸟自带多语言词库 (include/lang/)，直接拓展对应语言包');
+if (/支付|充值|USDT|Coins/.test(rawPrompt)) nativeCheck.push('火鸟标准支付插件接口 (api/payment/)，严禁修改核心订单表');
+
+const nativeHint = nativeCheck.length > 0 ? nativeCheck.map(c => `- ⚠️ **原生复用提示**：${c}`).join('\n') : '- 经过原生检索，该需求确需新增独立适配组件。';
+
 const specContent = `# Task Spec: ${taskId} - ${rawPrompt.slice(0, 40)}
 
 > 任务编号: \`${taskId}\`  
@@ -65,24 +72,25 @@ const specContent = `# Task Spec: ${taskId} - ${rawPrompt.slice(0, 40)}
 
 ---
 
-### 1. 业务目标 (Objective)
+### 1. 业务目标与脱水定义 (Objective & Scope Dehydration)
 - **需求原声**：${rawPrompt}
-- **解决问题**：实现 ${moduleName} 模块下关于“${rawPrompt.slice(0, 30)}”的高可用与去中心化落地。
+- **脱水交付目标**：实现 ${moduleName} 下关于“${rawPrompt.slice(0, 30)}”的单一核心闭环。
+${nativeHint}
 
 ---
 
-### 2. 详细功能说明 (Specification)
-1. 由 AI Agent 认领此任务后，检出分支并分析相关业务逻辑。
-2. 依据 \`.agents/RULES.md\` 编写高质量生产代码与单元测试。
-3. 如果涉及系统级交互或新接口，必须在 \`/docs/internal/\` 同步编写技术文档。
+### 2. 防臃肿约束 (Anti-Bloat Constraints)
+- **Zero-Dep 守则**：严禁引入未批准的外部重型依赖，优先使用 Node.js / PHP 内置原生库。
+- **Diff 行数控制**：代码修改增量原则上不得超过 200 行，拒绝过度封装。
+- **环境整洁**：严禁遗留 \`.bak\`、临时文件或未清理的调试打印。
 
 ---
 
-### 3. 验收标准 (Acceptance Criteria - AC)
-- [ ] **AC 1**：核心功能开发完毕并通过本地功能探针验证。
-- [ ] **AC 2**：涉及的前后端错误处理与超时风控机制完备。
-- [ ] **AC 3 (Docs 卡点)**：同步修改或创建对应 \`/docs/\` 下的 Markdown 文档。
-- [ ] **AC 4**：运行 \`make verify\` 全项自检绿标。
+### 3. 单一验收准则 (Atomic Acceptance Criteria)
+- [ ] **AC 1 (单一核心功能)**：核心功能开发完毕并通过独立功能探针测试。
+- [ ] **AC 2 (Docs 卡点)**：同步修改或创建对应 \`/docs/\` 下的 Markdown 文档。
+- [ ] **AC 3 (防臃肿合规)**：通过 \`make dev-check\` 检查，无新增冗余依赖且代码无死垃圾。
+- [ ] **AC 4 (独立红队验收)**：通过 \`make accept TASK=${taskId}\` 审查并签发通过报告。
 `;
 
 fs.writeFileSync(taskFilePath, specContent, 'utf-8');
