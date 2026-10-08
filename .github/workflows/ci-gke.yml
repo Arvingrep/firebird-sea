@@ -1,4 +1,4 @@
-name: CI/CD to GKE (Multi-Site Copy Ready)
+name: "CI: Build & Push to GAR (ArgoCD 负责部署)"
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
           helm lint deploy/helm/firebird-site
           helm template test-demo deploy/helm/firebird-site -f deploy/helm/firebird-site/values.yaml > /dev/null
 
-  build-and-deploy:
+  build-and-push:
     needs: test-and-verify
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -38,20 +38,14 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: 2. 配置 GKE 凭据
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: ${{ vars.GKE_CLUSTER_NAME || 'zxem-prod-gke' }}
-          location: asia-southeast1-a
-
-      - name: 3. 配置 Docker 认证 Google Artifact Registry (GAR)
+      - name: 2. 配置 Docker 认证 Google Artifact Registry (GAR)
         run: |
           gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
 
-      - name: 4. 初始化 Docker Buildx 缓存加速引擎
+      - name: 3. 初始化 Docker Buildx 缓存加速引擎
         uses: docker/setup-buildx-action@v3
 
-      - name: 5. 构建极简多阶段镜像并推送至 Google Artifact Registry (GAR)
+      - name: 4. 构建并推送镜像至 Google Artifact Registry (GAR)
         run: |
           GCP_PROJECT="${{ vars.GCP_PROJECT_ID || 'fh580-70533' }}"
           IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:${{ github.sha }}"
@@ -67,29 +61,11 @@ jobs:
             --cache-to type=gha,mode=max \
             -t "$API_IMAGE_TAG" -f deploy/docker/Dockerfile.api .
 
-      - name: 6. Helm 部署/更新 GKE 目标分站
-        run: |
-          GCP_PROJECT="${{ vars.GCP_PROJECT_ID || 'fh580-70533' }}"
-          TARGET="${{ github.event.inputs.site_target || 'manila' }}"
-          VALUES_FILE="deploy/helm/firebird-site/values-${TARGET}.yaml"
-          if [ ! -f "$VALUES_FILE" ]; then
-            VALUES_FILE="deploy/helm/firebird-site/values.yaml"
-          fi
-          
-          echo "🚀 正在部署分站: $TARGET (配置文件: $VALUES_FILE)"
-          helm upgrade --install "firebird-${TARGET}" deploy/helm/firebird-site \
-            --namespace default \
-            -f "$VALUES_FILE" \
-            --set image.repository="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php" \
-            --set image.tag="${{ github.sha }}" \
-            --set api.image.repository="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api" \
-            --set api.image.tag="${{ github.sha }}"
-
-      - name: 7. 触发 Telegram 手机上线闭环通知
+      - name: 5. 触发 Telegram 手机通知（镜像已推送，ArgoCD 将自动同步上线）
         if: success()
         run: |
           TARGET="${{ github.event.inputs.site_target || 'manila' }}"
-          MSG="🎉 *【GKE 生产上线成功】*%0A城市分站: *${TARGET}*%0A版本 Commit: \`${{ github.sha }}\`%0A状态: *🟢 运行中*"
+          MSG="📦 *【镜像已构建推送 GAR】*%0A城市分站: *${TARGET}*%0A版本 Commit: \`${{ github.sha }}\`%0A状态: *🟡 等待 ArgoCD + Image Updater 自动同步上线*"
           if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && [ -n "${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}" ]; then
             curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
               -d "chat_id=${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}&text=${MSG}&parse_mode=Markdown" > /dev/null || true
