@@ -9,13 +9,18 @@ data:
   default.conf: |
     server {
         listen 80;
-        server_name {{ (index .Values.ingress.hosts 0).host | default "localhost" }};
+        server_name {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}localhost;
         root /var/www/html;
         index index.php index.html;
 
         # 东南亚高延迟连接优化
         keepalive_timeout 65;
         client_max_body_size 50M;
+
+        # 管理后台专属子域名 (admin.*) 自动引导至后台管理入口
+        if ($host ~* ^admin\.) {
+            rewrite ^/$ /admin/ redirect;
+        }
 
         # 火鸟伪静态重写
         location / {
