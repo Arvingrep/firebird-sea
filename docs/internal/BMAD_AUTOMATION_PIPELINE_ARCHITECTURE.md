@@ -98,8 +98,9 @@ sequenceDiagram
 - **Acceptance Agent** 的 Prompt 是：**假定代码存在缺陷**，运行真实探针与安全攻击，比对 Docs 真实性，只有它持有写 `.agents/tasks/reports/` 和发 Approve 的权限。
 
 ### 4. GKE 上线闭环的单键触发
-- GitHub Actions 监听 `main` 分支的合并，调用我们已编排好的 `deploy/helm/firebird-site` 进行自动部署。
-- 部署成功后，触发 GitHub Deployment Webhook 到 n8n，给你的手机 TG 发回最终确认。
+- GitHub Actions 监听 `main` 分支的合并，配置 `gcloud auth configure-docker asia-southeast1-docker.pkg.dev` 进行安全镜像推送。
+- 调用已编排好的 `deploy/helm/firebird-site` 进行自动部署与分站更新。
+- 部署成功后，触发 Telegram 手机通知，发回最终上线卡片。
 
 ---
 

@@ -44,7 +44,11 @@ jobs:
           cluster_name: ${{ vars.GKE_CLUSTER_NAME }}
           location: asia-southeast1-a
 
-      - name: 3. 构建极简多阶段镜像并推送至 Google Artifact Registry (GAR)
+      - name: 3. 配置 Docker 认证 Google Artifact Registry (GAR)
+        run: |
+          gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: 4. 构建极简多阶段镜像并推送至 Google Artifact Registry (GAR)
         run: |
           IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-php:${{ github.sha }}"
           API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-api:${{ github.sha }}"
@@ -53,7 +57,7 @@ jobs:
           docker push $IMAGE_TAG
           docker push $API_IMAGE_TAG
 
-      - name: 4. Helm 部署/更新 GKE 目标分站
+      - name: 5. Helm 部署/更新 GKE 目标分站
         run: |
           TARGET="${{ github.event.inputs.site_target || 'manila' }}"
           VALUES_FILE="deploy/helm/firebird-site/values-${TARGET}.yaml"
@@ -67,7 +71,7 @@ jobs:
             -f "$VALUES_FILE" \
             --set image.tag="${{ github.sha }}"
 
-      - name: 5. 触发 Telegram 手机上线闭环通知
+      - name: 6. 触发 Telegram 手机上线闭环通知
         if: success()
         run: |
           TARGET="${{ github.event.inputs.site_target || 'manila' }}"
