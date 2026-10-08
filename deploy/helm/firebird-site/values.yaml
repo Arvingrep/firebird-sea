@@ -1,0 +1,65 @@
+# ========================================================
+# Firebird Site Helm Values - 最小 Demo 站配置模板 (支持复制)
+# ========================================================
+
+# 站点标识 (多站点复制只需改此字段，如 manila, cebu, clark)
+siteId: "demo"
+siteName: "Firebird SEA Demo"
+domain: "demo.fh580.net"
+
+replicaCount: 2
+
+image:
+  repository: "asia-southeast1-docker.pkg.dev/firebird-gcp/containers/firebird-php"
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+nginxImage:
+  repository: "nginx"
+  tag: "alpine"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: "gce"
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: "firebird-ssl-cert"
+  hosts:
+    - host: "demo.fh580.net"
+      paths:
+        - path: /*
+          pathType: ImplementationSpecific
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+# 外部数据库连接 (GCP Cloud SQL 或共享 RDS)
+database:
+  host: "10.0.0.10"
+  port: 3306
+  name: "firebird_demo"
+  user: "firebird_user"
+  passwordSecretRef: "firebird-db-secret"
+
+# 外部 Redis 缓存 (GCP Memorystore 或轻量 Redis)
+redis:
+  host: "10.0.0.20"
+  port: 6379
+
+# 本地化配置
+localization:
+  defaultCurrency: "PHP"
+  currencySymbol: "₱"
+  timezone: "Asia/Manila"
+  phonePrefix: "+63"
+  defaultLang: "en-US"

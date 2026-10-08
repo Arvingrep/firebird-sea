@@ -1,4 +1,4 @@
-.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog
+.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec
 
 help:
 	@echo "=========================================================="
@@ -7,11 +7,11 @@ help:
 	@echo "  make setup            - 初始化基地目录与环境检查"
 	@echo "  make up               - 启动 LEMP + Redis + n8n 容器集群"
 	@echo "  make down             - 停止容器集群"
-	@echo "  make restart          - 重启容器集群"
 	@echo "  make logs             - 查看所有容器实时日志"
-	@echo "  make ps               - 查看运行中容器状态"
-	@echo "  make dispatch         - 需求/语音转标准 Spec 并自动拉分支 (例: make dispatch PROMPT='外卖USDT支付')"
-	@echo "  make verify           - 运行一人团队质量与 Docs-as-Code 校验卡点"
+	@echo "  make dispatch         - 需求/语音转标准 Spec 并自动拉分支"
+	@echo "  make bmad-spec        - 生成 BMAD 标准故事规范 (例: make bmad-spec EPIC=EPIC-PAY TITLE='USDT支付')"
+	@echo "  make verify           - 运行一人团队代码与 Docs-as-Code 校验卡点"
+	@echo "  make accept           - 启动独立验收智能体 (Agent 2) 进行红队质检验收 (例: make accept TASK=TASK-001)"
 	@echo "  make backlog          - 查看当前任务看板状态"
 	@echo "  make download-package - 执行第 1 步：从官方源下载旗舰版安装包"
 	@echo "  make extract-package  - 解压源码至 webroot 并注入商业授权证书"
@@ -39,9 +39,16 @@ ps:
 dispatch:
 	@node scripts/dispatch-task.js "$(PROMPT)" $(MODULE) $(PRIORITY)
 
+bmad-spec:
+	@node scripts/bmad-spec-gen.js $(EPIC) "$(TITLE)"
+
 verify:
 	@chmod +x scripts/verify-task.sh
 	@./scripts/verify-task.sh
+
+accept:
+	@chmod +x scripts/agent-accept.sh
+	@./scripts/agent-accept.sh $(TASK)
 
 backlog:
 	@cat .agents/tasks/BACKLOG.md

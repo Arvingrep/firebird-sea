@@ -1,0 +1,65 @@
+name: CI/CD to GKE (Multi-Site Copy Ready)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      site_target:
+        description: '选择部署的分站 (demo / manila / cebu)'
+        required: true
+        default: 'demo'
+
+jobs:
+  test-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 1. 执行一人 AI 团队质量与文档卡点 (Gate)
+        run: |
+          chmod +x scripts/verify-task.sh
+          ./scripts/verify-task.sh
+
+      - name: 2. 检查 Helm 语法与模板渲染
+        run: |
+          helm lint deploy/helm/firebird-site
+          helm template test-demo deploy/helm/firebird-site -f deploy/helm/firebird-site/values.yaml > /dev/null
+
+  build-and-deploy:
+    needs: test-and-verify
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 1. 登录 Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 2. 配置 GKE 凭据
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ vars.GKE_CLUSTER_NAME }}
+          location: asia-southeast1-a
+
+      - name: 3. 构建并推送至 Google Artifact Registry (GAR)
+        run: |
+          IMAGE_TAG="asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/containers/firebird-php:${{ github.sha }}"
+          docker build -t $IMAGE_TAG -f docker/php/Dockerfile .
+          docker push $IMAGE_TAG
+
+      - name: 4. Helm 部署/更新 GKE 目标分站
+        run: |
+          TARGET="${{ github.event.inputs.site_target || 'demo' }}"
+          VALUES_FILE="deploy/helm/firebird-site/values-${TARGET}.yaml"
+          if [ ! -f "$VALUES_FILE" ]; then
+            VALUES_FILE="deploy/helm/firebird-site/values.yaml"
+          fi
+          
+          echo "🚀 正在部署分站: $TARGET (配置文件: $VALUES_FILE)"
+          helm upgrade --install "firebird-${TARGET}" deploy/helm/firebird-site \
+            --namespace default \
+            -f "$VALUES_FILE" \
+            --set image.tag="${{ github.sha }}"
