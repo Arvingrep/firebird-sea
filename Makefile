@@ -1,10 +1,11 @@
-.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes
+.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes test-mcp
 
 help:
 	@echo "=========================================================="
 	@echo "🔥 火鸟模式东南亚（菲律宾）一人 AI 团队基地操作指令"
 	@echo "=========================================================="
 	@echo "  make hermes           - 🏛️  启动 Agent 2 (Hermes) 执行全链路独立红队总验收"
+	@echo "  make test-mcp         - ⚡ 验证 n8n MCP Server 协议及 4 核心工作流端到端状态"
 	@echo "  make setup            - 初始化基地目录与环境检查"
 	@echo "  make up               - 启动 LEMP + Redis + n8n + TG-Bot 容器集群"
 	@echo "  make down             - 停止容器集群"
@@ -110,6 +111,6 @@ hermes:
 	@chmod +x scripts/hermes-accept.sh
 	@./scripts/hermes-accept.sh
 
-
-
-
+test-mcp:
+	@chmod +x scripts/mcp-acceptance-test.js
+	@node scripts/mcp-acceptance-test.js

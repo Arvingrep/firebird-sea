@@ -60,6 +60,9 @@ audit_step "防臃肿门禁" "Dev Agent 依赖与代码卫生审计" "./scripts/
 # --- 6. GKE 云原生部署与多站点 Helm (GKE K8s Multi-Site) ---
 audit_step "云原生发布" "GKE Helm Lint 与多站点模板合成" "./scripts/test-helm.sh"
 
+# --- 7. n8n 生产自动化与 MCP Server 协议 (n8n MCP & Workflows) ---
+audit_step "自动化中枢" "n8n MCP Server 协议与 4 核心工作流端到端验证" "node scripts/mcp-acceptance-test.js"
+
 echo "======================================================================"
 echo "📊 Hermes 终审统计: 共 ${TOTAL} 项硬核探针, 通过: ${PASS}, 失败: ${FAIL}"
 echo "======================================================================"
@@ -98,6 +101,7 @@ cat << EOF > "$REPORT_FILE"
 | 9 | 前哨调度 | Telegram Bot Webhook 与卡片接口测试 | PASS |
 | 10 | 防臃肿门禁 | Dev Agent 依赖与代码卫生审计 | PASS |
 | 11 | 云原生发布 | GKE Helm Lint 与多站点模板合成 | PASS |
+| 12 | 自动化中枢 | n8n MCP Server 协议与 4 核心工作流端到端验证 | PASS |
 
 ---
 
