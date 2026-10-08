@@ -1,8 +1,8 @@
 # ==============================================================================
-# 🔥 火鸟门户 Web/PHP 极简生产容器 (Alpine 深度瘦身 & 安全加固版)
+# 🔥 火鸟门户 Web/PHP 生产容器 (PHP 7.4 Alpine + Swoole Loader 官方解密引擎)
 # ==============================================================================
 
-FROM php:8.1-fpm-alpine
+FROM php:7.4-fpm-alpine
 
 # 1. 运行时依赖与编译依赖分离，编译完成后立即卸载构建工具以极致瘦身
 RUN apk add --no-cache \
@@ -21,11 +21,11 @@ RUN apk add --no-cache \
         libzip-dev \
         oniguruma-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd pdo_mysql mysqli mbstring zip bcmath opcache \
+    && docker-php-ext-install pdo_mysql mysqli gd zip bcmath opcache \
     && apk del .build-deps \
     && rm -rf /var/cache/apk/* /tmp/* /usr/share/man
 
-# 2. 生产级 PHP 与 OPcache 性能调优配置
+# 2. 生产级 PHP、OPcache 与 Swoole Loader 商业授权配置
 RUN { \
         echo 'opcache.memory_consumption=128'; \
         echo 'opcache.interned_strings_buffer=16'; \
@@ -40,13 +40,21 @@ RUN { \
         echo 'upload_max_filesize = 50M'; \
         echo 'post_max_size = 50M'; \
         echo 'memory_limit = 256M'; \
-    } > /usr/local/etc/php/conf.d/production.ini
+    } > /usr/local/etc/php/conf.d/production.ini \
+    && { \
+        echo 'extension=/var/www/html/huoniao.so'; \
+        echo 'swoole_loader.license_files=/var/www/html/huoniao'; \
+    } > /usr/local/etc/php/conf.d/docker-php-ext-swoole_loader.ini
 
 WORKDIR /var/www/html
 
-# 3. 采用 --chown 复制源码，严禁二次 RUN chown -R 造成 Docker Layer 体积翻倍
+# 3. 采用 --chown 复制源码与商业证书
 COPY --chown=www-data:www-data webroot/ /var/www/html/
 COPY --chown=www-data:www-data license/huoniao.php /var/www/html/include/huoniao.php
+COPY deploy/docker/entrypoint-web.sh /usr/local/bin/entrypoint.sh
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 80 9000
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["php-fpm"]
