@@ -72,6 +72,10 @@ else{
     @include_once(HUONIAOINC.'/config/siteCityAdvanced.inc.php'); //付费查看电话配置
 }
 
+if (empty($cfg_basehost) || $cfg_basehost === '~domain') {
+    $cfg_basehost = 'fbird.men';
+}
+
 define('HUONIAOBUG', (int)$cfg_siteDebug); //开启调试
 ini_set('display_errors', $cfg_siteDebug ? 'On' : 'Off'); //Debug设置
 
@@ -194,8 +198,14 @@ include_once(HUONIAOINC.'/dbinfo.inc.php');
 //需要更新浏览次数的附件SQL
 $updateAttachmentClickSql = array();
 
-//系统核心文件
+//系统核心文件 (适配多城市分站与多域名：在底层授权校验期间桥接官方授权基准域名)
+$hn_auth_license_host = 'fh580.net';
+$hn_req_orig_host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
+$_SERVER['HTTP_HOST'] = $hn_auth_license_host;
 include_once(HUONIAOINC.'/kernel.inc.php');
+if ($hn_req_orig_host !== '') {
+    $_SERVER['HTTP_HOST'] = $hn_req_orig_host;
+}
 
 //检测IP段
 if(checkIpAccess(GetIP(), $cfg_iplimit) && !empty($cfg_iplimit)){

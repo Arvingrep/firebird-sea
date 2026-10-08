@@ -1,5 +1,5 @@
 <?php
-$cfg_basehost = '~domain';
+$cfg_basehost = 'fbird.men';
 $cfg_webname = '火鸟门户网站管理系统';
 $cfg_shortname = '火鸟门户';
 $cfg_weblogo = 'https://upload.ihuoniao.cn//siteConfig/logo/large/2023/05/05/16832575477318.png';

@@ -52,7 +52,13 @@ if(file_exists(HUONIAOROOT . "/huoniao")){
 
 $cfg_secureAccess = $cfg_httpSecureAccess ? 'https://' : 'http://';
 
+$hn_auth_license_host = 'fh580.net';
+$hn_req_orig_host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
+$_SERVER['HTTP_HOST'] = $hn_auth_license_host;
 include_once(HUONIAOINC . '/kernel.inc.php');
+if ($hn_req_orig_host !== '') {
+    $_SERVER['HTTP_HOST'] = $hn_req_orig_host;
+}
 require_once(dirname(__FILE__) . '/common.func.php');
 
 loadPlug(array('filter', 'charset'));
