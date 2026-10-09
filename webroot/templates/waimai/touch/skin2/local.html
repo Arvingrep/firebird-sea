@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<meta name="description" content="{#$waimai_description#}" />
+<title>{#$langData['waimai'][2][75]#}</title>   {#* 定位 *#}
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/loca_ing.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+  var masterDomain = '{#$cfg_basehost#}', staticPath = '{#$cfg_staticPath#}';
+  var cityname = '{#$siteCityInfo["name"]#}';
+  var local = '{#$local#}';
+  var userid = '{#$userinfo.userid#}';
+  var cityid = '{#$siteCityInfo["cityid"]#}';
+  var cityLng = '{#$siteCityInfo["lng"]#}';
+  var cityLat = '{#$siteCityInfo["lat"]#}';
+  var currCityInfo = '{#json_encode($siteCityInfo)#}'
+  var radius = '99999';
+  var wmIndex = '{#$waimai_channelDomain#}?appFullScreen';
+
+</script>
+</head>
+<body>
+
+	{#$pageTitle = "选择收货地址"#}
+	{#include file="../../../siteConfig/touch_top.html" headTheme=" "#}
+  <div id="page">
+    <div class="searchAddrBox" v-cloak>
+      <div class="cityChose" @click="showCity" v-cloak><span>{{city}}</span></div>
+      <div :class="['searchInp',{'hideClear':search_key == ''}]" v-cloak><input type="text" placeholder="请输入收货地址" enterkeyhint="search" class="addrInp" @input="searchInpChange" id="searchInp"  v-model="search_key"> <s @click="search_key = '',searchList = []"></s></div>{#* 请输入收货地址 *#}
+    </div>
+    <div class="addressDlList" v-cloak v-show="search_key == ''">
+      <dl class="currPosi">
+        <dt>当前定位</dt>
+        <dd @click="goCurrPosi()">
+          <h4><span v-cloak>{{address?address:'定位中...'}}</span></h4>
+          <a href="javascript:;" class="posi_btn" @click.stop="getLnglat(1)">重新定位</a>
+        </dd>
+      </dl>
+      <dl class="myAddrList" v-cloak v-show="userid && myAddrList.length">
+        <dt>我的地址</dt>
+        <div class="allDD">
+          <dd v-for="addr in myAddrList" @click="goLink(addr,2)">
+            <h4>{{addr.street +'  '+ addr.address}}</h4>
+            <p><span class="uname">{{addr.person}}</span><span class="utel">{{addr.tel}}</span></p>
+          </dd>
+        </div>
+        <dd class="moreAddr" @click="openAddrList" v-if="myAddrList.length > 4">展开更多地址</dd>
+      </dl>
+
+      <dl class="nearbyList opacityDiv" v-cloak>
+        <dt>附近地址</dt>
+        <dd v-for="addr in surroundingPois" @click="goLink(addr)">
+          <div class="leftAddr">
+            <h4>{{addr.name}}</h4>
+            <p>{{addr.address}}</p>
+          </div>
+          <div class="posi_distance">{{addr.distance>1000?`${(addr.distance/1000).toFixed(2)}k`:addr.distance}}m</div>
+        </dd>
+
+      </dl>
+      <div class="btnbox">
+        {#if $userinfo#}
+        <a href="{#$member_userDomain#}/new_address_waimai.html?from=index" class="add_addr">新增收货地址</a>
+        {#else#}
+        <a href="{#$member_userDomain#}/login.html" class="add_addr">新增收货地址</a>
+        {#/if#}
+      </div>
+    </div>
+    <div class="searchDlList" v-cloak v-show="search_key != ''">
+      <ul>
+        <li  v-for="(item,index) in searchList" @click="choseAddr(item)" :key="index">
+          <a :href="returnUrl">
+            <div class="addrInfo">
+              <h3>{{item.name}}</h3>
+              <p>{{item.address}}&nbsp;</p>
+            </div>
+            <div class="addrDistance">{{mapDistance(item.lat,item.lng,lat,lng)}}</div>
+          </a>
+        </li>
+        <li class="toDefine" v-show="loadEnd">
+          <a href="{#$member_userDomain#}/mapDefine_waimai.html?from=index">
+            <div class="addrInfo">
+              <h3>以上都不是</h3>
+              <p>点击添加自定义位置</p>
+            </div>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- 城市选择 -->
+    <div class="cityMask" @click="hideCity"></div>
+    <div class="siteCityListBox">
+      <div class="cityTitle">
+        <a href="javascript:;" class="city_back" @click="hideCity">{#$langData['info'][2][42]#}</a>   {#* 取消 *#}
+        <h4>{#$langData['info'][3][96]#}</h4>   {#* 城市选择 *#}
+        <a href="javascript:;" class="city_sure"></a>
+      </div>
+      <div class="jump_szm"></div>
+      <div class="cityList">
+        <ul class="right_szm">
+          <li @click="go_szm(0)" data-id="hot">{#$langData['info'][3][97]#}</li>{#* 热门 *#}
+          <li v-for="(szm,ind) in szmArr" @click="go_szm(ind+1)"  :data-id="szm">{{szm}}</li>
+        </ul>
+        <div class="cityUl">
+          <dl class="hot" id="hot">
+            <dt>{#$langData['info'][3][98]#}</dt>  {#* 热门城市 *#}
+            <dd @click="chose_city(city)" v-for="city in hotCity"  :data-cityid="city.cityid">{{city.name}}</dd>
+          </dl>
+          <dl v-for="szm in szmArr" :id="szm">
+            <dt>{{szm}}</dt>
+            <dd @click="chose_city(city)"  v-for="city in orderBy(szm)":data-cityid="city.cityid">{{city.name}}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script type="text/javascript">
+	var mapCity = '{#$cfg_mapCity#}';
+</script>
+
+{#* 微信分享 *#}
+{#$Share_description = {#$waimai_description#}#}
+{#$Share_title = {#$waimai_title#}#}
+{#$Share_img = {#$waimai_logoUrl#}#}
+{#$Share_url = {#$waimai_channelDomain#}#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script src="{#$templets_skin#}js/local_new.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

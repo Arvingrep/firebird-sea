@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0,viewport-fit=cover">
+	<title>{#$langData['waimai'][1][32]#}</title> {#*   店铺列表   *#}
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/index.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+	<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+
+	<script>
+		var status = {#$status#}; //店铺状态
+		var ordervalid = {#$ordervalid#};  //外卖下单
+		var shopid = '{#$id#}';
+		var custom_otherpeisong = '{#$custom_otherpeisong#}';
+		var mangeItem = [
+					{'item':"{#$langData['waimai'][1][68]#}",'en':'jbxx','url':'store-info.php?dotype=basic-info&sid='},   //基本信息
+					{'item':"{#$langData['waimai'][1][116]#}",'en':'dpgg','url':'store-info.php?dotype=display-info&sid='},   //店铺公告
+					{'item':"{#$langData['waimai'][11][182]#}",'en':'dpzp','url':'store-info.php?dotype=image-info&sid='},   //店铺照片
+					{'item':"{#$langData['waimai'][11][160]#}",'en':'psfa','url':'manage-store.php?dotype=peisong&sid='},   //配送方案
+					// {'item':"{#$langData['waimai'][1][44]#}",'en':'spfl','url':'goods-type.php?sid='},   //商品分类
+					// {'item':"{#$langData['waimai'][1][42]#}",'en':'spgl','url':'manage-goods.php?sid='},   //商品管理
+
+					{'item':"优惠券",'en':'yhq','url':'manage-quan.php?sid='},   //优惠券
+					{'item':"{#$langData['waimai'][1][159]#}",'en':'spgl','url':'manage-store.php?dotype=promotions&sid='},   //店铺活动
+					{'item':"{#$langData['waimai'][11][183]#}",'en':'yygl','url':'store-info.php?dotype=business-info&sid='},   //营业管理
+					{'item':"{#$langData['waimai'][11][184]#}",'en':'pjgl','url':'/wmsj/message/waimaiCommon.php?sid='+'{#$id#}'}   //评价管理
+				],
+				serviceItem = [
+					{'item':"{#$langData['waimai'][0][27]#}",'en':'zhgl','url':'manage-store.php?dotype=desk&sid='},   //桌号管理
+					{'item':"{#$langData['waimai'][1][144]#}",'en':'hdfk','url':'manage-store.php?dotype=paytype&sid='},   //货到付款
+					{'item':"{#$langData['waimai'][1][183]#}",'en':'zzfw','url':'manage-store.php?dotype=addservice&sid='},   //增值服务
+					{'item':"{#$langData['waimai'][1][169]#}",'en':'ddtx','url':'manage-store.php?dotype=notice&sid='},   //订单提醒
+					{'item':"{#$langData['waimai'][11][176]#}",'en':'zdynr','url':'manage-store.php?dotype=selfdefine&sid='},   //自定义内容
+
+				];
+		var managerIds = {#json_encode(","|explode:$managerIds)#};
+
+	</script>
+</head>
+<body>
+<div id="page">
+	<!-- 头部 s-->
+	<div class="top_box">
+		<div class="headbox">
+			<a href="javascript:;" ></a>
+			<div class="htitle">{#$langData['waimai'][1][32]#}</div>    {#*   店铺列表   *#}
+			{#$shopList = ","|explode:$managerIds#}
+			{#if count($shopList)>1#}
+			<a href="javascript:;" data-count="{#count($shopList)#}" class="change_shop" @click='callShop()'>{#$langData['waimai'][11][186]#}</a> {#*   切换店铺   *#}
+			{#/if#}
+		</div>
+	</div>
+	<!-- 头部 e-->
+	<div class="shopCard_box" v-cloak>
+		<div class="shopCard">
+			<div class="shopInfo">
+				<div class="llogo"><img src="{#$shop_banner#}" alt=""></div>
+				<div class="rdetail">
+					<h2>{#$shopname#}</h2>
+					<div class="shop_state" >
+						<div class="star">{#$star#}</div>
+						<div class="yingye_state ying" v-if="status==1">{#$langData['waimai'][2][64]#}</div>
+						<div class="yingye_state"   v-else >{#$langData['waimai'][2][102]#}</div>{#*   营业中  休息中 *#}
+					</div>
+				</div>
+			</div>
+			<a class="orderCount" href="../statistics/waimaiStatisticsChartrevenue.php">
+				<div class="shopIncome">
+					<p>{#$langData['waimai'][11][185]#}</p>{#*   本月收入/元   *#}
+					<h4>{#$byamount#}</h4>
+				</div>
+				<div class="shopOrder">
+					<p>{#$langData['waimai'][11][187]#}</p>{#*   有效订单/单   *#}
+					<h4>{#$countnum#}</h4>
+				</div>
+				<button type="button" class="golink"></button>
+			</a>
+		</div>
+		<div class="shop_op ">
+			<ul class="fn-clear " v-cloak>
+				<li  v-for="item in manageitem" v-if="item.url!='' && (((custom_otherpeisong=='2' || custom_otherpeisong=='3') && item.en != 'psfa') || custom_otherpeisong =='' || custom_otherpeisong == '0')" :data-url="item.url" :data-type="item.en" @click="toUrl">
+					<div class="icon"><img :src="'{#$templets_skin#}images/'+item.en+'.png'" alt=""></div>
+					<p>{{item.item}}</p>
+				</li>
+			</ul>
+		</div>
+		<div class="foodManage">
+			<a class="category" :href="'goods-type.php?sid='+shopid">
+				<div class="text">
+					<h3>分类管理</h3>
+					<p>编辑/排序</p>
+				</div>
+				<div class="icon"><img src="{#$templets_skin#}images/category.png" alt=""></div>
+			</a>
+			<a class="food"  :href="'manage-goods.php?sid='+shopid">
+				<div class="text">
+					<h3>商品管理</h3>
+					<p>管理商品货架</p>
+				</div>
+				<div class="icon"><img src="{#$templets_skin#}images/food_1.png" alt=""></div>
+			</a>
+		</div>
+		<div class="shop_service" >
+			<div class=" swiper-container ">
+				<ul class="fn-clear swiper-wrapper" v-cloak >
+					<li class="swiper-slide" v-for="item in serviceItem" :data-url="item.url" @click="toUrl">
+						<div class="icon"><img :src="'{#$templets_skin#}images/'+item.en+'.png'" alt=""></div>
+						<p>{{item.item}}</p>
+					</li>
+
+				</ul>
+			</div><div class="swiper-pagination pagination"></div>
+		</div>
+
+		<!-- 店铺开关 -->
+		<div class="shop_switch">
+			<h5>{#$langData['waimai'][11][188]#}</h5>  {#*   店铺开关   *#}
+			<ul>
+				<li>
+					<label class="label">{#$langData['waimai'][1][38]#}</label> {#*   店铺状态   *#}
+					<div class="switch_box" >
+						<em v-if="status==1">{#$langData['waimai'][2][64]#}</em>
+						<em v-else>{#$langData['waimai'][2][102]#}</em>
+						<span data-type="status" :class="['switch',{'active':status==1}]" @click="changeStatus()"></span>
+					</div>
+				</li>
+				<li>
+					<label class="label">{#$langData['waimai'][11][100]#}</label>   {#*   外卖下单   *#}
+					<div class="switch_box"  >
+						<em v-if="ordervalid">{#$langData['waimai'][11][189]#}</em>   {#*   已开启   *#}
+						<em v-else>{#$langData['waimai'][11][190]#}</em>   {#*   已关闭   *#}
+						<span data-type="ordervalid" :class="['switch',{'active':ordervalid}]" @click="changeStatus()"></span>
+					</div>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="loading_icon" c-cloak v-show="LOADING"></div>
+	{#include file='../_footer.html' curr='order' toppage=1#}
+	<!-- 切换店铺 -->
+	<div class="mask_change" v-cloak v-show = "changeShop" @click="changeShop = !changeShop"></div>
+	<div class="shop_list"  v-cloak  v-show = "changeShop">
+		<ul>
+			<li v-for="list in slists" class="shop_li" v-if="list.id != shopid ">
+				<a :href="'store-detail.php?id='+list.id">
+					<div class="llogo"><img :src="list.pic" alt=""></div>
+					<div class="rdetail">
+						<h2>{{list.shopname}}</h2>
+						<div class="shop_state">
+							<div class="star">{{Number(list.rating).toFixed(1)}}</div>
+							<div class="yingye_state ying" v-if="list.status==1">{#$langData['waimai'][2][64]#}</div>
+							<div class="yingye_state" v-else>{#$langData['waimai'][2][102]#}</div>{#*   营业中  休息中 *#}
+						</div>
+					</div>
+				</a>
+			</li>
+
+		</ul>
+	</div>
+</div>
+</body>
+
+<script src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/index.js?v={#$cfg_staticVersion#}"></script>
+</html>

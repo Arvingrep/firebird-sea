@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0,viewport-fit=cover" >
+		<title>{#$langData['waimai'][11][142]#}</title> {#*   下单预设字段   *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage-desk.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var sid = "{#$sid#}";
+			var addservice = {#json_encode($addservice)#};  //增值服务
+			var open_addservice = {#$open_addservice#};  //开启增值服务
+			var open_promotion = '{#$open_promotion#}';  //开启满减
+			var promotions = '{#$promotions#}';  //满减
+			var offline_limit = '{#$offline_limit#}' ;  //货到付款金额限制
+			var paytype = '{#strstr($paytype, "1")#}';  //货到付款
+			var smsvalid = '{#$smsvalid#}';  //短信通知
+			var emailvalid = '{#$emailvalid#}';  //邮箱通知
+			var weixinvalid = '{#$weixinvalid#}'; //微信通知
+			var auto_printer = '{#$auto_printer#}'; //打印机自动打印
+			var appvalid = '{#$appvalid#}'; //app订单提醒
+			var selfdefine = {#json_encode($selfdefine)#}; //自定义
+			var merchant_deliver = '{#$merchant_deliver#}'; //商家自配
+			var delivery_fee_mode = "{#$delivery_fee_mode#}"; //配送模式
+			var preset = {#json_encode($preset)#}
+		</script>
+	</head>
+	<body>
+		<div id="page">
+			<!-- 头部 -->
+			<div class="top_box">
+				<div class="headbox">
+					<a href="javascript:;" onclick="javascript:history.go(-1);" class="back_btn goBack"></a>
+					<div class="htitle">{#$langData['waimai'][11][142]#}</div>    {#*   下单预设字段   *#}
+				</div>
+			</div>
+			
+			<form action="" method="post" id="submitBox" >
+				<div class="detail_box" >
+					<div class="toggle more_hi inpbox">
+						<div class="left_label">
+							<label for="">{#$langData['waimai'][11][143]#}</label> <p> {#$langData['waimai'][11][144]#} </p>{#*开启下单预设字段  开启后会在下单页面看到，建议不要设置过多项， 以免影响顾客下单体验  *#}
+						</div>
+						<span class="switch active"></span> 
+						<input type="hidden" name="merchant_deliver" id="Config_merchant_deliver" value="1"></div>
+				</div>
+				<div class="detail_box tipShow" v-for="(p,index) in preset"  v-cloak>
+					<div class="option_box" v-if="p[0]==1">
+						<a href="javascript:;" class="del" @click="removeArr(index,preset)"></a>
+						<input type="hidden" name="field[type][]" value="1" />
+						<input type="hidden" name="field[sort][]" :value="p[1]" />
+						<div class="inplist">
+							<div class="inpbox normal" ><input type="text" name="field[name][]" placeholder="请输入标题" v-model="p[2]"></div>
+							<div class="inpbox normal" v-for="(x,ii) in p[3].split(',')">
+								<div class="left_input">
+									<label for="">{#$langData['waimai'][11][145]#}{{ii+1}}</label> {#*   选项   *#}
+									<input type="text" name="arr" placeholder="{#$langData['waimai'][11][146]#}" :value="x" @change="xuanxiang(index,ii)"> {#*   请输入选项内容   *#}
+								</div>
+								<a href="javascript:;" class="del_btn" @click="changeArr(index,ii,p[3])"></a>
+							</div>
+							<input type="hidden" name="field[content][]" :value="p[3]">
+						</div>
+						<a href="javascript:;" class="add_btn sm_btn" @click="addxu(index)">{#$langData['waimai'][11][147]#}</a>  {#*   添加选项   *#}
+						<div class="tipbox">
+							{#$langData['waimai'][11][148]#}
+							
+							{#*
+							<p>例：</p>
+							<ul>
+								<li><label for="">标题</label><p>环保助力，餐具选择</p></li>
+								<li><label for="">选项1</label><p>不需要餐具</p></li>
+								<li><label for="">选项2</label><p>需要餐具</p></li>
+							</ul>
+							*#}
+						</div>
+					</div>
+					<div class="option_box" v-else>
+						<a href="javascript:;" class="del"  @click="removeArr(index,preset)"></a>
+						<input type="hidden" name="field[type][]" value="2" />
+						<input type="hidden" name="field[sort][]" :value="p[1]" />
+						<div class="inplist">
+							<div class="inpbox normal" ><input type="text" placeholder="{#$langData['waimai'][11][150]#}" name="field[name][]" v-model="p[2]"></div>{#*   请输入标题   *#}
+							<div class="inpbox normal">
+								<div class="left_input">
+									<label for="">{#$langData['waimai'][11][152]#}</label>
+									<input type="text" name="field[content][]" placeholder="{#$langData['waimai'][11][151]#}" v-model="p[3]">{#*   请输入提示语   *#}
+								</div>
+								<p class="tip">{#$langData['waimai'][11][153]#}</p>{#*   此项可不填   *#}
+							</div>
+						</div>
+						<div class="tipbox">
+							{#$langData['waimai'][11][148]#}
+							{#* 
+							<p>例：</p>
+							<ul>
+								<li><label for="">标题</label><p>本店免费提供手写贺卡</p></li>
+								<li><label for="">提示</label><p>请填写贺卡寄语</p></li>
+							</ul>
+							 *#}
+						</div>
+					</div>
+				</div>
+				
+			</form>
+			<div class="add_group"  v-cloak>
+				<a href="javascript:;" class="add_btn" v-cloak v-if="delivery_fee_mode==3" @click="new_option(1)">{#$langData['waimai'][1][151]#}</a>{#*   添加选项字段   *#}
+				<a href="javascript:;" class="add_btn" v-cloak v-if="delivery_fee_mode==3"  @click="new_option(2)">{#$langData['waimai'][1][152]#}</a>{#*   添加填写字段   *#}
+			</div>
+			
+			<a href="javascript:;" class="save_btn" data-type="options"  @click="submitDate"  v-cloak>{#$langData['waimai'][2][52]#}</a>{#*   保存   *#}
+			
+			<!-- 加载中 -->
+			<div v-cloak class="loading_icon" v-if="LOADING"></div>
+			<!-- 底部 -->
+			
+		</div>
+	</body>
+	<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/manage-addservice.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

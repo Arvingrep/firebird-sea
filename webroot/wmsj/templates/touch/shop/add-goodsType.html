@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#if $id #}{#$langData['waimai'][11][77]#}{#else#}{#$langData['waimai'][11][78]#}{#/if#}</title> {#*  编辑分类 新增分类   *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/goods-type.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var sid = "{#$sid#}";
+			var id = "{#$id#}";
+			var weekshow = '{#$weekshow|default:1#}';
+			var week = '{#$week#}'
+			var weeklist = '{#$weeklist#}'
+		</script>
+	</head>
+	<body>
+		<div id="page">
+			<!-- 头部 s-->
+			<div class="top_box">
+				<div class="headbox">
+					<a href="javascript:;" onclick="javascript:history.go(-1);" class="back_btn goBack"></a>
+					<div class="htitle">{#if $id #}{#$langData['waimai'][11][77]#}{#else#}{#$langData['waimai'][11][78]#}{#/if#}</div>    {#*   编辑分类 新增分类   *#}
+					
+				</div>
+			</div>
+			<!-- 头部 e-->
+			<form class="type_detail" id="submitForm">
+				<!-- 排序 -->
+				<input type="hidden" value="{#$sort|string_format:'%d'#}" name="sort">
+				<!-- 显示 -->
+				<input type="hidden" value="{#$status|default:1#}" name="status">
+				<input type="hidden" value="{#$id#}" name="id">
+				<input type="hidden" value="{#$sid#}" name="sid">
+				<ul>
+					<li class="inpbox">
+						<label>{#$langData['siteConfig'][19][485]#}</label> {#* 分类名称 *#}
+						<input type="text" name="title" placeholder="请输入分类名" value="{#$title#}">
+					</li>
+					<li class="inpbox select_inp">
+						<label>{#$langData['waimai'][11][79]#}</label> {#* 显示时段 *#} 
+						<div class="right_box">
+							<input readonly="readonly" id="stime" name="start_time" type="text" placeholder="{#$langData['waimai'][11][80]#}" value="{#$start_time|default:'00:00'#} ">
+							{#$langData['waimai'][11][70]#}
+							<input readonly="readonly" id="etime" name="end_time" type="text" placeholder="{#$langData['waimai'][11][80]#}" value="{#$end_time|default:'23:59'#}">{#* 请选择时间段 *#} 
+						</div>
+						
+					</li>
+					<li>
+						<label>{#$langData['waimai'][11][82]#}<a href="javascript:;" :class="['switch',{'active':weekShow}] " @click="weekShow = !weekShow"><span v-if="weekShow">{#$langData['waimai'][1][120]#}</span><span v-else>{#$langData['waimai'][11][81]#}</span></a><input type="hidden" name="weekshow" :value="weekShow?1:0"></label> {#* 显示时间 显示 *#}
+						<div class="weekList">
+							<input type="hidden" name="week">
+							<span @click="chose_day" data-day="1" class="week_item">{#$langData['siteConfig'][14][4]#}</span>
+							<span @click="chose_day" data-day="2" class="week_item">{#$langData['siteConfig'][14][5]#}</span>
+							<span @click="chose_day" data-day="3" class="week_item">{#$langData['siteConfig'][14][6]#}</span>
+							<span @click="chose_day" data-day="4" class="week_item">{#$langData['siteConfig'][14][7]#}</span>
+							<span @click="chose_day" data-day="5" class="week_item">{#$langData['siteConfig'][14][8]#}</span>
+							<span @click="chose_day" data-day="6" class="week_item">{#$langData['siteConfig'][14][9]#}</span>
+							<span @click="chose_day" data-day="7" class="week_item">{#$langData['siteConfig'][14][10]#}</span>
+							<span @click="chose_day" data-day="all" class="week_item">{#$langData['siteConfig'][6][28]#}</span>
+						</div>
+					</li>
+				</ul>
+				
+			</form>
+			<div class="btns_group">
+				<button type="button" class="save_btn" @click="save_type">{#$langData['waimai'][2][52]#}</button>{#* 保存 *#}
+				{#if $id#}<button type="button" class="del_btn" @click="del_sure = !del_sure">{#$langData['waimai'][11][83]#}</button>{#/if#}{#* 删除此分类 *#}
+
+			</div>
+			<template>
+				<div class="comfirm_mask" v-if="del_sure"></div>
+				<div class="comfirm_box"  v-if="del_sure">
+					<dl>
+						<dt>{#$langData['waimai'][11][84]#}</dt>{#* 确定删除此分类？ *#}
+						<dd class="del_sure" @click="del_type">{#$langData['waimai'][2][42]#}</dd>{#* 删除 *#}
+					</dl>
+					<div class="cancel_btn"  @click="del_sure = !del_sure">{#$langData['waimai'][2][43]#}</div>{#* 取消 *#}
+				</div>
+			</template>
+			<div class="loading_icon" c-cloak v-show="LOADING"></div>
+		</div>
+	</body>
+	
+	
+	<script src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/add-goodsType.js?v={#$cfg_staticVersion#}"></script>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<meta name="description" content="{#$waimai_description#}" />
+<title>帮我买</title>
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" />
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/swiper.min.css">
+<link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/paotui-buy.css?v={#$cfg_staticVersion#}">
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script>
+  var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$waimai_channelDomain#}', modelType = 'waimai', staticPath = '{#$cfg_staticPath#}';
+  var cookiePre = '{#$cfg_cookiePre#}';
+  var indexUrl = '{#getUrlPath service='waimai' template='paotui'#}';
+  var mapUrl = '{#getUrlPath service='waimai' template='addressPaotui' param="shop=$shop&shopid=$shopid"#}'; 
+  var payUrl = '{#getUrlPath service="waimai" template="pay" param="ordertype=paotui&ordernum=#ordernum"#}';
+  var serviceMoney = {#$serviceMoney|default:5#};
+  var myMoney = {#$userinfo['money']#};
+  var shoptype = '{#$shop#}';
+   //各价格计算规则
+  var juliCalc = {#$paotui_delivery#};
+  //min-max 之间是price  然后每增加zjweight 费用增加fjprice;
+  var weightCalc = {#$ptweightconf#};
+  var speTimeCalc = {#$addservice#};
+  var maxxWeight = {#$ptweight|default:1#};
+  var saddress = {#if $scart_address_id#}{#$scart_address_id#}{#else#}''{#/if#}, smylng = {#if $scart_address_lng#}{#$scart_address_lng#}{#else#}''{#/if#}, smylat = {#if $scart_address_lat#}{#$scart_address_lat#}{#else#}''{#/if#};
+  var maxtip ={#$maxtip|default:0#};
+  // 积分抵扣
+  var hasPoint = '{#$userinfo.point#}';
+  jifen_ =  '{#$cfg_offset_waimai#}';
+  var pointRatio = '{#$cfg_pointRatio#}';
+</script>
+</head>
+
+<body>
+<!-- 原页面 s  -->
+{#$pageLeft = '<div class="header-l"><a href="javascript:;" class="goBack order-header-back"></a></div>'#}
+{#include file="../../../siteConfig/touch_top.html" pageTitle='帮我买'#}
+<div class="mainWrap">
+  <div class="con">
+    <div class="remark" id="shop" contenteditable="true" placeholder="输入想买的商品，如：星巴克大杯拿铁">{#if $shop !=''#}{#$shop#}{#/if#}</div>
+    <div class="noteCon">
+      <ul class="fn-clear">
+        {#if $shopid#}
+        {#waimai action="paotuitype" return='type' type={#$shopid#}#}
+        <li><a href="javascript:;">{#$type.typename#}</a></li>
+        {#/waimai#}
+        {#else#}
+        {#waimai action="paotuitype" return='type' type=21#}
+        <li><a href="javascript:;">{#$type.typename#}</a></li>
+        {#/waimai#}
+        {#/if#}
+      </ul>
+    </div>
+    <div class="planPrice fn-clear">
+      <div class="fn-left">
+        <h3>预估商品费</h3>
+        <p>由骑手垫付，骑手购买后再支付</p>
+      </div>
+      <input type="text" id="planPriceTxt" value="" readonly>
+      <i></i>
+    </div>
+    <input type="hidden" id="planPrice">
+  </div>
+
+  <div class="more">
+    <div class="dom_select">
+      <span class="spetit">买</span>
+      <div class="option">
+   
+        <div class="buyfrom">
+          <label class="checked">{#$langData['waimai'][3][19]#}</label> {#* 指定地址*#}
+          <label>{#$langData['waimai'][3][21]#}</label> {#* 就近购买*#}
+        </div>
+        <div class="buyCon">
+          <div class="comCon show selfBuy">
+            <a href="javascript:;" data-url="{#getUrlPath service='waimai' template='addressBuy' param="shop=$shop&shopid=$shopid&saddress=$scart_address_id&currentPageOpen=1"#}">
+              <input type="text" id="buyaddress" placeholder="指定哪个店铺购买" readonly value="">
+              <i></i>
+            </a>
+            
+            <input type="hidden" id="buylat" value="">
+            <input type="hidden" id="buylng" value="">
+          </div>
+          <div class="comCon">
+            <p>骑手将在附近3公里内帮您购买</p>
+            <i></i>
+          </div>
+        </div>
+
+        
+      </div>
+    </div>
+    <div class="dom_select take">
+      <span class="spetit">收</span>
+      <div class="option">
+        <a href="javascript:;" class="chooseaddrss" data-url="{#getUrlPath service='waimai' template='addressPaotui' param="shop=$shop&ptype=paotui-buy&stype=s&saddress=$scart_address_id&currentPageOpen=1"#}">
+          {#if $scart_address_id#}
+          <p class="takeAddress">{#$scart_address_street#}{#$scart_address_address#}</p>
+          <p class="takeMan">{#$scart_address_person#} {#if $scart_address_areaCode !='' &&$scart_address_areaCode !='86' #}+{#$scart_address_areaCode#}{#/if#} {#$scart_address_tel#}</p>
+          {#else#}
+          <p class="takeAddress">取货后送到哪里？</p>
+          <p class="takeMan">点击填写收货信息</p>
+          {#/if#}
+          <em class="arrow"></em>
+        </a>
+        <input type="hidden" id="takelng" value="{#if $scart_address_lng#}{#$scart_address_lng#}{#/if#}">
+        <input type="hidden" id="takelat" value="{#if $scart_address_lat#}{#$scart_address_lat#}{#/if#}">        
+      </div>
+    </div>
+  </div>
+
+  <div class="more">
+    <dl class="fn-clear qjTime" data-time="">
+      <dt>{#$langData['siteConfig'][17][23]#}</dt> {#* 送达时间 *#}
+      <dd>
+        <div><input type="text" placeholder="请选择" id="time" readonly name="time"><i></i></div>
+      </dd>
+    </dl>
+    {#* 没有红包时 类名加disabled *#}
+<!--    <dl class="fn-clear youhui">-->
+<!--      <dt>红包</dt>-->
+<!--      <dd>-->
+<!--        <div>-->
+<!--          &lt;!&ndash; 没有优惠时 &ndash;&gt;-->
+<!--          &lt;!&ndash; <input type="text" placeholder="暂无可用" id="discount" disabled> &ndash;&gt;-->
+<!--          &lt;!&ndash; 有优惠券 &ndash;&gt;-->
+<!--          <span class="hasHb">3张可用</span>-->
+<!--          <span class="hasQuan fn-hide">券已减<em>0</em>{#echoCurrency type='short'#}</span>-->
+<!--          <i></i>-->
+<!--        </div>-->
+<!--      </dd>-->
+<!--    </dl>-->
+    <dl class="fn-clear addTips">
+      <dt>小费</dt>
+      <dd>
+        <div><input type="text" placeholder="加小费可以更快抢单哦" id="tipsTxt" readonly><i></i></div>
+        <input type="hidden" id="tips">
+      </dd>
+    </dl>
+  </div>
+  <!-- 积分抵扣 s-->
+  {#if $userinfo.point > 0 && $cfg_offset_waimai > 0#}
+  <div class="more jfchose">
+       <div>
+        <i class="jficon"></i>
+        <p>使用<span class="jifen">0</span>{#$cfg_pointName#}抵扣<span class="jian">0</span>{#echoCurrency type="short"#}</p>
+      </div>
+      <s class="jscheck"></s>   
+  </div>
+ {#/if#}
+ <input type="hidden" id="usePinput">
+  <!-- 积分抵扣 e-->
+  <div class="agree">
+    <i></i><span>同意并接受</span><a href="{#getUrlPath service='siteConfig' template='protocol' title="帮我买服务协议"#}">《帮我买服务协议》</a>
+  </div>
+
+
+  <div class="order_bottom">
+    
+    <div class="orbot fn-clear">
+      <div class="fn-left">
+        <p class="orderPrice">{#echoCurrency type='symbol'#}<strong>{#$serviceMoney#}</strong><i></i></p>
+        <p class="priceNote">此费用不含商品费</p>
+        <p class="distance fn-hide"><span>0</span>km<em>（预计13:09送达）</em></p>
+      </div>
+      <div class="fn-right" style="display: flex;">
+        {#if $peerpayState && !$peerpay#}
+        <a href="javascript:;" class="shareTo" data-paytype="1">找人付</a>
+        {#/if#}
+        <a href="javascript:;" class="tjBtn publicpaybtn paotuipaybtn" data-paytype="0">提交订单</a>
+      </div>
+    </div>
+    
+  </div>
+  <div class="orTop">
+      <div class="priceDetail">
+        <a href="javascript:;" class="cancelRules">取消</a>
+        <h3>价格明细</h3>
+        <a href="javascript:;" class="priceRules">计价规则</a>
+      </div>
+      <div class="priceBox">
+        <dl class="fn-clear show"><dt>基础配送费</dt><dd>{#echoCurrency type='symbol'#}<em class="basicPrice">{#$serviceMoney#}</em></dd></dl>
+        <dl class="fn-clear juliPrice"><dt>距离加价</dt><dd>{#echoCurrency type='symbol'#}<em class="distancePrice">0</em></dd></dl>
+        <dl class="fn-clear spePrice"><dt>特殊时段加价</dt><dd>{#echoCurrency type='symbol'#}<em>0</em></dd></dl>
+        <dl class="fn-clear xfPrice"><dt>小费</dt><dd>{#echoCurrency type='symbol'#}<em>0</em></dd></dl>
+        <dl class="fn-clear hbPrice"><dt>红包抵扣</dt><dd>-{#echoCurrency type='symbol'#}<em>0</em></dd></dl>
+        <dl class="fn-clear jfPrice"><dt>{#$cfg_pointName#}抵扣</dt><dd>-{#echoCurrency type='symbol'#}<em>0</em></dd></dl>
+      </div>
+    </div>
+    
+
+</div>
+<!-- 原页面 e  -->
+
+<!-- 优惠券列表新页面 s-->
+<div class="quanWrap">
+  <!--顶部s-->
+  <div class="header">
+    <div class="header-l"><a href="javascript:;" class="quan-header-back"></a></div>
+    <div class="header-address">
+      <span>优惠券</span>
+    </div>
+    <div class="header-search">
+      <a href="javascript:;" class="dropnav"></a>
+    </div>
+  </div>
+  <!--顶部e-->
+  <div class="coupon_list">
+    <ul>
+    </ul>
+  </div>
+</div>
+<!-- 优惠券列表新页面 e-->
+
+<!-- 计价规则新页面 s-->
+<div class="ruleWrap">
+  <!--顶部s-->
+  <div class="header">
+    <div class="header-l"><a href="javascript:;" class="rule-header-back"></a></div>
+    <div class="header-address">
+      <span>计价规则</span>
+    </div>
+    <div class="header-search">
+      <a href="javascript:;" class="dropnav"></a>
+    </div>
+  </div>
+  <!--顶部e-->
+  <div class="ruleBox">
+    <div class="basdiv">
+      <strong>基础配送费</strong><span><em id="basPrice">{#$serviceMoney#}</em>{#echoCurrency type='short'#}</span>
+    </div>
+    <dl class="juliAdd">
+      <dt>距离附加费</dt>
+      <dd>
+      </dd>
+    </dl>
+    <dl class="weightAdd">
+      <dt>重量附加费</dt>
+      <dd>
+      </dd>
+    </dl>
+    <dl class="speDl speAdd">
+      <dt>特殊时段费</dt>
+      <dd>
+      </dd>                         
+    </dl>
+    <dl class="speDl show">
+      <dt>溢价说明</dt>
+      <dd class="overPrice"><p>在恶劣天气、下单高峰等情况下，为促进骑手接单，平台可能会临时适当调整价格，以保障良好的服务体验</p></dd>
+    </dl>
+  </div>
+</div>
+
+<!-- 计价规则新页面 e-->
+
+<div class="mask"></div>
+<!-- 以下为弹窗 s-->
+<!-- 预估商品费弹窗 s -->
+<div class="planAlert comAlert">
+  <div class="tipError"></div>
+  <div class="comTitle">
+    <a href="javascript:;" class="cancelPlan cancelBtn">取消</a>
+    <h3>预估商品费</h3>
+    <a href="javascript:;" class="surePlan sureBtn">确定</a>
+  </div>
+  <div class="planBox">
+    <h3>供骑手代购时参考（可选填）</h3>
+    <div class="inpbox">
+      <div class="otPrice"><span>预估价格</span><input type="text" id="otherplan" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');"></div>
+    </div>
+    <p class="wtip2" data-most="{#$waimai_paotuiMaxAmount#}"><i></i>最高可代购价值{#$waimai_paotuiMaxAmount#}{#echoCurrency type='short'#}的商品</p>
+  </div>
+</div>
+<!-- 预估商品费弹窗 e -->
+
+<!-- 取件时间弹窗 s -->
+<div class="time_chose comAlert">
+  <div class="comTitle">
+    <a href="javascript:;" class="cancelTime cancelBtn">取消</a>
+    <h3>选择送达时间</h3>
+    <a href="javascript:;" class="sureTime sureBtn">确定</a>
+  </div>
+  <div class="time_box">
+    <div class="time fn-clear">
+      <div class="left_day">
+        <ul></ul>
+      </div>
+      <div class="right_time speR">
+        <ul></ul>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 取件时间弹窗 e -->
+
+<!-- 小费弹窗 s -->
+<div class="tipsAlert comAlert">
+  <div class="tipError"></div>
+  <div class="comTitle">
+    <a href="javascript:;" class="cancelTips cancelBtn">取消</a>
+    <h3>小费</h3>
+    <a href="javascript:;" class="sureTips sureBtn">确定</a>
+  </div>
+  <div class="tipsBox">
+    <ul class="fn-clear">
+      <li><a href="javascript:;" data-tips="0">不加了</a></li>
+      <li><a href="javascript:;" data-tips="2">{#echoCurrency type='symbol'#}2</a></li>
+      <li><a href="javascript:;" data-tips="5">{#echoCurrency type='symbol'#}5</a></li>
+      <li><a href="javascript:;" data-tips="10">{#echoCurrency type='symbol'#}10</a></li>
+      <li><a href="javascript:;" data-tips="15">{#echoCurrency type='symbol'#}15</a></li>
+      <li><a href="javascript:;" data-tips="20">{#echoCurrency type='symbol'#}20</a></li>
+    </ul>
+    <div class="inpbox">
+      <div class="otMoney"><span>其他金额</span><input type="text" id="otherTips" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')"></div>
+    </div>
+    <p class="wtip2" data-most="{#$maxtip#}"><i></i>最高{#$maxtip#}{#echoCurrency type='short'#}</p>
+  </div>
+</div>
+<!-- 小费弹窗 e --> 
+<!-- 错误弹窗 -->
+<div class="error"></div>
+<!-- 取消订单弹窗 s-->
+<div class="orderAlert">
+  <h2>放弃下单？</h2>
+  <ul>
+    <li class="giveup"><a href="javascript:;">放弃</a></li>
+    <li class="continue"><a href="javascript:;">继续下单</a></li>
+  </ul>
+</div>
+<!-- 取消订单弹窗 e-->  
+<!-- 取送货地址相同弹窗 s-->
+<div class="mask_pop"></div>
+<div class="pop_confirm">
+  <div class="pop_tip">
+    <h3>购买和收货距离过近</h3>  {#* 购买和收货距离过近 *#}
+    <p>请确认购买和收货地址是否填写正确</p>   {#* 请确认购买和收货地址是否填写正确 *#}
+  </div>
+  <div class="pop_btn">
+    <a href="javascript:;" class="cancle_btn">继续下单</a>  {#* 继续下单 *#}
+    <a href="javascript:;" class="sure_btn">检查一下</a>   {#* 检查一下 *#}
+  </div>
+</div>
+<!-- 取送货地址相同弹窗 e-->
+<script type="text/javascript">
+  var site_map = "{#$site_map#}";
+  var city = '{#$city#}', district = '{#$district#}', totalPrice = {#$serviceMoney#};
+</script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script src="{#$templets_skin#}js/paotui-buy.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

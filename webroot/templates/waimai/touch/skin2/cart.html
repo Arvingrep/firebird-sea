@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+		<meta name="description" content="{#$waimai_description#}" />
+		<title>{#$langData['waimai'][2][35]#}</title>{#* 提交订单 *#}
+        <meta name="apptitle" content="{#$langData['waimai'][2][35]#}">
+		<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" />
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/waimai_order.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var masterDomain = '{#$cfg_basehost#}',
+				channelDomain = '{#$waimai_channelDomain#}',
+				modelType = 'waimai',
+				staticPath = '{#$cfg_staticPath#}';
+			var shopin 	= {#if $shopin#}{#$shopin#}{#else#} 0 {#/if#}; {#* 是否是店内点餐 *#}
+			var desk 	= {#if desk#}'{#$desk#}'{#else#}0{#/if#}; {#* 桌号 *#}
+			var shopid = {#$detail_id#};  //店铺ID
+			var first_discount = {#if $detail_is_first_discount#}{#$detail_first_discount#}{#else#}0{#/if#};  //首单减免
+			var is_vipdiscount = {#$detail_is_vipdiscount#};
+			var vipdiscount_value = {#if $detail_is_vipdiscount#}{#$detail_vipdiscount_value#}{#else#}10{#/if#};  //店铺vip打折优惠
+			var basicprice = {#if $shopin#} 0 {#else#} {#$detail_basicprice#} {#/if#};  //起送价
+			var delivery_fee = {#if $shopin#} 0 {#else#} {#(float)$detail_delivery_gudingarr['deliveryattach_fee'] + $detail_delivery_fee#} {#/if#};  //配送费
+			var delivery_fee_type = {#if $shopin#} 0 {#else#} {#$detail_delivery_fee_type#} {#/if#};  //配送费类型  0：达到起送价免配送费  1：始终收取外送费  2：满额免
+			var yuan_delievery_fee = model_delivery_fee = {#if $shopin#} 0 {#else#} {#(float)$detail_delivery_gudingarr['deliveryattach_fee'] + $detail_delivery_fee#} {#/if#};  //配送费
+			var delivery_fee_value = {#$detail_delivery_fee_value#};  //满多少免配送费
+			var open_range_delivery_fee = {#$detail_open_range_delivery_fee#};  //开启不同距离收取不同的配送费
+			var range_delivery_fee_value = {#$detail_range_delivery_fee_value_json#};  //不同距离本着费规则
+			var juli = {#$juli#};  //用户距商家距离，单位：千米
+			var shop_delivery_radius = {#$detail_delivery_radius#}; //商家最大配送距离
+			var delivery_fee_mode = {#if $shopin#}0{#else#}{#$detail_delivery_fee_mode#}{#/if#}; //起送价、配送费模式 1固定 2区域 3距离
+			var promotions = {#if $detail_open_promotion && !$shopin#}{#$detail_promotions_json#}{#else#}[]{#/if#};  //满减规则
+
+			var addservice = {#if $detail_open_addservice#}{#$detail_addservice_json#}{#else#}[]{#/if#};  //增值服务
+			var foodTotalPrice = 0, dabaoTotalPrice = 0 , manjianPrice = 0, addservicePrice = 0, first_discount = {#if $firstOrder && $detail_is_first_discount #}{#$detail_first_discount#}{#else#}0{#/if#};   //商品总价，打包总价，满减金额，增值服务，首单减免
+
+			var offline_limit = {#$detail_offline_limit#};	//是否开启货到付款金额限制
+			var pay_offline_limit = {#$detail_pay_offline_limit#};	//货到付款金额限制
+			var myMoney = {#$userinfo['money']#};			//用户余额
+
+			var depositUrl = '{#getUrlPath service='member' type="user" template='deposit'#}';	//充值页面
+			var buyUrl = '{#getUrlPath service='waimai' template='shop' id=$detail_id#}';	// 商品页面
+
+			var zsbproportion ={#if $detail_zsbproportion ==0#} 1{#else#} {#$detail_zsbproportion#}{#/if#};
+			var cart_address_id = {#$cart_address_id#};
+			var order_content;
+			var shop_name = '{#$detail_shopname#}';
+			var shop_addr = "{#$detail_address#}";  //商家地址
+			var shop_lng = {#$detail_coordY#};   //经纬度
+			var shop_lat = {#$detail_coordX#};
+			var nowDate = {#$smarty.now#}, nowTime = "{#$smarty.now|date_format:'%H:%M'#}";
+			var wxconfig = {
+				"appId": '{#$wxjssdk_appId#}',
+				"timestamp": '{#$wxjssdk_timestamp#}',
+				"nonceStr": '{#$wxjssdk_nonceStr#}',
+				"signature": '{#$wxjssdk_signature#}',
+				"description": '{#$detail_description|replace:"\r\n":""|replace:"\r":""|replace:"\n":""#}',
+				"title": '{#if $detail_share_title#}{#$detail_share_title#}{#else#}{#$detail_shopname#}{#/if#}',
+				"imgUrl": '{#$detail_share_pic#}',
+				"link": '{#$detail_url#}',
+			};
+
+			var ptprofit = '{#$detail_ptprofit#}';
+			// var tjprice  = '{#$detail_tjprice#}' 该功能已弃用;
+			var tjprice  = '0';
+
+			var zsbspe = {#if $zsbspe#}{#json_encode($zsbspe)#}{#else#}''{#/if#};  //准时赔付
+			var delivery_time = '{#$delivery_time#}';  //送达时间
+			{#if !$detail_status#}alert('{#if $detail_closeinfo#}{#$detail_closeinfo#}{#else#}{#$deatil_status#}{#$langData['waimai'][3][57]#}{#/if#}');location.history.go(-1);{#/if#}
+			{#if $detail_status && !$detail_ordervalid#}alert('{#if $detail_closeorder#}{#$detail_closeorder#}{#else#}{#$langData['waimai'][3][58]#}{#/if#}');location.history.go(-1);{#/if#}
+
+			{#if !$detail_yingye#}
+				{#if !$detail_yingyeWeek#}
+				alert('{#$langData['waimai'][3][71]#}{#$langData['siteConfig'][18][15]#}：{#$detail_weeks|replace:"1":$langData['siteConfig'][14][4]|replace:"2":$langData['siteConfig'][14][5]|replace:"3":$langData['siteConfig'][14][6]|replace:"4":$langData['siteConfig'][14][7]|replace:"5":$langData['siteConfig'][14][8]|replace:"6":$langData['siteConfig'][14][9]|replace:"7":$langData['siteConfig'][14][10]|replace:",":"，"#}');
+				location.history.go(-1);
+				{#else#}
+				alert('{#$langData['waimai'][3][57]#}{#$langData['siteConfig'][18][15]#}：{#if $detail_start_time1 && $detail_start_time1 != "00:00" && $detail_end_time1 && $detail_end_time1 != "00:00"#}{#$detail_start_time1#}-{#$detail_end_time1#}{#/if#}{#if $detail_start_time2 && $detail_start_time2 != "00:00" && $detail_end_time2 && $detail_end_time2 != "00:00"#}; {#$detail_start_time2#}-{#$detail_end_time2#}{#/if#}{#if $detail_start_time3 && $detail_start_time3 != "00:00" && $detail_end_time3 && $detail_end_time3 != "00:00"#}; {#$detail_start_time3#}-{#$detail_end_time3#}{#/if#}');
+				location.history.go(-1);
+				{#/if#}
+			{#/if#}
+			{#if $shopin != 1#}
+			{#if $detail_delivery_radius != 0 && $detail_delivery_radius < $juli#}
+				alert("{#$langData['waimai'][2][34]#}");
+			{#/if#}
+			{#/if#}
+
+			var payUrl = '{#getUrlPath service="waimai" template="pay" param="ordernum=#ordernum"#}';
+			var quanid = {#$quanid#};
+			var quantype = 0 ; //默认quantype = 0
+			var pageData = {
+				mapType:'baidu',
+				lng    : shop_lng,
+				lat    : shop_lat,
+				cityName: "{#$siteCityInfo['name']#}",
+				title: shop_addr,
+				mapKey:'',
+				lnglat: [shop_lng,shop_lat],
+			}
+
+			var site_map = '{#$site_map#}';
+
+			var userinfovip = {
+			level : {#$userinfo['level']#},
+			levelName : '{#$userinfo['levelName']#}',
+			levelIcon : '{#$userinfo['levelIcon']#}',
+			birthday : '{#$userinfo['birthday']|date_format:'%m%d'#}',
+			delivery_count : '{#$userinfo['delivery_count']#}'
+			}
+
+			var levelName = '{#$userinfo['levelName']#}';
+			var privilege = {#json_encode($privilege)#};
+
+			var vip_discount = "{#if !$shopin#}{#if $detail_is_vipdiscount#}{#$detail_vipdiscount_value|default:10#}{#else if $levle && $levle['privilege'] && $levle['privilege']['waimai']#}{#$levle['privilege']['waimai']#}{#else if $privilege && $privilege['waimai']#}{#$privilege['waimai']#}{#/if#}{#else#}10{#/if#}";  //准vip折扣  //准vip折扣
+				vip_discount = vip_discount=='0' || !vip_discount ?10:vip_discount;
+
+			var vd_dicount = "{#if $levle && $levle['privilege'] && $levle['privilege']['delivery'][0]['val']#}{#$levle['privilege']['delivery'][0]['val']#}{#else if $privilege#}{#$privilege['delivery'][0]['val']#}{#/if#}";  //准vip配送折扣
+
+			var vlevel = {#json_encode($levle)#};
+			var vip_price ={#if $levle#}{#$levle['price']|default:0#}{#else#}0{#/if#};
+
+			var instorestatus 	= "{#$bret['instorestatus']#}";
+			var wmstorestatus 	= "{#$bret['wmstorestatus']#}";
+			var underpay 		= "{#$bret['underpay']#}";
+			var level = {#json_encode($levle)#};
+			var local = '{#$local#}';
+
+
+			// 积分抵扣
+			var hasPoint = '{#$userinfo.point#}';
+			jifen_ =  '{#$cfg_offset_waimai#}';
+			var pointRatio = {#$cfg_pointRatio#};
+
+			var usermoney = '{#$useinfo.money#}';
+		</script>
+	</head>
+	<body>
+		{#$pageTitle = "{#$langData['waimai'][2][35]#}"#} {#include file="../../../siteConfig/touch_top.html" #}{#* 提交订单 *#}
+		{#if $shopin#}
+		<!-- 店内点餐s -->
+		<div class="shopin_box">
+			<div class="shopin_detail">
+				<h1 class="desk_num">{#$desk#}</h1>
+				<h4 class="shopin_name">{#$detail_shopname#}</h4>
+				<p>请核对餐品</p>
+				<i>桌号</i>
+			</div>
+		</div>
+		<!-- 店内点餐e -->
+		{#else#}
+
+		<!--地址选择、配送方式s-->
+		<div class="addr_box">
+			{#if $detail_selftake#}
+			<ul class="tab_ul fn-clear">
+				<li class="tab_li active_li" data-id=""><a href="javascript:;">{#$langData['waimai'][7][26]#}</a></li>{#* 外卖配送 *#}
+				<li class="tab_li" data-id="1"><a href="javascript:;">{#$langData['waimai'][7][27]#}</a></li>{#* 到店自取 *#}
+			</ul>
+			{#/if#}
+			<div class="tabcon_box">
+					<a class="tab_con tab_addr tab_show" href="{#getUrlPath service='waimai' template='address' id=$detail_id param="address=$cart_address_id"#}">
+					<div class="address">
+						<div class="addr_info">
+							{#if $cart_address_street || $cart_address_address#}
+							<h2>{#$cart_address_street#} {#$cart_address_address#}</h2>
+							{#else#}
+                          	<h2>去添加地址</h2>
+                         	{#/if#}
+							<p><span class="name">{#$cart_address_person#}</span>  <span class="tel">{#if $cart_address_areaCode != '' && $cart_address_areaCode != '86'#}+{#$cart_address_areaCode#}{#$cart_address_tel#}{#else#}{#$cart_address_tel#}{#/if#}</span></p>
+						</div>
+					</div>
+					{#if $detail_delivery_time !=0#}
+						<div class="arr_time">
+						{#$langData['waimai'][8][84]|replace:"1":$detail_delivery_time#}
+						{#* 送达时间 <span>约1分钟送达</span> *#}
+						</div>
+					{#/if#}
+				</a>
+
+				<div class="tab_con shop_addr">
+					<h2>{#$detail_address#}</h2>
+					<div class="map_area">
+						<div class="map">
+						  <div id="map"></div>
+						</div>
+						<div class="mapPath">
+						  <div id="mapPath"></div>
+						  <div class="mapBtn">
+						    <button id="closeMap"></button>
+						    <button id="refreshMap"></button>
+						  </div>
+						</div>
+					</div>
+					<ul class="info_detail">
+						<li class="time" data-time="">
+							<input type="text" name="time" id="time" readonly="readonly" placeholder="{#$langData['waimai'][1][239]#}"/>
+							<label for="time">{#$langData['waimai'][8][73]#}</label>{#* 自提时间 *#}
+						</li>
+						<li class="phone">
+							<input type="number" name="phone" id="phone" value="{#$userphone#}"/>
+							<label for="phone">{#$langData['waimai'][7][29]#}</label>{#* 联系人电话 *#}
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+
+		<!--地址选择、配送方式e-->
+		{#/if#}
+
+		<!--订单详情s-->
+		<dl class="dl_box">
+			<dt>
+				{#if $shopin#}
+				<h2 class="num_cart">已选餐品(<em>0</em>)</h2>
+				{#else#}
+				<h2>{#$detail_shopname#}</h2>
+				{#/if#}
+			</dt>
+
+			<dd class="shop_cart">
+				<ul class="cart_con">
+				</ul>
+				<div class="price_calculate">
+
+					<!-- <p class="on_discount fn-clear">
+						<i>{#$langData['waimai'][2][91]#}</i>{#*  折  *#}
+						<span class="dis_tip">{#$langData['waimai'][2][90]|replace:'1':($detail_discount_value|string_format:"%.1f")#}</span>{#*  本店开启了1折优惠活动  *#}
+					</p> -->
+
+					<p class="on_full fn-clear">
+						<i>{#$langData['waimai'][1][103]#}</i>{#* 满  *#}
+						<span class="price-hui">-{#echoCurrency type='symbol'#}<em>{#$detail_delivery_fee_value#}</em></span>
+						<span class="dis_tip">{#$langData['waimai'][2][95]#}</span>{#*  满减优惠  *#}
+					</p>
+
+					{#if $firstOrder && $detail_is_first_discount && $detail_first_discount > 0#}
+					<p class="on_first  fn-clear">
+						<i>{#$langData['waimai'][2][92]#}</i>{#* 首  *#}
+						<span class="price-hui">-{#echoCurrency type='symbol'#}<em>{#$detail_first_discount#}</em></span>
+						<span class="dis_tip">{#$langData['waimai'][7][30]|replace:"1":$detail_first_discount#}</span>{#* 首单用户立减1元 *#}
+					</p>
+					{#/if#}
+
+					<!-- 会员折扣显示 -->
+					<!-- <div class="huijian_box {#if $privilege && $detail_vipdiscount_value !=0#} {#else#}fn-hide{#/if#}"> -->
+					<div data-hui="{#if !$shopin#}{#$privilege['waimai']#}{#else#}10{#/if#}" class="huijian_box {#if $privilege && $privilege['waimai'] !=0 && !$shopin #} {#else#}fn-hide{#/if#}">
+						<span class="h_discount"><i></i>会员<em>{#if $detail_is_vipdiscount#}{#$detail_vipdiscount_value#}{#else if $levle#}{#$levle['privilege']['waimai']#}{#else if $privilege#}{#$privilege['waimai']#}{#/if#}</em>折</span>
+						<span class="h_jian">-{#echoCurrency type='symbol'#}<em>0</em></span>
+					</div>
+
+					<p class="daba-fee fn-hide fn-clear">
+						<span class="fee_num">{#echoCurrency type='symbol'#}<em>0</em></span>
+						<span class="dis_tip">{#$langData['waimai'][7][31]#}</span>{#* 打包费 *#}
+					</p>
+					{#if $detail_delivery_gudingarr#}
+					<!-- 远距离配送费 -->
+					<div class="peisong-fee peisong_distance {#if $shopin#}fn-hide{#/if#} fn-clear">
+						<div class="peisong_price">
+							<div class="{#if $privilege#}{#else#}fn-hide{#/if#} hui_ps">
+								<span class="v_tip">会员减免配送费</span>
+								<i class="od_price" data-price = "{#$detail_delivery_gudingarr['deliveryattach_fee'] + $detail_delivery_fee#}">{#echoCurrency type='symbol'#}{#$detail_delivery_gudingarr['deliveryattach_fee'] + $detail_delivery_fee#}</i>
+							</div>
+							<span class="fee_num" data-delivery="{#$detail_delivery_gudingarr['deliveryattach_fee'] + $detail_delivery_fee#}">{#echoCurrency type='symbol'#}<em>{#$detail_delivery_gudingarr['deliveryattach_fee'] + $detail_delivery_fee#}</em></span>
+						</div>
+						<span class="dis_tip">远距离配送费<s></s>
+							{#if $detail_delivery_gudingarr['deliveryattach_fee'] + $detail_delivery_fee > 0 #}
+							<p class="ps_tip fn-hide">已减<em>0</em>{#echoCurrency type="short"#}配送费</p>
+							{#else#}
+							<p class="ps_tip" style="display: block;">免配送费</p>
+							{#/if#}
+						</span>{#* 配送费 *#}
+					</div>
+					{#else#}
+					<div class="peisong-fee {#if $shopin#}fn-hide{#/if#} fn-clear">
+						<div class="peisong_price">
+							<div class="{#if $privilege#}{#else#}fn-hide{#/if#} hui_ps">
+								<span class="v_tip">会员减免配送费</span>
+								<i class="od_price" data-price = "{#$detail_delivery_fee#}">{#echoCurrency type='symbol'#}{#$detail_delivery_fee#}</i>
+							</div>
+							<span class="fee_num" data-delivery="{#$detail_delivery_fee#}">{#echoCurrency type='symbol'#}<em>{#$detail_delivery_fee#}</em></span>
+						</div>
+						<span class="dis_tip">{#$langData['waimai'][1][19]#}
+							{#if $detail_delivery_fee_mode == 1#}
+							{#if $detail_delivery_fee > 0 #}
+							<p class="ps_tip fn-hide">已减<em>0</em>{#echoCurrency type="short"#}配送费</p>
+							{#else#}
+							<p class="ps_tip" style="display: block;">免配送费</p>
+							{#/if#}
+							{#/if#}
+						</span>{#* 配送费 *#}
+					</div>
+					{#/if#}
+					<div class="other-fee {#if $detail_open_addservice#}{#else#}fn-hide{#/if#} fn-clear">
+						<span class="fee_num">{#echoCurrency type='symbol'#}<em>3.5</em></span>
+						<span class="dis_tip">增值费</span>
+					</div>
+					<!-- 商家返券 -->
+				<!-- 	<p class="fan-fee fn-clear">
+						<i>{#$langData['waimai'][7][35]#}</i>{#* 返 *#}
+						<span class="price-hui">{#$langData['waimai'][7][33]|replace:'1':'2'#}</span>   {#* 满返商家优惠券 *#}
+						<span class="dis_tip">{#$langData['waimai'][7][32]#}</span>  {#* 满返商家优惠券 *#}
+					</p> -->
+
+				</div>
+
+              {#if !$shopin#}
+				<div class="coupon_chose">
+					<a data-url="{#getUrlPath service='waimai' template='quan' id=$detail_id param="address={#$cart_address_id#}"#}" href="{#getUrlPath service='waimai' template='quan' id=$detail_id param="address={#$cart_address_id#}"#}">
+						<span class=""></span>
+						<label>{#$langData['waimai'][2][36]#}</label>{#* 优惠券 *#}
+						<input type="hidden" id="coupon" name="coupon" />
+					</a>
+				</div>
+			  {#/if#}
+				{#if $detail_ptprofit !=0#}
+				<div class="ptshouyi">
+					<span class=""></span>
+					<label>{#$langData['waimai'][11][227]#}</label>{#* 平台收益 *#}
+				</div>
+				{#/if#}
+
+				{#if $userinfo.point > 0 && $cfg_offset_waimai > 0#}
+				<div class="integral">
+					<p class="left">使用<span class="jifen">0</span>{#$cfg_pointName#}抵扣<span class="jian">0</span>{#echoCurrency type="short"#}</p>
+					<span class="gou hasgou"></span>
+				</div>
+				{#/if#}
+
+				<div class="pay_box fn-clear">
+					<span class="hui_count">{#$langData['waimai'][2][39]#}<em>{#echoCurrency type='symbol'#}40</em></span>{#* 已优惠 *#}
+					<a href="javascript:;" class="pay_btn">
+						<span class="text">{#$langData['waimai'][7][36]#}:</span>{#* 小计 *#}
+						<span class="count_fee">{#echoCurrency type='symbol'#}<em>0.00</em></span>
+					</a>
+				</div>
+			</dd>
+
+		</dl>
+
+		<!--订单详情e-->
+		<!-- 商品推荐s -->
+		{#if count($zkre)>0 && !$shopin#}
+		<div class="rec_box">
+			<h2>{#$langData['waimai'][9][3]|replace:"1":count($zkre)#}</h2>{#* 优惠推荐 <em>共{#count($zkre)#}个优惠</em> *#}
+			<ul>
+				{#foreach from =$zkre item="item" #}
+				<li data-price="{#($item.price + $item.price * $detail_tjprice /100 )* $item.discount_value/10#}" data-oprice="{#$item.price + $item.price * $detail_tjprice /100#}" data-count="{#$item.count#}" data-dabao="{#$item.dabao_money#}" data-id="{#$item.id#}"  data-count="{#$item.count#}" data-title="{#$item.title#}" data-ntitle="{#$item.ntitle#}" data-unit="{#$item.unit#}"  data-discount_value="{#$item.discount_value#}" data-is_discount="{#$item.is_discount#}"  data-pic="{#$item.pics#}" data-vprice="{#$item.price*$levle['privilege']['waimai']/10#}" class="">
+					<div class="left_img"><img src="{#getFilePath($item.pics)#}" onerror="this.src='/static/images/404.jpg'"></div>
+					<div class="right_info">
+						<h4>{#$item.title#}</h4>
+						<div class="rprice_box">
+							{#if $privilege && $privilege['waimai']!= 0#}
+							<div data-vprice="{#$privilege['waimai']#}" class="{#if $privilege['waimai']<$item.discount_value#}v_price{#/if#} d_price">{#echoCurrency type='symbol'#}<em>{#if $privilege['waimai']>$item.discount_value#}{#($item.price + $item.price * $detail_tjprice /100)*$item.discount_value/10#}{#else#}{#$item.price*$privilege['waimai']/10#}{#/if#}</em></div>
+							{#else#}
+							<div  class="d_price">{#echoCurrency type='symbol'#}<em>{#(($item.price + $item.price * $detail_tjprice /100)*$item.discount_value/10)|string_format:"%.2f"#}</em></div>
+							{#/if#}
+							<div class="o_price">{#echoCurrency type='symbol'#}{#$item.price + $item.price * $detail_tjprice /100#}</div></div>
+						<a href="javascript:;" class="gou"></a>
+					</div>
+				</li>
+				{#/foreach#}
+			</ul>
+			<div class="rec_count">{#$langData['waimai'][7][36]#}：<span>{#echoCurrency type='symbol'#}<em>0.00</em></span></div>
+		</div>
+		{#/if#}
+
+		<!-- 商品推荐e -->
+		{#if $shopin !=1#}
+		<!-- 开通会员s -->
+
+		{#if $levle && $levle.privilege!='' && $levle.discount!=''#}
+		<div class="openvip">
+			<p class="open_tip">查看会员特权</p>
+			<div class="hui_box">
+				<div class="lBox level_{#$levle['id']#}"><i></i><span>{#$levle['name']#}</span></div>
+				<div class="hui_con">
+					<h3> 开通会员，本单立减<em>0</em>{#echoCurrency type='short'#}</h3>
+					<div class="hui_price">
+						<span class="h_span">{#echoCurrency type='symbol'#}<em>{#$levle['price']#}</em></span>
+						<span class="c_span"></span>
+					</div>
+				</div>
+			</div>
+			<a href="javascript:;" class="btn_agree2"><i></i><span>{#$langData['waimai'][9][4]#}</span></a> {#* 同意《会员开通服务协议》 *#}
+		</div>
+
+		<!-- 开通会员e -->
+		{#/if#}
+
+		<!-- 准时宝s -->
+      	{#if $detail_zsbproportion != 0 && $zsbspe  && $otherpeisong == 0#}
+		<div class="ontime_box">
+			<div class="time_head fn-clear">
+				{#$langData['waimai'][8][85]#}  {#*  准时宝  *#}
+				<div class="right_btn"><span class="tprice">{#echoCurrency type='symbol'#}<em>0.68</em></span><a href="javascript:void(0);" class="zs_btn"><i></i></a></div>
+			</div>
+
+			<p>{#$langData['waimai'][8][86]#} {#* 骑手送达 *#}
+			 {#$m = 0#}
+			 {#foreach from=$zsbspe item="item"#}
+			 {#if $item['time']!=0#}
+			  {#if $m != 0#},{#/if#}{#$langData['waimai'][9][0]|replace:" 1 ":$item['time']|replace:" 0 ":$item['proportion']#} {#* 超时1分钟赔<em>0</em> *#}
+			 {#/if#}
+			 {#$m = $m+1#}
+			 {#/foreach#}
+			 <i></i></p>
+			<a href="javascript:;" class="btn_agree"><i></i><span>{#$langData['waimai'][9][1]#}</span></a> {#* 同意《准时达服务协议》 *#}
+		</div>
+		{#/if#}
+		<!-- 准时宝e -->
+
+		{#/if#}
+
+		<!--备注、更多s-->
+		<div class="more_box">
+			<!-- 预设s -->
+			<ul class="extra">
+				{#if $detail_preset#}
+				{#$i=0#}
+				{#foreach from=$detail_preset item=preset#}
+				<li class=" fn-clear" {#if $preset[0]==1#}data-id="{#$i#}"{#/if#}>
+					{#foreach from=$presetData item=p#}
+						{#if $preset[2] == $p['title']#}
+						{#$r = $p['value']#}
+						{#/if#}
+					{#/foreach#}
+					<label>{#$preset[2]#}</label>
+					{#if $preset[0] == 1#}
+					<input type="text" placeholder="{#$langData['waimai'][1][239]#}" readonly="readonly" id="extra{#$i#}" />
+					<select class="preset fn-hide">
+						{#foreach from=$preset[3] item=pre#}
+						<option value="{#$pre#}"{#if $pre == $r#} selected="selected"{#/if#}>{#$pre#}</option>
+						{#/foreach#}
+					</select>
+					{#else#}
+					<input type="text" class="preset" placeholder="{#$preset[3]#}" value="{#$r#}">
+					{#/if#}
+				</li>
+				{#if $preset[0]==1#}{#$i=$i+1#}{#/if#}
+				{#/foreach#}
+				{#/if#}
+			</ul>
+			<!-- 预设e -->
+			<ul>
+				<li class="fn-clear">
+					<input type="text" placeholder="{#$detail_memo_hint#}" readonly="readonly" id="note"  value="{#$note#}" />
+					<label>{#$langData['siteConfig'][19][705]#}</label>  {#* 订单备注 *#}
+				</li>
+
+				<li class="fn-clear fn-hide">
+					<input type="text" placeholder="{#$langData['waimai'][1][239]#}" readonly="readonly" id="fork_num" />{#* 请选择 *#}
+					<label>{#$langData['waimai'][7][37]#}</label>{#* 餐具份数 *#}
+				</li>
+
+				<!-- <li class="fn-clear">
+					<span class="pay_way {#if $detail_pay_offline_limit>0#}pay_change{#/if#}">{#$langData['waimai'][7][38]#}</em></span>{#* 在线付款 *#}
+					<input type="hidden" id="paytype" name="paytype" placeholder="{#$langData['waimai'][1][239]#}" value="{#$langData['waimai'][7][38]#}" />{#* 请选择---在线付款 *#}
+					<label>{#$langData['waimai'][1][143]#}</label>{#* 支付方式 *#}
+				</li> -->
+			</ul>
+		</div>
+
+		<!--备注、更多e-->
+
+		<!-- 显示配送费明细 -->
+		<div class="orTopMask"></div>
+		<div class="orTop">
+			<div class="priceDetail">
+				<a href="javascript:;" class="cancelRules">取消</a>
+				<h3>价格明细</h3>
+				<!-- <a href="javascript:;" class="priceRules">计价规则</a> -->
+			</div>
+			<div class="priceBox">
+				{#if $detail_delivery_fee !='0'#}
+				<dl class="fn-clear show"><dt>基础配送费</dt><dd>{#echoCurrency type='symbol'#}<em class="basicPrice">{#$detail_delivery_fee#}</em></dd></dl>
+				{#/if#}
+				{#if (float)$detail_delivery_gudingarr['deliveryattach_fee'] !='0'#}
+				<dl class="fn-clear juliPrice"><dt>距离加价</dt><dd>{#echoCurrency type='symbol'#}<em class="distancePrice">{#(float)$detail_delivery_gudingarr['deliveryattach_fee']#}</em></dd></dl>
+				{#/if#}
+			</div>
+		</div>
+
+
+		<!--底部s-->
+		<div class="bottom_box fn-clear">
+			<button type="button" data-paytype="0" class="publicpaybtn">{#if $bret['instorestatus']==1 && $bret['underpay'] ==1 && $desk!=0#}{#$langData['waimai'][3][33]#}{#else#}{#$langData['waimai'][2][35]#}{#/if#}</button>{#* 提交订单 *#}
+			<div class="fee_info">
+				<div class="flexLeft">
+					<div class="r_count">
+						<div class="ac_show"><span>{#echoCurrency type='symbol'#}<em>--</em></span></div>
+						<span class="hp_show">含尊享会员{#echoCurrency type='symbol'#}{#$levle['price']#}</span>
+					</div>{#* 合计 *#}
+					<p class="b_txt">{#$langData['waimai'][2][39]#}{#echoCurrency type='symbol'#}<em>--</em></p>{#* 已优惠 *#}
+				</div>
+				{#if $peerpayState && !$peerpay && !$desk#}
+				<a href="javascript:;" class="btn_toPay" data-paytype="1">找人付</a>
+				{#/if#}
+			</div>
+		</div>
+		<!--底部e-->
+
+		<!--遮罩-->
+		<div class="mask_tableware"></div>
+		<!--选餐具-->
+		<div class="tware_chose">
+			{#if $detail_preset#}
+			{#$n=0#}
+			{#foreach from=$detail_preset item=preset#}
+			{#if $preset[0]==1#}
+			<div class="tb_box fn-hide" {#if $preset[0]==1#}data-id="{#$n#}"{#/if#}>
+				<a href="javascript:;" class="close_tware"></a>
+				<h3>{#$preset[2]#}</h3>{#* 餐具份数 *#}
+				<ul>
+					{#foreach from=$preset[3] item=pre#}
+						<li data-num="{#$pre#}">{#$pre#}</li>
+					{#/foreach#}
+				<!-- 	<li data-num="0">{#$langData['waimai'][7][40]#}</li>{#* 不需要餐具 *#}
+					{#section name=total loop=10#}
+					<li data-num="{#$smarty.section.total.index+1#}">{#$smarty.section.total.index+1#}{#$langData['waimai'][7][41]#}</li>{#* 份 *#}
+					{#/section#}
+					<li>{#$langData['waimai'][7][42]|replace:'1':'10'#}</li>{#* 10份以上 *#} -->
+				</ul>
+			</div>
+			{#$n=$n+1#}
+			{#/if#}
+			{#/foreach#}
+			{#/if#}
+		</div>
+
+		<div class="payway_chose">
+			<a href="javascript:;" class="close_payway"></a>
+			<dl>
+				<dt>{#$langData['waimai'][1][215]#}</dt>{#* 付款方式 *#}
+				<dd data-type="1">{#$langData['waimai'][1][15]#}<em>({#$langData['waimai'][7][43]|replace : "1" : $detail_pay_offline_limit#})</em></dd>{#* 货到付款  --  仅支持1元以内 *#}
+				<dd data-type="2">{#$langData['waimai'][7][38]#}</dd>{#* 在线付款 *#}
+			</dl>
+		</div>
+
+		<!-- 时间选择 -->
+		<div class="mask_timechose"></div>
+		<div class="time_chose">
+			<a href="javascript:;" class="close_time"></a>
+			<div class="time_box">
+				<h3>{#$langData['waimai'][7][44]#}</h3>{#* 时间选择 *#}
+				<div class="time fn-clear">
+					<div class="left_day">
+						<ul></ul>
+					</div>
+					<div class="right_time">
+						<ul></ul>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- 不能货到付款提示 -->
+		<div class="mask_tip"></div>
+		<div class="payway_null">
+			<div class="pay_tip">
+				{#* <h3>抱歉</h3><p>订单金额超出商家可货到付款最大金额限制</p> *#}
+				{#$langData['waimai'][7][45]#}
+			</div>
+			<a href="javascript:;" class="close_tip">{#$langData['waimai'][7][46]#}</a>{#* 我知道了 *#}
+		</div>
+
+       <div class="mask_right"></div>
+		<!-- 特权 -->
+		<div class="aright_box">
+		   <h2>{#$levle['name']#}尊享以下特权</h2>
+		   <div class="aright">
+			   <ul>
+			   	{#if !empty($levle['privilege']['quan'])#}
+			 	  <li>免费得会员红包 </li>
+			 	{#/if#}
+			 	{#if !empty($levle['privilege']['delivery'])#}
+			 	  <li>{#if $levle['privilege']['delivery'][0]['type'] == 'discount'#}配送费打{#$levle['privilege']['delivery'][0]['val']#}折{#else#}免配送次数({#$levle['privilege']['delivery'][0]['val']#}){#/if#}</li>
+			 	{#/if#}
+			 	{#if !empty($levle['privilege']['waimai'])#}
+			 	  <li>外卖商品全场享{#$levle['privilege']['waimai']#}折</li>
+			 	{#/if#}
+			   </ul>
+		   </div>
+		   <a href="javascript:;" class="btn_close">我知道了</a>
+		</div>
+
+		<!-- 备注 -->
+		<div class="remark_page">
+			<div class="header ">
+					<div class="header-l"><a href="javascript:;" class="goBack"></a></div>
+					<div class="header-address">
+					<span>添加备注</span>
+				</div>
+			</div>
+			<div class="remark_box">
+				<div class="remark" id="txtarea" contenteditable="true" placeholder="填写额外对商家和外卖小哥的备注信息"></div>
+				<div class="btn_remark">完成</div>
+			</div>
+		</div>
+
+		<div class="mask_gz"></div>
+		<div class="pop_box" data-xy="zsb">
+			<h2>{#$langData['waimai'][9][2]#} <a href="javascript:;" class="cancel"><img style="width: .3rem; height: .3rem; opacity: .5;"  src="/static/images/close_2.png"></a></h2>{#* 准时宝服务协议 *#}
+			<div class="txt_con">
+				{#$customZsbxy#}
+			</div>
+		</div>
+
+		<div class="pop_box" data-xy="vip">
+			<h2>会员服务协议 <a href="javascript:;" class="cancel"><img style="width: .3rem; height: .3rem; opacity: .5;"  src="/static/images/close_2.png"></a></h2>{#* 会员服务协议 *#}
+			<div class="txt_con">
+				{#$customHyxy#}
+			</div>
+		</div>
+
+
+		<!-- 地址确认 confirm -->
+		<div class="mask_alert"></div>
+		<div class="alertbox">
+			<div class="alert_con">
+				<h3></h3>
+				 <p class=""></p>
+			</div>
+			<div class="btns">
+				<button type="button" data-type="reset" data-id="192" data-state="0" class="reset">取消</button>
+				<button type="button" data-type="sure" data-id="192" data-state="1" class="sure">确认</button>
+			</div>
+		</div>
+
+	<script type="text/javascript" src="{#$site_map_apiFile#}"></script>
+	{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+	{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+	<script type="text/javascript">
+        var wxconfig = {
+          "appId": '{#$wxjssdk_appId#}',
+          "timestamp": '{#$wxjssdk_timestamp#}',
+          "nonceStr": '{#$wxjssdk_nonceStr#}',
+          "signature": '{#$wxjssdk_signature#}',
+          "description": '{#$waimai_description#}',
+          "title": '{#$waimai_title#}',
+          "imgUrl": '{#$waimai_logoUrl#}',
+          "link": '{#$waimai_channelDomain#}',
+        };
+
+        var typeid = '', orderby = '', yingye = '', lng = '', lat = '', page = 1, pageSize = 10;
+        document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+      </script>
+	<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/waimai_order.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

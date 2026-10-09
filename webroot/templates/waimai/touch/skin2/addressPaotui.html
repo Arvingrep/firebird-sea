@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<meta name="format-detection" content="telephone=no" />
+<meta name="description" content="{#$waimai_description#}" />
+<title>{#$langData['waimai'][2][66]#}</title>
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+  <link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/addressPaotui.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var redirectUrl = '{#getUrlPath service="waimai" template="paotui-buy" param="currentPageOpen=1&shop=$shop&{#$stype#}address=#id"#}';
+  var paotuiHref = '{#getUrlPath service="waimai" template=$ptype param="currentPageOpen=1&{#$stype#}address=#id"#}';
+  var songUrl = '{#getUrlPath service='waimai' template='paotui-song' param="currentPageOpen=1"#}';
+  var editUrl = '{#getUrlPath service='waimai' template='addressEdit' param="addressid=#id&ptype=$ptype&stype=$stype&currentPageOpen=1"#}';
+  var addAddress = `{#getUrlPath service='member' type="user" template='mapPosi_waimai'#}`; //2023.12.15修改
+	var masterDomain = '{#$cfg_basehost#}',staticPath = '{#$cfg_staticPath#}';
+	var id = 0, lng = "", lat = ""	;
+  var ptype = '{#$ptype#}';//用来判断 是index 还是 paotui-song 还是paotui-buy 请求的
+  var stype = '{#$stype#}';//用来判断是取 还是收
+  var comLng,comLat;//计算已选坐标的距离
+  var qhLng,qhLat,sqLng,sqLat;//取货送货地址
+  var sqAdr,sqDetail,qhAdr,qhDetail;
+  var loLng,loLat;//初始定位坐标
+  var maxJuli = {#$paotuiMaxjuli|default:0#};//最大距离
+</script>
+</head>
+
+<body>
+<!-- 选择收货地址新页面 s-->
+{#$selBackUrl = "{#getUrlPath service='waimai' template='paotui'#}"#}
+<div class="choseWrap" data-lng="" data-lat="" data-address="">
+  {#if $stype == 's'#}
+  {#$pageTitle = '收货地址'#}
+  {#elseif $stype == 'q'#}
+  {#$pageTitle = '取货地址'#}
+  {#else#}
+  {#$pageTitle = '选择地址'#}
+  {#/if#}
+  {#include file="../../../siteConfig/touch_top.html"#}
+  <div id="gzAddNewObj" >  
+    <!--表单s-->
+    <div class="formBox">
+      <form class="addr_add">
+        <ul class="form_ul">
+          <li class="form_li gz-addr-seladdr gz-no-sel" data-lng="" data-lat="">
+            <label for="addr">{#if $stype == 'q'#}取货地址{#elseif $stype == 's'#}收货地址{#else#}选择地址{#/if#}</label>{#* 取货地址-- 收货地址-- 选择地址*#}
+            <input type="text" name="addr" id="addr" readonly="readonly" placeholder="{#$langData['waimai'][1][239]#}"/>{#* 请选择 *#}
+          </li>
+          <li class="form_li">
+            <label for="people">{#$langData['waimai'][2][50]#}</label>{#* 详细地址 *#}
+            <input type="text" name="address" id="address" placeholder="请输入门牌号等详细信息" autocomplete="off" />{#* 请输入门牌号等详细信息 *#}
+          </li>
+          <li class="form_li">
+            <label for="people">{#$langData['waimai'][2][45]#}</label>{#* 联系姓名 *#}
+            <input type="text" name="people" id="people" placeholder="联系人姓名"/>{#* 联系人姓名 *#}
+          </li>
+          <li class="form_li">
+            <label for="mobile">{#$langData['waimai'][2][47]#}</label>{#* 手机号码 *#}
+            <div class="mobbox">
+              <span class="acode_show">86</span>
+              <input type="hidden" name="areaCode" id="areaCode" value="86">
+              <input type="tel" name="mobile" id="mobile" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');" placeholder="联系人手机号码"/>{#* 联系人手机号码 *#}
+            </div>
+          </li>
+          
+        </ul>
+        <button type="button" class="save_btn">保存并使用</button>{#* 保存并使用 *#}
+        <button type="button" class="del_addr" style="display: none;">{#$langData['waimai'][2][42]#}</button>{#* 删除 *#}
+      </form>
+    </div>
+    <!--表单e-->
+  </div>
+  <div class="have" id="gzAddrList">
+    <h3 class="offenAdr">常用地址</h3>
+    <div class="addresslist canUse">
+      <div class="loading">加载中...</div>
+    </div>
+    <div class="addresslist noUse">
+      <h4 class="cc">以下地址超出配送范围</h4>
+      <div class="noUseList"></div>
+    </div>
+
+  </div>
+</div>
+<!-- 选择收货地址新页面 e-->
+
+<!--地图新页面 s-->
+<div class="pageitem" id="map">
+  <div class="lead">
+    <p></p>
+    <input type="text" id="searchAddr" placeholder="{#$langData['siteConfig'][20][411]#}">
+  </div>
+  <div class="map">
+    <div id="mapdiv"></div>
+    <span class="mapcenter"></span>
+  </div>
+
+  <div class="mapresults">
+    <ul></ul>
+    <!-- <a href="javascript:;" class="elseStreet">没有找到您的建筑物？请点击这里！</a> -->
+  </div>
+</div>
+<!--地图新页面 e-->
+
+<!-- 区域选择 -->
+<div class="popl_mask"></div>
+<div class="popl_box anum_box">
+	<h2>{#$langData['business'][1][4]#}   <a href="javascript:;" class="back">{#$langData['business'][1][5]#}</a></h2>     {#* 选择地区----返回 *#}
+	<div class="areaList" id="areaList"><ul>
+		{#siteConfig action='internationalPhoneSection' return="item"#}
+		<li data-cn="{#$item.name#}" data-code="{#$item.code#}"><span>{#$item.name#}<span><em class="fn-right">+{#$item.code#}</em></li>
+		{#/siteConfig#}
+	</ul></div>
+</div>
+<!-- 错误弹窗 -->
+<div class="error"></div>
+<script>
+	var site_map = "{#$site_map#}";
+  var wxconfig = {
+      "appId": '{#$wxjssdk_appId#}',
+      "timestamp": '{#$wxjssdk_timestamp#}',
+      "nonceStr": '{#$wxjssdk_nonceStr#}',
+      "signature": '{#$wxjssdk_signature#}',
+      "description": '{#$waimai_description#}',
+      "title": '{#$langData['siteConfig'][16][49]#}',
+      "imgUrl": '{#$waimai_logoUrl#}',
+      "link": '{#getUrlPath service='waimai' template='paotui'#}',
+  };
+
+  document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/addressPaotui.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0,viewport-fit=cover">
+		<title>管理优惠券</title> {#*   订单列表   *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+		<!-- <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/waimaiOrder.css?v={#$cfg_staticVersion#}"> -->
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/quanlist.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+
+			 var pageUrl = '{#$cfg_basehost#}/wmsj/order/waimaiOrder.php?state=', state = '{#if $state#}{#$state#}{#else#}2{#/if#}';
+			 var cookiePre = '{#$cfg_cookiePre#}';
+			 var orderState = {#if $state==1#}1{#else#}0{#/if#};  //订单状态为1 则是历史订单
+			 var templets = "{#$templets_skin#}";
+			 var staticPath = "{#$cfg_staticPath#}";
+			 var sid = '{#$sid#}'
+		</script>
+	</head>
+	<body>
+		<div id="page">
+			<!-- 订单列表 -->
+			<div class="page_list">
+				<!-- 头部 s-->
+				<div class="top_box">
+					<div class="headbox">
+						<a class="back_btn goBack" href="javascript:;" onclick="history.go(-1)"></a>
+						<div class="htitle">管理优惠券</div>    {#*   订单列表   *#}
+					</div>
+					<div class="tab_box">
+						<template>
+							<ul v-cloak>
+								<li v-for="tab in tabs" :data-page="tab.page" :data-load="tab.isload" :data-typeid="tab.typeid" :data-state="tab.state" :class="{'on_chose':currOn == tab.typeid}" @click="changeTab">{{tab.name}}<span v-show="tab.dpageInfo!=''" :class="{'red':tab.typeid=='5'}">{{tab.dpageInfo}}</span></li>
+								<em></em>
+							</ul>
+						</template>
+					</div>
+				</div>
+				<!-- 头部 e-->
+
+				<!-- 列表 -->
+				<div class="ListBox">
+
+					<div class="swiper-container"  v-cloak>
+						<div class="swiper-wrapper">
+							<div v-for="tab in tabs" :data-page="tab.page" :data-load="tab.isload" :data-typeid="tab.typeid" :data-state="tab.state" class="swiper-slide list_ul" >
+								<div class="rloading">{#$langData['waimai']['11'][0]#}</div>  {#*  下拉刷新  *#}
+								<!-- <keep-alive>
+								<list-li  v-if="currOn==tab.typeid" ref="orderlist"></list-li>
+								</keep-alive> -->
+								<div class="listBox">
+									<ul>
+										<li v-for="quan in tab.dlists" :class="['quan_li',{'releasing':quan.state=='0' && quan.sent!='0'},{'hasEnd':quan.state!='0'},{'hasNone':quan.state=='0' && quan.sent=='0'}]"  >
+											<a href="javascript:;" class="qDetail ">
+												<h2>
+													<span class="qstate" v-if="quan.state=='0' && quan.sent!='0'">领取中</span>
+													<span class="qstate" v-if="quan.state=='0' && quan.sent=='0'">已领完</span>
+													<span class="qstate" v-if="quan.state!='0'">已结束</span>
+													{{quan.name}}</h2>
+												<div class="ptext">
+													<p>已领取/发行量：{{quan.received}}/{{quan.number}}张</p>
+													<p>已使用：{{quan.used}}张</p>
+													<p>每人限领：{{quan.limit}}张</p>
+													<p>使用时间：{{quan.pubdate.replace(/-/g,'.')}} ~ {{quan.deadline.replace('-','.')}}</p>
+												</div>
+											</a>
+											<div class="quanOpBox">
+												<a :href="'add-quan.php?id='+quan.id+'&sid={#$sid#}'" class="btns" v-if="quan.state == '0'">修改</a>
+												<a href="javascript:;" class="btns" v-if="quan.state == '0'" @click="endSure(quan.id)">结束</a>
+												<a href="javascript:;" class="btns" v-if="quan.state != '0'" @click="delSure(quan.id)">删除</a>
+											</div>
+										</li>
+										<!-- <li class="quan_li hasEnd">
+											<a href="javascript:;" class="qDetail ">
+												<h2><span class="qstate">已结束</span>5元无门槛</h2>
+												<div class="ptext">
+													<p>已领取/发行量：600/2000张</p>
+													<p>已使用：600张</p>
+													<p>每人限领：1张</p>
+													<p>使用时间：2021.05.31 ~ 2021.06.30</p>
+												</div>
+											</a>
+											<div class="quanOpBox">
+												<a href="javascript:;" class="btns">修改</a>
+												<a href="javascript:;" class="btns">删除</a>
+											</div>
+										</li>
+										<li class="quan_li hasNone">
+											<a href="javascript:;" class="qDetail ">
+												<h2><span class="qstate">已领完</span>5元无门槛</h2>
+												<div class="ptext">
+													<p>已领取/发行量：600/2000张</p>
+													<p>已使用：600张</p>
+													<p>每人限领：1张</p>
+													<p>使用时间：2021.05.31 ~ 2021.06.30</p>
+												</div>
+											</a>
+											<div class="quanOpBox">
+												<a href="javascript:;" class="btns">删除</a>
+											</div>
+										</li> -->
+									</ul>
+								</div>
+								<div class="loading_tip">{{tab.loadingTip}}</div>
+							</div>
+						</div>
+					</div>
+					<div v-if="LOADING" class="loading_icon"></div>
+
+
+				</div>
+
+				<!-- 按钮 -->
+				<div class="btnsbox"><a href="add-quan.php?sid={#$sid#}" class="btn_new">新建优惠券</a></div>
+			</div>
+
+
+		</div>
+	</body>
+	<script src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/drag-loading.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/quanlist.js?v={#$cfg_staticVersion#}"></script>
+</html>

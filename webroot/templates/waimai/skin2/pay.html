@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$langData['education'][9][65]#}</title> {#* 支付页面 *#}
+    <meta name="keywords" content="{#$list_keywords#}" />
+    <meta name="description" content="{#$list_description#}" />
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/pay.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$education_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = {#$cfg_hideUrl#};
+        var totalAmount = {#$totalAmount#}, totalPoint = {#$userinfo.point#}, totalBalance = {#$userinfo.money#}, pointRatio = {#$cfg_pointRatio#};
+        var pointName = '{#$cfg_pointName#}', ordernum = '{#$ordernum#}', cookieDomain = '{#$cfg_cookieDomain#}';
+        var orderdate = '{#$orderdate#}';
+    </script>
+</head>
+
+<body class="w1200">
+
+<!-- 导航 s-->
+{#include file="../../siteConfig/top1.html"#}
+<div class="header">
+    <div class="wrap fn-clear">
+        <div class="logo"><a href="{#getUrlPath service='waimai' template='index'#}"><img src="{#$waimai_logoUrl#}" alt=""></a></div>
+        <div class="head_cashier"><i class="he_line"></i>{#$langData['education'][9][66]#}</div>  {#* 我的收银台 *#}
+        <div class="head_kfrx"><span>{#$langData['siteConfig'][19][275]#}</span><span class="kfrx_num">{#$waimai_hotline#}</span></div>   {#* 客服热线 *#}
+    </div>
+</div>
+<!-- 导航 e-->
+<div class="all-wrap">
+    <form action="/include/ajax.php?service=waimai&action=pay" method="post" target="_blank" id="payform">
+        <!-- <input type="hidden" name="ordernum" id="ordernum" value="{#$ordernum#}" /> -->
+        <input type="hidden" name="ordernum" id="ordernum" value="{#$ordernum#}" />
+        <input type="hidden" name="paytype" id="paytype" value="" />
+        <div class="wrap pay_wrap1">
+            <div class="pay_top">
+                <div class="top_title">
+                    <h2 class="top_h2">{#$ordertypename#} - </h2><span class="store_name"><em>{#$product[0].title#}</em>  ....等{#count($product)#}件商品</span>
+                </div>
+                <div class="top_time">
+                    <span class="top_tip"><i></i>{#$langData['education'][9][67]#}</span>  {#* 超时订单将自动取消 *#}
+                    <span class="top_tip2">{#$langData['education'][9][68]#}： </span>  {#* 剩余支付时间 *#}
+                    <div class="time-item">
+                         <strong id="day_show">0</strong>天
+                         <strong id="hour_show">0</strong>时
+                         <strong id="minute_show">0</strong>分
+                         <strong id="second_show">0</strong>秒
+                    </div>
+                </div>
+            </div>
+            <div class="pay_bot">
+                <div class="bot_div1">
+                    <div class="bot_head">
+                        <ul>
+                            {#* 店铺 *#}
+                            <li>{#$langData['siteConfig'][17][12]#}：<span><a href="{#getUrlPath service='waimai' template='shop' id={#$shopid#}#}">{#$shopname#}</a></span></li>
+                            {#* 订单编号 *#}
+                            <li class="or_number">{#$langData['siteConfig'][19][50]#}：<span>{#$ordernum#}</span></li>
+                        </ul>
+                        {#* 小计 *#}
+                        <span class="lit_count">{#$order.price#}</span>
+                    </div>
+                {#foreach from=$product key=k item=order#}
+                    <div class="bot_cont fn-clear">
+                        <div class="store_img"><a href=""><img src="{#$order.pics#}" alt=""></a></div>
+                        <div class="store_info">
+                            <p class="class_title"><a href="{#getUrlPath service='waimai' template='shop' id={#$shopid#}#}">{#$shopname#}</a></p>
+                            <p class="class_info">{#$order.title#}</p>
+                        </div>
+                        <span class="class_price">数量：{#$order.count#}</span>
+                        <span class="class_price">单价：{#$order.price#}</span>
+                    </div>
+                {#/foreach#}
+                </div>
+                <div class="bot_div2">
+                   <div class="more_storeInfo"><i></i><span>{#$langData['siteConfig'][6][25]#}</span></div>{#* 展开 *#}
+                    <div class="order_money"><span>{#$langData['education'][9][69]#}</span><em>{#echoCurrency type='symbol'#}</em><strong>{#$totalAmount#}</strong> </div> {#* 订单总价 *#}
+                </div>
+
+            </div>
+        </div>
+        {#if $userinfo.point > 0 || $userinfo.money > 0#}
+        <div class="wrap pay_wrap2">
+            <div class="pay_top"><h2 class="top_h2">{#$langData['education'][9][70]#}</h2></div> {#* 使用账户资产抵扣 *#}
+            <div class="pay_bot2">
+
+                {#if $userinfo.money > 0#}
+                <div class="use-account fn-clear">
+                    <div class="account-summary fn-clear">
+                        {#* 余额 *#}
+                        <label><input id="useBalance" name="useBalance" type="checkbox" value="1" />{#$langData['siteConfig'][19][363]#}</label>
+                        <div class="jf_right">
+                            {#* 账户余额 *#}   {#* 此单最多可用 *#}
+                            <div class="use-tip">{#$langData['siteConfig'][19][386]#} <strong>{#$userinfo.money#}</strong>  {#echoCurrency type='short'#}，{#$langData['education'][9][73]#} <strong id="cuseBalance">0</strong> {#echoCurrency type='short'#}</div>
+                            <div class="use-input  fn-clear">
+                                <span class="input_span">{#$langData['education'][9][71]#}：</span> {#* 使用 *#}
+                                <div class="input_div"><input type="text" id="useBcount" name="balance" onkeyup="value=value.replace(/[^0-9.]/ig,'')" disabled="disabled" class="inpu" /><em>{#echoCurrency type='short'#}</em></div>
+                                {#* 抵 *#}
+                                <span class="discharge">{#$langData['education'][9][75]#}{#echoCurrency type='symbol'#}<em id="balMoney">0</em></span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+                {#/if#}
+                 {#* 共抵扣 *#}
+                <div class="all_discharge">{#$langData['education'][9][76]#} <em>{#echoCurrency type='symbol'#}</em><strong id="all_disMoney">0</strong></div>
+            </div>
+
+            <!--验证用户是否有设置密码-->
+            {#if $userinfo.paypwdCheck ==1#}
+            <div class="use-tip paypwd common_paypwd all_paypwd">
+                {#* 请输入密码 *#}
+                <span class="paypwd_tip"><i></i><em>{#$langData['siteConfig'][20][164]#}！</em></span>
+                {#* 支付密码 *#}
+                <label><span class="paypwd_txt">{#$langData['siteConfig'][5][7]#}</span><input type="password" id="paypwd" name="paypwd" /> <i class="true"></i></label>
+            </div>
+            {#else#}
+            <div class="common_paypwd no_paypwd fn-clear">
+                {#* 为了账户安全，建议您尽快设置， 或自行在 *#}  {#* 个人中心 *#}  {#* 账户设置 *#}  {#* 中设置 *#}
+                <div class="no_left"><i></i>{#$langData['education'][9][80]#} <a href="{#$member_userDomain#}" target="_blank">{#$langData['education'][9][81]#}</a> - <a href="{#$member_userDomain#}/profile.html" target="_blank">{#$langData['education'][9][82]#}</a> {#$langData['education'][9][83]#}</div>
+
+                <div class="no_right">
+                    <span>{#$langData['education'][9][77]#}</span>  {#* 您尚未设置支付密码 *#}
+                    {#* 去设置 *#}
+                    <a href="{#$member_userDomain#}/security-chpassword.html" class="set_pwd" target="_blank">{#$langData['education'][9][78]#}</a>
+                    {#* 稍后设置 *#}
+                    <a href="javascript:;" class="wait_set">{#$langData['education'][9][79]#}</a>
+                </div>
+            </div>
+            {#/if#}
+
+
+        </div>
+        {#/if#}
+        <div class="wrap pay_wrap3">
+            <div class="pay_top">
+                <h2 class="top_h2">{#$langData['siteConfig'][32][44]#}</h2>  {#* 应付金额 *#}
+                <div class="money-details">
+                    {#* 还需支付 *#}
+                    <p class="pri"><span>{#$langData['education'][9][84]#}</span><em>{#echoCurrency type='symbol'#}</em><strong id="totalPayMoney">{#$totalAmount#}</strong></p>
+                </div>
+            </div>
+            <!--全额抵扣 s-->
+            <p class="all_pay pay_p"><a href="javascript:;">{#$langData['siteConfig'][6][42]#}</a></p>  {#* 确认支付 *#}
+            <!--全额抵扣 e-->
+            <div class="pay-bank">
+                    <div class="tab">
+                        {#* 扫码支付 *#}  {#* 推荐 *#}
+                        <a href="javascript:;" class="current"><span>{#$langData['siteConfig'][29][126]#}</span><em>{#$langData['siteConfig'][23][109]#}</em></a>
+                        {#* 快捷支付 *#}
+                        <a href="javascript:;"><span>{#$langData['education'][9][85]#}</span></a>
+                    </div>
+                    <div class="con">
+                        <div class="blist codePay fn-clear" style="display: block;">
+                            <!--没有用抵扣 s-->
+                            <!--二维码 s-->
+                            <div class="qrpay">
+                                <span class="code_fresh"><i></i>{#$langData['siteConfig'][16][70]#}</span> {#* 刷新 *#}
+                                <dl class="fn-clear">
+                                    <dt><img src="{#$cfg_staticPath#}images/blank.gif" style="background: url('{#$cfg_staticPath#}images/ajax-loader.gif') no-repeat center;" id="qrimg" /></dt>
+                                    <dd>
+                                        <p class="pay_true">{#$langData['siteConfig'][19][514]#}</p> {#* 实付金额 *#}
+                                        <p class="verifyAmount"><em>{#echoCurrency type='symbol'#}</em><strong id="realMoney">{#$totalAmount#}</strong></p>
+                                        <input type="hidden" name="amount" value="{#$totalAmount#}">
+                                        <div class="pay_icon">
+                                            <img src="{#$cfg_staticPath#}images/pay_alipay2.png" style="margin-right: 10px;" /><img src="{#$cfg_staticPath#}images/pay_wx2.png" />
+                                        </div>
+                                        <p class="pay_tip">{#$langData['education'][9][87]#}</p>  {#* 使用支付宝、微信扫码支付 *#}
+                                    </dd>
+                                </dl>
+                            </div>
+                            <!--二维码 e-->
+                            <!--没有用抵扣 e-->
+                            <!--用抵扣 s-->
+                            <div class="code_div">
+                                {#* 输入密码后点击下方按钮，扫码支付余款 *#}
+                                <p class="code_tip">{#$langData['education'][9][88]#}</p>
+                                {#* 更新二维码 *#}
+                                <p class="pay_fresh">{#$langData['education'][9][89]#}</p>
+                            </div>
+                            <!--用抵扣 e-->
+
+
+                        </div>
+                        <div class="blist terrace fn-clear">
+                            <div class="blist_con fn-clear">
+								{#$alipay = 0#}
+	 		   					{#siteConfig action="payment"#}
+	 		   					{#if $row.pay_code == 'alipay'#}
+	 		   					{#$alipay = 1#}
+	 		   					{#/if#}
+                                <a href="javascript:;" class="bank-icon{#if $_bindex.row == 1#} active{#/if#}" title="{#$row.pay_name#}" data-type="{#$row.pay_code#}"><span class="{#$row.pay_code#}"></span><b></b></a>
+                                {#/siteConfig#}
+
+            					{#if $peerpayState#}
+            					<a href="{#getUrlPath service="member" type="user" template="daipay" param="module={#$service#}&ordernum={#$ordernum#}"#}" class="bank-icon" title="朋友代付" data-type="peerpay"><span class="peerpay"></span><b></b></a>
+            					{#/if#}
+                            </div>
+                            <p class="terrace_pay pay_p">{#$langData['siteConfig'][23][113]#}</p> {#* 立即支付 *#}
+
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </form>
+</div>
+<div class="pay-pop" id="feedback">
+    <a href="javascript:;" class="pop-close"></a>
+    <div class="pop-border"></div>
+    <div class="pop-main">
+        <div class="pop-title">{#$langData['siteConfig'][20][15]#}</div>  {#* 在新打开的页面上完成付款！ *#}
+        <div class="pop-con">
+            <p><i class="icon01"></i>
+                <span>{#$langData['siteConfig'][20][16]#}</span>  {#* 如已经支付成功，请点击 *#}
+                <a class="red" href="{#getUrlPath service='member' type='user' template='order' module='waimai'#}">{#$langData['siteConfig'][6][89]#}</a>  {#* 已完成付款 *#}
+            </p>
+            <p><i class="icon02"></i>
+                <span>{#$langData['siteConfig'][20][17]#}</span>  {#* 如付款遇到问题，您可以 *#}
+                <a class="gray" href="javascript:;">{#$langData['siteConfig'][6][61]#}</a>  {#* 重新支付 *#}
+                <em>{#$langData['siteConfig'][13][0]#}</em>{#* 或 *#}
+                <a class="gray" href="javascript:;">{#$langData['siteConfig'][6][107]#}</a>  {#* 选择其他支付方式 *#}
+            </p>
+            <div class="question">
+                <a href="{#getUrlPath service='siteConfig' template='help'#}" target="_blank">{#$langData['siteConfig'][20][18]#}</a>  {#* 支付常见问题 *#}
+                <span>|</span>{#$langData['siteConfig'][19][298]#}：{#$waimai_hotline#}</div>  {#* 客服电话 *#}
+        </div>
+    </div>
+</div>
+
+{#include file='../../siteConfig/public_foot_v3.html'  theme='white' #}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.scroll.loading.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.SuperSlide.2.1.1.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/pay.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

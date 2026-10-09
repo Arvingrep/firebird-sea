@@ -1,0 +1,618 @@
+{#$pageTitle = $langData['siteConfig'][19][313]#}
+{#$pageCurr = "order/waimaiOrder"#}
+{#include file="../_header.html"#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html" pageMapType='webgl'#}
+{#if $site_map=="google"#}
+<script src="{#$templets_skin#}js/markerwithlabel.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script>
+  var id = {#$id#};
+  var state = '{#$state#}';
+  var orderid = '{#$id#}';
+  var state = '{#$state#}';
+  var orderid = '{#$id#}';
+  var lng = '{#$lng#}';
+  var lat = '{#$lat#}';
+  var lnglat = '{#$lng#},{#$lat#}';
+  var qslnglat = '{#$peisonglng#},{#$peisonglat#}';
+  var user = '{#$username#}';
+  var userAddress = '{#$address#}';
+  var peisong = '{#$peisong#}';
+  var peisonglat = '{#$peisonglng#}';
+  var peisonglng = '{#$peisonglat#}';
+  var juliuser = '{#$juliuser#}';
+  var merchant_deliver = '{#$merchant_deliver#}';
+  var tel = '{#$tel#}';
+  var slat = '{#$coordX#}';
+  var slng = '{#$coordY#}';
+  var site_map = '{#$site_map#}'
+  var peisongpath = '{#$peisongpath#}';
+</script>
+<div class="main-content">
+  <div class="breadcrumbs" id="breadcrumbs">
+    <ul class="breadcrumb">
+      <i class="ace-icon fa fa-bar-chart-o bar-chart-o-icon"></i>
+      <li class="active">{#$langData['siteConfig'][17][1]#}</li>
+      <li class="active">{#$langData['siteConfig'][19][313]#}</li>
+    </ul>
+
+    {#include file="../_uinfo.html"#}
+<style type="text/css">
+  /*订单明细*/
+  .showbox{cursor:  pointer; line-height: 20px;}
+  .detailBox{display: none;}
+.ui_content .detail{width: 850px; box-sizing: border-box; padding: 20px 0;}
+.ui_content .detail h3{font-size: 18px; color: #333; font-weight: bold; margin-bottom: 0; text-align: right; padding-right: 30px;}
+.ui_content .detail h3 span{color: #f00; margin-left: 10px}
+.ui_content .detail ul{margin-bottom: 20px; margin-left: 0;}
+.ui_content .detail li{list-style: none; color: #333; font-size: 14px; line-height: 35px}
+.ui_content .detail li:hover{background:#f1f1f1;}
+.ui_content .detail .left_lab{display: inline-block;  color: #999; width: 420px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;  vertical-align: middle;}
+.ui_content .detail p{display: inline-block; width: 230px; text-align: right; margin-left: 30px;  vertical-align: middle; margin-bottom: 0}
+.ui_content .detail p.count {width: 120px; display: inline-block; margin-left: 20px;}
+.ui_content .detail p.zero {color: #ccc;}
+.ui_content .detail.fn-hide{display: none;}
+
+/* 骑手地图 */
+.mapShow{cursor:pointer;}
+#mapBox{position:fixed !important; left:0; right:0; top:0; bottom: 0; background: #fff; z-index:1026 !important; display:none; }
+#mapBox #map{width:100%; height:100%;}
+.bubble{position: relative; height: 36px; border-radius: 18px; background-color: #fff;  padding: 4px; box-sizing: border-box;box-shadow: 0 3px 3px 0 rgba(0, 0, 0, 0.24); pointer-events: all; min-width: 72px; text-align: center; box-sizing: border-box;}
+.bubble .txt{height: 30px; min-width: 62px; background-color: #FFB921; color: #fff; border-radius: 15px; box-sizing: border-box; padding:0 10px; line-height: 30px;  display: flex; font-size: 16px;align-items: center; position: relative;z-index: 3; font-weight: bold; justify-content: center;}
+.bubble .txt em{ margin-left: 4px; vertical-align: middle;font-size: 13px; white-space: nowrap;}
+.bubble .txt:after{content: ''; display: block; width: 0; height: 0; border: 6px solid rgba(0,0,0,0); border-top: 6px solid #fff; position: absolute; left: 0 ; right: 0; margin: auto; bottom: -12px; }
+.bubble::before{content: ''; display: block; width: 29px; height: 15px; border-radius: 50%; background-color: #FFB921; opacity: .3; position: absolute;bottom: 0; left: 0; right: 0; margin: auto;  transform: translate(0,100%);}
+.bubble::after{content: ''; display: block; width: 13px; height: 6px; border-radius: 50%;  background-color: #FFB921; opacity: .6;position: absolute; bottom: 0; left: 0; right: 0; margin: auto;margin-bottom:-3px ; transform: translate(0,100%);}
+.mapBtn {position: absolute; z-index: 20; left: 0; top: 0; right: 0;}
+.mapBtn button {position: absolute; top: 30px; width: 40px; height: 40px; background-color: #fff; background-position: center; background-repeat: no-repeat; box-shadow: 0 0 5px rgba(0, 0, 0, .2); border: 0; border-radius: 3px; outline: 0;cursor: pointer;}
+#closeMap {left: 30px; background-image: url('/static/images/close_2.png'); background-size: 20px;}
+#refreshMap {right: 30px; background-image: url('/static/images/refresh.png'); background-size:20px;}
+
+.header_text{display: flex; align-items: center; justify-content: space-between; padding-right: 10px;}
+
+</style>
+  </div>
+  <div class="page-content">
+
+      <div class="page-content-area" id="list">
+        <style>.detail-view tr { height:30px; line-height:30px; } td { width: 80px; }</style>
+        <div style="overflow:hidden;">
+          <div class="col-xs-12 col-sm-6 ui-sortable">
+
+            {#if $state == 2#}
+            <button class="btn btn-success" id="confirmObj">{#$langData['siteConfig'][6][141]#}</button>
+            <button class="btn btn-danger" id="failedObj">{#$langData['waimai'][1][205]#}</button>
+            <button class="btn btn-warning" id="printObj">打印订单</button>
+            {#elseif $state == 3 || $state == 4 || $state == 5#}
+            <button class="btn btn-success" id="okObj">{#$langData['waimai'][1][224]#}</button>
+            <button class="btn btn-danger" id="failedObj">{#$langData['waimai'][1][228]#}</button>
+            <button class="btn btn-warning" id="printObj">打印订单</button>
+            {#elseif $state == 1#}
+            <button class="btn btn-warning" id="printObj">打印订单</button>
+            {#/if#}
+
+
+            <div class="widget-box">
+              <div class="widget-header header-color-blue">
+                <div class="header_text" >
+                  <h5 class="bigger lighter"> <i class="icon-table"></i>{#$langData['siteConfig'][19][313]#}</h5>
+                  {#if $reservesongdate#}
+                  <div class="proOrderInfo" style="color:#f00;">预订订单，预订时间{#$reservesongdate|date_format:'%m-%d %H:%M'#}</div>
+                  {#/if#}
+                </div>
+              </div>
+              <div class="widget-body">
+                <div class="widget-main no-padding">
+                  <table class="table table-striped table-bordered table-hover">
+                    <tbody>
+                      <tr>
+                        <td>{#$langData['siteConfig'][19][50]#}</td>
+                        <td>{#if $ordernumstore != ""#}{#$shopname|cat:$ordernumstore#}{#else#}{#$ordernum#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['siteConfig'][19][308]#}</td>
+                        <td>{#$ordernum#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['siteConfig'][17][12]#}</td>
+                        <td>{#$shopname#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][1][260]#}</td>
+                        <td>{#if $selftime!=0#} 到店自提  {#else#}{#if $ordertype==1#}{#$langData['waimai'][1][261]#}{#else#}{#$langData['waimai'][1][262]#}{#/if#}/{#$desk#}{#/if#}</td>
+                      </tr>
+                      {#if $fxs#}
+                      <tr>
+                        <td>{#$cfg_fenxiaoName#}</td>
+                        <td><a href="javascript:;" class="userinfo" data-id="{#$fxs.userid#}">{#$fxs.nickname#}</a></td>
+                      </tr>
+                      {#/if#}
+                      <tr>
+                        <td>{#$langData['waimai'][1][175]#}</td>
+                        <td><a href="javascript:;" class="userinfo" data-id="{#$uid#}">{#$username#}</a></td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['siteConfig'][19][4]#}</td>
+                        <td>{#$person#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['siteConfig'][3][1]#}</td>
+                        <td>{#$tel#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][1][209]#}</td>
+                        <td>{#if $selftime!=0#}用户自提-时间({#date('y-m-d h:i:s',$selftime)#}){#else#}{#$address#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][1][210]#}</td>
+                        <td>
+                            {#foreach from=$food item=f#}
+                            {#$f.title#}{#if $f.ntitle#} - {#$f.ntitle#}{#/if#} 【{#$f.count#}】 &yen;{#$f.price * $f.count#}<br />
+                            {#/foreach#}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][1][211]#}</td>
+                        <td>{#$note#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][5][3]#}</td>
+                        <td>
+                            {#foreach from=$preset item=p#}
+                            {#$p.title#}：{#$p.value#}<br />
+                            {#/foreach#}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][5][4]#}</td>
+                        <td>
+                            {#foreach from=$priceinfo item=p#}
+                              {#if $p.type!='ktvip'#}
+                              {#$p.body#}：{#if $p.type == "youhui" || $p.type == "manjian" || $p.type == "shoudan" || strpos($p.type, "auth_") !== false#}-{#/if#}{#$p.amount#}<br />
+                              {#/if#}
+                            {#/foreach#}
+                            平台提价收益结算：{#$ptprofit#}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][1][213]#}</td>
+                        <td>
+                          <div class="zjyearr showbox" data-index="0"  title="点击查看明细" data-tit="订单收入明细" data-arr='{#$zjyearr|@json_encode#}'>订单收入：{#($amount - $ktvipTotal)|string_format:"%.2f"#}&nbsp;&nbsp;{#if $zjyearr #}<i class="ace-icon green fa fa-search bigger-130"></i>{#/if#}</div>
+                          {#if $state == 1#}
+                          <br />
+                          <div class="ptydarr showbox" data-index="1"  title="点击查看明细" data-tit="平台收入明细" data-arr='{#$ptydarr|@json_encode#}'>平台收入：{#if $refrundstate ==1 && $refrundamount =="0.00"#}0{#else#}{#$ptyd|string_format:"%.2f"#}{#/if#}&nbsp;&nbsp;{#if ptydarr#}<i class="ace-icon green fa fa-search bigger-130"></i>{#/if#}</div>
+                          <br />
+                          <div class="businesarr showbox" data-index="2" title="点击查看明细" data-tit="商家收入明细" data-arr='{#$businesarr|@json_encode#}'>
+                            商家收入：{#if $refrundstate ==1 && $refrundamount =="0.00"#}0{#else#}{#$business|string_format:"%.2f"#}{#/if#}&nbsp;&nbsp;{#if $businesarr#}<i class="ace-icon green fa fa-search bigger-130"></i>{#/if#}
+                          </div><br />
+                          {#/if#}
+                        </td>
+                      </tr>
+                      {#if $refrundstate ==1#}
+                      <tr>
+                        <td>退款金额</td>
+                        <td>
+                          {#if $refrundstate ==1 && $refrundamount =="0.00"#}{#$amount#}{#else#}{#$refrundamount#}{#/if#}
+                        </td>
+                      </tr>
+                      {#/if#}
+                      {#if $state == 1 #}
+                      <tr>
+                        <td>佣金明细</td>
+                        <td>
+                          佣金总额:{#$allfenxiao#}<br />
+
+                        </td>
+                      </tr>
+                      {#/if#}
+                      <tr>
+                        <td>{#$langData['siteConfig'][19][52]#}</td>
+                        <td>{#$paytype#}</td>
+                      </tr>
+                      {#if $desk#}
+                      <tr>
+                        <td>{#$langData['waimai'][0][30]#}</td>
+                        <td>{#$desk#}</td>
+                      </tr>
+                      {#/if#}
+                      <tr>
+                        <td>{#$langData['waimai'][1][221]#}</td>
+                        <td>{#$peisong#}  <i class="ace-icon green fa fa-search bigger-130 mapShow"></i></td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][1][214]#}</td>
+                        <td>{#if $pubdate#}{#$pubdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['siteConfig'][19][53]#}</td>
+                        <td>{#if $paydate > 0#}{#$paydate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][6][16]#}</td>
+                        <td>{#if $paytype == $langData['siteConfig'][19][712] || $paytype == $langData['siteConfig'][19][302] || $paytype == '工行E商通' || $paytype == '百度收银台' || $paytype == 'QQ小程序'#}<div>{#$langData['waimai'][6][17]#}：{#$paylognum#}</div><div>{#$langData['waimai'][6][18]#}：{#$transaction_id#}</div>{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][4][8]#}</td>
+                        <td>{#if $confirmdate#}{#$confirmdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['siteConfig'][17][26]#}</td>
+                        <td>{#if $peidate#}{#$peidate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['siteConfig'][17][27]#}</td>
+                        <td>{#if $songdate#}{#$songdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][1][226]#}</td>
+                        <td>{#if $okdate#}{#$okdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['waimai'][1][227]#}</td>
+                        <td>{#if $okdate#}{#ceil(($okdate-$pubdate)/60)#}{#/if#}</td>
+                      </tr>
+                      <tr>
+                        <td>{#$langData['siteConfig'][16][50]#}</td>
+                        <td>
+                            {#if $state == 0#}
+                    {#$langData['siteConfig'][9][22]#}
+                    {#elseif $state == 1#}
+                    {#$langData['siteConfig'][6][3]#} - {#$langData['waimai'][1][221]#}：{#if $merchant_deliver#}{#$langData['waimai'][5][5]#}{#else#}{#$peisong#},<a tel="{#$peisongphone#}">{#$peisongphone#}</a>{#/if#}
+                    {#elseif $state == 2#}
+                    {#$langData['siteConfig'][9][11]#}
+                    {#elseif $state == 3#}
+                    {#$langData['siteConfig'][9][46]#}
+                    {#elseif $state == 4#}
+                    {#$langData['siteConfig'][16][114]#} - {#$langData['waimai'][1][221]#}：{#$peisong#}，<a tel="{#$peisongphone#}">{#$peisongphone#}</a>
+                    {#elseif $state == 5#}
+                    {#$langData['siteConfig'][16][115]#} - {#$langData['waimai'][1][221]#}：{#$peisong#}，<a tel="{#$peisongphone#}">{#$peisongphone#}</a>
+                    {#elseif $state == 6#}
+                    {#$langData['siteConfig'][6][112]#}
+                    {#elseif $state == 7#}
+                    {#$langData['siteConfig'][9][47]#}
+                    {#/if#}
+                        </td>
+                      </tr>
+                      {#if $state == 6 || $state == 7#}
+                      <tr>
+                        <td>{#$langData['waimai'][1][229]#}</td>
+                        <td>{#$failed#}</td>
+                      </tr>
+                      {#/if#}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="detailBox">
+        <a href="javascript:;" class="close_btn"></a>
+        <h2>订单费用明细</h2>
+        <div class="boxwrapper">
+          <div class="box">
+            <div class="detail fn-hide">
+              {#if $zjyearr#}
+              <ul class=" fn-clear">
+                {#foreach from=$zjyearr key=k item=i#}
+                <li class="fn-clear"><span class="left_lab" >{#$i.name#}：</span><p>{#if $i.price == $i.money#}{#$i.price#}{#else#}{#$i.price#} = {#$i.money#}{#/if#}</p><p class="count{#if $i.money == 0#} zero{#/if#}">{#$i.type#}￥{#$i.money#}</p></li>
+                {#/foreach#}
+              </ul>
+              <h3>订单总计：<span>￥{#$amount|string_format:"%.2f"#}</span></h3>
+              {#/if#}
+            </div>
+
+
+
+            {#if $state == 1#}
+            {#if $refrundstate ==1 && $refrundamount =="0.00"#}
+            {#else#}
+            <div class="detail fn-hide">
+              {#if $ptydarr#}
+              <ul class=" fn-clear">
+                {#foreach from=$ptydarr key=k item=i#}
+                <li class="fn-clear"><span class="left_lab" >{#$i.name#}：</span><p>{#if $i.price == $i.money#}{#$i.price#}{#else#}{#$i.price#} = {#$i.money#}{#/if#}</p><p class="count{#if $i.money == 0#} zero{#/if#}">{#$i.type#}￥{#$i.money#}</p></li>
+                {#/foreach#}
+              </ul>
+              <h3>平台收入总计：<span>￥{#if $refrundstate ==1 && $refrundamount =="0.00"#}0{#else#}{#$staticmoney['ptyd']|string_format:"%.2f"#}{#/if#}</span></h3>
+              {#/if#}
+            {#/if#}
+            </div>
+
+            {#if $refrundstate ==1 && $refrundamount =="0.00"#}
+            {#else#}
+            <div class="detail fn-hide">
+              {#if $ptydarr#}
+              <ul class=" fn-clear">
+                {#foreach from=$businesarr key=k item=i#}
+                <li class="fn-clear"><span class="left_lab" >{#$i.name#}：</span><p>{#if $i.price == $i.money#}{#$i.price#}{#else#}{#$i.price#} = {#$i.money#}{#/if#}</p><p class="count{#if $i.money == 0#} zero{#/if#}">{#$i.type#}￥{#$i.money#}</p></li>
+                {#/foreach#}
+              </ul>
+              <h3>商家收入总计：<span>￥{#if $refrundstate ==1 && $refrundamount =="0.00"#}0{#else#}{#$staticmoney['business']|string_format:"%.2f"#}{#/if#}</span></h3>
+              {#/if#}
+            </div>
+
+            {#/if#}
+            {#/if#}
+          </div>
+        </div>
+      </div>
+  </div>
+
+
+  <div id="mapBox">
+    <div id="map"></div>
+    <div class="mapBtn">
+	    <button id="closeMap"></button>
+	    <button id="refreshMap"></button>
+	  </div>
+  </div>
+</div>
+
+{#include file="../_footer.html" jsFile=$jsFile#}
+<script type="text/javascript">
+  $(function(){
+    $('body').delegate('.showbox','click',function(){
+      var t = $(this),ind = t.attr('data-index');
+      var tit = t.attr('data-tit')
+      if(t.find('.green').length == 0) return false;
+      var html = $(".detailBox .box .detail").eq(ind).html()
+      $.dialog({
+              id: 'showDetail',
+              title: tit,
+              lock: true,
+              content: '<div class="detail">'+html+'</div>',
+              padding: 0,
+              ok: true
+          });
+
+    });
+    $('.close_btn').click(function(){
+      $('.box_mask,.detailBox').hide();
+    });
+
+
+    // 显示地图
+    $('.mapShow').click(function() {
+      $("#mapBox").show();
+      if(site_map=='baidu'){
+  			baiduMap();
+  		}else if(site_map == 'amap'){
+  			amapMap();
+  		}else if(site_map == 'google'){
+  			googleMap()
+  		}
+    })
+
+    // 关闭地图
+    $("#closeMap").click(function(){
+      $("#mapBox").hide();
+    })
+
+    //刷新地图
+    $('#refreshMap').click(function(){
+
+        $.ajax({
+            type: 'POST',
+            url: "?action=getLocation&id=" + orderid,
+            dataType: 'json',
+            success: function(data) {
+                if(data.state == 100){
+
+                    var info_ = data.info;
+                    slng = info_.coordY;
+                    slat = info_.coordX;
+                    lnglat = info_.lng + ',' + info_.lat;
+                    qslnglat = info_.peisonglng + ',' + info_.peisonglat;
+                    peisongpath = info_.peisongpath;
+
+                    if(site_map=='baidu'){
+                        baiduMap(1);
+                    }else if(site_map == 'amap'){
+                        amapMap();
+                    }else if(site_map == 'google'){
+                        googleMap()
+                    }
+                }else{
+                    $.dialog.alert('网络错误，获取失败！');
+                }
+            }
+        });
+
+        
+    })
+
+    var map;
+
+    // 显示百度地图
+  	function baiduMap(refresh){
+        if(!map){
+  		    map = new BMapGL.Map('map', {
+                displayOptions: {
+                    building: false  // 不显示建筑物
+                }
+            });
+        }
+  		map.clearOverlays();
+  		var labelStyle = {
+  			color: "#fff",
+  			borderWidth: "0",
+  			padding: "0",
+  			zIndex: "2",
+  			backgroundColor: "transparent",
+  			textAlign: "center",
+  			fontFamily: '"Hiragino Sans GB", "Microsoft Yahei UI", "Microsoft Yahei", "微软雅黑", "Segoe UI", Tahoma, "宋体b8bf53", SimSun, sans-serif'
+  		};
+        if(!refresh){
+            map.centerAndZoom(new BMapGL.Point(slng, slat), 12);  //设置中心坐标
+        }
+  		var store = new BMapGL.Point(slng, slat);
+  		map.enableScrollWheelZoom(true);     //开启鼠标滚轮缩放
+  		var bpoints = [];
+  		bpoints.push(store);
+  		function setZoom (bPoints) {
+  		     var view = map.getViewport(eval(bPoints));
+  		        var mapZoom = view.zoom;
+  		        var centerPoint = view.center;
+  		        map.centerAndZoom(centerPoint,mapZoom);
+  		}
+  		if(lnglat!=','&& lnglat!=''){
+  			var user = new BMapGL.Point(lnglat.split(',')[0], lnglat.split(',')[1]);
+  			var bLabel1 = new BMapGL.Label('<div  class="bubble wmguke"><div class="txt">顾客</div></div>', {
+  				  position: user,
+  				  offset: new BMapGL.Size(-30, -50)
+  				});
+  				bLabel1.setStyle(labelStyle);
+  				bLabel1.setZIndex(2);
+  				map.addOverlay(bLabel1);
+  				bpoints.push(user);
+  		}
+  		var bLabel2 = new BMapGL.Label('<div  class="bubble wmshop"><div class="txt">店铺</div></div>', {
+  			  position: store,
+  			  offset: new BMapGL.Size(-30, -50)
+  			});
+  			bLabel2.setStyle(labelStyle);
+  			bLabel2.setZIndex(2);
+  			map.addOverlay(bLabel2);
+
+        if(peisongpath){
+            var pathsArr = [];
+            pathArr = peisongpath.split(";");
+            for(var i = 0; i < pathArr.length; i++){
+            var p = pathArr[i].split(",");
+            pathsArr.push(new BMapGL.Point(p[0],p[1]));
+            }
+            polylineCourier = new BMapGL.Polyline(pathsArr, {strokeColor:"green", strokeTexture: {url: '/static/images/icon_road_green_arrow.png', width: 16, height: 64}, strokeWeight:8, strokeOpacity:.9, strokeStyle:'dashed'});
+            map.addOverlay(polylineCourier);
+
+            //获取骑手最新位置
+            psData = pathArr[pathArr.length-1].split(",");
+            qslnglat = psData[1] + ',' + psData[0];
+        }
+
+  		if(qslnglat != ''){
+  			var courier = new BMapGL.Point(qslnglat.split(',')[1], qslnglat.split(',')[0]);
+  			bpoints.push(courier);
+  			var bLabel3 = new BMapGL.Label('<div  class="bubble wmqishou"><div class="txt">骑手</div></div>', {
+  				  position: courier,
+  				  offset: new BMapGL.Size(-30, -50)
+  				});
+  				bLabel3.setStyle(labelStyle);
+  				bLabel3.setZIndex(2);
+  				map.addOverlay(bLabel3);
+  		}
+
+        if(!refresh){
+            setTimeout(function(){
+                setZoom(bpoints);
+            }, 1000)
+        }
+  	}
+
+  	// 显示高德地图
+  	function amapMap(){
+  		 // 初始化地图
+  		 var bpoints = []
+  		map = new AMap.Map("map", {
+  			center: [slng, slat],
+  			zoom: 14
+  		});
+
+  		shopIcon = new AMap.Marker({
+  			position: [slng, slat],
+  			content: '<div  class="bubble wmshop"><div class="txt">店铺</div></div>',
+  			offset: new AMap.Pixel(-30, -50),
+  			map: map
+  		});
+  		bpoints.push(shopIcon)
+  		if(lnglat!=','&& lnglat!=''){
+  			userIcon = new AMap.Marker({
+  				position: [lnglat.split(',')[0]*1, lnglat.split(',')[1]*1],
+  				content: '<div  class="bubble guke"><div class="txt">顾客</div></div>',
+  				offset: new AMap.Pixel(-30, -50),
+  				map: map
+  			});
+  			bpoints.push(userIcon)
+  		}
+  		if(qslnglat!=''){
+  			qishouIcon = new AMap.Marker({
+  				position: [qslnglat.split(',')[1]*1, qslnglat.split(',')[0]*1],
+  				content: '<div  class="bubble qishou"><div class="txt">骑手</div></div>',
+  				offset: new AMap.Pixel(-30, -50),
+  				map: map,
+  			});
+  			bpoints.push(qishouIcon)
+
+  		}
+  		map.setFitView(bpoints)
+  	}
+
+    // 显示google地图
+	function googleMap(){
+
+	    map = new google.maps.Map(document.getElementById("map"), {
+				zoom: 14,
+				center: {
+					lat: Number(slat),
+					lng:  Number(slng)
+				},
+			   zoomControl: false,
+			   mapTypeControl: false,
+			   streetViewControl: false,
+			   fullscreenControl: false
+		   });
+		var markers = [];
+		var sposition = new google.maps.LatLng(Number(slat),Number(slng));
+		var marker_shop  = new MarkerWithLabel({
+		   position: sposition,
+		   draggable: true,
+		   map: map,
+		   labelAnchor: new google.maps.Point(40, 50),
+		   labelContent: '<div  class="bubble wmshop"><div class="txt">店铺</div></div>',//分钟内送达
+		   icon:'/static/images/blank.gif',
+		 });
+		markers.push(marker_shop);
+		if(lnglat!=',' && lnglat!=''){
+			 var uposition = new google.maps.LatLng(Number(lnglat.split(',')[1]),Number(lnglat.split(',')[0]));
+			 var marker_user  = new MarkerWithLabel({
+			    position: uposition,
+			    map: map,
+			    labelAnchor: new google.maps.Point(28, 48),
+			    labelContent: '<div  class="bubble guke"><div class="txt">顾客</div></div>',//分钟内送达
+		        icon:'/static/images/blank.gif',
+			    draggable: true,
+			  });
+			markers.push(marker_user)
+		}
+		  if(qslnglat!=''){
+			  var cposition = new google.maps.LatLng(Number(qslnglat.split(',')[0]),Number(qslnglat.split(',')[1]));
+			  var marker_qs  = new MarkerWithLabel({
+			     position: cposition,
+			     draggable: true,
+			     map: map,
+			     labelAnchor: new google.maps.Point(28, 48),
+			     labelContent: '<div class="bubble qishou"><div class="txt">骑手</div></div>',//分钟内送达
+			     icon:'/static/images/blank.gif',
+			   });
+			  markers.push(marker_qs)
+		  }
+
+		  setVeiwPort();
+		  function setVeiwPort() {
+				var bounds = new google.maps.LatLngBounds();
+				//读取标注点的位置坐标，加入LatLngBounds
+				for(var i = 0;i < markers.length;i++){
+					bounds.extend(markers[i].getPosition());
+				}
+				//调整map，使其适应LatLngBounds,实现展示最佳视野的功能
+				map.fitBounds(bounds);
+			};
+
+	}
+
+
+
+
+  })
+</script>

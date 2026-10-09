@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html >
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0,viewport-fit=cover" >
+		<title>{#$langData['waimai'][11][160]#}</title> {#*   配送方案   *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage-desk.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var sid = "{#$sid#}";
+			var addservice = {#json_encode($addservice)#};  //增值服务
+			var open_addservice = {#$open_addservice#};  //开启增值服务
+			var open_promotion = '{#$open_promotion#}';  //开启满减
+			var promotions = '{#$promotions#}';  //满减
+			var offline_limit = '{#$offline_limit#}' ;  //货到付款金额限制
+			var paytype = '{#strstr($paytype, "1")#}';  //货到付款
+			var smsvalid = '{#$smsvalid#}';  //短信通知
+			var emailvalid = '{#$emailvalid#}';  //邮箱通知
+			var weixinvalid = '{#$weixinvalid#}'; //微信通知
+			var auto_printer = '{#$auto_printer#}'; //打印机自动打印
+			var appvalid = '{#$appvalid#}'; //app订单提醒
+			var selfdefine = {#json_encode($selfdefine)#}; //自定义
+			var merchant_deliver = '{#$merchant_deliver#}'; //商家自配
+			var delivery_fee_type = '{#$delivery_fee_type#}'; //运费满减
+			var delivery_fee_mode = "{#$delivery_fee_mode#}"; //配送模式
+			var range_delivery_fee_value = {#json_encode($range_delivery_fee_value)#};  //按距离
+			range_delivery_fee_value = range_delivery_fee_value?range_delivery_fee_value:[];
+			var preset = {#json_encode($preset)#}
+		</script>
+	</head>
+	<body>
+		<!-- :class="{'fullScreen':!merchant_deliver}" -->
+		<div id="page" class="{#if !$merchant_deliver#}fullScreen{#/if#}">
+			<!-- 头部 -->
+			<div class="top_box">
+				<div class="headbox">
+					<a href="javascript:;" onclick="javascript:history.go(-1);" class="back_btn goBack"></a>
+					<div class="htitle">{#$langData['waimai'][11][160]#}</div>    {#*   配送方案   *#}
+					{#if $merchant_deliver#}
+					<a href="javascript:;" data-type="peisong" style="color: #FCC01C;font-size: .3rem; font-weight: bold;" @click="submitDate">保存</a>
+					{#/if#}
+				</div>
+			</div>
+			
+			<form action="" method="post" id="submitBox" >
+				<div class="detail_box noMar">
+					<!-- ,{'ptop':!merchant_deliver} -->
+					<div :class="['toggle' ,'more_h','inpbox']" style="{#if !$merchant_deliver#}height: 1.4rem;{#/if#}">
+						<div class="left_label all_show" >
+							
+							{#if  !$merchant_deliver#}
+							<div class="pingtai" v-cloak>
+								<label for="" >{#$langData['waimai'][11][163]#}</label> {#*   当前配送模式为骑手配送   *#}
+								<p>{#$langData['waimai'][11][164]#}<span>{#$waimai_hotline#}</span></p>{#*   请勿随意修改配送模式，若需要改为商家自行配送，请谨慎操作 如有疑问请联系平台客服   *#}
+							</div>
+							{#else#}
+							<div v-cloak>
+								<label for="" >{#$langData['waimai'][11][161]#}</label> {#*   当前配送模式为商家配送   *#}
+								<p> {#$langData['waimai'][11][162]#}<span>{#$waimai_hotline#}</span></p>{#*   若需要平台骑手配送，请联系平台客服   *#}
+								
+							</div>
+							{#/if#}
+						</div>
+						  {#if  $merchant_deliver#}
+							<!-- <span  :class="['switch',{'active':merchant_deliver}]" @click="merchant_deliver = !merchant_deliver" style="position: absolute; right: .24rem; top: 0; bottom: .2rem; margin: auto;" ></span> -->
+						 <input type="hidden" name="merchant_deliver" id="Config_is_merchant_deliver" :value="merchant_deliver?1:0"/>
+						 {#else#}
+						 <input type="hidden" name="merchant_deliver" id="Config_is_merchant_deliver" value="1" />
+						 {#/if#}
+					</div>
+				</div>
+				
+				<!-- v-show="merchant_deliver" -->
+				<template>
+				<div class="detail_box tabBox {#if !$merchant_deliver#}fn-hide{#/if#}" v-cloak >
+					<ul class="tab_ul">
+						<li :class="['tab_li' ,{'active_li':delivery_fee_mode==1}]" @click="delivery_fee_mode=1"><span>{#$langData['waimai'][6][59]#}</span></li>   {#*   固定配送费   *#}
+						<li :class="['tab_li',{'active_li':delivery_fee_mode==3}]" @click="delivery_fee_mode=3"><span>{#$langData['waimai'][6][57]#}</span></li>   {#*   按距离   *#}
+					</ul>
+					<input type="hidden" name="delivery_fee_mode" v-model="delivery_fee_mode">
+					<div class="tab_con">
+						<div class="con " v-show="delivery_fee_mode==1">
+							<p> {#$langData['waimai'][11][165]#} </p>
+							<div class="inpbox">
+								<label>{#$langData['waimai'][6][58]#}</label>{#*   固定起送价   *#}
+								<input type="text" name="basicprice" oninput="value=value.replace(/[^\d.]/g,'')" placeholder="{#$langData['waimai'][11][114]#}" value="{#if $id#}{#$basicprice#}{#else#}10.0{#/if#}">{#*   请输入价格   *#}
+							</div>
+							<div class="inpbox">
+								<label>{#$langData['waimai'][6][59]#}</label> {#*   固定配送费   *#}
+								<input type="text" name="delivery_fee" oninput="value=value.replace(/[^\d.]/g,'')" placeholder="{#$langData['waimai'][11][114]#}" value="{#if $id#}{#$delivery_fee#}{#else#}3.0{#/if#}">
+							</div>
+							<div class="inpbox toggle normal">
+								<div class="left_inp">
+									{#$langData['waimai'][11][166]#}<input type="text" oninput="value=value.replace(/[^\d.]/g,'')" placeholder="{#$langData['waimai'][11][114]#}" name="delivery_fee_value" value="{#if $id#}{#$delivery_fee_value#}{#/if#}"> {#$langData['waimai'][1][104]#}  {#*   免配送费 请输入价格  *#}
+								</div>
+								<span :class="['switch', {'active':delivery_fee_type}]" @click="delivery_fee_type=!delivery_fee_type"></span>
+								<input type="hidden" name="delivery_fee_type"  :value="delivery_fee_type?2:0">
+							</div>
+						</div>
+						<div class="con juli_con" v-show="delivery_fee_mode==3"  v-cloak>
+							{#* 仅可选择一种配送费模式，建议按距离设置，如需按区域更灵活设置请 前往电脑端  *#}
+							<p> {#$langData['waimai'][11][167]#} </p>
+							<div class="detail_box" v-if="range_delivery_fee_value.length==0">
+								<div class="inpbox">
+									<label>{#$langData['waimai'][6][60]#}</label>  {#*   配送距离   *#}
+									<div class="inpArr">
+										<input type="hidden" name="rangedeliveryfee[start][]"  value="0" />
+										0{#$langData['waimai'][2][27]#} - <input type="text" name="rangedeliveryfee[stop][]" placeholder="{#$langData['waimai'][11][168]#}" oninput="value=value.replace(/[^\d.]/g,'')" >{#$langData['waimai'][2][27]#}  
+										{#*   公里   请输入距离*#}
+									</div>
+								</div>
+								<div class="inpbox">
+									<label>{#$langData['waimai'][1][19]#}</label>{#*   配送费   *#}
+									<input type="text" name="rangedeliveryfee[value][]" oninput="value=value.replace(/[^\d.]/g,'')" placeholder="{#$langData['waimai'][11][114]#}">{#*   请输入价格   *#}
+								</div>
+								<div class="inpbox">
+									<label>{#$langData['waimai'][2][23]#}</label>
+									{#*   起送价   *#}
+									<input type="text" oninput="value=value.replace(/[^\d.]/g,'')" name="rangedeliveryfee[minvalue][]" placeholder="{#$langData['waimai'][11][114]#}">
+									{#*   请输入价格   *#}
+								</div>
+							</div>
+							<div class="detail_box" v-for="(v,index) in range_delivery_fee_value">
+								<a href="javascript:;" class="del_btn" @click="removeArr(index,range_delivery_fee_value)"></a>
+								<div class="inpbox">
+									<label>{#$langData['waimai'][6][60]#}</label>{#*   配送距离   *#}
+									<div class="inpArr">
+										<input type="text" v-model="v[0]" placeholder="{#$langData['waimai'][11][168]#}"  name="rangedeliveryfee[start][]"  >{#$langData['waimai'][2][27]#} - <input v-model="v[1]" type="text" placeholder="{#$langData['waimai'][11][168]#}"   name="rangedeliveryfee[stop][]" >{#$langData['waimai'][2][27]#}
+									</div>{#*   公里   请输入距离*#}
+								</div>
+								<div class="inpbox">
+									<label>{#$langData['waimai'][1][19]#}</label>{#*   配送费   *#}
+									<input type="text" oninput="value=value.replace(/[^\d.]/g,'')" placeholder="{#$langData['waimai'][11][114]#}"  v-model="v[2]" name="rangedeliveryfee[value][]">
+								</div>
+								<div class="inpbox">
+									<label>{#$langData['waimai'][2][23]#}</label>
+									<input type="text" placeholder="{#$langData['waimai'][11][114]#}"  v-model="v[3]" name="rangedeliveryfee[minvalue][]">
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				</template>
+			</form>
+			<a href="javascript:;" class="add_btn" v-cloak v-if="delivery_fee_mode==3 && merchant_deliver" @click="add_range">{#$langData['waimai'][11][169]#}</a>{#*   添加距离段   *#}
+			<!-- :class="{'bottom_btns':!merchant_deliver}" -->
+			<div class="{#if !$merchant_deliver#}bottom_btns{#/if#}" >
+				{#if $merchant_deliver#}
+				<!-- v-if="merchant_deliver" -->
+				<a href="javascript:;" class="save_btn"  @click="submitDate()" data-change="1" data-type="peisong" >{#$langData['waimai'][11][226]#}</a>{#*  申请改为骑手配送 *#}
+				{#else#}
+				<a href="javascript:;" class="save_btn"  @click="submitDate" data-type="peisong">{#$langData['waimai'][11][170]#}</a>{#*  申请改为商家配送 *#}
+				{#/if#}
+			</div>
+			<!-- 加载中 -->
+			<div v-cloak class="loading_icon" v-if="LOADING"></div>
+			<!-- 底部 -->
+			
+		</div>
+	</body>
+	<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/manage-addservice.js?v={#$cfg_staticVersion#}"></script>
+
+</html>
