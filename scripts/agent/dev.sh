@@ -15,13 +15,14 @@ PROTECTED=(.github scripts/agent .agents)
 
 ISSUE="${1:?用法: dev.sh <issue-number>}"
 BRANCH="agent/issue-${ISSUE}"
-# 用数组保存命令：工具规则里含空格（如 "Bash(php -l:*)"），不能靠字符串分词
+# 用数组保存命令：参数可能含空格，不能靠字符串分词
 if [ -n "${DEV_AGENT_CMD:-}" ]; then
   eval "DEV_CMD=(${DEV_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
   DEV_CMD=(claude -p --permission-mode acceptEdits --max-turns 80
-    --allowedTools "Read(./**)" "Edit(./**)" "Glob" "Grep"
-                   "Bash(php -l:*)" "Bash(node --check:*)" "Bash(helm lint deploy/helm/firebird-site)")
+    --allowedTools "Read(./**)" "Edit(./**)" "Glob" "Grep")
+  # 不放行任何 Bash：带 :* 的前缀规则可借参数执行任意代码（如 node --check -r ./x.js），
+  # 语法/Helm 检查由 gates.sh 负责
 fi
 
 ensure_labels
@@ -89,6 +90,10 @@ PROMPT_FILE="$(mktemp)"; trap 'rm -f "$PROMPT_FILE"' EXIT
 } > "$PROMPT_FILE"
 
 # 4. 施工
+# .git 不在受保护路径的 git 跟踪范围内：先快照 config，施工后还原并清空 hooks，
+# 之后所有 git 调用禁用 hooks/fsmonitor（防止 agent 借 .git 植入在带 token 环境下执行的代码）
+GIT_SNAP="$(mktemp -d)"; cp .git/config "$GIT_SNAP/config"
+SAFE_GIT=(git -c core.hooksPath=/dev/null -c core.fsmonitor=false)
 log "🚧 调用 Dev Agent: ${DEV_CMD[0]}"
 SUMMARY_FILE="$(mktemp)"
 # 提示词走 stdin（claude --allowedTools 是可变参数，会吞掉位置参数）
@@ -97,14 +102,17 @@ if ! agent_env "${DEV_CMD[@]}" < "$PROMPT_FILE" > "$SUMMARY_FILE" 2>&1; then
 fi
 SUMMARY="$(tail -n 30 "$SUMMARY_FILE" | redact)"
 
+cp "$GIT_SNAP/config" .git/config
+rm -rf .git/hooks && mkdir .git/hooks
+
 # 防越权：丢弃对受保护路径的一切改动——已跟踪文件还原 + 未跟踪新文件删除
 # 逐个路径还原：多路径一次 checkout 时只要有一个不存在于 HEAD，整条命令失败、其余也不还原
 for p in "${PROTECTED[@]}"; do
-  if git cat-file -e "HEAD:$p" 2>/dev/null; then git checkout -q HEAD -- "$p"; fi
+  if "${SAFE_GIT[@]}" cat-file -e "HEAD:$p" 2>/dev/null; then "${SAFE_GIT[@]}" checkout -q HEAD -- "$p"; fi
 done
-git clean -fdq -- "${PROTECTED[@]}"
+"${SAFE_GIT[@]}" clean -fdq -- "${PROTECTED[@]}"
 
-if [ -z "$(git status --porcelain)" ]; then
+if [ -z "$("${SAFE_GIT[@]}" status --porcelain)" ]; then
   gh issue comment "$ISSUE" -R "$REPO" -b "⚠️ Dev Agent 本轮无任何产出（空交付）。
 
 <details><summary>Agent 输出</summary>
@@ -119,11 +127,11 @@ ${SUMMARY}
 fi
 
 # 5. 提交 + 推送
-git add -A
-git -c user.name="firebird-dev-agent" -c user.email="dev-agent@users.noreply.github.com" \
-  commit -q -m "feat(agent): #${ISSUE} ${TITLE}"
+"${SAFE_GIT[@]}" add -A
+"${SAFE_GIT[@]}" -c user.name="firebird-dev-agent" -c user.email="dev-agent@users.noreply.github.com" \
+  commit -q --no-verify -m "feat(agent): #${ISSUE} ${TITLE}"
 # checkout 不持久化凭据（persist-credentials: false），推送时由 gh 临时提供
-git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -q -u origin "$BRANCH"
+"${SAFE_GIT[@]}" -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -q --no-verify -u origin "$BRANCH"
 
 # 6. 开/更新 PR（GH_TOKEN 为 PAT，才能触发 ci-verify / QA）
 if [ -z "$PR" ]; then

@@ -13,7 +13,8 @@ cd "${GATE_REPO_DIR:-$(dirname "${BASH_SOURCE[0]}")/../..}"
 BASE="${1:-origin/main}"
 MAX_ADDED="${GATE_MAX_ADDED:-300}"
 RANGE="${BASE}...HEAD"
-CHANGED="$(git diff --name-only --diff-filter=ACMR "$RANGE")"
+# --no-renames：重命名拆成「删除源 + 新增目标」，避免把受保护文件挪走时源路径不出现
+CHANGED="$(git diff --no-renames --name-only --diff-filter=ACMR "$RANGE")"
 FAILS=0; ROWS=""
 
 row() { ROWS+="| $1 | $2 | ${3:-} |"$'\n'; [ "$2" = "❌ FAIL" ] && FAILS=$((FAILS+1)); return 0; }
@@ -24,7 +25,7 @@ missing_tool() { # missing_tool <检查项> <工具>
 
 # 0. 受保护路径：Agent 分支不得改动流水线与规范自身（含新增文件）
 if [ "${GATE_AGENT_BRANCH:-0}" = "1" ]; then
-  PROT="$(git diff --name-only "${BASE}...HEAD" | grep -E '^(\.github|scripts/agent|\.agents)/' || true)"
+  PROT="$(git diff --no-renames --name-only "${BASE}...HEAD" | grep -E '^(\.github|scripts/agent|\.agents)/' || true)"
   [ -z "$PROT" ] && row "受保护路径未改动" "✅ PASS" || row "受保护路径未改动" "❌ FAIL" "$(echo $PROT | head -c 160)"
 fi
 
@@ -66,10 +67,11 @@ SYN_FAIL=""; NEED_PHP=0
 while IFS= read -r f; do
   [ -f "$f" ] || continue
   case "$f" in
-    *.php) if command -v php >/dev/null; then php -l "$f" >/dev/null 2>&1 || SYN_FAIL+="$f "; else NEED_PHP=1; fi ;;
-    *.js)  node --check "$f" >/dev/null 2>&1 || SYN_FAIL+="$f " ;;
-    *.sh)  bash -n "$f" 2>/dev/null || SYN_FAIL+="$f " ;;
-    *.json) node -e 'JSON.parse(require("fs").readFileSync(process.argv[1]))' "$f" 2>/dev/null || SYN_FAIL+="$f " ;;
+    # 一律以 ./ 前缀传入，防止形如 --require=x.js 的文件名被解析为选项
+    *.php) if command -v php >/dev/null; then php -l "./$f" >/dev/null 2>&1 || SYN_FAIL+="$f "; else NEED_PHP=1; fi ;;
+    *.js)  node --check "./$f" >/dev/null 2>&1 || SYN_FAIL+="$f " ;;
+    *.sh)  bash -n "./$f" 2>/dev/null || SYN_FAIL+="$f " ;;
+    *.json) node -e 'JSON.parse(require("fs").readFileSync(process.argv[1]))' "./$f" 2>/dev/null || SYN_FAIL+="$f " ;;
   esac
 done <<< "$CHANGED"
 [ -z "$SYN_FAIL" ] && row "改动文件语法" "✅ PASS" || row "改动文件语法" "❌ FAIL" "$SYN_FAIL"
