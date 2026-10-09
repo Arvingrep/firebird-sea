@@ -34,6 +34,11 @@
   ```
   彻底解决火鸟系统超大 Cookie 导致的 502 Bad Gateway 响应头溢出问题。
 
+### 2.4 地图 SDK 缺 AK 安全降级保护 (Map Safe Fallback)
+- 当系统未配置第三方商业地图 AK（如百度、谷歌、高德地图 Key 为空）时，自动降级至本地安全 Mock 桩 `/static/js/map_fallback.js`。
+- 彻底杜绝百度地图官方 JS SDK 在无 AK 访问时向终端用户弹出 `APP不存在，AK有误请检查再重试` 模态弹窗，提供透明兼容保护。
+
+
 ---
 
 ## 3. CI/CD 流水线与发布拓扑

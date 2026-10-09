@@ -63,27 +63,29 @@ $jsApiFile = "";
 //google
 if($cfg_map == 1){
 	global $cfg_map_google;
-	$jsApiFile = '//maps.googleapis.com/maps/api/js?key='.$cfg_map_google.'&libraries=places';
+	$jsApiFile = !empty($cfg_map_google) ? ('//maps.googleapis.com/maps/api/js?key='.$cfg_map_google.'&libraries=places') : '/static/js/map_fallback.js';
 //baidu
 }elseif($cfg_map == 2){
 	global $cfg_map_baidu;
-	$jsApiFile = '//api.map.baidu.com/api?v=2.0&ak='.$cfg_map_baidu;
+	$jsApiFile = !empty($cfg_map_baidu) ? ('//api.map.baidu.com/api?v=2.0&ak='.$cfg_map_baidu) : '/static/js/map_fallback.js';
 //tencent
 }elseif($cfg_map == 3){
 	global $cfg_map_qq;
-	$jsApiFile = '//map.qq.com/api/js?key='.$cfg_map_qq;
+	$jsApiFile = !empty($cfg_map_qq) ? ('//map.qq.com/api/js?key='.$cfg_map_qq) : '/static/js/map_fallback.js';
 //高德
 }elseif($cfg_map == 4){
 	global $cfg_map_amap;
 	global $cfg_map_amap_jscode;
 	$dituType = 'amap';
-	$jsApiFile = '//webapi.amap.com/maps?v=1.4.15&plugin=AMap.Autocomplete&key='.$cfg_map_amap;
-	echo '<script>window._AMapSecurityConfig = {securityJsCode:"'.$cfg_map_amap_jscode.'"}</script>';
+	$jsApiFile = !empty($cfg_map_amap) ? ('//webapi.amap.com/maps?v=1.4.15&plugin=AMap.Autocomplete&key='.$cfg_map_amap) : '/static/js/map_fallback.js';
+	if(!empty($cfg_map_amap_jscode)){
+		echo '<script>window._AMapSecurityConfig = {securityJsCode:"'.$cfg_map_amap_jscode.'"}</script>';
+	}
 //天地图
 }elseif($cfg_map == 5){
     global $cfg_map_tmap;
     $dituType = 'tmap';
-    $jsApiFile = '//api.tianditu.gov.cn/api?v=4.0&tk='.$cfg_map_tmap;
+    $jsApiFile = !empty($cfg_map_tmap) ? ('//api.tianditu.gov.cn/api?v=4.0&tk='.$cfg_map_tmap) : '/static/js/map_fallback.js';
 }
 ?>
 <script type="text/javascript" src="<?php echo $jsApiFile; ?>"></script>

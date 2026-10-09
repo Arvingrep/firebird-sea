@@ -879,34 +879,34 @@ switch ($cfg_map) {
 	case 1:
 		$site_map = "google";
 		$site_map_key = $cfg_map_google;
-		$site_map_apiFile = $cfg_secureAccess . "maps.googleapis.com/maps/api/js?key=".$site_map_key."&sensor=false&libraries=places";
+		$site_map_apiFile = !empty($site_map_key) ? ($cfg_secureAccess . "maps.googleapis.com/maps/api/js?key=".$site_map_key."&sensor=false&libraries=places") : "/static/js/map_fallback.js";
 		break;
 	case 2:
 		$site_map = "baidu";
 		$site_map_key = $cfg_map_baidu;
 		$site_map_server_key = $cfg_map_baidu_server;
-		$site_map_apiFile = $cfg_secureAccess . "api.map.baidu.com/api?v=2.0&ak=".$site_map_key;
+		$site_map_apiFile = !empty($site_map_key) ? ($cfg_secureAccess . "api.map.baidu.com/api?v=2.0&ak=".$site_map_key) : "/static/js/map_fallback.js";
 		break;
 	case 3:
 		$site_map = "qq";
 		$site_map_key = $cfg_map_qq;
-		$site_map_apiFile = $cfg_secureAccess . "map.qq.com/api/js?key=".$cfg_map_qq."&libraries=drawing";
+		$site_map_apiFile = !empty($site_map_key) ? ($cfg_secureAccess . "map.qq.com/api/js?key=".$cfg_map_qq."&libraries=drawing") : "/static/js/map_fallback.js";
 		break;
 	case 4:
 		$site_map = "amap";
 		$site_map_key = $cfg_map_amap;
 		$site_map_server_key = $cfg_map_amap_server;
-		$site_map_apiFile = $cfg_secureAccess . "webapi.amap.com/maps?v=1.4.15&key=".$site_map_key;
+		$site_map_apiFile = !empty($site_map_key) ? ($cfg_secureAccess . "webapi.amap.com/maps?v=1.4.15&key=".$site_map_key) : "/static/js/map_fallback.js";
 		break;
     case 5:
         $site_map = "tmap";
         $site_map_key = $cfg_map_tmap;
-        $site_map_apiFile = $cfg_secureAccess . "api.tianditu.gov.cn/api?v=4.0&tk=".$site_map_key;
+        $site_map_apiFile = !empty($site_map_key) ? ($cfg_secureAccess . "api.tianditu.gov.cn/api?v=4.0&tk=".$site_map_key) : "/static/js/map_fallback.js";
         break;
 	default:
 		$site_map = "baidu";
 		$site_map_key = $cfg_map_baidu;
-		$site_map_apiFile = $cfg_secureAccess . "api.map.baidu.com/api?v=2.0&ak=".$site_map_key;
+		$site_map_apiFile = !empty($site_map_key) ? ($cfg_secureAccess . "api.map.baidu.com/api?v=2.0&ak=".$site_map_key) : "/static/js/map_fallback.js";
 		break;
 }
 
