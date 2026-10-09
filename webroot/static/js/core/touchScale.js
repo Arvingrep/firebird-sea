@@ -619,18 +619,6 @@ function appToCityChange(url,mod = 'siteConfig'){
 }
 window.onload = function () {
 
-    //修复ios端cookie不生效问题
-    if(navigator.userAgent.toLowerCase().match(/huoniao_ios/)){ //ios端
-        let HN_siteCityInfo = JSON.parse($.cookie('HN_siteCityInfo'))||{};
-        let HN_siteCityInfo_iOS_APP = JSON.parse($.cookie('HN_siteCityInfo_iOS_APP'))||{};
-        if(JSON.stringify(HN_siteCityInfo_iOS_APP)=='{}'){
-            $.cookie('HN_siteCityInfo_iOS_APP',JSON.stringify(HN_siteCityInfo));
-        }else if(HN_siteCityInfo_iOS_APP?.cityid!=HN_siteCityInfo?.cityid){
-            $.cookie('HN_siteCityInfo',JSON.stringify(HN_siteCityInfo_iOS_APP));
-            location.reload();
-        }
-    }
-
     //  涉及到支付的地方  
     // 在微信小程序苹果端中 并且后台配置之后 
     // 类名  iOS_miniprogram_nocash  提示也是后台配置
@@ -1989,8 +1977,7 @@ window.onload = function () {
                 }
                 paramsArr = paramsArr.filter(item => item);
                 url = url.split('?')[0] + '?' + paramsArr.join('&');
-                // href = url.toLowerCase()
-                href = url
+                href = url.toLowerCase()
                 if(t.attr('href') != 'javascript:;'){
                     t.attr('href', href);
                 }

@@ -35,7 +35,37 @@ $(function(){
 
 
     //模块链接跳原生
-    
+    $('.tcInfo').delegate('a', 'click', function(e){
+        var t = $(this), name = t.attr('data-name'), code = t.attr('data-code'), href = t.attr('href');
+        if (!t.hasClass('toMini')) {
+            if (href != 'javascript:;' && device.indexOf('huoniao') > -1 && !t.hasClass('toMini')) {
+                e.preventDefault();
+                setupWebViewJavascriptBridge(function (bridge) {
+                    bridge.callHandler('redirectNative', { 'name': name, 'code': code, 'link': href }, function () { });
+                });
+            } else {
+                //抖音小程序 团购
+                switch (code){
+                    case 'tuan':{
+                        tt.miniProgram.navigateTo({ url: '/pages/packages/tuan/index/index' });
+                        break;
+                    }
+                    case 'info':{
+                        tt.miniProgram.navigateTo({ url: '/pages/packages/info/index/index' });
+                        break;
+                    }
+                    case 'job':{
+                        tt.miniProgram.navigateTo({ url: '/pages/packages/job/index/index' });
+                        break;
+                    }
+                    default:{
+                        tt.miniProgram.navigateTo({ url: '/pages/redirect/index?url=' + encodeURIComponent(url.replace('?', 'huoniaowh').replace(/\&/g, 'huoniaolj').replace(/\=/g, 'huoniaodh')) });
+                    }
+                }
+                return false;
+            }
+        }
+    });
 
     //同城头条动态数据
     $.ajax({

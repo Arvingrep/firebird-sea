@@ -1,9 +1,9 @@
 
-var pageVue = new Vue({
+var page = new Vue({
 	el:'#page',
 	data:{
 		navList:navList,
-		currid:currid,
+		currid:0,
 		hoverid:'',
 		loading:false,
 	},

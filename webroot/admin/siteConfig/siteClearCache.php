@@ -71,9 +71,6 @@ if($action == "do"){
 
     //清空配置文件缓存
     cache_clear('php');
-    cache_clear('php', 'dir', 'moduleConfig');
-    cache_clear('php', 'dir', 'siteModule');
-    cache_clear('php', 'dir', 'tableColumns');
 
 	//生成新的静态资源版本号为当前时间
     if($static) {
@@ -174,8 +171,7 @@ if($action == "do"){
         '/config/privatenumberConfig.inc.php',
         '/config/payPhoneConfig.inc.php',
         '/config/member.inc.php',
-        '/config/business.inc.php',
-        '/config/siteCityAdvanced.inc.php'
+        '/config/business.inc.php'
     );
 
     $configData = array();
@@ -198,11 +194,11 @@ if($action == "do"){
 
     cache_write('config.php', $cacheContent);
 
-    //删除/data/cache/下的所有.json和.txt文件
+    //删除/data/cache/下的所有.json文件
     $dir = HUONIAODATA . '/cache/';
     $files = scandir($dir);
     foreach($files as $file){
-        if(strstr($file, '.json') || strstr($file, '.txt')){
+        if(strstr($file, '.json')){
             unlinkFile($dir.$file);
         }
     }
@@ -228,17 +224,8 @@ if($action == "do"){
         PutFile($lang_dir.$sName . '.js', $content);
     }
 
-
-    //删除cache目录下的file_data缓存
-    if($filedata){
-        $fileDataCache = new FileDataCache();
-        $fileDataCache->clearAll();
-
-        array_unshift($module, '配置缓存');
-    }
-    
-
     updateAppConfig();  //更新APP配置文件
+
 
 	adminLog("清除页面缓存", join(",", $module));
 	ShowMsg("页面缓存已经清除成功。", "siteClearCache.php");
@@ -281,16 +268,6 @@ if($dopost == 'checkCompiledFolderSize'){
 if($dopost == 'checkAdminFolderSize'){
 
     $s = getFolderSize(HUONIAOROOT . '/templates_c/admin/');
-    $size = sizeFormat($s['size']);
-
-    echo '{"state": 100, "size": "'.$size.'"}';
-	die;
-}
-
-//查看缓存目录大小
-if($dopost == 'checkFileDataFolderSize'){
-
-    $s = getFolderSize(HUONIAODATA . '/cache/file_data/');
     $size = sizeFormat($s['size']);
 
     echo '{"state": 100, "size": "'.$size.'"}';

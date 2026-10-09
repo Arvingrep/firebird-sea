@@ -135,9 +135,9 @@ var pageVue = new Vue({
 		//客户端登录
 		$(".other_login a").bind("click", function(e){
 		  var el = e.currentTarget;
-		//   if($(el).closest('.wechat').length && !navigator.userAgent.toLowerCase().match(/micromessenger/) && navigator.userAgent.toLowerCase().match(/iphone|android/) && device.indexOf('huoniao') <= -1){
-		// 		return false
-		//    }
+		  if($(el).closest('.wechat').length && !navigator.userAgent.toLowerCase().match(/micromessenger/) && navigator.userAgent.toLowerCase().match(/iphone|android/) && device.indexOf('huoniao') <= -1){
+				return false
+		   }
 		  if(t.noagree && !$(el).hasClass('oneKeyLogin')){
 				$(el).closest('li').addClass('nowClick').siblings('li').removeClass('nowClick');
 				t.showPop();
@@ -270,13 +270,13 @@ var pageVue = new Vue({
 
 
 		  //微信登录验证
-		// $(".wechat").click(function(e){
-		// 	if(!navigator.userAgent.toLowerCase().match(/micromessenger/) && navigator.userAgent.toLowerCase().match(/iphone|android/) && device.indexOf('huoniao') <= -1){
-		// 		e.preventDefault();
-		// 		alert(langData['siteConfig'][20][169]);
-		// 		return false;
-		// 	}
-		// });
+		$(".wechat").click(function(e){
+			if(!navigator.userAgent.toLowerCase().match(/micromessenger/) && navigator.userAgent.toLowerCase().match(/iphone|android/) && device.indexOf('huoniao') <= -1){
+				e.preventDefault();
+				alert(langData['siteConfig'][20][169]);
+				return false;
+			}
+		});
 
 	},
 	methods:{

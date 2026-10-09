@@ -409,24 +409,24 @@ $(function(){
 			listSection.show();
       console.log('ces')
 			if(response.state == "SUCCESS"){
-				if(typeof backsuccessFn !="undefined"){ //回调函数
-					backsuccessFn(response);
-				}
 				var img = $li.find("img");
 				if (img.length > 0) {
 					img.attr("data-val", response.url).attr("data-url", response.turl).attr("src", response.turl);
 					$li.find(".enlarge").attr("href", response.turl);
 					$li.closest('.listImgBox').find('.deleteAllAtlas').show();
 					imgListVal(img);
-          			if($("#dzshapan").size()>0){
-          			  $("#shapan-obj").html(img);
-          			  $("#dzshapan .li-rm").show()
-          			}
-		      		if(fileCount == atlasMax && atlasMax == 1){
-						$(this.options.pick).closest('.uploadinp').hide();
-		  				return false;
-		  			}
+          if($("#dzshapan").size()>0){
+            $("#shapan-obj").html(img);
+            $("#dzshapan .li-rm").show()
+          }
+		      if(fileCount == atlasMax && atlasMax == 1){
+					$(this.options.pick).closest('.uploadinp').hide();
+		  			return false;
+		  		}
+
+
 				}else {
+          console.log($li[0])
 					$li.addClass("complete");
 					fileObj = $li.find('.enlarge');
 					var src = fileObj.attr("src");
@@ -469,7 +469,6 @@ $(function(){
 	          })
 					}
 				}
-
 			}else{
 	            $li.closest('.listImgBox').find('.filePicker').show();
 				removeFile(file, true);
@@ -838,11 +837,7 @@ $(function(){
 
 
 	//图集排序
-	if($(".drag-list")[0]){
-		$(".drag-list").dragsort({ dragSelector: "li", placeHolderTemplate: '<li class="holder"></li>', dragEnd: function(){
-			imgListVal($(this));
-		}});
-	}
+	// $(".list-holder ul").dragsort({ dragSelector: "li", placeHolderTemplate: '<li class="holder"></li>', dragEnd: function(){imgListVal($(this))}});
 
 
 	//错误提示

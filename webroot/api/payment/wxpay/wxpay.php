@@ -19,10 +19,7 @@ if(isset($set_modules) && $set_modules == TRUE){
     $payment[$i]['pay_code'] = "wxpay";
 
 	/* 名称 */
-    $payment[$i]['pay_name'] = "微信";
-
-	/* 所属公司 */
-    $payment[$i]['title'] = "微信官方";
+    $payment[$i]['pay_name'] = "微信扫码支付";
 
     /* 版本号 */
     $payment[$i]['version']  = '1.0.0';
@@ -44,15 +41,11 @@ if(isset($set_modules) && $set_modules == TRUE){
         array('title' => '服务号 APPSECRET',      'name' => 'APPSECRET',    'type' => 'text'),
 		array('title' => '商户平台 商户号',        'name' => 'MCHID',        'type' => 'text'),
 		array('title' => '商户平台 API密钥(KEY)',  'name' => 'KEY',          'type' => 'text'),
-        array('title' => 'APP支付',               'type' => 'split',        'description' => '外卖商家端和骑手端的配置仅用于提现，如果没有相关业务，可以不用填写！'),
-		array('title' => '开放平台 门户端APPID',        'name' => 'APP_APPID',     'type' => 'text'),
-        array('title' => '开放平台 门户端APPSECRET',    'name' => 'APP_APPSECRET', 'type' => 'text'),
+        array('title' => 'APP支付',               'type' => 'split',        'description' => '如果移动应用的微信支付直接关联了公众号申请好的商户号，下方的商户号和API密钥(KEY)直接填写网页支付的商户号和API密钥(KEY)即可！<br />如果单独给移动应用接入了微信支付，需要填写单独申请好的商户号和API密钥(KEY)！'),
+		array('title' => '开放平台 APPID',        'name' => 'APP_APPID',     'type' => 'text'),
+        array('title' => '开放平台 APPSECRET',    'name' => 'APP_APPSECRET', 'type' => 'text'),
 		array('title' => '商户平台 商户号',        'name' => 'APP_MCHID',     'type' => 'text'),
 		array('title' => '商户平台 API密钥(KEY)',  'name' => 'APP_KEY',       'type' => 'text'),
-		array('title' => '开放平台 商家端APPID',        'name' => 'WMSJ_APP_APPID',     'type' => 'text'),
-        array('title' => '开放平台 商家端APPSECRET',    'name' => 'WMSJ_APP_APPSECRET', 'type' => 'text'),
-		array('title' => '开放平台 骑手端APPID',        'name' => 'QISHOU_APP_APPID',     'type' => 'text'),
-        array('title' => '开放平台 骑手端APPSECRET',    'name' => 'QISHOU_APP_APPSECRET', 'type' => 'text'),
         array('title' => '服务商模式',             'type' => 'split',       'description' => '可选模式，主要用于分账，如果没有申请服务商，可以不配置！<br />开启服务商模式后，需要为商家申请特约商户并将特约商户号填写到商家资料中，网页支付/APP支付的 <u>商户平台商户号</u> 和 <u>商户平台API密钥(KEY)</u> <font color="green">可以留空</font>！<br />如果开启了服务商模式，但是商家又没有申请特约商户，交易将支付到平台配置的默认微信商户中（这种情况，网页支付/APP支付的 <u>商户平台商户号</u> 和 <u>商户平台API密钥(KEY)</u> <font color="red">必须配置</font>，否则将支付失败）。'),
 		array('title' => '服务商平台 商户名称',      'name' => 'PARTNER_NAME',  'type' => 'text'),
 		array('title' => '服务商平台 商户号',        'name' => 'PARTNER_MCHID',  'type' => 'text'),
@@ -126,7 +119,7 @@ class wxpay {
         }
 
         global $currency_rate;
-        $order_amount = (int)((sprintf("%.2f", $order['order_amount'] / $currency_rate)) * 100);  //单位为分
+        $order_amount = (sprintf("%.2f", $order['order_amount'] / $currency_rate)) * 100;
 
         require_once "WxPay.Api.php";
 
@@ -152,30 +145,32 @@ class wxpay {
 
             //验证分站是否绑定的独立小程序
             if($appid && $appid != $cfg_miniProgramAppid){
-                $config = getMiniProgramCityAdvancedConfig($appid);
-                if($config){
-                    $cfg_miniProgramAppid = $config['appid'];
-                    $cfg_miniProgramAppsecret = $config['appsecret'];
-                }
-                else{
+                $sql = $dsql->SetQuery("SELECT `config` FROM `#@__site_city` WHERE `config` LIKE '%$appid%' ORDER BY `id` DESC LIMIT 1");
+                $ret = $dsql->dsqlOper($sql, "results");
+                if($ret){
+                    $config = $ret[0]['config'];
+                    $config = unserialize($config);
+                    if(is_array($config)){
+                        $cfg_miniProgramAppid = $config['siteConfig']['miniProgramAppid'];
+                        $cfg_miniProgramAppsecret = $config['siteConfig']['miniProgramAppsecret'];
+
+                        if(!$cfg_miniProgramAppid || !$cfg_miniProgramAppsecret){
+                            die("该小程序在系统后台绑定错误，请检查后重试！");
+                        }
+
+                        $ownWxminiprogram = 1;
+                    }else{
+                        die("该小程序在系统后台绑定错误，请检查后重试！");
+                    }
+                }else{
                     die("该小程序未在系统后台绑定，请检查后重试！");
-                }
-
-                //获取分站绑定的商户号
-                $wxpayConfig = getWxpayCityAdvancedConfig($appid);
-                if($wxpayConfig){
-                    $cfg_miniProgramAppid = $wxpayConfig['appid'];
-                    $cfg_miniProgramAppsecret = $wxpayConfig['appsecret'];
-
-                    define('MCHID', $wxpayConfig['mchid']);
-                    define('KEY', $wxpayConfig['key']);
                 }
             }
 
             define('APPID', $cfg_miniProgramAppid);
             define('APPSECRET', $cfg_miniProgramAppsecret);
 
-            if(!$isPartner && !$wxpayConfig){
+            if(!$isPartner){
                 define('MCHID', $payment['MCHID']);
                 define('KEY', $payment['KEY']);
             }

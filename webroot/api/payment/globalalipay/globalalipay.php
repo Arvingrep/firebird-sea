@@ -21,9 +21,6 @@ if(isset($set_modules) && $set_modules == TRUE){
 	/* 名称 */
     $payment[$i]['pay_name'] = "支付宝国际版在线支付";
 
-	/* 所属公司 */
-    $payment[$i]['title'] = "支付宝";
-
     /* 版本号 */
     $payment[$i]['version']  = '1.0.0';
 

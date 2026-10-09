@@ -291,7 +291,6 @@ function getPoint(keyword, callback){
 			}
 		});
 	}
-
 }
 //计算距离，参数分别为第一点的纬度，经度；第二点的纬度，经度
 function GetDistance(lat1,lng1,lat2,lng2){

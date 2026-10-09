@@ -221,10 +221,6 @@ if (!empty($dataid) && $state == 1) {
                 $sql = $dsql->SetQuery("UPDATE `#@__waimai_order_all` SET `state` = 3, `confirmdate` = '$time' WHERE `state` = 2 AND `print_dataid` = '$dataid'");
                 $dsql->dsqlOper($sql, "update");
 
-                //商家自动确认
-                sendWxMiniProgramUploadShipping($ordernum, 3, array('peisong' => array('mode' => 1)));
-
-
                 $_printReport->DEBUG("确认订单SQL:" . $sql . "\r\n");
 
             }

@@ -17,30 +17,17 @@ $templates = "wechatMenu.html";
 
 $db = "site_wechat_menu";
 
-$where = "";
-$cityid = (int)$cityid;
-
-//分站管理员强制使用权限分站
-if($userType == 3){
-    $cityid = $adminCityIds;
-}
-
-if($cityid){
-    $where = " AND `cityid` = $cityid";
-}
-
-
 //获取指定ID信息详情
 if($dopost == "getTypeDetail"){
 	if($id == "") die;
-	$archives = $dsql->SetQuery("SELECT * FROM `#@__".$db."` WHERE `id` = ".$id . $where);
+	$archives = $dsql->SetQuery("SELECT * FROM `#@__".$db."` WHERE `id` = ".$id);
 	$results = $dsql->dsqlOper($archives, "results");
 	echo json_encode($results);die;
 
 //修改分类
 }elseif($dopost == "updateType"){
 	if($id == "") die;
-	$archives = $dsql->SetQuery("SELECT * FROM `#@__".$db."` WHERE `id` = ".$id . $where);
+	$archives = $dsql->SetQuery("SELECT * FROM `#@__".$db."` WHERE `id` = ".$id);
 	$results = $dsql->dsqlOper($archives, "results");
 
 	if(!empty($results)){
@@ -52,7 +39,7 @@ if($dopost == "getTypeDetail"){
 			if($type == "typename"){
 				if($val == "") die('{"state": 101, "info": '.json_encode('请输入菜单名称').'}');
 				if($results[0]['typename'] != $val){
-					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `typename` = '$val' WHERE `id` = ".$id . $where);
+					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `typename` = '$val' WHERE `id` = ".$id);
 					$results = $dsql->dsqlOper($archives, "update");
 				}else{
 					echo '{"state": 101, "info": '.json_encode('无变化！').'}';
@@ -63,7 +50,7 @@ if($dopost == "getTypeDetail"){
 			//KEY
 			if($type == "key"){
 				if($results[0]['title'] != $val){
-					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `title` = '$val' WHERE `id` = ".$id . $where);
+					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `title` = '$val' WHERE `id` = ".$id);
 					$results = $dsql->dsqlOper($archives, "update");
 				}else{
 					echo '{"state": 101, "info": '.json_encode('无变化！').'}';
@@ -77,7 +64,7 @@ if($dopost == "getTypeDetail"){
 			$key      = cn_substrR($key, 255);
 
 			//保存到主表
-			$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `typename` = '$typename', `title` = '$key' WHERE `id` = ".$id . $where);
+			$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `typename` = '$typename', `title` = '$key' WHERE `id` = ".$id);
 			$results = $dsql->dsqlOper($archives, "update");
 		}
 
@@ -85,7 +72,7 @@ if($dopost == "getTypeDetail"){
 			echo '{"state": 101, "info": '.json_encode('修改失败，请重试！').'}';
 			exit();
 		}else{
-			adminLog("修改微信自定义菜单", "分站：" . $cityid . '=>' . $typename);
+			adminLog("修改微信自定义菜单", $typename);
 			echo '{"state": 100, "info": '.json_encode('修改成功！').'}';
 			exit();
 		}
@@ -113,10 +100,10 @@ if($dopost == "getTypeDetail"){
 		$idsArr[] = $id;
 	}
 
-	$archives = $dsql->SetQuery("DELETE FROM `#@__".$db."` WHERE `id` in (".join(",", $idsArr).")" . $where);
+	$archives = $dsql->SetQuery("DELETE FROM `#@__".$db."` WHERE `id` in (".join(",", $idsArr).")");
 	$dsql->dsqlOper($archives, "update");
 
-	adminLog("删除微信自定义菜单", "分站：" . $cityid . '=>' . join(",", $idsArr));
+	adminLog("删除微信自定义菜单", join(",", $idsArr));
 	die('{"state": 100, "info": '.json_encode('删除成功！').'}');
 
 
@@ -137,91 +124,18 @@ if($dopost == "getTypeDetail"){
 	die;
 }
 
-//复制总站配置
-elseif($dopost == 'copyDefaultConfig'){
-
-    if(!$cityid) die('{"state": 101, "info": '.json_encode('请选择要操作的分站！').'}');
-
-    //查询出来总站配置,cityid=0的数据
-    $archives = $dsql->SetQuery("SELECT * FROM `#@__site_wechat_menu` WHERE `cityid` = 0 AND `parentid` = 0");
-    $results = $dsql->dsqlOper($archives, "results");
-
-    if($results){
-        // 复制数据到分站
-        foreach ($results as $key => $value) {
-            $archives = $dsql->SetQuery("INSERT INTO `#@__site_wechat_menu` (`cityid`, `parentid`, `typename`, `title`, `weight`) VALUES ('{$cityid}', '{$value['parentid']}', '{$value['typename']}', '{$value['title']}', '{$value['weight']}')");
-            $_nid = $dsql->dsqlOper($archives, "lastid");
-
-            //获取子级
-            $_id = $value['id'];
-            $archives = $dsql->SetQuery("SELECT * FROM `#@__site_wechat_menu` WHERE `cityid` = 0 AND `parentid` = " . $_id);
-            $_results = $dsql->dsqlOper($archives, "results");
-            if($_results){
-                foreach ($_results as $k => $v) {
-                    $archives = $dsql->SetQuery("INSERT INTO `#@__site_wechat_menu` (`cityid`, `parentid`, `typename`, `title`, `weight`) VALUES ('{$cityid}', '{$_nid}', '{$v['typename']}', '{$v['title']}', '{$v['weight']}')");
-                    $dsql->dsqlOper($archives, "update");
-                }
-            }
-        }
-    }
-
-    adminLog("复制总站微信自定义菜单到分站", $cityid);
-	die('{"state": 100, "info": '.json_encode('复制成功！').'}');
-
-}
-
 //验证模板文件
 if(file_exists($tpl."/".$templates)){
 
 	//js
 	$jsFile = array(
-		'ui/bootstrap.min.js',
 		'ui/jquery.dragsort-0.5.1.min.js',
 		'ui/jquery-ui-sortable.js',
-        'ui/chosen.jquery.min.js',
 		'admin/wechat/wechatMenu.js'
 	);
 	$huoniaoTag->assign('jsFile', includeFile('js', $jsFile));
 
 	$huoniaoTag->assign('typeListArr', json_encode(getMenu()));
-
-    // 获取所有分站绑定的公众号
-    global $cfg_siteCityAdvanced_wechat;
-    $wechatArr = array();
-
-    if($cfg_siteCityAdvanced_wechat){
-
-        $defautWechatConfig = array(
-            'cityname' => '总站配置',
-            'token' => $cfg_wechatToken,
-            'appid' => $cfg_wechatAppid,
-            'appsecret' => $cfg_wechatAppsecret,
-            'name' => $cfg_wechatName,
-            'code' => $cfg_wechatCode,
-            'qr' => $cfg_wechatQr
-        );
-
-        // 向cfg_siteCityAdvanced_wechat前面添加系统默认的公众号配置，不要改变原key
-        $wechatArr = array();
-        
-        // 先添加默认配置，key为0
-        if($cfg_wechatToken && $cfg_wechatAppid && $cfg_wechatAppsecret && $userType != 3){
-            $wechatArr[0] = $defautWechatConfig;
-        }
-        
-        // 再添加分站配置，保持原key不变
-        if($cfg_siteCityAdvanced_wechat && is_array($cfg_siteCityAdvanced_wechat)){
-            foreach($cfg_siteCityAdvanced_wechat as $key => $value){
-                if(($userType == 3 && $key == $adminCityIds) || $userType != 3){
-                    $wechatArr[$key] = $value;
-                }
-            }
-        }
-    }
-    
-    $huoniaoTag->assign('wechatArr', $wechatArr);
-    $huoniaoTag->assign('cityid', (int)$cityid);
-
 	$huoniaoTag->compile_dir = HUONIAOROOT."/templates_c/admin/wechat";  //设置编译目录
 	$huoniaoTag->display($templates);
 }else{
@@ -232,9 +146,7 @@ if(file_exists($tpl."/".$templates)){
 
 //更新菜单
 function typeOpera($arr, $pid = 0, $db){
-	global $dsql;
-    global $cityid;
-    global $where;
+	$dsql = new dsql($dbo);
 
 	if (!is_array($arr) && $arr != NULL) {
 		return '{"state": 200, "info": "保存失败！"}';
@@ -247,7 +159,7 @@ function typeOpera($arr, $pid = 0, $db){
 
 		//如果ID为空则向数据库插入下级分类
 		if($id == "" || $id == 0){
-			$archives = $dsql->SetQuery("INSERT INTO `#@__".$db."` (`cityid`, `parentid`, `typename`, `title`, `weight`) VALUES ('$cityid', '$pid', '$typename', '$key', '$i')");
+			$archives = $dsql->SetQuery("INSERT INTO `#@__".$db."` (`parentid`, `typename`, `title`, `weight`) VALUES ('$pid', '$typename', '$key', '$i')");
 			$id = $dsql->dsqlOper($archives, "lastid");
 
 			if($lower){
@@ -257,25 +169,25 @@ function typeOpera($arr, $pid = 0, $db){
 			adminLog("添加微信自定义菜单", $typename);
 		}
 		else{
-			$archives = $dsql->SetQuery("SELECT `typename`, `title`, `weight` FROM `#@__".$db."` WHERE `id` = ".$id . $where);
+			$archives = $dsql->SetQuery("SELECT `typename`, `title`, `weight` FROM `#@__".$db."` WHERE `id` = ".$id);
 			$results = $dsql->dsqlOper($archives, "results");
 			if(!empty($results)){
 				if($results[0]["typename"] != $typename){
-					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `typename` = '$typename' WHERE `id` = ".$id . $where);
+					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `typename` = '$typename' WHERE `id` = ".$id);
 					$dsql->dsqlOper($archives, "update");
-					adminLog("修改微信自定义菜单名称", "分站：" . $cityid . '=>' . $typename);
+					adminLog("修改微信自定义菜单名称", $typename);
 				}
 				if($results[0]["title"] != $key){
-					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `title` = '$key' WHERE `id` = ".$id . $where);
+					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `title` = '$key' WHERE `id` = ".$id);
 					$dsql->dsqlOper($archives, "update");
-					adminLog("修改微信自定义菜单key", "分站：" . $cityid . '=>' . $typename."=>".$key);
+					adminLog("修改微信自定义菜单key", $typename."=>".$key);
 				}
 
 				//验证排序
 				if($results[0]["weight"] != $i){
-					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `weight` = '$i' WHERE `id` = ".$id . $where);
+					$archives = $dsql->SetQuery("UPDATE `#@__".$db."` SET `weight` = '$i' WHERE `id` = ".$id);
 					$dsql->dsqlOper($archives, "update");
-					adminLog("修改微信自定义菜单排序", "分站：" . $cityid . '=>' . $typename."=>".$i);
+					adminLog("修改微信自定义菜单排序", $typename."=>".$i);
 				}
 			}
 
@@ -292,11 +204,9 @@ function typeOpera($arr, $pid = 0, $db){
 function getMenu(){
 	global $dsql;
 	global $db;
-    global $cityid;
-    global $where;
 
 	$list = array();
-	$sql = $dsql->SetQuery("SELECT `id`, `parentid`, `typename`, `title` FROM `#@__".$db."` WHERE `cityid` = '$cityid' AND `parentid` = 0 ".$where." ORDER BY `weight` ASC");
+	$sql = $dsql->SetQuery("SELECT `id`, `parentid`, `typename`, `title` FROM `#@__".$db."` WHERE `parentid` = 0 ORDER BY `weight` ASC");
 	$ret = $dsql->dsqlOper($sql, "results");
 	if($ret){
 		foreach ($ret as $k => $value) {
@@ -306,7 +216,7 @@ function getMenu(){
 			$key      = $value['title'];
 			$lower    = array();
 
-			$sql = $dsql->SetQuery("SELECT `id`, `parentid`, `typename`, `title` FROM `#@__".$db."` WHERE `parentid` = $id ".$where." ORDER BY `weight` ASC");
+			$sql = $dsql->SetQuery("SELECT `id`, `parentid`, `typename`, `title` FROM `#@__".$db."` WHERE `parentid` = $id ORDER BY `weight` ASC");
 			$ret = $dsql->dsqlOper($sql, "results");
 			if($ret){
 				foreach ($ret as $k => $value) {
@@ -335,8 +245,6 @@ function getMenu(){
 //发布菜单
 function releaseMenu(){
 
-    global $cityid;
-
 	$menus = getMenu();
 	$menuData = array();
 
@@ -344,14 +252,6 @@ function releaseMenu(){
 	$wechatConfig = HUONIAOINC."/config/wechatConfig.inc.php";
 	global $cfg_miniProgramAppid;
 	global $cfg_basehost;
-
-    //获取分站绑定的小程序配置
-    $miniProgramCityAdvancedConfig = getMiniProgramCityAdvancedConfig('', $cityid);
-    if($miniProgramCityAdvancedConfig){
-        $miniappid = $miniProgramCityAdvancedConfig['appid'];
-    }else{
-        $miniappid = $cfg_miniProgramAppid;  //系统默认小程序appid
-    }
 
 	if($menus){
 		foreach ($menus as $key => $value) {
@@ -366,6 +266,8 @@ function releaseMenu(){
 					}elseif(strstr($v['key'], 'miniprogram://')){//小程序
 						$miniProgramArr = explode('miniprogram://',$v['key']);
 						$minipagepath   = $miniProgramArr[1];
+
+                        $miniappid = $cfg_miniProgramAppid;  //系统默认小程序appid
 
                         //判断是否打开第三方小程序
                         if(strstr($v['key'], 'openxcx_')){
@@ -395,6 +297,8 @@ function releaseMenu(){
 					$miniProgramArr = explode('miniprogram://',$value['key']);
 					$minipagepath   = $miniProgramArr[1];
 
+                    $miniappid = $cfg_miniProgramAppid;  //系统默认小程序appid
+
                     //判断是否打开第三方小程序
                     if(strstr($value['key'], 'openxcx_')){
                         $miniProgramArr = explode('openxcx_', $value['key']);
@@ -419,13 +323,6 @@ function releaseMenu(){
 
 	if(!file_exists($wechatConfig)) return '{"state": 200, "info": "请先设置微信开发者信息！"}';
 	require($wechatConfig);
-
-    //获取分站绑定的公众号配置
-    $wechatCityAdvancedConfig = getWechatCityAdvancedConfig('', $cityid);
-    if($wechatCityAdvancedConfig){
-        $cfg_wechatAppid = $wechatCityAdvancedConfig['appid'];
-        $cfg_wechatAppsecret = $wechatCityAdvancedConfig['appsecret'];
-    }
 
 	include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
     $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
@@ -468,7 +365,6 @@ function releaseMenu(){
 	$result = json_decode($output, true);
 
 	if($result['errcode'] == 0){
-        adminLog("发布微信自定义菜单", "分站：" . $cityid);
 		return '{"state": 100, "info": "发布成功！"}';
 	}else{
 		return '{"state": 200, "info": "'.getErrCode($result['errcode'], $result['errmsg']).'"}';

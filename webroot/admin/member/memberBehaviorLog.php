@@ -36,19 +36,24 @@ if ($dopost == "getList" || $do == "export") {
     $pagestep = $pagestep == "" ? 10 : $pagestep;
     $page     = $page == "" ? 1 : $page;
 
-    $where = $mwhere = "";
-    //时间
-    // if ($start == "" || $end == "") {
-    //     echo '{"state":101, "info":' . json_encode("开始时间或结束时间不能为空") . '}';
-    //     die;
-    // }
-    
-    if ($start != "") {
-        $where .= " AND l.`pubdate` >= " . GetMkTime($start);
-    }
+    $where = "";
 
-    if ($end != "") {
-        $where .= " AND l.`pubdate` <= " . GetMkTime($end . " 23:59:59");
+    //搜索关键字
+    if ($sKeyword != "") {
+
+        $sKeyword = trim($sKeyword);
+
+        //用户ID
+        if (substr($sKeyword, 0, 1) == '#') {
+            $sKeyword = substr($sKeyword, 1);
+            $where .= " AND l.`uid` = " . $sKeyword;
+        //信息ID
+        }elseif (substr($sKeyword, 0, 1) == '@') {
+            $sKeyword = substr($sKeyword, 1);
+            $where .= " AND l.`aid` = " . $sKeyword;
+        } else {
+            $where .= " AND (m.`username` LIKE '%$sKeyword%' OR m.`nickname` LIKE '%$sKeyword%' OR l.`note` LIKE '%$sKeyword%' OR l.`ip` LIKE '%$sKeyword%' OR l.`ipaddr` LIKE '%$sKeyword%' OR l.`useragent` LIKE '%$sKeyword%')";
+        }
     }
 
     //模块
@@ -76,134 +81,42 @@ if ($dopost == "getList" || $do == "export") {
         $where .= " AND l.`type` = '$type'";
     }
 
-    //搜索关键字
-    if ($sKeyword != "") {
-        $sKeyword = trim($sKeyword);
-        $stype = trim($stype);
-        $leftJoin = false;
-
-        if ($stype == 'uid') {
-            $suid = (int)$sKeyword;
-            $where .= " AND l.`uid`=$suid";
-        } else if ($stype == 'aid') {
-            $said = (int)$sKeyword;
-            $where .= " AND l.`aid`=$said";
-        } else if ($stype == 'username') {
-            $mwhere = " AND m.`username` = '$sKeyword'";
-            $leftJoin = true;
-        } else if ($stype == 'nickname') {
-            $mwhere = " AND  m.`nickname` = '$sKeyword'";
-            $leftJoin = true;
-        } else if ($stype == 'phone') {
-            $mwhere = " AND m.`phone` = '$sKeyword'";
-            $leftJoin = true;
-        }else if ($stype == 'ip') {
-            $where .= " AND l.`$stype` LIKE '$sKeyword%'";
-        }else if (in_array($stype, array('note', 'ipaddr'))) {
-            $where .= " AND l.`$stype` LIKE '%$sKeyword%'";
-        }
+    //时间
+    if ($start != "") {
+        $where .= " AND l.`pubdate` >= " . GetMkTime($start);
     }
 
-    if ($leftJoin) {
-        $archives = $dsql->SetQuery("SELECT count(1) as totalCount FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`uid` WHERE 1=1 " . $where . $mwhere);
-    } else {
-        $archives = $dsql->SetQuery("SELECT count(1) as totalCount FROM `#@__" . $db . "` l WHERE 1=1 " . $where);
+    if ($end != "") {
+        $where .= " AND l.`pubdate` <= " . GetMkTime($end . " 23:59:59");
     }
+
+    $archives = $dsql->SetQuery("SELECT l.`id` FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`uid` WHERE 1 = 1 AND m.`id` IS NOT NULL" . $where);
 
     //总条数
-    $totalCount = (int)$dsql->getOne($archives);
+    $totalCount = $dsql->dsqlOper($archives . $where, "totalCount");
     //总分页数
     $totalPage = ceil($totalCount / $pagestep);
 
-    $orderBy = " ORDER BY l.`pubdate` desc";
+    $where .= " order by l.`id` desc";
 
     $atpage = $pagestep * ($page - 1);
-    if ($do == "export") {
-        //循环导出【新】
-        set_time_limit(0);      // 设置超时
-        ini_set('memory_limit', '3072M');
-        //开始导出
-        $fileName = "行为日志_" . date("YmdHis") . ".csv";
-        header('Content-Encoding: UTF-8');
-        header("Content-type:application/vnd.ms-excel;charset=UTF-8");
-        header('Content-Disposition: attachment;filename="' . $fileName . '"');
-        //打开php标准输出流
-        $fp = fopen('php://output', 'a');
-        //添加BOM头，以UTF8编码导出CSV文件，如果文件头未添加BOM头，打开会出现乱码。
-        fwrite($fp, chr(0xEF).chr(0xBB).chr(0xBF));
-        //添加导出标题
-        fputcsv($fp, ['记录ID','用户ID','用户昵称','所属模块','模块业务','模块信息ID','操作类型','操作描述','信息链接','操作时间','IP地址','IP归属地','设备信息','SQL语句','请求地址','请求参数','来源页面']);
-        $nums = 20000; //每次导出数量【如果这个值太小反而容易网络失败，一般来说2、3万没有问题】
-        $step = ceil($totalCount/$nums); //循环次数
-
-        $allModuleTitle = getAllModuleTitle();
-        for($i = 0; $i < $step; $i++) {
-            $start = $i * $nums;
-            $archives = $dsql->SetQuery("SELECT l.`id`, l.`uid`, l.`pubdate`, l.`ip`, l.`ipaddr`, l.`module`, l.`temp`, l.`aid`, l.`type`, l.`note`, l.`link`, l.`useragent`, l.`sql`, l.`url`, l.`param`, l.`referer`, m.`username`, m.`nickname` FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`uid` WHERE 1=1 " . $where  . $mwhere . $orderBy . " LIMIT $start, $nums");
-            $results = $dsql->dsqlOper($archives, "results");
-            $newList = array();
-            foreach ($results as $item) {
-                $newList["id"]      = $item["id"];
-                $newList["uid"]     = $item["uid"];
-                $newList["nickname"]  = $item["nickname"] ? $item['nickname'] : $item['username'];
-                $newList["module"]  = $item["module"] == 'siteConfig' ? '系统相关' : ($item["module"] == 'member' ? '会员相关' : ($item["module"] == 'business' ? '商家相关' : $allModuleTitle[$item["module"]]));
-                $newList["temp"]    = $item["temp"];
-                $newList["aid"]     = $item["aid"] ?: '';
-                $newList["type"]    = $item["type"] == 'select' ? '查找' : ($item["type"] == 'insert' ? '新增' : ($item["type"] == 'update' ? '更新' : '删除'));
-                $newList["note"]    = $item["note"];
-                $newList["link"]    = $item["link"];
-                $newList["pubdate"] = date("Y-m-d H:i:s", $item["pubdate"]);
-                $newList["ip"]      = $item["ip"];
-                $newList["ipaddr"]  = $item["ipaddr"];
-                $newList["useragent"] = $item["useragent"];
-                $newList["sql"]       = htmlspecialchars($item["sql"]);
-                $newList["url"]       = $item["url"];
-                $newList["param"]     = $item["param"];
-                $newList["referer"]   = $item["referer"];
-                fputcsv($fp, $newList);
-            }
-            //每1万条数据就刷新缓冲区
-            ob_flush();
-            flush();
-        }
-        die;
+    if ($do != "export") {
+        $where .= " LIMIT $atpage, $pagestep";
     }
 
-    $idWhere = "";
-    $maxLimit = 10000;
-    $limit = " LIMIT $atpage, $pagestep";
-
-    if ($atpage > $maxLimit) {
-        if ($leftJoin) {
-            $sql = $dsql->SetQuery("SELECT t.`id` FROM (SELECT l.`id`, l.`uid` FROM `#@__" . $db . "` l WHERE 1=1 $where $orderBy LIMIT $atpage, $pagestep) t LEFT JOIN `#@__member` m ON m.`id` = t.`uid` WHERE 1=1 $mwhere"); //延迟左联
-        } else {
-            $sql = $dsql->SetQuery("SELECT l.`id` FROM `#@__" . $db . "` l WHERE 1=1 $where $orderBy LIMIT $atpage, $pagestep");
-        }
-
-        $ids = $dsql->getArr($sql);
- 
-        if (count($ids) > 0) {
-            $idWhere = " AND l.`id` IN(" . join(',', $ids) . ")";
-        } else {
-            $idWhere = " AND 1=2";
-        }
-        $limit = "";
-    }
-
-    $archives = $dsql->SetQuery("SELECT l.`id`, l.`uid`, l.`pubdate`, l.`ip`, l.`ipaddr`, l.`module`, l.`temp`, l.`aid`, l.`type`, l.`note`, l.`link`, l.`useragent`, l.`sql`, l.`url`, l.`param`, l.`referer`, m.`username`, m.`nickname` FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`uid` WHERE 1=1 " . $where . $mwhere . $idWhere . $orderBy . $limit);
+    $archives = $dsql->SetQuery("SELECT l.`id`, l.`uid`, l.`pubdate`, l.`ip`, l.`ipaddr`, l.`module`, l.`temp`, l.`aid`, l.`type`, l.`note`, l.`link`, l.`useragent`, l.`sql`, l.`url`, l.`param`, l.`referer`, m.`username`, m.`nickname` FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`uid` WHERE 1 = 1 AND m.`id` IS NOT NULL" . $where);
 
     $results = $dsql->dsqlOper($archives, "results");
 
-    if (is_array($results) && count($results) > 0) {
+    if (count($results) > 0) {
         $list = array();
-        $allModuleTitle = getAllModuleTitle();
         foreach ($results as $key => $value) {
             $list[$key]["id"]      = $value["id"];
             $list[$key]["uid"]     = $value["uid"];
             $list[$key]["pubdate"] = date("Y-m-d H:i:s", $value["pubdate"]);
             $list[$key]["ip"]      = $value["ip"];
             $list[$key]["ipaddr"]  = $value["ipaddr"];
-            $list[$key]["module"]  = $value["module"] == 'siteConfig' ? '系统相关' : ($value["module"] == 'member' ? '会员相关' : ($value["module"] == 'business' ? '商家相关' : $allModuleTitle[$value["module"]]));
+            $list[$key]["module"]  = $value["module"] == 'siteConfig' ? '系统相关' : ($value["module"] == 'member' ? '会员相关' : ($value["module"] == 'business' ? '商家相关' : getModuleTitle(array('name' => $value["module"]))));
             $list[$key]["temp"]    = $value["temp"];
             $list[$key]["aid"]     = $value["aid"] ?: '';
             $list[$key]["type"]    = $value["type"] == 'select' ? '查找' : ($value["type"] == 'insert' ? '新增' : ($value["type"] == 'update' ? '更新' : '删除'));
@@ -232,8 +145,8 @@ if ($dopost == "getList" || $do == "export") {
         }
     }
 
-    if ($do == "export") { 
-        //已废弃 采用上面流式导出方法 2026-1-24
+    if ($do == "export") {
+
         $tit = array();
         array_push($tit, iconv('utf-8', 'gb2312//IGNORE', '记录ID'));
         array_push($tit, iconv('utf-8', 'gb2312//IGNORE', '用户ID'));
@@ -295,28 +208,11 @@ if ($dopost == "getList" || $do == "export") {
     die;
 }
 
-function getAllModuleTitle()
-{
-    global $dsql;
-    $list = array();
-    $sql = $dsql->SetQuery("SELECT `name`, `title`, `subject` FROM `#@__site_module`");
-    $ret = $dsql->dsqlOper($sql, "results");
-    if ($ret && is_array($ret)) {
-        foreach ($ret as $val) {
-            $list[$val['name']] = $val['subject'] ? $val['subject'] : $val['title'];
-        }
-    }
-    return $list;
-}
-
 //验证模板文件
 if (file_exists($tpl . "/" . $templates)) {
 
 	$huoniaoTag->assign('moduleList', getModuleList(false));
-    
-    // $huoniaoTag->assign('startDate', ($start != "") ? $start : date('Y-m-d', strtotime('-7 days')));
-    // $huoniaoTag->assign('endDate', ($end != "") ? $end : date('Y-m-d', time()));
-    
+
     $max_memberBehaviorLog_save_day = (int)$max_memberBehaviorLog_save_day;
     $huoniaoTag->assign('max_memberBehaviorLog_save_day', $max_memberBehaviorLog_save_day == 0 ? '' : $max_memberBehaviorLog_save_day);
 

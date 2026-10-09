@@ -1,35 +1,6 @@
 $(function(){
-	$.ajax({
-		url: `/include/ajax.php?service=house&action=route&route=consumer/myData`,
-		type: "POST",
-		dataType: "json",
-		success: function (data) {
-			if(data?.state == 100){
-				let info = data.info;
-				let url ='';
-				if(info.role.isStoreManage||info.role.isBroker||info.role.isOnlyBroker){ //经纪人
-					if(navigator.userAgent.toLowerCase().match(/micromessenger/)){ //微信小程序
-						wx.miniProgram.redirectTo({url:`/pages/packages/house/broker/fabu_house_sale/fabu_house_sale`})
-					}else{
-						location.href=`${houseDomain}/broker/fabu_house_sale?${app_platform?'appFullScreen=1':''}`;
-					}
-				}else{ //个人
-					if(navigator.userAgent.toLowerCase().match(/micromessenger/)){ //微信小程序
-						wx.miniProgram.redirectTo({url:`/pages/packages/house/member/publish/publish`})
-					}else {
-						location.href=`${houseDomain}/member/publish?${app_platform?'appFullScreen=1':''}`;
-					}
-				}
-				
-			}else{
-				alert(data.info);
-			}
-		},
-		error: function(){ 
-			alert('身份信息获取失败！')
-		}
-	});
-	return false;
+
+
 	//房型选择
 	var numArr =[],numArr1 =[],numArr2 =[];//自定义房型数据
 	for(var i=1; i<=10 ;i++){

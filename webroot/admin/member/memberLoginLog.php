@@ -36,8 +36,27 @@ if ($dopost == "getList" || $do == "export") {
     $pagestep = $pagestep == "" ? 10 : $pagestep;
     $page     = $page == "" ? 1 : $page;
 
-    $where = $mwhere = "";
-    
+    $where = "";
+
+    //搜索关键字
+    if ($sKeyword != "") {
+
+        $sKeyword = trim($sKeyword);
+
+        //用户ID
+        if (substr($sKeyword, 0, 1) == '#') {
+            $sKeyword = substr($sKeyword, 1);
+            $where .= " AND l.`userid` = " . $sKeyword;
+        } else {
+            $where .= " AND (m.`username` LIKE '%$sKeyword%' OR m.`nickname` LIKE '%$sKeyword%' OR l.`loginip` LIKE '%$sKeyword%' OR l.`ipaddr` LIKE '%$sKeyword%' OR l.`useragent` LIKE '%$sKeyword%')";
+        }
+    }
+
+    //平台
+    if ($mtype != "") {
+        $where .= " AND l.`platform` LIKE '%$mtype%'";
+    }
+
     //时间
     if ($start != "") {
         $where .= " AND l.`logintime` >= " . GetMkTime($start);
@@ -47,114 +66,25 @@ if ($dopost == "getList" || $do == "export") {
         $where .= " AND l.`logintime` <= " . GetMkTime($end . " 23:59:59");
     }
 
-    //搜索关键字
-    if ($sKeyword != "") {
-        $sKeyword = trim($sKeyword);
-        $stype = trim($stype);
-        $leftJoin = false;
-
-        if ($stype == 'uid') {
-            $suid = (int)$sKeyword;
-            $where .= " AND l.`userid`=$suid";
-        } else if ($stype == 'username') {
-            $mwhere = " AND m.`username` = '$sKeyword'";
-            $leftJoin = true;
-        } else if ($stype == 'nickname') {
-            $mwhere = " AND  m.`nickname` = '$sKeyword'";
-            $leftJoin = true;
-        } else if ($stype == 'loginip') {
-            $where .= " AND l.`loginip` LIKE '$sKeyword%'";
-        } else if ($stype == 'ipaddr') {
-            $where .= " AND l.`ipaddr` LIKE '%$sKeyword%'";
-        }
-    }
-
-    //平台
-    if ($mtype != "") {
-        $where .= " AND l.`platform` LIKE '%$mtype%'";
-    }
-
-    if ($leftJoin) {
-        $archives = $dsql->SetQuery("SELECT count(1) as totalCount FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`userid` WHERE 1=1 " . $where . $mwhere);
-    } else {
-        $archives = $dsql->SetQuery("SELECT count(1) as totalCount FROM `#@__" . $db . "` l WHERE 1=1 " . $where);
-    }
+    $archives = $dsql->SetQuery("SELECT l.`id` FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`userid` WHERE 1 = 1 AND m.`id` IS NOT NULL" . $where);
 
     //总条数
-    $totalCount = (int)$dsql->getOne($archives);
+    $totalCount = $dsql->dsqlOper($archives . $where, "totalCount");
     //总分页数
     $totalPage = ceil($totalCount / $pagestep);
 
-    $orderBy = " ORDER BY l.`logintime` DESC";
+    $where .= " order by l.`id` desc";
 
     $atpage = $pagestep * ($page - 1);
-    if ($do == "export") {
-        //循环导出【新】
-        set_time_limit(0);      // 设置超时
-        ini_set('memory_limit', '3072M');
-        //开始导出
-        $fileName = "登录日志_" . date("YmdHis") . ".csv";
-        header('Content-Encoding: UTF-8');
-        header("Content-type:application/vnd.ms-excel;charset=UTF-8");
-        header('Content-Disposition: attachment;filename="' . $fileName . '"');
-        //打开php标准输出流
-        $fp = fopen('php://output', 'a');
-        //添加BOM头，以UTF8编码导出CSV文件，如果文件头未添加BOM头，打开会出现乱码。
-        fwrite($fp, chr(0xEF).chr(0xBB).chr(0xBF));
-        //添加导出标题
-        fputcsv($fp, ['记录ID','用户ID','用户昵称','登录时间','登录IP','IP归属地','登录方式','设备信息']);
-        $nums = 20000; //每次导出数量【如果这个值太小反而容易网络失败，一般来说2、3万没有问题】
-        $step = ceil($totalCount/$nums); //循环次数
-
-        for($i = 0; $i < $step; $i++) {
-            $start = $i * $nums;
-            $archives = $dsql->SetQuery("SELECT l.`id`, l.`userid`, l.`logintime`, l.`loginip`, l.`ipaddr`, l.`platform`, l.`useragent`, m.`username`, m.`nickname` FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`userid` WHERE 1=1 " . $where  . $mwhere . $orderBy . " LIMIT $start, $nums");
-            $results = $dsql->dsqlOper($archives, "results");
-            $newList = array();
-            foreach ($results as $item) {
-                $newList["id"]      = $item["id"];
-                $newList["uid"]     = $item["userid"];
-                $newList["nickname"]  = $item["nickname"] ? $item['nickname'] : $item['username'];
-                $newList["logintime"] = date("Y-m-d H:i:s", $item["logintime"]);
-                $newList["loginip"]    = $item["loginip"];
-                $newList["ipaddr"]  = $item["ipaddr"];
-                $newList["platform"]  = $item["platform"];
-                $newList["useragent"] = $item["useragent"];
-                fputcsv($fp, $newList);
-            }
-            //每1万条数据就刷新缓冲区
-            ob_flush();
-            flush();
-        }
-        die;
+    if ($do != "export") {
+        $where .= " LIMIT $atpage, $pagestep";
     }
 
-    $idWhere = "";
-    $maxLimit = 10000;
-    $limit = " LIMIT $atpage, $pagestep";
-
-    if ($atpage > $maxLimit) {
-        if ($leftJoin) {
-            $sql = $dsql->SetQuery("SELECT t.`id` FROM (SELECT l.`id`, l.`userid` FROM `#@__" . $db . "` l WHERE 1=1 $where $orderBy LIMIT $atpage, $pagestep) t LEFT JOIN `#@__member` m ON m.`id` = t.`userid` WHERE 1=1 $mwhere"); //延迟左联
-        } else {
-            $sql = $dsql->SetQuery("SELECT l.`id` FROM `#@__" . $db . "` l WHERE 1=1 $where $orderBy LIMIT $atpage, $pagestep");
-        }
-
-        $ids = $dsql->getArr($sql);
- 
-        if (count($ids) > 0) {
-            $idWhere = " AND l.`id` IN (" . join(',', $ids) . ")";
-        } else {
-            $idWhere = " AND 1=2";
-        }
-        $limit = "";
-    }
-
-    $archives = $dsql->SetQuery("SELECT l.`id`, l.`userid`, l.`logintime`, l.`loginip`, l.`ipaddr`, l.`platform`, l.`useragent`, m.`username`, m.`nickname` FROM `#@__" . $db . "` l  LEFT JOIN `#@__member` m ON m.`id` = l.`userid` WHERE 1=1 " . $where . $mwhere . $idWhere . $orderBy . $limit);
+    $archives = $dsql->SetQuery("SELECT l.`id`, l.`userid`, l.`logintime`, l.`loginip`, l.`ipaddr`, l.`platform`, l.`useragent`, m.`username`, m.`nickname` FROM `#@__" . $db . "` l LEFT JOIN `#@__member` m ON m.`id` = l.`userid` WHERE 1 = 1 AND m.`id` IS NOT NULL" . $where);
 
     $results = $dsql->dsqlOper($archives, "results");
 
-    if (is_array($results) && count($results) > 0) {
+    if (count($results) > 0) {
         $list = array();
         foreach ($results as $key => $value) {
             $list[$key]["id"]         = $value["id"];
@@ -183,7 +113,7 @@ if ($dopost == "getList" || $do == "export") {
     }
 
     if ($do == "export") {
-        //此处代码已废弃 2026-01-26
+
         $tit = array();
         array_push($tit, iconv('utf-8', 'gb2312//IGNORE', '记录ID'));
         array_push($tit, iconv('utf-8', 'gb2312//IGNORE', '用户ID'));

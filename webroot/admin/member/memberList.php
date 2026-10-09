@@ -391,11 +391,11 @@ if($dopost == "del"){
 				delPicFile($res[0]['photo'], "delPhoto", "siteConfig");
 				delPicFile($res[0]['license'], "delCard", "siteConfig");
 
-				// $archives = $dsql->SetQuery("DELETE FROM `#@__".$db."_money` WHERE `userid` = ".$val);
-				// $dsql->dsqlOper($archives, "update");
+				$archives = $dsql->SetQuery("DELETE FROM `#@__".$db."_money` WHERE `userid` = ".$val);
+				$dsql->dsqlOper($archives, "update");
 
-				// $archives = $dsql->SetQuery("DELETE FROM `#@__".$db."_point` WHERE `userid` = ".$val);
-				// $dsql->dsqlOper($archives, "update");
+				$archives = $dsql->SetQuery("DELETE FROM `#@__".$db."_point` WHERE `userid` = ".$val);
+				$dsql->dsqlOper($archives, "update");
 
 				//同步删除论坛会员
 				// $userLogin->bbsSync($res[0]['username'], "delete");
@@ -532,40 +532,39 @@ if($dopost == "del"){
 	//排序  余额排序
 	if ($orderMoney){
 	    if($orderMoney == 1){
-            $order .= " ORDER BY m.`money` DESC";    //倒序
+            $order  .= " ORDER BY  m.`money` DESC";    //倒序
         }else{
-            $order .= "  ORDER BY m.`money`";    //正序
+            $order  .= "  ORDER BY m.`money` ";    //正序
         }
     }
+
+    $rightjoin = ' (SELECT count(`id`) FROM `#@__member` WHERE `from_uid` = m.`id`) rec';
+
 
     //积分排序
     if ($orderPoint){
         if($orderPoint == 1){
-            $order .= " ORDER BY m.`point` DESC";    //倒序
+            $order  .= " ORDER BY m.`point` DESC";    //倒序
         }else{
-            $order .= " ORDER BY m.`point`";    //正序
+            $order  .= " ORDER BY  m.`point` ";    //正序
         }
     }
 
     //消费金排序
     if ($orderBonus){
         if($orderBonus == 1){
-            $order .= " ORDER BY m.`bonus` DESC, m.`id` DESC";    //倒序
+            $order  .= " ORDER BY m.`bonus` DESC";    //倒序
         }else{
-            $order .= " ORDER BY m.`bonus`, m.`id` DESC ";    //正序
+            $order  .= " ORDER BY  m.`bonus` ";    //正序
         }
     }
 
     //推荐人排序
-    $recField = $recJoin = "";
     if ($tjOrder){
-        $recField =", IFNULL(r.rec, 0) AS rec";
-        $recJoin = " LEFT JOIN (SELECT `from_uid`, COUNT(`id`) AS rec FROM `#@__member` GROUP BY `from_uid`) r ON m.`id` = r.`from_uid`"; 
-
         if ($tjOrder == 1){
-            $order .= " ORDER BY `rec` DESC";    //倒序
+            $order  .= " ORDER BY `rec` DESC";    //倒序
         }else{
-            $order .= " ORDER BY `rec` ";    //倒序
+            $order  .= " ORDER BY `rec` ";    //倒序
         }
     }
 
@@ -598,31 +597,21 @@ if($dopost == "del"){
 
 
 
-    if ($sKeyword != "") {
+    if($sKeyword != ""){
         $sKeyword = trim($sKeyword);
-        if ($stype == "uid") {
-            $suid = (int)$sKeyword;
-            $where .= " AND m.`id` = $suid";
-        } else if ($stype == "uname") {
-            $where .= " AND m.`username` LIKE '$sKeyword%'";
-        } else if ($stype == "nickname") {
-            $where .= " AND m.`nickname` LIKE '$sKeyword%'";
-        } else if ($stype == "realname") {
-            $where .= " AND m.`realname` LIKE '$sKeyword%'";
-        } else if ($stype == "idcard") {
-            $where .= " AND m.`idcard` = '$sKeyword'";
-        } else if ($stype == "email") {
-            $where .= " AND m.`email` = '$sKeyword'";
-        } else if ($stype == "phone") {
-            $where .= " AND m.`phone` = '$sKeyword'";
-        } else if ($stype == "regip") {
-            $where .= " AND m.`regip` LIKE '$sKeyword%'";
-        } else if ($stype == "company") {
-            $where .= " AND m.`company` LIKE '$sKeyword%'";
-        }
+		$isId = false;
+		if(substr($sKeyword, 0, 1) == '#'){
+			$id = substr($sKeyword, 1);
+			if(is_numeric($id)){
+				$isId = true;
+				$where .= " AND m.`id` = $id";
+			}
+		}
+		if(!$isId){
+			$where .= " AND (m.`username` like '%$sKeyword%' OR m.`discount` like '%$sKeyword%' OR m.`nickname` like '%$sKeyword%' OR m.`realname` like '%$sKeyword%' OR m.`idcard` like '%$sKeyword%' OR m.`email` like '%$sKeyword%' OR m.`phone` like '%$sKeyword%' OR m.`regip` like '%$sKeyword%' OR m.`company` like '%$sKeyword%')";
+		}
 
-        // $where .= " AND (m.`username` like '%$sKeyword%' OR m.`discount` like '%$sKeyword%' OR m.`nickname` like '%$sKeyword%' OR m.`realname` like '%$sKeyword%' OR m.`idcard` like '%$sKeyword%' OR m.`email` like '%$sKeyword%' OR m.`phone` like '%$sKeyword%' OR m.`regip` like '%$sKeyword%' OR m.`company` like '%$sKeyword%')";
-    }
+	}
 
 	if($mtype != ""){
 		$where .= " AND m.`mtype` = ".$mtype;
@@ -776,7 +765,7 @@ if($dopost == "del"){
         set_time_limit(0);      // 设置超时
         ini_set('memory_limit', '3072M');
         //开始导出
-        $fileName = "会员数据_" . date("YmdHis") . ".csv";
+        $fileName = "会员数据.csv";
         header('Content-Encoding: UTF-8');
         header("Content-type:application/vnd.ms-excel;charset=UTF-8");
         header('Content-Disposition: attachment;filename="' . $fileName . '"');
@@ -791,7 +780,7 @@ if($dopost == "del"){
 
         for($i = 0; $i < $step; $i++) {
             $start = $i * $nums;
-            $archives = $dsql->SetQuery("SELECT m.`id`, m.`mtype`, m.`username`, m.`level`, m.`expired`, m.`discount`, m.`nickname`, m.`nickname_audit`, m.`realname`,m.`is_cancellation`,m.`certifyState`, m.`email`, m.`emailCheck`, m.`phone`, m.`phoneCheck`,m.`qq`,m.`birthday`, m.`company`, m.`licenseState`, m.`photo`, m.`photo_audit`, m.`sex`, m.`money`, m.`promotion`, m.`point`, m.`bonus`, m.`regtime`, m.`regip`, m.`regfrom`, m.`lastlogintime`, m.`lastloginip`, m.`state`, m.`idcard`, m.`cityid`, m.`addr`, m.`address`, m.`freeze`, m.`online` ,m.`from_uid`,m.`wechat_subscribe`,m.`robot` $recField FROM `#@__".$db."` m ".$recJoin.$leftjoin." WHERE 1 = 1".$whereb.$where.$order." LIMIT $start, $nums");
+            $archives = $dsql->SetQuery("SELECT m.`id`, m.`mtype`, m.`username`, m.`level`, m.`expired`, m.`discount`, m.`nickname`, m.`nickname_audit`, m.`realname`,m.`is_cancellation`,m.`certifyState`, m.`email`, m.`emailCheck`, m.`phone`, m.`phoneCheck`,m.`qq`,m.`birthday`, m.`company`, m.`licenseState`, m.`photo`, m.`photo_audit`, m.`sex`, m.`money`, m.`promotion`, m.`point`, m.`bonus`, m.`regtime`, m.`regip`, m.`regfrom`, m.`lastlogintime`, m.`lastloginip`, m.`state`, m.`idcard`, m.`cityid`, m.`addr`, m.`address`, m.`freeze`, m.`online`,".$rightjoin." ,m.`from_uid`,m.`wechat_subscribe`,m.`robot` FROM `#@__".$db."` m ".$leftjoin." WHERE 1 = 1".$whereb.$where.$order." LIMIT $start, $nums");
             $results = $dsql->dsqlOper($archives, "results");
             $newList = array();
             foreach ($results as $item) {
@@ -862,22 +851,8 @@ if($dopost == "del"){
     }
 
 	$atpage = $pagestep*($page-1);
-    //	$where .= " LIMIT $atpage, $pagestep";
-    $idWhere = "";
-    $maxLimit = 10000;
-    $limit = " LIMIT $atpage, $pagestep";
-    if ($atpage > $maxLimit) {
-        $sql = $dsql->SetQuery("SELECT m.`id` $recField FROM `#@__" . $db . "` m " . $recJoin . $leftjoin . " WHERE 1 = 1" . $whereb . $where . $order . " LIMIT $atpage, $pagestep");
-        $ids = $dsql->getArr($sql);
-        if (count($ids) > 0) {
-            $idWhere = " AND m.`id` IN(" . join(',', $ids) . ")";
-        } else {
-            $idWhere = " AND 1=2";
-        }
-        $limit = "";
-    }
-
-    $archives = $dsql->SetQuery("SELECT m.`id`, m.`mtype`, m.`username`, m.`level`, m.`expired`, m.`discount`, m.`nickname`, m.`nickname_audit`, m.`realname`,m.`is_cancellation`,m.`certifyState`, m.`email`, m.`emailCheck`, m.`phone`, m.`phoneCheck`, m.`company`, m.`licenseState`, m.`photo`, m.`photo_audit`, m.`sex`, m.`money`, m.`promotion`, m.`point`, m.`bonus`, m.`regtime`, m.`regip`, m.`lastlogintime`, m.`lastloginip`, m.`state`, m.`idcard`, m.`cityid`, m.`addr`, m.`address`, m.`freeze`, m.`online`,m.`from_uid`,m.`wechat_subscribe`,m.`robot` $recField FROM `#@__" . $db . "` m " . $recJoin . $leftjoin . " WHERE 1 = 1" . $idWhere . $whereb . $where . $order . $limit);
+//	$where .= " LIMIT $atpage, $pagestep";
+	$archives = $dsql->SetQuery("SELECT m.`id`, m.`mtype`, m.`username`, m.`level`, m.`expired`, m.`discount`, m.`nickname`, m.`nickname_audit`, m.`realname`,m.`is_cancellation`,m.`certifyState`, m.`email`, m.`emailCheck`, m.`phone`, m.`phoneCheck`, m.`company`, m.`licenseState`, m.`photo`, m.`photo_audit`, m.`sex`, m.`money`, m.`promotion`, m.`point`, m.`bonus`, m.`regtime`, m.`regip`, m.`lastlogintime`, m.`lastloginip`, m.`state`, m.`idcard`, m.`cityid`, m.`addr`, m.`address`, m.`freeze`, m.`online`,".$rightjoin." ,m.`from_uid`,m.`wechat_subscribe`,m.`robot` FROM `#@__".$db."` m ".$leftjoin." WHERE 1 = 1".$whereb.$where.$order." LIMIT $atpage, $pagestep");
 
 	$results = $dsql->dsqlOper($archives, "results");
 	$list = array();
@@ -1131,6 +1106,9 @@ elseif($dopost=="listCount"){
         }
     }
 
+    $rightjoin = ' (SELECT count(`id`) FROM `#@__member` WHERE `from_uid` = m.`id`) rec';
+
+
     //积分排序
     if ($orderPoint){
         if($orderPoint == 1){
@@ -1150,9 +1128,7 @@ elseif($dopost=="listCount"){
     }
 
     //推荐人排序
-    $rightjoin ="";
     if ($tjOrder){
-        $rightjoin = ', (SELECT count(`id`) FROM `#@__member` WHERE `from_uid` = m.`id`) rec';
         if ($tjOrder == 1){
             $order  .= " ORDER BY `rec` DESC";    //倒序
         }else{
@@ -1537,12 +1513,6 @@ elseif($dopost == "Add"){
 				}
 			}
 
-            //如果会员有在城市招聘入驻企业，则同步更新头像
-            /*if ($res[0]['zhaopin_company'] == 2 && $photo != null) {
-                $sql = $dsql->SetQuery("UPDATE `#@__zhaopin_company` SET `logo` = '$photo' WHERE `userid` = ".$id);
-                $dsql->dsqlOper($sql, "update");
-            }*/
-
 			adminLog("修改会员", $id." => ".$username);
 			echo '{"state": 100, "info": '.json_encode("修改成功！").'}';
 		}else{
@@ -1715,22 +1685,7 @@ elseif($dopost == "Add"){
 
                 $huoniaoTag->assign('wechat_app_openid', $results[0]['wechat_app_openid']);
 
-                //查询用户对分站的关注情况
 
-                // 获取所有分站绑定的公众号
-                global $cfg_siteCityAdvanced_wechat;
-                $wechat_subscribe_city = $cfg_siteCityAdvanced_wechat;
-
-                $sql = $dsql->SetQuery("SELECT * FROM `#@__member_wechat_subscribe` WHERE `userid` = ".$id);
-                $ret = $dsql->dsqlOper($sql, "results");
-                if ($ret != null && is_array($ret)) {
-                    foreach ($ret as $value) {
-                        if (isset($wechat_subscribe_city[$value['cityid']])) {
-                            $wechat_subscribe_city[$value['cityid']]['subscribe'] = $value['subscribe'];
-                        }
-                    }
-                }
-                $huoniaoTag->assign('wechat_subscribe_city', $wechat_subscribe_city);
 
 			}else{
 				ShowMsg('要修改的信息不存在或已删除！', "-1");
@@ -2080,16 +2035,14 @@ elseif($dopost == "Add"){
 		}
 
 		//会员
-		$archives = $dsql->SetQuery("SELECT count(m.`id`) totalCount FROM `#@__member` m LEFT JOIN `#@__member_invite` i ON i.`uid` = m.`id` WHERE m.`from_uid` = $userid");
+		$archives = $dsql->SetQuery("SELECT m.`id`, m.`nickname`, m.`phone`, m.`regtime`, i.`money` FROM `#@__member` m LEFT JOIN `#@__member_invite` i ON i.`uid` = m.`id` WHERE m.`from_uid` = $userid");
 		//总条数
-		$totalCount = $dsql->dsqlOper($archives.$where, "results");
-        $totalCount = (int)$totalCount[0]['totalCount'];
+		$totalCount = $dsql->dsqlOper($archives.$where, "totalCount");
 		//总分页数
 		$totalPage = ceil($totalCount/$pagestep);
 		$totalMoney = $dsql->dsqlOper($dsql->SetQuery("SELECT sum(i.`money`) totalMoney FROM `#@__member` m LEFT JOIN `#@__member_invite` i ON i.`uid` = m.`id` WHERE m.`from_uid` = $userid").$where, "results");
-        
+
 		//如果是分销商就去查member_money表统金钱
-		$archives = $dsql->SetQuery("SELECT m.`id`, m.`nickname`, m.`phone`, m.`regtime`, i.`money` FROM `#@__member` m LEFT JOIN `#@__member_invite` i ON i.`uid` = m.`id` WHERE m.`from_uid` = $userid");
         $ar = $dsql->SetQuery($archives.$where);
         $fenxiao = $dsql->dsqlOper($ar, "results");
         if(count($fenxiao) > 0) {

@@ -438,9 +438,6 @@ if($type != ""){
 	exit;
 }
 
-//配置参数
-require_once(HUONIAOINC.'/config/fenxiaoConfig.inc.php');
-
 //验证模板文件
 if(file_exists($tpl."/".$templates)){
 
@@ -453,9 +450,6 @@ if(file_exists($tpl."/".$templates)){
 		'admin/business/businessConfig.js'
 	);
 	$huoniaoTag->assign('jsFile', includeFile('js', $jsFile));
-
-	//分销商-推荐人范围限制
-    $huoniaoTag->assign('fenxiaoBindingChecked', (int)$cfg_fenxiaoBinding);
 
 	require_once(HUONIAOINC."/config/".$action.".inc.php");
 	global $cfg_basehost;

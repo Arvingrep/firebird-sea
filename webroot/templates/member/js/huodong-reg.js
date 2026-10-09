@@ -136,8 +136,7 @@ function getList(is){
 							var name = nickname, tel = phone;
 							if(property.length > 1){
 								name = property[0][langData['siteConfig'][19][4]];   //
-								tel = property[2][langData['siteConfig'][22][40]];
-                                tel = tel == undefined ? property[1][langData['siteConfig'][22][40]] : tel;
+								tel = property[1][langData['siteConfig'][22][40]];
 							}
 
 							var info = [];

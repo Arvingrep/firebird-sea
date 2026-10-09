@@ -529,10 +529,6 @@ function transfers($id)
     global $dsql;
     global $cfg_withdrawFee;
 
-    //获取微信转账接口版本
-    global $cfg_withdrawWxVersion;
-    $cfg_withdrawWxVersion = (int)$cfg_withdrawWxVersion;
-
     $sql = $dsql->SetQuery("SELECT `uid`, `bank`, `cardnum`, `cardname`, `amount`,`type`,`usertype`,`source` FROM `#@__member_withdraw` WHERE `id` = $id AND `state` = 0");
     $ret = $dsql->dsqlOper($sql, "results");
     if($ret) {
@@ -553,56 +549,35 @@ function transfers($id)
 
         /*0-普通用户,1-骑手*/
         if ($usertype == 0) {
-            $sql = $dsql->SetQuery("SELECT `realname`, `wechat_openid`, `wechat_mini_openid`, `wechat_app_openid`, `wechat_wmsj_openid` FROM `#@__member` WHERE `id` = " . $uid);
+            $sql = $dsql->SetQuery("SELECT `realname`, `wechat_openid`, `wechat_mini_openid`, `wechat_app_openid` FROM `#@__member` WHERE `id` = " . $uid);
             $ret = $dsql->dsqlOper($sql, "results");
             if ($ret) {
                 $realname           = $ret[0]['realname'];
                 $wechat_openid      = $ret[0]['wechat_openid'];
                 $wechat_mini_openid = $ret[0]['wechat_mini_openid'];
                 $wechat_app_openid = $ret[0]['wechat_app_openid'];
-                $wechat_wmsj_openid = $ret[0]['wechat_wmsj_openid'];
 
-                //如果是新版本的微信转账接口，则判断相应的openid是否存在
-                if ($cfg_withdrawWxVersion == 4) {
-                    if ($bank == 'weixin' && $source == 2 && !$wechat_app_openid) {
-                        return '{"state": 200, "info": "提现会员需要先绑定微信账号"}';
-                    }
-        
-                    //验证外卖商家提现openid
-                    if ($bank == 'weixin' && $source == 3 && !$wechat_wmsj_openid) {
-                        return '{"state": 200, "info": "提现会员需要先绑定微信账号"}';
-                    }
-                } else {
-                    if ($bank == 'weixin' && !$wechat_openid && !$wechat_mini_openid) {
-                        return '{"state": 200, "info": "提现会员需要先绑定微信账号"}';
-                    }
+                if ($bank == 'weixin' && !$wechat_openid && !$wechat_mini_openid) {
+                    return '{"state": 200, "info": "提现会员需要先绑定微信账号"}';
                 }
 
-                /*if ($bank == 'weixin' && !$wechat_openid && !$wechat_mini_openid) {
+                if ($bank == 'weixin' && $source == 2 && !$wechat_app_openid) {
                     return '{"state": 200, "info": "提现会员需要先绑定微信账号"}';
-                }*/
+                }
             }
         } else {
 
-            $Sql = $dsql->SetQuery("SELECT `name`,`openid`,`app_openid` FROM `#@__waimai_courier` WHERE 1=1 AND `id` = " . $uid);
+            $Sql = $dsql->SetQuery("SELECT `name`,`openid` FROM `#@__waimai_courier` WHERE 1=1 AND `id` = " . $uid);
             $Res = $dsql->dsqlOper($Sql, "results");
 
             if ($Res) {
                 $realname           = $Res[0]['name'];
                 $wechat_openid      = '';
                 $wechat_mini_openid = $Res[0]['openid'];
-                $wechat_app_openid = $Res[0]['app_openid'];
-                $wechat_wmsj_openid = '';
+                $wechat_app_openid = '';
 
-                //如果是新版本的微信转账接口，则验证骑手端提现openid
-                if ($cfg_withdrawWxVersion == 4) {
-                    if ($bank == 'weixin' && !$wechat_app_openid) {
-                        return '{"state": 200, "info": "提现会员需要先绑定微信账号"}';
-                    }
-                } else {
-                    if ($bank == 'weixin' && ((!$wechat_openid && $usertype !=1 && !$wechat_mini_openid) || ($usertype == 1 && !$wechat_mini_openid))) {
-                        return '{"state": 200, "info": "提现会员需要先绑定微信账号"}';
-                    }
+                if ($bank == 'weixin' && ((!$wechat_openid && $usertype !=1 && !$wechat_mini_openid) || ($usertype == 1 && !$wechat_mini_openid))) {
+                    return '{"state": 200, "info": "提现会员需要先绑定微信账号"}';
                 }
 
             }
@@ -630,7 +605,6 @@ function transfers($id)
                 'amount' => $amount_,
                 'wid'=>$id,
                 'wechat_app_openid' => $wechat_app_openid,
-                'wechat_wmsj_openid' => $wechat_wmsj_openid,
                 );
 
                 include_once HUONIAOROOT."/api/payment/wxpay/wxpayTransfers.php";

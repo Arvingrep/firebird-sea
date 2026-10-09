@@ -44,8 +44,8 @@ $leimuallarr = array(
     'tuikuan'          => '退款',
     'shangpinxiaoshou' => '商品销售',
     'yonghujili'       => '用户激励',
-    'payPhone'          =>'付费查看电话',
-    'zhaopin'           =>'城市招聘'
+    'payPhone'          =>'付费查看电话'
+
 );
 
 if ($dopost == "getList" || $do == "export") {
@@ -67,9 +67,6 @@ if ($dopost == "getList" || $do == "export") {
 
     //指定城市
     if($userType == 3){
-        $userid = $userLogin->getUserID();
-        $cityid = $userLogin->getAdminCityIds($userid);
-
         $where .= " AND `cityid` in ('$adminCityIds')";
     }
     if($cityid != ""){

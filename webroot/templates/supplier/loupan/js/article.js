@@ -1,4 +1,4 @@
-var pageVue = new Vue({
+var page = new Vue({
 	el:'#page',
 	data:{
 		navList:navList,  //左侧导航
@@ -8,7 +8,6 @@ var pageVue = new Vue({
 		editArr:[],  //批量编辑
 		shaixuanid:0,
 		loading:false,
-		typeId:1 ,//1官方 2代理人
 	},
 	mounted(){
 		var tt = this;
@@ -38,7 +37,7 @@ var pageVue = new Vue({
 			var keywords = $("#search").val();
 			axios({
 				method: 'post',
-				url:`/include/ajax.php?service=house&action=route&route=property/loupanNewsList&lpid=${loupanid}&page=${atpage}&pageSize=8&keywords=${keywords}&publish=${tt.typeId}`,
+				url:'/include/ajax.php?service=house&action=loupanNewsList&loupanid='+loupanid+"&page="+atpage+"&pageSize=8&keywords="+keywords,
 			  })
 			  .then((response)=>{
 					tt.loading = false;
@@ -247,10 +246,6 @@ var pageVue = new Vue({
 				info.hide();
 			}
 		},
-		tabFn(id){
-			this.typeId=id;
-			atpage=1;
-			this.getList();
-		}
+
   }
 })

@@ -76,8 +76,7 @@ new Vue({
 				alipay:[],
 				bank:[]
 			},
-            loading: false,
-			withdrawWxVersion:'', //当前微信提现版本号，新版需要绑定openid 目前只在商家中使用
+            loading: false
 		}
 	},
 	methods: {
@@ -131,51 +130,34 @@ new Vue({
                 this.hasWeixinPopup=false;
                 this.noWeixinPopup = false;
                 this.firstPopup = false;
-               
 
-				if(that.withdrawWxVersion == 4){ //新版提现 app需要重新获取openid
-					// 获取微信openid
-					setupWebViewJavascriptBridge(function(bridge) {
-						bridge.callHandler("wechatLogin", {}, function(responseData) {
-							
-							
-							let openid = responseData; //获取openid
-							let url = `/wmsj/statistics/tj-waimai.php?action=saveWmsjOpenid&openid=${openid}`; //待修改
-							$.ajax({
-								url: url,
-								type: "POST",
-								dataType: "json",
-								success: function (data) {
-									if(data && data.state == 100){
-										BindWeixin = 1;
-										that.BindWeixin = true;
-										that.selectWeixin(); //选择微信
-									}
-								},
-								error: function(){}
-							});
-						})
-					})
+                that.loading = true;
+                setTimeout(function(){
+                    setupWebViewJavascriptBridge(function(bridge) {
+                        if(path){
+                            bridge.callHandler('redirectToWxMiniProgram', {'id':miniId,'path': path},  function(responseData){});
+                        }else{
+                            bridge.callHandler('redirectToWxMiniProgram', {'id':miniId,'path':''},  function(responseData){});
+                        }
+                        bindwxInterval = setInterval(function(){
+                            that.checkBindWx()
+                        },1000)
+                    });
+                },1000)
 
-				}else{
-					that.loading = true;
-					setTimeout(function(){
-						setupWebViewJavascriptBridge(function(bridge) {
-							if(path){
-								bridge.callHandler('redirectToWxMiniProgram', {'id':miniId,'path': path},  function(responseData){});
-							}else{
-								bridge.callHandler('redirectToWxMiniProgram', {'id':miniId,'path':''},  function(responseData){});
-							}
-							bindwxInterval = setInterval(function(){
-								that.checkBindWx()
-							},1000)
-						});
-					},1000)
+                setTimeout(function(){
+                    that.loading = false;
+                }, 2000);
 
-					setTimeout(function(){
-						that.loading = false;
-					}, 2000);
-				}
+                // var popOptions = {
+                //     title: '温馨提示', //'确定删除信息？',  //提示文字
+                //     btnCancelColor: '#407fff',
+                //     isShow: true,
+                //     confirmHtml: '<p style="margin-top:.2rem;">请在微信中登录商家账号后绑定微信！</p>' , //'一经删除不可恢复',  //副标题
+                //     btnCancel: '好的，知道了',
+                //     noSure: true
+                // }
+                // confirmPop(popOptions);
                 
             }else{
                 location.href=memberDomain+'/connect.html'
@@ -183,25 +165,15 @@ new Vue({
 		},
 
         checkBindWx(){
-			const that = this;
+
             $.ajax({
-                url: '/wmsj/statistics/tj-waimai.php?action=getOpenid',
+                url: '/include/ajax.php?service=waimai&action=getWmsjOpenid&did='+wmsj_userid,
                 type: "POST",
                 dataType: "json",
                 success: function (data) {
                     if(data && data.state == 100){
-						clearInterval(bindwxInterval);
-						that.withdrawWxVersion = data.info.withdrawWxVersion
-						let openid = that.withdrawWxVersion == 4 ? data.info.wmsjOpenid : data.info.oldOpenid;
-                        if(!openid){
-							// 表示需要绑定openid
-							BindWeixin = 0;
-						}else{
-							BindWeixin = 1
-						} 
-						
-						that.BindWeixin = BindWeixin ? true : false;
-
+                        clearInterval(bindwxInterval);
+                        location.reload();                  
                     }
                 },
                 error: function(){}
@@ -255,7 +227,7 @@ new Vue({
 		selectWeixin() {
 			let device = navigator.userAgent.toLowerCase();
 			// 判断是否在微信浏览器内
-			if(!device.toLowerCase().match(/huoniao_ios/) && device.match(/MicroMessenger/i) != "micromessenger" && from != 'wmsj'){  // h5
+			if(!device.toLowerCase().match(/huoniao_ios/) && device.match(/MicroMessenger/i) != "micromessenger"){  // h5
 				var popOptions = {
                       title: '温馨提示', //'确定删除信息？', //提示文字
                       btnCancelColor: '#407fff',
@@ -392,9 +364,9 @@ new Vue({
 							let rdata = data.info
 							setupWebViewJavascriptBridge(function(bridge) {
 								bridge.callHandler('wxConfirmReceipt', {'mchId': rdata.mchid,'appId': rdata.appid,'package': encodeURIComponent(rdata.package_info),}, function(res){
-									console.log('安卓端提现,需判断是否成功'); //需要跳转至详情
+									console.log('安卓端提现,需判断是否成功');
 									setTimeout(() => {
-										var url = withdrawLog.replace("%id%", id);
+										var url = withdrawLog.replace("%id%", response.data.info);
 										setTimeout(() => {
 											location.href = url+'?from=' + that.from;
 										}, 500);
@@ -418,7 +390,6 @@ new Vue({
 		otherApply(){
 			let that = this;
 			that.loading = true;
-			// 此处的from表示从商家端app还是个人端app请求
 			const data=`bank=${this.bank}&bankCode=${this.bankCode}&bankName=${this.bankName}&cardnum=${this.cardnum}&cardname=${this.cardname}&amount=${this.amountNum}&from=${this.from}`;
 			axios.post(`/include/ajax.php?service=member&action=withdraw`,data)
 			.then(response =>{
@@ -488,7 +459,6 @@ new Vue({
 		},
 	},
 	mounted() {
-		const that = this;
 		// APP上取消下拉刷新
 		toggleDragRefresh('off');
 		this.getAllData()
@@ -499,9 +469,6 @@ new Vue({
 		// 单次最多提现
 		this.maxWithdraw=maxWithdraw;
 		this.from=from;
-		if(from == 'wmsj'){
-			that.checkBindWx(); //查询是否绑定过微信
-		}
 		if(this.from == 'invite'){
 			this.allAmount=totalCanWithdrawn;
 		}else{

@@ -928,15 +928,14 @@ $(function () {
     uploader.on('uploadSuccess', function (file, response) {
       var $li = $('#' + file.id);
       if (response.state == "SUCCESS") {
-        var response_url = response.url.toString();
-        var src = response_url.indexOf('http') > -1 ? response_url : "/include/attachment.php?f=" + response_url;
-        $li.find("img").attr("data-val", response_url).attr("src", src);
+        var src = response.url.indexOf('http') > -1 ? response.url : "/include/attachment.php?f=" + response.url;
+        $li.find("img").attr("data-val", response.url).attr("src", src);
 
         var video = [];
         if (id == "2") {
           var $li = $('#' + file.id);
-          var src = response_url.indexOf('http') > -1 ? response_url : "/include/attachment.php?f=" + response_url;
-          $li.html('<video class="video-js" data-setup="{}" controls src="' + src + '" data-val="' + response_url + '" webkit-playsinline="true" preload="auto" playsinline x5-video-player-type="h5" x5-video-player-fullscreen="true" x5-video-ignore-metadata="true" poster="' + response.poster + '"><source src="' + src + '"></source></video></div>');
+          var src = response.url.indexOf('http') > -1 ? response.url : "/include/attachment.php?f=" + response.url;
+          $li.html('<video class="video-js" data-setup="{}" controls src="' + src + '" data-val="' + response.url + '" webkit-playsinline="true" preload="auto" playsinline x5-video-player-type="h5" x5-video-player-fullscreen="true" x5-video-ignore-metadata="true" poster="' + response.poster + '"><source src="' + src + '"></source></video></div>');
           var $btns = $('<div class="file-panel"><span class="cancel"></span></div>').appendTo($li);
           $li.after('<div contenteditable="true" class="inp-item placeholder"><font class="txt-gray">帖子内容</font></div>');
           $btns.on('click', '.cancel', function () {

@@ -4,18 +4,15 @@
 <head>
 	<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
-	<title>发布活动</title>
+	<title>新增活动</title>
 	<meta name="keywords" content="{#$cfg_keywords#}">
 	<meta name="description" content="{#$cfg_description#}">
-	<link rel="stylesheet" type="text/css" media="all"
-		href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
-	<link rel="stylesheet" href="{#$templets_skin#}css/base_info.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
 	<link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/datetimepicker.css?v={#$cfg_staticVersion#}">
 	<link rel="stylesheet" href="{#$cfg_staticPath#}/css/admin/bootstrap.css?v={#$cfg_staticVersion#}">
 	<link rel="stylesheet" href="{#$templets_skin#}css/pub_loupan.css?v={#$cfg_staticVersion#}">
 	<link rel="stylesheet" href="{#$templets_skin#}css/add_huodong.css?v={#$cfg_staticVersion#}">
-	<script type="text/javascript"
-		src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
 	<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
 	<script type="text/javascript">
 		var masterDomain = '{#$cfg_basehost#}',
@@ -38,15 +35,13 @@
 			mapCity = "{#$mapCity#}",
 			subwayCity = 0;
 		var peitaoList = [];
-		var imglist = { "list1": '{#$imglist#}', };
-		var currid = 5;
+		var imglist = {"list1": '{#$imglist#}',};
+		var currid = 9;
 		var id = "{#$huodonglist.id#}";
 		var loupanid = "{#$loupanid#}";
 		var modelType = 'house';
-		var backsuccessFn = '';
 	</script>
 </head>
-
 <body class="w1200">
 	<div id="page">
 		<!-- 头部 -->
@@ -56,133 +51,60 @@
 			<!-- 右侧 -->
 			<div class="right_box">
 				<div class="rConBox">
-					<h3>{{article_id?'修改':'发布'}}活动</h3>
+					<h3>新增活动</h3>
 					<div class="formbox huxingFormbox">
 						<form action="" id="form">
-							<div class="inpbox required">
-								<label><em>* </em>活动类型</label>
-								<div class="inp_div radiobox">
-									<ul>
-										<li :class="{'chose':item.id==typeId}" v-for="(item,i) in type" :key="item.id"
-											@click="tabFn(item.id)">
-											<input type="radio" name="type" :value="item.id"
-												:checked="item.id==typeId"><s></s>{{item.title}}
-										</li>
-									</ul>
-								</div>
-							</div>
+							<input type="hidden" name="loupanid" value="{#$loupanid#}">
+							<input type="hidden" name="aid" value="{#$huodonglist.id#}">
+							<input type="hidden" name="dopost" value="{#if $huodonglist.id!=''#}edit{#else#}add{#/if#}">
 							<div class="inpbox required">
 								<label><em>* </em>活动标题</label>
 								<div class="inp_div">
-									<div class="inp ">
-										<input type="text" name="title" placeholder="请输入活动标题" v-model="title"></input>
-									</div>
+									<div class="inp "><input type="text" name="title" placeholder="请输入活动标题" data-regex=".{3,60}" value="{#$huodonglist.title#}"></div>
 								</div>
 							</div>
-							<div class="inpbox required" v-if="typeId==2">
-								<label><em>* </em>立减</label>
-								<div class="inp_div xs_inp" style="display: flex;">
-									<div class="inp ">
-										<input type="text" name="val" v-model="discount" placeholder="请输入金额"></input>
-									</div>
-									<span class="dw">元</span>
-									<ul class="inp_div radiobox" style="margin-left: 15px;">
-										<li :class="[{chose:unit==1}]" @click="unit=1">
-											<input type="radio" hidden><s></s>每套
-										</li>
-										<li :class="[{chose:unit==2}]" @click="unit=2">
-											<input type="radio" hidden><s></s>每平米
-										</li>
-									</ul>
-									<input type="text" name="unit" v-model="unit" style="display: none;"/>
-								</div>
-							</div>
-							<div class="inpbox required" v-else-if="typeId==3">
-								<label><em>* </em>优惠</label>
-								<div class="inp_div xs_inp">
-									<div class="inp ">
-										<input type="text" name="val" v-model="discount" placeholder="请输入折扣"></input>
-									</div>
-									<span class="dw">折</span>
-								</div>
-							</div>
-							<div class="inpbox required" v-else-if="typeId==4">
-								<label><em>* </em>成交返现</label>
-								<div class="inp_div xs_inp">
-									<div class="inp ">
-										<input type="text" name="val" v-model="discount" placeholder="请输入金额"></input>
-									</div>
-									<span class="dw">元</span>
-								</div>
-							</div>
-							<div class="inpbox required" key="static">
+
+							<div class="inpbox required">
 								<label><em>* </em>活动封面</label>
 								<div class="inp_div img_upload listImgBox">
-									<input type="hidden" name="thumb" class="imglist-hidden" v-model="thumb" placeholder="请上传活动封面" />
-									<div class="imgbox">
-										<div :class="['upload_btn filePicker uploadinp',{hide:thumb}]"
-											id="filePicker1" data-type="thumb" data-count="1" data-size="{#$thumbSize#}"
-											data-imglist="">
+									<input type="hidden" name="litpic" class="imglist-hidden" placeholder="请上传活动封面"/>
+									<div class="imgbox" >
+										<div class="upload_btn filePicker uploadinp {#if $huodonglist.litpic != ""#}hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist="">
 											<s></s>
 											<p>点击上传图片</p>
 										</div>
 										<div class="imgShow">
 											<ul id="listSection1" class="listSection thumblist">
-												<li id="WU_FILE_0" class="pubitem" v-if="thumb&&article_id">
-													<a :href="showThumb" target="_blank" title="" class="enlarge">
-														<img :src="showThumb" :data-val="thumb" data-url="showThumb">
-													</a>
-													<a class="reupload li-rm" href="javascript:;">重新上传</a>
-												</li>
+												{#if $huodonglist.litpic#}
+												<li  id="WU_FILE_0" class="pubitem"><a href="{#$cfg_basehost#}/include/attachment.php?f={#$huodonglist.litpic#}" target="_blank" title="" class="enlarge"><img src="{#$cfg_basehost#}/include/attachment.php?f={#$huodonglist.litpic#}" data-val="{#$huodonglist.litpic#}" data-url="{#$cfg_basehost#}/include/attachment.php?f={#$huodonglist.litpic#}"></a><a class="reupload li-rm" href="javascript:;">重新上传</a></li>
+												{#/if#}
 											</ul>
+											<!-- <div class="reupload">重新上传</div> -->
 										</div>
 									</div>
 									<p class="tip">推荐尺寸500像素*390像素</p>
 								</div>
 							</div>
-							<div class="inpbox required" v-if="typeId==1||typeId==5">
-								<label><em>* </em>活动报名时间</label>
-								<div class="inp_div sel_inp" style="display: flex;align-items: center;">
-									<div class="inp time">
-										<input name="startTime" id="hdStart" type="text" v-model="startTime" placeholder="请选择活动开始时间"></input><s></s> 
-									</div>
-									<div class="text">-</div>
-									<div class="inp time">
-										<input name="endTime" id="hdEnd" type="text" v-model="endTime" placeholder="请选择活动结束时间"></input><s></s> 
-									</div>
-								</div>
-							</div>
-							<template v-else>
-								<div class="inpbox required">
-									<label><em>* </em>优惠有效期</label>
-									<div class="inp_div sel_inp" style="display: flex;align-items: center;">
-										<div class="inp time">
-											<input name="startTime" id="hdStart" type="text" v-model="startTime" placeholder="开始时间"></input><s></s> 
-										</div>
-										<div class="text">-</div>
-										<div class="inp time">
-											<input name="endTime" id="hdEnd" type="text" v-model="endTime" placeholder="结束时间"></input><s></s> 
-										</div>
-									</div>
-								</div>
-								<div class="inpbox required">
-									<label><em>* </em>领取截止时间</label>
-									<div class="inp_div sel_inp" style="display: flex;align-items: center;">
-										<div class="inp time">
-											<input name="deadline" id="deadline" type="text" v-model="deadline" placeholder="选择时间"/><s></s> 
-										</div>
-									</div>
-								</div>
-							</template>
+
+
+
+
+
 							<div class="inpbox required">
-								<label>活动说明</label>
-								<div class="inp_div">
-									<div class="inp_textarea xs_inp">
-										<textarea name="note" placeholder="请输入该户型详细解析" v-model="note"></textarea>
-									</div>
+								<label><em>* </em>活动开始时间</label>
+								<div class="inp_div sel_inp">
+										<div class="inp "><input name="ktime" id="hdStart" type="text" value="{#$huodonglist.ktime|date_format:'%Y-%m-%d %H:%M:%S'#}"  placeholder="请选择活动开始时间" ><s></s> </div>
 
 								</div>
 							</div>
+							<div class="inpbox required">
+								<label><em>* </em>活动结束时间</label>
+								<div class="inp_div sel_inp">
+										<div class="inp "><input name="etime" id="hdEnd" type="text" value="{#$huodonglist.etime|date_format:'%Y-%m-%d %H:%M:%S'#}"  placeholder="请选择活动结束时间" ><s></s> </div>
+
+								</div>
+							</div>
+
 
 							<a href="javascript:;" class="submit" @click="submit()">确认提交</a>
 						</form>
@@ -201,9 +123,8 @@
 	</div>
 	<div>{#$cfg_statisticscode#}</div>
 </body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/bootstrap-datetimepicker.min.js?v={#$cfg_staticVersion#}"></script>
 <script type="text/javascript" src="{#$templets_skin#}js/publicUpload_v2.js?v={#$cfg_staticVersion#}"></script>
-<script type="text/javascript"
-	src="{#$cfg_staticPath#}js/ui/bootstrap-datetimepicker.min.js?v={#$cfg_staticVersion#}"></script>
 <script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
 <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
 <script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>

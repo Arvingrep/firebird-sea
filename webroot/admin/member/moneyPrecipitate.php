@@ -71,18 +71,8 @@ if($dopost == "getList"){
     // 搜索关键字
     if($sKeyword!=""){
         $sKeyword = trim($sKeyword);
-		$isId = false;
-		if(substr($sKeyword, 0, 1) == '#'){
-			$id = substr($sKeyword, 1);
-			if(is_numeric($id)){
-				$isId = true;
-				$wherekey = " AND m.`id` = $id";
-			}
-		}
-		if(!$isId){
-            $like_name = "%".$sKeyword."%";
-            $wherekey = " AND (m.`nickname` like '$like_name' or p.`ordernum` like '$like_name' or p.`title` like '$like_name')";
-        }
+        $like_name = "%".$sKeyword."%";
+        $wherekey = " AND (m.`nickname` like '$like_name' or p.`ordernum` like '$like_name' or p.`title` like '$like_name')";
     }
     $allsql = $dsql::SetQuery("select p.*,a.`typename` 'cityname',m.`nickname` from `#@__money_precipitate` p left join `#@__site_area` a on p.`cityid`=a.`id` left join `#@__member` m on p.`uid`=m.`id` WHERE 1 = 1 $wheresoure $wheretime $wherecity $wherekey");
 

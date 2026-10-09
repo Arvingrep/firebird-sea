@@ -18,21 +18,7 @@ $templates = "siteNotifyAdd.html";
 $action     = "site_notify";
 $pagetitle  = "新增消息通知";
 
-// 获取所有分站绑定的公众号
-global $cfg_siteCityAdvanced_wechat;
-$wechatArr = array();
-
-// 再添加分站配置，保持原key不变
-if($cfg_siteCityAdvanced_wechat && is_array($cfg_siteCityAdvanced_wechat)){
-    foreach($cfg_siteCityAdvanced_wechat as $key => $value){
-        if(($userType == 3 && $key == $adminCityIds) || $userType != 3){
-            $wechatArr[$key] = $value;
-        }
-    }
-}
-
 //表单二次验证
-$wechat_city_tempid = array();
 if($submit == "提交"){
 	if($token == "") die('token传递失败！');
 
@@ -40,17 +26,6 @@ if($submit == "提交"){
 		echo '{"state": 200, "info": "请输入消息名称"}';
 		exit();
 	}
-
-    if($wechatArr){
-        foreach($wechatArr as $key => $value){
-            $formObj = 'wechat_tempid_' . $key;
-            if(${$formObj}){
-                $wechat_city_tempid[$key] = ${$formObj};
-            }
-        }
-    }
-
-    $wechat_city_tempid = json_encode($wechat_city_tempid, JSON_UNESCAPED_UNICODE);
 }
 
 if($dopost == "edit"){
@@ -88,7 +63,7 @@ if($dopost == "edit"){
 		$state = (int)$state;
 
 		//保存到主表
-		$archives = $dsql->SetQuery("UPDATE `#@__".$action."` SET `email_state` = '$email_state', `email_title` = '$email_title', `email_body` = '$email_body', `sms_state` = '$sms_state', `sms_tempid` = '$sms_tempid', `sms_intempid` = '$sms_intempid',`sms_body` = '$sms_body',`sms_note` = '$sms_note', `wechat_state` = '$wechat_state', `wechat_tempid` = '$wechat_tempid', `wechat_city_tempid` = '$wechat_city_tempid', `wechat_body` = '$wechat_body', `site_state` = '$site_state', `site_title` = '$site_title', `site_body` = '$site_body', `app_state` = '$app_state', `app_title` = '$app_title', `app_body` = '$app_body',`wechat_serial` = '$wechat_serial',`state` = '$state'".$where." WHERE `id` = ".$id);
+		$archives = $dsql->SetQuery("UPDATE `#@__".$action."` SET `email_state` = '$email_state', `email_title` = '$email_title', `email_body` = '$email_body', `sms_state` = '$sms_state', `sms_tempid` = '$sms_tempid', `sms_intempid` = '$sms_intempid',`sms_body` = '$sms_body',`sms_note` = '$sms_note', `wechat_state` = '$wechat_state', `wechat_tempid` = '$wechat_tempid', `wechat_body` = '$wechat_body', `site_state` = '$site_state', `site_title` = '$site_title', `site_body` = '$site_body', `app_state` = '$app_state', `app_title` = '$app_title', `app_body` = '$app_body',`wechat_serial` = '$wechat_serial',`state` = '$state'".$where." WHERE `id` = ".$id);
 		$results = $dsql->dsqlOper($archives, "update");
 
 		if($results != "ok"){
@@ -120,7 +95,6 @@ if($dopost == "edit"){
 				$sms_note      = $results[0]['sms_note'];
 				$wechat_state  = $results[0]['wechat_state'];
 				$wechat_tempid = $results[0]['wechat_tempid'];
-                $wechat_city_tempid = $results[0]['wechat_city_tempid'];
 				$wechat_body   = $results[0]['wechat_body'];
 				$wechat_serial = $results[0]['wechat_serial'];
 				$site_state    = $results[0]['site_state'];
@@ -164,7 +138,7 @@ if($dopost == "edit"){
 		$state = (int)$state;
 
 		//保存到主表
-		$archives = $dsql->SetQuery("INSERT INTO `#@__".$action."` (`title`, `email_state`, `email_title`, `email_body`, `sms_state`, `sms_tempid`, `sms_intempid`,`sms_body`,`sms_note`, `wechat_state`, `wechat_tempid`, `wechat_city_tempid`, `wechat_body`, `site_state`, `site_title`, `site_body`, `app_state`, `app_title`, `app_body`, `state`, `system`,`wechat_serial`) VALUES ('$title', '$email_state', '$email_title', '$email_body', '$sms_state', '$sms_tempid','$sms_intempid', '$sms_body', '$sms_note', '$wechat_state', '$wechat_tempid', '$wechat_city_tempid', '$wechat_body', '$site_state', '$site_title', '$site_body', '$app_state', '$app_title', '$app_body', '$state', '2','$wechat_serial')");
+		$archives = $dsql->SetQuery("INSERT INTO `#@__".$action."` (`title`, `email_state`, `email_title`, `email_body`, `sms_state`, `sms_tempid`, `sms_intempid`,`sms_body`,`sms_note`, `wechat_state`, `wechat_tempid`, `wechat_body`, `site_state`, `site_title`, `site_body`, `app_state`, `app_title`, `app_body`, `state`, `system`,`wechat_serial`) VALUES ('$title', '$email_state', '$email_title', '$email_body', '$sms_state', '$sms_tempid','$sms_intempid', '$sms_body', '$sms_note', '$wechat_state', '$wechat_tempid', '$wechat_body', '$site_state', '$site_title', '$site_body', '$app_state', '$app_title', '$app_body', '$state', '2','$wechat_serial')");
 		$return = $dsql->dsqlOper($archives, "update");
 
 		if($return == "ok"){
@@ -214,17 +188,8 @@ if(file_exists($tpl."/".$templates)){
 	$huoniaoTag->assign('state', $state);
 	$huoniaoTag->assign('system', $system);
 
-    if($wechat_city_tempid){
-        $wechat_city_tempid = json_decode($wechat_city_tempid, true);
-        foreach($wechat_city_tempid as $key => $value){
-            $huoniaoTag->assign('wechat_tempid_' . $key, $value);
-        }
-    }
-
 	global $cfg_smsAlidayu;
 	$huoniaoTag->assign('cfg_smsAlidayu', $cfg_smsAlidayu);
-
-    $huoniaoTag->assign('wechatArr', $wechatArr);
 
 	$huoniaoTag->compile_dir = HUONIAOROOT."/templates_c/admin/siteConfig";  //设置编译目录
 	$huoniaoTag->display($templates);

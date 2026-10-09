@@ -21,9 +21,6 @@ if(isset($set_modules) && $set_modules == TRUE){
 	/* 名称 */
     $payment[$i]['pay_name'] = "抖音小程序";
 
-	/* 所属公司 */
-    $payment[$i]['title'] = "抖音";
-
     /* 版本号 */
     $payment[$i]['version']  = '1.0.0';
 

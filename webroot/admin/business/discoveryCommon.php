@@ -105,7 +105,7 @@ if ($action == "getArticleCommonDetail") {
                 if($rid!=0){
                     $pcid = $rid;
                     $pltype = "回复了您";
-                    $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $pcid);
+                    $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $pcid);
                     $results  = $dsql->dsqlOper($archives, "results");
                     if($results){
                         $admin        = $results[0]['userid'];
@@ -214,7 +214,7 @@ if ($action == "getArticleCommonDetail") {
                         if($rid!=0){
                             $pcid = $rid;
                             $pltype = "回复了您";
-                            $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $pcid);
+                            $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $pcid);
                             $results  = $dsql->dsqlOper($archives, "results");
                             if($results){
                                 $admin        = $results[0]['userid'];

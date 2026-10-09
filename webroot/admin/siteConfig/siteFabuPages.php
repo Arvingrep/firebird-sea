@@ -9,7 +9,7 @@
  */
 define('HUONIAOADMIN', "..");
 require_once(dirname(__FILE__)."/../inc/config.inc.php");
-checkPurview("siteDiyConfig");
+checkPurview("siteFabuPages");
 $dsql = new dsql($dbo);
 $tpl = dirname(__FILE__)."/../templates/siteConfig";
 $huoniaoTag->template_dir = $tpl; //设置后台模板目录

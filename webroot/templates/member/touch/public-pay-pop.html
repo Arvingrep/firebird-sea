@@ -115,7 +115,6 @@
 	}
 </style>
 <div id="payPage">
-    <div id="iframe-box" style="opacity: 0;"></div>
 	<div class="payBeforeLoading"></div>
 	<!-- 支付遮罩 -->
 	<div class="payMask"></div>
@@ -288,22 +287,6 @@
 					</div>
 					<div class="check-item-right"><input type="radio" name="paytype" value="xorpay_alipay"><span class="checkbox-icon-round"></span></div>
 				</li>
-				{#elseif $row.pay_code == "allinpay_wxpay"#}
-				<li class="check-item" id="wxpayObj" data-code="{#$row.pay_code#}">
-					<div class="left_item">
-						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/wxpay.png"></div>
-						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>
-					</div>
-					<div class="check-item-right"><input type="radio" name="paytype" value="allinpay_wxpay"><span class="checkbox-icon-round"></span></div>
-				</li>
-				{#elseif $row.pay_code == "allinpay_alipay"#}
-				<li class="check-item" id="alipayObj" data-code="{#$row.pay_code#}">
-					<div class="left_item">
-						<div class="check-item-img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/alipay.png"></div>
-						<div class="check-item-txt"><h3>{#$row.pay_name#}</h3></div>
-					</div>
-					<div class="check-item-right"><input type="radio" name="paytype" value="allinpay_alipay"><span class="checkbox-icon-round"></span></div>
-				</li>
 				{#/if#}
 				{#/loop#}
 
@@ -421,7 +404,6 @@
     <div class="payPhoneSuccessTips">支付成功</div>
 </div>
 <script>
-    var app_platform = '{#$app_platform#}'
     var monBonus = '{#$userinfo.surplusbonus#}';
     var bonus = '{#$userinfo.bonus#}'
     var pwdCheck = '{#$userinfo.paypwdCheck#}';
@@ -739,11 +721,6 @@
                     }
 
                     var appcall = payType == 'wxpay' ? 'wechatPay' : (payType == 'alipay' ? 'aliPay' : '')
-                    if(payType == 'allinpay_wxpay'){
-                        appcall = 'allInPayWx'
-                    }else if(payType == 'allinpay_alipay'){
-                        appcall = 'allInPayAli'
-                    }
                     if (service == 'waimai' && typeof (shopid) != "undefined") {
                         console.log('清除购物车')
                         utils.removeStorage("wm_cart_" + shopid)
@@ -753,13 +730,13 @@
                         payType == 'huoniao_bonus' || 
                         (
                             (
-                                (payType == 'wxpay' || payType == 'allinpay_wxpay') && 
+                                payType == 'wxpay' && 
                                 !navigator.userAgent.toLowerCase().match(/micromessenger/)  && 
                                 navigator.userAgent.toLowerCase().indexOf('huoniao') > -1
                             ) 
                             || 
                             (
-                                (payType == 'alipay' || payType == 'allinpay_alipay') && 
+                                payType == 'alipay' && 
                                 navigator.userAgent.toLowerCase().indexOf('huoniao') > -1
                             )
                         )
@@ -925,7 +902,7 @@
                         if(typeof ordernum != 'undefined'){
                             $("#pordernum").val(ordernum);
                         }
-                        
+
                         // $("#publicpayform").submit();
                         var addressid = $("#address").val() || '';
                         $(".payCancelMask,.payCancelPop").css('display', 'none');
@@ -937,7 +914,7 @@
                             var housetype = $("#payform input[name='type']").val();
                             housetypestr = "&type=" + housetype;
                         }
-                        
+                        console.log($("#publicpayform").serialize())
                         $("#payPage .btn_pay").attr('href', masterDomain + "/include/ajax.php?" + $("#publicpayform").serialize() + "&addressid=" + addressid + housetypestr)
                         setTimeout(function () {
                             $("#payPage .btn_pay").attr('href', 'javascript:;')
@@ -999,19 +976,6 @@
                 })
             },
 
-            getwxPayInfo:function(url){
-                const that = this;
-                $.ajax({
-                    url: url,
-                    type: "POST",
-                    dataType: "json",
-                    success: function (data) {
-                        if(data.state == 100){
-                            that.jsApiCall(data.info)
-                        }
-                    }
-                })
-            },
             // 微信或者小程序
             jsApiCall: function (jsApiParameters) {
                 var tt = this;
@@ -1019,6 +983,9 @@
                 wx.miniProgram.getEnv(function (res) {
                     wx_miniprogram = res.miniprogram;
                 });
+
+                var jsApiParameters = tt.jsApiParameters
+
                 //小程序
                 if (window.__wxjs_environment == 'miniprogram' || wx_miniprogram) {
                     var params = '?timestamp=' + jsApiParameters.timeStamp + '&nonceStr=' + jsApiParameters.nonceStr + '&signType=' + jsApiParameters.signType + '&paySign=' + encodeURIComponent(jsApiParameters.paySign) + '&prepay_id=' + (jsApiParameters.package).replace('prepay_id=', '') + '&returnUrl=' + encodeURIComponent('{#$returnUrl#}');
@@ -1069,64 +1036,19 @@
                 });
             },
 
-            // 创建iframe并打开
-            createAndOpenIframe(url) {
-                // 创建一个iframe元素
-                let iframe = document.createElement('iframe');
-                
-                // 设置iframe的属性
-                iframe.src = url; // 设置iframe的src属性为要打开的页面
-                iframe.height = '0'; // 设置iframe的高度
-                iframe.width = '0'; // 设置iframe的宽度
-                iframe.id = 'doc_iframe'; // 设置iframe的id
-                // 添加onload事件，以便在iframe加载完成后执行一些操作
-                if (iframe.attachEvent) {
-                    iframe.attachEvent('onload', function() {
-                        console.log('Iframe loaded using attachEvent');
-                        // 这里可以添加一些在iframe加载完成后要执行的代码
-                    });
-                } else {
-                    iframe.onload = function() {
-                        console.log('Iframe loaded using onload');
-                        // 这里可以添加一些在iframe加载完成后要执行的代码
-                    };
-                }
-                
-                // 将创建好的iframe元素添加到页面中的一个指定位置
-                document.getElementById('iframe-box').appendChild(iframe);
-            },
-
             // 调起客户端支付
             appPay(orderInfo, appCall) {
                 var tt = this;
-                let isn_ios = navigator.userAgent.toLowerCase().indexOf('huoniao_android') > -1 || navigator.userAgent.toLowerCase().indexOf('huoniao_harmony') > -1;
-		        if(isn_ios || appCall == 'wechatPay' || appCall == 'aliPay'){
-                    setupWebViewJavascriptBridge(function (bridge) {
-                        isOpen = true;
-                        bridge.callHandler(appCall, {
-                            "orderInfo": orderInfo
-                        }, function (responseData) {
-                            // if(responseData == 'fail'){
-                            // 	window.location.href = orderurl;
-                            // }
-                        });
+                setupWebViewJavascriptBridge(function (bridge) {
+                    isOpen = true;
+                    bridge.callHandler(appCall, {
+                        "orderInfo": orderInfo
+                    }, function (responseData) {
+                        // if(responseData == 'fail'){
+                        // 	window.location.href = orderurl;
+                        // }
                     });
-                }else if(appCall == 'allInPayWx'){
-                    // 新增的通用支付方式 -- 通用微信 => 跳转第三方小程序
-                    let paramArr = []
-                    for(let item in orderInfo){
-                        paramArr.push(item + '=' + orderInfo[item])
-                    }
-                    let miniId = 'gh_e64a1a89a0ad';
-                    let miniPath = '/pages/orderDetail/orderDetail'
-                    miniPath = miniPath + '?' + paramArr.join('&')
-                    setupWebViewJavascriptBridge(function(bridge) {
-                        bridge.callHandler('redirectToWxMiniProgram', {'id':miniId,'path': miniPath},  function(responseData){});
-                    })
-                }else if(appCall == 'allInPayAli'){ //通过iframe打开支付宝
-                    // 调用函数来创建并打开iframe
-                    tt.createAndOpenIframe(orderInfo);
-                }      
+                });
 
                 setTimeout(function () {
                     window.location.href = orderurl;

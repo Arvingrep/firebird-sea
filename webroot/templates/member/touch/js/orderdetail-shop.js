@@ -71,39 +71,12 @@ $(function(){
 
 	//收货
 	$(".sh").bind("click", function(){
-		// 此处需要判断当前订单是否是微信支付 并且是在微信小程序环境下 ，如果是微信小蒲城县支付但是不在小程序里 则需要提示 在小程序中打开
-		if(miniProgramShippingManage){ //是否开了小程序收货功能
-			if(typeof wx_miniprogram != 'undefined' && wx_miniprogram && wxminiPayment && transactionId ){
-				let transaction_id = transactionId;
-				let url = window.location.href;
-				let path = encodeURIComponent(url.replace('?', 'huoniaowh').replace(/\&/g, 'huoniaolj').replace(/\=/g, 'huoniaodh'));
-				wx.miniProgram.redirectTo({
-					url:`/pages/packages/mcenter/orderConfirm/orderConfirm?transaction_id=${transaction_id}&url=${path}`
-				})
-				return false;
-			}else if((typeof wx_miniprogram == 'undefined' || !wx_miniprogram) && wxminiPayment && transactionId){
-				// 表示 在h5页面中打开了小程序中支付的订单  此时需要提示在小程序中打开才能确认收货
-				var popOptions = {
-					title: '温馨提示', //'确定删除信息？', //提示文字
-					btnCancelColor: '#407fff',
-					isShow:true,
-					confirmHtml: '<p style="margin-top:.2rem;">请在微信小程序中打开此页面进行确认收货</p>' , //'一经删除不可恢复', //副标题
-					btnCancel: '好的，知道了',
-					noSure: true
-				}
-				confirmPop(popOptions);
-				return false;
-			}
-		}
 		$('.sureshmask').show();
 		$('.sureshAlert').addClass('show');
 	});
 	//收货--确认
 	$('.sureshAlert .suresh').click(function(){
-
-		
 		var t = $(this);
-
 		if(t.hasClass('disabled')) return;
 		t.addClass("disabled");
 		$.ajax({

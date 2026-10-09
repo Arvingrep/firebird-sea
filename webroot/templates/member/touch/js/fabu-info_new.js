@@ -1856,20 +1856,18 @@ function dataURLtoFile(dataurl, filename) { //将base64转换为文件
 			var desc = $("#desc").html().replace(/<br>/g,'\n');  //内容
 			let customArr = [];
 			let feature_text = []
-            if(feature){
-                let featureValue_arr = that.featureValue.split(',')
-                for(let i = 0; i < featureValue_arr.length; i++){
-                    let obj = that.features.find(item => {
-                        return item.id == featureValue_arr[i]
-                    })
-                    if(obj){
-                        feature_text.push(obj.name)
-                    }
-                }
-                if(feature_text && feature_text.length){
-                    customArr.push(`特色标签:${feature_text.join('、')}`)
-                }
-            }
+			let featureValue_arr = that.featureValue.split(',')
+			for(let i = 0; i < featureValue_arr.length; i++){
+				let obj = that.features.find(item => {
+					return item.id == featureValue_arr[i]
+				})
+				if(obj){
+					feature_text.push(obj.name)
+				}
+			}
+			if(feature_text && feature_text.length){
+				customArr.push(`特色标签:${feature_text.join('、')}`)
+			}
 			for(let i = 0; i < that.dCustomArr.length; i++){
 				if(that.dCustomArr[i].value ){
 					customArr.push(`${that.dCustomArr[i].type}:${that.dCustomArr[i].value}`)

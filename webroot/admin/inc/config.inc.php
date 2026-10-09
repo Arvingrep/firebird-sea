@@ -8,19 +8,11 @@
  * @link           https://www.ihuoniao.cn/
  */
 require_once(HUONIAOADMIN.'/../include/common.inc.php');
-include_once(HUONIAOINC.'/class/aliyun-php-sdk-core/Config.php');   //引入阿里云SDK
 require_once(HUONIAOINC.'/class/userLogin.class.php');
 $huoniaoTag->caching         = FALSE;                             //是否使用缓存，后台不需要开启
 $huoniaoTag->compile_dir     = HUONIAOROOT."/templates_c/admin";  //设置编译目录
 $huoniaoTag->template_dir = dirname(__FILE__)."/templates";       //设置后台模板目录
 $userLogin = new userLogin($dbo);
-
-// 官方应用商店防域名拦截：对官方云市场鉴权伪装授权域名
-if((isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'store.php') !== false) || (isset($_SERVER['SCRIPT_NAME']) && strpos($_SERVER['SCRIPT_NAME'], 'store.php') !== false)){
-    $_SERVER['HTTP_HOST'] = 'fh580.net';
-    $_SERVER['SERVER_NAME'] = 'fh580.net';
-    $cfg_basehost = 'fh580.net';
-}
 
 //获取当前地址
 $Nowurl = $s_scriptName = '';
@@ -50,7 +42,7 @@ if($action != 'dorevert'){
 	//css
 	$huoniaoOfficial = '';
 	if(!testPurview("huoniaoOfficial")){
-		$huoniaoOfficial = "\r\n<style>.alert.alert-success, .huoniaoOfficial {display: none!important;} a[href^='https://help.kumanyun.com'] {display: none!important;}</style>";
+		$huoniaoOfficial = "\r\n<style>.alert.alert-success {display: none!important;} a[href^='https://help.kumanyun.com'] {display: none!important;}</style>";
 	}
 	$huoniaoTag->assign('cssFile', includeFile('css') . $huoniaoOfficial);
 
@@ -135,10 +127,6 @@ $configPay = $dsql->SetQuery("SELECT `pay_name` FROM `#@__site_payment` WHERE `p
 $Payconfig= $dsql->dsqlOper($configPay, "results");
 $bonusName = $payname = $Payconfig[0]['pay_name'] ? $Payconfig[0]['pay_name'] : '消费金';
 $huoniaoTag->assign('bonusName', $bonusName);
-
-//商家入驻配置信息
-$cfg_BusinessJoinConfig = getBusinessJoinConfig();
-$huoniaoTag->assign('businessConfig', $cfg_BusinessJoinConfig);
 
 
 //获取分站筛选条件，只有在分站管理员登录状态时才需要返回值

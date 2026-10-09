@@ -150,6 +150,8 @@ class Loginwechat {
       global $cfg_secureAccess;
       global $cfg_basehost;
 
+      // print_r($return);die;
+
       //获取access_token
       if(!empty($return['code'])){
         $token_url = "https://api.weixin.qq.com/sns/oauth2/access_token?appid=" . $data["appid"]. "&secret=" . $data["appsecret"]. "&code=" . $return['code'] . "&grant_type=authorization_code";
@@ -202,7 +204,23 @@ class Loginwechat {
                 }
             }
         }
-        
+        //根据获取到的unionid，查询用户是否已经注册过，如果已经注册过，直接登录
+        if($unionid){
+    		$sql = $dsql->SetQuery("SELECT `id` FROM `#@__member` WHERE (`".$logincode."_conn` = '$unionid' OR `wechat_openid` = '$unionid' OR `".$logincode."_conn` = '$openid' OR `wechat_openid` = '$openid') AND (`mtype` = 1 OR `mtype` = 2)");
+            $ret = $dsql->dsqlOper($sql, "results");
+            if($ret){
+                $userLogin = new userLogin($dbo);
+                $data = array(
+                    "code"     => $logincode,
+                    "key"      => $unionid,
+                    "openid"   => $openid,
+                    "notclose" => $return['notclose'],
+                    "state"    => $return['qr']
+                );
+                $userLogin->loginConnect($data);
+                exit();
+            }
+        }
 
         if(isset($token['errcode'])) {
           //code been used 错误直接跳回首页
@@ -282,36 +300,7 @@ class Loginwechat {
             // $gender   = $user_info['sex'] == 1 ? '男' : '女';
             $gender   = '男';  //微信规则升级后，不再返回性别、省市区、语言信息  https://mmbiz.qpic.cn/mmbiz_png/3Luz3T7WxtYb1clMcSI35oty2EFgicEgdn21AAgNl6VQy19XLLVd2shJbGD9sUJGtrPbMZ48p1E1B4Zxxps1C4w/0
 
-            $userLogin = new userLogin();
-
-            //根据获取到的unionid，查询用户是否已经注册过，如果已经注册过，直接登录
-            if($unionid){
-                $sql = $dsql->SetQuery("SELECT `id`, `photo` FROM `#@__member` WHERE (`".$logincode."_conn` = '$unionid' OR `wechat_openid` = '$unionid' OR `".$logincode."_conn` = '$openid' OR `wechat_openid` = '$openid') AND (`mtype` = 1 OR `mtype` = 2)");
-                $ret = $dsql->dsqlOper($sql, "results");
-                if($ret){
-
-                    //如果微信的头像发生变化，同步更新网站头像
-                    $userid = (int)$ret[0]['id'];
-                    $_photo = trim($ret[0]['photo']);
-
-                    //更新用户头像
-                    if($photo != $_photo && strstr($_photo, "qlogo.cn")){
-                        $sql = $dsql->SetQuery("UPDATE `#@__member` SET `photo` = '$photo' WHERE `id` = '$userid'");
-                        $dsql->dsqlOper($sql, "update");
-                    }
-                    
-                    $data = array(
-                        "code"     => $logincode,
-                        "key"      => $unionid,
-                        "openid"   => $openid,
-                        "notclose" => $return['notclose'],
-                        "state"    => $return['qr']
-                    );
-                    $userLogin->loginConnect($data);
-                    exit();
-                }
-            }
-
+            $userLogin = new userLogin($dbo);
             $data = array(
                 "code"     => $logincode,
                 "key"      => $key,
@@ -350,6 +339,51 @@ class Loginwechat {
         $_wechatAppLogin->DEBUG("openid：" . $openid);
         $_wechatAppLogin->DEBUG("unionid：" . $unionid);
 
+
+        //根据获取到的unionid，查询用户是否已经注册过，如果已经注册过，直接登录
+        if($unionid){
+    		$sql = $dsql->SetQuery("SELECT `id`, `wechat_openid` FROM `#@__member` WHERE `".$logincode."_conn` = '$unionid' OR `wechat_openid` = '$unionid' OR `".$logincode."_conn` = '$openid' OR `wechat_openid` = '$openid'");
+            $ret = $dsql->dsqlOper($sql, "results");
+            if($ret){
+
+                //记录当前设备s
+                $deviceTitle  = !empty($return['deviceTitle'])  ? trim($return['deviceTitle'])  : '';
+                $deviceSerial = !empty($return['deviceSerial']) ? trim($return['deviceSerial']) : '';
+                $deviceType   = !empty($return['deviceType'])   ? trim($return['deviceType'])   : '';
+                //记录当前设备e
+
+                $openid = $ret[0]['wechat_openid'] ? $ret[0]['wechat_openid'] : $openid;  //如果已经注册过，APP端不需要更新openid，使用微信公众号的openid，如果更新会影响模板消息发送
+
+                $userLogin = new userLogin($dbo);
+                $data = array(
+                    "code"     => $logincode,
+                    "openid"   => $openid,
+                    "key"      => $unionid,
+                    "deviceTitle" => $deviceTitle,
+                    "deviceSerial" => $deviceSerial,
+                    "deviceType" => $deviceType,
+					"state" => $return['qr'],
+					"isapp" => 1
+                );
+                $userLogin->loginConnect($data);
+                exit();
+
+            //如果没有注册过，根据客户端得到的用户数据，注册一个新会员
+            }else{
+            	// $userLogin = new userLogin($dbo);
+	            // $data = array(
+	            //     "code"     => $logincode,
+	            //     "key"      => $unionid,
+	            //     "nickname" => $return['nickname'],
+	            //     "photo"    => $return['headimgurl'],
+	            //     "gender"   => $return['gender']
+	            // );
+	            // $userLogin->loginConnect($data);
+	            // exit();
+            }
+        }
+
+
         $user_info_url = 'https://api.weixin.qq.com/sns/userinfo?access_token='.$access_token.'&openid='.$openid.'&lang=zh_CN';
         $curl = curl_init();
         curl_setopt($curl, CURLOPT_URL, $user_info_url);
@@ -385,55 +419,6 @@ class Loginwechat {
             //记录当前设备e
 
             $userLogin = new userLogin($dbo);
-
-            //根据获取到的unionid，查询用户是否已经注册过，如果已经注册过，直接登录
-            if($unionid){
-                $sql = $dsql->SetQuery("SELECT `id`, `wechat_openid`, `photo` FROM `#@__member` WHERE `".$logincode."_conn` = '$unionid' OR `wechat_openid` = '$unionid' OR `".$logincode."_conn` = '$openid' OR `wechat_openid` = '$openid'");
-                $ret = $dsql->dsqlOper($sql, "results");
-                if($ret){
-
-                    //如果微信的头像发生变化，同步更新网站头像
-                    $userid = (int)$ret[0]['id'];
-                    $_photo = trim($ret[0]['photo']);
-
-                    //更新用户头像
-                    if($photo != $_photo && strstr($_photo, "qlogo.cn")){
-                        $sql = $dsql->SetQuery("UPDATE `#@__member` SET `photo` = '$photo' WHERE `id` = '$userid'");
-                        $dsql->dsqlOper($sql, "update");
-                    }
-
-                    $openid = $ret[0]['wechat_openid'] ? $ret[0]['wechat_openid'] : $openid;  //如果已经注册过，APP端不需要更新openid，使用微信公众号的openid，如果更新会影响模板消息发送
-
-                    $data = array(
-                        "code"     => $logincode,
-                        "openid"   => $openid,
-                        "key"      => $unionid,
-                        "deviceTitle" => $deviceTitle,
-                        "deviceSerial" => $deviceSerial,
-                        "deviceType" => $deviceType,
-                        "state" => $return['qr'],
-                        "isapp" => 1,
-                        "app_openid" => $return['openid'],
-                    );
-
-                    $userLogin->loginConnect($data);
-                    exit();
-
-                //如果没有注册过，根据客户端得到的用户数据，注册一个新会员
-                }else{
-                    // $userLogin = new userLogin($dbo);
-                    // $data = array(
-                    //     "code"     => $logincode,
-                    //     "key"      => $unionid,
-                    //     "nickname" => $return['nickname'],
-                    //     "photo"    => $return['headimgurl'],
-                    //     "gender"   => $return['gender']
-                    // );
-                    // $userLogin->loginConnect($data);
-                    // exit();
-                }
-            }
-
             $data = array(
                 "code"     => $logincode,
                 "key"      => $key,
@@ -446,10 +431,8 @@ class Loginwechat {
                 "deviceSerial" => $deviceSerial,
                 "deviceType" => $deviceType,
 				"state" => $return['qr'],
-				"isapp" => 1,
-                "app_openid" => $return['openid'],
+				"isapp" => 1
             );
-
             $userLogin->loginConnect($data);
 
         }

@@ -1,11 +1,5 @@
 $(function(){
 
-    //公众号、小程序排序
-    $('.orderby').click(function(){
-        var t = $(this), _id = t.data('id');
-        location.href = '?orderby='+_id;
-    });
-
     //搜索
 	$("#searchBtn").bind("click", function(){
 		var keyword = $("#keyword").val(), typeList = [], l=domainArr.length, addType = '';
@@ -67,14 +61,6 @@ $(function(){
 			list.push('<td class="row3"><span class="check"></span></td>');
 			list.push('<td class="row5">'+domainArr[i].aid+'</td>');
 			list.push('<td class="row17 left"><strong>'+domainArr[i].name+'</strong><label style="display:inline-block; margin-left:10px;"><input type="checkbox" class="hot" value="1"'+(domainArr[i].hot == 1 ? ' checked' : '')+'>热门</label></td>');
-            var wechat = '';
-            if(domainArr[i].wechat){
-                wechat += '<img class="wechat" title="已绑定独立公众号" src="/static/images/admin/mp_wechat.png" />';
-            }
-            if(domainArr[i].wxmini){
-                wechat += '<img class="wechat" title="已绑定小程序" src="/static/images/admin/mp_wxmini.png" />';
-            }
-			list.push('<td class="row10 left">'+wechat+'</td>');
 			list.push('<td class="row10 left">'+getSelect(domainArr[i].type)+'</td>');
 			list.push('<td class="row25 left">'+getInput(domainArr[i].type, domainArr[i].domain)+'</td>');
 
@@ -83,7 +69,7 @@ $(function(){
 				def = '<font color="#ff0000">取消默认城市</font>';
 			}
 
-			list.push('<td class="row30 left"><a href="javascript:;" class="link save">保存</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="javascript:;" class="link delete">删除</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="javascript:;" class="link default">'+def+'</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="javascript:;" class="link advanced">高级设置</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="javascript:;" class="link status" data-status="'+domainArr[i].state+'">'+(domainArr[i].state == 1 ? '停用' : '<font color="#ff0000">启用</font>')+'</a></td>');
+			list.push('<td class="row40 left"><a href="javascript:;" class="link save">保存</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="javascript:;" class="link delete">删除</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="javascript:;" class="link default">'+def+'</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="javascript:;" class="link advanced">高级设置</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="javascript:;" class="link status" data-status="'+domainArr[i].state+'">'+(domainArr[i].state == 1 ? '停用' : '<font color="#ff0000">启用</font>')+'</a></td>');
 			list.push('</tr>');
 		}
 		$("#list tbody").html(list.join(""));

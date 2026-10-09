@@ -189,7 +189,7 @@ var comTime = {
                     var d = list[i];
                     html.push('<li class="fn-clear" data-id="'+d.id+'">');
                     html.push('  <div class="left">');
-                    html.push(`    <a href="javascript:;"><img src="${(d.user.photo ? d.user.photo : (staticPath + 'images/noPhoto_60.jpg') )}" onerror="this.src='/static/images/noPhoto_100.jpg'"></a>`);
+                    html.push('    <a href="javascript:;"><img src="'+(d.user.photo ? d.user.photo : (staticPath + 'images/noPhoto_60.jpg') )+'" alt=""></a>');
                     html.push('  </div>');
                     html.push('  <div class="right reply" data-id="'+d.id+'">');
                     html.push('    <p class="name"><span class="sname">'+d.user.nickname+'</span>');
@@ -208,7 +208,7 @@ var comTime = {
                         var c = d.lower.list[n];
                         html.push('    <li class="fn-clear" data-id="'+c.id+'">');
                         html.push('      <div class="left">');
-                        html.push(`        <a href="javascript:;"><img src="${(c.user.photo ? c.user.photo : (staticPath + 'images/noPhoto_60.jpg') )}" onerror="this.src='/static/images/noPhoto_100.jpg'"></a>`);
+                        html.push('        <a href="javascript:;"><img src="'+(c.user.photo ? c.user.photo : (staticPath + 'images/noPhoto_60.jpg') )+'" alt=""></a>');
                         html.push('      </div>');
                         html.push('      <div class="right reply" data-id="'+c.id+'">');
                         html.push('        <p class="name"><span class="sname">'+c.user.nickname+'</span>');

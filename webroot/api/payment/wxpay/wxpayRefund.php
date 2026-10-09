@@ -97,20 +97,10 @@ class wxpayRefund {
 
         //根据订单号查询商家信息，确定是否开通特约商户
         $module = $submchid = '';
-        $sql = $dsql->SetQuery("SELECT `ordertype`, `cityid` FROM `#@__pay_log` WHERE `ordernum` = '$out_trade_no'");
+        $sql = $dsql->SetQuery("SELECT `ordertype` FROM `#@__pay_log` WHERE `ordernum` = '$out_trade_no'");
         $ret = $dsql->dsqlOper($sql, "results");
         if($ret){
             $module = $ret[0]['ordertype'];
-            $cityid = $ret[0]['cityid'];
-
-            //获取分站绑定的商户号
-            $wxpayConfig = getWxpayCityAdvancedConfig('', $cityid);
-            if($wxpayConfig){
-                $appId = $wxpayConfig['appid'];
-                $mch_id = $wxpayConfig['mchid'];
-                $key = $wxpayConfig['key'];
-            }
-            
             $submchid = getWxpaySubMchid($module, $out_trade_no, 0);
         }
 
@@ -152,19 +142,17 @@ class wxpayRefund {
         $url = "https://api.mch.weixin.qq.com/secapi/pay/refund";;//微信退款地址，post请求
         $xml = arrayToXml($refund);
 
-        $certFolder = dirname(__FILE__).'/cert'. ($submchid ? '/partner' : ($wxpayConfig ? '/' . $wxpayConfig['cityid'] : ($app ? '/app' : '')));
-
         $ch = curl_init();
         curl_setopt($ch,CURLOPT_URL,$url);
         curl_setopt($ch,CURLOPT_HEADER,1);
         curl_setopt($ch,CURLOPT_RETURNTRANSFER,0);
         curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,0);//证书检查
         curl_setopt($ch,CURLOPT_SSLCERTTYPE,'pem');
-        curl_setopt($ch,CURLOPT_SSLCERT, $certFolder .'/apiclient_cert.pem');
+        curl_setopt($ch,CURLOPT_SSLCERT,dirname(__FILE__).'/cert'. ($submchid ? '/partner' : ($app ? '/app' : '')) .'/apiclient_cert.pem');
         curl_setopt($ch,CURLOPT_SSLCERTTYPE,'pem');
-        curl_setopt($ch,CURLOPT_SSLKEY, $certFolder .'/apiclient_key.pem');
+        curl_setopt($ch,CURLOPT_SSLKEY,dirname(__FILE__).'/cert'. ($submchid ? '/partner' : ($app ? '/app' : '')) .'/apiclient_key.pem');
         curl_setopt($ch,CURLOPT_SSLCERTTYPE,'pem');
-        curl_setopt($ch,CURLOPT_CAINFO, $certFolder .'/rootca.pem');
+        curl_setopt($ch,CURLOPT_CAINFO,dirname(__FILE__).'/cert'. ($submchid ? '/partner' : ($app ? '/app' : '')) .'/rootca.pem');
         curl_setopt($ch,CURLOPT_POST,1);
         curl_setopt($ch,CURLOPT_POSTFIELDS,$xml);
         curl_setopt($ch,CURLOPT_RETURNTRANSFER, 1);

@@ -25,40 +25,29 @@ if($dopost == "getList"){
 
 	//关键词
 	if(!empty($sKeyword)){
-        $sKeyword = trim($sKeyword);
-		$isId = false;
-		if(substr($sKeyword, 0, 1) == '#'){
-			$id = substr($sKeyword, 1);
-			if(is_numeric($id)){
-				$isId = true;
-				$where .= " AND b.`uid` = $id";
+		$where1 = array();
+		$where1[] = "s.`title` like '%$sKeyword%'";
+		$where1[] = "s.`ordernum` like '%$sKeyword%'";
+		$where1[] = "s.`subMerId` like '%$sKeyword%'";
+		$where1[] = "s.`subMerPrtclNo` like '%$sKeyword%'";
+		$where1[] = "s.`seqNo` like '%$sKeyword%'";
+		$where1[] = "s.`subOrderNo` like '%$sKeyword%'";
+		$where1[] = "s.`subOrderTrxid` like '%$sKeyword%'";
+
+		//检索会员表和商家表
+		$userSql = $dsql->SetQuery("SELECT b.`id` FROM `#@__business_list` b LEFT JOIN `#@__member` m ON m.`id` = b.`uid` WHERE m.`username` like '%$sKeyword%' OR m.`nickname` like '%$sKeyword%' OR m.`company` like '%$sKeyword%' OR m.`phone` like '%$sKeyword%' OR b.`title` like '%$sKeyword%'");
+		$userResult = $dsql->dsqlOper($userSql, "results");
+		if($userResult){
+			$userid = array();
+			foreach($userResult as $key => $user){
+				array_push($userid, $user['id']);
+			}
+			if(!empty($userid)){
+				$where1[] = "s.`bid` in (".join(",", $userid).")";
 			}
 		}
-		if(!$isId){
-            $where1 = array();
-            $where1[] = "s.`title` like '%$sKeyword%'";
-            $where1[] = "s.`ordernum` like '%$sKeyword%'";
-            $where1[] = "s.`subMerId` like '%$sKeyword%'";
-            $where1[] = "s.`subMerPrtclNo` like '%$sKeyword%'";
-            $where1[] = "s.`seqNo` like '%$sKeyword%'";
-            $where1[] = "s.`subOrderNo` like '%$sKeyword%'";
-            $where1[] = "s.`subOrderTrxid` like '%$sKeyword%'";
 
-            //检索会员表和商家表
-            $userSql = $dsql->SetQuery("SELECT b.`id` FROM `#@__business_list` b LEFT JOIN `#@__member` m ON m.`id` = b.`uid` WHERE m.`username` like '%$sKeyword%' OR m.`nickname` like '%$sKeyword%' OR m.`company` like '%$sKeyword%' OR m.`phone` like '%$sKeyword%' OR b.`title` like '%$sKeyword%'");
-            $userResult = $dsql->dsqlOper($userSql, "results");
-            if($userResult){
-                $userid = array();
-                foreach($userResult as $key => $user){
-                    array_push($userid, $user['id']);
-                }
-                if(!empty($userid)){
-                    $where1[] = "s.`bid` in (".join(",", $userid).")";
-                }
-            }
-
-            $where .= " AND (".join(" OR ", $where1).")";
-        }
+		$where .= " AND (".join(" OR ", $where1).")";
 
 	}
 

@@ -137,9 +137,6 @@ class wxpayTransfers {
         $this->app_appId = $payment['APP_APPID'];
         $this->app_mch_id = $payment['APP_MCHID'];
         $this->app_key = $payment['APP_KEY'];
-
-        $this->wmsj_app_appId = $payment['WMSJ_APP_APPID']; //商家端appid
-        $this->qishou_app_appId = $payment['QISHOU_APP_APPID']; //骑手端appid
     }
 
     //申请回单【支付完毕，receipting为3，此时为待申请，需执行此方法】
@@ -739,12 +736,6 @@ class wxpayTransfers {
         $result_arr['appid'] = $config['app_id'];
         $result_arr['mchid'] = $config['mch_id'];
 
-        //兼容以前的逻辑，增加相关参数
-        $list = array("state"=>100,"info"=>$result_arr);
-        $list['date'] = GetMkTime(time());
-        $list['payment_no'] = $result_arr['transfer_bill_no'];
-        $list['processing'] = 1; //此项设为1，说明正在打款中，防止状态被更新
-
         //修改状态为转账中
         global $dsql;
         if($config['id']){
@@ -757,6 +748,12 @@ class wxpayTransfers {
                 $dsql->dsqlOper($sql, "update");
             }
         }
+
+        //兼容以前的逻辑，增加相关参数
+        $list = array("state"=>100,"info"=>$result_arr);
+        $list['date'] = GetMkTime(time());
+        $list['payment_no'] = $result_arr['transfer_bill_no'];
+        $list['processing'] = 1; //此项设为1，说明正在打款中，防止状态被更新
 
         //return array("state"=>100,"info"=>json_encode($result_arr));
         return $list;
@@ -780,22 +777,16 @@ class wxpayTransfers {
             $key = $this->key;
         }
 
-        //如果来源是小程序
-        if ($orderInfo['source'] == 1) {
-            require(HUONIAOINC."/config/wechatConfig.inc.php");
-            $appId = $cfg_miniProgramAppid;
-        } else if ($orderInfo['source'] == 2) {
-            //如果来源是APP
+        //如果是app端，则修改参数
+        if ($orderInfo['source'] == 2) {
             $appId = $this->app_appId;
             $mch_id = $this->app_mch_id;
             $key = $this->app_key;
             $app = true;
-        } else if ($orderInfo['source'] == 3) {
-            //如果来源是商家端
-            $appId = $this->wmsj_app_appId;
-        } else if ($orderInfo['source'] == 4) {
-            //如果来源是骑手端
-            $appId = $this->qishou_app_appId;
+        } else if ($orderInfo['source'] == 1) { 
+            //小程序端
+            require(HUONIAOINC."/config/wechatConfig.inc.php");
+            $appId = $cfg_miniProgramAppid;
         }
 
         $config = array(
@@ -820,15 +811,7 @@ class wxpayTransfers {
         $result_arr = json_decode($result,true);
 
         if(!isset($result_arr['update_time'])) {
-            $return = array("state"=>200,"info"=>"请求发送失败！错误原因：".$result_arr['message']);
-
-            //根据返回的错误码判断是否要重试
-            if (isset($result_arr['code']) && ($result_arr['code'] == 'SIGN_ERROR')) {
-            } else {
-                $return['noretry'] = 1;
-            }
-
-            return $return;
+            return array("state"=>200,"info"=>"请求发送失败！错误原因：".$result_arr['message']);
         }
 
         //修改状态为撤销中
@@ -1255,7 +1238,7 @@ class wxpayTransfers {
             $endTime = $startTime + 86400; //当天结束时间*/
 
             //查询提现详情
-            $sql = $dsql->SetQuery("SELECT `uid`,`usertype`,`isauto`,`bank`,`state`,`auditstate`,`source` FROM `#@__member_withdraw` WHERE `id` = ".$order['wid']);
+            $sql = $dsql->SetQuery("SELECT `uid`,`usertype`,`isauto`,`bank`,`state`,`auditstate`,`usertype`,`source` FROM `#@__member_withdraw` WHERE `id` = ".$order['wid']);
             $result = $dsql->dsqlOper($sql, "results");
             if ($result == null || !is_array($result)) {
                 return array("state" => 200,"info" => '没有找到对应的转账信息！','noretry' => 1);
@@ -1275,20 +1258,12 @@ class wxpayTransfers {
                 require(HUONIAOINC."/config/wechatConfig.inc.php");
                 $openid = $wechat_mini_openid;
                 $appId = $cfg_miniProgramAppid;
-            } else if ($withdrawInfo['source'] == 2) {
+            } else if ($withdrawInfo['source'] == 2 && $withdrawInfo['usertype'] != 1) {
                 //如果来源是APP，则使用APP的openid
                 $appId = $this->app_appId;
                 $mch_id = $this->app_mch_id;
                 $key = $this->app_key;
                 $app = true;
-                $openid = $order['wechat_app_openid'];
-            } else if ($withdrawInfo['source'] == 3) {
-                //如果来源是商家端，则使用商家端的openid
-                $appId = $this->wmsj_app_appId;
-                $openid = $order['wechat_wmsj_openid'];
-            } else if ($withdrawInfo['source'] == 4) {
-                //如果来源是骑手端，则使用骑手端的openid
-                $appId = $this->qishou_app_appId;
                 $openid = $order['wechat_app_openid'];
             }
 
@@ -1315,7 +1290,7 @@ class wxpayTransfers {
             $sceneName = ''; //场景名称
             $sceneLabel = ''; //场景label数组
             $sceneContent = ''; //场景label对应的内容数组
-            if ($withdrawInfo['source'] == 4) {
+            if ($withdrawInfo['usertype'] == 1) {
                 //骑手提现
                 global $cfg_courierWithdrawSceneIdV4;
                 global $cfg_courierWithdrawSceneNameV4;
@@ -1326,8 +1301,8 @@ class wxpayTransfers {
                 $sceneName = $cfg_courierWithdrawSceneNameV4;
                 $sceneLabel = $cfg_courierWithdrawSceneLabelV4;
                 $sceneContent = $cfg_courierWithdrawSceneContentV4;
-            } else if ($withdrawInfo['source'] == 3) {
-                //商家提现
+            } else if ($withdrawInfo['isauto'] == 1) {
+                //商家自动提现
                 global $cfg_businessAutoWithdrawSceneIdV4;
                 global $cfg_businessAutoWithdrawSceneNameV4;
                 global $cfg_businessAutoWithdrawSceneLabelV4;
@@ -1378,11 +1353,7 @@ class wxpayTransfers {
             $resBody = $this->v4_transfer($withdrawApply,$userAuth,$config);
 
             if ($resBody['state'] != 100) {
-                //根据返回的错误码判断是否要重试
-                if (isset($resBody['code']) && ($resBody['code'] == 'NO_AUTH' || $resBody['code'] == 'INVALID_REQUEST' || $resBody['code'] == 'SIGN_ERROR')) {
-                } else {
-                    $resBody['noretry'] = 1;
-                }
+                $resBody['noretry'] = 1;
             }
             return $resBody;
         }

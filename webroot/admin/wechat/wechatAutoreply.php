@@ -17,26 +17,14 @@ $templates = "wechatAutoreply.html";
 
 $db = "site_wechat_autoreply";
 
-$where = "";
-$cityid = (int)$cityid;
-
-//分站管理员强制使用权限分站
-if($userType == 3){
-    $cityid = $adminCityIds;
-}
-
-if($cityid){
-    $where = " AND `cityid` = $cityid";
-}
-
 
 //删除关键字
 if($dopost == "del"){
 	if($id == "") die('{"state": 200, "info": '.json_encode('请选择要删除的关键字！').'}');
-	$archives = $dsql->SetQuery("DELETE FROM `#@__".$db."` WHERE `id` in (".$id.")" . $where);
+	$archives = $dsql->SetQuery("DELETE FROM `#@__".$db."` WHERE `id` in (".$id.")");
 	$dsql->dsqlOper($archives, "update");
 
-	adminLog("删除微信自动回复", "分站：" . $cityid . '=>' . $id);
+	adminLog("删除微信自动回复", $id);
 	die('{"state": 100, "info": '.json_encode('删除成功！').'}');
 
 //获取微信素材
@@ -108,58 +96,16 @@ if($dopost == "del"){
 //更新
 }elseif($dopost == "save"){
 
-    //分站自定义配置
-    if($cityid){
+	$subscribeType = (int)$subscribeType;
+	$subscribe = _RunMagicQuotes($subscribe);
 
-        //载入微信配置文件
-        require(HUONIAOINC.'/config/wechatConfig.inc.php');
+    $autoReplyWithSiteSearchState = (int)$autoReplyWithSiteSearchState;
+    $autoReplyWithSiteSearchModule = trim($autoReplyWithSiteSearchModule);
+    $autoReplyWithSiteSearchTitle = trim($autoReplyWithSiteSearchTitle);
+    $autoReplyWithSiteSearchTitle = $autoReplyWithSiteSearchTitle ? $autoReplyWithSiteSearchTitle : '查看与[$keyword]相关的内容';
+    $autoReplyWithSiteSearchDescption = trim($autoReplyWithSiteSearchDescption);
 
-        $cfg_wechat_cityAdvanced = isset($cfg_wechat_cityAdvanced) ? $cfg_wechat_cityAdvanced : array();
-
-        //复制总站配置
-        if($action == 'copyDefaultConfig'){
-            $cfg_wechat_cityAdvanced[$cityid] = array(
-                "subscribeType" => $cfg_wechatSubscribeType,
-                "subscribe" => $cfg_wechatSubscribe,
-                "subscribeMedia" => $cfg_wechatSubscribeMedia,
-                "autoReplyWithSiteSearchState" => $cfg_autoReplyWithSiteSearchState,
-                "autoReplyWithSiteSearchModule" => $cfg_autoReplyWithSiteSearchModule,
-                "autoReplyWithSiteSearchTitle" => $cfg_autoReplyWithSiteSearchTitle,
-                "autoReplyWithSiteSearchDescption" => $cfg_autoReplyWithSiteSearchDescption,
-            );
-        }
-        else{
-            $cfg_wechat_cityAdvanced[$cityid] = array(
-                "subscribeType" => $subscribeType,
-                "subscribe" => _RunMagicQuotes($subscribe),
-                "subscribeMedia" => $subscribeMedia,
-                "autoReplyWithSiteSearchState" => $autoReplyWithSiteSearchState,
-                "autoReplyWithSiteSearchModule" => $autoReplyWithSiteSearchModule,
-                "autoReplyWithSiteSearchTitle" => $autoReplyWithSiteSearchTitle,
-                "autoReplyWithSiteSearchDescption" => $autoReplyWithSiteSearchDescption,
-            );
-        }
-
-        //系统默认配置
-        $_subscribeType = (int)$cfg_wechatSubscribeType;
-        $_subscribe = $cfg_wechatSubscribe;
-
-        $_autoReplyWithSiteSearchState = (int)$cfg_autoReplyWithSiteSearchState;
-        $_autoReplyWithSiteSearchModule = trim($cfg_autoReplyWithSiteSearchModule);
-        $_autoReplyWithSiteSearchTitle = trim($cfg_autoReplyWithSiteSearchTitle);
-        $_autoReplyWithSiteSearchTitle = $_autoReplyWithSiteSearchTitle ? $_autoReplyWithSiteSearchTitle : '查看与[$keyword]相关的内容';
-        $_autoReplyWithSiteSearchDescption = trim($cfg_autoReplyWithSiteSearchDescption);
-    }
-    else{
-        $_subscribeType = (int)$subscribeType;
-        $_subscribe = _RunMagicQuotes($subscribe);
-
-        $_autoReplyWithSiteSearchState = (int)$autoReplyWithSiteSearchState;
-        $_autoReplyWithSiteSearchModule = trim($autoReplyWithSiteSearchModule);
-        $_autoReplyWithSiteSearchTitle = trim($autoReplyWithSiteSearchTitle);
-        $_autoReplyWithSiteSearchTitle = $_autoReplyWithSiteSearchTitle ? $_autoReplyWithSiteSearchTitle : '查看与[$keyword]相关的内容';
-        $_autoReplyWithSiteSearchDescption = trim($autoReplyWithSiteSearchDescption);
-    }
+	require_once(HUONIAOINC.'/config/wechatConfig.inc.php');
 
 	//站点信息文件内容
 	$configFile = "<"."?php\r\n";
@@ -170,9 +116,9 @@ if($dopost == "del"){
     $configFile .= "\$cfg_wechatName = '"._RunMagicQuotes($cfg_wechatName)."';\r\n";
     $configFile .= "\$cfg_wechatCode = '"._RunMagicQuotes($cfg_wechatCode)."';\r\n";
     $configFile .= "\$cfg_wechatQr = '"._RunMagicQuotes($cfg_wechatQr)."';\r\n";
-    $configFile .= "\$cfg_wechatSubscribeType = '".$_subscribeType."';\r\n";
-    $configFile .= "\$cfg_wechatSubscribe = '".$_subscribe."';\r\n";
-    $configFile .= "\$cfg_wechatSubscribeMedia = '".$_subscribeMedia."';\r\n";
+    $configFile .= "\$cfg_wechatSubscribeType = '".$subscribeType."';\r\n";
+    $configFile .= "\$cfg_wechatSubscribe = '".$subscribe."';\r\n";
+    $configFile .= "\$cfg_wechatSubscribeMedia = '".$subscribeMedia."';\r\n";
     $configFile .= "\$cfg_wechatAutoLogin = '".$cfg_wechatAutoLogin."';\r\n";
     $configFile .= "\$cfg_wechatBindPhone = '".$cfg_wechatBindPhone."';\r\n";
     $configFile .= "\$cfg_wechatRedirect = '".$cfg_wechatRedirect."';\r\n";
@@ -182,19 +128,14 @@ if($dopost == "del"){
     $configFile .= "\$cfg_miniProgramAppid = '".$cfg_miniProgramAppid."';\r\n";
     $configFile .= "\$cfg_miniProgramAppsecret = '".$cfg_miniProgramAppsecret."';\r\n";
 	$configFile .= "\$cfg_miniProgramId = '".$cfg_miniProgramId."';\r\n";
-	$configFile .= "\$cfg_useWxMiniProgramLogin = ".$cfg_useWxMiniProgramLogin.";\r\n";
-	$configFile .= "\$cfg_miniProgramLocationAuth = '".$cfg_miniProgramLocationAuth."';\r\n";
 	$configFile .= "\$cfg_miniProgramLoginProfile = ".(int)$cfg_miniProgramLoginProfile.";\r\n";
 	$configFile .= "\$cfg_miniProgramBindPhone = ".(int)$cfg_miniProgramBindPhone.";\r\n";
-	$configFile .= "\$cfg_iosVirtualPaymentState = ".$cfg_iosVirtualPaymentState.";\r\n";
-	$configFile .= "\$cfg_iosVirtualPaymentTip = '".$cfg_iosVirtualPaymentTip."';\r\n";
     $configFile .= "\$cfg_miniProgramQr = '".$cfg_miniProgramQr."';\r\n";
 	$configFile .= "\$cfg_miniProgramTemplate = '".$cfg_miniProgramTemplate."';\r\n";
-	$configFile .= "\$cfg_autoReplyWithSiteSearchState = ".(int)$_autoReplyWithSiteSearchState.";\r\n";
-	$configFile .= "\$cfg_autoReplyWithSiteSearchModule = '".$_autoReplyWithSiteSearchModule."';\r\n";
-	$configFile .= "\$cfg_autoReplyWithSiteSearchTitle = '".$_autoReplyWithSiteSearchTitle."';\r\n";
-	$configFile .= "\$cfg_autoReplyWithSiteSearchDescption = '".$_autoReplyWithSiteSearchDescption."';\r\n";
-    $configFile .= "\$cfg_wechat_cityAdvanced = ".generateArrayString($cfg_wechat_cityAdvanced).";\r\n";
+	$configFile .= "\$cfg_autoReplyWithSiteSearchState = ".(int)$autoReplyWithSiteSearchState.";\r\n";
+	$configFile .= "\$cfg_autoReplyWithSiteSearchModule = '".$autoReplyWithSiteSearchModule."';\r\n";
+	$configFile .= "\$cfg_autoReplyWithSiteSearchTitle = '".$autoReplyWithSiteSearchTitle."';\r\n";
+	$configFile .= "\$cfg_autoReplyWithSiteSearchDescption = '".$autoReplyWithSiteSearchDescption."';\r\n";
 	$configFile .= "?".">";
 
 	$configIncFile = HUONIAOINC.'/config/wechatConfig.inc.php';
@@ -202,8 +143,7 @@ if($dopost == "del"){
 	fwrite($fp, $configFile);
 	fclose($fp);
 
-    //关键字回复
-	if($ids && $action != 'copyDefaultConfig'){
+	if($ids){
 		foreach ($ids as $k => $val) {
 			$id = $val;
 			$key = _RunMagicQuotes($keyword[$k]);
@@ -213,30 +153,19 @@ if($dopost == "del"){
 
 			//已经存在的更新
 			if($id){
-				$sql = $dsql->SetQuery("UPDATE `#@__".$db."` SET `title` = '$key', `type` = '$typ', `body` = '$res', `media` = '$med' WHERE `id` = $id AND `cityid` = $cityid");
+				$sql = $dsql->SetQuery("UPDATE `#@__".$db."` SET `title` = '$key', `type` = '$typ', `body` = '$res', `media` = '$med' WHERE `id` = $id");
 				$dsql->dsqlOper($sql, "update");
 
 			//新增
 			}else{
-				$sql = $dsql->SetQuery("INSERT INTO `#@__".$db."` (`cityid`, `title`, `type`, `body`, `media`) VALUES ('$cityid', '$key', '$typ', '$res', '$med')");
+				$sql = $dsql->SetQuery("INSERT INTO `#@__".$db."` (`title`, `type`, `body`, `media`) VALUES ('$key', '$typ', '$res', '$med')");
 				$dsql->dsqlOper($sql, "update");
 
 			}
 		}
 	}
 
-    if($action == 'copyDefaultConfig'){
-        $sql = $dsql->SetQuery("SELECT `id`, `title`, `type`, `body`, `media` FROM `#@__".$db."` WHERE `cityid` = 0");
-        $ret = $dsql->dsqlOper($sql, "results");
-        if($ret){
-            foreach ($ret as $key => $value) {
-                $sql = $dsql->SetQuery("INSERT INTO `#@__".$db."` (`cityid`, `title`, `type`, `body`, `media`) VALUES ('$cityid', '".$value['title']."', '".$value['type']."', '".$value['body']."', '".$value['media']."')");
-                $dsql->dsqlOper($sql, "update");
-            }
-        }
-    }
-
-	adminLog("修改微信自动回复", "分站：" . $cityid);
+	adminLog("修改微信自动回复");
 	die('{"state": 100, "info": '.json_encode('保存成功！').'}');
 }
 
@@ -248,45 +177,24 @@ if(file_exists($tpl."/".$templates)){
 		'ui/bootstrap.min.js',
 		'ui/jquery.dragsort-0.5.1.min.js',
 		'ui/jquery-ui-sortable.js',
-        'ui/chosen.jquery.min.js',
 		'admin/wechat/wechatAutoreply.js'
 	);
 	$huoniaoTag->assign('jsFile', includeFile('js', $jsFile));
 
 	require_once(HUONIAOINC.'/config/wechatConfig.inc.php');
+	$huoniaoTag->assign('wechatSubscribeType', $cfg_wechatSubscribeType);
+	$huoniaoTag->assign('wechatSubscribe', stripslashes($cfg_wechatSubscribe));
+	$huoniaoTag->assign('wechatSubscribeMedia', $cfg_wechatSubscribeMedia);
 
-    //全站搜索状态
-    $esState = (int)$esConfig['open'];
-    $huoniaoTag->assign('esState', $esState);
+    
+	//关联网站搜索服务
+	$huoniaoTag->assign('autoReplyWithSiteSearchValues', array('0', '1'));
+	$huoniaoTag->assign('autoReplyWithSiteSearchStateNames',array('开启','关闭'));
+	$huoniaoTag->assign('autoReplyWithSiteSearchStateChecked', (int)$cfg_autoReplyWithSiteSearchState);
 
-    if($cityid){
-        $huoniaoTag->assign('wechatSubscribeType', $cfg_wechat_cityAdvanced[$cityid]['subscribeType']);
-        $huoniaoTag->assign('wechatSubscribe', stripslashes($cfg_wechat_cityAdvanced[$cityid]['subscribe']));
-        $huoniaoTag->assign('wechatSubscribeMedia', $cfg_wechat_cityAdvanced[$cityid]['subscribeMedia']);
-
-        //关联网站搜索服务
-        $huoniaoTag->assign('autoReplyWithSiteSearchValues', array('0', '1'));
-        $huoniaoTag->assign('autoReplyWithSiteSearchStateNames',array('开启','关闭'));
-        $huoniaoTag->assign('autoReplyWithSiteSearchStateChecked', $cfg_wechat_cityAdvanced[$cityid] ? (int)$cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchState'] : 1);
-
-        $huoniaoTag->assign('autoReplyWithSiteSearchModule', $cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchModule']);
-        $huoniaoTag->assign('autoReplyWithSiteSearchTitle', $cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchTitle'] ? $cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchTitle'] : '查看与[$keyword]相关的内容');
-        $huoniaoTag->assign('autoReplyWithSiteSearchDescption', $cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchDescption']);
-    }
-    else{
-        $huoniaoTag->assign('wechatSubscribeType', $cfg_wechatSubscribeType);
-        $huoniaoTag->assign('wechatSubscribe', stripslashes($cfg_wechatSubscribe));
-        $huoniaoTag->assign('wechatSubscribeMedia', $cfg_wechatSubscribeMedia);
-
-        //关联网站搜索服务
-        $huoniaoTag->assign('autoReplyWithSiteSearchValues', array('0', '1'));
-        $huoniaoTag->assign('autoReplyWithSiteSearchStateNames',array('开启','关闭'));
-        $huoniaoTag->assign('autoReplyWithSiteSearchStateChecked', (int)$cfg_autoReplyWithSiteSearchState);
-
-        $huoniaoTag->assign('autoReplyWithSiteSearchModule', $cfg_autoReplyWithSiteSearchModule);
-        $huoniaoTag->assign('autoReplyWithSiteSearchTitle', $cfg_autoReplyWithSiteSearchTitle ? $cfg_autoReplyWithSiteSearchTitle : '查看与[$keyword]相关的内容');
-        $huoniaoTag->assign('autoReplyWithSiteSearchDescption', $cfg_autoReplyWithSiteSearchDescption);
-    }	
+	$huoniaoTag->assign('autoReplyWithSiteSearchModule', $cfg_autoReplyWithSiteSearchModule);
+	$huoniaoTag->assign('autoReplyWithSiteSearchTitle', $cfg_autoReplyWithSiteSearchTitle ? $cfg_autoReplyWithSiteSearchTitle : '查看与[$keyword]相关的内容');
+	$huoniaoTag->assign('autoReplyWithSiteSearchDescption', $cfg_autoReplyWithSiteSearchDescption);
 
     //内容列表
     $moduleList = array(
@@ -392,7 +300,7 @@ if(file_exists($tpl."/".$templates)){
 
 	//查询已经设置的关键字
 	$list = array();
-	$sql = $dsql->SetQuery("SELECT `id`, `title`, `type`, `body`, `media` FROM `#@__".$db."` WHERE `cityid` = '$cityid' ".$where." ORDER BY `id` ASC");
+	$sql = $dsql->SetQuery("SELECT `id`, `title`, `type`, `body`, `media` FROM `#@__".$db."` ORDER BY `id` ASC");
 	$ret = $dsql->dsqlOper($sql, "results");
 	if($ret){
 		foreach ($ret as $key => $value) {
@@ -405,44 +313,7 @@ if(file_exists($tpl."/".$templates)){
 			));
 		}
 	}
-	$huoniaoTag->assign('list', $list);// 获取所有分站绑定的公众号
-
-
-    global $cfg_siteCityAdvanced_wechat;
-    $wechatArr = array();
-
-    if($cfg_siteCityAdvanced_wechat){
-
-        $defautWechatConfig = array(
-            'cityname' => '总站配置',
-            'token' => $cfg_wechatToken,
-            'appid' => $cfg_wechatAppid,
-            'appsecret' => $cfg_wechatAppsecret,
-            'name' => $cfg_wechatName,
-            'code' => $cfg_wechatCode,
-            'qr' => $cfg_wechatQr
-        );
-
-        // 向cfg_siteCityAdvanced_wechat前面添加系统默认的公众号配置，不要改变原key
-        $wechatArr = array();
-        
-        // 先添加默认配置，key为0
-        if($cfg_wechatToken && $cfg_wechatAppid && $cfg_wechatAppsecret && $userType != 3){
-            $wechatArr[0] = $defautWechatConfig;
-        }
-        
-        // 再添加分站配置，保持原key不变
-        if($cfg_siteCityAdvanced_wechat && is_array($cfg_siteCityAdvanced_wechat)){
-            foreach($cfg_siteCityAdvanced_wechat as $key => $value){
-                if(($userType == 3 && $key == $adminCityIds) || $userType != 3){
-                    $wechatArr[$key] = $value;
-                }
-            }
-        }
-    }
-    
-    $huoniaoTag->assign('wechatArr', $wechatArr);
-    $huoniaoTag->assign('cityid', (int)$cityid);
+	$huoniaoTag->assign('list', $list);
 
 	$huoniaoTag->compile_dir = HUONIAOROOT."/templates_c/admin/wechat";  //设置编译目录
 	$huoniaoTag->display($templates);
@@ -504,21 +375,4 @@ function GrabImage($url) {
 	}else{
 		return $img;
 	}
-}
-
-
-// 生成PHP数组字符串
-function generateArrayString($array) {
-    if (empty($array)) return 'array()';
-    
-    $parts = [];
-    foreach ($array as $key => $value) {
-        $innerParts = [];
-        foreach ($value as $k => $v) {
-            $innerParts[] = "        '$k' => '$v'";
-        }
-        $parts[] = "    $key => array(\n" . implode(",\n", $innerParts) . "\n    )";
-    }
-    
-    return "array(\n" . implode(",\n", $parts) . "\n)";
 }

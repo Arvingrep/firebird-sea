@@ -1,13 +1,5 @@
 $(function(){
-	$(".chosen-select").chosen();
-	$("#cityId").change(function(){
-		var cityId = $(this).val();
-		if(cityId == ""){
-			location.href = "/admin/wechat/wechatAutoreply.php";
-		}else{
-			location.href = "/admin/wechat/wechatAutoreply.php?cityid="+cityId;
-		}
-	});
+
 	//类型切换
 	$(".list").delegate(".sel input", "click", function(){
 		var t = $(this), val = t.val(), sel = t.closest(".sel");
@@ -183,7 +175,7 @@ $(function(){
 		html.push('  <input type="hidden" name="ids[]" />');
 		html.push('  <dt class="row3">&nbsp;</dt>');
 		html.push('  <dt class="row30"><input type="text" class="input-large" name="keyword[]" placeholder="关键字" value=""></dt>');
-		html.push('  <dd class="row50"><div class="sel hide"><label><input type="radio" name="type['+index+']" value="1" checked>自定义</label><label><input type="radio" name="type['+index+']" value="2">微信素材</label></div><textarea name="body[]" class="input-xxlarge" rows="5" placeholder="请输入响应内容"></textarea><div class="media hide"><label></label><a href="javascript:;">选择素材</a></div><input type="hidden" name="media[]" value=""></dd>');
+		html.push('  <dd class="row50"><div class="sel"><label><input type="radio" name="type['+index+']" value="1" checked>自定义</label><label><input type="radio" name="type['+index+']" value="2">微信素材</label></div><textarea name="body[]" class="input-xxlarge" placeholder="请输入响应内容"></textarea><div class="media hide"><label></label><a href="javascript:;">选择素材</a></div><input type="hidden" name="media[]" value=""></dd>');
 		html.push('  <dd class="row17"><a href="javascript:;" class="del" title="删除">删除</a></dd>');
 		html.push('</dl>');
 		$(this).closest(".tr").before(html.join(""));
@@ -198,7 +190,7 @@ $(function(){
 		if(id){
 			$.dialog.confirm("删除后无法恢复，请谨慎操作！！！", function(){
 				huoniao.showTip("loading", "正在删除，请稍候...");
-				huoniao.operaJson("wechatAutoreply.php?dopost=del&cityid="+cityid, "id="+id, function(data){
+				huoniao.operaJson("wechatAutoreply.php?dopost=del", "id="+id, function(data){
 					if(data.state == 100){
 						huoniao.showTip("success", data.info, "auto");
 						location.reload();
@@ -221,38 +213,13 @@ $(function(){
 	});
 
 
-	//复制总站配置
-	$("#copyDefaultConfig").bind("click", function(){
-
-        $.dialog.confirm("确定后，此分站的微信自动回复将使用总站的配置，已有数据将会被覆盖！<br />确定后无法恢复，请谨慎操作！！！", function(){
-
-            huoniao.showTip("loading", "正在复制，请稍候...");
-            huoniao.operaJson("wechatAutoreply.php?dopost=save", "&action=copyDefaultConfig&cityid="+cityid, function(data){
-                if(data.state == 100){
-
-                    huoniao.showTip("success", data.info, "auto");
-                    setTimeout(function() {
-                        location.reload();
-                    }, 800);
-
-                }else{
-                    alert(data.info);
-                    return false;
-                }
-            });
-
-        }, function(){});
-
-	});
-
-
 });
 
 
 //保存
 function saveOpera(){
 	huoniao.showTip("loading", "正在保存，请稍候...");
-	huoniao.operaJson("wechatAutoreply.php?dopost=save&cityid="+cityid, $("#editform").serialize()+'&'+$("#list").serialize(), function(data){
+	huoniao.operaJson("wechatAutoreply.php?dopost=save", $("#editform").serialize()+'&'+$("#list").serialize(), function(data){
 		if(data.state == 100){
 			huoniao.showTip("success", data.info, "auto");
             setTimeout(function(){

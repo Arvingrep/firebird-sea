@@ -21,18 +21,6 @@ $Payconfig= $dsql->dsqlOper($configPay, "results");
 $payname = $Payconfig[0]['pay_name'] ? $Payconfig[0]['pay_name'] : '消费金';
 $huoniaoTag->assign('payname', $payname);
 
-//场景参数明细数组
-$sceneArr = array(
-    1 => array('id' => '1000','title' => '现金营销','label' => array('活动名称','奖励说明')),
-    2 => array('id' => '1011','title' => '企业赔付','label' => array('赔付原因')),
-    3 => array('id' => '1005','title' => '佣金报酬','label' => array('岗位类型','报酬说明')),
-    4 => array('id' => '1009','title' => '采购货款','label' => array('采购商品名称')),
-    5 => array('id' => '1010','title' => '二手回收','label' => array('回收商品名称')),
-    6 => array('id' => '1013','title' => '公益补助','label' => array('公益活动名称','公益活动备案编号')),
-    7 => array('id' => '1002','title' => '行政补贴','label' => array('补贴类型')),
-    8 => array('id' => '1004','title' => '保险理赔','label' => array('保险产品备案编号','保险名称','保险操作单号')),
-);
-
 if (!empty($_POST)) {
     if ($token == "") die('token传递失败！');
 
@@ -73,7 +61,6 @@ if (!empty($_POST)) {
         $cfg_fzawardlegouFee   = (float)$fzawardlegouFee;
         $cfg_fzpaimaiFee   = (float)$fzpaimaiFee;
         $cfg_fzjobFee   = (float)$fzjobFee;
-        $cfg_fzzhaopinFee   = (float)$fzzhaopinFee;
         $cfg_fzhomemakingFee   = (float)$fzhomemakingFee;
         $cfg_fzeducationFee    = (float)$fzeducationFee;
         $cfg_roofFee           = (float)$roofFee;
@@ -107,45 +94,6 @@ if (!empty($_POST)) {
         $cfg_withdrawCheckType = (float)$withdrawCheckType;
         $cfg_withdrawNote = $withdrawNote;
         $cfg_courierwithdrawNote = $courierwithdrawNote;
-
-        /*$cfg_maxWithdrawOnceV4 = (float)$maxWithdrawOnceV4; //单笔限额
-        $cfg_maxWithdrawPerdayEveryoneV4 = (float)$maxWithdrawPerdayEveryoneV4; //单用户转账限额
-        $cfg_maxWithdrawPerdayV4 = (float)$maxWithdrawPerdayV4; //单日转账额度*/
-
-        $cfg_businessAutoWithdrawMaxV4 = (float)$businessAutoWithdrawMaxV4; //商家自动提现每天最多提现金额
-
-        if ($businessAutoWithdrawSceneContentV4 && !is_array($businessAutoWithdrawSceneContentV4)) {
-            echo '{"state": 200, "info": "商家自动提现场景内容不能为空！"}';
-            die();
-        }
-        
-        $cfg_businessAutoWithdrawSceneSelectV4 = (int)$businessAutoWithdrawSceneSelectV4; //商家自动提现场景选项ID
-        $cfg_businessAutoWithdrawSceneIdV4 = $sceneArr[$cfg_businessAutoWithdrawSceneSelectV4]['id']; //商家自动提现场景ID
-        $cfg_businessAutoWithdrawSceneNameV4 = $sceneArr[$cfg_businessAutoWithdrawSceneSelectV4]['title']; //商家自动提现场景名称
-        $cfg_businessAutoWithdrawSceneLabelV4 = json_encode($sceneArr[$cfg_businessAutoWithdrawSceneSelectV4]['label'],JSON_UNESCAPED_UNICODE); //商家自动提现场景label
-        $cfg_businessAutoWithdrawSceneContentV4 = json_encode($businessAutoWithdrawSceneContentV4,JSON_UNESCAPED_UNICODE); //商家自动提现场景内容
-
-        if ($commonWithdrawSceneContentV4 && !is_array($commonWithdrawSceneContentV4)) {
-            echo '{"state": 200, "info": "普通提现场景内容不能为空！"}';
-            die();
-        }
-
-        $cfg_commonWithdrawSceneSelectV4 = (int)$commonWithdrawSceneSelectV4; //普通提现场景选项ID
-        $cfg_commonWithdrawSceneIdV4 = $sceneArr[$cfg_commonWithdrawSceneSelectV4]['id']; //普通提现场景ID
-        $cfg_commonWithdrawSceneNameV4 = $sceneArr[$cfg_commonWithdrawSceneSelectV4]['title']; //普通提现场景名称
-        $cfg_commonWithdrawSceneLabelV4 = json_encode($sceneArr[$cfg_commonWithdrawSceneSelectV4]['label'],JSON_UNESCAPED_UNICODE); //普通提现场景label
-        $cfg_commonWithdrawSceneContentV4 = json_encode($commonWithdrawSceneContentV4,JSON_UNESCAPED_UNICODE); //普通提现场景内容
-
-        if ($courierWithdrawSceneContentV4 && !is_array($courierWithdrawSceneContentV4)) {
-            echo '{"state": 200, "info": "骑手提现场景内容不能为空！"}';
-            die();
-        }
-
-        $cfg_courierWithdrawSceneSelectV4 = (int)$courierWithdrawSceneSelectV4; //骑手提现场景选项ID
-        $cfg_courierWithdrawSceneIdV4 = $sceneArr[$cfg_courierWithdrawSceneSelectV4]['id']; //骑手提现场景ID
-        $cfg_courierWithdrawSceneNameV4 = $sceneArr[$cfg_courierWithdrawSceneSelectV4]['title']; //骑手提现场景名称
-        $cfg_courierWithdrawSceneLabelV4 = json_encode($sceneArr[$cfg_courierWithdrawSceneSelectV4]['label'],JSON_UNESCAPED_UNICODE); //骑手提现场景label
-        $cfg_courierWithdrawSceneContentV4 = json_encode($courierWithdrawSceneContentV4,JSON_UNESCAPED_UNICODE); //骑手提现场景内容
     }
 
     //商城独立快速配置
@@ -192,7 +140,6 @@ if (!empty($_POST)) {
     $configFile .= "\$cfg_fzawardlegouFee 	= " . (float)$cfg_fzawardlegouFee . ";\r\n";
     $configFile .= "\$cfg_fzpaimaiFee 	= " . (float)$cfg_fzpaimaiFee . ";\r\n";
     $configFile .= "\$cfg_fzjobFee 	= " . (float)$cfg_fzjobFee . ";\r\n";
-    $configFile .= "\$cfg_fzzhaopinFee 	= " . (float)$cfg_fzzhaopinFee . ";\r\n";
     $configFile .= "\$cfg_fzhomemakingFee = " . (float)$cfg_fzhomemakingFee . ";\r\n";
     $configFile .= "\$cfg_fzeducationFee= " . (float)$cfg_fzeducationFee . ";\r\n";
     $configFile .= "\$cfg_roofFee 		= " . (float)$cfg_roofFee . ";\r\n";
@@ -235,30 +182,6 @@ if (!empty($_POST)) {
     $configFile .= "\$cfg_businessAutoWithdrawCycleWeek 	= " . (int)$cfg_businessAutoWithdrawCycleWeek . ";\r\n";
     $configFile .= "\$cfg_businessAutoWithdrawCycleDay 	= " . (int)$cfg_businessAutoWithdrawCycleDay . ";\r\n";
     $configFile .= "\$cfg_businessAutoWithdrawAmount 	= " . (float)$cfg_businessAutoWithdrawAmount . ";\r\n";
-
-    /*$configFile .= "\$cfg_maxWithdrawOnceV4 	= '" . (float)$cfg_maxWithdrawOnceV4 . "';\r\n"; //单笔限额
-    $configFile .= "\$cfg_maxWithdrawPerdayEveryoneV4 	= '" . (float)$cfg_maxWithdrawPerdayEveryoneV4 . "';\r\n"; //单用户转账限额
-    $configFile .= "\$cfg_maxWithdrawPerdayV4 	= '" . (float)$cfg_maxWithdrawPerdayV4 . "';\r\n"; //单日转账额度*/
-
-    $configFile .= "\$cfg_businessAutoWithdrawMaxV4 	= '" . (float)$cfg_businessAutoWithdrawMaxV4 . "';\r\n"; //商家自动提现每天最多提现金额
-
-    $configFile .= "\$cfg_businessAutoWithdrawSceneIdV4 	= '" . $cfg_businessAutoWithdrawSceneIdV4 . "';\r\n"; //商家自动提现场景ID
-    $configFile .= "\$cfg_businessAutoWithdrawSceneSelectV4 	= '" . $cfg_businessAutoWithdrawSceneSelectV4 . "';\r\n"; //商家自动提现场景选项ID
-    $configFile .= "\$cfg_businessAutoWithdrawSceneNameV4 	= '" . $cfg_businessAutoWithdrawSceneNameV4 . "';\r\n"; //商家自动提现场景名称
-    $configFile .= "\$cfg_businessAutoWithdrawSceneLabelV4 	= '" . $cfg_businessAutoWithdrawSceneLabelV4 . "';\r\n"; //商家自动提现场景label
-    $configFile .= "\$cfg_businessAutoWithdrawSceneContentV4 	= '" . $cfg_businessAutoWithdrawSceneContentV4 . "';\r\n"; //商家自动提现场景内容
-
-    $configFile .= "\$cfg_commonWithdrawSceneIdV4 	= '" . $cfg_commonWithdrawSceneIdV4 . "';\r\n"; //普通提现场景ID
-    $configFile .= "\$cfg_commonWithdrawSceneSelectV4 	= '" . $cfg_commonWithdrawSceneSelectV4 . "';\r\n"; //普通提现场景选项ID
-    $configFile .= "\$cfg_commonWithdrawSceneNameV4 	= '" . $cfg_commonWithdrawSceneNameV4 . "';\r\n"; //普通提现场景名称
-    $configFile .= "\$cfg_commonWithdrawSceneLabelV4 	= '" . $cfg_commonWithdrawSceneLabelV4 . "';\r\n"; //普通提现场景label
-    $configFile .= "\$cfg_commonWithdrawSceneContentV4 	= '" . $cfg_commonWithdrawSceneContentV4 . "';\r\n"; //普通提现场景内容
-
-    $configFile .= "\$cfg_courierWithdrawSceneIdV4 	= '" . $cfg_courierWithdrawSceneIdV4 . "';\r\n"; //骑手提现场景ID
-    $configFile .= "\$cfg_courierWithdrawSceneSelectV4 	= '" . $cfg_courierWithdrawSceneSelectV4 . "';\r\n"; //骑手提现场景选项ID
-    $configFile .= "\$cfg_courierWithdrawSceneNameV4 	= '" . $cfg_courierWithdrawSceneNameV4 . "';\r\n"; //骑手提现场景名称
-    $configFile .= "\$cfg_courierWithdrawSceneLabelV4 	= '" . $cfg_courierWithdrawSceneLabelV4 . "';\r\n"; //骑手提现场景label
-    $configFile .= "\$cfg_courierWithdrawSceneContentV4 	= '" . $cfg_courierWithdrawSceneContentV4 . "';\r\n"; //骑手提现场景内容
 
     $configFile .= "?" . ">";
 
@@ -324,7 +247,6 @@ if (file_exists($tpl . "/" . $templates)) {
     $huoniaoTag->assign('fzawardlegouFee', (float)$cfg_fzawardlegouFee);
     $huoniaoTag->assign('fzpaimaiFee', (float)$cfg_fzpaimaiFee);
     $huoniaoTag->assign('fzjobFee', (float)$cfg_fzjobFee);
-    $huoniaoTag->assign('fzzhaopinFee', (float)$cfg_fzzhaopinFee);
 
     $huoniaoTag->assign('chongzhiCheckType', (float)$cfg_chongzhiCheckType);
     $huoniaoTag->assign('chongzhiSongJiFen', (float)$cfg_chongzhiSongJiFen);
@@ -360,38 +282,6 @@ if (file_exists($tpl . "/" . $templates)) {
     $huoniaoTag->assign('businessAutoWithdrawCycleWeek', (int)$cfg_businessAutoWithdrawCycleWeek);
     $huoniaoTag->assign('businessAutoWithdrawCycleDay', (int)$cfg_businessAutoWithdrawCycleDay);
     $huoniaoTag->assign('businessAutoWithdrawAmount', (float)$cfg_businessAutoWithdrawAmount);
-
-    /*$huoniaoTag->assign('maxWithdrawOnceV4', (float)$cfg_maxWithdrawOnceV4); //单笔限额
-    $huoniaoTag->assign('maxWithdrawPerdayEveryoneV4', (float)$cfg_maxWithdrawPerdayEveryoneV4); //单用户转账限额
-    $huoniaoTag->assign('maxWithdrawPerdayV4', (float)$cfg_maxWithdrawPerdayV4); //单日转账额度*/
-
-    $huoniaoTag->assign('businessAutoWithdrawMaxV4', (float)$cfg_businessAutoWithdrawMaxV4); //商家自动提现每天最多提现金额
-
-    if ($cfg_businessAutoWithdrawSceneContentV4 != null) {
-        $cfg_businessAutoWithdrawSceneContentV4 = json_decode($cfg_businessAutoWithdrawSceneContentV4,true);
-    }
-
-    //$huoniaoTag->assign('businessAutoWithdrawSceneIdV4', $cfg_businessAutoWithdrawSceneIdV4); //商家自动提现场景ID
-    $huoniaoTag->assign('businessAutoWithdrawSceneSelectV4', $cfg_businessAutoWithdrawSceneSelectV4); //商家自动提现场景选项ID
-    $huoniaoTag->assign('businessAutoWithdrawSceneContentV4', $cfg_businessAutoWithdrawSceneContentV4); //商家自动提现场景内容
-
-    if ($cfg_commonWithdrawSceneContentV4 != null) {
-        $cfg_commonWithdrawSceneContentV4 = json_decode($cfg_commonWithdrawSceneContentV4,true);
-    }
-
-    //$huoniaoTag->assign('commonWithdrawSceneIdV4', $cfg_commonWithdrawSceneIdV4); //普通提现场景ID
-    $huoniaoTag->assign('commonWithdrawSceneSelectV4', $cfg_commonWithdrawSceneSelectV4); //普通提现场景选项ID
-    $huoniaoTag->assign('commonWithdrawSceneContentV4', $cfg_commonWithdrawSceneContentV4); //普通提现场景内容
-
-    if ($cfg_courierWithdrawSceneContentV4 != null) {
-        $cfg_courierWithdrawSceneContentV4 = json_decode($cfg_courierWithdrawSceneContentV4,true);
-    }
-
-    //$huoniaoTag->assign('courierWithdrawSceneIdV4', $cfg_courierWithdrawSceneIdV4); //骑手提现场景ID
-    $huoniaoTag->assign('courierWithdrawSceneSelectV4', $cfg_courierWithdrawSceneSelectV4); //骑手提现场景选项ID
-    $huoniaoTag->assign('courierWithdrawSceneContentV4', $cfg_courierWithdrawSceneContentV4); //骑手提现场景内容
-
-    $huoniaoTag->assign('sceneArr', $sceneArr); //场景参数明细数组
 
     $huoniaoTag->compile_dir = HUONIAOROOT . "/templates_c/admin/settlement";  //设置编译目录
     $huoniaoTag->display($templates);

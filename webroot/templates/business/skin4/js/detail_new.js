@@ -488,20 +488,4 @@ $(function(){
 
 	}
 
-	// 数据获取
-	(async res => {
-		let data = {
-			service: 'business',
-			action: 'storeDetail',
-			id: id,
-			from: 'detail'
-		}
-		let result = await ajax(data);
-		if (result.state == 100) {
-			let info = result.info;
-			if(info.collect){
-				$('.info_box .btn_group button.shoucang').addClass('click').text('已收藏');
-			}
-		}
-	})();
 })

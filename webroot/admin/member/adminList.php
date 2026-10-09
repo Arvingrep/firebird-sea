@@ -109,17 +109,8 @@ if($dopost == "del"){
 	//锁定
 	$lock = $dsql->dsqlOper($archives." AND `state` = 1".$where, "totalCount");
 
-    $state = $_POST['state'];
-	if($state !== ""){
-        $state = (int)$state;
+	if($state != ""){
 		$where .= " AND `state` = $state";
-
-        if ($state == 0) {
-            $totalPage = ceil($normal / $pagestep);
-        } elseif ($state == 1) {
-            $totalPage = ceil($lock / $pagestep);
-        }
-
 	}
 
 	$where .= " order by `id` desc";

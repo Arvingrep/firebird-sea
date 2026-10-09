@@ -99,7 +99,7 @@ $(function(){
 		$("#couriertype button").html(title+'<span class="caret"></span>');
 	});
 
-	$("#stateBtn,#sourceBtn, #pageBtn, #paginationBtn").delegate("a", "click", function(){
+	$("#stateBtn, #pageBtn, #paginationBtn").delegate("a", "click", function(){
 		var id = $(this).attr("data-id"), title = $(this).html(), obj = $(this).parent().parent().parent();
 		obj.attr("data-id", id);
 		if(obj.attr("id") == "paginationBtn"){
@@ -178,7 +178,6 @@ $(function(){
 	//打款
 	$("#list").delegate(".payment", "click", function(){
 		var id = $(this).attr('data-id');
-		var bank = $(this).attr('data-bank');
 		$.dialog.confirm('此操作不可恢复，您确定要打款吗？', function(){
 			huoniao.showTip("loading", "正在操作，请稍候...");
 			huoniao.operaJson("withdrawEdit.php?dopost=transfers", "id="+id, function(data){
@@ -188,18 +187,17 @@ $(function(){
 						getList();
 					}, 500);
 				}else{
-	                if(data.info.indexOf('微信转账中') > -1){
-	                    huoniao.showTip("success", data.info, "auto");
-	                    setTimeout(function() {
-	                        getList();
-	                    }, 500);
-	                }else{
-	                    $.dialog.alert(data.info);
+                    if(data.info.indexOf('微信转账中') > -1){
+                        huoniao.showTip("success", data.info, "auto");
+                        setTimeout(function() {
+                            getList();
+                        }, 500);
+                    }else{
+                        $.dialog.alert(data.info);
 					    huoniao.hideTip();
-	                }
+                    }
 				}
 			});
-			
 		});
 	});
 
@@ -293,7 +291,6 @@ function getList(){
 		couriertype    = $("#couriertypev").html(),
 		end      = $("#end").html(),
 		state    = $("#stateBtn").attr("data-id") ? $("#stateBtn").attr("data-id") : "",
-		source   = $("#sourceBtn").attr("data-id") ? $("#sourceBtn").attr("data-id") : 0,
 		pagestep = $("#pageBtn").attr("data-id") ? $("#pageBtn").attr("data-id") : "10",
 		page     = $("#list").attr("data-atpage") ? $("#list").attr("data-atpage") : "1";
 
@@ -303,7 +300,6 @@ function getList(){
 		data.push("start="+start);
 		data.push("end="+end);
 		data.push("state="+state);
-		data.push("source="+source);
 		data.push("couriertype="+couriertype);
 		data.push("pagestep="+pagestep);
 		data.push("page="+page);
@@ -319,8 +315,7 @@ function getList(){
 		$(".state1").html(val.pageInfo.state1);
 		$(".state2").html(val.pageInfo.state2);
 		$(".state3").html(val.pageInfo.state3);
-		$(".state4").html(val.pageInfo.state4);
-		$(".state6").html(val.pageInfo.state6);
+
 		if(val.state == "100"){
 			//huoniao.showTip("success", "获取成功！", "auto");
 			huoniao.hideTip();
@@ -376,26 +371,24 @@ function getList(){
 
 					state = '<span class="gray">微信打款中</span>';
 				}
-				switch (list[i].state) {
-					case "4":
-						state = '<span class="gray">打款撤销中</span>';
-						break;
-					case "6":
-						state = '<span class="audit">用户确认中</span>';
-						break;
-					case "5":
-						state = '<span class="refuse">失败</span>';
-						break;
-				}
+				// switch (list[i].state) {
+				// 	case "0":
+				// 		state = '<span class="gray">审核中</span>';
+				// 		break;
+				// 	case "1":
+				// 		state = '<span class="audit">成功</span>';
+				// 		break;
+				// 	case "2":
+				// 		state = '<span class="refuse">失败</span>';
+				// 		break;
+				// }
 				listArr.push('  <td class="row10 left">'+state+'</td>');
 
 				var btn = '';
-				// if(list[i].state == '0' && (list[i].bank == 'weixin' || list[i].bank == 'alipay') && list[i].auditstate ==1&&list[i].withdrawtransfer ==1){
-				// 	btn = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="javascript:;" data-bank="'+ list[i].bank +'" data-id="'+list[i].id+'" class="payment" title="确认打款">付款</a>';
-				// }
-				// if(list[i].state == '6' && list[i].bank == 'weixin' ){
-				// 	btn = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="javascript:;" data-bank="'+ list[i].bank +'" data-id="'+list[i].id+'" class="payment" title="确认打款">付款</a>';
-				// }
+				if(list[i].state == '0' && (list[i].bank == 'weixin' || list[i].bank == 'alipay') && list[i].auditstate ==1&&list[i].withdrawtransfer ==1){
+					btn = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="javascript:;" data-id="'+list[i].id+'" class="payment" title="确认打款">付款</a>';
+				}
+
 				listArr.push('  <td class="row10 left"><a data-id="'+list[i].id+'" data-title="'+list[i].username+'提现详细" href="withdrawEdit.php?dopost=edit&id='+list[i].id+'" title="修改" class="edit">修改</a><a href="javascript:;" title="删除" class="del">删除</a>'+btn+'</td>');
 			}
 

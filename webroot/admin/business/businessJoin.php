@@ -288,30 +288,34 @@ if($dopost == "getList"){
 						//房产门户
 						}elseif($module == 'house'){
 
-							$sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company` WHERE `uid` = $uid");
+							$sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjcom` WHERE `userid` = $uid");
 							$ret = $dsql->dsqlOper($sql, "results");
 							if(!$ret){
-								$sql = $dsql->SetQuery("INSERT INTO `#@__house_distributor_company` (`cityid`, `name`, `logo`, `uid`, `phone`, `address`, `weight`, `status`, `create_time`) VALUES ('$cityid', '$company', '$logo', '$uid', '$tel', '$address', '1', '1', '$time')");
+								$sql = $dsql->SetQuery("INSERT INTO `#@__house_zjcom` (`cityid`, `title`, `litpic`, `userid`, `tel`, `address`, `email`, `weight`, `state`, `pubdate`) VALUES ('$cityid', '$company', '$logo', '$uid', '$tel', '$address', '$email', '1', '1', '$time')");
 								$zjcomid = $dsql->dsqlOper($sql, "lastid");
 
 								//经纪人
 								if(is_numeric($zjcomid)){
-									$sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company_user` WHERE `uid` = '$uid'");
+									$sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjuser` WHERE `userid` = '$uid'");
 									$ret = $dsql->dsqlOper($sql, "results");
 
 									//如果会员已经是中介，则将所属公司更改为新创建的公司
 									if($ret){
-										$sql = $dsql->SetQuery("UPDATE `#@__house_distributor_company_user` SET `dcoid` = $zjcomid WHERE `uid` = $uid");
+										$sql = $dsql->SetQuery("UPDATE `#@__house_zjuser` SET `zjcom` = $zjcomid WHERE `userid` = $uid");
 										$dsql->dsqlOper($sql, "update");
 									}else{
-										$sql = $dsql->SetQuery("INSERT INTO `#@__house_distributor_company_user` (`cityid`, `uid`, `dcoid`, `litpic`, `weight`, `status`,  `create_time`) VALUES ('$cityid', '$uid', '$zjcomid', '$logo', '1', '1', '$time')");
+										$sql = $dsql->SetQuery("INSERT INTO `#@__house_zjuser` (`cityid`, `userid`, `zjcom`, `litpic`, `weight`, `state`, `flag`, `pubdate`) VALUES ('$cityid', '$uid', '$zjcomid', '$logo', '1', '1', '1', '$time')");
 										$zjuser = $dsql->dsqlOper($sql, "lastid");
 
 										//个人会员升级为企业会员后，需要将此会员所发布的所有房源类型更新为中介
 										if(is_numeric($zjuser)){
 
-											//新二手房+出租房
-											$sql = $dsql->SetQuery("UPDATE `#@__house_property_listing` SET `listing_nature` = 2 WHERE `property_type` IN (2, 3) AND  `listing_nature` = 0 AND `creator_uid` = $uid");
+											//二手房
+											$sql = $dsql->SetQuery("UPDATE `#@__house_sale` SET `usertype` = 1, `userid` = $zjuser WHERE `usertype` = 0 AND `userid` = $uid");
+											$dsql->dsqlOper($sql, "update");
+
+											//租房
+											$sql = $dsql->SetQuery("UPDATE `#@__house_zu` SET `usertype` = 1, `userid` = $zjuser WHERE `usertype` = 0 AND `userid` = $uid");
 											$dsql->dsqlOper($sql, "update");
 
 											//写字楼

@@ -111,7 +111,7 @@ function getList(is){
 	$(".pagination").hide();
 
 	$.ajax({
-		url: masterDomain+"/include/ajax.php?service=house&action=route&action=consumer/myMakeList&u=1&spec=out&state="+state+"&page="+atpage+"&pageSize="+pageSize,
+		url: masterDomain+"/include/ajax.php?service=house&action=bookHouseList&u=1&spec=out&state="+state+"&page="+atpage+"&pageSize="+pageSize,
 		type: "GET",
 		dataType: "jsonp",
 		success: function (data) {

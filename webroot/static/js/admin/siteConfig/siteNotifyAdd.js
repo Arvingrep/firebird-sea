@@ -63,8 +63,8 @@ $(function () {
 
 	});
 
-	$('.syncSmsWeixinTemplate').bind('click', function(e){
-		var t = $(this), id = $('#id').val(), _cityid = parseInt($(this).attr('data-cityid'));
+	$('#syncSmsWeixinTemplate').bind('click', function(e){
+		var t = $(this), id = $('#id').val();
 		if(t.hasClass('disabled') || !id) return false;
 
 		$.dialog.confirm('如果此编号已经在微信公众平台模板库添加过，一键导入功能会重复添加一条，这将导致模板数量被占用，确认无误，继续导入吗？', function(){
@@ -74,19 +74,14 @@ $(function () {
 
 			$.ajax({
 				type: "GET",
-				url: "../inc/json.php?action=addWxTemplate&addtype=1&id="+id+"&cityid="+_cityid,
+				url: "../inc/json.php?action=addWxTemplate&addtype=1&id="+id,
 				dataType: "json",
 				success: function(data){
 					huoniao.hideTip();
 					t.removeClass('disabled');
 					if(data.state == 100){
 
-                        if(_cityid == 0){
-                            $('#wechat_tempid').val(data.code);
-                        }
-                        else if(_cityid > 0){
-                            $('#wechat_tempid_'+_cityid).val(data.code);
-                        }
+						$('#wechat_tempid').val(data.code);
 
 						$.dialog({
 							fixed: true,
@@ -94,11 +89,6 @@ $(function () {
 							icon: 'success.png',
 							content: "导入成功！",
 							ok: function(){
-
-                                if(_cityid == -1){
-                                    location.reload();
-                                }
-
 							}
 						});
 
@@ -185,13 +175,13 @@ $(function () {
 							icon: 'success.png',
 							content: "修改成功",
 							ok: function(){
-								// try{
-								// 	$("body",parent.document).find("#nav-siteNotifyphp").click();
-								// 	parent.reloadPage($("body",parent.document).find("#body-siteNotifyphp"));
-								// 	$("body",parent.document).find("#nav-siteNotifyEdit"+id+" s").click();
-								// }catch(e){
-								// 	location.href = thisPath + "siteNotify.php";
-								// }
+								try{
+									$("body",parent.document).find("#nav-siteNotifyphp").click();
+									parent.reloadPage($("body",parent.document).find("#body-siteNotifyphp"));
+									$("body",parent.document).find("#nav-siteNotifyEdit"+id+" s").click();
+								}catch(e){
+									location.href = thisPath + "siteNotify.php";
+								}
 							},
 							cancel: false
 						});

@@ -100,26 +100,6 @@ if($loginData){
         $data[$value['name']] = $value['value'];
     }
 
-    //微信登录需要根据当前所在分站的城市ID查询分站绑定的独立公众号
-    // if($type == 'wechat'){
-    //     $_check_cityid = (int)$_GET['cityid'] ?? '';
-    //     if(!$_check_cityid){
-    //         global $siteCityInfo;
-    //         $_check_cityid = (int)$siteCityInfo['cityid'] ?? '';
-    //     }
-
-    //     if($_check_cityid){
-    //         $_wechatConfig = getWechatCityAdvancedConfig('', $_check_cityid);
-    //         if($_wechatConfig){
-    //             $appId = $_wechatConfig['appid'];
-    //             $appSecret = $_wechatConfig['appsecret'];
-    //             $data['appid'] = $appId;
-    //             $data['appsecret'] = $appSecret;
-    //             $data['callback'] .= "&cityid=" . $_check_cityid;
-    //         }
-    //     }
-    // }
-
     //登录
     if($action == ""){
         $furl = $_GET['furl'];

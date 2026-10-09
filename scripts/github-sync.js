@@ -42,17 +42,29 @@ function getLocalTasks() {
     const moduleMatch = raw.match(/>\s*(?:涉及模块|模块):\s*`([^`]+)`/);
     const module = moduleMatch ? moduleMatch[1].trim() : 'CORE';
 
-    // 检查是否有对应的验收报告
+    // 检查是否有对应的验收报告，并读取真实裁定（ACCEPTED / REJECTED）
     const reportFile = path.join(REPORTS_DIR, `${id}-ACCEPTANCE.md`);
     const hasReport = fs.existsSync(reportFile);
+    let verdict = null; // null=无报告, 'ACCEPTED', 'REJECTED'
+    if (hasReport) {
+      const rep = fs.readFileSync(reportFile, 'utf-8');
+      const m = rep.match(/最终裁定[^A-Za-z]*\*\*\s*(ACCEPTED|REJECTED)/i);
+      verdict = m ? m[1].toUpperCase() : 'REJECTED'; // 读不出裁定时按未通过处理,绝不默认通过
+    }
+
+    // 只有真实裁定 ACCEPTED 才算上线闭环;REJECTED 留在独立验收列(打回);无报告按任务自身状态
+    const effectiveStatus = verdict === 'ACCEPTED' ? 'DONE'
+      : hasReport ? 'IN_QA'
+      : status;
 
     return {
       id,
       file,
       title,
-      status: hasReport ? 'DONE' : status,
+      status: effectiveStatus,
       module,
       hasReport,
+      verdict,
       reportFile: hasReport ? reportFile : null
     };
   });
@@ -108,7 +120,10 @@ async function syncToGitHub() {
   for (const [col, list] of Object.entries(board)) {
     console.log(`\n${col} (${list.length}):`);
     list.forEach(item => {
-      console.log(`  • [${item.id}] [${item.module}] ${item.title} ${item.hasReport ? '🟢 验收通过' : ''}`);
+      const vb = item.verdict === 'ACCEPTED' ? '🟢 验收通过'
+               : item.verdict === 'REJECTED' ? '🔴 验收打回'
+               : '';
+      console.log(`  • [${item.id}] [${item.module}] ${item.title} ${vb}`);
     });
   }
 
@@ -122,7 +137,17 @@ async function syncToGitHub() {
     board
   }, null, 2), 'utf-8');
 
-  console.log(`\n💾 已生成 BMAD UI 看板数据源: apps/bmad-dashboard/board-data.json`);
+  // 同时写一份 JS 形式（window.__BMAD），供 index.html 用 <script> 引入，
+  // 规避 file:// 下浏览器拦截 fetch 本地 json 的 CORS 限制（这样看板一定读到真实数据）。
+  const jsPath = path.join(path.dirname(exportPath), 'board-data.js');
+  fs.writeFileSync(jsPath, 'window.__BMAD = ' + JSON.stringify({
+    syncedAt: new Date().toISOString(),
+    repo: GITHUB_REPO,
+    tasks,
+    board
+  }) + ';\n', 'utf-8');
+
+  console.log(`\n💾 已生成 BMAD UI 看板数据源: apps/bmad-dashboard/board-data.json (+ board-data.js)`);
 
   if (!GITHUB_TOKEN) {
     console.log('\nℹ️ 当前未注入 GITHUB_TOKEN，已启用本地离线 Project 看板引擎。');

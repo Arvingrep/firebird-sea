@@ -19,10 +19,7 @@ if(isset($set_modules) && $set_modules == TRUE){
     $payment[$i]['pay_code'] = "xorpay_alipay";
 
 	/* 名称 */
-    $payment[$i]['pay_name'] = "支付宝";
-
-	/* 所属公司 */
-    $payment[$i]['title'] = "XorPay";
+    $payment[$i]['pay_name'] = "支付宝个人收款";
 
     /* 版本号 */
     $payment[$i]['version']  = '1.0.0';

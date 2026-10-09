@@ -119,7 +119,6 @@ $(function(){
 
 	//搜索
 	$("#searchBtn").bind("click", function(){
-		$("#stype").html($("#searchType").val());
 		$("#sKeyword").html($("#keyword").val());
 		$("#mtype").html($("#ctype").attr("data-id"));
 		$("#start").html($("#stime").val());
@@ -323,14 +322,13 @@ $(function(){
 	$("#export").click(function(e){
 	var t = $(this), 
 		sKeyword = encodeURIComponent($("#sKeyword").html()),
-		stype = $("#stype").html(),
 		start    = $("#start").html(),
 		end      = $("#end").html(),
 		mtype    = $("#mtype").html(),
 		state    = $("#stateBtn").attr("data-id") ? $("#stateBtn").attr("data-id") : ""
 
 	
-	var url = '?do=export&stype='+stype+'&sKeyword='+sKeyword+'&start='+start+'&end='+end+'&state='+state+'&mtype='+mtype;
+	var url = '?do=export&sKeyword='+sKeyword+'&start='+start+'&end='+end+'&state='+state+'&mtype = '+mtype;
 	console.log(url);
 
 	t.attr('href', url);
@@ -346,7 +344,6 @@ function getList(){
 	$("#selectBtn a:eq(1)").click();
 	$("#loading").html("加载中，请稍候...").show();
 	var sKeyword = encodeURIComponent($("#sKeyword").html()),
-		stype = $("#stype").html(),
 		start    = $("#start").html(),
 		end      = $("#end").html(),
 		mtype    = $("#mtype").html(),
@@ -357,7 +354,6 @@ function getList(){
 
 	var data = [];
 		data.push("sKeyword="+sKeyword);
-		data.push("stype="+stype);
 		data.push("start="+start);
 		data.push("end="+end);
 		data.push("mtype="+mtype);

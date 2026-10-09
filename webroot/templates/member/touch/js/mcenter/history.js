@@ -111,12 +111,6 @@ $(function(){
 						$(".list_dd").remove();
 					}
 					$(".on_chose").remove();
-					$(`.${module}_dl`).each(function() { //移除空的business_dl
-						let $this = $(this);
-						if ($this.find('.list_dd').length === 0) {
-							$this.remove();
-						}
-					});
 					$('.btn_del em').text(0)
 				}else{
 					showErrAlert(data.info);
@@ -1174,7 +1168,7 @@ $(function(){
 										html.push('<div class="rinfo">');
 										html.push('<h1>'+list[i].title+'</h1>');
 
-										html.push('<p><span>案例</span> - '+list[i]?.author?.company+'</p>');
+										html.push('<p><span>案例</span> - '+list[i].author.company+'</p>');
 									}else{
 										html.push('<a href="'+list[i].url+'" class="fn-clear">');
 										html.push('<div class="litpic"><img src="'+list[i].logo+'" onerror="this.src=\'/static/images/404.jpg\'">');

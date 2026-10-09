@@ -1369,11 +1369,10 @@ $(".proCategory").click(function(){
 					var typeList = [],html = [];
 
 					html.push('<ul id="brandList" data-type="treeList" style="display: none;">')
-						// defaultValuee = [plist[0].id]
-						// if(plist[0].lower.length){
-						//     defaultValuee.push(plist[0].lower[0].id)
-						// }
-						html.push('<li data-val=""><span>请选择</span></li>')
+						defaultValuee = [plist[0].id]
+						if(plist[0].lower.length){
+						    defaultValuee.push(plist[0].lower[0].id)
+						}
     					for(var i = 0; i < plist.length; i++){
     						var lower = plist[i].lower;
     							var id = plist[i].id;
@@ -1393,6 +1392,7 @@ $(".proCategory").click(function(){
     						}
     					}
 					html.push('</ul>');
+					console.log(html)
 					$("#brandname").after(html.join(''));
 
 					var treelist = $('#brandList').mobiscroll().treelist({
@@ -1408,7 +1408,7 @@ $(".proCategory").click(function(){
 							$("#brandname").val($("#brandList li[data-val="+(defaultValuee.length > 1 ? defaultValuee[1]:defaultValuee[0])+"]").text())
 						},
 						onSet:function(valueText, inst){
-						    // console.log(inst,valueText)
+						    console.log(inst,valueText)
 							var typename = $("#brandList li[data-val="+(inst._wheelArray.length > 1 ? inst._wheelArray[1] : inst._wheelArray[0])+"]").text()
 							var typeid = inst._wheelArray.length > 1 ? inst._wheelArray[1] : inst._wheelArray[0];
 							

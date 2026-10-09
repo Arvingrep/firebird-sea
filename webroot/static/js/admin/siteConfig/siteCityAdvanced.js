@@ -1,18 +1,9 @@
 if(action == 'siteConfig') {
     var ue = UE.getEditor('powerby', {'enterTag': ''});
 }
-//上传成功接收
-function uploadSuccess(obj, file){
-	$("#"+obj).val(file);
-	$("#"+obj).siblings(".spic").find(".sholder").html('<img src="'+cfg_attachment+file+'" />');
-	$("#"+obj).siblings(".spic").find(".reupload").attr("style", "display: inline-block");
-	$("#"+obj).siblings(".spic").show();
-	$("#"+obj).siblings("iframe").hide();
-}
+
 $(function(){
-    $("#postRefreshCreatePeriodInp").focus(function(){
-        $("input[name='postRefreshCreatePeriodShow'][value='1']").attr('checked', true)
-    })
+
     //复制模板
     $('.copyTemplate').change(function(){
         var t = $(this), type = t.data('type'), val = t.val();
@@ -25,59 +16,20 @@ $(function(){
         });
     });
 
-
-    $("input[name='autojobup']").change(function(){
-        let t = $(this),val = t.val();
-        if(val == 2){
-            $('.refreshConfig').removeClass('hide');
-        }else{
-            $('.refreshConfig').addClass('hide');
-        }
-    })
-
     getCityTemplate();
-
-
-    //删除文件
-	$(".spic .reupload").bind("click", function(){
-		var t = $(this), parent = t.parent(), input = parent.prev("input"), iframe = parent.next("iframe"), src = iframe.attr("src");
-		delFile(input.val(), false, function(){
-			input.val("");
-			t.prev(".sholder").html('');
-			parent.hide();
-			iframe.attr("src", src).show();
-		});
-	});
 
 
     //表单提交
     $("#btnSubmit").bind("click", function(event) {
         event.preventDefault();
-        
-       
-        if(action == 'zhaopin'){
-            let postRefreshCreatePeriod = $("input[name='postRefreshCreatePeriodShow']:checked").val()
-            if(postRefreshCreatePeriod === '1'){
-                postRefreshCreatePeriod = $("#postRefreshCreatePeriodInp").val()
-                if(!postRefreshCreatePeriod){
-                    huoniao.showTip("error", "请填写职位发布时间限制", "auto");
-                    return false;
-                }
-            }
-            $("#postRefreshCreatePeriod").val(postRefreshCreatePeriod)
-            let autojobup = $("input[name='autojobup']:checked").val()
-            let autojobfrequency = $("input[name='autojobfrequency']").val()
-            if(autojobup == 2 && (autojobfrequency == '' || isNaN(autojobfrequency))){
-                huoniao.showTip("error", "请填写正确的自动更新频率！", "auto");
-                return false;
-            }
-        }
-         //异步提交
-         var post = $("#editform").serialize();
 
-         if(action == 'siteConfig'){
-             ue.sync();
-         }
+        //异步提交
+        var post = $("#editform").serialize();
+
+        if(action == 'siteConfig'){
+            ue.sync();
+        }
+
         huoniao.operaJson("?dopost=save", post, function(data){
             var state = "success";
             if(data.state != 100){
@@ -169,27 +121,4 @@ function getCityTemplate(){
             huoniao.showTip("error", "暂无相关模板！", "auto");
         }
     });
-}
-
-//删除已上传的文件
-function delFile(b, d, c) {
-	var g = {
-		mod: "siteConfig",
-		type: "delCard",
-		picpath: b,
-		randoms: Math.random()
-	};
-	$.ajax({
-		type: "POST",
-		cache: false,
-		async: d,
-		url: "/include/upload.inc.php",
-		dataType: "json",
-		data: $.param(g),
-		success: function(a) {
-			try {
-				c(a)
-			} catch(b) {}
-		}
-	})
 }

@@ -128,18 +128,18 @@ if($dopost == "getList"){
     $allsql .= $wheretime;
 
     //总条数
-    $totalCount = $dsql->dsqlOper($allsql, "totalCount", 'ASSOC', null, 0);
+    $totalCount = $dsql->dsqlOper($allsql, "totalCount");
     //总页数
     $totalPage = ceil($totalCount/$pagestep);
 
     // 计算分页 limit，并查询数据
     $atpage = $pagestep*($page-1);
     $listSql = $allsql." ORDER BY `date` DESC LIMIT $atpage, $pagestep";
-    $results = $dsql->dsqlOper($listSql, "results", 'ASSOC', null, 0);
+    $results = $dsql->dsqlOper($listSql, "results");
 
     //总金额
     $allsqlmm     = $dsql->SetQuery("SELECT SUM(`amount`) allamount FROM (".$allsql.") as alls");
-    $totalMoney   = $dsql->dsqlOper($allsqlmm, "results", 'ASSOC', null, 0);
+    $totalMoney   = $dsql->dsqlOper($allsqlmm, "results");
     $totalMoney = sprintf('%.2f', $totalMoney[0]['allamount']);
 
     // 数据封装处理

@@ -20,9 +20,6 @@ if(isset($set_modules) && $set_modules == TRUE){
 	/* 名称 */
     $payment[$i]['pay_name'] = "银联在线支付";
 
-	/* 所属公司 */
-    $payment[$i]['title'] = "银联";
-
     /* 版本号 */
     $payment[$i]['version']  = '2.0.0';
 

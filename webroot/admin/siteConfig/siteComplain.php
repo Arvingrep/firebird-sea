@@ -190,18 +190,6 @@ if($dopost == "updateDetail"){
 			array_push($search, "(`module` = 'house' AND `action` = 'cf' AND `aid` in ($idList))");
 		}
 
-		//新房产房源
-		$archives = $dsql->SetQuery("SELECT `id` FROM `#@__house_property_listing` WHERE `title` like '%$sKeyword%'");
-		$results = $dsql->dsqlOper($archives, "results");
-		if($results && is_array($results)){
-			$list = array();
-			foreach ($results as $key=>$value) {
-				$list[] = $value["id"];
-			}
-			$idList = join(",", $list);
-			array_push($search, "(`module` = 'house' AND `action` = 'listing' AND `aid` in ($idList))");
-		}
-
 		//招聘职位
 		$archives = $dsql->SetQuery("SELECT `id` FROM `#@__job_post` WHERE `title` like '%$sKeyword%'");
 		$results = $dsql->dsqlOper($archives, "results");
@@ -322,7 +310,7 @@ if($dopost == "updateDetail"){
 			array_push($search, "(`module` = 'tieba' AND `aid` in ($idList))");
 		}
 		//贴吧评论
-		$archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `content` like '%$sKeyword%' AND `type` = 'tieba-detail'");
+		$archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `content` like '%$sKeyword%' AND `type` = 'tieba-detail'");
 		$results  = $dsql->getTypeName($archives);
 		if($results && is_array($results)){
 			$list = array();
@@ -488,20 +476,18 @@ if($dopost == "updateDetail"){
 			//房产
 			if($value['module'] == "house"){
 
-				if($value['action'] == 'listing'){
-					//新房产房源
-					$typeSql = $dsql->SetQuery("SELECT `title` FROM `#@__house_property_listing` WHERE `id` = ". $value['aid']);
+				//中介公司
+				if($value['action'] == 'store-detail'){
+					$typeSql = $dsql->SetQuery("SELECT `title` FROM `#@__house_zjcom` WHERE `id` = ". $value['aid']);
 					$typename = $dsql->getTypeName($typeSql);
-				}elseif($value['action'] == 'store-detail'){
-					//中介公司
-					$typeSql = $dsql->SetQuery("SELECT `name` as `title` FROM `#@__house_distributor_company` WHERE `id` = ". $value['aid']);
-					$typename = $dsql->getTypeName($typeSql);
+
 				}elseif($value['action'] == 'broker'){
-					$typeSql = $dsql->SetQuery("SELECT m.`realname`, m.`nickname` FROM `#@__house_distributor_company_user` z LEFT JOIN `#@__member` m ON m.`id` = z.`uid` WHERE z.`id` = ". $value['aid']);
+					$typeSql = $dsql->SetQuery("SELECT m.`realname`, m.`nickname` FROM `#@__house_zjuser` z LEFT JOIN `#@__member` m ON m.`id` = z.`userid` WHERE z.`id` = ". $value['aid']);
 					$typename = $dsql->getTypeName($typeSql);
 					if($typename){
 						$typename[0]['title'] = $typename[0]['realname'] ? $typename[0]['realname'] : $typename[0]['nickname'];
 					}
+
 				}else{
 					$typeSql = $dsql->SetQuery("SELECT `title` FROM `#@__house_".$value['action']."` WHERE `id` = ". $value['aid']);
 					$typename = $dsql->getTypeName($typeSql);
@@ -562,11 +548,10 @@ if($dopost == "updateDetail"){
 
 			//城市招聘
 			if($value['module'] == "zhaopin"){
-				if($value['action'] == "quanzhi" || $value['action'] == "jianzhi" || $value['action'] == "detail"){
-					$typeSql = $dsql->SetQuery("SELECT `title`, `category` FROM `#@__zhaopin_post` WHERE `id` = ". $value['aid']);
+				if($value['action'] == "quanzhi" || $value['action'] == "jianzhi"){
+					$typeSql = $dsql->SetQuery("SELECT `title` FROM `#@__zhaopin_post` WHERE `id` = ". $value['aid']);
 					$typename = $dsql->getTypeName($typeSql);
-                    $zhaopin_category = (int)$typename[0]['category'];
-					$title = ($zhaopin_category == 1 ? '全职岗位：' : '兼职岗位：') . $typename[0]['title'];
+					$title = ($value['action'] == "quanzhi" ? '全职岗位：' : '兼职岗位：') . $typename[0]['title'];
 					$url = getUrlPath(array("service" => "zhaopin", "template" => 'postDetail', "param" => "id=" . $value['aid']));
 				}elseif($value['action'] == "resume"){
 					$typeSql = $dsql->SetQuery("SELECT `name` FROM `#@__zhaopin_resume` WHERE `id` = ". $value['aid']);
@@ -599,7 +584,7 @@ if($dopost == "updateDetail"){
 				$title = $typename[0]['title'];
 				$url = getUrlPath(array("service" => "tieba", "template" => "detail", "id" => $value['aid']));
 				if(!empty($value['commonid'])){
-					$contentSql = $dsql->SetQuery("SELECT `content` FROM `#@__public_comment` WHERE `aid`='".$value['aid']."' and `id` = ". $value['commonid']);
+					$contentSql = $dsql->SetQuery("SELECT `content` FROM `#@__public_comment_all` WHERE `aid`='".$value['aid']."' and `id` = ". $value['commonid']);
 					$contentA = $dsql->getTypeName($contentSql);
 					$commoncontent  = $contentA[0]['content'];
 				}

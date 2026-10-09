@@ -124,7 +124,6 @@ $(function(){
 
 	//搜索
 	$("#searchBtn").bind("click", function(){
-		$("#stype").html($("#searchType").val());
 		$("#sKeyword").html($("#keyword").val());
 		$("#start").html($("#stime").val());
 		$("#end").html($("#etime").val());
@@ -397,7 +396,6 @@ $(function(){
 	$("#export").click(function(e){
 		// e.preventDefault();
 		var sKeyword = $("#keyword").val(),
-			stype = $("#stype").val(),
 			cityid = $("#cityid").val(),
 			mtype = $("#ctype").val(),
 			level = $("#clevel").val(),
@@ -418,7 +416,6 @@ $(function(){
 
 		var data = [];
 		data.push("sKeyword="+sKeyword);
-		data.push("stype="+stype);
 		data.push("start="+start);
 		data.push("end="+end);
 		data.push("cityid="+cityid);
@@ -665,7 +662,6 @@ function getList(){
 	$("#selectBtn a:eq(1)").click();
 	$("#loading").html("加载中，请稍候...").show();
 	var sKeyword = encodeURIComponent($("#sKeyword").html()),
-		stype    = $("#stype").html(),
 		start    = $("#start").html(),
 		end      = $("#end").html(),
 		cityid    = $("#cityid").val(),
@@ -689,7 +685,6 @@ function getList(){
 
 	var data = [];
 		data.push("sKeyword="+sKeyword);
-		data.push("stype="+stype);
 		data.push("start="+start);
 		data.push("end="+end);
 		data.push("cityid="+cityid);

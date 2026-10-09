@@ -302,14 +302,8 @@
     </div>
   </header>
 
-  <!-- 分类过滤器 -->
-  <div class="filter-bar">
-    <button class="filter-btn active" onclick="filterModule('ALL')">全部需求 (All)</button>
-    <button class="filter-btn" onclick="filterModule('PAYMENT')">💳 支付与双币 (Coins.ph/USDT)</button>
-    <button class="filter-btn" onclick="filterModule('LOCALIZATION')">🌐 多语言与本地化 (PHP/+63)</button>
-    <button class="filter-btn" onclick="filterModule('FRANCHISE')">🏢 城市分站与总代</button>
-    <button class="filter-btn" onclick="filterModule('GKE')">☸️ GKE 云原生部署与复制</button>
-  </div>
+  <!-- 分类过滤器（按真实数据里的实际模块动态生成，见 renderFilters）-->
+  <div class="filter-bar" id="filter-bar"></div>
 
   <!-- 看板 5 列矩阵 -->
   <main class="kanban-board" id="kanban-container">
@@ -333,8 +327,11 @@
     </div>
   </div>
 
+  <!-- 真实看板数据（由 make sync-gh / github-sync.js 生成；window.__BMAD）。
+       用 <script> 引入而非 fetch，规避 file:// 的 CORS 限制。 -->
+  <script src="board-data.js"></script>
   <script>
-    const INITIAL_DATA = {
+    const DEMO_FALLBACK = {
       columns: [
         { id: "backlog", title: "📋 需求池 (Backlog)", items: [
           { id: "STORY-LOC-001", title: "菲律宾比索 ₱ 双币前台展示与 en-US / tl-PH 语言包挂载", module: "LOCALIZATION", status: "BACKLOG", priority: "HIGH" },
@@ -358,15 +355,41 @@
 
     let activeFilter = 'ALL';
 
+    // 列顺序（与 github-sync.js 的 board 分组键一致）
+    const COLUMN_ORDER = [
+      '📋 需求池 (Backlog)',
+      '🚧 编码实现 (In Progress)',
+      '🛡️ 独立验收 (In QA / Acceptance)',
+      '🚀 待发布上线 (Ready to Release)',
+      '✅ 已上线闭环 (Done / Closed)'
+    ];
+
+    // 真实数据优先（window.__BMAD 由 make sync-gh 生成）；读不到才退回 demo（并明确标注）。
+    const BOARD = (window.__BMAD && window.__BMAD.board) ? window.__BMAD.board : null;
+    const SYNCED_AT = (window.__BMAD && window.__BMAD.syncedAt) || null;
+
+    function verdictBadge(item) {
+      if (item.verdict === 'ACCEPTED') return '<span class="badge-report">🟢 验收通过</span>';
+      if (item.verdict === 'REJECTED') return '<span style="color:#f87171">🔴 验收打回</span>';
+      if (item.hasReport)             return '<span style="color:#f59e0b">🟠 有报告(未判定)</span>';
+      return '<span style="color:#64748b">待验收</span>';
+    }
+
     function renderBoard() {
       const container = document.getElementById('kanban-container');
       container.innerHTML = '';
 
-      INITIAL_DATA.columns.forEach(col => {
-        const filteredItems = col.items.filter(item => {
-          if (activeFilter === 'ALL') return true;
-          return item.module === activeFilter;
-        });
+      // 组装 {title, items[]} 列表：真实数据按 COLUMN_ORDER，否则 demo。
+      let columns;
+      if (BOARD) {
+        columns = COLUMN_ORDER.map(title => ({ title, items: (BOARD[title] || []) }));
+      } else {
+        columns = DEMO_FALLBACK.columns.map(c => ({ title: c.title + ' (DEMO 占位·未同步)', items: c.items }));
+      }
+
+      columns.forEach(col => {
+        const filteredItems = col.items.filter(item =>
+          activeFilter === 'ALL' ? true : item.module === activeFilter);
 
         const colEl = document.createElement('div');
         colEl.className = 'kanban-col';
@@ -380,12 +403,12 @@
               <div class="task-card" onclick="openTaskModal('${item.id}')">
                 <div class="card-top">
                   <span class="card-id">${item.id}</span>
-                  <span class="card-module">${item.module}</span>
+                  <span class="card-module">${item.module || 'CORE'}</span>
                 </div>
                 <div class="card-title">${item.title}</div>
                 <div class="card-footer">
-                  <span style="color:var(--text-muted)">优先级: ${item.priority || 'NORMAL'}</span>
-                  ${item.report ? '<span class="badge-report">🛡️ 验收通过</span>' : '<span style="color:#64748b">待验收</span>'}
+                  <span style="color:var(--text-muted)">状态: ${item.status || '-'}</span>
+                  ${verdictBadge(item)}
                 </div>
               </div>
             `).join('')}
@@ -393,22 +416,66 @@
         `;
         container.appendChild(colEl);
       });
+
+      // 数据来源/时间提示（诚实标注是否真同步）
+      const hint = document.getElementById('sync-hint');
+      if (hint) {
+        hint.textContent = BOARD
+          ? `数据源: board-data.js（真实任务 ${window.__BMAD.tasks.length} 条）· 同步于 ${SYNCED_AT || '未知'}`
+          : '⚠️ 未找到 board-data.js，当前为 DEMO 占位数据（请先 make sync-gh）';
+      }
     }
 
-    function filterModule(mod) {
+    const MODULE_LABELS = {
+      ALL: '全部需求 (All)',
+      WAIMAI: '🍔 外卖订单 (Waimai)',
+      PAYMENT: '💳 支付与双币 (Coins.ph/USDT)',
+      LOCALIZATION: '🌐 多语言与本地化 (PHP/+63)',
+      FRANCHISE: '🏢 城市分站与总代',
+      GKE: '☸️ GKE 云原生部署',
+      DEPLOY: '☸️ 部署/运维',
+      CORE: '⚙️ 核心基建'
+    };
+
+    // 固定业务分类（规划中的 epic，即使暂无任务也常驻显示）
+    const BASE_CATEGORIES = ['PAYMENT', 'LOCALIZATION', 'FRANCHISE', 'GKE'];
+
+    // 常驻业务分类 + 数据里实际出现的额外模块（如 WAIMAI），合并去重
+    function renderFilters() {
+      const bar = document.getElementById('filter-bar');
+      if (!bar) return;
+      const dataMods = BOARD
+        ? Array.from(new Set((window.__BMAD.tasks || []).map(t => t.module || 'CORE')))
+        : [];
+      const extra = dataMods.filter(m => !BASE_CATEGORIES.includes(m)).sort();
+      const cats = ['ALL', ...BASE_CATEGORIES, ...extra];
+      bar.innerHTML = cats.map(m =>
+        `<button class="filter-btn${m === activeFilter ? ' active' : ''}" onclick="filterModule('${m}', this)">${MODULE_LABELS[m] || m}</button>`
+      ).join('');
+    }
+
+    function filterModule(mod, el) {
       activeFilter = mod;
       document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
+      if (el) el.classList.add('active');
       renderBoard();
     }
 
     function openTaskModal(id) {
+      const all = BOARD ? Object.values(BOARD).flat() : [];
+      const t = all.find(x => x.id === id) || { id };
+      const vtxt = t.verdict === 'ACCEPTED' ? '🟢 ACCEPTED（验收通过）'
+                 : t.verdict === 'REJECTED' ? '🔴 REJECTED（验收打回）'
+                 : t.hasReport ? '🟠 有报告但未判定' : '尚无验收报告';
       document.getElementById('modal-task-title').innerText = `任务详情: ${id}`;
       document.getElementById('modal-task-body').innerHTML = `
         <p><strong>任务编号:</strong> ${id}</p>
-        <p><strong>执行角色:</strong> Dev Agent 编码 ➔ Acceptance Agent 独立红队验收</p>
-        <p><strong>验收标准:</strong> 遵循 <code>.agents/ACCEPTANCE_GATE.md</code> 自动化探针测试</p>
-        <p><strong>上线闭环:</strong> 验收通过自动同步 GitHub Project，触发 GKE 容器流水线。</p>
+        <p><strong>模块:</strong> ${t.module || '-'}</p>
+        <p><strong>状态:</strong> ${t.status || '-'}</p>
+        <p><strong>验收裁定:</strong> ${vtxt}</p>
+        ${t.reportFile ? `<p><strong>报告:</strong> <code>${t.reportFile}</code></p>` : ''}
+        <p style="color:var(--text-muted);font-size:12px;margin-top:8px">
+          裁定由 <code>scripts/acceptance-runner.sh</code> 据实生成；本看板只如实展示,不代为签发。</p>
       `;
       document.getElementById('task-modal').style.display = 'flex';
     }
@@ -418,11 +485,14 @@
     }
 
     function runAcceptance() {
-      alert('已触发独立验收 Agent！正在运行 scripts/agent-accept.sh 进行攻击性探针测试...');
-      closeModal();
+      // 诚实:浏览器里跑不了脚本,不谎称"已触发"。给出真实命令。
+      const title = document.getElementById('modal-task-title').innerText || '';
+      const id = (title.split(':')[1] || '').trim();
+      alert('独立验收需在终端运行（浏览器无法执行脚本）:\n\n  bash scripts/acceptance-runner.sh ' + id + '\n\n跑完 make sync-gh 刷新看板即可看到真实裁定。');
     }
 
     // 页面加载启动
+    renderFilters();
     renderBoard();
   </script>
 </body>

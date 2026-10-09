@@ -60,7 +60,6 @@ $(function(){
        }
    }
 
-
     // 轮播
    var slideIndex_img = $(".img_box").index();  //第一张图片的索引
    var slideIndex_video = $(".video-box").index();  //视频的索引
@@ -530,7 +529,7 @@ $(function(){
    if($('.article-con').size() > 0){
 
        $('.article-con .common-title a').attr('href', moduleData['store']['article']['homepage']);
-       $('.article-con .common-title a').addClass('toMini').attr('data-module','article').attr('data-temp','mddetail').attr('data-id',moduleData['store']['article']['sid'])
+
        $.ajax({
            type: "POST",
            url: "/include/ajax.php",
@@ -543,7 +542,7 @@ $(function(){
 
                    if(list.length > 0){
                        for (var i = 0; i < list.length; i++) {
-                           html.push('<li><a href="'+list[i].url+'" data-module="article" data-temp="detail" data-id="'+ list[i].id +'">');
+                           html.push('<li><a href="'+list[i].url+'">');
                            if(list[i].litpic){
                                html.push('<div class="article_img"><img onerror="this.src=\'/static/images/404.jpg\'" src="/static/images/blank.gif" data-url="'+list[i].litpic+'" alt=""><em class="blue-em">'+list[i].typeName[0]+'</em></div>');
                            }
@@ -582,7 +581,7 @@ $(function(){
 
                    if(list.length > 0){
                        for (var i = 0; i < list.length; i++) {
-                           html.push('<li><a href="'+list[i].url+'" data-module="info" data-temp="detail" data-id="'+ list[i].id +'" class="toMini">');
+                           html.push('<li><a href="'+list[i].url+'">');
                            html.push('<div class="top_img">');
                            html.push('<img onerror="this.src=\'/static/images/404.jpg\'" src="/static/images/blank.gif" data-url="'+list[i].litpic+'" alt="">');
                            html.push('<span class="infoType">'+list[i].typename+'</span>');
@@ -629,7 +628,7 @@ $(function(){
    if($('.house-con').size() > 0){
 
        //房源数据
-       $('.house_con1 .common-title a').attr('href', moduleData['store']['house']['homepage'] + '?appFullScreen=1');
+       $('.house_con1 .common-title a').attr('href', moduleData['store']['house']['homepage']);
 
        $.ajax({
            type: "POST",
@@ -940,7 +939,7 @@ $(function(){
    //招聘数据
    if($('.job-con').size() > 0){
 
-       $('.job-con .common-title a').addClass('toMini').attr('href', moduleData['store']['job']['homepage']).attr('data-module','job').attr('data-temp','company').attr('data-id',moduleData['store']['job']['sid']);
+       $('.job-con .common-title a').attr('href', moduleData['store']['job']['homepage']);
 
        $.ajax({
            type: "POST",
@@ -954,7 +953,7 @@ $(function(){
 
                    if(list.length > 0){
                        for (var i = 0; i < list.length; i++) {
-                           html.push('<li><a href="'+list[i].url+'" data-module="job" data-temp="job" data-id="'+ list[i].id +'" class="toMini">');
+                           html.push('<li><a href="'+list[i].url+'">');
                            html.push('<div class="zhiwei_title">');
                            html.push('<div class="title_01"><span>'+list[i].title+'</span><p>'+list[i].show_salary+'</p></div>');
                            html.push('<div class="title_02 fn-clear">');
@@ -985,7 +984,6 @@ $(function(){
    if($('.shop-con').size() > 0){
 
        $('.shop-con .common-title a, .shop-con .common-more a').attr('href', moduleData['store']['shop']['homepage']);
-       $('.shop-con .common-title a, .shop-con .common-more a').addClass('toMini').attr('data-module','shop').attr('data-temp','store-detail').attr('data-id',moduleData['store']['shop']['sid'])
 
        $.ajax({
            type: "POST",
@@ -999,7 +997,7 @@ $(function(){
 
                    if(list.length > 0){
                        for (var i = 0; i < list.length; i++) {
-                           html.push('<li><a href="'+list[i].url+'" data-temp="detail" class="toMini" data-module="shop" data-id="'+ list[i].id +'">');
+                           html.push('<li><a href="'+list[i].url+'">');
                            html.push('<div class="top_img"><img onerror="this.src=\'/static/images/404.jpg\'" src="/static/images/blank.gif" data-url="'+list[i].litpic+'" alt=""></div>');
                            html.push('<div class="goodInfo">');
                            html.push('<h4>'+list[i].title+'</h4>');
@@ -2020,7 +2018,7 @@ $(function(){
                if(data.state == 100){
                    var info = data.info.list[0];
                    var html = [];
-                   html.push('<a href="'+info.url+'" data-module="tieba" data-temp="detail" data-id="'+ info.id +'" class="toMini">');
+                   html.push('<a href="'+info.url+'">');
                    if(info.imgGroup.length > 0){
                        html.push('<div class="tie-left fn-left"><img onerror="this.src=\'/static/images/404.jpg\'" src="/static/images/blank.gif" data-url="'+info.imgGroup[0]+'" class="tie-img"></div>');
                    }
@@ -2094,7 +2092,7 @@ $(function(){
                        html.push('<li class="fn-clear" data-id="'+d.id+'" data-url="comdetail.html">');
                        html.push('    <div class="lileft">');
                        html.push('        <a href="javascript:;" class="headImg">');
-                       html.push(`            <img src="${(d.user.photo ? d.user.photo : (staticPath + 'images/noPhoto_60.jpg'))}" onerror="this.src='/static/images/noPhoto_100.jpg'">`);
+                       html.push('            <img src="'+(d.user.photo ? d.user.photo : (staticPath + 'images/noPhoto_60.jpg') )+'" alt="">');
                        html.push('        </a>');
                        html.push('    </div>');
                        html.push('    <div class="liCon">');
@@ -2348,26 +2346,5 @@ $(function(){
        $(".btm_mask").fadeOut(100);
        $('html').removeClass("noscroll")
 
-   });
-   // 数据获取
-	(async res => {
-		let data = {
-			service: 'business',
-			action: 'storeDetail',
-			id: id,
-			from: 'detail'
-		}
-		let result = await ajax(data, { dataType: 'json' });
-		if (result.state == 100) {
-			let info = result.info;
-            $('.other-comment .comment-num').text(`${info.comment}评论`);
-            $('.other-comment .bus-star').text(info.sco1);
-            $('#comment_good_ratio').text(info.sco1);
-            $('.head-title p span.comment_total').text(info.comment);
-            if(info.collect){
-                $('.follow-wrapper .follow-icon').addClass('active');
-                $('.follow-wrapper .text-follow').text('已收藏');
-            }
-		}
-	})();
+   })
 });

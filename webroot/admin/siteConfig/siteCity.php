@@ -477,8 +477,6 @@ if(file_exists($tpl."/".$templates)){
 	//获取模块域名配置数据
 	$domainArr = array();
     $cityCount = 0;  //正常状态的城市数量
-    $wechatCount = 0;  //绑定独立公众号的数量
-    $wxminiCount = 0;  //绑定独立小程序的数量
 	global $cfg_basehost;
 
 	$sql = $dsql->SetQuery("SELECT c.*, a.`typename`, a.`id` aid FROM `#@__site_city` c LEFT JOIN `#@__site_area` a ON a.`id` = c.`cid` WHERE a.`id` != '' ORDER BY c.`state` DESC, c.`hot` DESC, a.`id`");
@@ -487,23 +485,6 @@ if(file_exists($tpl."/".$templates)){
 		foreach ($result as $key => $value) {
 
 			$domainInfo = getDomain('siteConfig', 'city', $value['cid']);
-
-            $wechat = $wxmini = 0;
-            $cityConfig = unserialize($value['config']);
-            $config = unserialize($value['config']);
-            if (is_array($config) && isset($config['siteConfig'])){
-                $siteConfig = $config['siteConfig'];
-                // 微信公众号配置
-                if (!empty($siteConfig['wechatToken']) && !empty($siteConfig['wechatAppid']) && !empty($siteConfig['wechatAppsecret']) && !empty($siteConfig['wechatName'])) {
-                    $wechat = 1;
-                }
-
-                // 微信小程序配置
-                if (!empty($siteConfig['miniProgramName']) && !empty($siteConfig['miniProgramAppid']) && !empty($siteConfig['miniProgramAppsecret'])) {
-                    $wxmini = 1;
-                }
-            }
-
 			$domainArr[] = array(
 				"id" => $value['id'],
 				"aid" => $value['aid'],
@@ -514,37 +495,16 @@ if(file_exists($tpl."/".$templates)){
 				"domain" => $domainInfo['domain'],
 				"hot" => $value['hot'],
 				"state" => $value['state'],
-				"wechat" => $wechat,
-				"wxmini" => $wxmini,
 			);
 
 			if($value['state'] == 1){
 				$cityCount++;
 			}
 
-            if($wechat){
-                $wechatCount++;
-            }
-            if($wxmini){
-                $wxminiCount++;
-            }
-
 		}
-
-        //自定义排序
-        if($orderby){
-            if($orderby == 'wechat'){
-                array_multisort(array_column($domainArr, 'wechat'), SORT_DESC, $domainArr);
-            }
-            if($orderby == 'wxmini'){
-                array_multisort(array_column($domainArr, 'wxmini'), SORT_DESC, $domainArr);
-            }
-        }
 	}
 	$huoniaoTag->assign('domainCount', count($domainArr));
 	$huoniaoTag->assign('cityCount', $cityCount);
-    $huoniaoTag->assign('wechatCount', $wechatCount);
-    $huoniaoTag->assign('wxminiCount', $wxminiCount);
 	$huoniaoTag->assign('domainArr', json_encode($domainArr));
 
 	//省
@@ -616,7 +576,6 @@ function updateMemory(){
     //清除缓存
     $HN_memory->rm('site_city');
     unlinkFile(HUONIAOROOT . '/system_site_city.json');
-    unlinkFile(HUONIAOROOT . '/data/cache/system_site_city.json');
 
     //重新生成缓存
     $handels = new handlers('siteConfig', 'siteCity');

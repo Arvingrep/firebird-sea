@@ -32,20 +32,10 @@ $_out_trade_no = $postObj->out_trade_no;
 if($_out_trade_no){
 
 	//查询订单所属模块
-	$sql = $dsql->SetQuery("SELECT `ordertype`, `cityid` FROM `#@__pay_log` WHERE `ordernum` = '$_out_trade_no'");
+	$sql = $dsql->SetQuery("SELECT `ordertype` FROM `#@__pay_log` WHERE `ordernum` = '$_out_trade_no'");
 	$ret = $dsql->dsqlOper($sql, "results");
 	if($ret){
 		$_ordertype = $ret[0]['ordertype'];
-
-        $cityid = $ret[0]['cityid'];
-
-        //获取分站绑定的商户号
-        $wxpayConfig = getWxpayCityAdvancedConfig('', $cityid);
-        if($wxpayConfig){
-            $paymentArr['APPID'] = $wxpayConfig['appid'];
-            $paymentArr['MCHID'] = $wxpayConfig['mchid'];
-            $paymentArr['KEY'] = $wxpayConfig['key'];
-        }
 
 		$_submchid = getWxpaySubMchid($_ordertype, $_out_trade_no);
 		if($_submchid && $paymentArr['PARTNER_MCHID'] && $paymentArr['PARTNER_KEY']){

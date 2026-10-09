@@ -96,7 +96,7 @@ $(function(){
   	})
 
   	//管理收藏
-  	$('.header-search  .manageA,.mshow .manageA,.allModule_page  .manage_box').click(function(){
+  	$('.header-search  .manageA,.allModule_page  .manage_box').click(function(){
   		var t = $(this);
   		if($('.listBox li').size() > 0){
 			if(t.hasClass('manage_box')){
@@ -124,6 +124,7 @@ $(function(){
   		closeFilter();
   		
   	})
+
 	$(".btn_finish").click(function(){
 		$('.listBox').removeClass('on_manage');
 		$('.manageBox').removeClass('slide-in-bottom');
@@ -375,24 +376,13 @@ $(function(){
 					$(".loading").remove();
 					var list = data.info.list
 					if(list.length){
-						$(".manageA").show();
+						$(".manageA,.manage_box").show()
 						console.log(1)
 					}else{
 						console.log(2)
 						$(".manageA,.manage_box ").hide()
+
 					}
-					//小程序中和APP显示底部管理按钮
-					let wxtimers = -1;
-					wxtimers = setTimeout(() => {
-					  if(typeof wx_miniprogram_judge !='undefined'||is_app==1){
-						  if((wx_miniprogram_judge&&list.length>0||is_app==1)&&!$('.listBox').hasClass('on_manage')){ 
-							  $('.manage_box').show();
-							  if(!module) $('.btn_finish').css({display:'flex'});
-						  }
-						  clearInterval(wxtimers);
-					  }
-					}, 1000);
-					//
 					var html = [];
 					if(list.length > 0){
 						if(action == 'upList'){
@@ -456,9 +446,9 @@ $(function(){
 									 url 	= list[i].url,
 									 title 	= list[i].title,
 									detail 	= list[i].detail,
-									 price 	= list[i].price||list[i]?.detail?.price;
+									 price 	= list[i].price;
 								collecttype = list[i].collecttype;
-								if(smod =='awardlegou' || smod =='website' || smod == 'zhaopin'){
+								if(smod =='awardlegou' || smod =='website'){
 								  continue;
 								}
 								if(price >0){
@@ -873,7 +863,7 @@ $(function(){
 													pricetxt = '<span><strong>' + totalprice + '</strong>' + echoCurrency('short') + '/月</span><em>' + fenPrice + echoCurrency('short') + '/' + echoCurrency('areaname') + '/天</em>';//元/月 --- 元/平/天
 												} else {//出售
 													var fenPrice = (detail.price / detail.area).toFixed(2);
-													pricetxt = '<span><strong>' + Number((price/10000).toFixed(2)) + '</strong>万</span><em>' + fenPrice + echoCurrency('short') + '/' + echoCurrency('areaname') + '</em>';//元/平
+													pricetxt = '<span><strong>' + price + '</strong>万</span><em>' + fenPrice + echoCurrency('short') + '/' + echoCurrency('areaname') + '</em>';//元/平
 												}
 											} else {
 												pricetxt = '<span>价格待定</span>';

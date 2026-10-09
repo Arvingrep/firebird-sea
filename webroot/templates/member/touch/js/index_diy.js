@@ -36,9 +36,9 @@ var pageVue = new Vue({
             {id:3,text:'优惠券',num:'0',code:'quan',link:memberDomain + '/myquan.html'},
             {id:4,text:'收藏',num:'0',code:'collect',link:memberDomain + '/collection.html'},
             {id:5,text:'足迹',num:'0',code:'footPrint',link:memberDomain + '/history.html'},
-            {id:6,text:'粉丝',num:'0',code:'fans',link:masterDomain + 'user/'+ userid +'/fans.html'},
+            {id:6,text:'粉丝',num:'0',code:'fans',link:masterDomain + 'user/29/fans.html'},
             {id:7,text:'发布',num:'0',code:'fabu',link:memberDomain + '/manage.html'},
-            {id:8,text:'关注',num:'0',code:'follow',link:masterDomain + '/user/'+ userid +'/follow.html'},
+            {id:8,text:'关注',num:'0',code:'follow',link:masterDomain + '/user/29/follow.html'},
         ], //数字选项
         financeOption:[
             {id:1,text:cfg_pointName,num:'0',code:'point',link:memberDomain + '/pocket.html?dtype=1'},
@@ -61,11 +61,9 @@ var pageVue = new Vue({
         appBoolean:appBoolean,
         isBusiness:false,
         fromMod:fromMod || '', //从哪个模块进来
-        userid:userid
     },
     mounted(){
         const that = this;
-        that.getCityInfo(); //获取城市信息
         let numberOptions = that.numberOption.map(item => {
             let newItem = JSON.parse(JSON.stringify(item))
             newItem['link'].replace('29',userid)
@@ -116,9 +114,9 @@ var pageVue = new Vue({
         })
         console.log(that.fromMod,fromMod)
         if(that.fromMod == 'marry'){
+            console.log('测试')
             that.$set(that.memberComp.business,'link',businessUrl + '/marry.html')
         }
-
     },
     methods:{
         toREM(num){
@@ -439,30 +437,6 @@ var pageVue = new Vue({
                     bridge.callHandler("redirect", {link:url}, function (responseData) { });
                 })  
             }
-        },
-
-        // 进入登录页面 获取并存储城市信息
-		getCityInfo: function(){
-			// 由于ios端app登录或者退出登录会清空cookie，所以在退出/登录前需要获取城市信息 并存储
-			if(navigator.userAgent.toLowerCase().includes('huoniao_ios') > -1 && !navigator.userAgent.toLowerCase().includes('huoniao_android') && !navigator.userAgent.toLowerCase().includes('huoniao_harmony')){
-                let logBeforeObj = localStorage.getItem('logBeforeCityInfo') && JSON.parse(localStorage.getItem('logBeforeCityInfo'))
-                let cityObj = logBeforeObj && logBeforeObj['data'] || {}
-                let HN_siteCityInfo = JSON.parse($.cookie('HN_siteCityInfo'))||{};
-                let HN_siteCityInfo_iOS_APP = JSON.parse($.cookie('HN_siteCityInfo_iOS_APP'))||{};
-                if(cityObj.cityid && JSON.stringify(HN_siteCityInfo_iOS_APP)=='{}' && JSON.stringify(HN_siteCityInfo)=='{}'){
-                    $.cookie('HN_siteCityInfo_iOS_APP', JSON.stringify(cityObj));
-                    $.cookie('HN_siteCityInfo', JSON.stringify(cityObj));
-                }else if(!cityObj.cityid){
-                    if(JSON.stringify(HN_siteCityInfo_iOS_APP)=='{}'){
-                        HN_siteCityInfo_iOS_APP = HN_siteCityInfo;
-                    }
-                    let logBeforeCityInfo = JSON.parse(JSON.stringify(HN_siteCityInfo_iOS_APP));
-                    localStorage.setItem('logBeforeCityInfo', JSON.stringify({
-                        type: "object",
-                        data: logBeforeCityInfo
-                    }));
-                }
-            }
-		}
+        }
     }
 })
