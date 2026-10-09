@@ -37,13 +37,12 @@ function setStage(url, key) {
   if (!field) throw new Error(`Project field not found: ${FIELD_NAME}`);
   const option = field.options.find(o => o.name === stage);
   if (!option) throw new Error(`Project option not found: ${stage}`);
-  gh(['project', 'item-add', NUMBER, '--owner', OWNER, '--url', url]);
-  const items = JSON.parse(gh(['project', 'item-list', NUMBER, '--owner', OWNER, '--limit', '1000', '--format', 'json'])).items;
-  const item = items.find(i => i.content && i.content.url === url);
-  if (!item) throw new Error(`Project item was not added: ${url}`);
-  gh(['project', 'item-edit', '--id', item.id, '--project-id', PROJECT_ID,
+  const added = JSON.parse(gh(['project', 'item-add', NUMBER, '--owner', OWNER, '--url', url, '--format', 'json']));
+  const itemId = added.id;
+  if (!itemId) throw new Error(`Project item was not added: ${url}`);
+  gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
     '--field-id', field.id, '--single-select-option-id', option.id]);
-  return { url, stage, itemId: item.id };
+  return { url, stage, itemId };
 }
 
 function exportBoard() {
