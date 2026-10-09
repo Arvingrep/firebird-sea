@@ -22,6 +22,12 @@ EOF
     chown www-data:www-data "$DBINFO_FILE" 2>/dev/null || true
 fi
 
+# 确保底层扩展在 webroot 与系统目录下双重就绪 (自愈机制)
+if [ ! -f /var/www/html/huoniao.so ] && [ -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so ]; then
+    cp -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so /var/www/html/huoniao.so 2>/dev/null || true
+    chown www-data:www-data /var/www/html/huoniao.so 2>/dev/null || true
+fi
+
 # 确保目录与缓存写权限
 mkdir -p /var/www/html/data/cache /var/www/html/data/templates_c 2>/dev/null || true
 chown -R www-data:www-data /var/www/html/data 2>/dev/null || true

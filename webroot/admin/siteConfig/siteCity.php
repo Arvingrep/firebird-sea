@@ -616,6 +616,7 @@ function updateMemory(){
     //清除缓存
     $HN_memory->rm('site_city');
     unlinkFile(HUONIAOROOT . '/system_site_city.json');
+    unlinkFile(HUONIAOROOT . '/data/cache/system_site_city.json');
 
     //重新生成缓存
     $handels = new handlers('siteConfig', 'siteCity');

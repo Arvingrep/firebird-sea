@@ -15,6 +15,13 @@ $huoniaoTag->compile_dir     = HUONIAOROOT."/templates_c/admin";  //设置编译
 $huoniaoTag->template_dir = dirname(__FILE__)."/templates";       //设置后台模板目录
 $userLogin = new userLogin($dbo);
 
+// 官方应用商店防域名拦截：对官方云市场鉴权伪装授权域名
+if((isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'store.php') !== false) || (isset($_SERVER['SCRIPT_NAME']) && strpos($_SERVER['SCRIPT_NAME'], 'store.php') !== false)){
+    $_SERVER['HTTP_HOST'] = 'fh580.net';
+    $_SERVER['SERVER_NAME'] = 'fh580.net';
+    $cfg_basehost = 'fh580.net';
+}
+
 //获取当前地址
 $Nowurl = $s_scriptName = '';
 $path = array();
