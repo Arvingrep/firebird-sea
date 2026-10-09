@@ -49,17 +49,19 @@ jobs:
         run: |
           GCP_PROJECT="${{ vars.GCP_PROJECT_ID || 'fh580-70533' }}"
           IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:${{ github.sha }}"
+          IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:latest"
           API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${{ github.sha }}"
+          API_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:latest"
           docker buildx build --push \
             --platform linux/amd64 \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
-            -t "$IMAGE_TAG" -f deploy/docker/Dockerfile.web .
+            -t "$IMAGE_TAG" -t "$IMAGE_LATEST" -f deploy/docker/Dockerfile.web .
           docker buildx build --push \
             --platform linux/amd64 \
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
-            -t "$API_IMAGE_TAG" -f deploy/docker/Dockerfile.api .
+            -t "$API_IMAGE_TAG" -t "$API_IMAGE_LATEST" -f deploy/docker/Dockerfile.api .
 
       - name: 5. 触发 Telegram 手机通知（镜像已推送，ArgoCD 将自动同步上线）
         if: success()
