@@ -30,6 +30,7 @@ ensure_labels
 TITLE="$(gh issue view "$ISSUE" -R "$REPO" --json title -q .title)"
 BODY="$(gh issue view "$ISSUE" -R "$REPO" --json body -q .body)"
 log "🤖 Dev Agent 认领 #${ISSUE}: ${TITLE}"
+bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-progress
 
 # 1. 分支：已有（返工）则续做，否则从 main 新建
 git fetch -q origin main
@@ -152,5 +153,7 @@ else
   set_label "$PR" "agent:qa" "qa:rejected"
 fi
 set_label "$ISSUE" "agent:qa" "agent:dev"
+bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-qa
+bmad_stage "https://github.com/${REPO}/pull/${PR}" in-qa
 log "✅ 已推送 ${BRANCH} → PR #${PR}"
 notify dev_done "Dev Agent 已交付 #${ISSUE} → PR #${PR}，等待 QA" "$ISSUE" "$PR"

@@ -1,0 +1,47 @@
+name: BMAD Project 状态同步
+
+on:
+  issues:
+    types: [opened, closed]
+  pull_request:
+    types: [opened, closed]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Issue 或 PR URL
+        required: true
+      stage:
+        description: backlog | in-progress | in-qa | ready-to-release | done
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: [self-hosted, firebird-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - name: 更新 BMAD Stage
+        env:
+          BMAD_USE_GH_OAUTH: "1"
+          EVENT_NAME: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          INPUT_URL: ${{ inputs.url }}
+          INPUT_STAGE: ${{ inputs.stage }}
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME:$ACTION" in
+            issues:opened) URL="$ISSUE_URL"; STAGE=backlog ;;
+            issues:closed) URL="$ISSUE_URL"; STAGE=done ;;
+            pull_request:opened) URL="$PR_URL"; STAGE=in-qa ;;
+            pull_request:closed)
+              [ "$PR_MERGED" = "true" ] || exit 0
+              URL="$PR_URL"; STAGE=done ;;
+            workflow_dispatch:*) URL="$INPUT_URL"; STAGE="$INPUT_STAGE" ;;
+            *) exit 0 ;;
+          esac
+          node scripts/github-sync.js --set-stage "$URL" "$STAGE"

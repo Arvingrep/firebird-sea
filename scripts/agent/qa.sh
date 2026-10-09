@@ -118,6 +118,8 @@ gh pr comment "$PR" -R "$REPO" -F "$TMP/comment.md" >/dev/null
 
 if [ "$VERDICT" = "ACCEPTED" ]; then
   set_label "$PR" "qa:accepted" "qa:rejected" "agent:qa"
+  bmad_stage "https://github.com/${REPO}/pull/${PR}" ready-to-release
+  [ -n "$ISSUE" ] && bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" ready-to-release
   if [ "$AUTO_MERGE" = "1" ]; then
     # --match-head-commit：防止验收后有人又推了未验收的提交
     gh pr merge "$PR" -R "$REPO" --squash --delete-branch --match-head-commit "$HEAD_SHA" \
@@ -128,6 +130,8 @@ if [ "$VERDICT" = "ACCEPTED" ]; then
   fi
 else
   set_label "$PR" "qa:rejected" "qa:accepted" "agent:qa"
+  bmad_stage "https://github.com/${REPO}/pull/${PR}" in-qa
+  [ -n "$ISSUE" ] && bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-progress
   notify qa_rejected "PR #${PR} 第 ${ATTEMPT} 轮被 QA 打回" "$ISSUE" "$PR"
   # 打回 => issue 重新进入 agent:dev，触发 Dev Agent 返工（dev.sh 内部有次数上限）
   [ -n "$ISSUE" ] && set_label "$ISSUE" "agent:dev" "agent:qa"
