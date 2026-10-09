@@ -11,7 +11,11 @@ const https = require('https');
 const readline = require('readline');
 
 const MCP_ENDPOINT = process.env.N8N_MCP_ENDPOINT || 'https://n8n.k8shome.com/mcp-server/http';
-const MCP_API_KEY = process.env.N8N_MCP_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3YTg2NzBlMy1mYWQzLTQzMDctYWFkZC04NjIzNTM5ZDRmOTciLCJpc3MiOiJuOG4iLCJhdWQiOiJtY3Atc2VydmVyLWFwaSIsImp0aSI6IjYzNDJhZWIzLWNiM2YtNGJkYS1hNjUwLTJjODlmNmM4NTEwOCIsImlhdCI6MTc5MTQ3OTkxOH0.7raM30b10vgdOO7X9sve5fKt58Ur83zEydE-RBDZgF0';
+const MCP_API_KEY = process.env.N8N_MCP_API_KEY;
+if (!MCP_API_KEY) {
+  console.error('[mcp-proxy] 缺少环境变量 N8N_MCP_API_KEY。请在未被 git 跟踪的本地文件中提供（参考 mcp_config.example.json），不要写回仓库。');
+  process.exit(1);
+}
 
 const url = new URL(MCP_ENDPOINT);
 
