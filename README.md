@@ -1,5 +1,7 @@
 # firebird-sea
 
+> 目录结构见 [docs/internal/REPO_MAP.md](docs/internal/REPO_MAP.md)：哪些是第三方源码、哪些是我们自己的、线上与本地环境怎么分。
+
 ## 多 Agent 流水线运维
 
 | 命令 | 用途 |
