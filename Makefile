@@ -1,4 +1,4 @@
-.PHONY: bmad-next gates agent-dev agent-qa agent-runner help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes test-mcp
+.PHONY: bmad-next local-accept gates agent-dev agent-qa agent-runner help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes test-mcp
 
 help:
 	@echo "=========================================================="
@@ -65,6 +65,9 @@ accept:
 
 gates:
 	@bash scripts/agent/gates.sh origin/main
+
+local-accept:
+	@bash scripts/local-accept.sh
 
 agent-dev:
 	@bash scripts/agent/dev.sh $(ISSUE)
