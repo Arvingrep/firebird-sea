@@ -74,7 +74,9 @@ sequenceDiagram
 ## 5. 安全边界
 
 - 仓库是**公开**的，而 Agent 跑在本机自托管 runner 上，因此：
-  - `agent-dev` 只响应 `sender == 仓库 owner` 的 `agent:dev` 标签；
+  - `agent-dev` 只响应 `sender == 仓库 owner` 的 `agent:dev` 标签，或 owner 本人的 `workflow_dispatch`；
+  - n8n TG Trigger 限定 chat/user ID = Arvin 本人。**这一条是闸门的前提**：n8n 用 owner 的 OAuth 建 Issue，
+    若不限制发送人，任何给 bot 发消息的人都能以 owner 身份触发 Dev Agent 并一路自动合并上线；
   - `agent-qa` 只对本仓库 `agent/*` 分支运行，拒绝 fork PR（`qa.sh` 二次校验 `isCrossRepository`）；
   - 建议在 Settings → Actions 开启「Require approval for all outside collaborators」。
 - Dev Agent 的产出里对 `.github/` 和 `scripts/agent/` 的改动会被丢弃，不能篡改自己的考官。
