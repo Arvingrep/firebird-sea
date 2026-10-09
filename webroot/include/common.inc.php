@@ -72,7 +72,10 @@ else{
     @include_once(HUONIAOINC.'/config/siteCityAdvanced.inc.php'); //付费查看电话配置
 }
 
-if (empty($cfg_basehost) || $cfg_basehost === '~domain') {
+// 动态适配当前访问域名，确保静态资源在当前子域名下同源加载，避免根域名缺少DNS解析导致 ERR_NAME_NOT_RESOLVED
+if (!empty($_SERVER['HTTP_HOST'])) {
+    $cfg_basehost = $_SERVER['HTTP_HOST'];
+} elseif (empty($cfg_basehost) || $cfg_basehost === '~domain') {
     $cfg_basehost = 'fbird.men';
 }
 
