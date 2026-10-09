@@ -1,0 +1,45 @@
+name: "Agent 1: Dev Agent 施工"
+
+# Issue 打上 agent:dev → 本机自托管 runner 跑 Dev Agent → 推 agent/issue-<N> → 开 PR（交 QA）
+# 来源：n8n（TG 语音 → Issue 自带 agent:dev）、手动打标、QA 打回后自动重新打标。
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue 编号"
+        required: true
+
+concurrency:
+  group: agent-dev-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dev:
+    # 安全边界：公开仓库 + 自托管 runner，只响应仓库 owner 本人（含其 PAT/n8n OAuth）打的标签
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner) ||
+      (github.event.label.name == 'agent:dev' && github.event.sender.login == github.repository_owner)
+    runs-on: [self-hosted, firebird-agent]
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+      N8N_AGENT_EVENT_WEBHOOK: ${{ vars.N8N_AGENT_EVENT_WEBHOOK }}
+      N8N_AGENT_EVENT_TOKEN: ${{ secrets.N8N_AGENT_EVENT_TOKEN }}
+      DEV_AGENT_CMD: ${{ vars.DEV_AGENT_CMD }}
+      AGENT_MAX_ATTEMPTS: ${{ vars.AGENT_MAX_ATTEMPTS || '3' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # 不把 token 写进 .git/config（Dev Agent 能读工作区）；推送时 dev.sh 经 gh 临时取凭据。
+          # 必须用 PAT 推送：GITHUB_TOKEN 推的提交/开的 PR 不会触发后续 workflow。
+          persist-credentials: false
+      - name: Dev Agent 施工并开 PR
+        run: |
+          [ -n "$DEV_AGENT_CMD" ] || unset DEV_AGENT_CMD
+          scripts/agent/dev.sh "${{ github.event.issue.number || inputs.issue }}"

@@ -12,12 +12,16 @@
       "parameters": {
         "updates": [
           "message"
-        ]
+        ],
+        "additionalFields": {
+          "chatIds": "2057618975",
+          "userIds": "2057618975"
+        }
       },
       "id": "node-tg-trigger",
       "name": "1. 接收个人TG消息或语音",
       "type": "n8n-nodes-base.telegramTrigger",
-      "typeVersion": 1.1,
+      "typeVersion": 1.2,
       "position": [
         200,
         300
@@ -25,8 +29,8 @@
     },
     {
       "parameters": {
-        "model": "gemini-2.5-flash",
-        "prompt": "=你是敏捷开发产品脱水秘书。请对老板在TG发送的随笔/语音内容进行【严格脱水剪枝】：\n\"{{ $json.message.text || $json.message.caption }}\"\n\n【脱水与防臃肿原则】：\n1. 严禁加戏与发散：只提炼 1 个核心可验收交付目标 (Single AC)，砍掉次要修饰。\n2. 原生复用优先：如果该需求火鸟系统原生后台已有配置支持（如分站管理、汇率比率），标记无需新写代码。\n3. 零冗余依赖：要求使用 Node.js / PHP 原生能力。\n\n请输出标准JSON：\n{\n  \"title\": \"简洁标题 (20字内)\",\n  \"epic\": \"epic/payment|epic/localization|epic/franchise|epic/infra\",\n  \"priority\": \"p0-urgent|p1-high|p2-medium\",\n  \"single_ac\": \"明确的单一验收准则\",\n  \"anti_bloat_notes\": \"脱水过滤说明（砍掉的发散点）\",\n  \"body\": \"## 业务目标\\n...\\n\\n## 单一验收标准 (Atomic AC)\\n- [ ] AC: ...\\n\\n## 防臃肿规约\\n- [x] Zero-Dep: 严禁引入外部重包\\n- [x] Diff < 200 行\\n- [x] Docs-as-Code 同步更新\"\n}"
+        "promptType": "define",
+        "text": "=你是敏捷开发产品脱水秘书。请对老板在TG发送的随笔/语音内容进行【严格脱水剪枝】：\n\"{{ $json.message.text || $json.message.caption }}\"\n\n【脱水与防臃肿原则】：\n1. 严禁加戏与发散：只提炼 1 个核心可验收交付目标 (Single AC)，砍掉次要修饰。\n2. 原生复用优先：如果该需求火鸟系统原生后台已有配置支持（如分站管理、汇率比率），标记无需新写代码。\n3. 零冗余依赖：要求使用 Node.js / PHP 原生能力。\n\n请输出标准JSON：\n{\n  \"title\": \"简洁标题 (20字内)\",\n  \"epic\": \"epic/payment|epic/localization|epic/franchise|epic/infra\",\n  \"priority\": \"p0-urgent|p1-high|p2-medium\",\n  \"single_ac\": \"明确的单一验收准则\",\n  \"anti_bloat_notes\": \"脱水过滤说明（砍掉的发散点）\",\n  \"body\": \"## 业务目标\\n...\\n\\n## 单一验收标准 (Atomic AC)\\n- [ ] AC: ...\\n\\n## 防臃肿规约\\n- [x] Zero-Dep: 严禁引入外部重包\\n- [x] Diff < 200 行\\n- [x] Docs-as-Code 同步更新\"\n}"
       },
       "id": "node-ai-parse",
       "name": "2. AI 结构化提炼 Spec",
@@ -39,17 +43,52 @@
     },
     {
       "parameters": {
+        "jsCode": "// Agent 输出是纯文本（可能带 ```json 围栏）；解析为对象供 GitHub 节点使用，失败即报错中止（不建残缺 Issue）\nreturn $input.all().map(({ json }) => {\n  const raw = String(json.output ?? '').replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '').trim();\n  const m = raw.match(/\\{[\\s\\S]*\\}/);\n  if (!m) throw new Error('AI 输出中没有 JSON: ' + raw.slice(0, 200));\n  const spec = JSON.parse(m[0]);\n  for (const k of ['title', 'body', 'epic', 'priority']) if (!spec[k]) throw new Error('Spec 缺少字段: ' + k);\n  return { json: { output: spec } };\n});"
+      },
+      "id": "node-parse-spec",
+      "name": "2b. 解析 Spec JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        575,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash"
+      },
+      "id": "node-gemini-chat-model",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        450,
+        500
+      ]
+    },
+    {
+      "parameters": {
         "authentication": "oAuth2",
         "resource": "issue",
         "operation": "create",
-        "owner": "={{ $env.GITHUB_OWNER || 'arvin' }}",
+        "owner": "={{ $env.GITHUB_OWNER || 'Arvingrep' }}",
         "repository": "={{ $env.GITHUB_REPO || 'firebird-sea' }}",
         "title": "={{ $json.output.title }}",
         "body": "={{ $json.output.body }}",
         "labels": [
-          "={{ $json.output.epic }}",
-          "={{ $json.output.priority }}",
-          "status/backlog"
+          {
+            "label": "={{ $json.output.epic }}"
+          },
+          {
+            "label": "={{ $json.output.priority }}"
+          },
+          {
+            "label": "status/backlog"
+          },
+          {
+            "label": "agent:dev"
+          }
         ]
       },
       "id": "node-gh-create-issue",
@@ -64,7 +103,7 @@
     {
       "parameters": {
         "chatId": "={{ $('1. 接收个人TG消息或语音').item.json.message.chat.id }}",
-        "text": "=📋 *【BMAD 看板已入池】*\n\n📌 任务: *{{ $json.title }}*\n🏷️ 分类: `{{ $('2. AI 结构化提炼 Spec').item.json.output.epic }}`\n🔢 Issue: [#{{ $json.number }}]({{ $json.html_url }})\n\n💡 Dev Agent 已收到信号，进入 `In Progress` 队列！",
+        "text": "=📋 *【BMAD 看板已入池】*\n\n📌 任务: *{{ $json.title }}*\n🏷️ 分类: `{{ $('2b. 解析 Spec JSON').item.json.output.epic }}`\n🔢 Issue: [#{{ $json.number }}]({{ $json.html_url }})\n\n💡 Dev Agent 已收到信号，进入 `In Progress` 队列！",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -95,8 +134,19 @@
       "main": [
         [
           {
-            "node": "3. 创建 GitHub Issue 并打标",
+            "node": "2b. 解析 Spec JSON",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "2. AI 结构化提炼 Spec",
+            "type": "ai_languageModel",
             "index": 0
           }
         ]
@@ -107,6 +157,17 @@
         [
           {
             "node": "4. 回复手机 TG 确认卡片",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2b. 解析 Spec JSON": {
+      "main": [
+        [
+          {
+            "node": "3. 创建 GitHub Issue 并打标",
             "type": "main",
             "index": 0
           }

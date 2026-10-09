@@ -1,0 +1,37 @@
+{{- if .Values.deployNotify.webhook }}
+# ArgoCD PostSync 钩子：每次同步成功（含 Image Updater 触发的发版）后通知 n8n → TG，闭环「已上线」。
+# 通知失败不影响发布（|| true）。
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: firebird-notify-deployed-{{ .Values.siteId }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: notify
+          image: curlimages/curl:8.11.1
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 32Mi }
+          env:
+            - name: N8N_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.deployNotify.tokenSecret.name | quote }}
+                  key: {{ .Values.deployNotify.tokenSecret.key | quote }}
+                  optional: true
+          command: ["sh", "-c"]
+          args:
+            - >-
+              curl -fsS -m 10 --retry 3 --retry-delay 5 --retry-all-errors -H 'Content-Type: application/json'
+              ${N8N_TOKEN:+-H "X-Firebird-Token: $N8N_TOKEN"}
+              -d '{"source":"argocd","stage":"deployed","site":"{{ .Values.siteId }}","image":"{{ .Values.image.tag }}","message":"ArgoCD 同步完成，{{ .Values.domain }} 已上线"}'
+              {{ .Values.deployNotify.webhook | quote }} || true
+{{- end }}
