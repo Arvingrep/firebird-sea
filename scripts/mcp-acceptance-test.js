@@ -10,7 +10,11 @@
 const https = require('https');
 
 const MCP_ENDPOINT = 'https://n8n.k8shome.com/mcp-server/http';
-const MCP_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3YTg2NzBlMy1mYWQzLTQzMDctYWFkZC04NjIzNTM5ZDRmOTciLCJpc3MiOiJuOG4iLCJhdWQiOiJtY3Atc2VydmVyLWFwaSIsImp0aSI6ImE1MGU1OTYyLTM5NmItNGUwMS05N2M5LTM4ZDZlOThkZTQ4OCIsImlhdCI6MTc5MTQ4MTUzNH0.QjHkA1cjMxN2IixvG08IX68_rdh3T-SPNKrSSVrm7Bk';
+const MCP_API_KEY = process.env.N8N_MCP_API_KEY;
+if (!MCP_API_KEY) {
+  console.error('[mcp-acceptance-test] 缺少环境变量 N8N_MCP_API_KEY。');
+  process.exit(1);
+}
 
 const EXPECTED_WORKFLOWS = [
   { id: 'WkFtg2gh00000002', name: '一人AI团队：TG语音随笔转GitHub-Issue与Project看板' },
