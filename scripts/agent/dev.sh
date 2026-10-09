@@ -98,7 +98,10 @@ fi
 SUMMARY="$(tail -n 30 "$SUMMARY_FILE" | redact)"
 
 # 防越权：丢弃对受保护路径的一切改动——已跟踪文件还原 + 未跟踪新文件删除
-git checkout -q HEAD -- "${PROTECTED[@]}" 2>/dev/null || true
+# 逐个路径还原：多路径一次 checkout 时只要有一个不存在于 HEAD，整条命令失败、其余也不还原
+for p in "${PROTECTED[@]}"; do
+  if git cat-file -e "HEAD:$p" 2>/dev/null; then git checkout -q HEAD -- "$p"; fi
+done
 git clean -fdq -- "${PROTECTED[@]}"
 
 if [ -z "$(git status --porcelain)" ]; then
@@ -106,9 +109,9 @@ if [ -z "$(git status --porcelain)" ]; then
 
 <details><summary>Agent 输出</summary>
 
-\`\`\`
+\`\`\`\`
 ${SUMMARY}
-\`\`\`
+\`\`\`\`
 </details>" >/dev/null
   set_label "$ISSUE" "agent:blocked" "agent:dev"
   notify blocked "#${ISSUE} Dev Agent 空交付" "$ISSUE" "$PR"
@@ -132,9 +135,9 @@ if [ -z "$PR" ]; then
 由 Dev Agent 自动施工，等待独立 QA Agent 验收（通过即自动合并 → CI 构建 → Image Updater → ArgoCD 上线）。
 
 **Dev Agent 自述：**
-\`\`\`
+\`\`\`\`
 ${SUMMARY}
-\`\`\`")"
+\`\`\`\`")"
   PR="${PR_URL##*/}"
 else
   set_label "$PR" "agent:qa" "qa:rejected"

@@ -57,6 +57,9 @@ notify() {
   || log "⚠️ n8n 通知失败（忽略）: $1"
 }
 
+# 推送与 API 都依赖 gh（push 的凭据由 gh auth git-credential 读取 GH_TOKEN 提供）
+command -v gh >/dev/null 2>&1 || die "runner 缺少 gh CLI（scripts/agent/setup-runner.sh 会安装）"
+
 RUN_URL=""
 [ -n "${GITHUB_RUN_ID:-}" ] && RUN_URL="${GITHUB_SERVER_URL:-https://github.com}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
 
