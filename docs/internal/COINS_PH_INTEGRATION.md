@@ -44,6 +44,7 @@ flowchart LR
 ---
 
 ## 3. BMAD UI 看板与 GitHub 闭环集成
-* **看板 UI**：位于 [`apps/bmad-dashboard/index.html`](file:///Users/arvin/Documents/firebird-sea/apps/bmad-dashboard/index.html)
-* **数据同步**：运行 `make sync-gh` 自动聚合本地任务、验收报告并导出至看板数据源。
-* **闭环链路**：`需求录入 ➔ Issue/Project看板 ➔ Dev 编码 ➔ QA 红队验收 (make accept) ➔ GKE 上线`
+* **云端事实源**：GitHub user Project [`firebird-sea · BMAD Delivery Board`](https://github.com/users/Arvingrep/projects/3) 的 `BMAD Stage` 字段。
+* **看板 UI**：位于 [`apps/bmad-dashboard/index.html`](../../apps/bmad-dashboard/index.html)。
+* **数据同步**：运行 `make sync-gh` 从 GitHub Issues / PR / Project V2 读回并生成 `board-data.json/js`；不再扫描本地任务推断状态。
+* **状态闭环**：`Backlog ➔ In Progress ➔ In QA ➔ Ready to Release ➔ Done`，由 n8n 与 Dev/QA/merge 工作流更新。

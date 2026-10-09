@@ -70,6 +70,11 @@ set_label() { # set_label <issue|pr number> <add> [remove...]
   gh issue edit "$n" -R "$REPO" "${args[@]}" >/dev/null 2>&1 || log "⚠️ 标签更新失败: #$n +$add"
 }
 
+bmad_stage() { # bmad_stage <issue-or-pr-url> <stage-key>
+  BMAD_USE_GH_OAUTH=1 node "$ROOT_DIR/scripts/github-sync.js" --set-stage "$1" "$2" >/dev/null \
+    || log "⚠️ BMAD Project 状态更新失败: $1 → $2"
+}
+
 # 统计某 PR 上 QA 打回次数（用于 attempt 上限，防止死循环烧额度）
 qa_reject_count() {
   gh api "repos/${REPO}/issues/$1/comments" --paginate --jq \
