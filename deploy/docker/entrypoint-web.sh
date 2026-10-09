@@ -22,6 +22,12 @@ EOF
     chown www-data:www-data "$DBINFO_FILE" 2>/dev/null || true
 fi
 
+# 如果配置了基础域名环境变量，动态更新 siteConfig.inc.php
+SITECONFIG_FILE="/var/www/html/include/config/siteConfig.inc.php"
+if [ -n "$SITE_BASEHOST" ] && [ -f "$SITECONFIG_FILE" ]; then
+    sed -i "s/\\\$cfg_basehost = .*/\\\$cfg_basehost = '${SITE_BASEHOST}';/" "$SITECONFIG_FILE"
+fi
+
 # 确保底层扩展在 webroot 与系统目录下双重就绪 (自愈机制)
 if [ ! -f /var/www/html/huoniao.so ] && [ -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so ]; then
     cp -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so /var/www/html/huoniao.so 2>/dev/null || true
