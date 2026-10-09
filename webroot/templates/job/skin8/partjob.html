@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>兼职-{#$job_title#}</title>
+<meta name="keywords" content="找工作,招聘网,招聘信息,互联网招聘" />
+<meta name="description" content="找工作,招聘网,求职网,互联网招聘,{#$cfg_shortname#}招聘是互联网领域垂直招聘网站,互联网职业机会尽在{#$cfg_shortname#}招聘" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/partjob.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$job_channelDomain#}', staticPath = '{#$cfg_staticPath#}',member_userDomain='{#$member_userDomain#}';
+    var staticPaths='{#$templets_skin#}';
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var addr = {#$addr|string_format:"%d"#};
+    var userid='{#$userinfo.userid#}' //勿删
+    var cid="{#$job_cid#}";
+</script>
+</head>
+<body style="background-color: #F7F9FC;">
+
+{#*
+$keyword <!-- 关键字 -->
+$addrid  <!-- 地址id -->
+$eduid <!-- 学历id -->
+$max <!-- 最高工资 -->
+$min <!-- 最低工资 -->
+$industry <!-- 公司行业 -->
+$gnature <!-- 公司性质 -->
+$scale  <!-- 公司规模 -->
+$salary_type 
+$experience  <!-- 工作经历 -->
+$type  <!-- 职位类别 -->
+$orderby  <!-- 按发布时间排序 -->
+*#}
+
+{#include file="top.html"#}
+    <div class="shell">
+        <!-- 头部搜索 -->
+        <div class="topSearch">
+            {#if !$userinfo.userid#}
+            <form class="t-input">
+                <input type="text" placeholder="搜索职位/公司" name="keyword" value="{#$keyword#}">
+                <div><em {#if $type#}class="active"{#/if#}>兼职职位类型</em><img src="{#$templets_skin#}images/darrowBl.png"></div>
+                <span><img src="{#$templets_skin#}images/searchBlu.png" class="image"></span>
+            </form>
+            <a class="t-btn" href="{#$cfg_basehost#}/login.html">登录，查看更多好职位</a>
+            {#else#}
+            <form class="t-login">
+                <input type="text" name="keyword" placeholder="搜索职位/公司" value="{#$keyword#}">
+                <div class="filter">
+                    <span {#if $type#}class="active"{#/if#}>兼职职位类型</span>
+                    <img src="{#$templets_skin#}images/darrowBl.png">
+                </div>
+                <div class="btn">
+                    <img src="{#$templets_skin#}images/searchWB.png">
+                </div>
+            </form>
+            {#/if#}
+        </div>
+        <!-- 筛选条件 -->
+        <div class="d-filter">
+            <!-- 工作区域 -->
+            <div class="df-area">
+                <div>工作区域：</div>
+                <ul>
+                    <li {#if !{#$addrid#}||$siteCityInfo['cityid']=={#$addrid#}#} class="active" {#/if#} data-addrid="{#$siteCityInfo['cityid']#}">不限</li>
+                    {#job action="addr" type="{#$siteCityInfo['cityid']#}" service="job" return="address"#}
+					<li data-addrid="{#$address.id#}" {#if {#$addrid#}=={#$address.id#}#} class="active" {#/if#}>{#$address.typename#}</li>
+					{#/job#}
+                </ul>
+            </div>
+            <!-- 学历要求 -->
+            <div class="df-welfare">
+                <div>学历要求：</div>
+                <ul>
+                    <li {#if !$educational#}class="active"{#/if#}>不限</li>
+                    {#foreach from=$jobItems.education item=item#}
+                    <li data-id="{#$item.id#}" {#if $item.id==$educational#}class="active"{#/if#}>{#$item.typename#}</li>
+                    {#/foreach#}
+                </ul>
+            </div>
+            <!-- 工作经验 -->
+            <div class="df-experience">
+                <div>工作经验：</div>
+                <ul>
+                    <li {#if !$experience#}class="active"{#/if#}>不限</li>
+                    {#foreach from=$jobItems.experience item=item#}
+                    <li data-id="{#$item.id#}" {#if $item.id==$experience#}class="active"{#/if#}>{#$item.typename#}</li>
+                    {#/foreach#}
+                </ul>
+            </div>
+            <!-- 期望薪资 -->
+            <div class="df-salary">
+                <div class="dfs-left">
+                    <div>期望薪资：</div>
+                    <ul>
+                        <li {#if !$max_salary&&!$min_salary&&$salary_type==1||!$salary_type#} class="active" {#/if#}>不限</li>
+                        <li data-max="4000" {#if $max_salary==4000&&!$min_salary&&$salary_type==1#} class="active" {#/if#}>4000以下</li>
+                        <li data-min="4000" data-max="6000" {#if $min_salary==4000&&$max_salary==6000&&$salary_type==1#} class="active" {#/if#}>4000-6000</li>
+                        <li data-min="6000" data-max="8000" {#if $min_salary==6000&&$max_salary==8000&&$salary_type==1#} class="active" {#/if#}>6000-8000</li>
+                        <li data-min="8000" data-max="10000" {#if $min_salary==8000&&$max_salary==10000&&$salary_type==1#} class="active" {#/if#}>8000-10000</li>
+                        <li data-min="10000" data-max="15000" {#if $min_salary==10000&&$max_salary==15000&&$salary_type==1#} class="active" {#/if#}>10000-15000</li>
+                        <li data-min="15000" data-max="25000" {#if $min_salary==15000&&$max_salary==25000&&$salary_type==1#} class="active" {#/if#}>15000-25000</li>
+                        <li data-min="25000" {#if $min_salary==25000&&!$max_salary&&$salary_type==1#} class="active" {#/if#}>25000以上</li>
+                    </ul>
+                </div>
+                <div class="dfs-right">
+                    <span style="margin-right: 8px;">自定义</span>
+                    <div class="inputs">
+                        <span>￥</span>
+                        <input type="text" class="minSalary" {#if $salary_type==1 && $min_salary#}value="{#$min_salary#}{#/if#}">
+                    </div>
+                    <span style="margin: 0px 3px;">-</span>
+                    <div class="inputs" style="margin-right:10px;">
+                        <span>￥</span>
+                        <input type="text" class="maxSalary" {#if $salary_type==1 && $max_salary#}value="{#$max_salary#}"{#/if#}>
+                    </div>
+                    <div class="btn">确定</div>
+                </div>
+            </div>
+            <div class="df-salary time" style="margin-left: 81px;">
+                <div class="dfs-left">
+                    <div>或按时薪：</div>
+                    <ul>
+                        <li data-max="15" {#if $max_salary==15&&!$min_salary&&$salary_type==2#} class="active" {#/if#}>15以下</li>
+                        <li data-min="15" data-max="30" {#if $min_salary==15&&$max_salary==30&&$salary_type==2#} class="active" {#/if#}>15-30/小时</li>
+                        <li data-min="30" data-max="50" {#if $min_salary==30&&$max_salary==50&&$salary_type==2#} class="active" {#/if#}>30-50/小时</li>
+                        <li data-min="50" data-max="100" {#if $min_salary==50&&$max_salary==100&&$salary_type==2#} class="active" {#/if#}>50-100/小时</li>
+                        <li data-min="100" {#if $min_salary==100&&!$max_salary&&$salary_type==2#} class="active" {#/if#}>100以上</li>
+                    </ul>
+                </div>
+            </div>
+            <!-- 更多筛选 -->
+            <div class="df-more">
+                <div class="dfm-left">
+                    <span style="margin-right: 10px;">更多筛选：</span>
+                    <!-- 筛选项 -->
+                    <div class="item edu">
+                        {#if !$industry#}
+                            <span>公司行业</span>
+                        {#else#}
+                            {#job service="job" action="industry" return="indu"#}
+                                {#if $industry==$indu.id#}
+                                <span>{#$indu.title#}</span>
+                                {#/if#}
+                            {#/job#}
+                        {#/if#}
+                        <img src="{#$templets_skin#}images/darrowBl.png">
+                        <div class="fItem">
+                            <div>不限行业</div>
+                            {#job service="job" action="industry" return="indu"#}
+                                <div data-id="{#$indu.id#}" {#if $indu.id==$industry#}style="color:#2278FF"{#/if#}>{#$indu.title#}</div>
+                            {#/job#}
+                        </div>
+                    </div>
+                    <div class="item exp">
+                        <span>公司性质</span>
+                        <img src="{#$templets_skin#}images/darrowBl.png">
+                        <div class="fItem"></div>
+                    </div>
+                    <div class="item time">
+                        <span>公司规模</span>
+                        <img src="{#$templets_skin#}images/darrowBl.png">
+                        <div class="fItem"></div>
+                    </div>
+                </div>
+                <a class="dfm-right" href="{#getUrlPath service='job' template='partjob'#}">清空筛选条件<span>(0)</span></a>
+            </div>
+        </div>
+        <!-- 列表 -->
+        <div class="conList">
+            <!-- 左侧列表页 -->
+            <div class="c-left">
+                <!-- tab -->
+                <div class="cl-tab">
+                    <div class="clt-sort">
+                        <div {#if !$orderby#}class="active"{#/if#}>智能排序</div>
+                        <div data-sort="3" {#if $orderby==3#}class="active"{#/if#}>最新发布</div>
+                    </div>
+                    <!-- 批量投递底部 -->
+                    <div class="clt-fixed">
+                        <div class="clt-all">
+                            <div class="select">
+                                <div></div>
+                                <p>全选</p>
+                            </div>
+                            <div class="btn">批量投递<em style="margin-left: 6px;">(0)</em></div>
+                            <span>取消批量投递</span>
+                        </div>
+                    </div>
+                    <span>批量投递</span>
+                </div>
+                <!-- 列表项 -->
+                <ul class="cl-items">
+                    {#job service="job" action="postList" page="$page" pageSize="20" return="data" keyword="$keyword" addrid="$addrid" educational="$educational" max_salary="$max_salary" min_salary="$min_salary" industry="$industry" gnature="$gnature" scale="$scale" experience="$experience" type="$type" stype="all" nature="2,4" orderby=$orderby#}
+                    <li class="{#if $data.has_delivery!=0#}none{#elseif $data.has_delivery_company!=0#}donot{#elseif $data.companyDetail.id==$job_cid#}mypost{#/if#}">
+                        <a href="{#getUrlPath service='job' template='job' id=$data.id#}" target="_blank">
+                            <div class="show {#if $data.has_delivery_company!=1#}select{#else#}active{#/if#}" data-id="{#$data.id#}" data-certificate="{#$data.companyDetail.delivery_limit_certifyState#}"></div>
+                            <div class="left">
+                                <div class="title"><span>{#$data.title#}</span>
+                                    <div class="talk chat_to-Link" data-item='{#json_encode($data)#}' data-type="detail">
+                                        <em><img src="{#$templets_skin#}images/talkBlu.png">立即沟通</em>
+                                        <div class="qrcode">
+                                            <div class="photo">
+                                                <img src="{#$data.companyDetail.people_pic#}" onerror="this.src='/static/images/noPhoto_100.jpg'">
+                                                {#if $data.companyDetail.loginState==1#}<div>当前在线</div>{#elseif $data.companyDetail.loginState==2#}<div>今日活跃</div>{#else#}{#/if#}
+                                            </div>
+                                            <div class="detail">
+                                                <p class="name">{#$data.companyDetail.people#}</p>
+                                                <p class="text">{#if $cfg_app_android_download || $cfg_app_ios_download#}
+                                                    Hi~ 对职位感兴趣吗？快下载{#$cfg_appname#}APP和我聊聊吧，还可随时获取求职进度～
+                                                    {#else#}
+                                                    Hi~ 对职位感兴趣吗？点击立即沟通和我聊聊吧～
+                                                    {#/if#}
+                                                </p>
+                                            </div>
+                                            {#if $cfg_app_android_download || $cfg_app_ios_download#}
+                                            <div class="code">
+                                                <img src="{#$cfg_basehost#}/include/qrcode.php?data={#getUrlPath service='siteConfig' template='mobile'#}" onerror="this.src='/static/images/404.jpg'">
+                                            </div>
+                                            {#/if#}
+                                        </div>
+                                    </div>
+                                    {#if $data.is_topping!=0#}<div class="up"><img src="{#$templets_skin#}images/upArrW.png">置顶</div>{#/if#}
+                                </div>
+                                <div class="salary">
+                                    <span style="font-size: 20px;font-weight: bold;margin-right:16px;display: flex;font-family: 'DINMi';letter-spacing: .4px;{#if $data.mianyi#}font-size:17px;padding-top: 3px;{#/if#}">
+                                        {#if $data.mianyi#}
+                                        面议
+                                        {#else#}
+                                        {#$data.show_salary#}{#if $data.dy_salary>12#}<em style="margin: 0px 3px;">·</em>{#$data.dy_salary#}<span style="font-size: 17px;padding-top: 2px;">薪</span>{#/if#}
+                                        {#/if#}
+                                    </span>
+                                    <span class="address">{#foreach from=$data.job_addr_detail.addrName item=item key=index#}{#if $index>=count($data.job_addr_detail.addrName)-2#}{#$item#}{#/if#}{#if count($data.job_addr_detail.addrName)!=$index+1&&$index!=0#}-{#/if#}{#/foreach#}{#if $data.job_addr_detail.addrName#}<span>|</span>{#/if#}{#if $data.experience#} {#$data.experience#} {#else#} 经验不限 {#/if#} <span>|</span> {#if $data.educational#} {#$data.educational#} {#else#} 学历不限 {#/if#}</span>
+                                </div> 
+                                <div class="welfare">
+                                    <div>{#$data.nature#}</div>
+                                    {#foreach from=$data.companyDetail.welfareNames item=tag#}
+                                    <div>{#$tag#}</div>
+                                    {#/foreach#}
+                                </div>
+                            </div>
+                            <div class="right">
+                                <div class="title"><img src="{#$templets_skin#}images/company3.png"><span>{#$data.companyDetail.title#}</span></div>
+                                <div class="nature">{#$data.companyDetail.nature_name#}<span>|</span>{#$data.companyDetail.scale_name#}</div>
+                                {#if $data.has_delivery==0#}
+                                <div class="time">
+                                    {#if $data.updateCalc<=1#}今天
+                                    {#elseif $data.updateCalc<=7#}{#$data.updateCalc#}天前
+                                    {#elseif $data.updateCalc<=30#}最近
+                                    {#else#}招聘中
+                                    {#/if#}
+                                </div>
+                                {#/if#}
+                                <!-- 收藏 -->
+                                <div class="care">
+                                    {#if $data.collect==0#}
+                                    <div class="star" data-id="{#$data.id#}">收藏</div>
+                                    {#else#}
+                                    <div class="star has" data-id="{#$data.id#}">已收藏</div>
+                                    {#/if#}
+                                    {#if $data.has_delivery==0#}
+                                    <div class="btn" data-id="{#$data.id#}" data-certificate="{#$data.companyDetail.delivery_limit_certifyState#}" data-type="{#$data.typeid#}" data-name="{#$data.type#}" data-state="{#$data.has_delivery#}" data-hdc="{#$data.has_delivery_company#}" data-cid="{#$data.companyDetail.id#}"><img src="{#$templets_skin#}images/join.png">投递简历</div>
+                                    {#else#}
+                                    <div class="label">已投递</div>
+                                    {#/if#}
+                                </div>
+                            </div>
+                        </a>
+                        <div class="cli-detail">
+                            <div style="padding-right: 44px;" class="text">
+                                <p>职位描述：</p>
+                                <div>{#$data.note#}</div>
+                            </div>
+                            <div style="padding-left: 44px;" class="text">
+                                <p>任职要求：</p>
+                                <div>{#$data.claim#}</div>
+                            </div>
+                        </div>
+                    </li>
+                    {#/job#}
+                </ul>
+                {#if $pageInfo.totalPage==0#}
+                <!-- 无数据 -->
+                <div class="cl-none">
+                    <img src="{#$templets_skin#}images/nonesearch.png">
+                    <p>没有相关职位，试试别的筛选条件</p>
+                </div>
+                {#/if#}
+                {#if $pageInfo.totalPage>1#}
+                <!-- 分页 -->
+                <div class="dll-page">
+                    {#getPageList service='job' template='job-list' pageType='dynamic' param="page=#page#"#}
+                    <!-- 输入框跳转 -->
+                    <div class="topage">
+                        <!-- 输入框 -->
+                        <div>
+                            <span>前往</span>
+                            <input type="text" value="{#$page#}">
+                            <span>页</span>
+                        </div>
+                        <!-- 按钮 -->
+                        <div class="btn">跳转</div>
+                    </div>
+                </div>
+                {#/if#}
+            </div>
+            <!-- 右侧其他 -->
+            <div class="c-right">
+                <a href="{#$member_userDomain#}/job-resume.html" target="_blank"><img class="cr-create" src="{#$templets_skin#}images/creBanner_2.png"/></a>
+                <!-- 浏览历史 -->
+                <div class="dlr-history">
+                    <!-- 标题 -->
+                    <div class="title">
+                        <img src="{#$templets_skin#}images/clockBl.png">
+                        <span>最近浏览</span>
+                    </div>
+                    <!-- 浏览公司/职位 -->
+                    {#job service="job" action="history_postList" return="history"#}
+                    <a class="item" href="{#getUrlPath service='job' template='job' id=$history.id#}" target="_blank">
+                        <div class="jobs">
+                            <div>{#$history.title#}</div>
+                            <span>{#if $history.mianyi#}面议{#else#}{#$history.show_salary#}{#if $history.dy_salary>12#}<em>·</em>{#$history.dy_salary#}<span>薪</span>{#/if#}{#/if#}</span>
+                        </div>
+                        <div class="address">
+                            <div>{#$history.ctitle#}</div>
+                            {#if $history.ctitle&&$history.addrName#}
+                            <span>|</span>
+                            {#/if#}
+                            <div>{#if is_array($history.addrName)#}{#$history.addrName[count($history.addrName)-1]#}{#/if#}</div>
+                        </div>
+                    </a>
+                    {#/job#}
+                </div>
+                <!-- 二维码 -->
+                <div class="dr-code">
+                    <img src="/include/qrcode.php?data={#$job_channelDomain#}" onerror="this.src='/static/images/404.jpg'">
+                    <div>
+                        <p>手机微信扫一扫</p>
+                        <p>随时随地找工作</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 吸顶头部 -->
+        <div class="fixTop">
+            <div class="f-shell">
+                <!-- 搜索框 -->
+                <div class="fs-search">
+                    <div class="t-addr"><span>全苏州</span><img src="{#$templets_skin#}images/darrowBl.png"></div>
+                    {#if !$userinfo.userid#}
+                    <form class="t-input">
+                        <input type="text" placeholder="搜索职位/公司" name="keyword" value="{#$keyword#}">
+                        <input type="text" name="scroll" value="1" style="display:none">
+                        <div><em>兼职职位类型</em><img src="{#$templets_skin#}images/darrowBl.png"></div>
+                        <span><img src="{#$templets_skin#}images/searchBlu.png" class="image"></span>
+                    </form>
+                    <a class="t-btn" href="{#$cfg_basehost#}/login.html">登录，查看更多好职位</a>
+                    {#else#}
+                    <form class="t-login">
+                        <input type="text" name="keyword" placeholder="搜索职位/公司" value="{#$keyword#}">
+                        <input type="text" name="scroll" value="1" style="display:none">
+                        <div class="filter">
+                            <span>兼职职位类型</span>
+                            <img src="{#$templets_skin#}images/darrowBl.png">
+                        </div>
+                        <div class="btn">
+                            <img src="{#$templets_skin#}images/searchWB.png">
+                        </div>
+                    </form>
+                    {#/if#}
+                </div>
+                <!-- 地址展示 -->
+                <ul class="fs-address">
+                    <li {#if !{#$addrid#}||$siteCityInfo['cityid']=={#$addrid#}#} class="active" {#/if#} data-addrid="{#$siteCityInfo['cityid']#}">全{#$siteCityInfo['name']#}</li>
+                    {#job action="addr" type="{#$siteCityInfo['cityid']#}" service="job" return="address"#}
+					<li data-addrid="{#$address.id#}" {#if {#$addrid#}=={#$address.id#}#} class="active" {#/if#}>{#$address.typename#}</li>
+					{#/job#}
+                </ul>
+                <!-- 其他筛选 -->
+                <div class="fs-shell">
+                    <ul class="fs-filter">
+                        <!-- 薪资 -->
+                        <li class="salary">
+                            {#if $max||$min#}<img src="{#$templets_skin#}images/closeGra.png" class="close">{#/if#}
+                            <span {#if $max||$min#}class="active"{#/if#}>期望薪资</span><img src="{#$templets_skin#}images/triangleDG.png" class="arrow">
+                            <div class="fsf-items">
+                                <div style="display: none;">期望薪资</div>
+                                <div class="item {#if !$max&&!$min#}active{#/if#}">不限</div>
+                                <div class="label">
+                                    <span>按月薪</span>
+                                    <span>按时薪</span>
+                                </div>
+                                <ul class="msalary">
+                                    <li class="item{#if $max==4000&&!$min#} active{#/if#}" data-max="4000">4k以下</li>
+                                    <li class="item{#if $min==4000&&$max==6000#} active{#/if#}" data-min="4000" data-max="6000">4k-6k</li>
+                                    <li class="item{#if $min==6000&&$max==8000#} active{#/if#}" data-min="6000" data-max="8000">6k-8k</li>
+                                    <li class="item{#if $min==8000&&$max==10000#} active{#/if#}" data-min="8000" data-max="10000">8k-10k</li>
+                                    <li class="item{#if $min==10000&&$max==15000#} active{#/if#}" data-min="10000" data-max="15000">10k-15k</li>
+                                    <li class="item{#if $min==15000&&$max==25000#} active{#/if#}" data-min="15000" data-max="25000">15k-25k</li>
+                                    <li class="item{#if $min==25000&&!$max#} active{#/if#}" data-min="25000">25k以上</li>
+                                </ul>
+                                <ul class="tsalary">
+                                    <li class="item{#if $max==15&&!$min&&$salary_type==2#} active{#/if#}" data-max="15">15以下</li>
+                                    <li class="item{#if $min==15&&$max==30&&$salary_type==2#} active{#/if#}" data-min="15" data-max="30">15-30/小时</li>
+                                    <li class="item{#if $min==30&&$max==50&&$salary_type==2#} active{#/if#}" data-min="30" data-max="50">30-50/小时</li>
+                                    <li class="item{#if $min==50&&$max==100&&$salary_type==2#} active{#/if#}" data-min="50" data-max="100">50-100/小时</li>
+                                    <li class="item{#if $min==100&&!$max&&$salary_type==2#} active{#/if#}" data-min="100">100以上</li>
+                                </ul>
+                            </div>
+                        </li>
+                        <!-- 学历 -->
+                        <li class="education">
+                            {#if $eduid#}<img src="{#$templets_skin#}images/closeGra.png" class="close">{#/if#}
+                            <span {#if $eduid#}class="active"{#/if#}>学历要求</span><img src="{#$templets_skin#}images/triangleDG.png" class="arrow">
+                            <div class="fsf-items">
+                                <div style="display: none;">学历要求</div>
+                                <div class="item {#if !$eduid#}active{#/if#}">不限</div>
+                                {#foreach from=$jobItems.education item=item#}
+                                <div class="item{#if $item.id==$eduid#} active{#/if#}" data-id="{#$item.id#}">{#$item.typename#}</div>
+                                {#/foreach#}
+                            </div>
+                        </li>
+                        <!-- 工作经验 -->
+                        <li class="experience">
+                            {#if $experience#}<img src="{#$templets_skin#}images/closeGra.png" class="close">{#/if#}
+                            <span {#if $experience#}class="active"{#/if#}>工作经验</span><img src="{#$templets_skin#}images/triangleDG.png" class="arrow">
+                            <div class="fsf-items">
+                                <div style="display: none;">工作经验</div>
+                                <div class="item {#if !$experience#}active{#/if#}">不限</div>
+                                {#foreach from=$jobItems.experience item=item#}
+                                <div class="item{#if $item.id==$experience#} active{#/if#}" data-id="{#$item.id#}">{#$item.typename#}</div>
+                                {#/foreach#}
+                            </div>
+                        </li>
+                        <!-- 公司行业 -->
+                        <li class="industry">
+                            {#if $industry#}<img src="{#$templets_skin#}images/closeGra.png" class="close">{#/if#}
+                            <span {#if $industry#}class="active"{#/if#}>公司行业</span><img src="{#$templets_skin#}images/triangleDG.png" class="arrow">
+                            <div class="fsf-items">
+                                <div style="display: none;">公司行业</div>
+                                <div class="item {#if !$industry#}active{#/if#}">不限</div>
+                                {#job service="job" action="industry" return="indu"#}
+                                    <div data-id="{#$indu.id#}" class="item {#if $indu.id==$industry#}active{#/if#}">{#$indu.title#}</div>
+                                {#/job#}
+                            </div>
+                        </li>
+                        <!-- 公司性质 -->
+                        <li class="nature">
+                            {#if $gnature#}<img src="{#$templets_skin#}images/closeGra.png" class="close">{#/if#}
+                            <span {#if $gnature#}class="active"{#/if#}>公司性质</span><img src="{#$templets_skin#}images/triangleDG.png" class="arrow">
+                            <div class="fsf-items">
+                                <div style="display: none;">公司性质</div>
+                                <div class="item active">不限</div>
+                            </div>
+                        </li>
+                        <!-- 公司规模 -->
+                        <li class="scale">
+                            {#if $scale#}<img src="{#$templets_skin#}images/closeGra.png" class="close">{#/if#}
+                            <span {#if $scale#}class="active"{#/if#}>公司规模</span><img src="{#$templets_skin#}images/triangleDG.png" class="arrow">
+                            <div class="fsf-items">
+                                <div style="display: none;">公司规模</div>
+                                <div class="item active">不限</div>
+                            </div>
+                        </li>
+                    </ul>
+                    <a class="fs-clear" href="{#getUrlPath service='job' template='partjob'#}?scroll=1">清空筛选条件<span>(0)</span></a>
+                </div>
+            </div>
+        </div>
+        <!-- 弹窗提示 -->
+        <div class="reminding">已投过该公司，近期不可再投递</div>
+        <!-- 职位类型弹窗 -->
+        <div class="jobtype">
+            <!-- 弹窗内容 -->
+            <div class="j-pop" onclick="event.stopPropagation()">
+                <!--顶部标题  -->
+                <div class="jp-top">
+                    <p>选择职位</p>
+                    <img src="{#$templets_skin#}images/close_icon.png">
+                </div>
+                <!-- 选项 -->
+                <div class="jp-select">
+                    <ul>
+                        {#job service="job" action="type" son="1" return="jobtype"#}
+                        {#if $jobtype.lower#}
+                        <li {#if $_bindex.jobtype==1#}class="active" {#/if#}>
+                            <span>{#$jobtype.title#}<em>(1)</em></span>
+                            <div class="jps-con">
+                                {#foreach from=$jobtype.lower item=item#}
+                                <div class="item">
+                                    <p>{#$item.title#}</p>
+                                    <div>
+                                        {#foreach from=$item.lower item=kid#}
+                                        <a href="javascript:;" title="{#$kid.title#}" data-id="{#$kid.id#}" {#if $type==$kid.id#}class="activeitem"{#/if#}>{#$kid.title#}</a>
+                                        {#/foreach#}
+                                    </div>
+                                </div>
+                                {#/foreach#}
+                            </div>
+                        </li>
+                        {#/if#}
+                        {#/job#}
+                    </ul>
+                </div>
+                <!-- 按钮 -->
+                <div class="jp-btn">
+                    <!-- 标签（备用） -->
+                    <div class="jpb-btn">
+                        <div class="jbp-warn">提示:请选择筛选职位</div>
+                        <div class="text">
+                            <span>已选：</span>
+                            <div>计算机软件</div>
+                        </div>
+                        <div class="btn">
+                            <div class="cancel">重置</div>
+                            <div class="confirm">确定</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 投递成功弹窗 -->
+        <div class="sendpop">
+            <!-- 确认投递（相同职位类型） -->
+            <div class="s-same">
+                <img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+                <div class="ss-title">
+                    <img src="{#$templets_skin#}images/warning_icon.png">
+                    <p>确定投递<span>个人简历1？</span></p>
+                </div>
+                <div class="ss-text" style="margin-bottom: 20px;">
+                    <p>该职位类型为<span>销售主管</span>，请确认是否匹配</p>
+                    <p class="text">请勿无效投递</p>
+                </div>
+                <div class="ss-btn">
+                    <div class="cancel" data-state="0">取消</div>
+                    <div class="confirm" data-state="1">确认投递</div>
+                </div>
+            </div>
+            {#if $cfg_app_ios_download || $cfg_app_android_download#}
+            <!-- 投递成功（有app） -->
+            <div class="s-appsucceed" onclick="event.stopPropagation()">
+                <div class="sa-close"><img src="{#$templets_skin#}images/close.png"></div>
+                <div class="sa-title">
+                    <img src="{#$templets_skin#}images/confirmCBlue.png">
+                    <span>简历投递成功！请静候佳音</span>
+                </div>
+                <p class="sa-text">下载{#$cfg_appname#}APP，随时获取投递进度，第一时间与HR沟通联系</p>
+                <div class="sa-mobile">
+                    <img src="{#$cfg_basehost#}/include/qrcode.php?data={#getUrlPath service='siteConfig' template='mobile'#}">
+                </div>
+            </div>
+            {#else#}
+            <!-- 投递成功（无app） -->
+            <div class="s-succeed">
+                <img src="{#$templets_skin#}images/sendresume.png">
+                <p>简历投递成功！请静候佳音</p>
+            </div>
+            {#/if#}
+            <!-- 已经投递过 -->
+            <div class="s-had">
+                <div>
+                    <img src="{#$templets_skin#}images/warning_icon.png">
+                    <p>你已投递过该职位，请勿重复投递</p>
+                </div>
+            </div>
+            <!-- 实名认证 -->
+            <div class="s-certificate">
+                <img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+                <div class="ss-title">
+                    <img src="{#$templets_skin#}images/warning_icon.png">
+                    <p>该企业限制实名验证投递</p>
+                </div>
+                <div class="ss-text">
+                    <p>认证后可提高求职成功率哦</p>
+                </div>
+                <div class="ss-btn">
+                    <div class="cancel" data-state="0">先看看</div>
+                    <a class="certificate" href="{#$member_userDomain#}/security-chCertify.html" target="_blank">去实名认证</a>
+                </div>
+            </div>
+            <!-- 公司投递 -->
+            <div class="s-company" style="width: 480px;">
+                <img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+                <div class="ss-title">
+                    <img src="{#$templets_skin#}images/warning_icon.png">
+                    <p>温馨提示：您正在使用招聘企业账号，操作求职步骤</p>
+                </div>
+                <div class="ss-text">
+                    <p>如登录的不是您个人账号，可更换账号后创建简历、投递职位</p>
+                </div>
+                <div class="ss-btn">
+                    <div class="cancel" data-state="0">好的，我知道了</div>
+                </div>
+            </div>
+        </div>
+        <!-- 多个简历弹窗 -->
+        <div class="moreResume">
+            <div class="mr-content">
+                <img src="{#$templets_skin#}images/close_icon.png" class="mr-close">
+                <div class="mr-title">
+                    <div>
+                        <img src="{#$templets_skin#}images/warning_icon.png">
+                        <p>默认简历<span>个人简历1？</span>正在审核中</p>
+                    </div>
+                    <p>请稍后尝试</p>
+                </div>
+                <div class="mr-btn">
+                    <div class="change">更换简历</div>
+                    <div class="close">好的</div>
+                </div>
+            </div>
+            <div class="mr-select">
+                <img src="{#$templets_skin#}images/close_icon.png" class="mr-close">
+                <p class="mrs-title">请选择简历后投递</p>
+                <div class="mrs-select">
+                    <span>投递简历：</span>
+                    <div class="mrs-input">
+                        <input type="text" placeholder="请选择简历" readonly>
+                        <i></i>
+                        <ul></ul>
+                    </div>
+                </div>
+                <div class="mrs-btn">
+                    <div class="cancel">取消</div>
+                    <div class="confirm">确认投递</div>
+                </div>
+            </div>
+        </div>
+    </div>
+{#include file="footer.html" theme="white"#}
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/partjob.js?v={#$cfg_staticVersion#}"></script>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var adminPath = "{#$adminPath#}", modelType = 'house', apartmentList = {#$apartment|json_encode#};
+</script>
+<style>
+em {font-style: normal;}
+.editform {padding: 15px 0;}
+.sandDiv {padding: 0 13px;}
+.sandleft {float: left;}
+.sanditem{margin-left: 20px; position: relative; overflow: hidden; padding: 13px 0 0 20px; min-height: 750px;}
+.sanditem .build-num{margin-bottom: 10px;}
+.sanditem .info-btn{position: relative; background: #ebebeb; height: 30px; width: 55px; display: inline-block; text-align: center; line-height: 30px; cursor: pointer; float: left; margin: 0 12px 10px 0;}
+.sanditem .info-btn.on{transform: scale(1.2);transition: all .3s;}
+
+#shapan-box .drag.on{-webkit-animation: swing .5s linear 0s infinite alternate; -moz-animation: swing .5s linear 0s infinite alternate; animation: swing .5s linear 0s infinite alternate;}
+@-moz-keyframes swing{0%{transform:translate3d(0,-4px,0)}100%{transform:translate3d(0,4px,0)}}
+@-webkit-keyframes swing{0%{transform:translate3d(0,-4px,0)}100%{transform:translate3d(0,4px,0)}}
+@keyframes swing{0%{transform:translate3d(0,-4px,0)}100%{transform:translate3d(0,4px,0)}}
+
+#shapan-box .drag.on i{}
+.sanditem .info-btn i.del{ position: absolute; width: 15px; height: 15px; display: block; right: -5px; top: -7px; background: #a5a5a5; line-height: 15px; font-style: normal; border-radius: 50%; z-index: 99;}
+.sanditem .info-btn.on i.del{line-height: 14px;}
+.sanditem .add-btn{background: #ebebeb url(/static/images/admin/add.png) center center no-repeat;}
+.sanditem .add-btn.hide {display: none;}
+.sanditem dl{margin: 3px 0;}
+.sanditem dt{line-height: 30px; font-size: 14px; width: 60px; float: left; text-align: right; padding: 5px 0; font-weight: 500;}
+.sanditem dd{position: relative; overflow: hidden; padding: 5px 50px 5px 10px; }
+.sanditem dd label{display: inline-block; }
+.sanditem dd.radio label{margin: 6px 15px 0 0; line-height: 16px;}
+.radio{min-height: 20px;}
+.submit{position: relative; z-index: 5; margin-top: 20px;}
+#shapan-box{position: absolute; margin: -62px 0 0 -21px;}
+#shapan-box img{height: auto; width: auto; max-width: none;}
+.drag {position: absolute; background: #1f87ff; height: 26px; padding: 0 5px; min-width: 38px; cursor: move; top: 120px; text-align: center; line-height: 26px; z-index: 99; border-radius: 3px;  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);}
+.drag i{position: absolute; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #1f87ff; top: 26px; left: 50%; margin-left: -5px;}
+.nikan-area {width: 900px; height: 500px; border: 1px solid #eee; position: relative; color: #fff; background: #fafafa;}
+.submit iframe {float: left; width: 100px; height: 25px; margin: -295px 0 0 400px;}
+.submit iframe.h {margin: 10px 0 0;}
+.submit input {float: right;}
+</style>
+</head>
+
+<body>
+<div class="search">
+  <label>管理 <strong>{#$loupaname#}</strong> 沙盘</label>
+</div>
+
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="loupan" id="loupan" value="{#$loupan#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <input type="hidden" name="litpic" id="litpic" value="{#$litpic#}" />
+  <div class="sandDiv clearfix">
+    <!-- 左侧图片区域 s -->
+    <div class="sandleft">
+      <div class="sandimg nikan-area" id="dzshapan" style="overflow:hidden;">
+        <div id="shapan-box">
+          <div id="shapan-obj">{#if $litpic#}<img src='{#$cfg_attachment#}{#$litpic#}' />{#/if#}</div>
+		  {#foreach from=$data item=conf name=d#}
+		  <div class="drag{#if $smarty.foreach.d.index == 0#} on{#/if#}" id="drag_{#$smarty.foreach.d.index#}" style="top: {#$conf.coory#}px; left: {#$conf.coorx#}px; background: {#if $conf.state == "0"#}rgb(255, 154, 31){#elseif $conf.state == "1"#}rgb(38, 114, 236){#else#}rgb(168, 168, 168){#/if#};"><em>{#$conf.name#}</em><i style="border-top-color: {#if $conf.state == "0"#}rgb(255, 154, 31){#elseif $conf.state == "1"#}rgb(38, 114, 236){#else#}rgb(168, 168, 168){#/if#};"></i></div>
+		  {#/foreach#}
+        </div>
+      </div>
+      <div class="submit clearfix">
+		  <iframe src ="/include/upfile.inc.php?mod=house&type=card&obj=litpic&filetype=image" scrolling="no"{#if $litpic#} class="h"{#/if#} frameborder="0" marginwidth="0" marginheight="0" ></iframe>
+          <input class="btn btn-large btn-success{#if $litpic == ''#} hide{#/if#}" type="submit" name="submit" id="btnSubmit" value="确认提交">
+      </div>
+    </div>
+    <!-- 左侧图片区域 e -->
+    <!-- 右侧添加信息 s -->
+    <div class="sanditem">
+      <div class="build-num clearfix">
+		{#foreach from=$data item=conf name=d#}
+		<span class="info-btn{#if $smarty.foreach.d.index == 0#} on{#/if#}" id="info-btn_{#$smarty.foreach.d.index#}" style="background: {#if $conf.state == "0"#}rgb(255, 154, 31){#elseif $conf.state == "1"#}rgb(38, 114, 236){#else#}rgb(168, 168, 168){#/if#}; color: #fff;"><em>{#$conf.name#}</em><i class="del">×</i></span>
+		{#/foreach#}
+        <span class="info-btn add-btn{#if $litpic == ''#} hide{#/if#}" id="add"></span>
+      </div>
+      <div class="sandbox">
+      	{#foreach from=$data item=conf name=d#}
+		<div class="sandtxt" id="sandtxt_{#$smarty.foreach.d.index#}"{#if $smarty.foreach.d.index > 0#} style="display: none;"{#/if#}>
+			<dl class="clearfix">
+				<dt><label>楼栋：</label></dt>
+				<dd><input type="text" class="data1 input-medium Bnumber" placeholder="楼栋号" value="{#$conf.name#}" /></dd>
+			</dl>
+			<dl class="clearfix">
+				<dt><label>状态：</label></dt>
+				<dd class="radio">
+					<label><input type="radio" class="data_{#$smarty.foreach.d.index#}" name="salestate_{#$smarty.foreach.d.index#}" value="0"{#if $conf.state == "0"#} checked="checked"{#/if#}>待售</label>
+					<label><input type="radio" class="data_{#$smarty.foreach.d.index#}" name="salestate_{#$smarty.foreach.d.index#}" value="1"{#if $conf.state == "1"#} checked="checked"{#/if#}>在售</label>
+					<label><input type="radio" class="data_{#$smarty.foreach.d.index#}" name="salestate_{#$smarty.foreach.d.index#}" value="2"{#if $conf.state == "2"#} checked="checked"{#/if#}>售完</label>
+				</dd>
+			</dl>
+			<dl class="clearfix">
+				<dt><label>户型：</label></dt>
+				<dd style="overflow: visible;padding-left: 60px;">
+                    <select class="col-sm-2 chosen-select data9" data-placeholder="请选择该楼栋的户型，支持多选。" multiple="multiple" style="width:300px;">
+                        {#foreach from=$apartment item=type#}
+                        <option value="{#$type.id#}"{#if $conf.apartment && in_array($type.id, $conf.apartment)#} selected{#/if#}>{#$type.title#}</option>
+                        {#/foreach#}
+                    </select>
+                </dd>
+			</dl>
+			<dl class="clearfix">
+				<dt><label>层数：</label></dt>
+				<dd><input type="text" class="data3 input-medium" placeholder="总层数" value="{#$conf.floor#}" /></dd>
+			</dl>
+			<dl class="clearfix">
+				<dt><label>户数：</label></dt>
+				<dd><input type="text" class="data4 input-medium" placeholder="总户数" value="{#$conf.hushu#}" /></dd>
+			</dl>
+<!--			<dl class="clearfix">-->
+<!--				<dt><label>梯户：</label></dt>-->
+<!--				<dd><input type="text" class="data5 input-medium" placeholder="几梯几户" value="{#$conf.tishu#}" /></dd>-->
+<!--			</dl>-->
+			<dl class="clearfix">
+				<dt><label>几梯：</label></dt>
+				<dd><input type="text" class="data5 input-medium" placeholder="几梯" value="{#$conf.ti#}" /></dd>
+			</dl>
+			<dl class="clearfix">
+				<dt><label>几户：</label></dt>
+				<dd><input type="text" class="data5_1 input-medium" placeholder="几户" value="{#$conf.hu#}" /></dd>
+			</dl>
+			<dl class="clearfix">
+				<dt><label>均价：</label></dt>
+				<dd><input type="text" class="data6 input-medium" placeholder="均价" value="{#$conf.price#}" /></dd>
+			</dl>
+			<dl class="clearfix">
+				<dt><label>开盘：</label></dt>
+				<dd><input type="text" class="data7 input-medium" placeholder="开盘时间" value="{#$conf.began#}" /></dd>
+			</dl>
+			<dl class="clearfix">
+				<dt><label>交房：</label></dt>
+				<dd><input type="text" class="data8 input-medium" placeholder="交房时间" value="{#$conf.end#}" /></dd>
+			</dl>
+			<dl><input type="hidden" class="topVal" value="{#$conf.coory#}" /></dl>
+			<dl><input type="hidden" class="leftVal" value="{#$conf.coorx#}" /></dl>
+		</div>
+		{#/foreach#}
+      </div>
+    </div>
+    <!-- 右侧添加信息 e -->
+  </div>
+
+</form>
+
+{#$jsFile#}
+</body>
+</html>

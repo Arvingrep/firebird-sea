@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$langData['travel'][7][2]#}</title>{#* 订单填写 *#}
+    <meta name="keywords" content="{#$travel_keywords#}" />
+    <meta name="description" content="{#$travel_description#}" />
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/calendar.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/hotel-order.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$travel_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', templets_skin = '{#$templets_skin#}', type = '{#$type#}', price = '{#$price#}',totalBalance = '{#$userinfo.money#}';
+        var specialtimejson = '{#$specialtimejson#}';
+        var pickList = [];
+        var st;
+        var clickFlag = 0;//用来判断是否点击切换上下月
+
+        // 积分抵扣
+        var hasPoint = '{#$userinfo.point#}';
+        jifen_ =  '{#$cfg_offset_travel#}';
+        var pointRatio = {#$cfg_pointRatio#};
+    </script>
+
+</head>
+
+<body class="w1200">
+{#$pageCurr = "hotel"#}
+<!-- 导航 s-->
+{#include file="_top.html"#}
+
+<!-- 导航 e-->
+<div class="main_wrap">
+    <div class="wrap crumbs">
+        {#* 您当前所在： 酒店/民宿*#}
+        <div class="cont">
+            {#$langData['travel'][14][0]#}
+            <a href="{#$travel_channelDomain#}">{#$langData['siteConfig'][0][0]#}</a>
+            <span>></span>
+            <a href="javascript:;" class="green_a">{#$langData['travel'][15][59]#}</a>{#* 酒店/民宿 *#}
+        </div>
+    </div>
+    <div class="wrap order-progress">
+        <ul class="fn-clear">
+            <li class="has-go white"><em>1</em>{#$langData['travel'][14][63]#}</li> {#* 选择酒店 *#}
+            <li class="now-go white secd_li"><em>2</em>{#$langData['travel'][14][64]#}</li>   {#* 填写订单 *#}
+            <li class="no-go grey third_li"><em>3</em>{#$langData['travel'][14][65]#}</li>   {#* 在线支付 *#}
+            <li class="no-go grey four_li"><em>4</em>{#$langData['siteConfig'][16][55]#}</li>   {#* 支付成功 *#}
+        </ul>
+    </div>
+    <div class="fn-clear wrap main_con">
+        <div class="order_left ticketItemWrap">
+            <div class="left_con">
+                <div class="order_top orderInfo">
+                    <i class="leftIcon"></i><h2>{#$langData['travel'][7][6]#}</h2>  {#* 预订信息 *#}
+                </div>
+                <div class="order_con">
+                	{#* 房间类型 *#}
+                    <dl class="roomType">
+                        <dt>{#$langData['travel'][11][76]#}：</dt>
+                        <dd>{#$title#}</dd>
+                    </dl>
+
+                    {#* 入离日期 *#}
+                    <dl class="start-time">
+                        <dt>{#$langData['travel'][14][66]#}：</dt>
+                        <dd><input class="chooseDateInput entertime" readonly="readonly" placeholder="{#$langData['siteConfig'][20][331]#} ">  {#* 请选择日期 *#}
+                            <span class="week1 week"></span>
+                            <i class="time-icon"></i>
+                        </dd>
+                        <dd class="tip-dd">{#$langData['siteConfig'][13][51]#} </dd>{#* 到 *#}
+                        <dd><input class="chooseDateInput leavetime" readonly="readonly" placeholder="{#$langData['siteConfig'][20][331]#} ">  {#* 请选择日期 *#}
+                            <span class="week2 week"></span>
+                            <i class="time-icon"></i>
+                        </dd>
+                        <dd class="tip-dd2 night">{#$langData['travel'][14][43]#}</dd> {#*  共1晚   *#}
+                        <div id="range-pick"></div>
+                        <input type="hidden" id="datein" value="1"/>
+                        <input type="hidden" name="walktime" id="walktime" value="">
+                        <input type="hidden" name="departuretime" id="departuretime" value="">
+                    </dl>
+
+                    {#* 房间数量 *#}
+                    <dl class="roomNum">
+                        <dt>{#$langData['travel'][14][67]#}：</dt>
+                        <dd class="fn-clear">
+                            <span data-room="1" class="checked">1</span>
+                            <span data-room="2">2</span>
+                            <span data-room="3">3</span>
+                            <span data-room="4">4</span>
+                            <span data-room="5">5</span>
+                            <span data-room="6">6</span>
+                            <span data-room="7">7</span>
+                            <span data-room="8">8</span>
+                        </dd>
+                    </dl>
+
+                    {#* 房费总计 *#}
+                    <dl>
+                        <dt>{#$langData['travel'][14][68]#}：</dt>
+                        <dd class="detail_all" data-price='{#$price#}'>{#echoCurrency type='symbol'#}<em>{#$price#}</em></dd>
+                    </dl>
+                </div>
+                <div class="order_top orPeople">
+                    <i class="leftIcon"></i><h2>{#$langData['travel'][14][69]#}</h2>  {#* 入住信息 *#}
+                </div>
+                <div class="peo_con">
+                    <input type="hidden" value="{#$id#}" id="proid" name="proid">
+
+                    {#* 住客姓名 *#}
+                    <dl>
+                        <dt><label for=""><em class="star">*</em>{#$langData['travel'][14][70]#}：</label></dt>
+                        <dd>
+                            <div class="person">
+                                <!-- <div class="spe_input">
+                                	{#* 请输入住客1姓名 *#}
+                                    <input type="text" placeholder="{#$langData['travel'][14][71]#}" class="person_name" name="person_name">
+									<input type="text" placeholder="身份证号" class="person_id" name="person_id">
+                                </div>     -->
+								{#* 请输入住客1姓名 *#}
+								 <div class="spe_input"><input type="text" placeholder="{#$langData['travel'][14][71]#}" class="person_name" name="person_name"><input type="text" placeholder="身份证号" name="person_id" class="person_id"></div>
+                                <span class="tip_span">{#$langData['travel'][14][42]#}</span>
+                            </div>
+                        </dd>
+                    </dl>
+
+                    {#* 手机号码 *#}
+                    <dl class="peo_tel">
+                        <dt><label for="tel"><em class="star">*</em>{#$langData['siteConfig'][3][6]#}：</label></dt>
+                        <dd>
+                            <div class="inpbdr fn-clear">
+                                <span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+                                {#* 请输入手机号码 *#}
+                                <input type="text" placeholder="{#$langData['siteConfig'][20][463]#}" id="tel" name="tel">
+                                <!--国际区号弹窗-->
+                                <div class="areaCode_wrap areaCode_wrap2">
+                                    <ul>
+
+                                    </ul>
+                                </div>
+                                <input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+                            </div>
+                            {#* 预订成功后会向您发送短信通知 *#}
+                            <span class="tip_span">{#$langData['travel'][14][72]#}</span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="submit_btn">
+                <a href="javascript:;" class="submit_a publicpaybtn">{#$langData['travel'][8][41]#}</a>{#*  提交订单   *#}
+            </div>
+        </div>
+        <!-- 列表右 s-->
+
+        <!-- 结算信息 s-->
+        <div class="settlement">
+            <div class="hotelDetail">
+                <div class="hotelImg">
+                    {#if $detail_pics|@count ==0#}
+                    <img src="{#$detail_liptic#}" alt="">
+                    {#else#}
+                    {#$n=1#}
+                    {#foreach from=$detail_pics item=img key="key"#}
+                        {#if $n==1#}
+                        <img src="{#$img.path#}">
+                        {#/if#}
+                    {#$n=$n+1#}
+                    {#/foreach#}
+                    {#/if#}
+                </div>
+                <div class="hotelInfo">
+                    <h2>{#$detail_title#}</h2>
+                    <p class="addrInfo"><i class="addr-icon"></i>{#$detail_address#}</p>
+                    <h3>{#$title#}</h3>
+                    <div class="otherInfo fn-clear">
+                    	{#*  床型   *#}
+                        <dl><dt>{#$langData['travel'][14][23]#}：</dt><dd>{#$typeidname#}</dd></dl>
+
+                        {#*  窗户   *#}
+                        <dl><dt>{#$langData['travel'][14][24]#}：</dt><dd>{#$iswindowname#}</dd></dl>
+
+                        {#*  面积   *#}
+                        <dl><dt>{#$langData['travel'][14][25]#}：</dt><dd>{#$area#}m<sup>2</sup></dd></dl>
+
+                        {#*  早餐   *#}
+                        <dl><dt>{#$langData['travel'][14][26]#}：</dt><dd>{#$breakfastname#}</dd></dl>
+                    </div>
+
+                </div>
+            </div>
+            {#if $userinfo.point > 0 && $cfg_offset_travel > 0#}
+            <!-- 优惠信息 -->
+            <dl class="youhui integral">
+              <dt>本单优惠</dt>
+              <dd class="fn-clear">
+                <div class="ltxt"><span class="gou hasgou"></span>使用<span class="jifen">0</span>积分抵扣<span class="jifen_jian">0</span>元</div>
+                <div class="rtxt amount_jian">-{#echoCurrency type="symbol"#}<span>0</span></div>
+              </dd>
+            </dl>
+            {#/if#}
+            <div class="priceAll">
+            	{#*  订单总额   *#}
+                <span>{#$langData['travel'][14][73]#}</span><span class="price_all fn-right">{#echoCurrency type='symbol'#}<em>{#$totalAmount#}</em></span>
+            </div>
+        </div>
+        <!-- 结算信息 e-->
+
+        <!-- 列表右 e-->
+    </div>
+</div>
+<div class="tou-mask"></div>
+{#include file="{#$HUONIAOROOT#}/templates/member/public-pay-pop.html"#}
+{#include file="../../siteConfig/public_foot_v3.html" module='siteConfig' theme='gray'#}
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.scroll.loading.js"></script>
+<script charset="UTF-8" src="{#$cfg_staticPath#}js/ui/jquery.SuperSlide.2.1.1.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<!-- 公共头部搜索+收藏js -->
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/calendar.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/hotel-order.js?v={#$cfg_staticVersion#}"></script>
+
+
+</body>
+</html>

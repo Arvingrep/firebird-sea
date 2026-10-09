@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+  <title>订单确认-{#$paimai_title#}</title>
+  <meta name="keywords" content="{#$paimai_keywords#}"/>
+  <meta name="description" content="{#$paimai_description#}"/>
+  <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico?v={#$cfg_staticVersion#}" type="image/x-icon"/>
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public_header.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/confirm.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/jquery-1.9.0.min.js"></script>
+    <script>
+        var cfg_staticPath = staticPath = "{#$cfg_staticPath#}";
+        var id = "{#$detail_id#}";
+        var masterDomain = "{#$cfg_basehost#}";
+        var type = '{#$type#}';
+        var map_city = '{#$cfg_mapCity#}', site_map = "{#$site_map#}";
+        var totalMoney = '{#$totalMoney#}'
+    </script>
+</head>
+<body class="w1200">
+    {#include file="public_top.html"#} 
+    {#include file="{#$HUONIAOROOT#}/templates/member/public-pay-pop.html"#}
+    <div id="pcEnsure" class="wrap">
+        <div class="m pm-info">
+          <h3 class="mt">填写并核对以下信息</h3>
+          <div class="mc">
+            <div class="sm pm-item"><h3 class="smt">拍品信息</h3>
+              <div class="smc">
+                <div class="pm-image"><img
+                    src="{#$detail_litpicUrl#}"
+                    :alt="goodsInfo.title"></div>
+                <div class="pm-name">{#$detail_title#}</div>
+                <div class="pm-price">
+                  {#if $type == 'reg'#}
+                  <span>保证金</span><em>{#echoCurrency type='symbol'#}{#$detail_amount#}</em>
+                  {#else#}
+                  <span>竞拍价</span><em>{#echoCurrency type='symbol'#}{#$totalMoney#}</em>
+                  {#/if#}
+                </div>
+                <div class="pm-state">{#if $type == 'reg'#}报名中{#else#}拍卖中{#/if#}</div>
+              </div>
+              {#if $type == 'reg'#}
+              <ul class="smb">
+                <li>若竞拍成功，保证金直接作为货款的一部分扣款至商家账户；</li>
+                <li>若竞拍不成功，保证金将在竞拍结束后1-15个工作日内原路返还或解冻（大额转账支付保证金的，需您自行提交准确的原汇款账户信息），具体到账时间请以银行信息提示为准。</li>
+              </ul>
+              {#/if#}
+            </div>
+            <div class="sm pm-consignee">
+              <div class="smt"><h3>收货人信息</h3>
+                <button class="button-add">+ 管理收货地址
+                </button>
+              </div>
+              <div class="smc">
+                <el-select v-model="address" style="width:60%" placeholder="请选择收货地址...">
+                  <el-option
+                      v-for="item in options"
+                      :key="item.id"
+                      :label="item.address"
+                      :value="item.id"
+                  ></el-option>
+                </el-select>
+                
+              </div>
+            </div>
+          </div>
+        </div>
+        {#if $type == 'reg'#}
+        <div class="ensure-submit">
+          <div class="count">
+            <template> 
+              <el-input-number size="small"  v-model="num" :min="1" :max="maxnum" @change="handleChange(num)"></el-input-number>
+            </template>
+          </div>
+          <div class="pm-price" v-cloak><span>保证金合计：</span><em>{#echoCurrency type='symbol'#}{{allAmount}}</em></div>
+          <div class="submit">
+            <button @click="submit('regist')" type="button" v-if="goodsInfo.amount > 0">同意并支付保证金</button>
+            <button @click="submit('regist')" type="button" v-else clstag="pageclick|keycount|PaimaiEnsure_bond|PaimaiEnsure_0">同意，去参拍</button>
+          </div>
+        </div>
+        {#else#}
+        <div class="ensure-submit">
+          <!-- <div class="count">
+            <template>
+              <el-input-number size="small" v-model="num" @change="handleChange(num)"></el-input-number>
+            </template>
+          </div> -->
+          <div class="pm-price"><span>合计：</span><em>{#echoCurrency type='symbol'#}{#$totalMoney#}</em></div>
+          <div class="submit">
+            <button @click="submit('pai')" type="button" clstag="pageclick|keycount|PaimaiEnsure_bond|PaimaiEnsure_0">立即支付</button>
+          </div>
+        </div>
+        {#/if#}
+      </div>
+     <!--收货地址弹出层-->
+    <div id="bg"></div>
+    <div class="popup">
+      <div class="popCon">
+        <div class="tip"><span class="left">{#$langData['siteConfig'][6][96]#}</span><i class="right"></i></div>
+        <ul>
+          
+          <li class="name">
+            <dl class="fn-clear">
+              <dt><font>*</font>{#$langData['siteConfig'][19][33]#}：</dt>
+              <dd class="fn-clear"><input id="person" type="text" value="" placeholder="请填写收货人姓名" /><span class="input-tips"><s></s>{#$langData['shop'][5][31]#}</span></dd>
+            </dl>
+          </li>
+          <li class="phone">
+            <dl class="fn-clear">
+              <dt><font>*</font>{#$langData['siteConfig'][3][6]#}：</dt>
+              <dd class="fn-clear">
+                <div class="inpbdr">
+                  <span class="areaCode" data-code="{#$internationalPhoneSection[0]['code']#}"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+                  <input id="mobile" type="text" value="" placeholder="请填写手机号码" />
+                </div>
+                <!--国际区号弹窗-->
+                <div class="areaCode_wrap areaCode_wrap2">
+                  <ul>
+
+                  </ul>
+                </div>
+                <input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+                <span class="input-tips"><s></s>{#$langData['siteConfig'][20][315]#}</span>
+              </dd>
+            </dl>
+          </li>
+          <li class="address2">
+            <dl class="fn-clear">
+              <dt><font>*</font>{#$langData['siteConfig'][19][34]#}：</dt>
+              <dd class="fn-clear" id="selAddr">
+                <div class="sel-group" data-title="{#$langData['siteConfig'][20][68]#}">{#* 请选择所在区域 *#}
+                  <div class="city-title addrBtn" data-type="area" data-field="addrid" data-ids="" data-id=""><span style="color:#bbb;">请选择所在地区</span>
+                  </div>
+                          <input type="hidden" name="addrid" id="addrid" value="">
+                </div>
+                <span class="input-tips"><s></s>{#$langData['siteConfig'][23][118]#}</span>
+              </dd>
+            </dl>
+          </li>
+          <li class="detail">
+            <dl>
+              <dt><font>*</font>{#$langData['siteConfig'][19][35]#}：</dt>
+              <dd class="fn-clear"><input id="address" type="text" value="" placeholder="请输入详细地址信息，如道路、门牌号、小区、楼栋号、单元等信息" /><img src="{#$cfg_staticPath#}images/admin/markditu.jpg" id="mark" title="{#$langData['siteConfig'][6][92]#}"><span class="input-tips"><s></s>{#$langData['shop'][5][30]#}</span></dd>
+              <input type="hidden" id="lnglat" name="lnglat" />
+            </dl>
+          </li>
+          <li class="">
+            <dl>
+              <dt></dt>
+              <dd class="defaultCheck">
+                <i></i><span>设为默认收货地址</span>
+                <input type="hidden" id="setdefault" name="default" />
+              </dd>
+            </dl>
+          </li>
+          <li>
+            <dl>
+              <dt></dt>
+              <dd class="confirm"><a href="javascript:;" id="submit">保存并使用</a></dd>
+            </dl>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <!-- 删除地址 弹窗 s-->
+      {#include file="foot.html"#} 
+</body>
+<script src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/ui/jquery.dialog-4.2.0.js"></script>
+
+<script src="{#$cfg_staticPath#}js/publicAddr.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/confirm.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>修改订单-{#$tuan_channelName#}</title>
+<meta name="keywords" content="{#$tuan_keywords#}" />
+<meta name="description" content="{#$tuan_description#}" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/buy.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$tuanDomain#}', cfg_staticPath = '{#$cfg_staticPath#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+</script>
+</head>
+
+<body>
+{#include file="../../siteConfig/top1.html"#}
+
+<div class="wrap fn-clear btop">
+	<h1 class="logo"><a href="{#$tuanDomain#}" title="{#$tuan_channelName#}"><img src="{#$tuan_logoUrl#}" alt="{#$tuan_channelName#}" /></a></h1>
+	<ul class="process p1">
+		<li class="curr"><strong>1</strong>修改订单</li>
+		<li><strong>2</strong>选择支付方式</li>
+		<li><strong>3</strong>购买成功</li>
+	</ul>
+</div>
+
+<div class="wrap">
+	<form action="/include/ajax.php?service=tuan&action=deal" method="post">
+		<div class="error-tips"><p><s></s><span></span></p><span class="close">&times;</span></div>
+
+		<!-- 商品信息 -->
+		<table class="cart section">
+			<thead>
+				<tr>
+					<th width="20"></th>
+					<th class="name">商品</th>
+					<th width="150">单价</th>
+					<th width="180">数量</th>
+					<th width="180">小计</th>
+					<th width="110">操作</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#$totalPrice = 0#}
+				{#$tuantype = 0#}
+				{#$totalCount = 0#}
+				{#$deliveryType = 0#}
+				{#$useraddr = ""#}
+				{#$username = ""#}
+				{#$usercontact = ""#}
+				{#$usernote = ""#}
+
+				{#tuan action="getOrderList" return="cart" ordernum={#$ordernum#}#}
+				{#$totalPrice = $totalPrice + $cart.totalAmount#}
+				{#if $totalPrice != 0#}
+				{#$totalCount = $totalCount + 1#}
+				{#/if#}
+				<tr data-orderid="{#$cart.orderid#}" data-id="{#$cart.id#}" data-price="{#$cart.price#}" data-max="{#$cart.limit#}" data-type="{#$cart.tuantype#}"{#if $cart.tuantype == 2#} data-freight="{#$cart.freight#}" data-freeshi="{#$cart.freeshi#}"{#/if#}>
+					<td></td>
+					<td class="title"><a href="{#$cart.url#}" target="_blank"><img src="{#$cart.thumb#}" />{#$cart.title#}</a></td>
+					<td><span class="price">团购价 {#echoCurrency type='symbol'#}{#$cart.price#}</span></td>
+					<td class="counter">
+						<button type="button" class="minus">-</button><input type="text" value="{#$cart.count#}" maxlength="5" onkeyup="value=value.replace(/\D+/ig,'')" /><button type="button" class="add">+</button>
+						<span class="tips"></span>
+					</td>
+					<td class="total">
+						{#echoCurrency type='symbol'#}<strong>{#$cart.totalAmount#}</strong>
+						{#if $cart.tuantype == 2#}
+						{#$tuantype = 1#}
+
+						{#$deliveryType = $cart.deliveryType#}
+						{#$useraddr = $cart.useraddr#}
+						{#$username = $cart.username#}
+						{#$usercontact = $cart.usercontact#}
+						{#$usernote = $cart.usernote#}
+
+						{#if $cart.count > $cart.freeshi#}
+						<span class="del">免运费</span>
+						{#else#}
+						<span class="del">含运费 {#echoCurrency type='symbol'#}{#$cart.freight#}</span>
+						{#/if#}
+						{#/if#}
+					</td>
+					<td><a href="javascript:;" class="delete">删除</a></td>
+				</tr>
+				{#/tuan#}
+
+				{#if $totalCount == 0#}
+				<tr><td colspan="6" class="empty">订单不存在或已删除</td></tr>
+				{#/if#}
+			</tbody>
+		</table>
+
+		{#if $totalCount > 0#}
+		<div class="total-fee">应付总额：<strong id="totalPrice">{#echoCurrency type='symbol'#}{#$totalPrice|string_format:'%.2f'#}</strong></div>
+		{#else#}
+		<div class="empty-split"></div>
+		{#/if#}
+
+		{#if $tuantype == 1 && $userinfo#}
+		<!-- 收货地址 -->
+		<div class="delivery">
+			<h3>收货地址<a href="{#getUrlPath service='member' type='user' template='address'#}" target="_blank">管理收货地址</a></h3>
+			<ul class="radlist" id="delivery">
+				{#member action="address"#}
+
+				{#$useraddress = $row.addrname|cat:$row.address#}
+				{#$contact = ""#}
+				{#if $row.mobile != ""#}{#$contact = $row.mobile#}{#/if#}
+				{#if $row.mobile != "" && $row.tel != ""#}{#$contact = $contact|cat:" / "|cat:$row.tel#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$contact = $row.tel#}{#/if#}
+
+				<li{#if ($_bindex.row == 1 && $useraddr == "") || ($useraddr == $useraddress && $username == $row.person && $usercontact == $contact) #} class="selected"{#/if#}>
+					<s></s>
+					<input type="radio" name="addressid" id="address_{#$row.id#}" value="{#$row.id#}"{#if ($_bindex.row == 1 && $useraddr == "") || ($useraddr == $useraddress && $username == $row.person && $usercontact == $contact) #} checked{#/if#} />
+					<label for="address_{#$row.id#}"><s></s>{#$row.person#}，{#$row.addrname|cat:" "|cat:$row.address#}，{#$contact#}</label>
+				</li>
+				{#/member#}
+				{#if $row#}
+				<li>
+					<s></s>
+					<input type="radio" name="addressid" id="address_0" value="0" />
+					<label for="address_0"><s></s>使用其它地址</label>
+				</li>
+				{#/if#}
+			</ul>
+			<div class="address-field"{#if !$row#} style="display: block;"{#/if#}>
+				<div class="formfield">
+					<label for="addrid"><em>*</em> 所在区域：</label>
+					<span id="addrlist">
+						<select id="addrid" name="addrid[]">
+							<option value="0">请选择区域</option>
+							{#siteConfig action="addr" return="addr" son="0"#}
+							<option value="{#$addr.id#}">{#$addr.typename#}</option>
+							{#/siteConfig#}
+						</select>
+					</span>
+					<span class="input-tips"><s></s>请选择区域</span>
+				</div>
+				<div class="formfield">
+					<label for="address"><em>*</em> 街道地址：</label>
+					<input type="text" name="address" id="address" size="50" maxlength="60" />
+					<span class="input-tips"><s></s>请填写街道地址，最少5个字，最多不能超过60个字，不能全部为数字</span>
+				</div>
+				<div class="formfield">
+					<label for="person"><em>*</em> 收货人姓名：</label>
+					<input type="text" name="person" id="person" size="20" maxlength="10" />
+					<span class="input-tips"><s></s>请正确填写姓名，最少不能低于2个字，最多不能超过15个字</span>
+				</div>
+				<div class="formfield">
+					<label for="mobile">手机号码：</label>
+					<input type="text" name="mobile" id="mobile" size="20" maxlength="11" />
+					<span class="input-tips" style="display: inline-block;"><s></s>手机号码和固定电话最少填写一项</span>
+				</div>
+				<div class="formfield">
+					<label for="tel">固定电话：</label>
+					<input type="text" name="tel" id="tel" size="20" maxlength="20" />
+					<span class="input-tips"><s></s>手机号码和固定电话最少填写一项</span>
+				</div>
+			</div>
+			<h4>希望送货时间</h4>
+			<ul class="radlist">
+				<li{#if $deliveryType == 1 || $deliveryType == 0#} class="selected"{#/if#}>
+					<input type="radio" name="deliveryType" id="deliveryType_1" value="1"{#if $deliveryType == 1 || $deliveryType == 0#} checked{#/if#} />
+					<label for="deliveryType_1"><s></s>只工作日送货(双休日、假日不用送，写字楼/商用地址客户请选择)</label>
+				</li>
+				<li{#if $deliveryType == 2#} class="selected"{#/if#}>
+					<input type="radio" name="deliveryType" id="deliveryType_2" value="2"{#if $deliveryType == 2#} checked{#/if#} />
+					<label for="deliveryType_2"><s></s>只双休日、假日送货(工作日不用送)</label>
+				</li>
+				<li{#if $deliveryType == 3#} class="selected"{#/if#}>
+					<input type="radio" name="deliveryType" id="deliveryType_3" value="3"{#if $deliveryType == 3#} checked{#/if#} />
+					<label for="deliveryType_3"><s></s>学校地址/地址白天没人，请尽量安排其它时间送货 (特别安排可能会超出预计送货天数)</label>
+				</li>
+				<li{#if $deliveryType == 4#} class="selected"{#/if#}>
+					<input type="radio" name="deliveryType" id="deliveryType_4" value="4"{#if $deliveryType == 4#} checked{#/if#} />
+					<label for="deliveryType_4"><s></s>工作日、双休日与假日均可送货</label>
+				</li>
+			</ul>
+
+			<h4>配送说明<span>（快递公司由商家根据情况选择，请不要指定。其他要求会尽量协调）</span></h4>
+			<input type="text" class="comment" name="comment" size="70" value="{#$usernote#}" />
+		</div>
+		{#/if#}
+
+		<!-- 提交 -->
+		{#if $totalCount > 0#}
+		<div class="submit fn-clear">
+			{#if $userinfo#}
+			<div class="tips">
+				您的手机号
+				<span class="mob">{#$userinfo.phoneEncrypt#}</span><a href="{#getUrlPath service='member' type='user' template='security'#}" target="_blank">[修改]</a></div>
+			{#/if#}
+			<button type="button" class="subtn" id="submit">提交订单</button>
+		</div>
+		{#/if#}
+	</form>
+</div>
+
+{#include file="footer.html"#}
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v=4"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/editorder.js?v=4"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>外卖订单</title>
+{#$cssFile#}
+<script>
+var action = "{#$action#}", adminPath = "{#$adminPath#}",cityList={#json_encode($city)#};
+</script>
+<style>
+
+.pagination {display: block; text-align: right;}
+.pagination div {margin: 0;}
+.pagination .page_info {display: inline-block; line-height: 35px; margin-left: 15px;}
+.pagination ul>li.page_current span {background: #e8e8e8;}
+.chzn-container {vertical-align: middle;}
+.tab-content {overflow: visible;}
+
+table.table {border-collapse: collapse;border-spacing: 0;}
+.label-sm {height: auto;}
+td.center {text-align: center;}
+
+
+.peisongyuan-xing {
+    position: absolute;
+    top: 30px;
+    left: 130px;
+    margin: 0;
+}
+.shoplist-item-xingxing-bkg {
+    position: absolute;
+    z-index: 1;
+    left: 0;
+    top: 115px;
+    width: 75px;
+    background: url(/static/images/xingxing_small_row_black.png) no-repeat;
+    background-size: 76px 14px;
+}
+.shoplist-item-xingxing-front {
+    width: 76px;
+    height: 14px;
+    float:left;
+    background: url(/static/images/xingxing_small_row.png) no-repeat;
+    background-size: 76px 14px;
+}
+.shoplist-item-xingxing-score{
+    position:absolute;
+    left:81px;
+    top:-5px;
+    width: 30px;
+    display:inline;
+    color:red;
+}
+
+
+</style>
+</head>
+<body class="no-skin">
+<div class="main-content">
+    <div class="page-content">
+        <div class="page-content-area">
+            <div class="col-xs-12">
+                <form id="frmselect" method="get" action="" style="margin-bottom:0;">
+                    <label> 选择城市
+                    <div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}"></div>
+                    </label>
+                    <label> 选择配送员
+                        <select class="chosen-select courier_id" name="peisongid" id="form-field-select-1">
+                            <option value="0">全部配送员</option>
+                            {#foreach from=$courier item=c#}
+                            <option value="{#$c.id#}"{#if $c.id == $peisongid#} selected="selected"{#/if#}>{#$c.name#} </option>
+                            {#/foreach#}
+                        </select>
+                        <br />
+                    </label>
+                    {#if $peisongid#}
+                    <label style="position: relative; height: 30px;"><div style="position: absolute;z-index: 1;left: 87px;top: 0;width: 55px;height: 15px;">总体</div>
+                    <div style="position: absolute;z-index: 1;left: 230px;top: 0;width: 55px;height: 15px;">今日</div>
+                    </label> 
+                    <label style="position: relative; height: 30px;">
+                        <div style="position: absolute;z-index: 1;left:20px;top: 0;width: 45px;">外卖：</div> 
+                        <div class="peisongyuan-xing shoplist-item-xingxing-bkg"style="left:85px; top: 0;">
+                            <div class="shoplist-item-xingxing-front" style="width:{#$starperson / 5 * 100#}%;"></div>
+                            <div class="shoplist-item-xingxing-score">{#$starperson#}</div>
+                        </div>
+                        <div class="peisongyuan-xing shoplist-item-xingxing-bkg" style="left:230px; top: 0;">
+                            <div class="shoplist-item-xingxing-front" style="width:{#$starpersonToday / 5 * 100#}%;"></div>
+                            <div class="shoplist-item-xingxing-score">{#$starpersonToday#}</div>
+                        </div>
+                    </label>
+                    <label style="position: relative; height: 30px;">
+                        <div style="position: absolute;z-index: 1;left: 20px;top:0;width: 45px;height: 14px;">跑腿：</div>   
+                        <div class="peisongyuan-xing shoplist-item-xingxing-bkg"style="left:85px;top:0;">
+                            <div class="shoplist-item-xingxing-front" style="width:{#$paotui_starperson / 5 * 100#}%;"></div>
+                            <div class="shoplist-item-xingxing-score">{#$paotui_starperson#}</div>
+                        </div>
+                        <div class="peisongyuan-xing shoplist-item-xingxing-bkg" style="left:230px;top:0;">
+                            <div class="shoplist-item-xingxing-front" style="width:{#$paotui_starpersonToday / 5 * 100#}%;"></div>
+                            <div class="shoplist-item-xingxing-score">{#$paotui_starpersonToday#}</div>
+                        </div>
+                    </label>
+                    
+                    {#/if#}
+                    <label> 选择配送员打分
+                        <select class="chosen-select courier_score" name="starps" id="form-field-select-2">
+                            <option value="0" selected>全部分数</option>
+                            <option value="1"{#if $starps == 1#} selected="selected"{#/if#}>1</option>
+                            <option value="2"{#if $starps == 2#} selected="selected"{#/if#}>2</option>
+                            <option value="3"{#if $starps == 3#} selected="selected"{#/if#}>3</option>
+                            <option value="4"{#if $starps == 4#} selected="selected"{#/if#}>4</option>
+                            <option value="5"{#if $starps == 5#} selected="selected"{#/if#}>5</option>
+                         </select>
+                         <br />
+                    </label>
+                </form>
+                <div id="yw0" class="grid-view">
+                    <table class="table table-striped table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th id="yw0_c0">配送员</th>
+                                <th id="yw0_c0">顾客ID</th>
+                                <th id="yw0_c0">顾客姓名</th>
+                                <th id="yw0_c1">店铺/商品名称</th>
+                                <th id="yw0_c2">评论内容</th>
+                                <th id="yw0_c4">评论打分</th>
+                                <th id="yw0_c3">评论的时间</th>
+                                <th id="yw0_c5">订单ID</th>
+                                <th class="button-column" id="yw0_c6">类型</th></tr>
+                        </thead>
+                        <tbody>
+                            {#foreach $list as $key => $value#}
+                            <tr class="{#if $key%2 == 0#}odd{#else#}even{#/if#}" data-oid={#$value['oid']#} data-type="{#if $value['type'] == 0#}waimai{#else#}paotui{#/if#}">
+                                <td width="70">{#$value['name']#}</td>
+                                <td width="70">{#$value['uid']#}</td>
+                                <td width="70">{#$value['username']#}</td>
+                                <td width="140">{#$value['shopname']#}</td>
+                                <td>{#$value['contentps']#}</td>
+                                <td width="80">{#$value['starps']#}</td>
+                                <td width="150">{#$value['pubdate']|date_format: "%Y-%m-%d %H:%M:%S"#}</td>
+                                <td width="80">
+                                <a href="javascript:;" class="label label-sm label-success orderdetail" title="订单详情">{#$value['oid']#}</a>
+                                </td>
+                                <td width="40" class="center">{#if $value['type'] == '0'#}外卖{#else#}跑腿{#/if#}</td>
+                            </tr>
+                            {#/foreach#}
+                            {#if $list|@count == 0#}
+                            <tr>
+                                <td colspan="9" class="center">没有找到数据.</td>
+                            </tr>
+                            {#/if#}
+                        </tbody>
+                    </table>
+                    {#$pagelist#}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="disk"></div>
+{#$jsFile#}

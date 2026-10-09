@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 0;  //图集配置
+var imglist = {"list1": {#$imglist#},},
+	typeid = {#$typeid#}, addr = {#$addr#}, typeListArr = {#$typeListArr#}, addrListArr = {#$addrListArr#}, action = '{#$action#}', modelType = '{#$action#}',
+	cfg_term = "pc", adminPath = "{#$adminPath#}";
+var service = 'info';
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="typeid">信息分类：</label></dt>
+    <dd>
+      <span id="typeList">
+        <select name="typeid" id="typeid" class="input-large"></select>
+      </span>
+      <span class="input-tips"><s></s>请选择信息分类</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="title">信息标题：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="title" id="title" data-regex=".{1,60}" maxlength="60" value="{#$title#}" />
+      <div class="color_pick"><em style="background:{#$color#};"></em></div>
+      <span class="input-tips"><s></s>请输入信息标题，1-60个汉字</span>
+      <input type="hidden" name="color" id="color" value="{#$color#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="user">对应会员：</label></dt>
+    <dd style="position:static;">
+      <input class="input-medium" type="text" name="user" id="user" value="{#$username#}" autocomplete="off" />
+      <input type="hidden" name="userid" id="userid" value="{#$userid#}" />
+      <span class="input-tips"><s></s>请输入网站对应会员名</span>
+      <div id="userList" class="popup_key"></div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="addr">所属地区：</label></dt>
+    <dd>
+			<div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addr split=' '#}" data-id={#$addr#}>
+				{#if $addr != '' && $addr != "''"#}{#getPublicParentInfo tab='site_area' id=$addr type='typename' split='/'#}{#else#}请选择{#/if#}
+			</div>
+			<input type="hidden" name="addr" id="addr" value={#$addr#}>
+            <input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+	  <dt>价格开关：</dt>
+	  <dd class="radio">
+	    {#html_radios name="price_switch" values=$priceopt checked=$price_switch output=$pricenames separator="&nbsp;&nbsp;"#}
+	    <span class="input-tips" style="display:inline-block;"><s></s>如果关闭，前台价格不显示</span>
+	  </dd>
+  </dl>
+
+  <dl class="clearfix priceinfo {#if $price_switch==1#}hide{#/if#}">
+    <dt><label>价格：</label></dt>
+    <dd>
+        <div class="input-prepend input-append">
+            <input class="input-mini" type="number" name="price" id="price" value="{#$price#}" data-regex="0|\d*\.?\d+">
+            <span class="add-on">元</span>
+            <span class="input-tips" style="display:inline-block;"><s></s>数字类型(面议请填写0元)</span>
+        </div>
+    </dd>
+</dl>
+
+    <dl class="clearfix priceinfo {#if $price_switch==1#}hide{#/if#}">
+        <dt><label>运费：</label></dt>
+        <dd>
+            <div class="input-prepend input-append">
+                <input class="input-mini" type="number" name="yunfei" id="price" value="{#$yunfei#}" min="0" data-regex="0|\d*\.?\d+">
+                <span class="add-on">元</span>
+                <span class="input-tips" style="display:inline-block;"><s></s>数字类型(若无则填写0元)</span>
+            </div>
+        </dd>
+    </dl>
+  <div id="itemList" class="hide" style="background:#f5f5f5; padding:5px 0;">{#$itemList#}</div>
+  <dl class="clearfix">
+    <dt>信息说明：</dt>
+    <dd>
+      <ul class="nav nav-tabs" style="margin-bottom:5px;">
+        <li class="active"><a href="#pc">电脑端</a></li>
+        <li><a href="#mobile">移动端</a></li>
+      </ul>
+      <div id="pc">
+      	<script id="body" name="body" type="text/plain" style="width:85%;height:500px">{#$body#}</script>
+      </div>
+      <div id="mobile" class="hide">
+      	<script id="mbody" name="mbody" type="text/plain" style="width:960px;height:500px">{#$mbody#}</script>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="person">联系人：</label></dt>
+    <dd>
+      <input class="input-medium" type="text" name="person" id="person" value="{#$person#}" />
+      <label for="tel">电话或手机：
+		  <select name="areaCode" id="areaCode">
+              <option value="">区号</option>
+              {#foreach from=$internationalPhoneCode item=p#}
+              <option value="{#$p.code#}"{#if $areaCode == $p.code#} selected{#/if#}>{#$p.name#}&nbsp;&nbsp;+{#$p.code#}</option>
+              {#/foreach#}
+          </select>
+        <input class="input-medium" type="text" name="tel" id="tel" value="{#$tel#}" />
+      </label>
+      <label for="qq">QQ/MSN：
+        <input class="input-medium" type="text" name="qq" id="qq" value="{#$qq#}" />
+      </label>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="click">浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="number" name="click" min="0" id="click" data-regex="[1-9]\d*" value="{#$click#}" /></span>
+      <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+      <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="valid">有效期：</label></dt>
+    <dd class="radio">
+      <input type="text" class="input-medium" id="valid" name="valid" value="{#$valid#}" />
+      <label for="arcrank">信息状态：
+        <select name="arcrank" id="arcrank" class="input-medium">
+          {#html_options options=$arcrankList selected=$arcrank#}
+        </select>
+      </label>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>上传图片：</dt>
+		<dd class="listImgBox hide">
+			<div class="list-holder">
+				<ul id="listSection2" class="clearfix listSection"></ul>
+				<input type="hidden" name="imglist" value='{#$imglist#}' class="imglist-hidden">
+			</div>
+			<div class="btn-section clearfix">
+				<div class="uploadinp filePicker" id="filePicker2" data-type="desc" data-count="999" data-size="{#$atlasSize#}" data-imglist="list1"><div id="flasHolder"></div><span>添加图片</span></div>
+				<div class="upload-tip">
+					<p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+				</div>
+			</div>
+		</dd>
+  </dl>
+
+  <dl class="clearfix" id="type0">
+    <dt>上传视频：</dt>
+    <dd>
+		<input name="video" type="hidden" id="video" value="{#$video#}" />
+		<div class="spic{#if $video == ""#} hide{#/if#}">
+			<div class="sholder" id="videoPreview">
+				 <a href="/include/videoPreview.php?f=" data-id="{#$video#}">预览视频</a>
+			</div>
+			<a href="javascript:;" class="reupload">重新上传</a>
+		</div>
+		<iframe src ="/include/upfile.inc.php?mod={#$action#}&type=video&obj=video&filetype=video" style="width:100%; height:25px;{#if $video != ""#} display: none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label>其它设置：</label></dt>
+    <dd class="radio">
+      <label><input type="checkbox" name="rec" value="1"{#if $rec == 1#} checked{#/if#} />推荐</label>
+      <label><input type="checkbox" name="fire" value="1"{#if $fire == 1#} checked{#/if#} />火急</label>
+      <!-- <label><input type="checkbox" name="top" value="1"{#if $top == 1#} checked{#/if#} />置顶</label> -->
+    </dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+</form>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

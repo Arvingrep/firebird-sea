@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no">
+    <title>投票详情</title>
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}">
+   <script src="{#$cfg_staticPath#}js/ui/html2canvas.js?v={#$cfg_staticVersion#}"></script>
+   <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+   <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+
+    <script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$vote_channelDomain#}', staticPath = cfg_staticPath = '{#$cfg_staticPath#}';
+    var hideFileUrl = {#$cfg_hideUrl#};
+    var cookiePre = '{#$cfg_cookiePre#}';
+
+    var detail = {
+        'id' : {#$detail_id#},
+        'title' : '{#$detail_title#}',
+        'state' : {#$detail_state#},
+        'has_vote' : {#$detail_has_vote#}
+    };
+	var touch_poster = 1;
+	var JubaoConfig = {
+			"module" : 'vote',
+			"action" : 'detail',
+			"id" : '{#$detail_id#}'
+		};
+    </script>
+</head>
+<style>
+	.html2Con .center{background: none; padding-bottom: 0;}
+	.html2Con .center .vdetail p {padding-bottom: 0;}
+</style>
+<body>
+    <!-- <div class="mian"> -->
+        {#$pageTitle = '投票详情'#}
+        {#include file="../../../siteConfig/touch_top.html"#}
+
+		<!-- 海报s -->
+		{#include file="../../../siteConfig/public_touch_poster.html" posterModule='voteDetail'#}
+		{#include file="../../../siteConfig/touch_poster_3.7.html" posterType="voteModule"#}
+		<!-- 海报 -->
+
+        <div class="banner"><img src="{#$detail_litpic#}"></div>
+        <div class="center">
+            <h2 class="title">{#$detail_title#}</h2>
+            <div class="top_count">
+                <div><h4>{#$detail_optionCount#}</h4><p>投票项</p></div>
+                <div><h4>{#$detail_join#}</h4><p>累计票数</p></div>
+                <div><h4>{#$detail_click#}</h4><p>访问量</p></div>
+            </div>
+            <div class="state" id="state">{#if $detail_state==2#}投票已结束{#elseif $detail_state==1#}投票进行中{#/if#}</div>
+
+
+
+            {#*投票前*#}
+            {#if !$detail_has_vote#}
+            <div class="vdetail">
+                <div class="voting">
+                    <h4 class="title"><span class="xh"></span>投票详情</h4>
+                    <p>{#$detail_description#}</p>
+                </div>
+            </div>
+            <div class="container vote_before">
+                <div class="groupList" id="groupList">
+
+                    {#foreach from=$detail_body key=k item=q_cfg#}
+                    {#$xuan_count = 0#}
+
+                    {#if !$q_cfg.s_dire#}
+                    <div class="item item_one" data-type="{#if $q_cfg.q_type#}1{#else#}0{#/if#}" alt="{#$q_cfg.s_dire#}">
+                        <div class="result">
+                            <div class="title">
+                                <span class="px">{#$k+1#}</span>
+                                <span class="tit">{#$q_cfg.title#}</span>
+                            </div>
+                            <div class="body fn-clear">
+                                <div class="xuan_row fn-clear">
+                                    {#foreach from=$q_cfg.xuan key=x_k item=x_cfg#}
+                                    <div class="xuan" data-index="{#$x_k#}">
+                                        <div class="txt">
+                                            <span class="count">{#if $q_cfg.s_count#}{#$x_cfg.count#}票 {#/if#}{#if $q_cfg.s_ratio#}({#$x_cfg.ratio#}){#/if#}</span>
+                                            <label class="choose" title="{#$x_cfg.txt#}">
+                                                <i class="icon icon_{#if $q_cfg.q_type#}check{#else#}radio{#/if#}"></i>
+                                                {#$x_cfg.txt#}
+                                            </label>
+                                        </div>
+                                        <div class="pic">
+                                            {#if $x_cfg.imgturl#}<div class="pic_box"><img src="{#$x_cfg.imgturl#}" alt=""></div>{#/if#}
+                                        </div>
+                                    </div>
+                                    {#$xuan_count = $xuan_count + 1#}
+
+                                    {#if $q_cfg.s_dire && (($x_k+1) % $q_cfg.s_dire) == 0#}
+                                    </div>
+                                    <div class="xuan_row fn-clear">
+                                    {#/if#}
+
+                                    {#/foreach#}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {#else#}
+                    <div class="item item_columns" data-type="{#if $q_cfg.q_type#}1{#else#}0{#/if#}" alt="{#$q_cfg.s_dire#}">
+                        <div class="result">
+                            <div class="title">
+                                <span class="px">{#$k+1#}</span>
+                                <span class="tit">{#$q_cfg.title#}</span>
+                            </div>
+                            <div class="body fn-clear">
+                                <div class="xuan_row fn-clear">
+                                    {#foreach from=$q_cfg.xuan key=x_k item=x_cfg#}
+                                    <div class="xuan" data-index="{#$x_k#}">
+                                        {#if $x_cfg.imgturl#}<div class="pic"><img src="{#$x_cfg.imgturl#}"></div>{#/if#}
+                                        <div class="txt">
+                                            <label class="choose_title" title="{#$x_cfg.txt#}">{#$x_cfg.txt#}</label>
+                                            <span class="count">{#if $q_cfg.s_count#}{#$x_cfg.count#}票 {#/if#}{#if $q_cfg.s_ratio#}({#$x_cfg.ratio#}){#/if#}</span>
+                                            <div class="choose"><div class="icon_btn"></div></div>
+                                        </div>
+
+                                    </div>
+
+                                    {#/foreach#}
+
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                    {#/if#}
+
+                    {#/foreach#}
+
+
+
+
+                </div>
+
+                <!-- <div class="load"><i class="iloadmore"></i><span>加载中</span></div> -->
+                <div class="sub"></div>
+                <div class="submit">
+                    <div href="javascript:;" class="btnsubmit">提交投票</div>
+                </div>
+
+                <!-- <div class="ratio_dalog"><div>当前投票项目<br>您只能投一票</div></div> -->
+
+                <div class="dalog"><div>
+                    <div class="msg">确定要提交选票吗</div>
+                    <div class="btns"><span class="cancel">否</span><span class="sure">是</span></div>
+                </div></div>
+            </div>
+
+
+
+            {#*投票后*#}
+            {#else#}
+            <div class="container vote_after">
+                <div class="groupList" id="groupList">
+                    {#foreach from=$detail_body key=k item=q_cfg#}
+                    {#$xuan_count = 0#}
+                    <div class="item" data-type="{#if $q_cfg.q_type#}1{#else#}0{#/if#}">
+                        <div class="result">
+                            <div class="title">
+                                <span class="px">{#$k+1#}</span>
+                                <span class="tit">{#$q_cfg.title#}</span>
+                            </div>
+                            <div class="body fn-clear">
+                                {#foreach from=$q_cfg.xuan key=x_k item=x_cfg#}
+                                <div class="xuan fn-clear">
+                                    <div class="txt">
+                                        <label for class="choose{#if $x_cfg.active#} active{#/if#}" title="{#$x_cfg.txt#}">
+                                            <i class="icon icon_{#if $q_cfg.q_type#}check{#else#}radio{#/if#}"></i>
+                                            {#$x_cfg.txt#}
+                                        </label>
+                                        <div class="pic">
+                                        {#if $x_cfg.imgturl#}<div class="pic_box"><img src="{#$x_cfg.imgturl#}"></div>{#/if#}
+                                        </div>
+                                        <div class="tj fn-clear">
+                                            <div class="progress"><b style="width:{#$x_cfg.ratio#}"></b></div>
+                                            <div class="count">{#$x_cfg.count#}票 ({#$x_cfg.ratio#})</div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                                {#/foreach#}
+
+                            </div>
+                        </div>
+                    </div>
+                    {#/foreach#}
+
+                </div>
+            </div>
+            {#/if#}
+
+            <div class="gotop"><a href="#top"><i class="gotop_icon"></i></a></div>
+
+        </div>
+    <!-- </div> -->
+
+<!--大图查看s-->
+	{#include file="../../../siteConfig/bigimg_1.2.html"#}
+<!--大图查看e-->
+<script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '{#$vote_description#}',
+        "title": '{#$detail_title#}',
+        "imgUrl": '{#$detail_litpic#}',
+        "link": '{#getUrlPath service='vote' template='detail' id={#$detail_id#}#}',
+    };
+
+    document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

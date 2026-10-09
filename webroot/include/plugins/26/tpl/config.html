@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <meta charset="UTF-8">
+    <title>AI助手</title>
+    <link rel='stylesheet' type='text/css' href='/static/css/admin/common.css?v={#$cfg_staticVersion#}' />
+    <link rel='stylesheet' type='text/css' href='/static/css/admin/bootstrap.css?v={#$cfg_staticVersion#}' />
+    <link rel='stylesheet' type='text/css' href='/static/css/admin/daterangepicker.css?v={#$cfg_staticVersion#}' />
+    <link rel='stylesheet' type='text/css' href='/static/css/ui/jquery.chosen.css?v={#$cfg_staticVersion#}'/>
+    <script src="/static/js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+    <style media="screen">
+        body {padding: 10px;}
+        .bs-docs-example {position: relative; margin: 15px 20px; padding: 30px 19px 30px; *padding-top: 19px; background-color: #fff; border: 1px solid #ddd; -webkit-border-radius: 4px; -moz-border-radius: 4px; border-radius: 4px;}
+        /* .bs-docs-example:after {content: "配置选项"; position: absolute; top: -1px; left: -1px; padding: 3px 7px; font-size: 12px; font-weight: bold; background-color: #f5f5f5; border: 1px solid #ddd; color: #9da0a4; -webkit-border-radius: 4px 0 4px 0; -moz-border-radius: 4px 0 4px 0; border-radius: 4px 0 4px 0;} */
+        .controls label {display: inline-block; margin: 5px 0 0;}
+        .help-inline {color: #999; margin-left: 10px; padding: 0; font-size: 12px;}
+        .chzn-container {margin-right: 0;}
+        .chzn-container {width: 284px!important;}
+        
+        #save {margin: 10px 0 20px;}
+
+        .config-field .input-prepend {margin-bottom: 5px!important;}
+        .config-field .input-prepend .add-on {width: 110px; text-align: left!important; vertical-align: top !important;}
+
+        .control-group .select-radio {margin-right: 30px;}
+        /* .dataShow.bs-docs-example:after {content: '数据统计';} */
+        .right_header{display: flex; align-items: center; justify-content: space-between;}
+        .right_header h3 {   font-size: 18px; color: #141433; font-weight: bold;}
+        .time-box {display: flex; justify-content: space-between; align-items: center;}
+        .time-chose {display: flex; justify-content: space-between; align-items: center;border:solid 1px #DAE3ED; border-left: 0; border-radius: 4px; overflow: hidden;}
+        .time-chose span {cursor: pointer; padding: 0 10px; display: inline-block; color: #9D9FA6; font-size: 14px; line-height: 30px; text-align: center; border-left: 1px solid #DAE3ED;}
+        .time-chose span em {font-style: normal;}
+        .time-chose span.self-define i {display: inline-block; width: 17px; height: 17px; background: url('/static/images/admin/date_chose.png') no-repeat center; background-size: cover; vertical-align: middle; margin-left: 3px;}
+        .time-chose span.curr {box-shadow: 0px 2px 5px 0px inset rgba(82,88,102,0.2);}
+        .chartBox{height: 500px;}
+        .form-horizontal{margin-left: 50px;}
+        body{padding: 10px; box-sizing: border-box; height: 100vh;}
+    </style>
+</head>
+<body>
+    {#$now = $smarty.now#}
+<div class="page">
+    <div class="btn-group config-nav">
+        <button type="button" class="btn active" data-id="1">数据统计</button>
+        <button type="button" class="btn link" data-url="count.php?adminRoute={#$adminRoute#}" >请求记录</button>
+        <button type="button" class="btn" data-id="2">配置选项</button>
+    </div>
+</div>
+<div class="dataShow bs-docs-example form-horizontal" data-id="1">
+    <div class="right_header">
+        <h3>token使用情况与请求次数</h3>
+        <div class="time-box">
+            <div id="time-chose" class="time-chose">
+                <div class="time-box">
+                    <div id="platform-time-chose" class="time-chose">
+                        <span class="week curr" data-start="{#($now - (86400 * 7))|date_format:"%Y-%m-%d"#}">周</span>
+                        <span class="month" data-start="{#($now - (86400 * 30))|date_format:"%Y-%m-%d"#}">月</span>
+                        <span class="year" data-start="{#($now - (86400 * 365))|date_format:"%Y-%m-%d"#}">年</span>
+                        <span class="self-define" id="reportrange2"><em class="time-in">时间</em><i class="self-chose"></i></span>
+                    </div>
+                </div>
+            </div>
+        </div>  
+    </div>
+    <div class="chartBox" id="areaChart">
+
+    </div>
+</div>
+<div class="bs-docs-example form-horizontal hide" data-id="2">
+
+    <form action="###" id="formObj">
+
+        <div class="control-group">
+            <label class="control-label">开启插件：</label>
+            <div class="controls">
+                {#foreach from=$openPluginOptions item=l key=key#}
+                <label class="select-radio"><input type="radio" name="openPlugin" value="{#$key#}" {#if $key == $openPlugin#} checked{#/if#}> {#$l#}</label>
+                {#/foreach#}
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">AI平台：</label>
+            <div class="controls">
+                {#foreach from=$aiPlatformOptions item=l key=key#}
+                <label class="select-radio"><input type="radio" name="aiPlatform" value="{#$key#}" {#if $key == $aiPlatform#} checked{#/if#}> {#$l#}<a style="margin-left: 6px; font-size: 12px;  text-decoration: underline;" href="{#if $key == 1#}https://help.kumanyun.com/help-209-1189.html{#else#}https://help.kumanyun.com/help-209-1188.html{#/if#}" target="_blank">教程</a></label>
+                {#/foreach#}
+            </div>
+        </div>
+        <div class="control-group">
+            <label class="control-label">输出方式：</label>
+            <div class="controls">
+                {#foreach from=$outputMethodOptions item=l key=key#}
+                <label class="select-radio"><input type="radio" name="outputMethod" value="{#$key#}" {#if $key == $outputMethod#} checked{#/if#}> {#$l#}</label>
+                {#/foreach#}
+            </div>
+        </div>
+        <div class="control-group">
+            <label class="control-label"><font color="#f00">*</font> 模型：</label>
+            <div class="controls">
+                <input type="text" class="input-xlarge" name="model" placeholder="请输入调用模型的model" value="{#$model#}">
+            </div>
+        </div>
+
+       
+
+        <div class="control-group">
+            <label class="control-label"><font color="#f00">*</font> API_KEY：</label>
+            <div class="controls">
+                <input type="text" class="input-xxlarge" name="apiKey" placeholder="请输入调用模型的API_KEY" value="{#$apiKey#}">
+                <span style="font-size: 12px; color: #f00; margin-left: 10px;">注意：如果发现API Key被盗用，请及时删除并创建新的API Key！</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label"><font color="#f00">*</font> 应用模块：</label>
+            <div class="controls">
+                <!-- <input type="text" class="input-xlarge" name="modules" placeholder="请输入要应用的模块标识，多个模块用,分开" value="{#$modules#}">
+                <span class="help-inline" style="display: block; margin-left: 0;">请输入要应用的模块标识，多个模块用,分开</span> -->
+                {#if in_array("info", $installModuleArr)#}<label style="width: 100px; margin-right: 10px;"><input type="checkbox" name="modules[]" value="info" {#if in_array("info", $modules)#}checked="true"{#/if#}>{#getModuleTitle name='info'#}</label>{#/if#}
+                {#if in_array("job", $installModuleArr)#}<label style="width: 100px; margin-right: 10px;"><input type="checkbox" name="modules[]" value="job" {#if in_array("job", $modules)#}checked="true"{#/if#}>{#getModuleTitle name='job'#}</label>{#/if#}
+            </div>
+        </div>
+        <div class="control-group">
+            <label class="control-label"><font color="#f00"></font> 使用限制：</label>
+            <div class="controls">
+                {#foreach from=$useLimitOptions item=l key=key#}
+                <label style="width: 100px; margin-right: 10px;"><input type="radio" name="useLimit" value="{#$key#}" {#if $key == $useLimit#} checked{#/if#}>{#$l#}</label>
+                {#/foreach#}
+                <!-- <label style="width: 100px; margin-right: 10px;"><input type="checkbox" name="limit[]" value="0" >所有人</label>
+                <label style="width: 100px; margin-right: 10px;"><input type="checkbox" name="limit[]" value="1" >仅VIP会员</label> -->
+            </div>
+        </div>
+        <!-- {#var_dump($installModuleArr)#} -->
+        <div class="controls">
+            <button type="button" id="save" class="btn btn-success">保存配置</button>
+        </div>
+    </form>
+
+</div>
+
+
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='/static/js/ui/jquery.dialog-4.2.0.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='/static/js/ui/jquery.dragsort-0.5.1.min.js?v=1725262390'></script>
+<script type='text/javascript' src='/static/js/admin/common.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='/static/js/admin/moment.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='/static/js/admin/daterangepicker.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='/static/js/ui/echarts/echart.5.5.0.js?v={#$cfg_staticVersion#}'></script>
+<script type='text/javascript' src='/static/js/ui/chosen.jquery.min.js?v={#$cfg_staticVersion#}'></script>
+
+
+<script>
+    var pageId = '{#$smarty.get.id#}'
+    var startTime = '{#($now - 604800)|date_format:"%Y-%m-%d"#}';
+    var endTime = '{#$smarty.now|date_format:"%Y-%m-%d"#}';
+    var isload = false;
+    $(function () {
+          //选择自定义日期范围
+        var optionSet2 = {
+            "autoApply": true,
+            "opens": 'left',
+            "linkedCalendars": false
+        };
+        $('#reportrange2').daterangepicker(optionSet2, function(start, end) {
+            $('.platform-income-popup .time-chose span').removeClass('curr');
+            $('.platform-income-popup .time-chose .self-define').addClass('curr');
+            startTime = start.format('YYYY-MM-DD');
+            endTime = end.format('YYYY-MM-DD');
+            getData()
+            $("#reportrange2").addClass('curr');
+            // getPlatformRevenue('start=' + start.format('YYYY-MM-DD') + '&end=' + end.format('YYYY-MM-DD'));
+        });
+        $('.time-chose span').click(function(){
+            if(!$(this).hasClass('self-define')){
+
+                $(this).addClass('curr').siblings().removeClass('curr');
+                startTime = $(this).attr('data-start');
+                endTime = '{#$smarty.now|date_format:"%Y-%m-%d"#}';
+                getData()
+            }else{
+                $(this).siblings().removeClass('curr');
+            }
+        })
+        //保存配置
+        $("#save").click(function () {
+            if(isload) return false;
+            isload = true;
+            $.ajax({
+                url: '?action=save',
+                data: $('#formObj').serialize(),
+                type: "POST",
+                dataType: "json",
+                success: function (data) {
+                    isload = false;
+                    if(data && data.state == 100){
+                        $.dialog({
+                            title: '提示信息',
+                            icon: 'success.png',
+                            content: '保存成功',
+                            ok: true
+                        });
+                    }else{
+                        $.dialog.alert(data.info);
+                    }
+                },
+                error: function(){
+                    isload = false
+                    $.dialog.alert('网络错误，请稍候重试！')//网络错误，请稍候重试！
+                }
+            });
+        });
+
+        if(pageId != 2){
+            getData()
+        }
+        function getData(){
+            $.ajax({
+                url: 'count.php?action=historyCount',
+                data:{
+                    startTime,
+                    endTime
+                },
+                type: "POST",
+                dataType: "json",
+                success: function (data) {
+                    if(data && data.state == 100){
+                        drawStatics(data.list)
+                    }else{
+                        $.dialog.alert(data.info);
+                    }
+                },
+                error: function(){
+                    $.dialog.alert('网络错误，请稍候重试！')//网络错误，请稍候重试！
+                }
+            });
+        }
+
+        // 画统计图
+        function drawStatics(data) {
+            var chartDom = document.getElementById('areaChart');
+            var areaChart = echarts.init(chartDom); 
+            let xAxisData = data.map(item => item.date);
+            let seriesData = data.map(item => {
+                return {
+                    tokens: item.tokens,
+                    num: item.num,
+                    promptTokens:item.promptTokens,
+                    completionTokens:item.completionTokens
+                }
+            });
+
+            let tokensObj = {
+                name:'花费tokens',
+                type:'line',
+                smooth: true,
+                // stack: 'Total',
+                connectNulls:true,
+                lineStyle: {width: 3, color: '#4CCDFC'},
+                symbol: 'circle',
+                itemStyle: {
+                    color: '#4CCDFC',
+                    borderWidth: 3,
+                    borderColor: '#fff',
+                    borderType: 'solid'
+                },
+                yAxisIndex:1,
+                symbolSize: 10,
+				showSymbol: false,
+                areaStyle: {
+                    opacity: 1,
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        {
+                            offset: 0,
+                            color: 'rgb(63, 221, 252, .06)'
+                        },
+                        {
+                            offset: 1,
+                            color: 'rgba(63, 221, 252, 0)'
+                        }
+                    ])
+                },
+                clip:false,
+                data: []
+            },
+             tokensObjOut = {
+                name:'输出tokens',
+                type:'line',
+                smooth: true,
+                // stack: 'Total',
+                connectNulls:true,
+                lineStyle: {width: 3, color: '#8063FF'},
+                symbol: 'circle',
+                itemStyle: {
+                    color: '#8063FF',
+                    borderWidth: 3,
+                    borderColor: '#fff',
+                    borderType: 'solid'
+                },
+                yAxisIndex:1,
+                symbolSize: 10,
+				showSymbol: false,
+                areaStyle: {
+                    opacity: 1,
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        {
+                            offset: 0,
+                            color: 'rgb(128, 99, 255, .06)'
+                        },
+                        {
+                            offset: 1,
+                            color: 'rgba(128, 99, 255, 0)'
+                        }
+                    ])
+                },
+                clip:false,
+                data: []
+            },
+             tokensObjIn = {
+                name:'输入tokens',
+                type:'line',
+                smooth: true,
+                // stack: 'Total',
+                connectNulls:true,
+                lineStyle: {width: 3, color: '#26D49B'},
+                symbol: 'circle',
+                itemStyle: {
+                    color: '#26D49B',
+                    borderWidth: 3,
+                    borderColor: '#fff',
+                    borderType: 'solid'
+                },
+                yAxisIndex:1,
+                symbolSize: 10,
+				showSymbol: false,
+                areaStyle: {
+                    opacity: 1,
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        {
+                            offset: 0,
+                            color: 'rgba(38, 212, 155, .06)'
+                        },
+                        {
+                            offset: 1,
+                            color: 'rgba(38, 212, 155, 0)'
+                        }
+                    ])
+                },
+                clip:false,
+                data: []
+            },
+            
+            numObj = {
+                name:'请求次数',
+                type:'line',
+                smooth: true,
+                // stack: 'Total',
+                clip:false,
+                connectNulls:true,
+                lineStyle: {width: 3, color: '#3377FF'},
+                symbol: 'circle',
+                itemStyle: {
+                    color: '#3377FF',
+                    borderWidth: 3,
+                    borderColor: '#fff',
+                    borderType: 'solid'
+                },
+                yAxisIndex:0,
+                symbolSize: 10,
+				showSymbol: false,
+                areaStyle: {
+                    opacity: 1,
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        {
+                            offset: 0,
+                            color: 'rgb(51, 119, 255,.06)'
+                        },
+                        {
+                            offset: 1,
+                            color: 'rgba(51, 119, 255, 0)'
+                        }
+                        
+                    ])
+                },
+                data:[]
+            }
+            for(let i = 0; i < seriesData.length; i++){
+                let data = seriesData[i]
+                tokensObjIn.data.push(data['promptTokens'])
+                tokensObjOut.data.push(data['completionTokens'])
+                tokensObj.data.push(data['tokens'])
+                numObj.data.push(data['num'])
+            }
+            option = {
+                // color: [ '#3377FF','#4CCDFC'],
+                legend: {
+                    data: ['请求次数', '花费tokens', '输入tokens', '输出tokens'],
+                    bottom:0,
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                        type: 'cross',
+                        label: {
+                            backgroundColor: '#6a7985'
+                        }
+                    },
+                    
+                    // formatter : function (params,ticket, callback) {
+                    //     // console.log(params,ticket,callback)
+                    //     // var htmlEle = '',htmlEle_tokens = '',htmlEle_num = '';
+                    //     // params.forEach(function(val,index){
+                    //     //     if(val.seriesName == 'num'){
+                    //     //         htmlEle_num = '<span class="num" style="color:#404A80;">（请求 '+ val.value  + '次）</span>'
+                    //     //     }else if(val.seriesName == 'tokens'){
+                    //     //         htmlEle_tokens = '<span class="token" style="color:#8A8C99;"> 花费tokens'+ val.value +'次</span>'
+                    //     //     }else if(val.seriesName == 'tokensIn'){
+                    //     //         htmlEle_tokens = htmlEle_tokens + '<span class="token" style="color:#8A8C99;"> 输入tokens'+ val.value +'次</span>'
+                    //     //     }else{
+                    //     //         htmlEle_tokens = htmlEle_tokens + '<span class="token" style="color:#8A8C99;"> 输出tokens'+ val.value +'次</span>'
+
+                    //     //     }
+                            
+                    //     // })
+                    //     // htmlEle = '<p style="font-size:14px;">'+ htmlEle_tokens + htmlEle_num +'</p>'
+                    //     // return htmlEle;
+                    // },
+                },
+                title:{
+                    show: true,
+                    text:startTime.replace(/-/g,'/') + ' - ' + endTime.replace(/-/g,'/') + ' AI助手使用统计',
+                    textStyle:{
+                        fontWeight:'normal',
+                        color:'#5C5E66',
+                        fontSize:15,
+                        textAlign:'center',
+                    },
+                    left:'center',
+                    top:20
+                },
+                
+                grid: {
+                    left: 20,
+                    right: 40,
+                    bottom: '10%',
+                    containLabel: true
+                },
+                xAxis: [
+                    {
+                        type: 'category',
+                        boundaryGap: true,
+                        axisTick: {show:false},
+                        axisLine: {show: false},
+                        axisLabel: {color: '#4A538E'},
+                        data: xAxisData,
+                        offset: 12,
+                        axisPointer: {
+                            type: 'shadow'
+                        },
+
+                        
+                    }
+                ],
+                yAxis: [
+                    {
+
+                        nameGap:25,
+                        type: 'value',
+                        splitNumber:5,
+                        alignTicks:true,
+                        show:true,
+                        nameTextStyle:{
+                            align:'center'
+                        },
+                        axisPointer: {
+                            show: false
+                        },
+                        
+                        minInterval:1,
+                        show: true,
+                        position:'left',
+                        name: '请求次数（次）',
+                        max:() => {
+                            let maxVal_curr = numObj.data.length ? Math.max(...(numObj.data)) : 1;
+                            return ceilNumber(maxVal_curr)
+
+                        },
+                        min:0,
+                        splitLine:{
+                            lineStyle: {
+                                color: "#EAEFF6"
+                            }
+                        }
+                    },
+                    {
+                        alignTicks:true,
+                        type: 'value',
+                        show:true,
+                        nameGap:25, 
+                        splitNumber:5,
+                        minInterval:1,
+                        axisTick: {
+                            show:false,
+                        },
+                        axisPointer: {
+                            show: false
+                        },
+                        axisLine: {
+                            show: false,
+                            onZeroAxisIndex:1,
+                        },
+                        axisLabel:{
+                            formatter:function(val,ind){
+                                return parseFloat(val.toFixed(2))
+                            }
+                        },
+                        position:'right',
+                        // minInterval:1,
+                        name:'tokens(次)    ',
+                        min:0,
+                        max:() => {
+                            return ceilNumber(Math.max(...(tokensObj.data)))
+                        },
+                        splitLine:{
+                            show:false,
+                            lineStyle: {
+                                color: "#EAEFF6"
+                            }
+                        }
+                    },
+                    
+                ],
+                series: [numObj,tokensObj,tokensObjIn,tokensObjOut]
+            }
+            option && areaChart.setOption(option);
+        }
+
+        // 双坐标。 向上取整十，整百，整千，整万
+        function ceilNumber(number) {
+            let bite = 0
+            if (number < 10) {
+            return 10
+            }
+            while (number >= 10) {
+            number /= 10
+            bite += 1
+            }
+            return Math.ceil(number) * Math.pow(10, bite)
+        }
+
+    
+        $('.btn-group .btn').click(function(){
+            let id = $(this).attr('data-id')
+            if(id == 1 || id == 2){
+                if(pageId == 2 && id == 1 && $(".chartBox").html().trim() == ''){
+                    getData()
+                }
+                $(this).addClass('active').siblings().removeClass('active');
+                $(".bs-docs-example[data-id='"+id+"']").removeClass('hide').siblings('.bs-docs-example').addClass('hide');
+            }else{
+                location.href = $(this).attr('data-url')
+            }
+            
+        })
+
+        if(pageId){
+            $('.btn-group .btn[data-id="'+pageId+'"]').click();
+        }
+    });
+</script>
+</body>
+</html>

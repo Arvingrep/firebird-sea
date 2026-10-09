@@ -1,0 +1,411 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>{#$langData['siteConfig'][11][12]#} </title>	{#* 管理我发布的信息 *#}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage-info.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+  <script src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
+
+  <script src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+  var usermoney = {#$userinfo.money#};
+  var siteservice = 'siteConfig';
+  var ordertype = 'refreshTop';
+  var masterDomain = '{#$cfg_basehost#}';
+</script>
+</head>
+<body>
+{#$pageTitle = "{#$langData['info'][3][44]#}"#} {#* 信息管理  *#}
+{#include file="top.html"#}
+<div id="page">
+  <div class="loadIcon" v-show="loadIcon"></div>
+  <div class="tabs">
+    <a href="javascript:;" class="curr tab" data-type="1">{#$langData['info'][1][36]#}<span class="buble" v-cloak v-if="totalCount > 0">{{totalCount}}</span></a>{#* 全部  *#}
+    <a href="javascript:;" class="tab" data-type="2">{#$langData['info'][3][46]#}<span class="buble" v-cloak  v-if="extension > 0">{{extension}}</span></a>{#* 推广中  *#}
+    <a href="javascript:;" class="tab" data-type="3">{#$langData['info'][3][47]#}<span class="buble" v-cloak v-if="refuse > 0">{{refuse}}</span></a>{#* 审核拒绝  *#}
+    <s></s>
+  </div>
+  <div class="listBox">
+    <ul>
+      <li class="info_li" v-for="(info,index) in infoList" v-cloak>
+        <!-- 信息 -->
+        <a :href="info.url" class="infoCon fn-clear">
+          <div class="pic"><img :src="info.litpic" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+          <div class="dtail">
+            <h2>{{info.title}}</h2>
+            <p><span class="pbtime">{#$langData['info'][3][45]#}{{info.pubdate}}</span>
+              <span v-if="info.arcrank ==0" class="info_state">{#$langData['info'][3][48]#}</span>
+              <span v-if="info.arcrank ==1" class="info_state">{#$langData['info'][1][6]#} {{info.click}}</span>
+              <span v-if="info.arcrank ==2" class="info_state">{#$langData['info'][3][47]#}</span>
+            </p>
+            {#* 更新于  待审核 *#}
+          </div>
+        </a>
+
+        <!-- 刷新 -->
+        <div class="refreshTopBox" v-if="info.bid_type && info.bid_type == 'plan' || info.refreshSmart == 1">{#* 智能刷新 *#}
+          <div class="refresh" v-if="info.refreshSmart == 1" :data-time="info.refreshNext"><label for="">{#$langData['info'][3][51]#}</label><span>7:35:31  {#$langData['info'][3][49]|replace:' 0 ':'{{info.refreshCount-info.refreshSurplus}}'|replace:' 1 ':'{{info.refreshSurplus}}'#}</span></div>{#*  后刷新，已刷新 0 次，剩余 1 次  *#}
+          <div class="refresh" v-if="info.bid_type && info.bid_type == 'plan'" :data-time="info.bid_end"><label for="">{#$langData['info'][3][50]#}</label><span>{{info.bid_end}}{#$langData['info'][3][52]#}</span></div>{#* 计划置顶 结束 *#}
+        </div>
+
+
+        <!-- 操作按钮 -->
+        <div class="optBox fn-clear" v-if="info.isbid || info.refreshSmart">
+          <div class="btnLeft" @click="showEditPop(info.id)"></div>
+          <div class="btnRight">
+            <a href="javascript:;" class="extendInfo btnicon " @click="showExtend(info)">{#$langData['info'][3][53]#}</a> {#* 推广 *#}
+            <a href="javascript:;" class="refreshInfo btnicon btnbg" @click="oneFresh(info)">{#$langData['info'][3][54]#}</a> {#* 刷新 *#}
+          </div>
+        </div>
+        <div class="optBox fn-clear" v-else>
+          <div class="btnRight">
+            <a href="javascript:;" class="delInfo btnicon" @click="EditId = info.id">{#$langData['info'][3][55]#}</a>   {#* 删除 *#}
+            <a :href="'{#$member_userDomain#}/fabu-info.html?do=edit&id='+info.id" class="editInfo btnicon">{#$langData['info'][3][56]#}</a>   {#* 编辑 *#}
+            <a href="javascript:;" class="repub btnbg">{#$langData['info'][3][57]#}</a>   {#* 重新发布 *#}
+          </div>
+        </div>
+      </li>
+      {#* ==============
+      <li class="info_li">
+        <!-- 信息 -->
+        <a href="#" class="infoCon fn-clear">
+          <div class="pic"></div>
+          <div class="dtail">
+            <h2>暑期来学大，因材施教轻松学一夏。中小学网课线上线下课程，中学1V1满分冲刺</h2>
+            <p><span class="pbtime">更新于2020-05-05</span> <span class="info_state">待审核</span></p>
+          </div>
+        </a>
+        <!-- 刷新 -->
+        <div class="refreshTopBox">
+          <div class="refresh"><label for="">智能刷新</label><span>7:35:31后刷新，已刷新1次，剩余3次</span></div>
+          <div class="refresh"><label for="">计划置顶</label><span>7:35:31后刷新，已刷新1次，剩余3次</span></div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="optBox fn-clear">
+          <div class="btnLeft" @click="showEditPop(1)"></div>
+          <div class="btnRight">
+            <a href="javascript:;" class="extendInfo btnicon ">推广</a>
+            <a href="javascript:;" class="refreshInfo btnicon btnbg">刷新</a>
+          </div>
+        </div>
+      </li>
+      ============*#}
+    </ul>
+  </div>
+
+  <!-- 操作弹窗s  -->
+  <div class="optMask" @click="hideEditPop"></div>
+  <div class="optPop">
+    <ul>
+      <li v-if="EditId"><a :href="'{#$member_userDomain#}/fabu-info.html?do=edit&id='+EditId" class="editbtn" >{#$langData['info'][3][56]#}</a> </li>  {#* 编辑 *#}
+      <li v-else><a href="javascript:;" class="editbtn" >{#$langData['info'][3][56]#}</a> </li>  {#* 编辑 *#}
+      <li><a href="javascript:;" class="delbtn delInfo"  data-title="{#$langData['info'][3][58]#}" >{#$langData['info'][3][55]#}</a></li>{#* 该信息已开通付费推广，确定删除？ 删除 *#}
+    </ul>
+    <a href="javascript:;" class="cancelbtn" @click="hideEditPop">{#$langData['info'][2][42]#}</a>  {#* 取消 *#}
+  </div>
+
+  <!-- 推广弹窗 -->
+  <div class="exMask" @click="hideExtend"></div>
+  <div class="extendPop">
+    <div class="popBg"></div>
+    <div class="PopCon">
+
+      <h2>{#$langData['info'][3][59]#}<s @click="extendTipShow = !extendTipShow"></s></h2> {#* 信息推广神器 *#}
+      <p class="popTip" v-show="extendTipShow">{#$langData['info'][3][60]#}</p>{#* 多种推广方式自由选择，快速提升信息曝光量</br>花小钱办大事！ *#}
+      <ul>
+        {#if $custom_excitation#}
+        <li>
+          <a v-if="!hasSetjili" :href="'{#$member_userDomain#}/reward_fabu.html?id='+EditId" class="btn_jili">
+            <div class="hasSet" v-if="hasSetjili">{#$langData['info'][3][61]#}</div>  {#* 已设置 *#}
+            <s></s>
+            <div class="btnCon">
+              <h5>{#$langData['info'][3][62]#}</h5>  {#* 用户激励 *#}
+              <p>{#$langData['info'][3][63]#}</p>   {#* 设置红包以激发用户阅读/分享欲望 *#}
+            </div>
+          </a>
+          <a v-else href="javascript:;" class="btn_jili" @click="showjiliPop">
+            <div class="hasSet" v-if="hasSetjili">已设置</div>
+            <s></s>
+            <div class="btnCon">
+              <h5>{#$langData['info'][3][62]#}</h5> {#* 用户激励 *#}
+              <p>{#$langData['info'][3][63]#}</p> {#* 设置红包以激发用户阅读/分享欲望 *#}
+            </div>
+          </a>
+        </li>
+        {#/if#}
+        <li>
+          <a href="javascript:;" @click="showtoTopPop(EditId)" class="btn_toTop">
+            <div class="hasSet" v-if="hasSetTop">{#$langData['info'][3][61]#}</div>  {#* 已设置 *#}
+            <s></s>
+            <div class="btnCon">
+              <h5>{#$langData['info'][3][50]#}</h5>   {#* 用户激励 *#}
+              <p>{#$langData['info'][3][64]#}</p>   {#* 置顶展示，关注度大幅提升 *#}
+            </div>
+          </a>
+        </li>
+        <li>
+          <a href="javascript:;" class="btn_fresh" @click="showSmartFresh">
+            <s></s>
+            <!-- <div class="hasSet" v-if="hasSetjili">已设置</div> -->
+            <div class="btnCon">
+              <h5>{#$langData['info'][3][51]#}</h5>   {#* 智能刷新 *#}
+              <p>{#$langData['info'][3][65]#}</p>   {#* 定时自动刷新，稳定曝光率 *#}
+            </div>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+
+
+  <!-- 激励弹窗 -->
+  <div class="jlMask" @click="hidejiliPop"></div>
+  <div class="jiliPop">
+    <div class="jiliCon">
+      <h2>{#$langData['info'][3][62]#}</h2>    {#* 用户激励 *#}
+      <dl v-if="jiliData.hbData">
+        <dt>{#$langData['info'][3][66]#}</dt>   {#* 阅读红包 *#}
+        <dd>
+          <div class="hbDetail">
+            <div class="hbAmount">
+              <h3><span>{#echoCurrency type="symbol"#}</span><b>{{jiliData.hbData.hbLeftAmount}}</b></h3>
+              <p>{#$langData['info'][3][67]#}</p>   {#* 红包余额 *#}
+            </div>
+            <div class="hbNum">
+              <h3><b>{{jiliData.hbData.hbNum - jiliData.hbData.hbLeftNum}}</b></h3>
+              <p>{#$langData['info'][3][68]#}</p>   {#* 红包已领(个) *#}
+            </div>
+            <div class="hbLeft">
+              <h3><b>{{jiliData.hbData.hbLeftNum}}</b></h3>
+              <p>{#$langData['info'][3][69]#}</p>   {#* 红包剩余(个) *#}
+            </div>
+          </div>
+          <div class="hb_txt">
+            <span>{{jiliData.hbData.hbMessage}}</span>
+            <a href="javascript:;" class="change_txt">{#$langData['info'][3][70]#}</a>  {#* 修改口令 *#}
+          </div>
+        </dd>
+      </dl>
+      <dl v-if="jiliData.readData">
+        <dt>{#$langData['info'][3][71]#}</dt>  {#* 分享有奖 *#}
+        <dd>
+          <div class="hbDetail">
+            <div class="hbAmount">
+              <h3><span>{#echoCurrency type="symbol"#}</span><b>{{jiliData.readData.unit}}</b></h3>
+              <p>{#$langData['info'][3][72]#}</p>  {#* 奖励金额/次 *#}
+            </div>
+            <div class="hbNum">
+              <h3><b>{{jiliData.readData.shareNum}}</b></h3>
+              <p>{#$langData['info'][3][73]#}</p>  {#* 已分享(人) *#}
+            </div>
+            <div :class="['hbLeft',{'orange':jiliData.readData.readLeftNum<=5}]">
+              <h3><b>{{jiliData.readData.readLeftNum}}</b></h3>
+              <p>{#$langData['info'][3][74]#}</p>   {#* 奖励剩余(次) *#}
+            </div>
+          </div>
+        </dd>
+      </dl>
+
+      <div class="btnBox">
+        <p>{#$langData['info'][3][75]#}</p>  {#*  传播效果不错，红包剩余不多了哦  *#}
+        <a :href="'{#$member_userDomain#}/reward_fabu.html?id='+EditId" class="btn_add">{#$langData['info'][3][76]#}</a>
+         {#*  追加红包  *#}
+      </div>
+    </div>
+  </div>
+
+
+  <div class="topMask" @click="hidetoTopPop"></div>
+  <!-- 置顶弹窗 -->
+  <div class="toTopPop">
+    <div class="top_tabs">
+      <a href="javascript:;" :class="['toTop',{'chosed':topType==0}]">{#$langData['info'][1][44]#}</a>  {#* 立即置顶 *#}
+      <a href="javascript:;" :class="['topPlan',{'chosed':topType==1}]">{#$langData['info'][3][50]#}</a>  {#* 计划置顶 *#}
+    </div>
+    <div class="topCon">
+      <!-- 立即置顶 -->
+      <div :class="['toTop_now', {'fn-hide':topType != 0}]">
+          <ul>
+            <!-- 被选中的 chosed_top -->
+            <li v-for="item in topMustData" @click="choseTop(item.days)">
+              <div class="topTime">{{item.days}}天<span v-if="item.offer > 0">省{#echoCurrency type="symbol"#}{{item.offer}}</span></div>
+              <div class="topPrice">{#echoCurrency type="symbol"#}<b>{{item.countPrice}}</b></div>
+            </li>
+
+          </ul>
+          <div class="btnBox">
+            <p v-if="topDates">{#$langData['info'][3][77]|replace:"1":"{{topDates}}"#}</p>  {#* 已选择1置顶推广<span>流量飞升</span> *#}
+            <a href="javascript:;" class="btn_top" @click="mustTop">{#$langData['info'][3][50]#}</a>  {#* 立即置顶 *#}
+          </div>
+      </div>
+
+      <!-- 选择时间段  -->
+      <div :class="['top_timeInterval',{'fn-hide':topType != 1}] ">
+        <!-- 日期选择 -->
+        <div class="dateChose">
+           <h3><a href="javascript:;" class="btn_back" @click="showTimeChose"></a>{#$langData['info'][3][78]#}</h3>  {#* 选择时间段 *#}
+           <ul class="weeks">
+             <li>{#$langData['info'][3][79][0]#}</li> {#* 日 *#}
+             <li>{#$langData['info'][3][79][1]#}</li> {#* 一 *#}
+             <li>{#$langData['info'][3][79][2]#}</li> {#* 二 *#}
+             <li>{#$langData['info'][3][79][3]#}</li> {#* 三 *#}
+             <li>{#$langData['info'][3][79][4]#}</li> {#* 四 *#}
+             <li>{#$langData['info'][3][79][5]#}</li> {#* 五 *#}
+             <li>{#$langData['info'][3][79][6]#}</li> {#* 六 *#}
+           </ul>
+           <div class="dateArr">
+             <dl v-for="(calendar,ind) in calendarList">
+               <dt><span class="month_txt">{{calendar.month}}月</span><span class="year_txt">{{calendar.year}}</span></dt>
+               <dd>
+                 <ul class="fn-clear" :data-month="calendar.year+'/'+calendar.month">
+                   <li v-for="(day,ii) in calendar.weekdays" :style="endTime == 0?'border-radius:.32rem;':''" :data-time="countTime(day,calendar)"  :data-date="calendar.year+'/'+calendar.month+'/'+countDay(day,calendar)" :data-week="ii%7" :class="[
+                   {'noClick': countTime(day,calendar) < todayTime},
+                   {'currDay': countTime(day,calendar) == todayTime},
+                   {'chosed_start':countTime(day,calendar)==starTime && countDay(day,calendar) != ''},
+                   {'chosed_end':countTime(day,calendar) == endTime && countDay(day,calendar) != ''},
+                   {'includeTime':countTime(day,calendar) < endTime && countTime(day,calendar ) > starTime && countDay(day,calendar)!=''},
+                   {'borderRadiusL':ii%7==0 ||  countDay(day,calendar)==1},{'borderRadiusR':ii%7==6 }]" @click="choseTime(countTime(day,calendar))"><span>{{countDay(day,calendar)}}</span></li>
+                 </ul>
+               </dd>
+             </dl>
+           </div>
+           <div class="bottmTip fn-hide" >{#$langData['info'][3][80]#}</div>  {#* 请选择结束时间 *#}
+        </div>
+
+        <!-- 时间选择 -->
+        <div class="timeChose fn-hide">
+          <div class="h3"><label for="">{#$langData['info'][3][81]#}</label> <div class="timeinpbox" @click="hideTimechose"><span class="startTime">{{getDateText(starTime,1)}}</span>-<span class="EndTime">{{getDateText(endTime,1)}}</span></div></div>{#* 选择时间 *#}
+          <div class="weekTime">
+            <ul>
+
+              <li data-index="1">
+                <span>{#$langData['info'][3][82][1]#}</span>  {#* 周一 全天 早8点-晚8点*#}
+                <div class="timeTabBox"><span class="timetab onChose">{#$langData['info'][3][84]#}</span><span class="timetab">{#$langData['info'][3][83]#}</span></div>
+              </li>
+              <li data-index="2">
+                <span>{#$langData['info'][3][82][2]#}</span>  {#* 周二 全天 早8点-晚8点*#}
+                <div class="timeTabBox"><span class="timetab onChose">{#$langData['info'][3][84]#}</span><span class="timetab">{#$langData['info'][3][83]#}</span></div>
+              </li>
+              <li data-index="3">
+                <span>{#$langData['info'][3][82][3]#}</span>  {#* 周三 全天 早8点-晚8点*#}
+                <div class="timeTabBox"><span class="timetab onChose">{#$langData['info'][3][84]#}</span><span class="timetab">{#$langData['info'][3][83]#}</span></div>
+              </li>
+              <li data-index="4">
+                <span>{#$langData['info'][3][82][4]#}</span>  {#* 周四 全天 早8点-晚8点*#}
+                <div class="timeTabBox"><span class="timetab onChose">{#$langData['info'][3][84]#}</span><span class="timetab">{#$langData['info'][3][83]#}</span></div>
+              </li>
+              <li data-index="5">
+                <span>{#$langData['info'][3][82][5]#}</span>  {#* 周五全天 早8点-晚8点 *#}
+                <div class="timeTabBox"><span class="timetab onChose">{#$langData['info'][3][84]#}</span><span class="timetab">{#$langData['info'][3][83]#}</span></div>
+              </li>
+              <li data-index="6">
+                <span>{#$langData['info'][3][82][6]#}</span>  {#* 周六 全天 早8点-晚8点*#}
+                <div class="timeTabBox"><span class="timetab onChose">{#$langData['info'][3][84]#}</span><span class="timetab">{#$langData['info'][3][83]#}</span></div>
+              </li>
+              <li data-index="0">
+                <span>{#$langData['info'][3][82][0]#}</span>  {#* 周日 全天 早8点-晚8点*#}
+                <div class="timeTabBox"><span class="timetab onChose">{#$langData['info'][3][84]#}</span><span class="timetab">{#$langData['info'][3][83]#}</span></div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="btnBox">
+            <p>{#$langData['info'][3][85]#}<span>{#echoCurrency type="symbol"#}<b>{{topPlanAmount}}</b></span></p>{#*  预计花费  *#}
+            <a href="javascript:;" class="btn_top" @click="countTopAmount()">{#$langData['info'][1][44]#}</a>{#*  立即置顶  *#}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 智能刷新 -->
+  <div class="refreshMask" @click="hidefreshPop"></div>
+  <div class="refreshPop">
+      <div class="top_tit">
+         <h3>{#$langData['info'][1][42]#}</h3>  {#*  智能刷新  *#}
+         <p>{#$langData['info'][3][86]#}</p>  {#*  每6小时智能定时刷新，效果更明显！  *#}
+      </div>
+      <div class="topCon">
+        <div class="top_smart">
+          <ul>
+            <li v-for="item in smartFreshData" @click="choseFresh(item.days)">
+              <div class="topTime" v-if="item.days">
+                {{item.days}}{#$langData['info'][1][17]#} <em>{{item.fresh}}{#$langData['info'][1][43]#}</em>{#*  天  次  *#}
+                <span v-if="item.offer>0">{#$langData['info'][3][88]#}{#echoCurrency type="symbol"#}{{item.offer}}</span>{#*  省  *#}
+              </div>
+              <div class="topTime" v-else>{#$langData['info'][3][87]|replace:'1':'{{item.fresh}}'#}</div>{#*  或立即刷新  1次  *#}
+              <div class="topPrice">{#echoCurrency type="symbol"#}<b>{{item.countPrice}}</b></div>
+            </li>
+          </ul>
+          <div class="btnBox">
+            <p v-if="freshDates">{#$langData['info'][3][89]|replace:'1':'{{freshDates}}'#}</p>{#*  已选择<em class="freshdays">{{freshDates}}</em>天智能刷新套餐<span>稳定曝光</span>  *#}
+            <a href="javascript:;" class="btn_top publicpaybtn" @click="smartFresh">{#$langData['info'][0][15]#}</a>{#*  立即购买  *#}
+          </div>
+        </div>
+      </div>
+
+  </div>
+
+  <!-- 置顶计划展示 -->
+  <div class="plantopMask" @click="hidePlanPop"></div>
+  <div class="topPlanPop">
+    <div class="titleTop">{#$langData['info'][3][90]#}</div>  {#*  查看置顶计划  *#}
+    <div class="headBox">
+        <div class="topTit">
+          <a href="javascript:;" class="prevM" @click="getYearMonth('prev')"></a>
+          <span class="planMon" :data-year="currShowYear" :data-month="currShowMonth">{{currShowYearMonth}}</span>
+          <a href="javascript:;" class="nextM" @click="getYearMonth('next')"></a>
+        </div>
+        <ul class="weeks">
+          <li>{#$langData['info'][3][79][0]#}</li> {#* 日 *#}
+          <li>{#$langData['info'][3][79][1]#}</li> {#* 一 *#}
+          <li>{#$langData['info'][3][79][2]#}</li> {#* 二 *#}
+          <li>{#$langData['info'][3][79][3]#}</li> {#* 三 *#}
+          <li>{#$langData['info'][3][79][4]#}</li> {#* 四 *#}
+          <li>{#$langData['info'][3][79][5]#}</li> {#* 五 *#}
+          <li>{#$langData['info'][3][79][6]#}</li> {#* 六 *#}
+        </ul>
+    </div>
+    <div class="monthShow">
+      <ul class="fn-clear">
+        <li v-for="(day,ii) in currShowMonthData.weekdays" :class="{'endPlan':checkEndPlan(countDay(day,currShowMonthData))}">
+          <div class="txtBox" v-if="countDay(day,currShowMonthData)!=''">
+            <h4 class="day_txt">{{countDay(day,currShowMonthData)}}</h4>
+            <p :class="{'orage':checkPlan(countDay(day,currShowMonthData))!='-'}">{{checkPlan(countDay(day,currShowMonthData))}}</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="btnBox">
+      <p>{#$langData['info'][3][91]|replace:"1":"{{currTopData.endTop}}"#}</p>  {#* 温馨提示：计划置顶将于{{currTopData.endTop}}结束 *#}
+      <a href="javascript:;" class="hidebtn" @click="hidePlanPop">{#$langData['info'][3][92]#}</a> {#* 好的 知道了 *#}
+    </div>
+  </div>
+</div>
+</body>
+
+<form action="/include/ajax.php" method="get" id="refreshTopForm">
+  <input type="hidden" name="service" id="service" value="siteConfig">
+  <input type="hidden" name="action" id="action" value="refreshTop">
+  <input type="hidden" name="type" id="type" value="">
+  <input type="hidden" name="module" id="module" value="{#$module#}">
+  <input type="hidden" name="act" id="act" value="{#$act#}">
+  <input type="hidden" name="paytype" id="paytype" value="{#$paytype#}">
+  <input type="hidden" name="aid" id="aid" value="" />
+  <input type="hidden" name="amount" id="amount" value="" />
+  <input type="hidden" name="useBalance" id="useBalance" value="" />
+  <input type="hidden" name="config" id="config" value="" />
+  <input type="hidden" name="tourl" id="tourl" value="{#$cfg_basehost#}/u/manage-info.html" />
+</form>
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+<script src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/calendar.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/manage-info_v2.js?v={#$cfg_staticVersion#}"></script>
+</html>

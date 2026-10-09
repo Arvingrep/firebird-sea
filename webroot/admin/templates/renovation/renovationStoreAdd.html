@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+  atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 0;  //图集配置
+	modelType = "renovation", adminPath = "{#$adminPath#}",
+	addrid = {#$addrid#}, addrListArr = {#$addrListArr#}, mapCity = "{#$mapCity#}",
+	basehost = '{#$basehost#}', subdomain = '{#$subdomain#}',
+  certs = "{#$certs#}";
+var service = 'renovation';
+</script>
+</head>
+
+<body>
+<!--<div class="btn-group config-nav" data-toggle="buttons-radio">-->
+<!--  <button type="button" class="btn active">基本信息</button>-->
+<!--&lt;!&ndash;  <button type="button" class="btn">详细信息</button>&ndash;&gt;-->
+<!--&lt;!&ndash;  <button type="button" class="btn">工商注册信息</button>&ndash;&gt;-->
+<!--</div>-->
+
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <div class="item">
+    <dl class="clearfix">
+      <dt><label for="company">公司名称：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="company" id="company" value="{#$company#}" maxlength="60" data-regex=".{3,60}" />
+        <span class="input-tips"><s></s>请输入公司名称，3-60位</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+    <dt><label for="safeguard">保障金：</label></dt>
+    <dd>
+      <div class="input-prepend input-append">
+        <input class="input-small" type="text" name="safeguard" id="safeguard" value="{#$safeguard#}" />
+        <span class="add-on">{#echoCurrency type="short"#}</span>
+      </div>
+    </dd>
+    </dl>
+    <div class="hide">
+      <dl class="clearfix">
+        <dt><label>访问方式：</label></dt>
+        <dd class="radio">
+          {#html_radios name="domaintype" values=$domaintype checked=$domaintypeChecked output=$domaintypeNames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      {#if $domaintypeChecked == 0#}
+      <div id="domainObj" class="hide" style="background:#f5f5f5; padding:5px 0;">
+      {#else#}
+      <div id="domainObj" style="background:#f5f5f5; padding:5px 0;">
+      {#/if#}
+        <dl class="clearfix">
+          <dt><label for="domain">绑定域名：</label></dt>
+          <dd>
+            <div class="input-prepend input-append">
+              <span class="add-on">http://</span>
+              {#if $domaintypeChecked == 1#}
+              <input class="input-large" type="text" name="domain" id="domain" value="{#$domain#}" />
+              <span class="add-on" style="display:none;">
+              {#else#}
+              <input class="input-mini" type="text" name="domain" id="domain" value="{#$domain#}" />
+              <span class="add-on">
+              {#/if#}
+              {#if $customSubDomain == 0#}
+              .{#$subdomain#}
+              {#else#}
+              .{#$subdomain#}.{#$basehost#}
+              {#/if#}</span>
+            </div>
+            <span class="input-tips" style="display:inline-block; margin-bottom:10px;"><s></s>此功能只针对已认证中介</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="domainexp">过期时间：</label></dt>
+          <dd><input class="input-medium" id="domainexp" name="domainexp" type="text" value="{#$domainexp#}" /></dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="domaintip">过期提示：</label></dt>
+          <dd>
+            <textarea name="domaintip" id="domaintip" class="input-xxlarge" rows="5">{#$domaintip#}</textarea>
+          </dd>
+        </dl>
+      </div>
+    </div>
+    <dl class="clearfix">
+      <dt><label for="addrid">所在区域：</label></dt>
+      <dd>
+        <div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id={#$addrid#}>
+  				{#if $addrid != '' && $addrid != "''"#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}
+  			</div>
+  			<input type="hidden" name="addrid" id="addrid" value={#$addrid#}>
+        <input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="address">详细地址：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" data-regex=".{5,100}" />
+        <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+        <span class="input-tips"><s></s>请输入详细地址，5-100位</span>
+        <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>公司Logo：</dt>
+      <dd class="thumb clearfix listImgBox">
+  			<div class="uploadinp filePicker thumbtn{#if $litpic != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+  			{#if $litpic != ""#}
+  			<ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$litpic#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$litpic#}" data-val="{#$litpic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+  			{#else#}
+  			<ul id="listSection1" class="listSection thumblist clearfix"></ul>
+  			{#/if#}
+  			<input type="hidden" name="litpic" value="{#$litpic#}" class="imglist-hidden" id="litpic">
+  		</dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="user">对应会员：</label></dt>
+      <dd style="position:static;">
+        <input class="input-medium" type="text" name="user" id="user" autocomplete="off" value="{#$username#}" />
+        <input type="hidden" name="userid" id="userid" value="{#$userid#}" />
+        <span class="input-tips" style="display:inline-block;"><s></s>此会员可以管理公司信息</span>
+        <div id="userList" class="popup_key"></div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="people">联系人：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="people" id="people" value="{#$people#}" maxlength="30" data-regex=".{2,30}" />
+        <span class="input-tips"><s></s>请输入联系人，2-30位</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="contact">联系电话：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="contact" id="contact" value="{#$contact#}" maxlength="30" data-regex=".{7,30}" />
+        <span class="input-tips"><s></s>请输入联系电话，7-30位</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="qq">客服QQ：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="qq" id="qq" value="{#$qq#}" maxlength="30" data-regex="[1-9]\d*" />
+        <span class="input-tips"><s></s>请输入客服QQ，由数字组成</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="qq">微信：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="wechat" id="wechat" value="{#$wechat#}" maxlength="30" data-regex=".{1,30}" />
+        <span class="input-tips"><s></s>请输入微信</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="company-detai">网址：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="website" id="website" value="{#$website#}" maxlength="200" data-regex=".{1,200}" />
+        <span class="input-tips"><s></s>请输入网址</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>家装专长：</label></dt>
+      <dd class="radio">
+        {#html_checkboxes name='jiastyle' values=$jiastyleval output=$jiastylelist selected=$jiastyle separator="&nbsp;&nbsp;"#}
+        <br /><span class="label label-info checkAll" style="margin-top:5px;">全选</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>公装专长：</label></dt>
+      <dd class="radio">
+        {#html_checkboxes name='comstyle' values=$comstyleval output=$comstylelist selected=$comstyle separator="&nbsp;&nbsp;"#}
+        <br /><span class="label label-info checkAll" style="margin-top:5px;">全选</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>专长风格：</label></dt>
+      <dd class="radio">
+        {#html_checkboxes name='style' values=$styleval output=$stylelist selected=$style separator="&nbsp;&nbsp;"#}
+        <br /><span class="label label-info checkAll" style="margin-top:5px;">全选</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>公司介绍：</dt>
+      <dd>
+        <script id="body" name="body" type="text/plain" style="width:85%;height:300px">{#$body#}</script>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="click">浏览次数：</label></dt>
+      <dd>
+        <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+        <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+        <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="state">显示状态：</label></dt>
+      <dd class="radio">
+        {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix{#if $state != 2#} hide{#/if#}" id="refuseObj">
+      <dt>拒审原因：</dt>
+      <dd>
+          <textarea class="input-xxlarge" rows="2" name="refuse" id="refuse" data-regex=".{0,250}">{#$refuse#}</textarea>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="certi">认证状态：</label></dt>
+      <dd class="radio">
+        {#html_radios name="certi" values=$certiopt checked=$certi output=$certinames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="license">营业执照认证：</label></dt>
+      <dd class="radio">
+        {#html_radios name="license" values=$licenseopt checked=$license output=$licensenames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>上传资质：</dt>
+      <dd class="listImgBox hide">
+  			<div class="list-holder">
+  				<ul id="listSection2" class="clearfix listSection"></ul>
+  				<input type="hidden" name="imglist" value='{#$imglist#}' class="imglist-hidden" id="certs">
+  			</div>
+  			<div class="btn-section clearfix">
+  				<div class="uploadinp filePicker" id="filePicker2" data-type="certificate" data-count="999" data-size="{#$atlasSize#}" data-imglist="certs"><div id="flasHolder"></div><span>添加图片</span></div>
+  				<div class="upload-tip">
+  					<p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+  				</div>
+  			</div>
+  		</dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>属性：</label></dt>
+      <dd class="radio">
+        {#html_checkboxes name='property' values=$propertyval output=$propertylist selected=$property separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label for="state">商家幻灯广告：</label></dt>
+        <dd class="radio">
+            {#html_radios name="advertising" values=$advertisingopt checked=$advertising output=$advertisingnames separator="&nbsp;&nbsp;"#}
+        </dd>
+        <span class="input-tips" style="display:inline-block;"><s></s>请确认系统基本参数内是否开启商家幻灯广告功能,并配置广告管理中的“商家幻灯广告_装修门户_电脑端”和“商家幻灯广告_装修门户_移动端”</span>
+    </dl>
+    <div class="hide">
+      <dl class="clearfix">
+        <dt><label for="storetemp">店铺模板：</label></dt>
+        <dd>
+          <select name="storetemp" id="storetemp">
+            {#html_options values=$storetemp selected=$storetempSelected output=$storetemp#}
+          </select>
+          <span class="input-tips" style="display:inline-block;"><s></s>模板存放在{#$HUONIAOROOT#}/templates/store/shop下</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="seotitle">SEO标题：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="seotitle" id="seotitle" data-regex=".{0,50}" maxlength="50" placeholder="用于搜索引擎，50汉字以内" value="{#$seotitle#}" />
+          <span class="input-tips"><s></s>用于搜索引擎，50汉字以内</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="keywords">关键字：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="keywords" id="keywords" data-regex=".{0,100}" maxlength="100" placeholder="用于搜索引擎，100汉字以内" value="{#$keywords#}" />
+          <span class="input-tips"><s></s>用于搜索引擎，100汉字以内</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="description">描述：</label></dt>
+        <dd>
+          <textarea name="description" id="description" placeholder="10~200汉字之内" data-regex=".{0,200}">{#$description#}</textarea>
+          <span class="input-tips"><s></s>10~200汉字之内</span>
+        </dd>
+      </dl>
+    </div>
+  </div>
+<!--  <div class="item hide">-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="scale">公司规模：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="scale" id="scale">{#$scale#}</textarea></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="afterService">装后服务：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="afterService" id="afterService">{#$afterService#}</textarea></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="initDesign">初期设计/量房：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="initDesign" id="initDesign">{#$initDesign#}</textarea></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="initBudget">初期预算/洽谈方式：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="initBudget" id="initBudget">{#$initBudget#}</textarea></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="detaDesign">深化设计：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="detaDesign" id="detaDesign">{#$detaDesign#}</textarea></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="detaBudget">深化预算：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="detaBudget" id="detaBudget">{#$detaBudget#}</textarea></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="material">材料质量：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="material" id="material">{#$material#}</textarea></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="normative">合同规范性：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="normative" id="normative">{#$normative#}</textarea></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="speService">特色服务：</label></dt>-->
+<!--      <dd><textarea class="input-xxlarge" name="speService" id="speService">{#$speService#}</textarea></dd>-->
+<!--    </dl>-->
+<!--  </div>-->
+<!--  <div class="item hide">-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="comType">企业类型：</label></dt>-->
+<!--      <dd>-->
+<!--        <select class="input-large" id="comType" name="comType">-->
+<!--          {#html_options values=$comType selected=$comTypeSelected output=$comType#}-->
+<!--        </select>-->
+<!--      </dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="regFunds">注册资金：</label></dt>-->
+<!--      <dd><input type="text" class="input-large" name="regFunds" id="regFunds" value="{#$regFunds#}" /></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label>营业期限：</label></dt>-->
+<!--      <dd>-->
+<!--        <input type="text" class="input-small" name="operPeriodb" id="operPeriodb" value="{#$operPeriodb#}" />-->
+<!--        - -->
+<!--        <input type="text" class="input-small" name="operPeriode" id="operPeriode" value="{#$operPeriode#}" />-->
+<!--      </dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="founded">成立日期：</label></dt>-->
+<!--      <dd><input type="text" class="input-small" name="founded" id="founded" value="{#$founded#}" /></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="authority">登记机关：</label></dt>-->
+<!--      <dd><input type="text" class="input-xlarge" name="authority" id="authority" value="{#$authority#}" /></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="operRange">经营范围：</label></dt>-->
+<!--      <dd><input type="text" class="input-xxlarge" name="operRange" id="operRange" value="{#$operRange#}" /></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="inspection">年检时间：</label></dt>-->
+<!--      <dd><input type="text" class="input-small" name="inspection" id="inspection" value="{#$inspection#}" /></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="regnumber">注册号：</label></dt>-->
+<!--      <dd><input type="text" class="input-large" name="regnumber" id="regnumber" value="{#$regnumber#}" /></dd>-->
+<!--    </dl>-->
+<!--    <dl class="clearfix">-->
+<!--      <dt><label for="legalPer">法定代表人：</label></dt>-->
+<!--      <dd><input type="text" class="input-large" name="legalPer" id="legalPer" value="{#$legalPer#}" /></dd>-->
+<!--    </dl>-->
+<!--  </div>-->
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

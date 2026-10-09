@@ -1,0 +1,197 @@
+{#if !$is_app#}
+
+{#if $userinfo#}
+<!-- 发布信息 s-->
+<div class="cd-bouncy-nav-modal" id="myFabu">
+	<div class="cd-bouncy-nav">
+		<iframe  name="myFabuIframe" id="myFabuIframe" src="{#getUrlPath service='member' type='user' template='fabuJoin_touch_popup_3.4'#}" data-src="{#getUrlPath service='member' type='user' template='fabuJoin_touch_popup_3.4'#}" frameborder="0" width="100%" height="100%"></iframe>
+	</div>
+</div>
+<!-- 发布信息 e-->
+{#/if#}
+
+{#if !$userinfo#}
+<!-- 登录 s-->
+<div class="login-modal" id="myLogin" >
+	<div class="loginBox">
+		<iframe name="myLoginIframe" id="myLoginIframe" src="{#getUrlPath service='member' type='user' template='login_touch_popup_3.4'#}" data-src="{#getUrlPath service='member' type='user' template='login_touch_popup_3.4'#}" frameborder="0"  width="100%" height="100%"></iframe>
+	</div>
+</div>
+<!-- 登录 e-->
+{#/if#}
+
+<div class="footer_4_3">
+	<ul class="fn-clear">
+        <li class="ficon1  {#if $pageCurr == "index" #}active{#/if#}"><a href="{#$shop_channelDomain#}"><i></i>{#$langData['shop'][5][95]#}</a></li> {#* 商城 *#}
+	    <li class="ficon2 {#if $pageCurr == "category" #}active{#/if#}"><a href="{#$shop_channelDomain#}/category.html"><i></i>{#$langData['siteConfig'][19][393]#}</a></li>
+	    <li class="ficon3 topcart shopgocart {#if $pageCurr == "cart" #}active{#/if#}"  style="display: block;">
+	    	<a href="{#$shop_channelDomain#}/cart.html" class="cart-btn">
+	    		<i></i>{#$langData['siteConfig'][22][12]#}<em class="cart num"></em>
+	    	</a></li>
+	    <li class="ficon4 fixed_botmessage"><a href="{#getUrlPath service='member' type='user' template='message'#}"><i></i>{#$langData['siteConfig'][19][239]#}</a></li>	     {#* 消息 *#}
+	    <li class="ficon5"><a href="{#$member_userDomain#}"><i></i>{#$langData['siteConfig'][10][0]#}</a></li>
+	</ul>
+
+</div>
+<style>
+
+</style>
+<!-- 多语言包引入 -->
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+var audioSrc = {
+	refresh: '{#$cfg_staticPath#}audio/refresh.mp3',
+	tap: '{#$cfg_staticPath#}audio/tap.mp3',
+	cancel: '{#$cfg_staticPath#}audio/cancel.mp3'
+}
+
+var is_login_animating = false;
+var audio,audio1,audio2,stop=1;
+    audio = new Audio();
+    audio1 = new Audio();
+    audio2 = new Audio();
+    audio.src = audioSrc.refresh;
+    audio1.src = audioSrc.tap;
+    audio2.src = audioSrc.cancel;
+
+var myLoginIframe = '';
+var myFabuIframe = '';
+var popupIframeTop = 0;
+
+//关闭菜单
+function btnLoginClose(){
+	audio2.play();
+	$('.login-modal').removeClass('fade-in').addClass('fade-out');
+	setTimeout(function(){
+		$('.login-modal').hide();
+	}, 500);
+	$('html').removeClass("popup_fixed");
+	$(window).scrollTop(popupIframeTop);
+}
+
+function btnFbClose(){
+	audio2.play();
+	$('.cd-bouncy-nav-modal').removeClass('fade-in').addClass('fade-out');
+	setTimeout(function(){
+		$('.cd-bouncy-nav-modal').hide();
+	}, 500);
+	$('html').removeClass("popup_fixed");
+    $(window).scrollTop(popupIframeTop);
+}
+
+function noscroll(){
+    setTimeout(function(){
+        $('html').addClass("popup_fixed");
+	}, 300);
+}
+
+$(function(){
+	var cookie = $.cookie("HN_float_hide");
+	//弹出菜单--登录
+	$('.header-top .login').on('tap', function() {
+        popupIframeTop = $(window).scrollTop();
+		audio.play();
+		$('.login-modal').show().removeClass('fade-out').addClass('fade-in');
+		if(myLoginIframe != 'login'){
+			myLoginIframe = 'login';
+			$("#myLoginIframe").attr("src", $("#myLoginIframe").data('src') + '#log');
+		}
+		stop=0;
+		noscroll();
+	});
+	 //弹出菜单--注册
+	$('.header-top .register').on('tap', function() {
+        popupIframeTop = $(window).scrollTop();
+		audio.play();
+		$('.login-modal').show().removeClass('fade-out').addClass('fade-in');
+		if(myLoginIframe != 'register'){
+			myLoginIframe = 'register';
+			$("#myLoginIframe").attr("src", $("#myLoginIframe").data('src') + '#reg');
+		}
+		stop=0;
+		noscroll();
+	});
+
+	//发布信息弹出菜单
+	$('.footer_4_3 ul .fabu').on('tap', function() {
+		if(window.wx_miniprogram_judge == undefined) return;
+    popupIframeTop = $(window).scrollTop();
+    var userid = $.cookie(cookiePre+'login_user');
+    if(userid == undefined || userid == null || userid == 0 || userid == ''){
+
+		//小程序里跳转到登录页面
+		if(wx_miniprogram){
+			location.href = masterDomain + '/login.html';
+			return;
+		}
+
+      audio.play();
+      $('.login-modal').show().removeClass('fade-out').addClass('fade-in');
+      if(myLoginIframe != 'login'){
+        myLoginIframe = 'login';
+        $("#myLoginIframe").attr("src", $("#myLoginIframe").data('src') + '#log');
+      }
+      stop=0;
+      noscroll();
+    }else {
+      audio.play();
+      if (myFabuIframe != 'fabu') {
+        $("#myFabuIframe").attr("src", $("#myFabuIframe").data('src') + '#fabu');
+      }
+      if(wx_miniprogram){
+        $('#gotopage').remove();
+        $('body').append('<a href="'+$("#myFabuIframe").attr("src")+'" id="gotopage"></a>');
+        $('#gotopage').click();
+        return;
+      }
+      $('.cd-bouncy-nav-modal').show().removeClass('fade-out').addClass('fade-in');
+      myFabuIframe = 'fabu';
+      stop = 0;
+      noscroll();
+    }
+	});
+
+	//获取消息数目
+	function getnum(){
+		$.ajax({
+	       url: '/include/ajax.php?service=member&action=message&type=tongji&im=1',
+	       type: "GET",
+	       dataType: "json",
+	       timeout: 3000,
+	       success: function (data) {
+		       var html = [];
+		       if(data.state == 100){
+		       	var info = data.info.pageInfo;
+		       	var count = info.im + info.unread + info.upunread + info.commentunread;
+		       	$('.footer_4_3 li.fixed_botmessage').find('em').remove();
+		       	if(count<=99 && count>0){
+		       		$('.footer_4_3 li.fixed_botmessage').find('a i').prepend('<em>'+count+'</em>');
+		       		$('.footer_4_3 li.fixed_botmessage').attr('data-unread',info.unread);
+		       		$('.footer_4_3 li.fixed_botmessage').attr('data-im',info.im);
+		       		$('.footer_4_3 li.fixed_botmessage').attr('data-upunread',info.upunread);
+		       		$('.footer_4_3 li.fixed_botmessage').attr('data-commentunread',info.commentunread)
+		       	}else if(count>99){
+		       		$('.footer_4_3 li.fixed_botmessage').find('a i').prepend('<em>99+</em>')
+		       	}
+
+		       }
+	       },
+	       error: function(){
+	         $('.loading').html('<span>'+langData['siteConfig'][37][80]+'</span>');  //请求出错请刷新重试
+	       }
+	    });
+	}
+
+	var userid = $.cookie(cookiePre+"login_user");
+	if(userid == null || userid == ""){
+           console.log(langData['siteConfig'][37][81])//登录之后可以查看新消息
+	}else{
+		setTimeout(function(){
+			getnum();
+			setInterval(getnum,5000)
+		},5000)
+	}
+
+});
+</script>
+{#/if#}

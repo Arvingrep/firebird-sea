@@ -1,0 +1,166 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>{#$langData['info'][3][62]#} </title>	{#* 用户激励 *#}
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/reward_fabu.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/vue/vue.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+
+var setType='{#$hasSetjili#}';  //打开类型，为空就是第一次设置， add就是追加
+var hb_balance = '{#$hongbaoPrice#}',hb_num = '{#$hongbaoCount#}',share_money='{#$rewardPrice#}',share_num = '{#$rewardCount#}';
+var templets = '{#$templets_skin#}';
+var totalBalance = {#$userinfo.money#};
+var ordertype ='payEncourage';
+</script>
+
+</head>
+<body>
+  <!-- {#$langData['info'][3][63]#}  追加奖励-->
+{#$pageTitle = "{#$langData['info'][3][62]#}"#} {#* 用户激励/追加奖励  *#}
+{#include file="top.html"#}
+<div id="rewardPage">
+  <form action="/include/ajax.php?service=siteConfig&action=encourage" id="formBox">
+    <input type="hidden" name="id" id="id" value="{#$id#}">
+
+    {#if $hongbao == 1#}
+    <!-- 阅读红包 -->
+    <dl class="readHbBox rewardModule">
+      <dt>
+        <div class="txt">
+          <h3>{#$langData['info'][3][66]#}</h3>   {#* 阅读红包  *#}
+          <p>{#$langData['info'][3][100]#}</p>   {#* 设置红包激发用户阅读与分享欲望  *#}
+        </div>
+      </dt>
+      <dd class="hbInfo" v-if="setType == 'add'">
+        <div class="hb_balance">{#$langData['info'][3][67]#} <span>{#echoCurrency type="symbol"#}{{hb_balance}}</span></div>   {#* 红包余额  *#}
+        <div class="hb_left">{#$langData['info'][4][0]#} <span>{{hb_num}}</span></div>  {#* 剩余个数  *#}
+      </dd>
+      <dd class="inpBox" v-show="setType == 'add'">
+        <label for="">{#$langData['info'][4][1]#}</label>  {#* 追加金额  *#}
+        <div :class="['divInp', {'placeholderOn':add_hb_money == 0}]">{#echoCurrency type="symbol"#}<div class="hbAmount" placeholder="0.00" contenteditable="true" @blur="changeHbAmount(1)" @input="checkPlaceHolder">{{add_hb_money}}</div></div>
+        <input type="hidden" name="addhbAmount" :value="add_hb_money">
+      </dd>
+      <dd class="inpBox" v-show="setType == 'add'">
+        <label for="hbNum">{#$langData['info'][4][2]#}</label>  {#* 追加个数  *#}
+        <input type="text" placeholder="" name="addhbnum" pattern="[0-9]*" v-model="add_hb_num" @focus="showRecTip" @blur="hideRecTip">
+        <div class="recTip">
+          <ul>
+            <li v-for="x in recTip" @click="add_hb_num = x">{{x}}</li>
+          </ul>
+        </div>
+      </dd>
+      <dd class="inpBox" v-show="setType != 'add'">
+        <label for="">{#$langData['info'][3][2]#}</label>  {#* 红包总额  *#}
+        <div :class="['divInp', {'placeholderOn':hb_balance == 0}]" >{#echoCurrency type="symbol"#}<div class="hbAmount" placeholder="0.00" contenteditable="true" @blur="changeHbAmount()" @input="checkPlaceHolder">{{hb_balance}}</div></div>
+        <input type="hidden" name="hbAmount" :value="hb_balance">
+      </dd>
+      <dd class="inpBox" v-show="setType != 'add'">
+        <label for="hbNum">{#$langData['info'][4][3]#}</label>  {#* 红包个数  *#}
+        <input type="text" placeholder="" name="hbNum" pattern="[0-9]*" v-model="hb_num" @focus="showRecTip" @blur="hideRecTip">
+        <div class="recTip">
+          <ul>
+            <li v-for="x in recTip" @click="hb_num = x">{{x}}</li>
+          </ul>
+
+        </div>
+      </dd>
+
+      <dd class="inpBox" v-show="setType != 'add'">
+        <label for="hbMessage">{#$langData['info'][4][5]#}</label>   {#* 红包口令  *#}
+        <input type="text" placeholder="{#$langData['info'][4][4]#}" name="hbMessage">  {#* (选填)填写后需输入口令才可领取  *#}
+      </dd>
+      <dd class="inpBox selBox" v-show="setType != 'add'">
+        <label for=""></label>
+        <div class="selectBox">
+          <span :class="['hbtype',{'onChose':hbfmode=='0'}]" data-ftype="0" @click="hbfmode='0'" >{#$langData['info'][4][6]#}</span> {#* 随机  *#}
+          <span :class="['hbtype',{'onChose':hbfmode=='1'}]" data-ftype="1" @click="hbfmode='1'">{#$langData['info'][4][7]#}</span> {#* 均分  *#}
+          <input type="hidden" name="ftype" :value="hbfmode">
+        </div>
+      </dd>
+    </dl>
+    {#/if#}
+
+    {#if $bao == 2#}
+    <!-- 分享红包 -->
+    <dl :class="['shareHbBox rewardModule',{'moreTop':setType=='add'}]">
+      <dt>
+        <div class="txt">
+          <h3>{#$langData['info'][4][8]#}</h3>   {#* 分享红包  *#}
+          <p>{#$langData['info'][4][9]#}</p>   {#* 设置分享奖励，转发传播率飞升的秘诀  *#}
+        </div>
+      </dt>
+      <dd class="hbInfo"  v-show="setType == 'add'"><div class="hb_balance">{#$langData['info'][4][11]#} <span>{#echoCurrency type="symbol"#}{{share_money}}</span></div> <div class="hb_left">{#$langData['info'][4][10]#} <span>{{share_num}}</span></div></dd>    {#* 每次奖励 剩余次数  *#}
+      <dd class="inpBox"  v-show="setType == 'add'">
+        <label for="hbNum">{#$langData['info'][4][10]#}</label>  {#* 追加人次  *#}
+        <input type="text" placeholder="" name="hbAddshareNum" pattern="[0-9]*" v-model="add_share" @focus="showRecTip" @blur="hideRecTip">
+        <div class="recTip">
+          <ul>
+            <li v-for="x in recTip" @click="add_share = x">{{x}}</li>
+          </ul>
+        </div>
+      </dd>
+
+      <dd class="inpBox" v-show="setType != 'add'">
+        <label for="">{#$langData['info'][4][13]#}<em>/{#$langData['info'][4][14]#}<s @click="showShareTip = !showShareTip"></s></em>{#* 奖励金额  次分享 *#}
+          <div class="shareTip" v-show="showShareTip">
+            <p>{#$langData['info'][4][12]#}</p>{#* 用户转发成功可得一次奖励，分享的链接每增加一次<span>新点击（互刷无效）</span>可再得一次奖励  *#}
+          </div>
+        </label>
+        <div :class="['divInp', {'placeholderOn':share_money == 0}]">{#echoCurrency type="symbol"#}<div class="hbAmount" placeholder="0.00" contenteditable="true" @blur="changeShareAmount" @input="checkPlaceHolder">{{share_money}}</div></div>
+        <input type="hidden" name="share_money" :value="share_money">
+      </dd>
+      <dd class="inpBox" v-show="setType != 'add'">
+        <label for="hbNum">{#$langData['info'][4][15]#}</label>  {#* 奖励人次  *#}
+        <input type="text" placeholder="" name="hbshareNum" pattern="[0-9]*" v-model="share_num" @focus="showRecTip" @blur="hideRecTip">
+        <div class="recTip">
+          <ul>
+            <li v-for="x in recTip" @click="share_num = x">{{x}}</li>
+          </ul>
+        </div>
+      </dd>
+
+    </dl>
+    {#/if#}
+
+
+    <!-- 成功提示 -->
+    <div class="popMask" v-show="successTip"></div>
+    <div class="successPop" v-show="successTip">
+      <div class="popIcon"><img src="{#$templets_skin#}/images/info/success.png" alt=""></div>
+      <h3>{#$langData['info'][4][17]#}</h3>  {#* 设置成功！  *#}
+      <p>{#$langData['info'][4][16]#}</p>  {#* 曝光量即将飞速提升！  *#}
+    </div>
+
+
+
+    <!-- 提交按钮 -->
+    <div class="btnBox">
+      <p>{#$langData['info'][4][18]#}</p>  {#* 两种激励方式任选，也可都设置  *#}
+      <a href="javascript:;" class="btn_set publicpaybtn" @click="submit">{#$langData['info'][4][19]#}</a>{#* 塞钱进红包  *#}
+    </div>
+
+  </form>
+</div>
+  <form action="/include/ajax.php" method="get" id="payEncourage">
+    <input type="hidden" name="service" id="service" value="siteConfig">
+    <input type="hidden" name="action" id="action" value="payEncourage">
+    <input type="hidden" name="type" id="type" value="">
+    <input type="hidden" name="module" id="module" value="info">
+    <input type="hidden" name="act" id="act" value="{#$act#}">
+    <input type="hidden" name="paytype" id="paytype" value="{#$paytype#}">
+    <input type="hidden" name="aid" id="aid" value="{#$id#}" />
+    <input type="hidden" name="amount" id="amount" value="" />
+    <input type="hidden" name="useBalance" id="useBalance" value="" />
+    <input type="hidden" name="config" id="config" value="" />
+    <input type="hidden" name="tourl" id="tourl" value="{#$tourl#}" />
+  </form>
+</body>
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+<script src="{#$cfg_staticPath#}js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/reward_fabu.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

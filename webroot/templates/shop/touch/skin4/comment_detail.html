@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<title>{#$langData['shop'][7][49]#}</title> {#* 商品评价 *#}
+<meta name="apptitle" content="{#$langData['shop'][7][49]#}">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/comment_detail.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/ui/html2canvas.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.bigImage_1.2.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$shop_channelDomain#}', cfg_staticPath = staticPath = '{#$cfg_staticPath#}',templets='{#$templets_skin#}';
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+	jQuery = $;
+	var detailID = '{#$detail_id#}';     //当前商品信息ID
+	var storeid  = '{#$detail_store[id]#}';     //商家ID
+	var detailTitle = '{#$detail_title#}';
+	var detailPrice = '{#$detail_price#}';
+	var maxCount = '{#$detail_limit#}';  //最多购买数量
+	var detailinventory = '{#$detail_inventory#}';
+	var detailThumb = "{#changeFileSize url={#$detail_litpic#} type='small'#}";   //当前商品缩略图
+	var detailUrl = '{#getUrlPath service="shop" template="detail" id=$detail_id#}';
+	var date = [];
+	var prohuodongtype = '{#$detail_states#}';
+	var bargainingurl = '{#if $userinfo#}{#getUrlPath service="shop" template="bargain_detail"  id="%id"#}{#else#}{#$cfg_basehost#}/login.html{#/if#}';
+	{#if $detail_flag|strpos:"3" !== false#}
+	date = [{#$smarty.now#}, {#$detail_ktime#}, {#$detail_etime#}];
+	{#/if#}
+
+	var JubaoConfig = {
+		"module" : 'shop',
+		"action" : 'detail',
+		"id" : '{#$detail_id#}'
+	};
+
+	var huodongid = "{#$detail_hid#}";
+
+	//商品信息-商品颜色和尺寸
+	var sku_conf = {
+
+			//属性表
+			"property": [
+				{#foreach from=$detail_specificationArr item=spe#}
+				{
+					"name": "{#$spe.typename#}",
+					"options": [
+						{#foreach from=$spe.item item=item#}
+						{"id": "{#$item.id#}",	"name": "{#$item.name#}"{#if $item.pic#}, "pic": "{#$item.pic#}"{#/if#}},
+						{#/foreach#}
+					]
+				},
+				{#/foreach#}
+			]
+
+			//属性值
+			,"data": {
+
+				{#foreach from=$detail_specification item=spe#}
+				{#if $spe.price[2] > 0#}
+				"{#$spe.spe|replace:"-":";"#}": {price: {#$spe.price[1]#}, mprice: {#$spe.price[0]#}, stock: {#$spe.price[2]#}},
+				{#/if#}
+				{#/foreach#}
+			}
+	};
+
+	//商品规格选择
+	var detail_video='{#$detail_video#}';
+	var imconfig = {
+		'mod':'shop',
+		'chatid':"{#$detail_store['userid']#}",
+		'title': '{#$detail_title#}',
+		"price": '<em>{#echoCurrency type="symbol"#}</em>{#$detail_price#}',
+		"imgUrl": '{#changeFileSize url={#$detail_litpic#} type='small'#}',
+		"link": '{#getUrlPath service="shop" template="detail" id=$detail_id#}',
+
+	};
+
+	var userinfo = '{#$userinfo.photo#}';
+</script>
+
+</head>
+
+<body>
+	<!-- 头部 -->
+	{#include file="../../../siteConfig/touch_top.html" pageTitle="{#$langData['shop'][7][49]#}"#} {#* 商品评价 *#}
+	<!-- 头部 end -->
+
+	<div class="mainWrap">
+
+		<!-- 评价 s-->
+		<div class="mainBox">
+			<div class="commentWrap">
+				<div class="pjTop">
+					{#* 好评度 *#}
+					<h3>{#$langData['shop'][7][26]#} <em class="hpl"></em></h3>
+					<ul class="com-tab fn-clear">
+						{#* 全部 *#}
+						<li class="active"><a href="javascript:;">{#$langData['siteConfig'][9][0]#}</a></li>
+						{#* 好评 *#}
+						<li data-type="h"><a href="javascript:;">{#$langData['siteConfig'][19][367]#}(<em class="hp">0</em>)</a></li>
+						{#* 中评 *#}
+						<li data-type="z"><a href="javascript:;">{#$langData['siteConfig'][19][368]#}(<em class="zp">0</em>)</a></li>
+						{#* 差评 *#}
+						<li data-type="c"><a href="javascript:;">{#$langData['siteConfig'][19][369]#}(<em class="cp">0</em>)</a></li>
+						{#* 有图/视频 *#}
+						<li data-type="pic"><a href="javascript:;">{#$langData['shop'][7][48]#}(<em class="sp">0</em>)</a></li>
+					</ul>
+				</div>
+				<div class="comment-box">
+					<ul class="com-list">
+					</ul>
+				</div>
+				<div class="imgWrap" style="display: none;">
+					
+				</div>
+			</div>
+		</div>		
+		<!-- 评价 e-->
+
+	</div>
+
+	<div class="mask"></div>
+
+	<!--&lt;!&ndash; 评论区图片大图展示 s&ndash;&gt;-->
+	<div class="bigBoxShow">
+	  <div class="swiper-container bigSwiper">
+	      <i class="vClose"></i>
+	      <div class="swiper-wrapper">
+
+	      </div>
+	      <div class="swiper-pagination bigPagination"></div>
+	  </div>
+	</div>
+	<!--&lt;!&ndash; 评论区图片大图展示 e&ndash;&gt;-->
+	<!-- 规格图片放大 s-->
+	<div class="guigeBoxShow">
+	  <div class="swiper-container guigeSwiper">
+	      <i class="vClose"></i>
+	      <div class="swiper-wrapper">
+
+	      </div>
+	      <div class="swiper-pagination guigePagination"></div>
+	  </div>
+	</div>
+	<!-- 规格图片放大 e-->
+<div class="wechat-popup">
+	<div class="con">
+		<a href="javascript:;" class="close">×</a>
+		{#if $cfg_weixinQr#}
+		<dl><dt><img src="{#$cfg_weixinQr#}"></dt><dd>{#$cfg_weixinName#}<br>微信中长按识别</dd></dl>
+		{#/if#}
+		{#if $cfg_miniProgramQr#}
+		<dl><dt><img src="{#$cfg_miniProgramQr#}"></dt><dd>{#$cfg_miniProgramName#}<br>微信中长按识别</dd></dl>
+		{#/if#}
+	</div>
+</div>
+<div class="topcart" style="display:none;"><div class="cart-con"><div class="cartlist"><ul></ul></div></div></div>
+<form action="{#getUrlPath service='shop' template='confirm-order'#}" data-action="{#$cfg_basehost#}/include/ajax.php?service=shop&action=confirm_order" method="get" id="buyForm">
+	<input type="hidden" name="pros[]" id="pros" value="">
+	<input type="hidden" name="price" id="payPrice">
+	<input type="hidden" name="ordertype" id="ordertype">
+	<input type="hidden" name="hid" id="hid" value="{#$detail_hid#}">
+	<input type="hidden" name="bid" id="bid" value="{#$detail_bargaid#}">
+
+	<input type="hidden" name="buytype" id="buytype" value="{#if $detail_states ==3#}bargain{#elseif $detail_states == 4#}pintuan{#elseif $detail_states == 2#}miaosha{#elseif $detail_states == 1#}qianggou{#/if#}">
+</form>
+
+	<!-- 图片放大 -->
+	{#include file="../../../siteConfig/bigimg_1.2.html"#}
+<script>
+	var atpage = 1,
+		pageSize = 20,
+		keywords = '{#$keywords#}';
+</script>
+
+
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$shop_description#}',
+		"title": '{#$seo_title#}',
+        "imgUrl": '{#$shop_logoUrl#}',
+		"link": '{#getUrlPath service='shop' template='comment_detail' id={#$detail_id#}#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/common.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/comment_detail.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+</body>
+</html>

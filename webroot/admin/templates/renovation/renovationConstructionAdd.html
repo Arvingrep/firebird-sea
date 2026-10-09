@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+  <title>{#$pagetitle#}</title>
+  {#$cssFile#}
+  <script>
+    var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+            atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 0,  //图集配置
+            modelType = "renovation", adminPath = "{#$adminPath#}",
+            imglist = {"list1": {#$imglist#}}, addrListArr = {#$addrListArr#}, mapCity = "{#$mapCity#}",
+            stageList = {#json_encode($stageList)#},
+    j = {#if $stage#}{#count($stage)#}{#else#}0{#/if#},
+      atlasSize = {#$atlasSize#},
+      atlasType = '{#$atlasType#}',
+              staticPath = '{#$cfg_staticPath#}'
+      ;
+  </script>
+  <style>
+
+  </style>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="title">工地标题 ：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="title" id="title" value="{#$title#}" maxlength="60" data-regex=".{3,60}" />
+      <span class="input-tips"><s></s>请输入工地标题，3-60位</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="designername">公司：</label></dt>
+    <dd style="position:static;">
+      <select name="sid" id="sid" class="input-large">
+        {#foreach from=$shopList  item="i"#}
+        <option value="{#$i.id#}" {#if $stage == $i.id#} selected="selected" {#/if#}> {#$i.company#}</option>
+        {#/foreach#}
+      </select>
+
+    </dd>
+  </dl>
+  {#if $type == 0#}
+  <dl class="clearfix jiastyle">
+    {#else#}
+    <dl class="clearfix hide jiastyle">
+      {#/if#}
+      <dt><label>装修风格：</label></dt>
+      <dd class="radio">
+        {#html_radios name='style' values=$styleval output=$stylelist checked=$style separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="btype">装修方式：</label></dt>
+      <dd class="radio">
+        {#html_radios name="btype" values=$btypeopt checked=$btype output=$btypenames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="area">面积：</label></dt>
+      <dd>
+        <div class="input-prepend input-append" style="margin:0;">
+          <input class="input-mini" type="text" name="area" id="area" value="{#$area#}" data-regex="[1-9]\d*">
+          <span class="add-on" style="margin-right:10px;">㎡</span>
+          <span class="input-tips"><s></s>请输入装修面积</span>
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="price">预算：</label></dt>
+      <dd>
+      <span id="budget">
+        <select name="budget" id="budget" class="input-large">
+          {#html_options  options=$budgetList selected=$budget#}
+        </select>
+      </span>
+        <span class="input-tips"><s></s>请选择预算</span>
+      </dd>
+    </dl>
+    {#if $type == 0#}
+    <dl class="clearfix jiastyle">
+      {#else#}
+      <dl class="clearfix hide jiastyle">
+        {#/if#}
+        <dt><label>所属小区：</label></dt>
+        <dd>
+          <div class="selectedTags" id="communityName">{#$communityName#}</div>
+          <input type="hidden" name="communityid" id="communityid" value="{#$communityid#}" />
+          <input type="hidden" name="community" id="community" value="{#$community#}" />
+          <button class="btn chooseCommunity" type="button">选择</button>
+        </dd>
+      </dl>
+
+      <dl class="clearfix">
+        <dt><label for="addrid">所属区域：</label></dt>
+        <dd>
+          <div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id={#$addrid#}>
+            {#if $addrid != '' && $addrid != "''"#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}
+          </div>
+          <input type="hidden" name="addrid" id="addrid" value={#$addrid#}>
+          <input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+        </dd>
+      </dl>
+      <dl class="clearfix ">
+        <dt><label for="address">详细地址：</label></dt>
+        <dd>
+          <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" data-regex=".{5,100}" />
+          <!--      <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />-->
+          <span class="input-tips"><s></s>请输入详细地址，5-100位</span>
+          <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>缩略图：</dt>
+        <dd class="thumb clearfix listImgBox">
+          <div class="uploadinp filePicker thumbtn{#if $litpic != ""#} hide{#/if#}" id="filePicker" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+          {#if $litpic != ""#}
+          <ul id="listSection" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_2"><a href='{#$cfg_attachment#}{#$litpic#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$litpic#}&type=small" data-val="{#$litpic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+          {#else#}
+          <ul id="listSection" class="listSection thumblist clearfix"></ul>
+          {#/if#}
+          <input type="hidden" name="litpic" value="{#$litpic#}" class="imglist-hidden" id="litpic">
+        </dd>
+      </dl>
+      {#* 施工详情 *#}
+      <div class="common-title spe_title">{#$langData['renovation'][15][50]#}</div>
+      <div class="stage-wrap">
+        {#if $stageListarr#}
+        {#foreach from=$stageListarr key="k" item="satge"#}
+        <section class="sectionStage item normal">
+          <div class="result" data-id="{#$satge.stage#}">
+            <div class="title"><span class="px">{#$k+1#}</span>.<span class="tit">{#$satge.stageName#}</span></div>
+            <div class="descrip"> {#$satge.description#}</div>
+            <div class="img_wrap fn-clear" data-img="{#$satge.imgList#}">
+              {#foreach from = $satge.listpicarr key=k item=i#}
+              <div class="pic">
+                <img src="{#$i.path#}" alt="" data-val=" {#$i.img#}"data-url="{#$i.path#}">
+              </div>
+              {#/foreach#}
+
+            </div>
+          </div>
+          <div class="edit" >
+            {#* 选择阶段  -- 请选择阶段*#}
+            <dl class="fn-clear" data-required="1">
+              <dt><span>*</span>{#$langData['renovation'][9][43]#}：</dt>
+              <dd>
+                <select class="inp stageChose">
+
+                  <option value="">{#$langData['siteConfig'][7][2]#}</option> {#* 请选择 *#}
+                  {#foreach from=$statgelist key ="k" item ="stage"#}
+                  <option value="{#$stage.id#}" {#if $satge.stage == $stage.id#} selected {#/if#}>{#$stage.typename#}</option>
+                  {#/foreach#}
+                </select>
+              </dd>
+            </dl>
+            {#* 阶段描述  -- 请输入阶段描述*#}
+            <dl class="fn-clear" data-required="1">
+              <dt><span>*</span>{#$langData['renovation'][9][44]#}：</dt>
+              <dd>
+                <textarea class="note">{#$satge.description#}</textarea>
+              </dd>
+            </dl>
+            {#* 图集 *#}
+            <dl class="fn-clear">
+              <dt><span>*</span>  {#$langData['siteConfig'][19][2]#}：</dt>
+              <dd class="listImgBox fn-hide">
+                <div class="list-holder">
+                  <ul id="listSection1" class="fn-clear listSection fn-hide"{#if $satge.listpicarr#} style="display: block;"{#/if#}>
+                  {#foreach from = $satge.listpicarr key=k item=i#}
+                  <li class="pubitem  fn-clear" id="WU_FILE_1_{#$k#}">
+                    <span class="li-move" title="{#$langData['siteConfig'][23][42]#}">↕</span>
+                    <a class="li-rm" href="javascript:;">×</a>
+                    <div class="li-thumb" style="display: block;">
+                      <div class="r-progress"><s></s></div>
+                      <span class="ibtn">
+                      <a href="javascript:;" class="Lrotate" title="{#$langData['siteConfig'][23][43]#}"></a>
+                      <a href="javascript:;" class="Rrotate" title="{#$langData['siteConfig'][23][44]#}"></a>
+                      <a href="{#$i.path#}" target="_blank" class="enlarge" title="{#$langData['siteConfig'][23][45]#}"></a>
+                  </span>
+                      <span class="ibg"></span>
+                      <img data-val="{#$i.img#}" data-url="{#$i.path#}" type="small"#}" src="{#$i.path#}" />
+                    </div>
+                  </li>
+                  {#/foreach#}
+                  </ul>
+                  <input type="hidden" name="imglist" value="{#$satge.imgList#}" class="imglist-hidden">
+                </div>
+                <div class="btn-section fn-clear">
+                  <div class="wxUploadObj fn-clear">
+                    <div class="uploadinp filePicker" id="filePicker1" data-type="album" data-count="20" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder1"></div><span>{#$langData['siteConfig'][6][168]#}</span></div> {#*添加图片*#}
+                    <span class="upload-split fn-hide">{#$langData['siteConfig'][13][0]#}</span> {#*或*#}
+                    <dl class="wxUpload fn-hide fn-clear">
+                      <dt><img id="wxUploadImg1" class="wxUploadImg" /></dt>
+                      {#*使用*#} {#*微信*#} {#*扫描左侧二维码*#} {#*关注*#} {#*公众号后*#} {#*将图片*#} {#*发送*#} {#*给公众号即可传图*#}
+                      <dd>{#$langData['siteConfig'][19][362]#}<em class="wx">{#$langData['siteConfig'][27][139]#}</em>{#$langData['siteConfig'][27][140]#}<br />{#$langData['siteConfig'][19][846]#}{#$cfg_weixinName#}{#$langData['siteConfig'][27][141]#}<br />{#$langData['siteConfig'][27][142]#}<em class="fs">{#$langData['siteConfig'][6][139]#}</em>{#$langData['siteConfig'][27][143]#}</dd>
+
+                    </dl>
+                  </div>
+                  <div class="upload-tip">
+                    <p><a href="javascript:;" class="fn-hide deleteAllAtlas"{#if $satge.listpicarr#} style="display: inline-block;"{#/if#}>{#$langData['siteConfig'][6][79]#}</a>&nbsp;&nbsp;{#$langData['siteConfig'][54][19]|replace:' 1 ':'2'|replace:' 2 ':20#} <span class="fileerror"></span></p>
+                  </div>
+                </div>
+              </dd>
+            </dl>
+            <div class="finishEdit">{#$langData['siteConfig'][31][79]#}</div>  {#* 完成编辑 *#}
+
+          </div>
+          <div class="g-btns-right g-btns">
+            <a href="javascript:;" class="edit secEdit"><i class="icon icon_edit"></i>{#$langData['siteConfig'][6][6]#}</a> {#* 编辑 *#}
+            <a href="javascript:;" class="down"><i class="icon icon_down2"></i>{#$langData['siteConfig'][6][159]#}</a> {#* 下移 *#}
+            <a href="javascript:;" class="up"><i class="icon icon_up2"></i>{#$langData['siteConfig'][6][158]#}</a> {#* 上移 *#}
+            <a href="javascript:;" class="gotop"><i class="icon icon_top"></i>{#$langData['siteConfig'][31][87]#}</a> {#* 最前 *#}
+            <a href="javascript:;" class="gobottom"><i class="icon icon_bottom"></i>{#$langData['siteConfig'][31][88]#}</a> {#* 最后 *#}
+            <a href="javascript:;" class="del"><i class="icon icon_del1"></i>{#$langData['siteConfig'][6][8]#}</a> {#* 删除 *#}
+          </div>
+        </section>
+        {#/foreach#}
+        {#else#}
+        <section class="sectionStage item editing">
+          <div class="result" data-id="">
+            <div class="title"><span class="px">1</span>.<span class="tit"></span></div>
+            <div class="descrip"></div>
+            <div class="img_wrap fn-clear" data-img=""></div>
+          </div>
+          <div class="edit" >
+            {#* 选择阶段  -- 请选择阶段*#}
+            <dl class="fn-clear" data-required="1">
+              <dt><span>*</span>{#$langData['renovation'][9][43]#}：</dt>
+              <dd>
+                <select class="inp stageChose">
+
+                  <option value="">{#$langData['siteConfig'][7][2]#}</option> {#* 请选择 *#}
+                  {#foreach from=$statgelist key ="k" item ="stage"#}
+                  <option value="{#$stage.id#}">{#$stage['typename']#}</option>
+                  {#/foreach#}
+                </select>
+              </dd>
+            </dl>
+            {#* 阶段描述  -- 请输入阶段描述*#}
+            <dl class="fn-clear" data-required="1">
+              <dt><span>*</span>{#$langData['renovation'][9][44]#}：</dt>
+              <dd>
+                <textarea class="note"></textarea>
+              </dd>
+            </dl>
+            {#* 图集 *#}
+            <dl class="fn-clear">
+              <dt><span>*</span>  {#$langData['siteConfig'][19][2]#}：</dt>
+              <dd class="listImgBox fn-hide">
+                <div class="list-holder">
+                  <ul id="listSection1" class="fn-clear listSection hide">
+
+                  </ul>
+                  <input type="hidden" name="imglist" value="" class="imglist-hidden">
+                </div>
+                <div class="btn-section fn-clear">
+                  <div class="wxUploadObj fn-clear">
+                    <div class="uploadinp filePicker" id="filePicker1" data-type="album" data-count="20" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder1"></div><span>{#$langData['siteConfig'][6][168]#}</span></div> {#*添加图片*#}
+                    <span class="upload-split fn-hide">{#$langData['siteConfig'][13][0]#}</span> {#*或*#}
+                    <dl class="wxUpload fn-hide fn-clear">
+                      <dt><img id="wxUploadImg1" class="wxUploadImg" /></dt>
+                      {#*使用*#} {#*微信*#} {#*扫描左侧二维码*#} {#*关注*#} {#*公众号后*#} {#*将图片*#} {#*发送*#} {#*给公众号即可传图*#}
+                      <dd>{#$langData['siteConfig'][19][362]#}<em class="wx">{#$langData['siteConfig'][27][139]#}</em>{#$langData['siteConfig'][27][140]#}<br />{#$langData['siteConfig'][19][846]#}{#$cfg_weixinName#}{#$langData['siteConfig'][27][141]#}<br />{#$langData['siteConfig'][27][142]#}<em class="fs">{#$langData['siteConfig'][6][139]#}</em>{#$langData['siteConfig'][27][143]#}</dd>
+
+                    </dl>
+                  </div>
+                  <div class="upload-tip">
+                    <p><a href="javascript:;" class="hide deleteAllAtlas">{#$langData['siteConfig'][6][79]#}</a>&nbsp;&nbsp;{#$langData['siteConfig'][54][19]|replace:' 1 ':'2'|replace:' 2 ':20#} <span class="fileerror"></span></p>
+                  </div>
+                </div>
+              </dd>
+            </dl>
+            <div class="finishEdit">{#$langData['siteConfig'][31][79]#}</div>  {#* 完成编辑 *#}
+
+          </div>
+          <div class="g-btns-right g-btns">
+            <a href="javascript:;" class="edit secEdit"><i class="icon icon_edit"></i>{#$langData['siteConfig'][6][6]#}</a> {#* 编辑 *#}
+            <a href="javascript:;" class="down"><i class="icon icon_down2"></i>{#$langData['siteConfig'][6][159]#}</a> {#* 下移 *#}
+            <a href="javascript:;" class="up"><i class="icon icon_up2"></i>{#$langData['siteConfig'][6][158]#}</a> {#* 上移 *#}
+            <a href="javascript:;" class="gotop"><i class="icon icon_top"></i>{#$langData['siteConfig'][31][87]#}</a> {#* 最前 *#}
+            <a href="javascript:;" class="gobottom"><i class="icon icon_bottom"></i>{#$langData['siteConfig'][31][88]#}</a> {#* 最后 *#}
+            <a href="javascript:;" class="del"><i class="icon icon_del1"></i>{#$langData['siteConfig'][6][8]#}</a> {#* 删除 *#}
+          </div>
+        </section>
+        {#/if#}
+      </div>
+      <a href="javascript:;" class="addNew">{#$langData['renovation'][15][51]#}</a> {#* 继续添加下阶段 *#}
+
+
+
+      <!--<dl class="clearfix" id="next">-->
+      <!--  <dt>&nbsp;</dt>-->
+      <!--  <dd><div class="btn btn-small btn-warning" id="copy" >继续下个阶段</div>-->
+      <!--  </dd>-->
+      <!--</dl>-->
+      <dl class="clearfix">
+        <dt><label for="state">显示状态：</label></dt>
+        <dd class="radio">
+          {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix formbtn">
+        <dt>&nbsp;</dt>
+        <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+      </dl>
+</form>
+
+{#$jsFile#}
+</body>
+</html>

@@ -1,0 +1,119 @@
+<?php
+$customChannelName = '任务悬赏';
+$customLogo = 0;
+$customLogoUrl = '';
+$customSharePic = '';
+$customSubDomain = 0;
+$customChannelSwitch = 0;
+$customCloseCause = '系统维护中，请稍候访问！';
+$customSeoTitle = '任务悬赏-口袋里的赚钱宝典';
+$customSeoKeyword = '手机赚钱,悬赏赚钱,任务赚钱,安卓赚钱,苹果赚钱,手机赚钱软件,网上任务,手赚平台,赚钱app,正规兼职,赚钱软件';
+$customSeoDescription = '任务悬赏是一款手机赚钱软件，手机赚钱随时随地想赚就赚！让你充分利用自己的碎片时间，任务发布一键完成，做单极速审核，提现秒到帐！';
+$hotline_config = 0;
+$customHotline = '';
+$customfabuCheck = 0;
+$customfabuParam = 'website,qr,copy,text,image,video,save-text,save-image,save-video';
+$customfabuCount = 5;
+$customfabuFee = 15;
+$customrefreshPrice = 0.5;
+$custombidPrice = 5;
+$customfenXiao = 1;
+$customfenxiaoFee = 5;
+$customthemeBackgroundColor = '#8db3e2';
+$customthemeFontColor = '#333333';
+$customhelpLink1 = 'https://ihuoniao.cn/help-detail-21.html';
+$customhelpLink2 = 'https://ihuoniao.cn/help-detail-22.html';
+$customhelpLink3 = 'https://ihuoniao.cn/help-detail-23.html';
+$customhelpLink4 = 'https://ihuoniao.cn/protocol-46.html';
+$customhelpLink5 = 'https://ihuoniao.cn/protocol-47.html';
+$customhelpLink6 = 'https://ihuoniao.cn/help-detail-26.html';
+$customhelpLink7 = 'https://ihuoniao.cn/help-detail-27.html';
+$customkefuLink = '';
+$customkefuId = '';
+$customfeedback = '悬赏不合理，根本无法达到要求
+悬赏描述与实际操作不符，有隐藏步骤
+悬赏分类不正确或有其他违规行为
+联系悬赏主没有任何回应
+悬赏主要求私下交易
+悬赏关键词与实际不符';
+$customrefusalReason = '门槛问题类#不属于新用户
+数据问题类#后台没有数据
+恶意提交类#提交无关截图
+门槛问题类#未按指定要求
+其他';
+$customreportTimeLimit = 24;
+$customRouter = 0;
+$customTemplate = 'skin1';
+$customTouchRouter = 1;
+$customTouchTemplate = 'skin1';
+$tuanDefaultCity = 0;
+$subscribe = '1';
+$subscribetime = '09:00';
+$subscribetemp = '默认风格';
+$customUpload = 0;
+$custom_uploadDir = '/uploads';
+$custom_softSize = 20480;
+$custom_softType = 'zip|gz|rar|iso|doc|xsl|ppt|wps';
+$custom_thumbSize = 2048;
+$custom_thumbType = 'jpg|jpeg|gif|png|swf';
+$custom_atlasSize = 2048;
+$custom_atlasType = 'jpg|jpeg|gif|png';
+$custom_thumbSmallWidth = 300;
+$custom_thumbSmallHeight = 200;
+$custom_thumbMiddleWidth = 400;
+$custom_thumbMiddleHeight = 300;
+$custom_thumbLargeWidth = 600;
+$custom_thumbLargeHeight = 500;
+$custom_atlasSmallWidth = 100;
+$custom_atlasSmallHeight = 100;
+$custom_photoCutType = 'scale';
+$custom_photoCutPostion = 'center';
+$custom_quality = 100;
+$customFtp = 0;
+$custom_ftpState = 1;
+$custom_ftpType = 0;
+$custom_ftpSSL = 0;
+$custom_ftpPasv = 0;
+$custom_ftpUrl = '';
+$custom_ftpServer = '';
+$custom_ftpPort = 0;
+$custom_ftpDir = '';
+$custom_ftpUser = '';
+$custom_ftpPwd = '';
+$custom_ftpTimeout = 30;
+$custom_OSSUrl = '';
+$custom_OSSBucket = '';
+$custom_EndPoint = '';
+$custom_OSSKeyID = '';
+$custom_OSSKeySecret = '';
+$custom_QINIUAccessKey = '';
+$custom_QINIUSecretKey = '';
+$custom_QINIUbucket = '';
+$custom_QINIUdomain = '';
+$custom_OBSUrl = '';
+$custom_OBSBucket = '';
+$custom_OBSEndpoint = '';
+$custom_OBSKeyID = '';
+$custom_OBSKeySecret = '';
+$custom_COSUrl = '';
+$custom_COSBucket = '';
+$custom_COSRegion = '';
+$custom_COSSecretid = '';
+$custom_COSSecretkey = '';
+$customMark = 0;
+$custom_thumbMarkState = 1;
+$custom_atlasMarkState = 1;
+$custom_editorMarkState = 1;
+$custom_waterMarkWidth = 100;
+$custom_waterMarkHeight = 100;
+$custom_waterMarkPostion = 9;
+$custom_waterMarkType = 1;
+$custom_waterMarkText = '';
+$custom_markFontfamily = '';
+$custom_markFontsize = 0;
+$custom_markFontColor = '';
+$custom_markFile = '';
+$custom_markPadding = 10;
+$custom_markTransparent = 50;
+$custom_markQuality = 100;
+?>

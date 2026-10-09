@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>外卖订单</title>
+{#$cssFile#}
+<script>
+var action = "{#$action#}", adminPath = "{#$adminPath#}",cityList = {#json_encode($city)#};
+var personId = {#$personId#};
+</script>
+<style>
+.pagination {display: block; text-align: right;}
+.pagination div {margin: 0;}
+.pagination .page_info {display: inline-block; line-height: 35px; margin-left: 15px;}
+.pagination ul>li.page_current span {background: #e8e8e8;}
+.chzn-container {vertical-align: middle;}
+.tab-content {overflow: visible;}
+td hr {margin:5px 0;}
+
+
+.col-sm-1, .col-sm-10, .col-sm-11, .col-sm-12, .col-sm-2, .col-sm-3, .col-sm-4, .col-sm-5, .col-sm-6, .col-sm-7, .col-sm-8, .col-sm-9 {float: left;}
+.col-sm-2 {width: 16.66666667%;}
+.form-group {width:600px;float: left;margin:0 -12px 15px 0;}
+.form-group select {width:216px;}
+
+.resultiframe {width:100%; height:1600px;}
+.main-content, body, html{overflow: auto;}
+
+.resultiframe.fixheight {height: 1000px !important;min-height: 1000px !important;}
+</style>
+</head>
+
+<body class="no-skin">
+<div class="main-content">
+
+  <div class="page-content">
+
+    {#if empty($action)#}
+    <div class="page-content">
+      <div class="page-content-area">
+        <style>.col-sm-input{ width:60px; }</style>
+        <div class="row">
+          <div class="col-xs-12">
+            <form class="form-horizontal searchform" id="yw0" action="" method="get" target="resultiframe">
+              <input type="hidden" name="action" id="action" value="search">
+              <div class="form-group">
+              <label class="col-sm-2" for="waimaiOrder_cityid">城市</label>
+
+			  <div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}"></div>
+              </div>
+              <div class="form-group">
+                <label class="col-sm-2" for="waimaiOrder_trade_no">订单编号</label>
+                <input name="ordernum" id="waimaiOrder_trade_no" type="text"></div>
+              <div class="form-group">
+                <label class="col-sm-2" for="waimaiOrder_lewaimai_customer_id">顾客ID</label>
+                <input name="personId" id="waimaiOrder_lewaimai_customer_id" type="text" maxlength="10" placeholder="用户ID,用户名,手机号,邮箱,昵称"></div>
+              <div class="form-group">
+                <label class="col-sm-2" for="waimaiOrder_nickname">姓名</label>
+                <input name="person" id="waimaiOrder_nickname" type="text" maxlength="20"></div>
+              <div class="form-group">
+                <label class="col-sm-2" for="waimaiOrder_phone">电话</label>
+                <input name="tel" id="waimaiOrder_phone" type="text" maxlength="20"></div>
+              <div class="form-group">
+                <label class="col-sm-2" for="waimaiOrder_init_date">下单时间</label>
+                <input id="waimaiOrder_start_time" type="text" autocomplete="off" name="paydate[]"> 至
+                <input id="waimaiOrder_end_time" type="text" autocomplete="off" name="paydate[]"></div>
+              <div class="form-group" style="height:38px">
+                <label class="col-sm-2" for="Order_courier_id">店铺</label>
+                <select class="chosen-select" name="shopid" id="form-field-select-1">
+                  <option value="">全部店铺</option>
+                  {#foreach from=$shop item=l#}
+                  <option value="{#$l.id#}">{#$l.shopname#}</option>
+                  {#/foreach#}
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="col-sm-2" for="Order_courier_id">配送员</label>
+                <select class="chosen-select" name="peisongid" id="form-field-select-2">
+                    <option value="0">请选择</option>
+                    {#if $otherpeisongArr#}
+                      <optgroup label="平台配送员">
+                          {#foreach from=$courier item=c#}
+                          <option value="{#$c.id#}">{#$c.name#}</option>
+                          {#/foreach#}
+                      </optgroup>
+                      <optgroup label="第三方配送">
+                          {#foreach from=$otherpeisongArr item=c#}
+                          <option value="o_{#$c.id#}">{#$c.title#}</option>
+                          {#/foreach#}
+                      </optgroup>
+                      </optgroup>
+                    {#else#}
+                      {#foreach from=$courier item=c#}
+                      <option value="{#$c.id#}">{#$c.name#}</option>
+                      {#/foreach#}
+                    {#/if#}
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="col-sm-2" for="Order_charge_type">支付方式</label>
+                <select class="chosen-select" name="paytype" id="form-field-select-3">
+                  <option value="">请选择</option>
+                  <option value="delivery">货到付款</option>
+                  <option value="money">余额付款</option>
+                  <option value="online">在线支付</option>
+                  <option value="wxpay">微信支付</option>
+                  <option value="alipay">支付宝支付</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="col-sm-2" for="Order_order_status">订单状态</label>
+                <select class="chosen-select" name="state" id="form-field-select-4">
+                  <option value="">请选择</option>
+                  <option value="2">未处理订单</option>
+                  <option value="3">已确认订单</option>
+                  <option value="4">已接单</option>
+                  <option value="5">配送中</option>
+                  <option value="1">成功</option>
+                  <option value="7">失败</option>
+                  <option value="6">已取消</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="col-sm-2" for="waimaiOrder_amount">订单金额</label>
+                <input class="col-sm-input" type="number" name="amount[]" id="waimaiOrder_amount1" type="text">&nbsp;&nbsp;到&nbsp;&nbsp;
+                <input class="col-sm-input" type="number" name="amount[]" id="waimaiOrder_amount2" type="text"> 元之间</div>
+              <div class="form-group">
+                <label class="col-sm-2" for="waimaiOrder_complete">完成时间</label>
+                <select class="chosen-select" name="comtime" id="form-field-select-5">
+                  <option value="">请选择</option>
+                  {#foreach from=$comtime item=t#}
+                  <option value="{#$t#}">{#$t#}</option>
+                  {#/foreach#}
+                </select>
+                分钟之内
+              </div>
+              <div class="form-group">
+                <label class="col-sm-2" for="waimaiOrder_address">收货地址</label>
+                <input name="address" id="waimaiOrder_address" type="text" maxlength="20"></div>
+              <div style="clear:both;"></div>
+              <div class="clearfix form-actions">
+                <div class="col-md-offset-3 col-md-9">
+                  <button class="btn btn-info" type="submit">
+                    <i class="ace-icon fa fa-check bigger-110"></i>搜索</button>&nbsp; &nbsp; &nbsp;
+                  <button class="btn" type="reset" id="reset">
+                    <i class="icon-undo bigger-110"></i>重置</button>&nbsp; &nbsp; &nbsp;
+<!--                  <button class="btn btn-danger" type="button" id="export_btn">导出</button>-->
+                  <a href="waimaiOrderSearch.php?action=export" class="btn btn-primary" id="export">导出</a>
+
+                  <input type="hidden" value="0" name="is_export" id="lewaimaiorder_export">
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <iframe src="" name="resultiframe" id="resultiframe" frameborder="0" class="resultiframe"></iframe>
+
+    {#else#}
+
+    <style>body{overflow-y: hidden;}.page-content {padding:8px 0 24px;}</style>
+    <div class="page-content-area">
+      <div class="col-xs-12">
+        <div class="tabbable">
+
+          <div id="order-grid-open" class="grid-view">
+            <table id="list" class="table table-striped table-bordered table-hover">
+              <thead>
+                <tr>
+                  <th class="checkbox-column" id="order-grid-open_c0"><input type="checkbox" value="1" name="order-grid-open_c0_all" id="order-grid-open_c0_all"></th>
+                  <th id="order-grid-open_c1">订单编号</th>
+                  <th id="order-grid-open_c2">店铺</th>
+                  <th id="order-grid-open_c3">顾客ID</th>
+                  <th id="order-grid-open_c4">姓名/电话</th>
+                  <th id="order-grid-open_c6">配送地址</th>
+                  <th id="order-grid-open_c7">详情</th>
+                  <th id="order-grid-open_c8">备注</th>
+                  <th id="order-grid-open_c9">用户下单填写的预设字段值</th>
+                  <th id="order-grid-open_c10">总价</th>
+                  <th id="order-grid-open_c10_1">配送费</th>
+                  <th id="order-grid-open_c11">配送员</th>
+                  <th id="order-grid-open_c15">系统备注</th>
+                  <th id="order-grid-open_c11">订单状态</th>
+                  <th id="order-grid-open_c12">失败原因</th>
+                  <th id="order-grid-open_c13">下单时间</th>
+                  <th id="order-grid-open_c16">完成时间</th>
+                  <th id="order-grid-open_c17">完成速度（分钟）</th>
+                  <th id="order-grid-open_c14">付款方式</th>
+                  <th class="button-column" id="order-grid-open_c15">操作</th></tr>
+              </thead>
+              <tbody>
+                {#foreach from=$list item=l#}
+                  {#if $l.state == 1#}
+                  {#$state = '成功'#}
+                  {#else if $l.state == '2'#}
+                  {#$state = '未处理'#}
+                  {#else if $l.state == '3'#}
+                  {#$state = '已确认'#}
+                  {#else if $l.state == '4'#}
+                  {#$state = '已接单'#}
+                  {#else if $l.state == '5'#}
+                  {#$state = '配送中'#}
+                  {#else if $l.state == '6'#}
+                  {#$state = '已取消'#}
+                  {#else if $l.state == '7'#}
+                  {#$state = '失败'#}
+                  {#/if#}
+                <tr>
+                  <td width="30"><input value="{#$l.id#}" id="order-grid-open_c0_0" type="checkbox" name="selectorderl[]"></td>
+                  <td width="60">{#$l.cityname#}：<br />{#if $l.ordernumstore != ""#}{#$l.shopname#}{#$l.ordernumstore#}{#else#}{#$l.ordernum#}{#/if#}</td>
+                  <td width="70" style="word-break: break-all;">{#$l.shopname#}</td>
+                  <td width="60"><a href="javascript:;" class="userinfo" data-id="{#$l.uid#}">{#$l.username#}</a></td>
+                  <td width="90">{#$l.person#}<br>{#$l.tel#}</td>
+                  <td style="word-break: break-all;" width="100">{#$l.address#}</td>
+                  <td width="120">
+<!--                    {#foreach from=$l.food item=food#}-->
+<!--                    <div style="background:#ddd;padding:1px;margin:3px 0px;">{#$food.title#}【{#$food.count#}】</div>-->
+<!--                    {#/foreach#}-->
+
+
+                    {#foreach from=$l.food item=food#}
+                    <div style="background:#ddd;padding:1px;margin:3px 0px;">{#$food.title#}{#if $food.ntitle#} - {#$food.ntitle#}{#/if#}【{#$food.count#}】</div>
+                    {#/foreach#}
+                  </td>
+                  <td style="word-break: break-all;" width="80">{#$l.note#}</td>
+                  <td width="80" style="word-break: break-all;">
+                    {#foreach from=$l.preset item=preset#}
+                    <div style="background:#ddd;padding:1px;margin:3px 0px;">{#$preset.title#}：{#$preset.value#}</div>
+                    {#/foreach#}
+                  </td>
+                  <td width="50">{#$l.amount#}</td>
+                  <td width="50">{#$l.amount_deliver#}</td>
+                  <td width="100">{#if $l.peisonglogistic#}({#$l.peisonglogistic#}){#/if#}{#$l.peisongname#}{#if $l.peisongtel#}({#$l.peisongtel#}){#/if#}</td>
+                  <td width="100">{#$l.peisongidlog#}</td>
+                  <td width="100">{#$state#}</td>
+                  <td width="100">{#$l.failed#}</td>
+                  <td width="40">{#$l.pubdate|date_format:"%y-%m-%d %H:%M:%S"#}</td>
+                  <td width="40">{#if $l.state == 1#}{#$l.okdate|date_format:"%y-%m-%d %H:%M:%S"#}{#/if#}</td>
+                  <td width="50">{#if $l.state == "1"#}{#ceil(($l.okdate-$l.pubdate)/60)#}{#/if#}</td>
+                  <td width="50"><b style="color:green">{#$l.paytype#}</b></td>
+                  <td width="80" class="button-column">
+                    <a title="查看" class="green orderdetail" data-id="{#$l.id#}" data-num="{#$l.ordernum#}" style="padding-right:8px;" href="waimaiOrderDetail.php?id={#$l.id#}"><i class="ace-icon fa fa-search bigger-130"></i></a>
+                    
+                    {#if $l.reservesongdate#}
+                    <div class="proOrderInfo" style="color:#f00;">预订订单，预订时间{#$l.reservesongdate|date_format:'%m-%d %H:%M'#}</div>
+                    {#/if#}
+                  </td>
+                </tr>
+                {#/foreach#}
+
+                {#if $list|@count == 0#}
+                <tr>
+                  <td colspan="20" style="height: 200px; line-height: 200px; text-align: center;">没有找到数据.</td>
+                </tr>
+                {#/if#}
+              </tbody>
+            </table>
+
+            {#$pagelist#}
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    {#/if#}
+  </div>
+</div>
+
+{#$jsFile#}
+{#if $action == "search"#}
+<script>
+  $(function(){
+    var conHeight = 0, timer = null, listen = false;
+    setParIframeHeight();
+    parent.winScroll();
+
+    //查看订单
+    $(".orderdetail").bind("click", function(event){
+      event.preventDefault();
+      var href = $(this).attr("href"), id = $(this).data("id"), num = $(this).data("num");
+      try {
+        parent.parent.addPage("waimaiOrderDetail"+id, "waimai", "订单"+num, "waimai/"+href);
+        parent.winScroll('set'); //滚动条滚动一像素，否则切换回此标签滚动滚动条会返回顶部
+      } catch(e) {}
+
+    });
+
+    $(window).resize(function(){
+      if(!listen) return;
+      clearTimeout(timer)
+      timer = setTimeout(function(){
+        setParIframeHeight();
+      },1000)
+    })
+
+    function setParIframeHeight(){
+
+      var h = parseInt($(".main-content").height());
+      if(Math.abs(h-conHeight) < 50){
+        conHeight = h;
+        return;
+      }
+      conHeight = h;
+      $('#resultiframe', window.parent.document).css('height', conHeight+'px');
+      listen = true;
+    }
+  })
+</script>
+{#/if#}

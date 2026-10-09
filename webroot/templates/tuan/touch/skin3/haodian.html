@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{#if $list_seotitle != ""#}{#$list_seotitle#}{#else#}发现好店{#/if#}</title>
+<meta name="apptitle" content="发现好店">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/haodian.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+var masterDomain = '{#$cfg_basehost#}', hideFileUrl = {#$cfg_hideUrl#}, cfg_staticPath = '{#$cfg_staticPath#}', templatesSkin = '{#$templets_skin#}', staticPath = '{#$cfg_staticPath#}';
+var typeUrl     = '{#getUrlPath service="tuan" template="haodian" typeid="%id%" addrid=$list_addrid business=$list_business subway=$list_subway station=$list_station param="{#$skeyword#}"#}';
+var addrUrl     = '{#getUrlPath service="tuan" template="haodian" typeid="{#$list_id#}" addrid="%addr%" business="%circle%" subway="0" param="{#$skeyword#}"#}';
+var subwayUrl   = '{#getUrlPath service="tuan" template="haodian" typeid="{#$list_id#}" addrid="0" business="0" subway="%subway%" station="%station%" param="{#$skeyword#}"#}';
+</script>
+</head>
+
+<body>
+<!-- 头部 -->
+{#include file="../../../siteConfig/touch_top.html" pageTitle="发现好店"#}
+
+{#$city = ""#}
+{#if $list_addrid != 0 && $list_business == 0#}
+	{#$city = $list_addrname#}
+{#elseif $list_business != 0#}
+	{#$city = $list_businessname#}
+{#elseif $list_subway != 0#}
+	{#$city = $list_subwayname#}
+{#else#}
+	{#$city = '全城'#}
+{#/if#}
+
+<!-- 搜索框 -->
+  <div class="search-form fn-clear">
+    <div class="sobj">
+      <div class="inp">
+        <input type="text" id="keywords" name="keywords" placeholder="搜商家、搜地址">
+        <span id="search">搜索</span>
+      </div>
+    </div>
+  </div>
+
+<!-- 筛选框 -->
+<div class="choose-box">
+	<div class="choose">
+		<div class="choose-tab">
+			<ul>
+				<li class="food" data-id="{#if $list_typename#}{#$list_id#}{#else#}{#/if#}"><a href="javascript:;"><span>{#if $list_typename#}{#$list_typename#}{#else#}全部分类{#/if#}</span></a></li>
+				<li class="city" data-addrid="" data-business="" data-subway="" data-station=""><a href="javascript:;"><span>{#$city#}</span></a></li>
+			</ul>
+		</div>
+		<div class="choose-list">
+			<div class="choose-con">
+				<div class="choose-local fn-hide">
+					<div class="choose-li choose-food" id="choose-food">
+						<ul>
+							<li data-id=""><a href="javascript:;"><span class="name">全部分类</span></a></li>
+							{#tuan action="type" return="type"#}
+							<li class="{#if $type.lower#}right-more{#/if#} {#if $list_id == $type.id#} active{#/if#}" data-id="{#$type.id#}">
+								<a href="javascript:;" data-id="{#$type.id#}"><span class="name">{#$type.typename#}</span>{#if $type.lower#}<span class="quantity"><strong>{#$type.lower#}</strong></span>{#/if#}</a>
+							</li>
+							{#/tuan#}
+						</ul>
+					</div>
+				</div>
+				<div class="choose-local fn-hide">
+					<div class="choose-li choose-city">
+						<div class="choose-area-box">
+							<div class="choose-area">
+								<a href="javascript:;" class="active" data-action="business">商区</a>
+								<a href="javascript:;" data-action="subway">公交地铁</a>
+							</div>
+						</div>
+						<div id="choose-city-sq" class="choose-city-area">
+							<ul>
+								<li data-id=""><a href="javascript:;"><span class="name">全城</span></a></li>
+								{#tuan action="addr" return='addr'#}
+								<li class="right-more" data-id="{#$addr.id#}"><a href="javascript:;"><span class="name">{#$addr.typename#}</span><span class="quantity"><strong>商圈</strong></span></a></li>
+								{#/tuan#}
+							</ul>
+						</div>
+						<div id="choose-city-dt" class="choose-city-area fn-hide">
+							<ul>
+								{#$cityid#}
+								{#siteConfig action="subway" return='subway' city={#$siteCityInfo['cityid']#}#}
+								<li class="right-more" data-id="{#$subway.id#}"><a href="javascript:;"><span>{#$subway.title#}</span><span class="quantity"><strong>线路</strong></span></a></li>
+								{#/siteConfig#}
+							</ul>
+						</div>
+					</div>
+				</div>
+				<div class="more-second fn-hide" id="more-second"></div>
+				<div class="city-second fn-hide" id="city-second"></div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- 商家列表 -->
+<div class="shop-box" id="detailList"><ul></ul></div>
+
+<!-- 遮罩层 -->
+<div class="mask"></div>
+
+<script>
+	var city = '{#$city#}',
+			parid = '{#$list_parid#}',
+			typeid = '{#$list_id#}',
+			addrid = '{#$list_addrid#}',
+			business = '{#$list_business#}',
+			subway = '{#$list_subway#}',
+			station = '{#$list_station#}',
+			keywords = '{#$search_keyword#}',
+			orderby = '',
+			atpage = '{#$page#}',
+			totalCount = {#if $pageInfo.totalCount == 0#}0{#else#}{#$pageInfo.totalCount#}{#/if#},
+			totalPage = {#if $pageInfo.totalPage == 0#}0{#else#}{#$pageInfo.totalPage#}{#/if#},
+			pageSize = 10,
+			detailListId = 'detailList';
+</script>
+<script src="{#$cfg_staticPath#}js/ui/jquery.scroll.loading.js"></script>
+<script src="{#$cfg_staticPath#}js/detail2list.js?v={#$cfg_staticVersion#}"></script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script src="{#$templets_skin#}js/haodian.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$tuan_description#}',
+		"title": '{#$list_typename#}',
+		"imgUrl": '{#$tuan_logoUrl#}',
+		"link": '{#getUrlPath service="tuan" template="haodian"#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+</body>
+</html>

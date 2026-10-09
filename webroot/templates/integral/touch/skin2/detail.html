@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<title>商品详情</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript">
+	  var masterDomain = '{#$cfg_basehost#}',templets = '{#$templets_skin#}';
+	  var staticPath = '{#$cfg_staticPath#}';
+	  var cookiePre = '{#$cfg_cookiePre#}';
+	  var detail_video='{#$detail_video#}';
+	  var detailID = '{#$detail_id#}';     //当前信息ID
+	  var detail = {
+	    'id' : {#$detail_id#},
+	    'price' : {#$detail_price#},
+	    'point' : {#$detail_point#},
+	    'inventory' : {#$detail_inventory#}
+	  }
+	  var pointRatio = {#$cfg_pointRatio#};
+	  var userPoint = {#if $userinfo#}{#$userinfo['point']#}{#else#}0{#/if#};
+	  var confirmUrl = '{#getUrlPath service="integral" template="confirm-order" param="id=$detail_id&count=#count"#}';
+
+</script>
+</head>
+
+<body>
+	<!-- 头部 -->
+	{#include file="../../../siteConfig/touch_top.html" pageTitle="商品详情"#}
+	<!-- 头部 end -->
+
+	<!-- 视频图片轮播 s-->
+	<div class="topSwiper">
+		<div class="swiper-container">
+	          <div class="swiper-wrapper">
+	          	  {#if !empty($detail_video)#}
+	              <div class="swiper-slide video-box">
+	              	<img src="{#$detail_litpic#}" width="100%" height="100%">
+	              	<div class="imgplay"><img src="{#$templets_skin#}images/viplay.png" alt=""></div>
+	              </div>
+	              {#/if#}
+	              {#foreach from=$detail_pics item=pic#}
+	              <div class="swiper-slide"><img src="{#changeFileSize url={#$pic.path#} type='large'#}" width="100%" height="100%"></div>
+	              {#/foreach#}
+	          </div>
+	          <div class="swiper-pagination"></div>
+	    </div>
+	    <div class="markBox">
+	    	{#if !empty($detail_video)#}
+			<a href="javascript:;" class="pmark curr video"><i class="ivIcon"></i>视频</a>
+			{#/if#}
+			<a href="javascript:;" class="pmark picture">图片</a>
+		</div>
+	</div>
+	<!-- 视频图片轮播 e-->
+
+
+
+	<!-- 商品信息s -->
+	<div class="shopInfo">
+		<div class="info_price fn-clear"><span class="jifen"><i class="jf"></i>{#$detail_point#}</span> <b>+</b> <span class="nprice"><em>{#echoCurrency type='symbol'#}</em>{#$detail_price#}</span></div>
+		<h2>{#$detail_title#}</h2>
+        <p class="des">{#$detail_description#}</p>
+		<div class="bo_info"><span class="yprice">原价: {#echoCurrency type='symbol'#}{#$detail_mprice#}</span><span class="yunfei">运费: {#$detail_freight#}{#echoCurrency type='short'#}</span><span class="xiaol">兑换量: {#$detail_sales#}笔</span></div>
+	</div>
+	<!-- 商品信息e -->
+
+	<!-- 图文详情 s-->
+	<div class="goods_detail">
+		<ul class="det-tab">
+			<li class="active">图文详情 <s></s></li>
+		</ul>
+		<div class="det-con picshow show">
+			{#if $detail_mbody#}{#$detail_mbody#}{#else#}{#$detail_body#}{#/if#}
+		</div>
+	</div>
+	<!-- 图文详情 e-->
+
+
+{#if $detail_inventory#}
+<a href="javascript:;" class="want">我要兑换</a>
+{#else#}
+<a href="javascript:;" class="want disabled">我要兑换</a>
+{#/if#}
+
+<div class="mask"></div>
+
+<div class="footBox">
+	<div class="deBox fn-clear">
+		<img src="{#$detail_litpic#}" alt="" class="fn-left">
+		<div class="txtbox fn-left">
+			<p class="orange"><span class="spJf"><i class="jf"></i>{#$detail_point#}</span> <b>+</b> <span class="price"><em>{#echoCurrency type='symbol'#}</em>{#$detail_price#}</span></p>
+			<p class="ku">库存: {#$detail_inventory#} 件</p>
+		</div>
+		<a href="javascript:;" class="closed"></a>
+	</div>
+	<div class="btnBox fn-clear">
+		<span class="fn-left">兑换数量</span>
+		<div class="btn fn-right">
+			<span class="reduce">-</span>
+			<span class="count" data-inventory="{#$detail_inventory#}">1</span>
+			<span class="add{#if $detail_inventory <= 1#} disabled{#/if#}">+</span>
+		</div>
+	</div>
+  {#*
+	<div class="select">
+		<p class="fn-clear"><span class="fn-left">兑换方式</span></p>
+		<p class="radio">
+      {#$usePoint = 0#}
+      {#if $detail_point / $cfg_pointRatio == $detail_price#}
+      {#$usePoint = 1#}
+      <a href="javascript:;" class="active" data-type="point">全{#$cfg_pointName#}</a>
+      {#else#}
+      <a href="javascript:;" class="disabled" data-type="point">全{#$cfg_pointName#}</a>
+      {#/if#}
+      <a href="javascript:;"{#if $usePoint == 0#} class="active" data-type="blend"{#/if#}>{#$cfg_pointName#}+现金</a>
+    </p>
+	</div>
+  *#}
+  {#if $detail_inventory#}
+  <a href="javascript:;" class="sureBtn" data-page="{#getUrlPath service="integral" template="confirm-order"#}">兑换</a>
+  {#else#}
+  <a href="javascript:;" class="sureBtn disabled">兑换</a>
+  {#/if#}
+
+</div>
+
+
+	<!-- 视频图片弹出层 s-->
+	<div class="videoModal">
+		<div class="swiper-container">
+			  <i class="vClose"></i>
+	          <div class="swiper-wrapper">
+	          	  {#if !empty($detail_video)#}
+	              <div class="swiper-slide">
+	              	<video width="100%" height="100%" controls preload="meta" x5-video-player-type="h5" x5-playsinline playsinline webkit-playsinline  x5-video-player-fullscreen="true" id="video" src="{#$detail_video#}"  poster="{#$detail_litpic#}"></video>
+	              </div>
+	              {#/if#}
+	              <div class="swiper-slide"><img src="{#$templets_skin#}upfile/vposter.png"></div>
+	              <div class="swiper-slide"><img src="{#$templets_skin#}upfile/vposter.png"></div>
+	          </div>
+	          <div class="swiper-pagination"></div>
+	    </div>
+	</div>
+	<!-- 视频图片弹出层 e-->
+
+<!-- 底部悬浮 s -->
+	<!--<div class="wechat">-->
+	  <!--<a href="javaScript:;"><i></i></a>-->
+	<!--</div>-->
+	<!--<div class="my">-->
+	  <!--<a href="{#$member_userDomain#}"><i></i></a>-->
+	<!--</div>-->
+	<!--<div class="gotop">-->
+	  <!--<a href="javaScript:;"><i></i></a>-->
+	<!--</div>-->
+	<!-- 底部悬浮 e-->
+<div class="wechat-popup">
+	<div class="con">
+		<a href="javascript:;" class="close">×</a>
+		{#if $cfg_weixinQr#}
+		<dl><dt><img src="{#$cfg_weixinQr#}"></dt><dd>{#$cfg_weixinName#}<br>微信中长按识别</dd></dl>
+		{#/if#}
+		{#if $cfg_miniProgramQr#}
+		<dl><dt><img src="{#$cfg_miniProgramQr#}"></dt><dd>{#$cfg_miniProgramName#}<br>微信中长按识别</dd></dl>
+		{#/if#}
+	</div>
+</div>
+
+	<!-- 图片放大 -->
+	{#include file="../../../siteConfig/bigimg_1.2.html"#}
+<script>
+	var atpage = 1,
+		pageSize = 20,
+		keywords = '{#$keywords#}';
+</script>
+<script type="text/javascript"  src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$cfg_staticPath#}js/ui/iscroll.js" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$detail_description|replace:"\r\n":""#}',
+		"title": '{#$detail_title#}',
+		"imgUrl": '{#$detail_litpic#}',
+		"link": '{#getUrlPath service='integral' template='detail' id=$detail_id#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+</body>
+</html>

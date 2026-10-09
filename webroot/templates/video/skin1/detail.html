@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#$detail_title#} - {#$list_typename#} - {#$video_channelName#} - {#$cfg_webname#}</title>
+<meta name="keywords" content="{#$video_keywords#}" />
+<meta name="description" content="{#$video_description#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/jquery.mCustomScrollbar.min.css" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/video-js.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="//g.alicdn.com/de/prismplayer/2.9.3/skins/default/aliplayer-min.css">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" charset="utf-8" src="https://g.alicdn.com/de/prismplayer/2.9.3/aliplayer-min.js"></script>
+<script type="text/javascript" charset="utf-8" src="{#$templets_skin#}js/aliplayercomponents-1.0.5.min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$video_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+	var criticalPoint = 1200, criticalClass = "w1450";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}';
+	var aid = {#$detail_id#};
+	var price = "{#$price#}";
+	var followId = '{#$detail_user.userid#}';
+	var userUrl = "{#getUrlPath service="video" templates="personal" id="{#$detail_user.userid#}"#}";
+</script>
+</head>
+
+<body class="w1200">
+{#$pageUrl = {#getUrlPath service="video" template="detail" id=$detail_id#}#}
+{#include file="_header.html"#}
+
+<div class="bg_color">
+	<div class="middle-content fn-clear">
+
+		<div class="mleft">
+			<div class="pic_area">
+				{#if $detail_user#}
+				<div class="intro name_title fn-clear">
+
+					<div class="user_img"><a href="{#getUrlPath service="video" templates="personal" id="{#$detail_user.userid#}"#}" target="_blank"><img src="{#$detail_user.photo#}"></a></div>
+
+					<div class="user_txt">
+						<h2>{#$detail_title#}</h2>
+						{#* 管理员 *#}
+						{#* 粉丝 -- 视频 *#}
+						<p><a href="{#getUrlPath service="video" templates="personal" id="{#$detail_user.userid#}"#}" target="_blank">{#if $detail_user.nickname#} {#$detail_user.nickname#} {#else#}{#$langData['video'][0][12]#} {#/if#}</a><span>{#$langData['siteConfig'][19][847]#}：{#$detail_follow_num#}</span><span> {#$langData['siteConfig'][38][89]#}：{#$detail_video_num#}</span></p>
+					</div>
+					{#* 已关注 -- 关注 *#}
+					<div class="guanzhu {#if $detail_is_follow#}follow{#else#}isfollow{#/if#}">
+						<div class="follwa">
+							{#if $detail_is_follow#}
+							<a href="{#getUrlPath service="video" templates="personal" id="{#$detail_user.userid#}"#}" target="_blank">{#$langData['siteConfig'][19][845]#}</a>
+							{#else#}
+							<a href="javascript:;"><i></i>{#$langData['siteConfig'][19][846]#}</a>
+							{#/if#}
+						</div>
+
+						<div class="appo_sec">
+                            <p><i></i>关注成功！</p>  {#*  关注成功！   *#}
+                        </div>
+					</div>
+				</div>
+				{#/if#}
+				<div class="content" id="playercontainer">
+					<!-- vip或者付费才能观看 -->
+					{#if $openvideo ==0#}
+					<div class="needWrap">
+						{#if in_array('3',$videochargearr) && in_array('1',$videochargearr)#}
+						{#* 当前视频需要付费或会员才能观看哦~ *#}
+							<h2 class="tit">{#$langData['video'][0][5]#}</h2>
+						{#elseif in_array('3',$videochargearr)#}
+							<h2 class="tit">{#$langData['video'][0][28]#}</h2>
+						{#elseif in_array('1',$videochargearr)#}
+							<h2 class="tit">{#$langData['video'][0][27]#}</h2>
+						{#/if#}
+
+						{#if in_array('3',$videochargearr)#}
+						{#* 付费后可无限次观看 *#}
+						<p class="tip">{#$langData['video'][0][6]#}</p>
+						{#/if#}
+
+						{#if in_array('1',$videochargearr) && !in_array('3',$videochargearr)#}
+						{#* 开通会员可免费观看更多视频 *#}
+						<p class="tip">{#$langData['video'][0][7]#}</p>
+						{#/if#}
+						<!-- needA vip和付费 两种情况 -->
+						{#if in_array('3',$videochargearr)#}
+						{#* 立即付费观看 *#}
+						<a href="javascript:;" class="money needA">付费{#echoCurrency type='symbol'#}{#$price#}立即观看</a>
+						{#elseif in_array('1',$videochargearr)#}
+						{#* 立即开通 *#}
+						<a href="{#getUrlPath service="member" type="user" template="upgrade"#}" class="levelVip needA">{#$langData['siteConfig'][6][185]#}</a>
+						{#/if#}
+
+						{#if !$userinfo#}
+						{#* 已是会员或已购买 -- 请登录*#}
+						<div class="has {#if in_array('1',$videochargearr) && in_array('3',$videochargearr)#}speHas{#/if#}">{#$langData['video'][0][9]#}，<a href="{#$cfg_basehost#}/login.html">{#$langData['video'][0][10]#}><i></i></a></div>
+						{#/if#}
+					</div>
+					{#/if#}
+					<!-- 此处也可以换成是广告位  需要会员又需要收费的时候-->
+					{#if in_array('1',$videochargearr) && in_array('3',$videochargearr)#}
+					<div class="vipNeed">
+						<i></i>
+						{#* 开通会员可免费观看 -- 立即开通*#}
+						<span>{#$langData['video'][0][11]#}</span>
+						<a href="{#getUrlPath service="member" type="user" template="upgrade"#}">{#$langData['siteConfig'][6][185]#}</a>
+
+					</div>
+					{#/if#}
+					{#if $detail_videotype == 1#}
+					<iframe src="{#$detail_videourl#}" frameborder="0" width="970" height="522" allowfullscreen="true"></iframe>
+					{#else#}
+					<div id="J_prismPlayer"></div>
+					<!--<video id="my-video" class="video-js vjs-big-play-centered" controls preload="auto" width="640" height="264"
+					  poster="{#$detail_litpic#}" data-setup="{}">
+						<source src="{#$detail_videourl#}" >
+						<p class="vjs-no-js">
+						 	您的浏览器版本过低，请升级您的浏览器！
+						</p>
+				  </video>-->
+					{#/if#}
+				</div>
+				<div class="share_friends fn-clear">
+					<div class="left_share">
+						<span>分享给朋友 : </span>
+						<a href="http://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?url={#$pageUrl#}&title={#$detail_title#}&pics={#$detail_litpic#}" class="left_2" target="_blank"><i></i></a>
+						<a href="http://service.weibo.com/share/share.php?url={#$pageUrl#}&title={#$detail_title#}" class="left_3" target="_blank"><i></i></a>
+						<a href="http://connect.qq.com/widget/shareqq/index.html?title={#$detail_title#}&url={#$pageUrl#}&desc={#$detail_description#}&pics=&site={#$cfg_softname#}" class="left_4" target="_blank"><i></i></a>
+						<s>|</s>
+					</div>
+					<div class="middle_share">
+						{#*<a href="javascript:;" class="middle_1"><i></i><span>收藏</span></a>*#}
+						<a href="javascript:;" class="middle_3"><i></i><span>手机看</span>
+							<div class="phone_icon">
+								<p>扫码访问</p><img src="{#$cfg_basehost#}/include/qrcode.php?data={#$pageUrl#}"><s></s>
+							</div>
+						</a>
+					</div>
+				</div>
+			</div>
+
+			{#if $detail_description#}
+			<div class="vabout">
+				<h4>视频简介</h4>
+				<div class="vcon">
+					{#$detail_description#}
+				</div>
+			</div>
+			{#/if#}
+
+			<div class="laugh_fans">
+				<!-- 评论区 -->
+				<div id="comment"></div>
+				<div class="comment">
+					<div class="c-title fn-clear">
+						<h4>精彩评论<small>文明上网理性发言，请遵守<a href="{#getUrlPath service='siteConfig' template='protocol' title='评论服务协议'#}" target="_blank">评论服务协议</a></small></h4>
+						<a href="javascript:;" class="tnum">共0条评论</a>
+					</div>
+					<div class="c-area">
+						<div class="textarea" contenteditable="true" data-type="parent"></div>
+						<div class="c-sub fn-clear">
+							{#if $userinfo#}
+							<div class="np-login">
+								<a href="{#$member_userDomain#}" target="_blank" class="u"><img onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_40.jpg';" src="{#if $userinfo.photo == ""#}{#$cfg_staticPath#}images/noPhoto_40.jpg{#else#}{#changeFileSize url="{#$userinfo.photo#}" type="small"#}{#/if#}" /><span>{#$userinfo.nickname#}</span></a>
+								<a href="{#$cfg_basehost#}/logout.html" class="o logout">安全退出</a>
+							</div>
+							<a href="javascript:;" class="subtn">发表</a>
+							<div class="vip_sticker">
+								<a href="javascript:;" class="class_sticker"><i></i>表情</a>
+							</div>
+							{#else#}
+							<a href="javascript:;" class="subtn login">登录</a>
+							{#/if#}
+						</div>
+					</div>
+					<div class="c-content">
+						<ul class="c-nav fn-clear">
+							<li>全部评论</li>
+							<li class="c-orderby fn-clear"><a href="javascript:;" class="chot" data-id="hot">热度</a><a href="javascript:;" class="ctime active" data-id="time">时间</a></li>
+						</ul>
+						<ul class="c-list" id="commentList" data-page="1">
+							<div class="loading"></div>
+						</ul>
+						<div id="loadMore" class="loading">加载更多</div>
+					</div>
+				</div>
+				<div class="listen_me">
+					<a href="#comment">发表评论</a>
+				</div>
+				<!-- 评论区 -->
+			</div>
+
+		</div>
+
+		<div class="mright">
+
+			{#if $detail_businessinfo!='' || $detail_foodcount > 0 || $detail_albumcount > 0#}
+			<div class="tabBox">
+				<ul>
+					{#* 商家 *#}
+					{#if $detail_businessinfo!=''#}
+					<li><a href="javascript:;">{#$langData['siteConfig'][0][3]#}</a></li>
+					{#/if#}
+
+					{#*商品 *#}
+					{#if $detail_foodcount > 0#}
+					<li><a href="javascript:;">{#$langData['siteConfig'][16][25]#}</a></li>
+					{#/if#}
+
+					{#*专辑 *#}
+					{#if $detail_albumcount > 0#}
+					<li><a href="javascript:;">{#$langData['video'][0][13]#}</a></li>
+					{#/if#}
+				</ul>
+			</div>
+
+			<div class="listContainer">
+
+				{#if $detail_businessinfo!=''#}
+				<div class="good_list same_list show">
+					<ul>
+					{#$n =1#}
+					{#video action="businesslist" return="business" businessinfo="{#$detail_businessinfo#}" pageSize="1000" page="1"#}
+					<li>
+					  <a href="{#$business.url#}" target="_blank">
+						<div class="goodImg">
+						  <em>{#$n#}</em>
+						  <img src="{#if $business.logopath#}{#$business.logopath#}{#else#}{#$cfg_staticPath#}images/404.jpg{#/if#}" onerror="javascript:this.src='{#$cfg_staticPath#}images/404.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+						<div class="goodInfo">
+						  <h3>{#$business.title#}</h3>
+						  <span class="goBuy">去查看</span></div>
+					  </a>
+					</li>
+					{#$n = $n+1#}
+					{#/video#}
+					</ul>
+				</div>
+				{#/if#}
+
+				{#if $detail_foodcount > 0#}
+				<div class="good_list same_list show">
+					<ul>
+					{#$n =1#}
+					{#video action="goodlist" return="good" vid="{#$detail_id#}" pageSize="1000" page="1"#}
+					<li>
+					  <a href="{#$good.goodsurl#}" target="_blank">
+						<div class="goodImg">
+						  <em>{#$n#}</em>
+						  <img src="{#if $good.litpic#}{#$good.litpic#}{#else#}{#$cfg_staticPath#}images/404.jpg{#/if#}" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+						<div class="goodInfo">
+						  <h3>{#$good.title#}</h3>
+						  {#$priceArr = "."|explode:$good.price#}
+						  <p class="price">{#echoCurrency type='symbol'#}<strong>{#$priceArr[0]#}</strong>.{#$priceArr[1]#}</p>
+						  <span class="goBuy">去购买</span></div>
+					  </a>
+					</li>
+					{#$n = $n+1#}
+					{#/video#}
+					</ul>
+				</div>
+				{#/if#}
+				{#if $detail_albumcount > 0#}
+				<div class="albumlist same_list">
+					<ul>
+					{#video action="alist" return="album" orderby="2" album="{#$detail_album#}" pageSize="1000" page="1"#}
+					<li><a href="{#$album.url#}" target="_blank">
+						<div class="top_img">
+							<img src="{#if $album.litpic#}{#$album.litpic#}{#else#}{#$cfg_staticPath#}images/404.jpg{#/if#}" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';">
+							{#if $album.times#}
+							<div class="scInfo">
+								<span class="time">{#$album.times#}</span>
+							</div>
+							{#/if#}
+							<div class="need">
+								{#if $album.videocharge == 3#}
+								<span class="money">付费</span>
+								{#/if#}
+								{#if $album.videocharge == 1#}
+								<span class="vip">VIP</span>
+								{#/if#}
+							</div>
+						</div>
+						<div class="vInfo">
+							<h3>{#$album.title#}</h3>
+							<p>{#$album.click#}次播放</p>
+						 </div>
+					</a></li>
+					{#/video#}
+					</ul>
+				</div>
+				{#/if#}
+
+			</div>
+			{#/if#}
+
+			<!-- 猜你喜欢 -->
+			<div class="about_advise">
+				<div class="about_title">
+					<p>猜你喜欢</p>
+				</div>
+				<div class="back_screat albumlist">
+					<ul>
+					{#video action="alist" return="album" flag="r" pageSize="5"#}
+					<li><a href="{#$album.url#}">
+					  	<div class="top_img">
+				      		<img src="{#if $album.litpic#}{#$album.litpic#}{#else#}{#$cfg_staticPath#}images/404.jpg{#/if#}" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';">
+							{#if $album.times#}
+				      		<div class="scInfo">
+				        		<span class="time">{#$album.times#}</span>
+				     		</div>
+				     		{#/if#}
+							<div class="need">
+								{#if $album.videocharge == 3#}
+								<span class="money">付费</span>
+								{#/if#}
+								{#if $album.videocharge == 1#}
+								<span class="vip">VIP</span>
+								{#/if#}
+							</div>
+					  	</div>
+					  	<div class="vInfo">
+						    <h3>{#$album.title#}</h3>
+						    <p>{#$album.click#}次播放</p>
+						 </div>
+					</a></li>
+					{#/video#}
+					</ul>
+				</div>
+			</div>
+			<!-- 猜你喜欢 -->
+
+		</div>
+
+	</div>
+</div>
+{#include file="_footer.html"#}
+
+<script type="text/template" id="replaytemp">
+	<div class="c-area">
+		<div class="textarea" contenteditable="true"></div>
+		<div class="c-sub fn-clear">
+			{#if $userinfo#}
+			<a href="javascript:;" class="subtn">回复</a>
+			{#else#}
+			<a href="javascript:;" class="subtn login">登录</a>
+			{#/if#}
+		</div>
+	</div>
+</script>
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.SuperSlide.2.1.1.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/jquery.mCustomScrollbar.concat.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/videojs-ie8.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/video.min.js"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}"></script>
+{#if $openvideo == 1#}
+	{#if $detail_videotype == 0 && $startTime>0#}
+	 <script>
+		 var source = '{#$detail_videourl#}';
+			if($("#J_prismPlayer").size()>0){
+				var player = new Aliplayer({
+						id: "J_prismPlayer",
+						autoplay: true,
+						isLive: false,
+						playsinline: true,
+						width:"100%",
+						height:"100%",
+						useH5Prism:true,
+						useFlashPrism:false,
+						source:source,
+						cover:"{#$detail_litpic#}",
+						components: [
+							{
+						      name: 'StartADComponent',
+						      type: AliPlayerComponent.StartADComponent,
+						      args: ['{#$startlitpicPath#}','{#$startUrl#}', '{#$startTime#}']
+						    }, 
+							{
+						      name: 'PauseADComponent',
+						      type: AliPlayerComponent.PauseADComponent,
+						      args: ['{#$pauselitpicPath#}', '{#$pauseUrl#}']
+						    },
+							{
+							  name: 'StopADComponent',
+							  type: AliPlayerComponent.StopADComponent,
+							  args: ['{#$endlitpicPath#}', '{#$endUrl#}']
+							},
+						]
+					});
+			}
+	 </script>
+	 {#else#}
+	 <script>
+		 var source = '{#$detail_videourl#}';
+			if($("#J_prismPlayer").size()>0){
+				var player = new Aliplayer({
+						id: "J_prismPlayer",
+						autoplay: true,
+						isLive: false,
+						playsinline: true,
+						width:"100%",
+						height:"100%",
+						useH5Prism:true,
+						useFlashPrism:false,
+						source:source,
+						cover:"{#$detail_litpic#}",
+						
+					});
+			}
+	 </script>
+	{#/if#}
+{#/if#}
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+  <title>绑定打印机管理</title>
+  {#$cssFile#}
+  <script>
+    var action = "{#$action#}", adminPath = "{#$adminPath#}",cityList = {#json_encode($city)#};
+  </script>
+  <style>
+    body {background-color: #fff;}
+    .statusSwitch, .orderValidSwitch, .unitShowSwitch, .authTypeSwitch {display: none;}
+    #shopList .shopNameInput, #shopList .tagInput, #shopList .orderPrefixInput {font-size:12px; color:black; display:none; width:100%;}
+    .pop-one {background: #fff; border-radius:3px; position: fixed; top: 21%; left: 50%; margin-left: -135px;}
+    .pop-two {width:400px; background: #fff; border-radius:3px; position: fixed; top: 21%; left: 50%; margin-left: -135px;}
+    .meng {background:rgba(0,0,0,.5); position: fixed; width: 100%; height: 100%; left: 0; top: 0; z-index:9999;}
+    .feng {background:rgba(0,0,0,.5); position: fixed; width: 100%; height: 100%; left: 0; top: 0; z-index:9999;}
+    .pop-one .pop-cont {line-height: 25px; padding: 12px 10px; border-bottom: 1px solid #d2d6da;}
+    .pop-bottom a {text-align: center; height: 40px; line-height: 40px; color: #007aff;}
+    .pop-bottom a:first-child {border-right:1px solid #d2d6da;}
+    .align-center, .div-align-center {text-align: center;}
+    .webkit-box1 {display: -webkit-box; width: 100%;}
+    .webkit-box1 >* {-webkit-box-flex: 1; width: 100%; display: block;}
+    .order_true {cursor:pointer;} .aa{display:none;}
+    .mybtn {float: right;}
+    .pagination {display: block; text-align: right;}
+    .pagination div {margin: 0;}
+    .pagination .page_info {display: inline-block; line-height: 35px; margin-left: 15px;}
+    .pagination ul>li.page_current span {background: #e8e8e8;}
+    #shop_list_choose_chosen {width:200px !important;}
+    td.fastedit {position: relative;}
+    td.fastedit:hover {background-color: #82af6f !important;color: #fff;}
+    /*td.fastedit:after {opacity:0;content:"快速编辑";position:absolute;left:0;top:0;right:0;text-align:center;background: #82af6f;color:#fff;-webkit-transition:top .3s ;transition:top .3s ;}*/
+    /*td.fastedit:hover::after {opacity:1;top:-15px;}*/
+    .popbox{display: none !important; opacity: 0;}
+    .ulbox .dropdown-menu{border-radius: 6px !important; padding-left: 4px; padding-right: 4px;}
+    .ulbox .dropdown{float: left;  position: relative;}
+    .ulbox .dropdown a.dropdown-toggle{padding: 4px 12px; border-radius: 4px;}
+    .ulbox .dropdown-toggle .caret{margin-top: 0 !important; vertical-align: middle; margin-left: 4px;}
+  </style>
+</head>
+
+<div class="main-content">
+  <div class="alert alert-success" style="margin:10px 100px 0 20px;"><button type="button" class="close" data-dismiss="alert">×</button>打印机配置教程：<a href="https://help.kumanyun.com/help-212-760.html" target="_blank">https://help.kumanyun.com/help-212-760.html</a></div>
+
+  <div class="page-content">
+    <!-- /section:settings.box -->
+    <div class="page-content-area">
+
+      <div class="meng aa">
+        <div class="pop-two">
+          <div class="pop-cont align-center">
+            <p><span style="position:relative;">店铺链接</span></p>
+            <p class="seeurl"></p>
+          </div>
+          <div class="pop-bottom webkit-box1"><a class="order_true">确定</a></div>
+        </div>
+      </div>
+      <div class="feng aa">
+        <div class="pop-one">
+          <div class="pop-cont align-center">
+            <p><span style="position:relative;">店铺二维码</span></p>
+            <p id="seeticket"></p>
+          </div>
+          <div class="pop-bottom webkit-box1"><a class="order_true">确定</a></div>
+        </div>
+      </div>
+      <div class="">
+        <div class="col-xs-12">
+          <div id="shopList" class="grid-view">
+            <form action="shopPrintBinding.php" method="get" id="searchf">
+              <table class="table table-striped table-bordered table-hover">
+                <thead>
+                <tr>
+                  <th id="shopList_c12">城市</th>
+                  <th id="shopList_c0">店铺名称</th>
+                  <th id="shopList_c1">打印机</th>
+                  <th id="shopList_c10" style="text-align:center;">操作</th>
+                </tr>
+                <tr class="filters">
+                  <td><div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}"></div></td>
+                  <td><input name="shopname" type="text" maxlength="20" value="{#$shopname#}"></td>
+                  <td><input name="printcode" type="text" maxlength="20" value="{#$printcode#}"></td>
+                  <td><input type="submit" style="display: none;" /></td>
+                </tr>
+                </thead>
+                <tbody>
+                {#foreach from=$list item=l#}
+                <tr data-url="{#$l.url#}" data-id="{#$l.id#}">
+                  <td width="40">{#$l.cityname#}</td>
+                  {#if $l.branchid#}
+                  <td width="300"><a href="shopBranchStoreAdd.php?dopost=edit&id={#$l.branchid#}&id={#$l.id#}" data-id="{#$l.id#}" class="shopname">{#$l.shopname#} ({#$l.branchtitle#}的分店)</a></td>
+                  {#else#}
+                  <td width="300"><a href="shopStoreAdd.php?dopost=edit&id={#$l.id#}" data-id="{#$l.id#}" class="shopname">{#$l.shopname#}</a></td>
+                  {#/if#}
+                  <td width="300" class="noPadding" style="padding-top:2px; padding-bottom:0;">
+                    <ul class="nav ulbox">
+                      {#if $l.printInfo#}
+                      {#foreach from=$l.printInfo item=f#}
+
+                      <li class="dropdown" data-id="{#$f.id#}" data-pid="{#$f.id#}">
+                        <a href="javascript:;" class="dropdown-toggle" data-toggle="dropdown">{#$f.title#}<b class="caret"></b></a>
+                        <ul class=" dropdown-menu">
+<!--                          <li><a href="javascript:;" class="edit_btn">DIY自定义</a></li>-->
+<!--                          <li class="divider"></li>-->
+                          <li><a href="javascript:;" class="del_btn">删除</a></li>
+                        </ul>
+                      </li>
+                      {#/foreach#}
+                      {#/if#}
+                    </ul>
+                  </td>
+                  <td nowrap="nowrap" width="80" style="text-align:center;">
+                    <a href="javascript:;" class="bindPrint">绑定打印机</a>
+                  </td>
+                </tr>
+                {#/foreach#}
+                {#if $list|@count == 0#}
+                <tr>
+                  <td colspan="12" style="height: 200px; line-height: 200px; text-align: center;">没有找到数据.</td>
+                </tr>
+                {#/if#}
+                </tbody>
+              </table>
+            </form>
+            {#$pagelist#}
+
+          </div>
+        </div>
+      </div>
+      <div class="popbox">
+        <table class="ui_border ui_state_visible ui_state_focus ui_state_lock">
+          <tbody>
+          <tr>
+            <div class="headbox">
+              <div class="ui_title ui_title_bar">选择打印机</div>
+              <div class="ui_title_buttons">
+                <a href="javascript:;" class="close_btn ui_close">×</a>
+              </div>
+            </div>
+          </tr>
+          <tr>
+            <td  class="ui_main">
+              <div class="ui_content" id="printList"  >
+                <table class="table table_list table-striped table-bordered table-hover">
+                  <thead>
+                  <td class="row3">选择</td>
+                  <td class="row20">打印机标题</td>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="popBtns ui_buttons">
+                <input type="button"  value="绑定" class="ui_state_highlight" id="bindPrint">
+                <input type="button" value="取消" id="cancelbtn">
+              </div>
+            </td>
+          </tr>
+          </tbody>
+
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {#$jsFile#}

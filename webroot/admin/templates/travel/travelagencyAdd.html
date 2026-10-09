@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<link rel="stylesheet" href="/static/css/ui/kalendae.css" type="text/css" charset="utf-8">
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+  modelType = "travel", adminPath = "{#$adminPath#}", mapCity = "{#$cfg_mapCity#}";
+  var cityid = {#$cityid#}, cityList = {#$cityList#}, addr = {#$addrid#};
+  var imglist = {"imgpics": {#$pics#}, "imglist": {#$imglist#}};
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="title">景点名称：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="title" id="title" value="{#$title#}" data-regex=".{1,60}"/>
+      <span class="input-tips"><s></s>请输入2-30字</span>
+    </dd>
+  </dl>
+  <dl id="companyInfo" class="clearfix">
+    <dt><label for="zjcom">所属店铺：</label></dt>
+    <dd style="position:static;">
+      <input class="input-xlarge" type="text" name="zjcom" id="zjcom" value="{#$zjcom#}" autocomplete="off" />
+      <input type="hidden" name="comid" id="comid" value="{#$comid#}" />
+      <span class="input-tips"><s></s>请选择所属店铺</span>
+      <div id="comList" class="popup_key"></div>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="addrid">所属地区：</label></dt>
+    <dd>
+			<div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id="{#$addrid#}">{#if $addrid != ""#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}</div>
+			<input type="hidden" name="addrid" id="addrid" value="{#$addrid#}" />
+		<input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+      <span class="input-tips"><s></s>请选择所属地区</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="typeid">选择分类：</label></dt>
+    <dd class="radio">
+      {#html_radios name="typeid" values=$typeidopt checked=$typeid output=$typeidnames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt>价格：</dt>
+    <dd>
+      <div class="input-prepend input-append" style="margin-bottom:0">
+        <input class="input-mini" id="price" name="price" type="text" data-regex="0|\d*\.?\d+" value="{#$price#}">
+        <span class="add-on">{#echoCurrency type="short"#}</span>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="address">详细地址：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" maxlength="60" data-regex=".{2,60}" />
+      <span class="input-tips"><s></s>请输入详细地址，2-60位</span>
+    </dd>
+  </dl>
+
+  <dl id="sendtime" class="clearfix {#if $typeid!=1#}hide{#/if#}">
+    <dt><label for="missiontime">发团时间：</label></dt>
+    <dd>
+      <label><input type="radio" name="missiontype" {#if $missiontype ==0 #} checked="" {#/if#} value="0">天天发团</label>&nbsp;&nbsp;
+      <label><input type="radio" name="missiontype" {#if $missiontype ==1 #} checked="" {#/if#} value="1">自选发团</label>
+    </dd>
+  </dl>
+  <dl id="groupChose" class="clearfix {#if $typeid!=1 || $missiontype !=1#}hide{#/if#}">
+    <dt><label for="grouptime">选择日期：</label></dt>
+    <dd>
+      <input type="text" class="auto-kal" data-kal="months: 2, direction: 'future',mode:'multiple'" id="grouptime" value="{#$missiontime#}">
+      <span class="input-tips"><s></s>请选择发团日期</span>
+    </dd>
+  </dl>
+  <dl id="ywday" class="clearfix {#if $typeid!=1#}hide{#/if#}">
+    <dt><label for="tag">游玩天数：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="number" name="ywday" id="ywday"  maxlength="40" value="{#$ywday#}">
+      <span class="input-tips"><s></s>请直接填写天数</span>
+    </dd>
+  </dl>
+
+  <dl id="agencytag" class="clearfix">
+    <dt><label for="tag">景点特色：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="tag" id="tag" maxlength="100" value="{#$tag#}">
+      <span class="input-tips"><s></s>多个请用|分隔</span>
+    </dd>
+  </dl>
+
+
+  <dl class="clearfix">
+    <dt><label for="travelservice">所属旅行社：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="travelservice" id="travelservice" maxlength="100" data-regex=".{1,100}" value="{#$travelservice#}">
+      <span class="input-tips"><s></s>请填写所属旅行社</span>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt>景点图片：</dt>
+		<dd class="listImgBox hide">
+			<div class="list-holder">
+				<ul id="listSection4" class="clearfix listSection piece"></ul>
+				<input type="hidden" name="pics" value='{#$pics#}' class="imglist-hidden">
+			</div>
+			<div class="btn-section clearfix">
+				<div class="uploadinp filePicker" id="filePicker4" data-type="album" data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist="imgpics"><div id="flasHolder"></div><span>添加图片</span></div>
+				<div class="upload-tip">
+					<p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+				</div>
+			</div>
+		</dd>
+  </dl>
+
+  <dl class="clearfix" id="type0">
+    <dt>景点视频：</dt>
+    <dd>
+		<input name="video" type="hidden" id="video" value="{#$video#}" />
+		<div class="spic{#if $video == ""#} hide{#/if#}">
+			<div class="sholder" id="videoPreview">
+				 <a href="/include/videoPreview.php?f=" data-id="{#$video#}">预览视频</a>
+			</div>
+			<a href="javascript:;" class="reupload">重新上传</a>
+		</div>
+		<iframe src ="/include/upfile.inc.php?mod=travel&type=video&obj=video&filetype=video" style="width:100%; height:25px;{#if $video != ""#} display: none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="expense">费用说明：</label></dt>
+    <dd>
+        <script id="expense" name="expense" type="text/plain" style="width:85%;height:200px">{#$expense#}</script>
+        <!-- <textarea class="input-xxlarge" name="expense" id="expense" rows="5">{#$expense#}</textarea> -->
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="instructions">购买须知：</label></dt>
+    <dd>
+        <script id="instructions" name="instructions" type="text/plain" style="width:85%;height:200px">{#$instructions#}</script>
+        <!-- <textarea class="input-xxlarge" name="instructions" id="instructions" rows="5">{#$instructions#}</textarea> -->
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>行程路线：</label></dt>
+    <dd id="notice" class="notice">
+      {#if $dopost == "edit"#}
+      {#if $itinerary|@count neq 0#}
+      {#foreach from=$itinerary key=id item=n#}
+      <dl>
+        <dt><input type="text" class="dt" value="{#$n.title#}" /></dt>
+        <dd><textarea class="dd">{#$n.note#}</textarea></dd>
+        <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span title="添加" class="add"><i class="icon-plus"></i></span>
+      </dl>
+      {#/foreach#}
+      {#else#}
+      <a href="javascript:;" class="btn btn-small addNotice">新增一项</a>
+      {#/if#}
+      {#else#}
+      <dl>
+        <dt><input type="text" class="dt" placeholder="请输入标题" value="" /></dt>
+        <dd><textarea class="dd" placeholder="请输入内容"></textarea></dd>
+        <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span title="添加" class="add"><i class="icon-plus"></i></span>
+      </dl>
+      <a href="javascript:;" class="btn btn-small addNotice">新增一项</a>
+      {#/if#}
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt>图文介绍：</dt>
+    <!-- <dd><script id="note" name="note" type="text/plain" style="width:85%;height:500px">{#$note#}</script></dd> -->
+    <dd>
+        <script id="note" name="note" type="text/plain" style="width:85%;height:500px">{#$note#}</script>
+        <!-- <textarea class="input-xxlarge" name="note" id="note" rows="8">{#$note#}</textarea> -->
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt>图片：</dt>
+    <dd class="listImgBox hide">
+      <div class="list-holder">
+        <ul id="listSection5" class="clearfix listSection piece"></ul>
+        <input type="hidden" name="imglist" value='{#$imglist#}' class="imglist-hidden">
+      </div>
+      <div class="btn-section clearfix">
+        <div class="uploadinp filePicker" id="filePicker5" data-type="album" data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist="imglist"><div id="flasHolder"></div><span>添加图片</span></div>
+        <div class="upload-tip">
+          <p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+        </div>
+      </div>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+      <dt><label>星级：</label></dt>
+      <dd>
+          {#html_radios name="flag" values=$flagopt checked=$flag output=$flagnames separator="&nbsp;&nbsp;"#}
+    </dd>
+    </dl>
+
+  <dl class="clearfix">
+    <dt><label for="click">浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+      <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+      <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="state">显示状态：</label></dt>
+    <dd class="radio">
+      {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$editorFile#}
+{#$jsFile#}
+<script src="/static/js/ui/kalendae.standalone.js" type="text/javascript" charset="utf-8"></script>
+</body>
+</html>

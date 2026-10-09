@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<title>{#$detail_title#}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/store-detail-tuan.css?v=1{#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$shop_channelDomain#}',staticPath = '{#$cfg_staticPath#}';
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+	jQuery = $;
+	var storeid = {#$detail_id#};
+	var imconfig = {
+		chatid:"{#$detail_userid#}"
+	}
+	var pageData = {
+        id: "{#$detail_id#}",
+        title: "{#$detail_title#}",
+        address: "{#if $detail_address#}{#$detail_address#}{#else#}{#$detail_addr[$detail_addr|count-2]#} {#$detail_addr[$detail_addr|count-1]#}{#/if#}",
+        lat: "{#$detail_lat#}",
+        lng: "{#$detail_lng#}",
+        mapType: '{#$site_map#}',
+        mapKey: '{#$site_map_key#}'
+    };
+    var colNum = '{#$detail_collectnum#}';
+    var detail_video='{#$detail_video#}';
+    var serviceTime = '{#$smarty.now#}';
+		var lnglat = '{#$detail_lnglat#}';
+		var cityname = '{#$siteCityInfo["name"]#}'
+		var cityid = '{#$detail_cityid#}'
+</script>
+</head>
+<body class="">
+	{#$pageCurr = ''#}
+	<!-- 头部 -->
+	{#include file="../../../siteConfig/touch_top.html"  pageTitle="" headTheme="transparent"#}
+	<!-- 头部 end -->
+	<div class="banner topSwiper">
+
+	  <div class="wrapper">
+	      <div class="swiper-container" id="banContainer">
+	          <div class="swiper-wrapper">
+	          	{#$len = 0#}
+	          	{#if $detail_video#}
+	            <div class="swiper-slide video-box" >
+	                <img src="{#$detail_pics[0].path#}">
+	                <div class="imgplay"><img src="{#$templets_skin#}images/viplay2.png" alt=""></div>
+	            </div>
+	            {#/if#}
+
+				  {#if $detail_litpicpath#}
+				  {#$len = $len + 1#}
+				  <div class="swiper-slide">
+					  <div class="bannerImg" ><img src="{#$detail_litpicpath#}" alt="" onerror="this.src='/static/images/404.jpg'" ></div>
+					  <div class="reflection"><img src="{#$detail_litpicpath#}" alt="" onerror="this.src='/static/images/404.jpg'" ></div>
+				  </div>
+				  {#else#}
+				  {#$len = $len + 1#}
+				  <div class="swiper-slide" >
+					  <div class="bannerImg"><img src="{#$detail_pics[0].path#}" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+					  <div class="reflection"><img src="{#$detail_pics[0].path#}" alt=""></div>
+				  </div>
+				  {#/if#}
+	          	{#foreach from=$detail_pics item="img" key='k'#}
+	          	{#if ($k + $len) < 5#}
+	              <div class="swiper-slide">
+	              	<div class="bannerImg"><img src="{#$img.path#}" alt="" onerror="this.src='/static/images/404.jpg'" ></div>
+	              	<div class="reflection"><img src="{#$img.path#}" alt="" onerror="this.src='/static/images/404.jpg'" ></div>
+	              </div>
+	              {#/if#}
+	          	{#/foreach#}
+	          </div>
+	          <div class="pagination"></div>
+	      </div>
+	  </div>
+
+	  <div class="shopCollect">
+	  	<div class="collectInfo {#if $detail_collect == 1#}cared{#/if#}">
+	  		<i class="ciocn "></i>
+	  		<em class="line"></em>
+	  		<div class="buscollect">
+	  			{#if $detail_collect != 1#}
+	  			<h2>关注商家</h2>{#if $detail_collectnum > 0#}<p>{#$detail_collectnum#}人已关注</p>{#/if#}
+	  			{#else#}
+	  			<h2>已关注</h2> <!-- <p>订阅商家动态</p> -->
+	  			{#/if#}
+	  		</div>
+	  	</div>
+	  	<!-- 图集数量 -->
+	  	<div class="imgCout"><i></i><span>{#count($detail_pics) + 1#}</span></div>
+	  </div>
+	</div>
+	<!-- <div class="container"> -->
+		<div class="infoWrap">
+			<div class="shopInfo">
+				<div class="shopTop">
+					<h2>{#$detail_title#}</h2>
+					<p>
+						{#if $detail_authattrtype && $detail_authattrparam#}<span class="renzheng">认证</span>{#/if#}
+						{#$rateArr = "%"|explode:$detail_rating#}
+						<span class="haoping"><i></i><span>{#if $rateArr[0]#}{#($rateArr[0]/20)|string_format:"%.1f"#}{#else#}<em style="color: #999; font-size: .24rem; line-height: .34rem;">暂无评分</em>{#/if#}</span></span> <!--						<span class="rateInfo"><em>口味4.8</em><em>服务5.0</em><em>环境4.9</em></span>-->
+					</p>
+					<a href="javascript:;" class="topmore"></a>
+				</div>
+				<div class="openInfo">
+					<div class="openDet"><span>{#if $detail_yingye == 0#}休息中{#else#}营业中{#/if#}</span>{#if $detail_yingye == 0#}{#$detail_daystr#} {#join(',',$detail_periodarr)#}营业{#else#}{#join(',',$detail_periodarr)#}{#/if#}</div>
+					<div class="other">
+						{#if $detail_merchant_deliver == 1 || $detail_distribution == 1#}
+							{#if $detail_merchant_deliver == 1#}<span>商家配送</span>{#else#}<span>平台配送</span>{#/if#}
+						{#/if#}
+
+						{#if $detail_toshop == 1#}
+						<span>到店消费</span>
+						{#/if#}
+						{#if $detail_express == 1#}
+						<span>快递</span>
+						{#/if#}
+						{#foreach from= $detail_facilityarr item=facility#}
+						<em>{#$facility#}</em>
+						{#/foreach#}
+					</div>
+					<a href="javascript:;" class="openmore"></a>
+				</div>
+				<div class="shopOther">
+					<div class="shopAddr">
+						<h2>{#if $detail_address#}{#$detail_address#}{#else#}{#$detail_addr[$detail_addr|count-2]#} {#$detail_addr[$detail_addr|count-1]#}{#/if#}</h2>
+						<p>距您<em class="distance">0km</em></p> <!--前端需要计算一下距离-->
+					</div>
+					<div class="shopContact">
+						<a href="javascript:;" class="appMapBtn"></a>
+						<a href="tel:{#$detail_tel#}" class="shopTel"></a>
+					</div>
+				</div>
+			</div>
+		</div>
+		{#if count($detail_madvertisear) > 0#}
+		<div class="advBox">
+			<div class="swiper-container">
+				<div class="swiper-wrapper">
+					<!--样式有问题 手机端$detail_madvertisear pc端 $detail_padvertise-->
+
+					{#foreach from=$detail_madvertisear item="adv"#}
+					<div class="swiper-slide">
+						<div class="siteAdvObj">
+							<a href="{#$adv.link#}" target="_blank">
+								<img src="{#$adv.picpath#}" onerror="this.src='/static/images/404.jpg'" width="100%" height="" alt="">
+							</a>
+						</div>
+						<!-- <div class="slideinfo">
+							<h3><a href="{#$adv.link#}" target="_blank">{#$adv.title#}</a></h3>
+						</div> -->
+					</div>
+					{#/foreach#}
+
+
+				</div>
+
+			</div>
+		</div>
+		{#/if#}
+
+		<div class="activity" {#if count($detail_madvertisear) == 0#}style="padding-top:.4rem;"{#/if#}>
+            {#if $detail_huodongarr#}
+			{#$huodongtypearr = array_column($detail_huodongarr,'huodongtype')#}
+            {#else#}
+            {#$huodongtypearr = array()#}
+            {#/if#}
+			{#$hdNum = 0#}
+			{#if $detail_huodongarr #}
+				{#if in_array('1',$huodongtypearr) || in_array('2',$huodongtypearr) || in_array('4',$huodongtypearr)#}
+				<!-- 爆热活动 s-->
+				<div class="baoreBox fn-hide">
+					<div class="titTop"><strong>爆热活动</strong></div>
+					<div class="swiper-container">
+						<div class="swiper-wrapper">
+							{#$i = 0#}
+							{#foreach from=$detail_huodongarr key = k item=huodong#}
+
+								{#$nowtime = time()#}
+								{#if $huodong.huodongtype!=3 && in_array($huodong['pid'],$detail_explosionidarr)#}
+							<div class="swiper-slide {#if $huodong.huodongtype ==1 || $huodong.huodongtype ==2#} xianshi {#elseif $huodong.huodongtype== 4#} pintuan {#/if#}" >
+								<a href="{#getUrlPath service='shop' template='detail'  id={#$huodong.pid#}#}">
+									<div class="{#if $huodong.huodongtype ==4#}hd_img{#else#}saleImg{#/if#}"><img src="{#$huodong.litpic#}" alt="" onerror="this.src='/static/images/404.jpg'"></div>
+									<div class="{#if $huodong.huodongtype ==4#}hd_info{#else#}saleInfo{#/if#}">
+										<h2>{#$huodong.title#}</h2>
+										{#if $huodong.huodongtype ==4#}
+										<!-- 未开始 -->
+											{#if $nowtime < $huodong.ktime#}
+											<div class="ptdjs" data-time="{#$huodong.ktime#}"><span class="day">00</span><em class="daypot">天</em><span class="hour">00</span><em class="hourpot">时</em><span class="minute">00</span><em>分</em><i>后开始</i></div>
+											{#else#}
+											<div class="pt_list">
+												<ul>
+													{#foreach from=$huodong.huodongjoinarr item=pic#}
+													<li><img src="{#$pic.photopath#}" alt="" onerror="this.src='/static/images/404.jpg'"></li>
+													{#/foreach#}
+												</ul>
+												{#if $huodong.huodongjoinnum > 0#}
+												<p><span>{#$huodong.huodongjoinnum#}</span>人已参团</p>
+												{#else#}
+												<p style="margin-left:0; color: #F7262E">火热拼团中</p>
+												{#/if#}
+
+											</div>
+											{#/if#}
+										{#/if#}
+										<div class="salePrice fn-clear">							{#$priarr = explode('.', $huodong.huodongprice)#}
+											<p class="newPrice">{#echoCurrency type='symbol'#}<span>{#$priarr[0]#}</span><em>.{#$priarr[1]#}</em></p>
+											<p class="oldPrice"><span>{#if $huodong.huodongtype ==4#}团购价{#else#}价格{#/if#}</span><s>{#echoCurrency type='symbol'#}{#$huodong.mprice#}</s></p>
+										</div>
+										{#$cls = ''#}
+										{#$clstxt = ''#}
+										{#$pintxt = ''#}
+										{#if $nowtime > $huodong.etime#}
+										<!-- 已经结束 -->
+											{#$cls = 'disabled'#}
+											{#$clstxt = '活动已结束~'#}
+											{#$pintxt = '已结束'#}
+										{#elseif $huodong.ktime <= $nowtime && $huodong.etime >$nowtime#}
+											{#$clstxt = '活动中'#}
+											{#$pintxt = '去拼团'#}
+										{#else#}
+											{#$clstxt = '预热中'#}
+											{#$pintxt = '提前加购'#}
+										{#/if#}
+										{#if $huodong.huodongtype ==2#}
+										<div class="huod {#$cls#}">
+											<p class="huodTxt">限时秒杀</h3>
+											<p class="huodState">{#$clstxt#}</h3>
+										</div>
+										{#else if $huodong.huodongtype ==1#}
+										<div class="huod qg {#$cls#}">
+											<p class="huodTxt">限时抢购</h3>
+											<p class="huodState">{#$clstxt#}</h3>
+										</div>
+										{#else if $huodong.huodongtype ==4#}
+										<span class="btn_pin {#$cls#}">{#$pintxt#}</span>
+										{#/if#}
+									</div>
+								</a>
+							</div>
+								{#$i = $i + 1#}
+								{#$hdNum = $hdNum + 1#}
+								{#/if#}
+							{#/foreach#}
+
+						</div>
+						<div class="pagination"></div>
+					</div>
+				</div>
+				<!-- 爆热活动 e-->
+				{#/if#}
+			{#else#}
+			<!-- 没有活动时 s-->
+			<div class="saleOne">
+				<div class="titTop"><strong>本店热销</strong><i></i></div>
+				{#shop action="slist" return="list" orderby=1 store="{#$detail_id#}" pageSize=1 page=1 #}
+				<div class="saleGoods">
+					<a href="{#$list.url#}">
+						<div class="saleImg"><img src="{#$list.litpic#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+						<div class="saleInfo">
+							<h2>{#$list.title#}</h2>
+							<span class="cutdown">立省{#$list.mprice-$list.price#}</span>
+							<div class="salePrice fn-clear">
+								{#$priceArr = "."|explode:$list.price#}
+								<p class="newPrice">{#echoCurrency type='symbol'#}<span>{#$priceArr[0]#}</span><em>.{#$priceArr[1]#}</em></p>
+								<p class="oldPrice"><span>价格</span><s>{#echoCurrency type='symbol'#}{#$list.mprice#}</s><span class="hssale">已售{#$list.sales#}</span></p>
+
+								<span class="qg">抢购</span>
+							</div>
+						</div>
+					</a>
+				</div>
+				{#/shop#}
+			</div>
+			<!-- 没有活动时 e-->
+			{#/if#}
+
+			<!-- 砍价 -->
+			{#if $detail_huodongarr#}
+				{#$b = 0#}
+				{#foreach from=$detail_huodongarr key = k item=huodong#}
+				{#$nowtime = time()#}
+				{#if $huodong.huodongtype == 3 && $b < 1 && in_array($huodong['pid'],$detail_explosionidarr)#}
+
+				<dl class="kanjiaBox" data-ktime="{#$huodong.ktime#}" data-etime="{#$huodong.etime#}" >
+					<dt>
+						<h2>砍价狂欢</h2>
+						{#if $nowtime > $huodong.etime#}
+						<!-- 已经结束 -->
+						<div class="hasOver">活动已结束</div>
+						{#else#}
+						<div class="cutTime">距开始
+							<span class="hh">00</span><em>:</em><span class="mm">00</span><em>:</em><span class="ss">00</span>
+						</div>
+						{#/if#}
+					</dt>
+					<dd>
+						<a href="{#$huodong.url#}">
+							<div class="kj_img">
+								{#if $nowtime <= $huodong.etime#}
+								<label>即将开始</label>
+								{#/if#}
+	                          	<img src="{#$huodong.litpic#}" onerror="this.src='/static/images/404.jpg'">
+							</div>
+							<div class="kj_info">
+								<h2>{#$huodong.title#}</h2>
+								<div class="priceBox fn-clear">
+									<div class="p_tit"></div>
+									{#$pricearr = explode('.', $huodong.huodongprice)#}
+									<div class="p_show ">
+										<h4>{#echoCurrency type="symbol"#}<b>{#$pricearr[0]#}</b><span>.{#$pricearr[1]#}</span></h4>
+										<p>价格<s>{#echoCurrency type="symbol"#}{#$huodong.mprice#}</s></p>
+									</div>
+								</div>
+							</div>
+						</a>
+					</dd>
+				</dl>
+				{#$b = $b+1#}
+				{#/if#}
+				{#/foreach#}
+			{#/if#}
+		</div>
+		<!-- 速递到家 s-->
+		{#if $totalExpress > 0#}
+		<div class="sudiBox">
+			<a href="{#getUrlPath service='shop' template='store-express' id=$detail_id#}">
+				<div>
+					<i class="sudi"></i>
+					<strong>速递到家</strong>
+					<span>异地也能同享优惠！</span>
+				</div>
+				<div>
+					<em>{#$totalExpress#}件商品</em>
+					<s></s>
+				</div>
+
+
+			</a>
+		</div>
+		{#/if#}
+		<!-- 速递到家 e-->
+
+		<div class="shop_container">
+			<div class="headbox">
+				<ul class="{#if $detail_toshop != 1 || ($detail_merchant_deliver != 1 && $detail_distribution != 1)#}singleLi{#/if#}">
+					{#if $detail_toshop == 1#}
+					<li class="curr" data-action="1" data-page="1" data-totalpage="1"><a href="javascript:;">到店优惠</a></li>
+					{#/if#}
+
+					{#if $detail_merchant_deliver == 1 || $detail_distribution == 1#}
+					<li data-action="2" data-page="1" data-totalpage="1" data-isload="0"><a href="javascript:;">同城配送</a></li>
+					{#/if#}
+				</ul>
+			</div>
+
+			<div class="swiper-container" id="tabs-container">
+				<div class="swiper-wrapper box-wrapper">
+
+					<!-- 到店优惠 列表 -->
+					<div class="proBox swiper-slide">
+						<div class="proList fn-clear">
+							<ul class="proUl list_ul1">
+
+							</ul>
+							<ul class="proUl list_ul2">
+
+							</ul>
+						</div>
+						<p class="loading">加载中....</p>
+					</div>
+					<!-- 同城配送 -->
+					<div class="proBox swiper-slide" data-id="{#$siteCityInfo['cityid']#}">
+						{#if $siteCityInfo['cityid'] != $detail_cityid#}
+						<div class="juliWrap">
+							<div class="juliLong"><i class="tip"></i>温馨提示：您当前在<span class="city"></span>	，商家距您<span class="distance"></span></div>
+						</div>
+						{#/if#}
+
+						<div class="proList fn-clear">
+							<ul class="proUl list_ul1">
+							</ul>
+							<ul class="proUl list_ul2">
+							</ul>
+						</div>
+						<p class="loading">加载中....</p>
+					</div>
+
+				</div>
+			</div>
+		</div>
+	<!-- </div> -->
+
+
+	<!-- 店铺信息 -->
+	<div class="pop_box" style="transform:none;">
+		<div class="shopMask"></div>
+		<div class="shopDetailBox ">
+			<div class="shopDetail">
+				<div class="spinfoBox">
+					<div class="spinfo">
+						<div class="sdetail">
+							<h2>{#$detail_title#}</h2>
+							<p>{#if $detail_collectnum > 0#}{#$detail_collectnum#}人关注{#/if#} <span>{#$detail_distance#}</span></p>
+						</div>
+					</div>
+					{#if $detail_collect != 1#}
+					<a href="javascript:;" class="btn-care">关注</a>
+					{#else#}
+					<a href="javascript:;" class="btn-care cared">已关注</a>
+					{#/if#}
+				</div>
+				<div class="proWrap">
+
+
+
+				<!-- 执照 -->
+				<ul class="zhizhaoBox">
+					{#if $detail_authattrtype && $detail_authattrparam#}
+					<li class="rz">
+						<h3>资质认证</h3>
+						<p>商家已通过相关营业资质认证</p>
+						<a href="{#getUrlPath service='shop' template='store-quality' param="storeid={#$detail_id#}"#}" class="zizhiMore">查看<i></i></a>
+					</li>
+					{#/if#}
+					{#if $detail_promotion > 0#}
+					<li class="bzj">
+						<h3>保证金</h3>
+						<p>商家已缴纳{#$detail_promotion#}元店铺保证金</p>
+					</li>
+					{#/if#}
+					<li class="zf">
+						<h3>主流支付</h3>
+						{#$i = 0#}
+						<p>商家支持{#siteConfig action="payment"#}{#if $i < 4#}{#if $i != 0 #}、{#/if#}{#$row['pay_name']#}{#$i = $i + 1#}{#/if#}{#/siteConfig#}等多种主流支付方式</p>
+					</li>
+				</ul>
+
+				<!-- 好评 -->
+				<dl class="haopingBox">
+					<dt>
+						<div>
+							<strong class="sjpf">商家评分</strong>
+							{#$rateArr = "%"|explode:$detail_rating#}
+							<span class="haoping {#if ($rateArr[0]/20) <= 0#}noPoint{#/if#}"><i></i><span>{#if ($rateArr[0]/20) > 0#}{#($rateArr[0]/20)|string_format:"%.1f"#}{#else#}暂无评分{#/if#}</span></span>
+						</div>
+
+						<p>好评率<strong>{#$detail_rating#}</strong></p>
+
+					</dt>
+					<dd class="{#if $detail_score1<= 0#}noPoint{#/if#}">
+						<span class="label">描述相符</span>
+						<div class="scoreLineBox"><div class="scoreLine" style="width: {#$detail_score1 * 20#}%"></div></div>
+						<h3><span class="score">{#if $detail_score1 > 0#}{#$detail_score1#}{#else#}暂无评分{#/if#}</span> {#if $detail_score1 > 3#}高{#else if $detail_score1 >2#}中{#else if $detail_score1 > 0#}低{#/if#}</h3>
+					</dd>
+					<dd class="{#if $detail_score3 <= 0#}noPoint{#/if#}">
+						<span class="label">服务态度</span>
+						<div class="scoreLineBox"><div class="scoreLine" style="width: {#$detail_score3 * 20#}%"></div></div>
+						<h3><span class="score">{#if $detail_score3 > 0#}{#$detail_score3#}{#else#}暂无评分{#/if#}</span> {#if $detail_score3 > 3#}高{#else if $detail_score3 >2#}中{#else if $detail_score3 > 0#}低{#/if#}</h3>
+					</dd>
+					<dd class="{#if $detail_score2 <= 0#}noPoint{#/if#}">
+						<span class="label">物流服务</span>
+						<div class="scoreLineBox"><div class="scoreLine" style="width: {#$detail_score2 * 20#}%"></div></div>
+						<h3><span class="score">{#if $detail_score2 > 0#}{#$detail_score2#}{#else#}暂无评分{#/if#}</span> {#if $detail_score2 > 3#}高{#else if $detail_score2 >2#}中{#else if $detail_score2 > 0#}低{#/if#}</h3>
+					</dd>
+				</dl>
+
+				<!-- 营业信息 -->
+				<div class="yingyeBox">
+					<dl class="yytime">
+						<dt><span class="label">营业时间</span><span>{#$detail_periodstr#}</span></dt>
+						<dd>{#$detail_daystr#}</dd>
+					</dl>
+					{#if count($detail_facilityarr) > 0#}
+					<dl class="yyss">
+						<dt><span class="label">设施服务</span></dt>
+						<dd>
+							{#foreach from=$detail_facilityarr item=f#}
+							<em>{#$f#}</em>
+							{#/foreach#}
+						</dd>
+					</dl>
+					{#/if#}
+				</div>
+
+				<!-- 店铺介绍 -->
+				{#if $detail_note#}
+				<div class="shopintroBox">
+					<div class="spTxt">
+						<h2 class="jstitle">商家介绍</h2>
+						<div class="jieshao">{#$detail_note#}</div>
+					</div>
+				</div>
+				{#/if#}
+				<div class="seeYh">
+					<a href="javascript:;" class="btn_to_pro">查看所有优惠</a>
+				</div>
+				</div>
+
+			</div>
+		</div>
+	</div>
+
+
+	<div class="mask"></div>
+<!-- 底部 -->
+<div class="contact_box">
+	<div>
+		<ul class="fn-clear">
+			<li class="collectBus {#if $detail_collect == 1#}cared{#/if#}"><a href="javascript:;"><i></i><p>{#if $detail_collect != 1#}关注商家{#else#}已关注{#/if#}</p></a></li>
+			<li class="posBus"><a href="javascript:;" class="appMapBtn"><i></i><p>位置</p></a></li>
+			<li class="telBus"><a href="tel:{#$detail_tel#}"><i></i><p>电话</p></a></li>
+		</ul>
+		<a href="javascript:;" class="chat_to chat_to-Link contactBus" data-type="user">联系商家</a>
+	</div>
+
+</div>
+<!-- 底部 end -->
+<!-- 视频图片弹出层 s-->
+<div class="videoModal">
+    <div class="swiper-container">
+        <i class="vClose"></i>
+    	<div class="swiper-bg"></div>
+        <div class="swiper-wrapper">
+
+        </div>
+        <div class="swiper-pagination"></div>
+    </div>
+</div>
+<!-- 视频图片弹出层 e-->
+
+<div class="wechat-popup">
+	<div class="con">
+		<a href="javascript:;" class="close">×</a>
+		{#if $cfg_weixinQr#}
+		<dl><dt><img src="{#$cfg_weixinQr#}"></dt><dd>{#$cfg_weixinName#}<br>微信中长按识别</dd></dl>
+		{#/if#}
+		{#if $cfg_miniProgramQr#}
+		<dl><dt><img src="{#$cfg_miniProgramQr#}"></dt><dd>{#$cfg_miniProgramName#}<br>微信中长按识别</dd></dl>
+		{#/if#}
+	</div>
+</div>
+<div class="topcart" style="display:none;"><div class="cart-con"><div class="cartlist"><ul></ul></div></div></div>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicOpenMap.js"></script>
+<script src="{#$templets_skin#}js/swiper.min_4.2.2.js" type="text/javascript"></script>
+<script src="{#$cfg_staticPath#}js/ui/jquery.fly.min.js" type="text/javascript"></script>
+<script src="{#$cfg_staticPath#}js/ui/noscroll.js" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/jquery.smartScroll.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/ui/iscroll.js" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/common.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/store-detail-tuan.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$shop_description#}',
+		"title": '{#$detail_title#}',
+		"imgUrl": '{#$detail_logo#}',
+		"link": '{#getUrlPath service='shop' template='store-detail' id={#$detail_id#}#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+</body>
+</html>

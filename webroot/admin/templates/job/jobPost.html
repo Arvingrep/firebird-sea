@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>管理招聘职位</title>
+{#$cssFile#}
+<style>
+    .list td.state .tooltip {text-indent: 0;}
+    .list td.state .douyin {font-size: 12px;}
+    .list td.state .douyin0 {color: #cd0200;}
+    .list td.state .douyin1 {color: green;}
+</style>
+</head>
+
+<body>
+<div class="search">
+  搜索：
+  <div class="choseCity"><input type="hidden" id="cityList" name="cityList" placeholder="请选择城市分站" value=""></div>&nbsp;
+  <div class="btn-group" id="typeBtn" data-id="">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">全部分类<span class="caret"></span></button>
+  </div>
+  <div class="btn-group" id="natureBtn">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">职位性质<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="" data-nolist="true">职位性质</a></li>
+        {#foreach $natureListArr as $natureId => $natureTitle#}
+        <li><a href="javascript:;" data-id="{#$natureTitle.value#}" data-nolist="true">{#$natureTitle.zh#}</a></li>
+        {#/foreach#}
+    </ul>
+  </div>
+  发布日期&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期" autocomplete="off">&nbsp;到&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期" autocomplete="off">
+  <input class="input-large" type="search" id="keyword" placeholder="请输入要搜索的关键字">
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>&nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="javascript:;" class="btn btn-warning" id="export">导出数据</a>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="selectBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="1">全选</a></li>
+        <li><a href="javascript:;" data-id="0">不选</a></li>
+      </ul>
+    </div>
+    <button class="btn" data-toggle="dropdown" id="delBtn">删除</button>
+    <div class="btn-group" id="stateBtn"{#if $notice#} data-id="0"{#/if#}>
+		{#if $notice#}
+        <button class="btn dropdown-toggle" data-toggle="dropdown">待审核(<span class="state0"></span>)<span class="caret"></span></button>
+        {#else#}
+        <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="totalCount"></span>)<span class="caret"></span></button>
+        {#/if#}
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>
+        <li><a href="javascript:;" data-id="0">待审核(<span class="state0"></span>)</a></li>
+        <li><a href="javascript:;" data-id="1">已审核(<span class="state1"></span>)</a></li>
+        <li><a href="javascript:;" data-id="2">拒绝审核(<span class="state2"></span>)</a></li>
+        <li><a href="javascript:;" data-id="4">已下架(<span class="state4"></span>)</a></li>
+        <li><a href="javascript:;" data-id="3">已过期(<span class="state3"></span>)</a></li>
+        {#if $douyin#}
+        <li><a href="javascript:;" data-id="5">抖音隐藏(<span class="state5"></span>)</a></li>
+        {#/if#}
+      </ul>
+    </div>
+    <div class="btn-group hide" id="batchAudit">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">批量操作<span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="待审核">待审核</a></li>
+        <li><a href="javascript:;" data-id="已审核">已审核</a></li>
+        <li><a href="javascript:;" data-id="拒绝审核">拒绝审核</a></li>
+        <li><a href="javascript:;" data-id="上架">上架</a></li>
+        <li><a href="javascript:;" data-id="下架">下架</a></li>
+        {#if $douyin#}
+        <li><a href="javascript:;" data-id="抖音展示">抖音展示</a></li>
+        <li><a href="javascript:;" data-id="抖音隐藏">抖音隐藏</a></li>
+        {#/if#}
+      </ul>
+    </div>
+<!--    <div class="btn-group" id="updateBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">延长截止日期<span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="7">延长一星期</a></li>
+        <li><a href="javascript:;" data-id="15">延长半个月</a></li>
+        <li><a href="javascript:;" data-id="30">延长一个月</a></li>
+        <li><a href="javascript:;" data-id="90">延长三个月</a></li>
+        <li><a href="javascript:;" data-id="180">延长半年</a></li>
+        <li><a href="javascript:;" data-id="365">延长一年</a></li>
+      </ul>
+    </div>-->
+    <!--<a href="javascript:;" class="btn" id="updateFabuTime">刷新发布时间</a>-->
+    <!--<a href="jobPostAdd.php" class="btn btn-primary" id="addNew">新增招聘职位</a>-->
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row3">&nbsp;</li>
+  <li class="row20 left">职位名称/职位类别/薪资</li>
+  <li class="row20 left">所属公司/管理员</li>
+  <li class="row10 left">招聘/应聘/浏览次数</li>
+  <li class="row13 left">刷新/置顶</li>
+  <li class="row17 left">发布时间/更新时间/截止时间</li>
+  <li class="row10 left">状态</li>
+  <li class="row7">操作</li>
+</ul>
+
+<div class="list mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="sType"></span>
+  <span id="start"></span>
+  <span id="end"></span>
+</div>
+
+<script>
+  var typeListArr = {#$typeListArr#}, adminPath = "{#$adminPath#}", cityList = {#$cityList#}, douyin = {#$douyin#};
+</script>
+{#$jsFile#}
+</body>
+</html>

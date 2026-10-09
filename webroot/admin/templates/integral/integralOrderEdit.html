@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<style>
+.o-wrap {padding:15px 15px 50px;}
+.o-item {margin:-10px 0 0 0; padding:5px 20px 10px; background:#f9f9f9;}
+.o-item p {margin:0;}
+.o-item table {width:100%; margin:0;}
+.o-item table td {vertical-align:middle;}
+.o-item table td img {width:50px; height:50px;}
+.o-item table td.p-total {color:#f00; font-size:16px;}
+</style>
+<script>
+var action = '{#$action#}', adminPath = "{#$adminPath#}";
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <dl class="clearfix">
+    <dt>订单编号：</dt>
+    <dd class="singel-line">{#$ordernum#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>订单时间：</dt>
+    <dd class="singel-line">{#$orderdate#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>订单状态：</dt>
+    <dd class="singel-line">
+      {#if $orderstate == 0#}
+      <span class="muted">未付款</span>
+      {#elseif $orderstate == 1#}
+      已付款
+      {#elseif $orderstate == 3#}
+      <span class='text-info'>交易成功</span>
+      {#elseif $orderstate == 6#}
+        {#if $retState == 1#}
+          {#if $expDate == 0#}
+            <span class='text-error'>未发货，买家申请退款</span>
+          {#else#}
+            <span class='text-error'>已发货，买家申请退款</span>
+          {#/if#}
+        {#else#}
+          已发货，等待买家收货
+        {#/if#}
+      {#elseif $orderstate == 7#}
+      <span class='text-error'>退款成功</span>
+      {#elseif $orderstate == 10#}
+      <span class='text-error'>关闭</span>
+      {#/if#}
+    </dd>
+  </dl>
+
+  {#if $orderstate == 7#}
+  <dl class="clearfix">
+    <dt>退款时间：</dt>
+    <dd class="singel-line">{#$retOkdate#}</dd>
+  </dl>
+  {#/if#}
+
+
+  {#if ($orderstate == 6 && $retState == 1) || $orderstate == 7#}
+  <div style="padding: 5px 0; background:#f5f5f5;">
+    <dl class="clearfix">
+      <dt>退款原因：</dt>
+      <dd class="singel-line">{#$retType#}</dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>退款说明：</dt>
+      <dd class="singel-line">{#$retNote#}</dd>
+    </dl>
+    {#if $retPics|@count > 0#}
+    <dl class="clearfix">
+      <dt>退款凭证：</dt>
+      <dd class="singel-line">
+        {#foreach from=$retPics item=pics key=k#}
+        <a href="{#$pics.path#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics.val#}&type=small" /></a>
+        {#/foreach#}
+      </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt>申请时间：</dt>
+      <dd class="singel-line">{#$retDate#}</dd>
+    </dl>
+  </div>
+  {#/if#}
+
+
+  {#if $retSnote != ""#}
+  <div style="margin-top: 10px; padding: 5px 0; background:#f5f5f5;">
+    <dl class="clearfix">
+      <dt>卖家回复：</dt>
+      <dd class="singel-line">{#$retSnote#}</dd>
+    </dl>
+    {#if $retSpics|@count > 0#}
+    <dl class="clearfix">
+      <dt>回复凭证：</dt>
+      <dd class="singel-line">
+        {#foreach from=$retSpics item=pics key=k#}
+        <a href="{#$pics.path#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics.val#}&type=small" /></a>
+        {#/foreach#}
+      </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt>回复时间：</dt>
+      <dd class="singel-line">{#$retSdate#}</dd>
+    </dl>
+  </div>
+  {#/if#}
+
+
+
+  <dl class="clearfix">
+    <dt>下单会员：</dt>
+    <dd class="singel-line"><a href="javascript:;" data-id="{#$userid#}" class="userinfo">{#$username#}</a></dd>
+  </dl>
+  
+  <dl class="clearfix">
+    <dt>购买商品：</dt>
+    <dd>
+      <div class="o-item">
+        <table class="table">
+          <thead><tr><th width="50">商品</th><th>&nbsp;</th><th>现金</th><th>积分</th><th>数量</th><th>运费</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><a href="{#$product.url#}" target="_blank"><img src="{#changeFileSize url={#$product.img#} type='small'#}" /></a></td>
+              <td><a href="{#$product.url#}" target="_blank">{#$product.title#}</a></td>
+              <td>{#$product.price#}</td>
+              <td>{#$product.point#}</td>
+              <td>{#$product.count#}</td>
+              <td>{#$freight#}</td>
+            </tr>
+            {#foreach from=$priceinfo item=hui#}
+            <tr><td colspan="5">{#$hui.body#}：</td><td class="p-total" colspan="2">-{#$hui.amount#}</td></tr>
+            {#/foreach#}
+            <tr><td colspan="5">总额：</td><td class="p-total" colspan="2"><span id="tPrice">&yen;{#$orderprice#} + {#$orderpoint#}积分</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </dd>
+  </dl>
+
+  {#if $orderstate != 0#}
+  <dl class="clearfix">
+    <dt>付款方式：</dt>
+    <dd class="singel-line">{#$paytype#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>付款时间：</dt>
+    <dd class="singel-line">{#$paydate#}</dd>
+  </dl>
+  {#/if#}
+
+
+  <dl class="clearfix">
+    <dt>街道地址：</dt>
+    <dd class="radio">
+      <input class="input-xxlarge" type="text" name="address" id="address" value="{#$address#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>收货人姓名：</dt>
+    <dd class="radio">
+      <input class="input-medium" type="text" name="people" id="people" value="{#$people#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>联系电话：</dt>
+    <dd class="radio">
+      <input class="input-xlarge" type="text" name="contact" id="contact" value="{#$contact#}" />
+    </dd>
+  </dl>
+
+  <!-- <dl class="clearfix">
+    <dt>备注：</dt>
+    <dd class="radio">
+      <textarea class="input-xxlarge" type="text" name="note" id="note">{#$note#}</textarea>
+    </dd>
+  </dl> -->
+  
+  {#if $peisongid == 0#}{#/if#}
+
+  {#*已发货*#}
+  {#if $expDate != 0#}
+  <dl class="clearfix">
+    <dt>快递公司：</dt>
+    <dd class="singel-line">{#$expCompany#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>快递单号：</dt>
+    <dd class="singel-line">{#$expNumber#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>发货时间：</dt>
+    <dd class="singel-line">{#$expDate#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>物流跟踪：</dt>
+    <dd class="singel-line"><a href="https://www.baidu.com/s?wd={#$expCompany#} {#$expNumber#}" target="_blank">点击查看</a></dd>
+  </dl>
+  {#/if#}
+    
+  {#if $orderstate == 0 && $expDate == 0#}
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+  {#/if#}
+
+</form>
+
+{#$jsFile#}
+</body>
+</html>

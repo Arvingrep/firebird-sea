@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+	modelType = "pension", adminPath = "{#$adminPath#}",
+	basehost = '{#$basehost#}', subdomain = '{#$subdomain#}', mapCity = "{#$cfg_mapCity#}";
+var cityid = {#$cityid#}, cityList = {#$cityList#},addr = {#$addrid#};
+var imglist = {"imgpics": {#$pics#}};
+</script>
+<style>
+.taocon .many {width: 1000px;}
+.taocon .desc{width: 300px!important;padding: 0;}
+/* .editform .taocon .many input{width: 200px!important;padding: 0;} */
+.taocon .many .move{margin-left: 0px;}
+</style>
+</head>
+<body>
+<div class="btn-group config-nav" data-toggle="buttons-radio">
+  <button type="button" class="btn active">基本资料</button>
+  <button type="button" class="btn">费用详细</button>
+  <button type="button" class="btn">机构信息</button>
+</div>
+
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <input type="submit" class="hide">
+  <div class="item ">
+      <dl class="clearfix">
+        <dt><label for="user">对应会员：</label></dt>
+        <dd style="position:static;">
+          <input class="input-medium" type="text" name="user" id="user" value="{#$username#}" autocomplete="off" />
+          <input type="hidden" name="userid" id="userid" value="{#$userid#}" />
+          <span class="input-tips" style="display:inline-block;"><s></s>此会员可以管理店铺信息</span>
+          <div id="userList" class="popup_key"></div>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="title">店铺名称：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="title" id="title" data-regex=".{2,60}" maxlength="60" value="{#$title#}" />
+          <span class="input-tips"><s></s>请输入店铺名称。</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="price">价格：</label></dt>
+        <dd>
+          <div class="input-prepend input-append" style="margin-bottom:0">
+            <input class="input-mini" id="price" name="price" type="number" data-regex="0|\d*\.?\d+" value="{#$price#}">
+            <span class="add-on">{#echoCurrency type="short"#}</span>
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="addrid">所属地区：</label></dt>
+        <dd>
+          <div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id="{#$addrid#}">{#if $addrid != ""#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}</div>
+          <input type="hidden" name="addrid" id="addrid" value="{#$addrid#}" />
+        <input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+          <span class="input-tips"><s></s>请选择所属地区</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="address">详细地址：</label></dt>
+        <dd>
+          <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" maxlength="60" data-regex=".{2,60}" />
+          <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+          <span class="input-tips"><s></s>请输入详细地址，2-60位</span>
+          <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+        </dd>
+      </dl>
+      <dl class="clearfix">
+          <dt><label for="station">最近车站：</label></dt>
+          <dd><input class="input-xlarge" type="text" name="station" id="station" value="{#$station#}" /></dd>
+        </dl>
+      <dl class="clearfix">
+        <dt><label for="trans">交通方式：</label></dt>
+        <dd><textarea id="trans" name="trans" rows="4" class="input-xxlarge">{#$trans#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="tel">联系电话：</label></dt>
+        <dd><input type="text" class="input-large" id="tel" name="tel" data-regex=".{2,60}" value="{#$tel#}" /><span class="input-tips"><s></s>请输入联系电话</span></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="typeid">机构类型：</label></dt>
+        <dd>
+          <span id="proList">
+            {#html_checkboxes name='typeid' values=$typeidval output=$typeidlist selected=$typeid separator="&nbsp;&nbsp;"#}
+          </span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="servicecontent">服务内容：</label></dt>
+        <dd>
+          <span id="proList">
+            {#html_checkboxes name='servicecontent' values=$servicecontentval output=$servicecontentlist selected=$servicecontent separator="&nbsp;&nbsp;"#}
+          </span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="targetcare">照护对象：</label></dt>
+        <dd>
+          <span id="proList">
+            {#html_checkboxes name='targetcare' values=$targetcareval output=$targetcarelist selected=$targetcare separator="&nbsp;&nbsp;"#}
+          </span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="roomtype">房间类型：</label></dt>
+        <dd>
+          <span id="proList">
+            {#html_checkboxes name='roomtype' values=$roomtypeval output=$roomtypelist selected=$roomtype separator="&nbsp;&nbsp;"#}
+          </span>
+          <span class="input-tips"><s></s>请选择房间类型</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="tag">特色服务：</label></dt>
+        <dd>
+          <span id="proList">
+            {#html_checkboxes name='tag' values=$tagval output=$taglist selected=$tag separator="&nbsp;&nbsp;"#}
+          </span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>店铺图集：</dt>
+        <dd class="listImgBox hide">
+          <div class="list-holder">
+            <ul id="listSection4" class="clearfix listSection piece"></ul>
+            <input type="hidden" name="pics" value='{#$pics#}' class="imglist-hidden">
+          </div>
+          <div class="btn-section clearfix">
+            <div class="uploadinp filePicker" id="filePicker4" data-type="album" data-count="{#$storeatlasMax#}" data-size="{#$atlasSize#}" data-imglist="imgpics"><div id="flasHolder"></div><span>添加图片</span></div>
+            <div class="upload-tip">
+              <p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+            </div>
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="explains">说明：</label></dt>
+        <dd><textarea id="explains" name="explains" rows="4" class="input-xxlarge">{#$explains#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="desc">店铺详情：</label></dt>
+        <dd>
+          <script id="desc" name="desc" type="text/plain" style="width:85%;height:500px">{#$desc#}</script>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label>其他设置：</label></dt>
+        <dd class="radio">
+          <label><input type="checkbox" name="visitday" value="1"{#if $visitday == 1#} checked{#/if#} />参观日</label>&nbsp;&nbsp;
+          <label><input type="checkbox" name="flag" value="1"{#if $flag == 1#} checked{#/if#} />提供试住</label>&nbsp;&nbsp;
+          <label><input type="checkbox" name="award" value="1"{#if $award == 1#} checked{#/if#} />入住有奖</label>
+          <label><input type="checkbox" name="rec" value="1"{#if $rec == 1#} checked{#/if#} />推荐</label>
+          <label><input type="checkbox" name="invite" value="1"{#if $invite == 1#} checked{#/if#} />邀请授权</label>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="visitdaydesc">参观说明：</label></dt>
+        <dd><textarea id="visitdaydesc" name="visitdaydesc" rows="2" class="input-xxlarge">{#$visitdaydesc#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="awarddesc">入住有奖说明：</label></dt>
+        <dd><textarea id="awarddesc" name="awarddesc" rows="2" class="input-xxlarge">{#$awarddesc#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="rzprice">入住奖励：</label></dt>
+        <dd>
+          <div class="input-prepend input-append" style="margin-bottom:0">
+            <input class="input-mini" id="rzprice" name="rzprice" type="number" data-regex="0|\d*\.?\d+" value="{#$rzprice#}">
+            <span class="add-on">{#echoCurrency type="short"#}</span>
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="click">浏览次数：</label></dt>
+        <dd>
+          <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+          <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+          <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="state">显示状态：</label></dt>
+        <dd class="radio">
+          {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix{#if $state != 2#} hide{#/if#}" id="refuseObj">
+        <dt>拒审原因：</dt>
+        <dd>
+            <textarea class="input-xxlarge" rows="2" name="refuse" id="refuse" data-regex=".{0,250}">{#$refuse#}</textarea>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+          <dt><label for="state">商家幻灯广告：</label></dt>
+          <dd class="radio">
+              {#html_radios name="advertising" values=$advertisingopt checked=$advertising output=$advertisingnames separator="&nbsp;&nbsp;"#}
+          </dd>
+          <span class="input-tips" style="display:inline-block;"><s></s>请确认系统基本参数内是否开启商家幻灯广告功能,并配置广告管理中的“商家幻灯广告_养老机构_电脑端”和“商家幻灯广告_养老机构_移动端”</span>
+      </dl>
+
+  </div>
+  <div class="item hide">
+      <dl class="clearfix">
+        <dt><label for="catid">类型：</label></dt>
+        <dd>
+          <span id="proList">
+            {#html_checkboxes name='catid' values=$catidval output=$catidlist selected=$catid separator="&nbsp;&nbsp;"#}
+          </span>
+        </dd>
+      </dl>
+      <div class="catid1 {#if in_array('1', $catid) || empty($catid)#}{#else#}hide{#/if#}">
+          <dl class="clearfix">
+            <dt><label for="institutionadesc">机构养老公告：</label></dt>
+            <dd><textarea id="institutionadesc" name="institutionadesc" rows="2" class="input-xxlarge">{#$institutionadesc#}</textarea></dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="longinstitutionadesc">长住说明：</label></dt>
+            <dd><textarea id="longinstitutionadesc" name="longinstitutionadesc" rows="2" class="input-xxlarge">{#$longinstitutionadesc#}</textarea></dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>入住费用：</label></dt>
+              <dd class="taocon">
+                  <div class="many longrzfee">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>类型</th>
+                                <th width="50%">说明</th>
+                                <th width="15%">费用</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {#if !empty($longexpensesArr)#}
+                              {#foreach from=$longexpensesArr item=tr#}
+                              <tr>
+                                <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                <td>
+                                  <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                </td>
+                              </tr>
+                              {#/foreach#}
+                              {#else#}
+                              <tr>
+                                <td><input type="text" class="tit" value="" /></td>
+                                <td><input type="text" class="desc" value="" /></td>
+                                <td><input type="text" class="pric" value="" /></td>
+                                <td>
+                                  <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                </td>
+                              </tr>
+                              {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>每月床位费：</label></dt>
+              <dd class="taocon">
+                  <div class="many longmouthfee">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>类型</th>
+                                <th width="50%">说明</th>
+                                <th width="15%">费用</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($longbedfeeArr)#}
+                                {#foreach from=$longbedfeeArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>其它月费：</label></dt>
+              <dd class="taocon">
+                  <div class="many longother">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>类型</th>
+                                <th width="50%">说明</th>
+                                <th width="15%">费用</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($longotherfeesArr)#}
+                                {#foreach from=$longotherfeesArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="shortinstitutionadesc">短住说明：</label></dt>
+            <dd><textarea id="shortinstitutionadesc" name="shortinstitutionadesc" rows="2" class="input-xxlarge">{#$shortinstitutionadesc#}</textarea></dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>入住费用：</label></dt>
+              <dd class="taocon">
+                  <div class="many shortrzfee">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>类型</th>
+                                <th width="50%">说明</th>
+                                <th width="15%">费用</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($shortexpensesArr)#}
+                                {#foreach from=$shortexpensesArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>每月床位费：</label></dt>
+              <dd class="taocon">
+                  <div class="many shortmouthfee">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>类型</th>
+                                <th width="50%">说明</th>
+                                <th width="15%">费用</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($shortbedfeeArr)#}
+                                {#foreach from=$shortbedfeeArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>其它月费：</label></dt>
+              <dd class="taocon">
+                  <div class="many shortother">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>类型</th>
+                                <th width="50%">说明</th>
+                                <th width="15%">费用</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($shortotherfeesArr)#}
+                                {#foreach from=$shortotherfeesArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+      </div>
+      <div class="catid2 {#if in_array('2', $catid)#}{#else#}hide{#/if#}">
+          <dl class="clearfix">
+            <dt><label for="homecaredesc">居家养老公告：</label></dt>
+            <dd><textarea id="homecaredesc" name="homecaredesc" rows="2" class="input-xxlarge">{#$homecaredesc#}</textarea></dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="homecareagedesc">居家养老说明：</label></dt>
+            <dd><textarea id="homecareagedesc" name="homecareagedesc" rows="2" class="input-xxlarge">{#$homecareagedesc#}</textarea></dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>餐饮服务：</label></dt>
+              <dd class="taocon">
+                  <div class="many homecyfw">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>服务类型</th>
+                                <th width="50%">价格</th>
+                                <th width="15%">备注</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($homecyfwArr)#}
+                                {#foreach from=$homecyfwArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>照料护理：</label></dt>
+              <dd class="taocon">
+                  <div class="many homezlhl">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>服务类型</th>
+                                <th width="50%">价格</th>
+                                <th width="15%">备注</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($homezlhlArr)#}
+                                {#foreach from=$homezlhlArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>家政服务：</label></dt>
+              <dd class="taocon">
+                  <div class="many homejzfw">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>服务类型</th>
+                                <th width="50%">价格</th>
+                                <th width="15%">备注</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($homejzfwArr)#}
+                                {#foreach from=$homejzfwArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>精神关爱：</label></dt>
+              <dd class="taocon">
+                  <div class="many homejsga">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>服务类型</th>
+                                <th width="50%">价格</th>
+                                <th width="15%">备注</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($homejsgaArr)#}
+                                {#foreach from=$homejsgaArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>集体活动：</label></dt>
+              <dd class="taocon">
+                  <div class="many homejthd">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>服务类型</th>
+                                <th width="50%">价格</th>
+                                <th width="15%">备注</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($homejthdArr)#}
+                                {#foreach from=$homejthdArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+          <dl class="clearfix">
+              <dt><label>托老服务：</label></dt>
+              <dd class="taocon">
+                  <div class="many hometlfw">
+                    <table class="tab">
+                      <tr>
+                        <td class="items">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>服务类型</th>
+                                <th width="50%">价格</th>
+                                <th width="15%">备注</th>
+                                <th width="20%">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                                {#if !empty($hometlfwArr)#}
+                                {#foreach from=$hometlfwArr item=tr#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                  <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                  <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/foreach#}
+                                {#else#}
+                                <tr>
+                                  <td><input type="text" class="tit" value="" /></td>
+                                  <td><input type="text" class="desc" value="" /></td>
+                                  <td><input type="text" class="pric" value="" /></td>
+                                  <td>
+                                    <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                  </td>
+                                </tr>
+                                {#/if#}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+              </dd>
+          </dl>
+      </div>
+      <div class="catid3 {#if in_array('3', $catid)#}{#else#}hide{#/if#}">
+          <dl class="clearfix">
+              <dt><label for="residentialdesc">旅居养老公告：</label></dt>
+              <dd><textarea id="residentialdesc" name="residentialdesc" rows="2" class="input-xxlarge">{#$residentialdesc#}</textarea></dd>
+            </dl>
+            <dl class="clearfix">
+              <dt><label for="residentialagedesc">旅居养老说明：</label></dt>
+              <dd><textarea id="residentialagedesc" name="residentialagedesc" rows="2" class="input-xxlarge">{#$residentialagedesc#}</textarea></dd>
+            </dl>
+            <dl class="clearfix">
+                <dt><label>每日床位费：</label></dt>
+                <dd class="taocon">
+                    <div class="many residentialmouthfee">
+                      <table class="tab">
+                        <tr>
+                          <td class="items">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>户型</th>
+                                  <th width="50%">面积（平米）</th>
+                                  <th width="15%">床费（元）</th>
+                                  <th width="20%">操作</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                  {#if !empty($residentialbedfeeArr)#}
+                                  {#foreach from=$residentialbedfeeArr item=tr#}
+                                  <tr>
+                                    <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                    <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                    <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                    <td>
+                                      <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                    </td>
+                                  </tr>
+                                  {#/foreach#}
+                                  {#else#}
+                                  <tr>
+                                    <td><input type="text" class="tit" value="" /></td>
+                                    <td><input type="text" class="desc" value="" /></td>
+                                    <td><input type="text" class="pric" value="" /></td>
+                                    <td>
+                                      <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                    </td>
+                                  </tr>
+                                  {#/if#}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                </dd>
+            </dl>
+            <dl class="clearfix">
+                <dt><label>其它费用/天：</label></dt>
+                <dd class="taocon" data-id="1">
+                    <div class="many residentialoother">
+                      <table class="tab">
+                        <tr>
+                          <td class="items">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>费用</th>
+                                  <th width="14%">完全自理</th>
+                                  <th width="14%">轻度失能</th>
+                                  <th width="14%">中度失能</th>
+                                  <th width="14%">重度失能</th>
+                                  <th width="14%">失智长者</th>
+                                  <th width="14%">操作</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                  {#if !empty($residentialotherfeesArr)#}
+                                  {#foreach from=$residentialotherfeesArr item=tr#}
+                                  <tr>
+                                    <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                    <td><input type="text" class="pric1" value="{#$tr[1]#}" /></td>
+                                    <td><input type="text" class="pric2" value="{#$tr[2]#}" /></td>
+                                    <td><input type="text" class="pric3" value="{#$tr[3]#}" /></td>
+                                    <td><input type="text" class="pric4" value="{#$tr[4]#}" /></td>
+                                    <td><input type="text" class="pric5" value="{#$tr[5]#}" /></td>
+                                    <td>
+                                      <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                    </td>
+                                  </tr>
+                                  {#/foreach#}
+                                  {#else#}
+                                  <tr>
+                                    <td><input type="text" class="tit" value="" /></td>
+                                    <td><input type="text" class="pric1" value="" /></td>
+                                    <td><input type="text" class="pric2" value="" /></td>
+                                    <td><input type="text" class="pric3" value="" /></td>
+                                    <td><input type="text" class="pric4" value="" /></td>
+                                    <td><input type="text" class="pric5" value="" /></td>
+                                    <td>
+                                      <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                    </td>
+                                  </tr>
+                                  {#/if#}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                </dd>
+            </dl>
+            <dl class="clearfix">
+                <dt><label>会员卡：</label></dt>
+                <dd class="taocon">
+                    <div class="many residentialcard">
+                      <table class="tab">
+                        <tr>
+                          <td class="items">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th width="15%" align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>类型</th>
+                                  <th width="50%">说明</th>
+                                  <th width="15%">费用（元）</th>
+                                  <th width="20%">操作</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                  {#if !empty($residentialcardArr)#}
+                                  {#foreach from=$residentialcardArr item=tr#}
+                                  <tr>
+                                    <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                                    <td><input type="text" class="desc" value="{#$tr[1]#}" /></td>
+                                    <td><input type="text" class="pric" value="{#$tr[2]#}" /></td>
+                                    <td>
+                                      <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                    </td>
+                                  </tr>
+                                  {#/foreach#}
+                                  {#else#}
+                                  <tr>
+                                    <td><input type="text" class="tit" value="" /></td>
+                                    <td><input type="text" class="desc" value="" /></td>
+                                    <td><input type="text" class="pric" value="" /></td>
+                                    <td>
+                                      <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                                    </td>
+                                  </tr>
+                                  {#/if#}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                </dd>
+            </dl>
+      </div>
+  </div>
+  <div class="item hide">
+    <dl class="clearfix">
+      <dt><label for="registration">注册日期：</label></dt>
+      <dd>
+        <div class="input-prepend input-append"><input class="input-small" type="text" name="registration" id="registration" value="{#$registration#}"></div>
+        <label for="buildings" class="ml30">建筑数量：</label>
+        <div class="input-prepend input-append">
+            <input class="input-mini" id="buildings" name="buildings" type="number" data-regex="0|\d*\.?\d+" value="{#$buildings#}">
+            <span class="add-on">栋</span>
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="landarea">土地面积：</label></dt>
+      <dd>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="landarea" id="landarea" value="{#$landarea#}">
+          <span class="add-on">㎡</span>
+        </div>
+        <label for="builtuparea" class="ml30">建筑面积：</label>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="builtuparea" id="builtuparea" value="{#$builtuparea#}">
+          <span class="add-on">㎡</span>
+        </div>
+        <label for="roomarea" class="ml30">房间面积：</label>
+        <div class="input-prepend input-append">
+          <input class="input-large" type="text" name="roomarea" id="roomarea" value="{#$roomarea#}">
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="rooms">房间数量：</label></dt>
+      <dd>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="number" name="rooms" id="rooms" value="{#$rooms#}">
+          <span class="add-on">间</span>
+        </div>
+        <label for="bednums" class="ml30">床位数量：</label>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="number" name="bednums" id="bednums" value="{#$bednums#}">
+          <span class="add-on">张</span>
+        </div>
+        <label for="peoplenums" class="ml30">从业人数：</label>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="number" name="peoplenums" id="peoplenums" value="{#$peoplenums#}">
+          <span class="add-on">人</span>
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="ownedinstitutions">自有医疗机构：</label></dt>
+      <dd><textarea id="ownedinstitutions" name="ownedinstitutions" rows="4" class="input-xxlarge">{#$ownedinstitutions#}</textarea></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="cooperativeinstitutions">合作医疗机构：</label></dt>
+      <dd><textarea id="cooperativeinstitutions" name="cooperativeinstitutions" rows="4" class="input-xxlarge">{#$cooperativeinstitutions#}</textarea></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="diseases">是否接收特殊疾病长者：</label></dt>
+      <dd><textarea id="diseases" name="diseases" rows="4" class="input-xxlarge">{#$diseases#}</textarea></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="careservices">照护服务：</label></dt>
+      <dd><textarea id="careservices" name="careservices" rows="4" class="input-xxlarge">{#$careservices#}</textarea></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="lifeservice">生活服务：</label></dt>
+      <dd><textarea id="lifeservice" name="lifeservice" rows="4" class="input-xxlarge">{#$lifeservice#}</textarea></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="foodsituation">伙食情况：</label></dt>
+      <dd><textarea id="foodsituation" name="foodsituation" rows="4" class="input-xxlarge">{#$foodsituation#}</textarea></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="othernotes">其他说明：</label></dt>
+      <dd><textarea id="othernotes" name="othernotes" rows="4" class="input-xxlarge">{#$othernotes#}</textarea></dd>
+    </dl>
+
+  </div>
+  
+  
+</form>
+
+<div class="fix-btn" style="padding:10px 0 5px 150px;"><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></div>
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

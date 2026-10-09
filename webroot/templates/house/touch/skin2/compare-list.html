@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+{#$pageType=$smarty.get.type#}
+{#if $pageType=='loupan'#}
+{#$pageTitle="楼盘对比"#}
+{#else#}
+{#$pageTitle="房源对比"#}
+{#/if#}
+
+<head>
+    <meta charset="{#$cfg_soft_lang#}">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1,minimum-scale=1.0,maximum-scale=1.0, user-scalable=0">
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no">
+    <title>{#$pageTitle#}</title>
+    <meta name="apptitle" content="{#$pageTitle#}">
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/compare-list.css?v={#$cfg_staticVersion#}">
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript"
+        src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var type = "{#$pageType#}"; //三个值：loupan、sale、zu，分别表示楼盘、二手房、租房
+        var pageId = "{#$smarty.get.id#}";
+        var symbolShort = `{#echoCurrency type='short'#}`; //金钱单位
+        var symbolArea = `{#echoCurrency type='areasymbol'#}`; //面积单位
+    </script>
+</head>
+
+<body>
+    {#include file="../../../siteConfig/touch_top.html" pageTitle="{#$pageTitle#}"#}
+    <div class="Shell" id="Shell" v-cloak>
+        <!-- 楼盘 -->
+        {#if $pageType=='loupan'#}
+        <!-- 之前选择过的 -->
+        <div class="s-store">
+            <div :class="['ss-loupan','drag',{'active':compareArr.includes(item.id)}]" v-for="(item,index) in selfList"
+                :key="index" @touchstart="touchStartFn" @touchmove="toucMoveFn($event,index)"
+                @touchend="touchEndFn($event,index)" @click="selectFn(item.id)"
+                :style="`transform:translateX(-${item.moveDistance}rem);`">
+                <img src="{#$templets_skin#}images/confirmWhite.png" class="ssl-icon">
+                <div class="ssl-content">
+                    <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'" class="picture">
+                    <div class="details">
+                        <div class="title">{{item.title}}</div>
+                        <div class="price">
+                            <span v-if="item.price<=0" style="margin-right: .1rem;"><span>待定</span></span>
+                            <span style="margin-right: .1rem;"
+                                v-else-if="item.ptype==1"><span>{{item.price}}</span>{#echoCurrency
+                                type='short'#}/{#echoCurrency type='areasymbol'#}</span>
+                            <span style="margin-right:.1rem" v-else>{{item.price}}{#echoCurrency
+                                type='short'#}/套</span>
+                            <span>建面{{Number(item.buildarea)}}平</span>
+                        </div>
+                        <div class="address">
+                            <span style="margin-right: .3rem;">{{item.addr.join('-')}}</span>
+                            <!-- <span>10km</span> -->
+                        </div>
+                    </div>
+                </div>
+                <div class="ssl-delete" @click="deleteFn(index)">删除</div>
+            </div>
+        </div>
+        <!-- 推荐 -->
+        <div class="s-list">
+            <div class="sl-tab">
+                <div :class="['slt-item',{'active':activeIndex==0}]" @click="tabFn(0)">猜你喜欢</div>
+                <div :class="['slt-item',{'active':activeIndex==1}]" @click="tabFn(1)">浏览纪录</div>
+            </div>
+            <div class="s-store">
+                <div :class="['ss-loupan',{'active':compareArr.includes(item.id)}]"
+                    v-for="(item,index) in recommendList" :key="index" @click="selectFn(item.id)">
+                    <img src="{#$templets_skin#}images/confirmWhite.png" class="ssl-icon">
+                    <div class="ssl-content">
+                        <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'" class="picture">
+                        <div class="details">
+                            <div class="title">{{item.title}}</div>
+                            <div class="price">
+                                <span v-if="item.price<=0" style="margin-right: .1rem;"><span>待定</span></span>
+                                <span style="margin-right: .1rem;"
+                                    v-else-if="item.ptype==1"><span>{{item.price}}</span>{#echoCurrency
+                                    type='short'#}/{#echoCurrency type='areasymbol'#}</span>
+                                <span style="margin-right:.1rem" v-else>{{item.price}}{#echoCurrency
+                                    type='short'#}/套</span>
+                                <span>建面{{Number(item.buildarea)}}平</span>
+                            </div>
+                            <div class="address">
+                                <span style="margin-right: .3rem;">{{item.addr.join('-')}}</span>
+                                <!-- <span>10km</span> -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="s-loading">{{loadingb?'加载中...':'没有更多了~'}}</div>
+        </div>
+        {#elseif $pageType=='sale'#}
+        <!-- 二手房 -->
+        <div class="s-store">
+            <div :class="['ss-sale','drag',{'active':compareArr.includes(item.id)}]" v-for="(item,index) in selfList"
+                :key="index" @touchstart="touchStartFn" @touchmove="toucMoveFn($event,index)"
+                @touchend="touchEndFn($event,index)" @click="selectFn(item.id)"
+                :style="`transform:translateX(-${item.moveDistance}rem);`">
+                <img src="{#$templets_skin#}images/confirmWhite.png" class="sss-icon">
+                <div class="sss-content">
+                    <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'" class="picture">
+                    <div class="details">
+                        <div class="title">
+                            <div class="label" v-if="item.isbid>0">置顶</div>
+                            <span>{{item.title}}</span>
+                        </div>
+                        <div class="price">
+                            <span class="money">{{item.price>0?`${Number(item.price)}万{#echoCurrency
+                                type='short'#}`:'价格面议'}}</span>
+                            <span class="text">{{item.room}}</span>
+                            <span class="text">{{Number(item.area)}}{#echoCurrency type='areasymbol'#}</span>
+                        </div>
+                        <div class="name">{{item.community}}</div>
+                    </div>
+                </div>
+                <div class="sss-delete" @click="deleteFn(index)">删除</div>
+            </div>
+        </div>
+        <div class="s-list">
+            <div class="sl-tab">
+                <div :class="['slt-item',{'active':activeIndex==0}]" @click="tabFn(0)">猜你喜欢</div>
+                <div :class="['slt-item',{'active':activeIndex==1}]" @click="tabFn(1)">浏览纪录</div>
+            </div>
+            <div class="s-store">
+                <div :class="['ss-sale',{'active':compareArr.includes(item.id)}]" v-for="(item,index) in recommendList"
+                    :key="index" @click="selectFn(item.id)">
+                    <img src="{#$templets_skin#}images/confirmWhite.png" class="sss-icon">
+                    <div class="sss-content">
+                        <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'" class="picture">
+                        <div class="details">
+                            <div class="title">
+                                <div class="label" v-if="item.isbid>0">置顶</div>
+                                <span>{{item.title}}</span>
+                            </div>
+                            <div class="price">
+                                <span class="money">{{item.price>0?`${Number(item.price)}万{#echoCurrency
+                                    type='short'#}`:'价格面议'}}</span>
+                                <span class="text">{{item.room}}</span>
+                                <span class="text">{{Number(item.area)}}{#echoCurrency type='areasymbol'#}</span>
+                            </div>
+                            <div class="name">{{item.community}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="s-loading">{{loadingb?'加载中...':'没有更多了~'}}</div>
+        </div>
+        {#else#}
+        <!-- 租房 -->
+        <div class="s-store">
+            <div :class="['ss-zu','drag',{'active':compareArr.includes(item.id)}]" v-for="(item,index) in selfList"
+                :key="index" @touchstart="touchStartFn" @touchmove="toucMoveFn($event,index)"
+                @touchend="touchEndFn($event,index)" @click="selectFn(item.id)"
+                :style="`transform:translateX(-${item.moveDistance}rem);`">
+                <img src="{#$templets_skin#}images/confirmWhite.png" class="ssz-icon">
+                <div class="ssz-content">
+                    <div class="picture">
+                        <img src="{#$templets_skin#}images/ss.png" class="icon" v-if="item.video">
+                        <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'" class="exhibition">
+                    </div>
+                    <div class="details">
+                        <div class="title">{{item.title}}</div>
+                        <div class="price">{{item.price>0?`${Number(item.price)}{#echoCurrency type='short'#}/月`:'面议'}}
+                        </div>
+                        <div class="address">
+                            <span style="margin-right: .3rem;">{{item.community}}</span>
+                            <!-- <span>10km</span> -->
+                        </div>
+                    </div>
+                </div>
+                <div class="ssz-delete" @click="deleteFn(index)">删除</div>
+            </div>
+        </div>
+        <div class="s-list">
+            <div class="sl-tab">
+                <div :class="['slt-item',{'active':activeIndex==0}]" @click="tabFn(0)">猜你喜欢</div>
+                <div :class="['slt-item',{'active':activeIndex==1}]" @click="tabFn(1)">浏览纪录</div>
+            </div>
+            <div class="s-store">
+                <div :class="['ss-zu',{'active':compareArr.includes(item.id)}]" v-for="(item,index) in recommendList"
+                    @click="selectFn(item.id)">
+                    <img src="{#$templets_skin#}images/confirmWhite.png" class="ssz-icon">
+                    <div class="ssz-content">
+                        <div class="picture">
+                            <img src="{#$templets_skin#}images/ss.png" class="icon" v-if="item.video">
+                            <img :src="item.litpic" onerror="this.src='/static/images/404.jpg'" class="exhibition">
+                        </div>
+                        <div class="details">
+                            <div class="title">{{item.title}}</div>
+                            <div class="price">{{item.price>0?`${Number(item.price)}{#echoCurrency
+                                type='short'#}/月`:'面议'}}</div>
+                            <div class="address">
+                                <span style="margin-right: .3rem;">{{item.community}}</span>
+                                <!-- <span>10km</span> -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="s-loading">{{loadingb?'加载中...':'没有更多了~'}}</div>
+        </div>
+        {#/if#}
+        <!-- 底部按钮 -->
+        <div class="compareBtn" @click="toCompareFn('{#$house_channelDomain#}')">
+            <div>开始对比</div>
+        </div>
+        <div class="popWarn">弹窗提醒</div>
+    </div>
+    <script src="{#$templets_skin#}js/compare-list.js?v={#$cfg_staticVersion#}"></script>
+</body>

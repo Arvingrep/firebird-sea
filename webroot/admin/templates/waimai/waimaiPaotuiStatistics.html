@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>跑腿统计</title>
+{#$cssFile#}
+<script>
+var action = "{#$action#}", adminPath = "{#$adminPath#}";
+var cityid = {#$cityid#}, cityList = {#$cityList#};
+</script>
+<style media="screen">
+.tab-content {overflow: visible;}
+</style>
+</head>
+
+<div class="main-content">
+
+  <div class="page-content">
+    <!-- /section:settings.box -->
+    <div class="page-content-area">
+
+      <div class="">
+        <div class="col-sm-12">
+          <div class="tabbable">
+            <ul class="nav nav-tabs" id="myTab">
+              <li{#if $action == "chartrevenue"#} class="active"{#/if#}><a href="?action=chartrevenue">跑腿营业额统计</a></li>
+              <li{#if $action == "chartorder"#} class="active"{#/if#}><a href="?action=chartorder">订单统计</a></li>
+              <li{#if $action == "chartcourier"#} class="active"{#/if#}><a href="?action=chartcourier">配送员统计</a></li>
+              <!-- <li{#if $action == "financenew"#} class="active"{#/if#}><a href="?action=financenew">财务结算</a></li> -->
+            </ul>
+            <div class="tab-content">
+              <div class="tab-pane active">
+
+                {#if $action == "chartrevenue"#}
+                <div class="widget-box">
+                  <div class="widget-header"><h5>营业额统计-条件选择</h5></div>
+                  <div class="widget-body" style="padding:20px;">
+                      <form id="exportorder-form" class="clearfix">
+                        <input type="hidden" name="action" value="{#$action#}" />
+                        <input type="hidden" name="dopost" value="getresults" />
+                        <label>城市
+                          <br>
+                          <div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}"></div>
+                        </label>
+                        <br />
+                        <label>统计时间段</label>
+                        <input id="beginDate" type="text" class="chooseDate" value="{#$lastMonthDate#}" name="beginDate" />至
+                        <input id="endDate" type="text" class="chooseDate" value="{#$nowDate#}" name="endDate" />
+                        <br />
+                        <br />
+                        <div class="span12" style="margin-left: 0;"><button type="submit" class="btn btn-success">查看统计</button></div>
+                      </form>
+                    </div>
+                </div>
+                <div class="widget-box" style="margin-top: 20px;">
+                  <div class="widget-header">
+                    <h5>统计图</h5></div>
+                  <div class="widget-body" style="padding:20px;">
+                    <div id="chartscontainer"></div>
+                  </div>
+                </div>
+                <div class="">
+                  <div class="col-xs-10">
+                    <div id="shopList" class="grid-view">
+                      <table class="table table-striped table-bordered table-hover">
+                        <thead>
+                          <tr>
+                            <th id="shopList_c0">时间</th>
+                            <th id="shopList_c1">跑腿总金额</th>
+                            <th id="shopList_c4">余额付款</th>
+                            <th id="shopList_c5">在线支付</th>
+                            <th id="shopList_c2">服务费</th>
+                            <th id="shopList_c3">小费</th>
+                        </thead>
+                        <tbody>
+                          {#$total = 0#}
+                          {#$money = 0#}
+                          {#$total = 0#}
+                          {#$online = 0#}
+                          {#$tip = 0#}
+
+                          {#foreach from=$dataArr item=data#}
+                          {#$total = $total + $data.total#}
+                          {#$money = $money + $data.money#}
+                          {#$online = $online + $data.online#}
+                          {#$fuwu = $fuwu + $data.fuwu#}
+                          {#$tip = $tip + $data.tip#}
+                          <tr>
+                            <td style="width: 120px">{#$data.date#}</td>
+                            <td>{#$data.total#}</td>
+                            <td>{#$data.money#}</td>
+                            <td>{#$data.online#}</td>
+                            <td>{#$data.fuwu#}</td>
+                            <td>{#$data.tip#}</td>
+                          </tr>
+                          {#/foreach#}
+                          <tr>
+                              <td style="width: 120px">总计</td>
+                              <td>{#$total|string_format:"%.2f"#}</td>
+                              <td>{#$money|string_format:"%.2f"#}</td>
+                              <td>{#$online|string_format:"%.2f"#}</td>
+                              <td>{#$fuwu|string_format:"%.2f"#}</td>
+                              <td>{#$tip|string_format:"%.2f"#}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="col-xs-2">
+                    <a class="btn btn-success" href="?action={#$action#}&dopost=getresults&do=export&shop_id={#$shop_id#}&beginDate={#$lastMonthDate#}&endDate={#$nowDate#}&cityid={#$cityid#}">导出成excel</a></div>
+                </div>
+                {#elseif $action == "chartorder"#}
+                <div class="widget-box">
+                  <div class="widget-header"><h5>订单统计-条件选择</h5></div>
+                  <div class="widget-body" style="padding:20px;">
+                      <form id="exportorder-form" class="clearfix">
+                        <input type="hidden" name="action" value="{#$action#}" />
+                        <input type="hidden" name="dopost" value="getresults" />
+                        <label>城市
+                          <br>
+                          <div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}"></div>
+                        </label>
+                        <br />
+                        <label>统计时间段</label>
+                        <input id="beginDate" type="text" class="chooseDate" value="{#$lastMonthDate#}" name="beginDate" />至
+                        <input id="endDate" type="text" class="chooseDate" value="{#$nowDate#}" name="endDate" />
+                        <br />
+                        <br />
+                        <div class="span12" style="margin-left: 0;"><button type="submit" class="btn btn-success">查看统计</button></div>
+                      </form>
+                    </div>
+                </div>
+                <div class="widget-box" style="margin-top: 20px;">
+                  <div class="widget-header">
+                    <h5>统计图</h5></div>
+                  <div class="widget-body" style="padding:20px;">
+                    <div id="chartscontainer"></div>
+                  </div>
+                </div>
+                <div class="">
+                  <div class="col-xs-10">
+                    <div id="shopList" class="grid-view">
+                      <table class="table table-striped table-bordered table-hover">
+                        <thead>
+                          <tr>
+                            <th id="shopList_c0">时间</th>
+                            <th id="shopList_c1">成功订单数</th>
+                            <th id="shopList_c2">失败订单数</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {#$success = 0#}
+                          {#$fail = 0#}
+
+                          {#foreach from=$dataArr item=data#}
+                          {#$success = $success + $data.success#}
+                          {#$fail = $fail + $data.fail#}
+                          <tr>
+                            <td style="width: 120px">{#$data.date#}</td>
+                            <td>{#$data.success#}</td>
+                            <td>{#$data.fail#}</td>
+                          </tr>
+                          {#/foreach#}
+                          <tr>
+                              <td style="width: 120px">总计</td>
+                              <td>{#$success#}</td>
+                              <td>{#$fail#}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="col-xs-2">
+                    <a class="btn btn-success" href="?action={#$action#}&dopost=getresults&do=export&shop_id={#$shop_id#}&beginDate={#$lastMonthDate#}&endDate={#$nowDate#}&cityid={#$cityid#}">导出成excel</a></div>
+                </div>
+                {#elseif $action == "chartordertime"#}
+                <div class="widget-box">
+                  <div class="widget-header"><h5>订单统计-条件选择</h5></div>
+                  <div class="widget-body" style="padding:20px;">
+                      <form id="exportorder-form" class="clearfix">
+                        <input type="hidden" name="action" value="{#$action#}" />
+                        <input type="hidden" name="dopost" value="getresults" />
+                        <label>城市
+                          <br>
+                          <div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}"></div>
+                        </label>
+                        <br />
+                        <label>统计时间段</label>
+                        <input id="beginDate" type="text" class="chooseDateTime" value="{#$lastMonthDate#}" name="beginDate" />至
+                        <input id="endDate" type="text" class="chooseDateTime" value="{#$nowDate#}" name="endDate" />
+                        <br />
+                        <br />
+                        <label>选择店铺
+                          <br>
+                          <select class="chosen-select" name="shop_id" id="shop_id">
+                            <option value="0">全部店铺</option>
+                            {#foreach from=$shopArr item=shop#}
+                            <option value="{#$shop.id#}"{#if $shop_id == $shop.id#} selected{#/if#}>{#$shop.shopname#}</option>
+                            {#/foreach#}
+                          </select>
+                        </label>
+                        <br />
+                        <div class="span12" style="margin-left: 0;"><button type="submit" class="btn btn-success">查看统计</button></div>
+                      </form>
+                    </div>
+                </div>
+                <div class="">
+                  <div class="col-xs-10">
+                    <div id="shopList" class="grid-view">
+                      <table class="table table-striped table-bordered table-hover">
+                        <thead>
+                          <tr>
+                            <th id="shopList_c0">时间段</th>
+                            <th id="shopList_c1">成功订单数</th>
+                            <th id="shopList_c2">货到付款成功订单数</th>
+                            <th id="shopList_c3">余额付款成功订单数</th>
+                            <th id="shopList_c4">在线支付成功订单数</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td style="width: 300px">{#$lastMonthDate#} 至 {#$nowDate#}</td>
+                            <td>{#$dataArr[0].success#}</td>
+                            <td>{#$dataArr[0].delivery#}</td>
+                            <td>{#$dataArr[0].money#}</td>
+                            <td>{#$dataArr[0].online#}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                {#elseif $action == "chartcourier"#}
+                <div class="widget-box">
+                  <div class="widget-header"><h5>配送员统计-条件选择</h5></div>
+                  <div class="widget-body" style="padding:20px;">
+                      <form id="exportorder-form" class="clearfix">
+                        <input type="hidden" name="action" value="{#$action#}" />
+                        <input type="hidden" name="dopost" value="getresults" />
+                        <label>城市
+                          <br>
+                          <div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}"></div>
+                        </label>
+                        <br />
+                        <label>统计时间段</label>
+                        <input id="beginDate" type="text" class="chooseDateTime" value="{#$lastMonthDate#}" name="beginDate" />至
+                        <input id="endDate" type="text" class="chooseDateTime" value="{#$nowDate#}" name="endDate" />
+                        <br />
+                        <br />
+                        <label>选择配送员
+                          <br>
+                          <select class="chosen-select" name="courier_id" id="courier_id">
+                            <option value="0">全部</option>
+                            {#foreach from=$courierArr item=courier#}
+                            <option value="{#$courier.id#}"{#if $courier_id == $courier.id#} selected{#/if#}>{#$courier.name#}</option>
+                            {#/foreach#}
+                          </select>
+                        </label>
+                        <br />
+                        <div class="span12" style="margin-left: 0;"><button type="submit" class="btn btn-success">查看统计</button></div>
+                      </form>
+                    </div>
+                </div>
+                <div class="widget-box" style="margin-top: 20px;">
+                  <div class="widget-header">
+                    <h5>统计图</h5></div>
+                  <div class="widget-body" style="padding:20px;">
+                    <div id="chartscontainer"></div>
+                  </div>
+                </div>
+                <div class="">
+                  <div class="col-xs-10">
+                    <div id="shopList" class="grid-view">
+                      <table class="table table-striped table-bordered table-hover">
+                        <thead>
+                          <tr>
+                            <th id="shopList_c0">配送员</th>
+                            <th id="shopList_c2">配送成功</th>
+                            <th id="shopList_c3">配送失败</th>
+                            <th id="shopList_c4">总费用</th>
+                            <th id="shopList_c4">配送费</th>
+                            <th id="shopList_c5">小费</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {#$totalSuccess = 0#}
+                          {#$totalFailed = 0#}
+                          {#$total = 0#}
+                          {#$fuwu = 0#}
+                          {#$tip = 0#}
+
+                          {#foreach from=$dataArr item=data#}
+
+                          {#$totalSuccess = $totalSuccess + $data.totalSuccess#}
+                          {#$totalFailed = $totalFailed + $data.totalFailed#}
+                          {#$total = $total + $data.total#}
+                          {#$fuwu = $fuwu + $data.fuwu#}
+                          {#$tip = $tip + $data.tip#}
+                          <tr>
+                            <td style="width: 120px">{#$data.name#}</td>
+                            <td>{#$data.totalSuccess#}</td>
+                            <td>{#$data.totalFailed#}</td>
+                            <td>{#$data.total#}</td>
+                            <td>{#$data.fuwu#}</td>
+                            <td>{#$data.tip#}</td>
+                          </tr>
+                          {#/foreach#}
+                          <tr>
+                              <td style="width: 120px">总计</td>
+                              <td>{#$totalSuccess#}</td>
+                              <td>{#$totalFailed#}</td>
+                              <td>{#$total|string_format:"%.2f"#}</td>
+                              <td>{#$fuwu|string_format:"%.2f"#}</td>
+                              <td>{#$tip|string_format:"%.2f"#}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="col-xs-2">
+                    <a class="btn btn-success" href="?action={#$action#}&dopost=getresults&do=export&courier_id={#$courier_id#}&beginDate={#$lastMonthDate#}&endDate={#$nowDate#}&cityid={#$cityid#}">导出成excel</a></div>
+                </div>
+                {#/if#}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+{#$jsFile#}
+
+{#if $action == "chartrevenue"#}
+<script>
+  $(function() {
+
+    $('#chartscontainer').highcharts({
+        title: {
+            text: '跑腿营业额统计',
+            x: -20 
+        },
+        xAxis: {
+            categories: {#$timeArr#},
+            labels: {
+                  step: 3,
+            }
+        },
+        yAxis: {
+            title: {
+                text: '收入(元)'
+            },
+            plotLines: [{
+                value: 0,
+                width: 1,
+                color: '#808080'
+            }]
+        },
+        tooltip: {
+            valueSuffix: '元'
+        },
+        series: [{
+            name: '跑腿营业额统计',
+            data: {#$priceArr#}
+        }]
+    });
+            
+  });
+</script>
+{#elseif $action == "chartorder"#}
+<script>
+  $(function () {
+      $('#chartscontainer').highcharts({
+          title: {
+              text: '订单统计',
+              x: -20 //center
+          },
+          xAxis: {
+              categories: {#$timeArr#},
+        labels: {
+              step: 3,
+        }
+          },
+          yAxis: {
+              title: {
+                  text: '订单数（笔）'
+              },
+              plotLines: [{
+                  value: 0,
+                  width: 1,
+                  color: '#808080'
+              }]
+          },
+          tooltip: {
+              valueSuffix: '笔'
+          },
+          series: [{
+              name: '成功订单',
+              data: {#$priceArr#}
+          }, {
+              name: '失败订单',
+              data: {#$priceFailArr#}
+          }]
+      });
+  }); 
+</script>
+{#elseif $action == "chartcourier"#}
+<script>$(function() {
+    $('#chartscontainer').highcharts({
+      title: {
+        text: '配送员统计',
+        x: -20 //center
+      },
+      xAxis: {
+        categories: {#$timeArr#},
+        labels: {
+          step: 3,
+        }
+      },
+      yAxis: {
+        title: {
+          text: '配送数（件）'
+        },
+        plotLines: [{
+          value: 0,
+          width: 1,
+          color: '#808080'
+        }]
+      },
+      tooltip: {
+        valueSuffix: '件'
+      },
+      series: [{
+        name: '配送成功',
+        data: {#$priceArr#}
+    },{
+      name: '配送失败',
+      data: {#$failedArr#}
+    }]
+    });
+  });
+</script>
+{#elseif $action == "financenew"#}
+<script type="text/javascript">
+$(function(){
+    //搜索回车提交
+    $("#shopname").keyup(function (e) {
+        if (!e) {
+            var e = window.event;
+        }
+        if (e.keyCode) {
+            code = e.keyCode;
+        }
+        else if (e.which) {
+            code = e.which;
+        }
+        if (code === 13) {
+
+            var shopname = $.trim($(this).val());
+            if(shopname){
+                $("#shopList tbody").find("tr").each(function(){
+                    var name = $(this).find("td:eq(0)").text();
+                    if(name.indexOf(shopname) < 0){
+                        $(this).hide();
+                    }
+                });
+            }else{
+                $("#shopList tbody tr").show();
+            }
+
+        }
+    });
+});
+</script>
+{#/if#}

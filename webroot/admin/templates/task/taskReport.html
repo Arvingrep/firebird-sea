@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>举报管理</title>
+{#$cssFile#}
+<style>
+.list td {font-size: 15px;}
+.list td small {font-size: 90%;}
+.thead li{font-size: 14px;}
+.thead li .moneyA,.thead li .pointA,.thead li .bonusA,.thead li .recomdA{color: #999;text-decoration: none;}
+.thead li .moneyA.curr,.thead li .pointA.curr,.thead li .bonusA.curr,.thead li .recomdA.curr{color: #2672ec;}
+.thead li .moneyA i,.thead li .pointA i,.thead li .bonusA i,.thead li .recomdA i{display: inline-block;width: 18px;height: 20px;background: url(/static/images/ui/chosen-sprite.png) no-repeat -2px 3px;margin-left: 2px;}
+.thead li .moneyA.up i,.thead li .pointA.up i,.thead li .bonusA.up i,.thead li .recomdA.up i{background: url(/static/images/ui/chosen-sprite.png) no-repeat -20px 3px;}
+.uaccount {padding: 0px 4px; margin-right: 3px; display: inline-block; line-height: 16px; vertical-align: middle; margin-top: -1px; margin-bottom: 2px; color: #b1b1b1; text-align-last: justify;}
+</style>
+</head>
+<body>
+<div class="search">
+  <label>搜索：</label>
+  <input class="input-xxlarge" type="search" id="keyword" placeholder="请输入关键字，指定用户#123，指定商家@123，指定任务$123" style="width: 420px;">
+  &nbsp;&nbsp;举报日期&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期">&nbsp;&nbsp;到&nbsp;&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期">&nbsp;&nbsp;
+  <select class="chosen-select" id="cadmin" style="width: auto;"></select>&nbsp;&nbsp;
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="stateBtn"{#if $notice#} data-id="1"{#/if#}>
+        <button class="btn dropdown-toggle" data-toggle="dropdown">{#if $notice#}审核中{#else#}全部信息{#/if#}(<span class="{#if $notice#}state1{#else#}totalCount{#/if#}"></span>)<span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>
+          <li><a href="javascript:;" data-id="0">维权中(<span class="state0"></span>)</a></li>
+          <li><a href="javascript:;" data-id="1">审核中(<span class="state1"></span>)</a></li>
+          <li><a href="javascript:;" data-id="2">已通过(<span class="state2"></span>)</a></li>
+          <li><a href="javascript:;" data-id="3">已结束(<span class="state3"></span>)</a></li>
+        </ul>
+      </div>
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row2">&nbsp;</li>
+  <li class="row20 left">订单信息</li>
+  <li class="row24 left">用户信息</li>
+  <li class="row17 left">任务时间</li>
+  <li class="row17 left">举报时间</li>
+  <li class="row10 left">状态</li>
+  <li class="row10">操作</li>
+</ul>
+
+<div class="list common mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="start"></span>
+  <span id="end"></span>
+</div>
+
+<script id="editForm0" type="text/html">
+    <style>.quick-editForm{max-height: 600px; overflow-y: auto;}.quick-editForm dt {width: 120px;}.task-items{border-bottom: 1px solid #ccc; margin-bottom: 10px; padding-bottom: 5px;}.task-image{display: inline-block; width: 100px; height: 100px; object-fit: cover;}.ui_main{vertical-align: top;}</style>
+    <form action="" class="quick-editForm" name="editForm">
+        <dl class="clearfix">
+            <dt>订单编号：</dt>
+            <dd><span id="ordernum"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>举报状态：</dt>
+            <dd><span id="state"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>胜诉方：</dt>
+            <dd><span id="winner"></span></dd>
+        </dl>
+        <dl class="clearfix report_admin">
+            <dt>操作管理员：</dt>
+            <dd><span id="admin"></span></dd>
+        </dl>
+        <dl class="clearfix report_admin">
+            <dt>管理员备注：</dt>
+            <dd><span id="note"></span></dd>
+        </dl>
+        <dl class="clearfix report_admin">
+            <dt>操作时间：</dt>
+            <dd><span id="admin_time"></span></dd>
+        </dl>
+        <hr>
+        <dl class="clearfix">
+            <dt>举报人：</dt>
+            <dd><span id="uid"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>举报理由：</dt>
+            <dd><span id="reason"></span></dd>
+        </dl>
+        <dl class="clearfix report_pics">
+            <dt>证据图片：</dt>
+            <dd><span id="pics"></span></dd>
+        </dl>
+        <dl class="clearfix report_video">
+            <dt>证据视频：</dt>
+            <dd><span id="video"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>举报时间：</dt>
+            <dd><span id="pubdate"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>辩诉过期时间：</dt>
+            <dd><span id="expired"></span></dd>
+        </dl>
+        <hr>
+        <dl class="clearfix">
+            <dt>被举报人：</dt>
+            <dd><span id="mid"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>辩诉理由：</dt>
+            <dd><span id="bs_reason"></span></dd>
+        </dl>
+        <dl class="clearfix report_bs_pics">
+            <dt>辩诉图片：</dt>
+            <dd><span id="bs_pics"></span></dd>
+        </dl>
+        <dl class="clearfix report_bs_video">
+            <dt>辩诉视频：</dt>
+            <dd><span id="bs_video"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>辩诉时间：</dt>
+            <dd><span id="bs_pubdate"></span></dd>
+        </dl>
+    </form>
+</script>
+
+<script id="editForm" type="text/html">
+    <style>.quick-editForm{max-height: 600px; overflow-y: auto;}.quick-editForm dt {width: 120px;}.task-items{border-bottom: 1px solid #ccc; margin-bottom: 10px; padding-bottom: 5px;}.task-image{display: inline-block; width: 100px; height: 100px; object-fit: cover;}.ui_main{vertical-align: top;}</style>
+    <form action="" class="quick-editForm" name="editForm">
+        <dl class="clearfix">
+            <dt>订单编号：</dt>
+            <dd><span id="ordernum"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>提交数据：</dt>
+            <dd><span id="tj_data"></span></dd>
+        </dl>
+    </form>
+</script>
+
+<script id="editForm1" type="text/html">
+    <style>.quick-editForm{max-height: 600px; overflow-y: auto;}.quick-editForm dt {width: 120px;}.task-items{border-bottom: 1px solid #ccc; margin-bottom: 10px; padding-bottom: 5px;}.task-image{display: inline-block; width: 100px; height: 100px; object-fit: cover; margin: 0 5px 5px 0;}.quick-editForm p{margin-bottom: 0;}.ui_main{vertical-align: top;}</style>
+    <form action="" class="quick-editForm" name="editForm">
+        <dl class="clearfix">
+            <dt>订单编号：</dt>
+            <dd><span id="ordernum"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>提交记录：</dt>
+            <dd><span id="tj_log"></span></dd>
+        </dl>
+    </form>
+</script>
+
+<script id="editForm2" type="text/html">
+    <style>.quick-editForm{max-height: 600px; overflow-y: auto;}.quick-editForm dt {width: 140px;}.task-items{border-bottom: 1px solid #ccc; margin-bottom: 10px; padding-bottom: 5px;}.task-image{display: inline-block; width: 100px; height: 100px; object-fit: cover;}.ui_main{vertical-align: top;}</style>
+    <form action="" class="quick-editForm" name="editForm">
+        <dl class="clearfix">
+            <dt>任务ID：</dt>
+            <dd><span id="tid"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>任务标题：</dt>
+            <dd><span id="title"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>任务价格：</dt>
+            <dd><span id="price"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>提交限时：</dt>
+            <dd><span id="tj_time"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>审核限时：</dt>
+            <dd><span id="sh_time"></span></dd>
+        </dl>
+        <div class="js_sh_obj hide">
+            <dl class="clearfix">
+                <dt>极速审核限时：</dt>
+                <dd><span id="js_sh_time"></span></dd>
+            </dl>
+            <dl class="clearfix">
+                <dt>极速审核开始时间：</dt>
+                <dd><span id="js_began_time"></span></dd>
+            </dl>
+            <dl class="clearfix">
+                <dt>极速审核结束时间：</dt>
+                <dd><span id="js_end_time"></span></dd>
+            </dl>
+            <dl class="clearfix">
+                <dt>极速审核历史记录：</dt>
+                <dd id="js_log" style="max-height: 265px; overflow-y: auto; margin-right: 100px;"></dd>
+            </dl>
+        </div>
+        <dl class="clearfix">
+            <dt>领取条件/限制：</dt>
+            <dd><span id="note"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>平台说明：</dt>
+            <dd><span id="platform_tips"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>视频讲解：</dt>
+            <dd><span id="video"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>任务步骤：</dt>
+            <dd><span id="steps"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>支付金额：</dt>
+            <dd><span id="amount"></span>(<span id="pay_type"></span>)</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>支付时间：</dt>
+            <dd><span id="pay_time"></span></dd>
+        </dl>
+    </form>
+</script>
+
+<script>
+var adminList = {#$adminList#}, adminPath = "{#$adminPath#}";
+</script>
+
+{#$jsFile#}
+</body>
+</html>

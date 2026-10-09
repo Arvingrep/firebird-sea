@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+<title>{#if $id#}修改活动{#else#}发布活动{#/if#}</title>
+<link rel="stylesheet" type="text/css" href="{#$cfg_basehost#}/static/css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link href="{#$templets_skin#}css/mobiscroll.css" rel="stylesheet" type="text/css" />
+<link rel="stylesheet" href="{#$templets_skin#}css/fabu.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}../../../member/touch/css/fabu-pay.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}../../../member/touch/css/gz-fabu.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.deferred.js" type="text/javascript"></script>
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/mobiscroll.js" type="text/javascript"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$huodong_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+
+	var hideFileUrl = {#$cfg_hideUrl#}, modelType = 'huodong', id = {#$id#}, detailUrl = '{#getUrlPath service="huodong" template="detail" id="{#$id#}"#}', reg = {#$detail_reg|string_format:"%d"#};
+	var typeid = {#if $id#}{#$detail_typeid#}{#else#}0{#/if#};
+    var siteCityInfo_lng = "{#$siteCityInfo['lng']#}";
+    var siteCityInfo_lat = "{#$siteCityInfo['lat']#}";
+    var cfg_cityInfo = '{#$siteCityInfoArr#}';
+	var addAddress = `{#getUrlPath service='member' type="user" template='mapPosi'#}`; //2023.12.21修改
+	var updateStatus;
+	var fileCount=0;
+</script>
+</head>
+<body>
+
+<div class="gz-address">
+
+  <div class="gz-addr-wrap" id="gzAddNewObj">
+		<div class="content">
+			<div class="main" id="main">
+				<div class="header lead fn-clear">
+					<a href="javascript:;" onclick="history.go(-1)" class="goBack"><i>返回</i></a>
+					<a href="javascript:;" class="tab"></a>
+					<a href="{#getUrlPath service='huodong' template='search'#}" class="search"></a>
+					<div class="tab-list">
+						<ul>
+							{#if $userinfo#}
+							<li>
+								<a href="{#getUrlPath service="member" type="user" template="manage-huodong"#}">我发布的活动</a>
+							</li>
+							<li>
+								<a href="{#getUrlPath service="member" type="user" template="huodong-join"#}">我参与的活动</a>
+							</li>
+							<li>
+								<a href="{#getUrlPath service="huodong" template="fabu"#}">发布活动</a>
+							</li>
+							<li>
+								<a href="{#$cfg_basehost#}/logout.html">退出</a>
+							</li>
+							{#else#}
+							<li>
+								<a href="{#getUrlPath service="member" type="user" template="manage-huodong"#}">我发布的活动</a>
+							</li>
+							<li>
+								<a href="{#getUrlPath service="member" type="user" template="huodong-join"#}">我参与的活动</a>
+							</li>
+							<li>
+								<a href="{#getUrlPath service="huodong" template="fabu"#}">发布活动</a>
+							</li>
+							<li>
+								<a href="{#$cfg_basehost#}/login.html">登录</a>
+							</li>
+							{#/if#}
+						</ul>
+					</div>
+				</div>
+
+
+				<div class="img-box">
+		      <ul class="uploader-list fn-clear" id="fileList">
+		        <li class="uploadbtn">
+		          <div id="filePicker" class="webuploader-container">
+		            <div class="webuploader-pick">+</div>
+		            <div id="rt_rt_1b5mb0qo71j791ejf1ilj2mt1ie81" style="position: absolute; top: 0px; left: 0px; overflow: hidden; bottom: 0px; right: 0px;">
+		              <input type="file" name="file" class="webuploader-element-invisible" accept="image/*">
+		              <label style="opacity: 0; width: 100%; height: 100%; display: block; cursor: pointer; background: rgb(255, 255, 255);"></label>
+		            </div>
+		          </div>
+		        </li>
+		        {#if $detail_litpic != ''#}
+						<li class="item litpic thumbnail" id="item_0"><img src="{#$detail_litpic#}" data-val="{#$detail_litpicSource#}" data-url="{#changeFileSize url="{#$detail_litpic#}" type="small"#}" alt=""><i class="cancel"></i><div class="file-panel"><span class="cancel"></span></div></li>
+						{#/if#}
+		      </ul>
+					{#if $detail_litpic == ''#}
+			    <p class="imgtip">上传活动海报</p>
+					{#/if#}
+		    </div>
+
+
+				<div class="formwrap">
+					<form action="/include/ajax.php?service=huodong&action={#if $id#}edit{#else#}fabu{#/if#}" id="fabuForm">
+						<input type="hidden" name="litpic" id="litpic" value="{#$detail_litpic#}" />
+						<div class="group ml4r bbottom">
+		    			<div data-role="fieldcontain" class="dom_select">
+		    				<label for="typename">活动类型</label>
+		            <select id="typeid" name="typeid" class="demo-select-opt" data-role="none">
+									{#huodong action='type' return='type'#}
+									<option value="{#$type.id#}"{#if $id#}{#if $type.id == $detail_typeid#} selected="selected" {#/if#}{#/if#}>{#$type.typename#}</option>
+									{#/huodong#}
+		            </select>
+		          </div>
+		        </div>
+						<div class="modulebox">
+							<div class="ml4r">
+			  				<dl class="inpbox">
+			            <dt><span><label for="title">活动主题</label></span></dt>
+			      			<dd><input type="text" name="title" id="title" placeholder="活动主题"{#if $id#} value="{#$detail_title#}"{#/if#}></dd>
+			      		</dl>
+			        </div>
+							<div class="ml4r">
+			          <div data-role="fieldcontain" class="dom_select">
+			            <label for="began">开始时间</label>
+			      			<input placeholder="开始时间" name="began" id="began" autocomplete="off"{#if $id#} value="{#$detail_began|date_format:"%Y-%m-%d %H:%M"#}"{#/if#} class="demo-test-date">
+			          </div>
+			        </div>
+							<div class="ml4r">
+			          <div data-role="fieldcontain" class="dom_select">
+			            <label for="end">结束时间</label>
+			      			<input placeholder="结束时间" name="end" id="end" autocomplete="off"{#if $id#} value="{#$detail_end|date_format:"%Y-%m-%d %H:%M"#}"{#/if#} class="demo-test-date">
+			          </div>
+			        </div>
+							<div class="ml4r">
+								<dl class="inpbox fn-clear">
+									<dt><span>报名截止</span></dt>
+									<dd class="fn-clear">
+										<div class="turn {#if $id && $detail_baoming#}open{#else#}close{#/if#}">
+											<div class="typebox"><span class="type">ON</span><span class="type">OFF</span></div>
+										</div>
+										<input type="text" class="baomingdes" placeholder="活动结束之前均可报名" disabled readonly="true">
+										<input type="hidden" id="baoming" name="baoming" value="{#if $id && $detail_baoming#}1{#else#}0{#/if#}">
+									</dd>
+								</dl>
+							</div>
+							<div class="ml4r baomingend"{#if $id && $detail_baoming#} style="display: none;"{#else#} style="display: block;"{#/if#}>
+			          <div data-role="fieldcontain" class="dom_select">
+			            <label for="baomingend">截止时间</label>
+			      			<input placeholder="报名截止时间" name="baomingend" id="baomingend" autocomplete="off"{#if $id && $detail_baomingend#} value="{#$detail_baomingend|date_format:"%Y-%m-%d %H:%M"#}"{#/if#} class="demo-test-date">
+			          </div>
+			        </div>
+							<div class="ml4r">
+								<dl class="inpbox fn-clear gz-addr-seladdr" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_addrid split=' '#}" data-id="{#$detail_addrid#}">
+									<dt><span><label for="typeid">活动地点</label></span></dt>
+									<dd class="selgroup"><p>{#if $id#}{#getPublicParentInfo tab='site_area' id=$detail_addrid type='typename' split=' '#}{#else#}<font style="color: #aaa;">请选择</font>{#/if#}</p></dd>
+									<input type="hidden" name="addrid" id="addrid" value="{#$detail_addrid#}">
+									<input type="hidden" name="cityid" id="cityid" value="{#$detail_cityid#}"/>
+								</dl>
+							</div>
+							<div class="ml4r">
+				        <dl class="inpbox detail_addr chose_val">
+				        	<dt><span><label for="address">详细地址</label></span></dt>
+				        	<dd><input type="text" readonly="readonly" placeholder="详细地址" id="address" name="address"{#if $id#} value="{#$detail_address#}"{#/if#}>
+							<input type="hidden" id="lnglat" name="lnglat" {#if $detail_lng#}value="{#$detail_lng#},{#$detail_lat#}"{#/if#}></dd>
+				        </dl>
+							</div>
+						</div>
+
+						<div class="mulinpbox mb4r">
+							<p class="multit">活动详情</p>
+							<div class="mulcon">
+								<textarea placeholder="详情" name="body" id="body" class="textarea body">{#if $id#}{#$detail_body#}{#/if#}</textarea>
+							</div>
+						</div>
+				<div class="group">
+					<div class="ml4r signtype btop">
+						<dl class="fn-clear inpbox">
+							<dt><span style=" white-space: nowrap">是否支持取消报名</span></dt>
+							<dd>
+								<div class="radio radioBox fn-clear" data-title="请选择活动报名">
+									<label>
+										<div class="check-left">
+											<input type="radio" name="sign[]" value=""{#if !$id || $detail_sign == 1#} checked="checked"{#/if#}>
+											<span class="checkbox-icon-round"></span>
+										</div>
+										<a href="javascript:;" data-id="1">不支持</a>
+									</label>
+									<label>
+										<div class="check-left">
+											<input type="radio" name="sign[]" value=""{#if !$id || $detail_sign == 0#} checked="checked"{#/if#}>
+											<span class="checkbox-icon-round"></span>
+										</div>
+										<a href="javascript:;" data-id="0">支持</a>
+									</label>
+								</div>
+								<input type="hidden" name="sign" id="sign" value="{#if $detail_sign#}1{#else#}0{#/if#}" />
+							</dd>
+						</dl>
+					</div>
+
+				</div>
+
+						<div class="group">
+							{#if $id == 0 || $detail_reg == 0#}
+							<div class="ml4r pricetype btop">
+								<dl class="fn-clear inpbox">
+									<dt><span>活动费用</span></dt>
+									<dd>
+										<div class="radio radioBox fn-clear" data-title="请选择活动费用">
+											<label>
+												<div class="check-left">
+													<input type="radio" name="fee[]" value=""{#if !$id || $detail_feetype == 1#} checked="checked"{#/if#}>
+													<span class="checkbox-icon-round"></span>
+												</div>
+												<a href="javascript:;" data-id="1">收费活动</a>
+											</label>
+											<label>
+												<div class="check-left">
+													<input type="radio" name="fee[]" value=""{#if !$id || $detail_feetype == 0#} checked="checked"{#/if#}>
+													<span class="checkbox-icon-round"></span>
+												</div>
+												<a href="javascript:;" data-id="0">免费活动</a>
+											</label>
+										</div>
+										<input type="hidden" name="fee" id="fee" value="{#if $detail_feetype#}1{#else#}0{#/if#}" />
+									</dd>
+								</dl>
+							</div>
+							<div class="ml4r bbottom max">
+								<dl class="inpbox">
+						    	<dt><span><label for="max">人数限制</label></span></dt>
+						    	<dd><input type="number" name="max" id="max" placeholder="请输入" onkeyup="value=value.replace(/\D+/ig,'')"value="{#$detail_max#}"></dd>
+						  	</dl>
+							</div>
+							<div class="fee_body{#if !$id || $detail_feetype == 0#} fn-hide{#/if#}">
+								<div class="fee_top">
+									<span class="t1">电子票类型</span>
+									<span class="t2">金额</span>
+									<span class="t3">人数上限</span>
+									<span class="t4">&nbsp;</span>
+								</div>
+								<div class="fee_con">
+									{#if $id#}
+									{#foreach from=$detail_feeList item=fee#}
+									<div class="fee_item fn-clear">
+										<span class="t1"><input type="text" name="fee_title[]" placeholder="费用名称" value="{#$fee.title#}" /></span>
+										<span class="t2"><input type="number" name="fee_price[]" placeholder="免费请填0" value="{#$fee.price#}" /></span>
+										<span class="t3"><input type="number" name="fee_max[]" onkeyup="value=value.replace(/[^\d.]/g,'')" placeholder="留空不限" value="{#$fee.max#}" /></span>
+										<span class="t4"><a href="javascript:;" class="del">删除</a></span>
+									</div>
+									{#/foreach#}
+									{#else#}
+									<div class="fee_item fn-clear">
+										<span class="t1"><input type="text" name="fee_title[]" placeholder="费用名称"></span>
+										<span class="t2"><input type="number" name="fee_price[]" placeholder="免费请填0"></span>
+										<span class="t3"><input type="number" name="fee_max[]" onkeyup="value=value.replace(/[^\d.]/g,'')" placeholder="留空不限"></span>
+										<span class="t4"><a href="javascript:;" class="del">删除</a></span>
+									</div>
+									<div class="fee_item fn-clear">
+										<span class="t1"><input type="text" name="fee_title[]" placeholder="费用名称"></span>
+										<span class="t2"><input type="number" name="fee_price[]" placeholder="免费请填0"></span>
+										<span class="t3"><input type="number" name="fee_max[]" onkeyup="value=value.replace(/[^\d.]/g,'')" placeholder="留空不限"></span>
+										<span class="t4"><a href="javascript:;" class="del">删除</a></span>
+									</div>
+									{#/if#}
+									<a href="javascript:;" class="fee_add" id="feeAdd">+增加电子票</a>
+								</div>
+							</div>
+							{#else#}
+							<label class="price">
+								<i>活动费用</i>
+								<div class="con fn-clear">
+									<input type="text" value="已经有报名的活动不能修改费用内容！" readonly="true" disabled="disabled">
+								</div>
+							</label>
+							{#/if#}
+						</div>
+
+						<div class="mulinpbox" style="margin-bottom: .4rem;">
+							<p class="multit">报名表单设置</p>
+							<div class="ml4r">
+			  				<dl class="inpbox">
+			            <dt><span><label>姓名</label></span></dt>
+			      			<dd><input type="text" placeholder="必填项" readonly disabled /></dd>
+			      		</dl>
+			        </div>
+							<div class="ml4r">
+			  				<dl class="inpbox">
+			            <dt><span><label>手机</label></span></dt>
+			      			<dd><input type="text" placeholder="必填项" readonly disabled /></dd>
+			      		</dl>
+			        </div>
+							<div id="join_ol">
+
+								{#if $detail_property#}
+								{#foreach from=$detail_property item=p#}
+								{#if $p.type == 'text' || $p.type == 'text_long'#}
+								<div class="ml4r" data-type="{#$p.type#}" data-title="{#$p.title#}">
+				  				<dl class="inpbox">
+				            <dt><s></s><input type="text" placeholder="输入{#if $p.type == 'text'#}单{#else#}多{#/if#}行文本问题" value="{#$p.title#}" /></dt>
+				      			<dd>
+											<div class="radio radioBox fn-clear">
+												<label>
+													<a href="javascript:;" data-id="1">必填</a>
+													<div class="check-left check-right">
+														<input type="checkbox" value="1"{#if $p.required#} checked{#/if#} />
+														<span class="checkbox-icon-round"></span>
+													</div>
+												</label>
+											</div>
+										</dd>
+				      		</dl>
+				        </div>
+								{#elseif $p.type == 'single_vote' || $p.type == 'multi_vote'#}
+								<div class="ml4r" data-type="{#$p.type#}" data-title="{#$p.title#}">
+				  				<dl class="inpbox">
+				            <dt><s></s><input type="text" placeholder="输入{#if $p.type == 'single_vote'#}单{#else#}多{#/if#}选标题" value="{#$p.title#}" /></dt>
+				      			<dd>
+											<div class="radio radioBox fn-clear">
+												<label>
+													<a href="javascript:;" data-id="1">必填</a>
+													<div class="check-left check-right">
+														<input type="checkbox" value="1"{#if $p.required#} checked{#/if#} />
+														<span class="checkbox-icon-round"></span>
+													</div>
+												</label>
+											</div>
+										</dd>
+				      		</dl>
+									<div class="singlelist{#if $p.type == 'multi_vote'#} multilist{#/if#}">
+										{#if $p.val#}
+										{#foreach from=$p.val item=i#}
+										<dl class="inpbox">
+					            <dt><s></s><input type="text" placeholder="输入选项" value="{#$i#}" /></dt>
+					      			<dd><i>+</i></dd>
+					      		</dl>
+										{#/foreach#}
+										{#else#}
+										<dl class="inpbox">
+					            <dt><s></s><input type="text" placeholder="输入选项" /></dt>
+					      			<dd><i>+</i></dd>
+					      		</dl>
+										<dl class="inpbox">
+					            <dt><s></s><input type="text" placeholder="输入选项" /></dt>
+					      			<dd><i>+</i></dd>
+					      		</dl>
+										{#/if#}
+									</div>
+				        </div>
+								{#/if#}
+								{#/foreach#}
+								{#/if#}
+
+							</div>
+							<div class="addNewProperty"><a href="javascript:;">+ 新增报名项</a></div>
+						</div>
+						<div class="btop bbottom code_group">
+							<span class="guoji">{#$langData['siteConfig'][47][86]#}</span>{#* 国籍地区 *#}
+							<span class="areacode_span"><em class="code_label">+{#$internationalPhoneSection[0]['code']#}</em></span>
+							<input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+						</div>
+						<div class="group  bbottom">
+							<label class="contact">
+								<i>联系方式</i>
+								<div class="con">
+									<input type="text" name="contact" id="contact" placeholder="主办方联系方式"{#if $id#} value="{#$detail_contact#}"{#/if#}>
+								</div>
+							</label>
+						</div>
+						<div class="submit">
+						  <a href="javascript:;" id="submit">立即发布</a>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="gz-sel-addr gz-sel-addr-hide" id="gzSelAddr">
+		<div class="gz-sel-addr-header">
+			<h3>选择地区</h3>
+			<button class="gz-sel-addr-close" id="gzSelAddrCloseBtn"></button>
+		</div>
+		<ul class="gz-sel-addr-nav"></ul>
+		<div class="gz-sel-addr-list"></div>
+	</div>
+
+	<div class="gz-sel-addr-mask"></div>
+
+</div>
+
+<div class="error"></div>
+
+<div id="popupSelectPropertyType">
+	<div class="con">
+		<h3>常用报名项</h3>
+		<ul class="item row4 fn-clear">
+			<li data-type="text">公司</li>
+			<li data-type="text">职位</li>
+			<li data-type="text">行业</li>
+			<li data-type="text">年龄</li>
+			<li data-type="text">邮箱</li>
+			<li data-type="text_long">备注</li>
+			<li data-type="single_vote">性别</li>
+		</ul>
+		<h3>自定义填写项</h3>
+		<ul class="item row2 fn-clear">
+			<li data-type="text">+ 单行文本</li>
+			<li data-type="text_long">+ 多行文本</li>
+			<li data-type="single_vote">+ 单选问题</li>
+			<li data-type="multi_vote">+ 多选问题</li>
+		</ul>
+	</div>
+	<div class="cancel">取消</div>
+</div>
+<div id="popupSelectPropertyTypeBg"></div>
+
+{#include file="../../../member/touch/fabu-pay.html" module="huodong"#}
+<!-- 区号弹出层 s -->
+  <div class="layer_code">
+    {#* 国籍/地区  *#}
+    <div class="layer_search"><p>{#$langData['siteConfig'][19][285]#}</p><em class="layer_close"></em></div>
+    <div class="layer_list" id="layer_list">
+      <ul>
+      </ul>
+    </div>
+  </div>
+<!-- 区号弹出层 e -->
+<div class="mask-code" id="maskReg"></div>
+<div class="pageitem page" id="map">
+			<div class="lead">
+				<p></p>
+				<input type="text" id="searchAddr" placeholder="{#$langData['siteConfig'][20][411]#}">
+			</div>
+			<div class="map">
+				<div id="mapdiv"></div>
+				<span class="mapcenter"></span>
+			</div>
+
+			<div class="mapresults">
+				<ul></ul>
+				<!-- <a href="javascript:;" class="elseStreet">没有找到您的建筑物？请点击这里！</a> -->
+			</div>
+		</div>
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = '{#$thumbType#}', atlasSize = {#$atlasSize*1024*1024#}, atlasType = '{#$atlasType#}', atlasMax = 999999, modelType = 'huodong', upType = 'thumb';
+</script>
+<script type="text/javascript">
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '',
+        "title": '',
+        "imgUrl": '',
+        "link": '',
+    };
+
+    document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/webuploader/webuploader.js" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/mobiscroll.select.js" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/mobiscroll.datetime.js" type="text/javascript"></script>
+<!-- <script src="{#$templets_skin#}js/common.js?v={#$cfg_staticVersion#}"></script> -->
+<script src="{#$templets_skin#}../../../member/touch/js/gz-info.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/fabu.js?v={#$cfg_staticVersion#}"></script>
+<!-- <script src="{#$templets_skin#}../../../member/touch/js/wxUploadFile.js?v={#$cfg_staticVersion#}"></script> -->
+<script src="{#$templets_skin#}../../../member/touch/js/fabu-pay.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/map_chose.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

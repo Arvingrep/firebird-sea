@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>职位详情-{#$job_title#}</title>
+<meta name="keywords" content="招聘会,招聘网,招聘信息,互联网招聘" />
+<meta name="description" content="招聘会,招聘网,求职网,互联网招聘,{#$cfg_shortname#}招聘是互联网领域垂直招聘网站,互联网职业机会尽在{#$cfg_shortname#}招聘" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/job.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$job_channelDomain#}', staticPath = '{#$cfg_staticPath#}',member_userDomain='{#$member_userDomain#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var addr = {#$addr|string_format:"%d"#};
+    var userid='{#$userinfo.userid#}' //勿删
+    var id='{#$job_id#}'
+    var imconfig = {
+    	'mod':'job',
+		'chatid':"{#$job_companyDetail.userid#}", //职位发布者id
+		'title': '{#$job_title#}',
+        'description':'',
+		"salary": '{#$job_show_salary#}{#if $job_dy_salary>12#}·{#$job_dy_salary#}薪{#/if#}',
+        "imgUrl": '{#$job_companyDetail.logo_url#}',
+		"link": '{#getUrlPath service="job" template="job" id=$job_id#}', //详情id
+    };
+    var pageData = { //地图
+		title: '工作地点',
+		address: '{#$job_job_addr_detail.address#}',
+		lng: '{#$job_job_addr_detail.lng#}',
+		lat: '{#$job_job_addr_detail.lat#}',
+		mapType: '{#$site_map#}',
+		mapKey: '{#$site_map_key#}'
+	};
+    var state='{#$job_state#}'
+    {#if $cfg_adminid == -1#}
+    if('{#$job_state#}'!=1&&'{#$job_cid#}'!='{#$job_companyDetail.id#}'){
+        alert('该职位待审核，即将关闭页面');
+        setTimeout(() => {
+            windows.close();
+        }, 2000);
+    }
+    {#/if#}
+    var postCertificate='{#$job_companyDetail.delivery_limit_certifyState#}';
+    var ucid='{#$job_cid#}'; //当前登录用户的公司id
+    var pcid='{#$job_companyDetail.id#}'; //职位发布者的公司id
+
+    var shareUrl = '{#getUrlPath service="job" template="job" id={#$job_id#} param="{#if $userinfo && $userinfo.userid#}fromShare={#$userinfo.userid#}{#/if#}"#}';
+    var shareQr = '/include/qrcode.php?data=' + encodeURIComponent(shareUrl);
+</script>
+</head>
+<body style="background-color: #F7F9FC;">
+{#include file="top.html" nature=$job_natureid#}
+{#if $job_state==1||$job_cid==$job_companyDetail.id || $cfg_adminid != -1#}
+    <!-- 顶部背景板 -->
+    <div class="topBgimg"></div>
+    <div class="Shell">
+        <!-- 顶部用于背景的图片 -->
+        <img src="{#$templets_skin#}images/jobtbg.png" class="topbgimg">
+        <!-- 职位简介 -->
+        <div class="jobDescript">
+            <div class="j-left">
+                <div class="jl-time">更新于{#if $job_updateCalc<=1#}今天{#elseif
+                        $job_updateCalc<=7#}{#$job_updateCalc#}天前{#else#}{#$job_update_time|date_format:"%Y/%m/%d"#}{#/if#}</div>
+                        <div class="jl-title">{#$job_title#}</div>
+                        <div class="jl-salary">{#if $job_mianyi#}面议{#else#}{#$job_show_salary#}{#if
+                            $job_dy_salary>12#}·{#$job_dy_salary#}<span>薪</span>{#/if#}{#/if#}</div>
+                        <div class="jl-addr">
+                            {#foreach from=$job_job_addr_detail.addrName item=item key=index#}
+                            {#if $index!=0#}
+                            {#$item#}
+                            {#/if#}
+                            {#/foreach#}
+                            {#if $job_job_addr_detail.addrName&&$job_nature#}<span> | </span>{#/if#}
+                            {#$job_nature#}
+                            {#if $job_nature#}<span> | </span>{#/if#}
+                            {#if $job_experience#}{#$job_experience#}经验{#else#}经验不限{#/if#}<span> | </span>
+                            {#if $job_educational#}{#$job_educational#}{#else#}学历不限{#/if#}<span> | </span>
+                            招{#$job_number#}人
+                        </div>
+                </div>
+                <div class="j-right">
+                    <div class="jr-top">
+                        <a href="javascript:;" class="report"><img src="{#$templets_skin#}images/complainG.png">举报</a>
+                        <div class="shareBox">
+                            <img src="{#$templets_skin#}images/share.png">分享
+                            <div class="shareListPop">
+                                <div class="sh-con">
+                                    <h5>{#$langData['info'][4][44]#}</h5> {#* 微信扫码分享</b>或点击分享到 *#}
+                                    <div class="shareWayBox">
+                                        <div class="wxQrShare">
+                                            <div class="wxQr"><img src="/static/images/blank.gif" alt="">
+                                            </div>
+                                        </div>
+                                        <div class="otherShare">
+                                            <ul>
+                                                <ul>
+                                                    <li class="qzone"><a
+                                                            href="http://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?url={#getUrlPath service='job' template='job' id={#$job_id#} param="
+                                                            {#if $userinfo
+                                                            &&$userinfo.userid#}fromShare={#$userinfo.userid#}{#/if#}"#}&desc={#$detail_titlenew|truncate:100:"":true#}&pics={#$detail_imglist[0]['path']|default:$info_logoUrl#}"
+                                                            target="_blank" class="sharea">QQ空间</a></li>
+                                                    <li class="qq"><a
+                                                            href="http://connect.qq.com/widget/shareqq/index.html?url={#getUrlPath service='info' template='detail' id={#$job_id#} param="
+                                                            {#if $userinfo
+                                                            &&$userinfo.userid#}fromShare={#$userinfo.userid#}{#/if#}"#}&desc={#$detail_titlenew|truncate:100:"":true#}&title={#$detail_titlenew|truncate:100:"":true#}&summary={#$detail_titlenew|truncate:100:"":true#}&pics={#$detail_imglist[0]['path']|default:$info_logoUrl#}"
+                                                            target="_blank" class="sharea">QQ好友</a></li>
+                                                    <li class="sina"><a
+                                                            href="http://service.weibo.com/share/share.php?url={#getUrlPath service='job' template='job' id={#$job_id#} param="
+                                                            {#if $userinfo
+                                                            &&$userinfo.userid#}fromShare={#$userinfo.userid#}{#/if#}"#}&title={#$detail_titlenew|truncate:100:"":true#}&pic={#$detail_imglist[0]['path']|default:$info_logoUrl#}"
+                                                            target="_blank" class="sharea">新浪微博</a></li>
+                                                </ul>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="jr-bottom" {#if $job_cid==$job_companyDetail.id#}style="pointer-events: none;" {#/if#}>
+                        {#if $job_state==1&&$job_off==0&&$job_del==0#}
+                        {#if $job_collect==0&&$job_off==0#}
+                        <div class="jrb-care have" data-id="{#$job_id#}">收藏</div>
+                        {#elseif $job_off==0#}
+                        <div class="jrb-care had" data-id="{#$job_id#}">已收藏</div>
+                        {#/if#}
+                        {#/if#}
+                        {#if $job_off==1#}
+                            <div class="jrb-apply" style="background-color:#bfbfbf;">职位已下架</div>
+                        {#elseif $job_state!=1#}
+                            <div class="jrb-apply" style="pointer-events: none;background-color: rgba(33,118,255,.3);">职位{#if
+                            $job_state==0||($job_state==2&&$job_cid!=$job_companyDetail.id)#}审核中{#else#}审核未通过{#/if#}</div>
+                        {#elseif $job_current_delivery_company_limit==0 && $job_has_delivery == 0#}
+                        <div class="jrb-apply" data-id="{#$job_id#}" data-type="{#$job_typeid#}" data-name="{#$job_type#}"
+                            data-state="{#$job_has_delivery#}"><img src="{#$templets_skin#}images/join.png">申请职位</div>
+                        {#else#}
+                        <a class="jrb-apply" href="javascript:;" data-id="{#$job_id#}" data-type="{#$job_typeid#}"
+                            data-name="{#$job_type#}" data-state="{#$job_has_delivery#}"
+                            style="pointer-events: none;background-color: rgba(33,118,255,.3);">{#if
+                            $job_has_delivery!=0#}已投递{#else#}已投递该公司其他职位{#/if#}</a>
+                        {#/if#}
+                    </div>
+                </div>
+            </div>
+            <!-- 详情和发布者信息 -->
+            <div class="conDetail">
+                <!-- 职位详情 -->
+                <div class="c-left">
+                    <!-- 详情板 -->
+                    <div class="cl-detail">
+                        <!-- 详情 -->
+                        <div class="cld-detail">
+                            <div class="title">职位详情</div>
+                            <ul class="label">
+                                {#foreach from=$job_tag item=item#}
+                                <li>{#$item#}</li>
+                                {#/foreach#}
+                            </ul>
+                            <div class="description">
+                                <div class="text">
+                                    <p>职位描述：</p>
+                                    <div style="font-size: 14px;">{#str_replace("\n","<br>",$job_note)#}</div>
+                                </div>
+                                <div class="text">
+                                    <p>任职要求：</p>
+                                    <div style="font-size: 14px;">{#str_replace("\n","<br>",$job_claim)#}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 福利 -->
+                        {#if $job_companyDetail.welfareNames && count($job_companyDetail.welfareNames)!=0#}
+                        <div class="cld-welfare">
+                            <div class="title"><span>公司福利</span></div>
+                            <ul class="label">
+                                {#foreach from=$job_companyDetail.welfareNames item=item#}
+                                <li>{#$item#}</li>
+                                {#/foreach#}
+                            </ul>
+                        </div>
+                        {#/if#}
+                        <!-- 地址 -->
+                        <div class="cld-address">
+                            <div class="title"><span>工作地点</span></div>
+                            <a class="text" href="javascript:;" target="_blank"><img
+                                    src="{#$templets_skin#}images/siteBlu.png"><span>{#$job_job_addr_detail.address#}</span></a>
+                            <div class="mapview">
+                                <div class="map" id="map"></div>
+                            </div>
+                        </div>
+                        <!-- 举报 -->
+                        <div class="cld-complain">
+                            <img src="{#$templets_skin#}images/complainO.png">
+                            <span>如遇招聘方信息不实、扣押证件、违规收费、强迫入股或集资等违法情形，请<a href="javascript:;">立即举报！</a></span>
+                        </div>
+                    </div>
+                    <!-- 在线简历 -->
+                    <a class="cl-resume" href="{#$member_userDomain#}/job-resume.html" target="_blank">
+                        <div class="text">
+                            <p class="title">生成在线简历</p>
+                            <p>数万家企业在线招聘，海量职位精准推荐</p>
+                        </div>
+                        <div class="label">完善简历，成功求职第一步 ></div>
+                    </a>
+                </div>
+                <!-- 职位发布者 -->
+                <div class="c-right">
+                    {#if $job_companyDetail.people#}
+                    <div class="cr-pub">
+                        <div class="crp-title">职位发布者</div>
+                        <div class="crp-people">
+                            <img src="{#$job_companyDetail.people_pic_url#}" class="photo"
+                                onerror="this.src='/static/images/noPhoto_100.jpg'">
+                            <div class="right">
+                                <p>{#$job_companyDetail.people#}/{#$job_companyDetail.people_job#}</p>
+                                <div class="label">
+                                    {#if $job_companyDetail.loginState==1#}<div class="time">当前在线</div>{#elseif
+                                    $job_companyDetail.loginState==2#}<div class="time">今日活跃</div>{#else#}{#/if#}
+                                    <a class="talk chat_to-Link" href="javascript:;" data-type="detail"><img
+                                            src="{#$templets_skin#}images/talkBlu.png">立即沟通</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {#/if#}
+                    <div class="cr-company">
+                        <div class="crc-name">
+                            <a href="{#$job_companyDetail.url#}" target="_blank">
+                                <img src="{#$job_companyDetail.logo_url#}" onerror="this.src='/static/images/404.jpg'"
+                                    class="logo">
+                                <p>{#$job_companyDetail.title#}</p>
+                            </a>
+                            <div class="label">
+                                {#if $job_companyDetail.certification==1#}<div class="item1"><img
+                                        src="{#$templets_skin#}images/shieldGreen.png">认证</div>{#/if#}
+                                {#if $job_companyDetail.famous==1#}<div class="item2">名企</div>{#/if#}
+                            </div>
+                        </div>
+                        <ul class="crc-label">
+                            <li><img src="{#$templets_skin#}images/classifyG.png"><span>{#foreach
+                                    from=$job_companyDetail.industry item=item key=index#}{#$item#}{#if
+                                    count($job_companyDetail.industry)!=$index+1#}、{#/if#}{#/foreach#}</span></li>
+                            <li><img src="{#$templets_skin#}images/userG.png">{#$job_companyDetail.scale#}</li>
+                            <li><img src="{#$templets_skin#}images/company4.png">{#$job_companyDetail.nature#}</li>
+                        </ul>
+                        <div class="crc-descript">
+                            {#$job_companyDetail.body#}
+                        </div>
+                        <a class="crc-btn" href="{#$job_companyDetail.url#}" target="_blank">公司主页</a>
+                    </div>
+                    <!-- 二维码 -->
+                    <div class="dr-code">
+                        <img src="/include/qrcode.php?data={#$job_channelDomain#}"
+                            onerror="this.src='/static/images/404.jpg'">
+                        <div>
+                            <p>手机微信扫一扫</p>
+                            <p>随时随地找工作</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 你可能感兴趣 -->
+            <div class="interest">
+                <div class="i-title">你可能感兴趣</div>
+                <ul class="i-list">
+                    {#job service="job" action="postlist" type={#$job_typeid#} pageSize=9 return="care"#}
+                    {#if $care.id!=$job_id#}
+                    <li>
+                        <a href="{#$care.url#}" target="_blank">
+                            <div class="il-up">
+                                <div class="ilu-left">
+                                    <p>{#$care.title#}</p>
+                                    <div>{#if $care.experience#}{#$care.experience#} <span></span> {#/if#}{#if
+                                        $care.educational#}{#$care.educational#} <span></span> {#/if#}{#$care.nature#}</div>
+                                </div>
+                                <div class="ilu-right">
+                                    <div class="salary">{#$care.show_salary#}{#if
+                                        $care.dy_salary>12#}<em>·</em>{#$care.dy_salary#}<span>薪</span>{#/if#}</div>
+                                    <div class="address">
+                                        {#if $care.job_addr_detail && count($care.job_addr_detail.addrName)==1#}
+                                        {#$care.job_addr_detail.addrName[0]#}
+                                        {#else#}
+                                        {#foreach from=$care.job_addr_detail.addrName item=item key=index#}
+                                            {#if count($care.job_addr_detail.addrName)-1-$index<=1#}
+                                            {#$item#}
+                                            {#/if#}
+                                        {#/foreach#}
+                                        {#/if#}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="il-down">{#$care.companyDetail.title#}</div>
+                        </a>
+                    </li>
+                    {#/if#}
+                    {#/job#}
+                </ul>
+            </div>
+        </div>
+        <!-- 吸顶头部 -->
+        <div class="fixTop">
+            <div class="f-shell">
+                <div class="fs-name"><em>{#$job_title#}</em><span style="margin-left: 13px;">{#$job_show_salary#}{#if
+                        $job_dy_salary>12#}·{#$job_dy_salary#}<span>薪</span>{#/if#}</div>
+                {#if $job_off==1#}
+                <div class="jrb-apply" style="background-color:#bfbfbf;">职位已下架</div>
+                {#elseif $job_state!=1#}
+                    <div class="jrb-apply" style="pointer-events: none;background-color: rgba(33,118,255,.3);">职位{#if
+                    $job_state==0||($job_state==2&&$job_cid!=$job_companyDetail.id)#}审核中{#else#}审核未通过{#/if#}</div>
+                {#elseif $job_current_delivery_company_limit==0 && $job_has_delivery == 0#}
+                <div class="jrb-apply" data-id="{#$job_id#}" data-type="{#$job_typeid#}" data-name="{#$job_type#}"
+                    data-state="{#$job_has_delivery#}" {#if $job_cid==$job_companyDetail.id#}style="pointer-events: none;"
+                    {#/if#}><img src="{#$templets_skin#}images/join.png">申请职位</div>
+                {#else#}
+                <a class="jrb-apply" href="javascript:;" data-id="{#$job_id#}" data-type="{#$job_typeid#}"
+                    data-name="{#$job_type#}" data-state="{#$job_has_delivery#}"
+                    style="pointer-events: none;background-color: rgba(33,118,255,.3);">{#if
+                    $job_has_delivery!=0#}已投递{#else#}已投递该公司其他职位{#/if#}</a>
+                {#/if#}
+            </div>
+        </div>
+        <!-- 投递成功弹窗 -->
+        <div class="sendpop">
+            <!-- 确认投递（相同职位类型） -->
+            <div class="s-same">
+                <img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+                <div class="ss-title">
+                    <img src="{#$templets_skin#}images/warning_icon.png">
+                    <p>确定投递<span>个人简历1？</span></p>
+                </div>
+                <div class="ss-text">
+                    <p>该职位类型为<span>销售主管</span>，请确认是否匹配</p>
+                    <p class="text">请勿无效投递</p>
+                </div>
+                <div class="ss-btn">
+                    <div class="cancel" data-state="0">取消</div>
+                    <div class="confirm" data-state="1">确认投递</div>
+                </div>
+            </div>
+            {#if $cfg_app_ios_download || $cfg_app_android_download#}
+            <!-- 投递成功（有app） -->
+            <div class="s-appsucceed" onclick="event.stopPropagation()">
+                <div class="sa-close"><img src="{#$templets_skin#}images/close.png"></div>
+                <div class="sa-title">
+                    <img src="{#$templets_skin#}images/confirmCBlue.png">
+                    <span>简历投递成功！请静候佳音</span>
+                </div>
+                <p class="sa-text">下载{#$cfg_appname#}APP，随时获取投递进度，第一时间与HR沟通联系</p>
+                <div class="sa-mobile">
+                    <img
+                        src="{#$cfg_basehost#}/include/qrcode.php?data={#getUrlPath service='siteConfig' template='mobile'#}">
+                </div>
+            </div>
+            {#else#}
+            <!-- 投递成功（无app） -->
+            <div class="s-succeed">
+                <img src="{#$templets_skin#}images/sendresume.png">
+                <p>简历投递成功！请静候佳音</p>
+            </div>
+            {#/if#}
+            <!-- 已经投递过 -->
+            <div class="s-had">
+                <div>
+                    <img src="{#$templets_skin#}images/warning_icon.png">
+                    <p>你已投递过该职位，请勿无效投递</p>
+                </div>
+            </div>
+            <!-- 实名认证 -->
+            <div class="s-certificate">
+                <img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+                <div class="ss-title">
+                    <img src="{#$templets_skin#}images/warning_icon.png">
+                    <p>该企业限制实名验证投递</p>
+                </div>
+                <div class="ss-text">
+                    <p>认证后可提高求职成功率哦</p>
+                </div>
+                <div class="ss-btn">
+                    <div class="cancel" data-state="0">先看看</div>
+                    <a class="certificate" href="{#$member_userDomain#}/security-chCertify.html" target="_blank">去实名认证</a>
+                </div>
+            </div>
+            <!-- 公司投递 -->
+            <div class="s-company" style="width: 480px;">
+                <img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+                <div class="ss-title">
+                    <img src="{#$templets_skin#}images/warning_icon.png">
+                    <p>温馨提示：您正在使用招聘企业账号进行求职操作</p>
+                </div>
+                <div class="ss-text">
+                    <p>如登录的不是您个人账号，可更换账号后创建简历、投递职位</p>
+                </div>
+                <div class="ss-btn">
+                    <div class="cancel" data-state="0">好的，我知道了</div>
+                </div>
+            </div>
+        </div>
+        <!-- 多个简历弹窗 -->
+        <div class="moreResume">
+            <div class="mr-content">
+                <img src="{#$templets_skin#}images/close_icon.png" class="mr-close">
+                <div class="mr-title">
+                    <div>
+                        <img src="{#$templets_skin#}images/warning_icon.png">
+                        <p>默认简历<span>个人简历1？</span>正在审核中</p>
+                    </div>
+                    <p>请稍后尝试</p>
+                </div>
+                <div class="mr-btn">
+                    <div class="change">更换简历</div>
+                    <div class="close">好的</div>
+                </div>
+            </div>
+            <div class="mr-select">
+                <img src="{#$templets_skin#}images/close_icon.png" class="mr-close">
+                <p class="mrs-title">请选择简历后投递</p>
+                <div class="mrs-select">
+                    <span>投递简历：</span>
+                    <div class="mrs-input">
+                        <input type="text" placeholder="请选择简历" readonly>
+                        <i></i>
+                        <ul></ul>
+                    </div>
+                </div>
+                <div class="mrs-btn">
+                    <div class="cancel">取消</div>
+                    <div class="confirm">确认投递</div>
+                </div>
+            </div>
+        </div>
+    </div>
+{#/if#}
+{#include file="footer.html" theme='white'#}
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/publicOpenMap.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$site_map_apiFile#}"></script>
+{#if $site_map=="google"#}
+<script src="{#$templets_skin#}js/markerwithlabel.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script type="text/javascript" src="{#$templets_skin#}js/job.js?v={#$cfg_staticVersion#}"></script>
+</html>

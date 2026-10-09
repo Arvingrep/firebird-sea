@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+  <title>管理客服服务</title>
+  {#$cssFile#}
+  <style type="text/css">
+    .quick-editForm{max-height: 500px; overflow: auto;}
+  </style>
+</head>
+
+<body>
+<div class="search">
+  <label>搜索：<input class="input-xlarge" type="search" id="keyword" placeholder="请输入要搜索的关键字"></label>
+  <div class="choseCity"><input type="hidden" id="cityList" name="cityList" placeholder="请选择城市分站" value=""></div>
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="selectBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="1">全选</a></li>
+        <li><a href="javascript:;" data-id="0">不选</a></li>
+      </ul>
+    </div>
+    <button class="btn" data-toggle="dropdown" id="delBtn">删除</button>
+    <!--    <div class="btn-group" id="stateBtn"{#if $notice#} data-id="0"{#/if#}>-->
+    <!--    {#if $notice#}-->
+    <!--    <button class="btn dropdown-toggle" data-toggle="dropdown">待审核(<span class="totalGray"></span>)<span class="caret"></span></button>-->
+    <!--    {#else#}-->
+    <!--    <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="totalCount"></span>)<span class="caret"></span></button>-->
+    <!--    {#/if#}-->
+    <!--    <ul class="dropdown-menu">-->
+    <!--      <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>-->
+    <!--      <li><a href="javascript:;" data-id="0">待审核(<span class="totalGray"></span>)</a></li>-->
+    <!--      <li><a href="javascript:;" data-id="1">已审核(<span class="totalAudit"></span>)</a></li>-->
+    <!--      <li><a href="javascript:;" data-id="2">拒绝审核(<span class="totalRefuse"></span>)</a></li>-->
+    <!--    </ul>-->
+    <!--  </div>-->
+    <!--  <div class="btn-group hide" id="batchAudit">-->
+    <!--    <button class="btn dropdown-toggle" data-toggle="dropdown">批量审核<span class="caret"></span></button>-->
+    <!--    <ul class="dropdown-menu">-->
+    <!--      <li><a href="javascript:;" data-id="待审核">待审核</a></li>-->
+    <!--      <li><a href="javascript:;" data-id="已审核">已审核</a></li>-->
+    <!--      <li><a href="javascript:;" data-id="拒绝审核">拒绝审核</a></li>-->
+    <!--    </ul>-->
+    <!--  </div>-->
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row3">&nbsp;</li>
+  <li class="row10 left">订单号</li>
+  <li class="row10 left">退款时间</li>
+  <li class="row15 left">退款说明</li>
+  <li class="row10 left">状态</li>
+  <li class="row15 left">退款原因</li>
+  <li class="row7 left">联系人</li>
+  <li class="row10 left">联系方式</li>
+  <li class="row10 left">平台客服</li>
+  <li class="row5 left">退款金额</li>
+  <li class="row5">操作</li>
+</ul>
+
+<div class="list mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="sAddr"></span>
+  <span id="sType"></span>
+</div>
+
+<script id="quickEdit" type="text/html">
+  <style>
+    #negotiate{width: 70%}
+    .imgbox::after{content: ''; display: block; clear: both;}
+    .tkInfo{overflow: hidden;}
+    .tkInfo dl{float: left; padding-right: 40px; box-sizing: border-box; min-width: 30%}
+  </style>
+  <form action="" class="quick-editForm" name="editForm" style="max-height: 700px; overflow: auto;">
+  	<div class="tkInfo">
+  		<dl class="clearfix">
+	      <dt>用户退货方式：</dt>
+	      <dd id="store"></dd>
+	    </dl>
+	    <dl class="clearfix">
+	      <dt>申请退款时间：</dt>
+	      <dd id="user"></dd>
+	    </dl>
+	    <dl class="clearfix">
+	      <dt>用户退货金额：</dt>
+	      <dd id="price"></dd>
+	    </dl>
+  	</div>
+    
+    <div class="tkInfo">
+	    <dl class="clearfix">
+	      <dt>申请人姓名：</dt>
+	      <dd id="applyer"></dd>
+	    </dl>
+	    <dl class="clearfix">
+	      <dt>申请人电话：</dt>
+	      <dd id="applyer_mobile"></dd>
+	    </dl>
+	</div>
+    <!-- <dl class="clearfix">
+      <dt>退款凭证</dt>
+      <dd id="pic"></dd>
+    </dl> -->
+    <dl class="clearfix">
+      <dt>协商历史：</dt>
+      <dd id="negotiate" style="max-height: 300px; max-width: 90%; overflow: auto; "></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>图片：</dt>
+      <dd id="pics"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>是否退款：</dt>
+      <dd>
+        <select id="isCheck" name="isCheck" class="input-medium">
+          <option value="1" selected="selected">是</option>
+          <option value="2">否</option>
+        </select>&nbsp;&nbsp;&nbsp;
+      </dd>
+    </dl>
+    
+
+  </form>
+</script>
+
+<script>
+  var  adminPath = "{#$adminPath#}",cityList = {#$cityList#};
+</script>
+{#$jsFile#}
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+    atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 0,  //图集配置
+  modelType = "renovation", adminPath = "{#$adminPath#}",
+  addrListArr = {#$addrListArr#}, mapCity = "{#$mapCity#}";
+</script>
+<style>
+	.list-holder li {width: 162px!important;}
+</style>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="title">案例名称 ：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="title" id="title" value="{#$title#}" maxlength="60" data-regex=".{3,60}" />
+      <span class="input-tips"><s></s>请输入日记标题，3-60位</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>类别：</label></dt>
+    <dd class="radio">
+      {#html_radios name="type" values=$typeopt checked=$type output=$typenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#if $type == 0#}
+  <dl class="clearfix ">
+  {#else#}
+  <dl class="clearfix hide ">
+  {#/if#}
+    <dt><label>装修风格：</label></dt>
+    <dd class="radio">
+      {#html_radios name='style' values=$styleval output=$stylelist checked=$style separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#if $type == 0#}
+  <dl class="clearfix jiastyle">
+  {#else#}
+  <dl class="clearfix hide jiastyle">
+  {#/if#}
+    <dt><label for="units">户型：</label></dt>
+    <dd class="radio">
+      {#html_radios name='units' values=$unitsval output=$unitslist checked=$units separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#if $type == 1#}
+  <dl class="clearfix comstyle">
+  {#else#}
+  <dl class="clearfix hide comstyle">
+  {#/if#}
+    <dt><label>公装分类：</label></dt>
+    <dd class="radio">
+      {#html_radios name='comstyle' values=$comstyleval output=$comstylelist checked=$comstyle separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="btype">装修方式：</label></dt>
+    <dd class="radio">
+      {#html_radios name="btype" values=$btypeopt checked=$btype output=$btypenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt>缩略图：</dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $litpic != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $litpic != ""#}
+      <ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$litpic#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$litpic#}&type=small" data-val="{#$litpic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection1" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="litpic" value="{#$litpic#}" class="imglist-hidden" id="litpic">
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="area">面积：</label></dt>
+    <dd>
+      <div class="input-prepend input-append" style="margin:0;">
+        <input class="input-mini" type="text" name="area" id="area" value="{#$area#}" data-regex="[1-9]\d*">
+        <span class="add-on" style="margin-right:10px;">㎡</span>
+        <span class="input-tips"><s></s>请输入装修面积</span>
+      </div>
+    </dd>
+  </dl>
+  {#* 平面户型图 *#}
+  <dl class="fn-clear">
+    <dt><span></span>{#$langData['renovation'][9][25]#}：</dt>
+    <dd class="listImgBox fn-hide" style="position: relative;overflow: hidden;padding: 5px 80px 5px 10px;">
+      <div class="list-holder">
+        <ul id="listSection4" class="fn-clear listSection fn-hide"{#if $detail_pics#} style="display: block;"{#/if#}>
+        {#foreach from=$unitspicarr key=k item=i#}
+        <li class="fn-clear" id="WU_FILE_2_{#$k#}">
+          <span class="li-move" title="{#$langData['siteConfig'][23][42]#}">↕</span>
+          <a class="li-rm" href="javascript:;">×</a>
+          <div class="li-thumb" style="display: block;">
+            <div class="r-progress"><s></s></div>
+            <span class="ibtn">
+                  <a href="javascript:;" class="Lrotate" title="{#$langData['siteConfig'][23][43]#}"></a>
+                  <a href="javascript:;" class="Rrotate" title="{#$langData['siteConfig'][23][44]#}"></a>
+                  <a href="{#$i.picpath#}" target="_blank" class="enlarge" title="{#$langData['siteConfig'][23][45]#}"></a>
+              </span>
+            <span class="ibg"></span>
+            <img data-val="{#$i.picresources#}" data-url="{#changeFileSize url="{#$i.picpath#}" type="small"#}" src="{#changeFileSize url="{#$i.picpath#}" type="small"#}" />
+          </div>
+        </li>
+        {#/foreach#}
+        </ul>
+        <input type="hidden" name="unitspic" value="{#$unitspic#}" class="imglist-hidden" id="unitspic">
+      </div>
+      <div class="btn-section fn-clear">
+        <div class="wxUploadObj fn-clear">
+          <div class="uploadinp filePicker" id="filePicker4" data-type="album" data-count="5" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][168]#}</span></div>
+          <div class="upload-tip">
+	        <p><a href="javascript:;" class="hide deleteAllAtlas"{#if $unitspic#} style="display: inline-block;"{#/if#}>{#$langData['siteConfig'][6][79]#}</a>&nbsp;&nbsp;{#$langData['siteConfig'][54][19]|replace:' 1 ':($atlasSize/1024)|replace:' 2 ':5#} <span class="fileerror"></span></p>
+	      </div>
+        </div>
+      </div>
+    </dd>
+  </dl>
+  {#* 效果图 *#}
+  <dl class="fn-clear">
+    <dt><span></span>{#$langData['renovation'][0][8]#}：</dt>
+    <dd class="listImgBox fn-hide" style="position: relative;overflow: hidden;padding: 5px 80px 5px 10px;">
+      <div class="list-holder">
+        <ul id="listSection3" class="fn-clear listSection fn-hide"{#if $pics#} style="display: block;"{#/if#}>
+        {#foreach from=$picsarr key=k item=i#}
+        <li class="fn-clear" id="WU_FILE_1_{#$k#}">
+          <span class="li-move" title="{#$langData['siteConfig'][23][42]#}">↕</span>
+          <a class="li-rm" href="javascript:;">×</a>
+          <div class="li-thumb" style="display: block;">
+            <div class="r-progress"><s></s></div>
+            <span class="ibtn">
+                <a href="javascript:;" class="Lrotate" title="{#$langData['siteConfig'][23][43]#}"></a>
+                <a href="javascript:;" class="Rrotate" title="{#$langData['siteConfig'][23][44]#}"></a>
+                <a href="{#$i.picpath#}" target="_blank" class="enlarge" title="{#$langData['siteConfig'][23][45]#}"></a>
+            </span>
+            <span class="ibg"></span>
+            <img data-val="{#$i.picresources#}" data-url="{#changeFileSize url="{#$i.picpath#}" type="small"#}" src="{#changeFileSize url="{#$i.picpath#}" type="small"#}" />
+          </div>
+        </li>
+        {#/foreach#}
+        </ul>
+        <input type="hidden" name="pics" value="{#$pics#}" class="imglist-hidden" id="imglist">
+      </div>
+      <div class="btn-section fn-clear">
+        <div class="wxUploadObj fn-clear">
+          <div class="uploadinp filePicker" id="filePicker3" data-type="album" data-count="20" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>{#$langData['siteConfig'][6][168]#}</span></div>
+          <div class="upload-tip">
+	        <p><a href="javascript:;" class="hide deleteAllAtlas"{#if $pics#} style="display: inline-block;"{#/if#}>{#$langData['siteConfig'][6][79]#}</a>&nbsp;&nbsp;{#$langData['siteConfig'][54][19]|replace:' 1 ':($atlasSize/1024)|replace:' 2 ':20#} <span class="fileerror"></span></p>
+	      </div>
+        </div>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="price">价格：</label></dt>
+    <dd>
+      <div class="input-prepend input-append" style="margin:0;">
+        <input class="input-mini" type="text" name="price" id="price" value="{#$price#}" data-regex="\d*\.?\d+">
+        <span class="add-on" style="margin-right:10px;">万元</span>
+        <span class="input-tips"><s></s>请输入装修总价</span>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="btype">发布类型：</label></dt>
+    <dd class="radio" id="ftype">
+      {#html_radios name="ftype" values=$ftypeopt checked=$ftype output=$ftypenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+
+  <dl class="clearfix {#if $ftype!=0#}hide{#/if#}" id="company">
+    <dt><label for="company">所属公司：</label></dt>
+    <dd style="position:static;">
+      <input class="input-large" type="text" name="companyname" id="companyname" autocomplete="off" value="{#$fname#}" />
+      <input type="hidden" name="companyid" id="companyid" value="{#$fid#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>请输入所属公司</span>
+      <div id="companyList" class="popup_key"></div>
+    </dd>
+  </dl>
+
+  <dl class="clearfix {#if $ftype!=1#}hide{#/if#}" id="foreman">
+    <dt><label for="foremanname">工长：</label></dt>
+    <dd style="position:static;">
+      <input class="input-medium" type="text" name="foremanname" id="foremanname" autocomplete="off" value="{#$fname#}" />
+      <input type="hidden" name="foremanid" id="foremanid" value="{#$fid#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>请输入案例所属设计师</span>
+      <div id="foremanList" class="popup_key"></div>
+    </dd>
+  </dl>
+
+  <dl class="clearfix {#if $ftype!=2#}hide{#/if#}" id="designer">
+    <dt><label for="designername">设计师：</label></dt>
+    <dd style="position:static;">
+      <input class="input-medium" type="text" name="designername" id="designername" autocomplete="off" value="{#$fname#}" />
+      <input type="hidden" name="designerid" id="designerid" value="{#$fid#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>请输入案例所属设计师</span>
+      <div id="designerList" class="popup_key"></div>
+    </dd>
+  </dl>
+  <!-- <dl class="clearfix">
+    <dt><label for="case">设计方案：</label></dt>
+    <dd>
+      <div class="selectedTags" id="caseName">{#$caseName#}</div>
+      <input type="hidden" name="case" id="case" value="{#$case#}" />
+      <button class="btn chooseCase" type="button">选择</button>
+    </dd>
+  </dl> -->
+<!--  {#if $type == 0#}-->
+<!--  <dl class="clearfix jiastyle">-->
+<!--  {#else#}-->
+<!--  <dl class="clearfix hide jiastyle">-->
+<!--  {#/if#}-->
+<!--    <dt><label>所属小区：</label></dt>-->
+<!--    <dd>-->
+<!--      <div class="selectedTags" id="communityName">{#$communityName#}</div>-->
+<!--      <input type="hidden" name="communityid" id="communityid" value="{#$communityid#}" />-->
+<!--      <input type="hidden" name="community" id="community" value="{#$community#}" />-->
+<!--      <button class="btn chooseCommunity" type="button">选择</button>-->
+<!--    </dd>-->
+<!--  </dl>-->
+  {#if $type == 1#}
+  <dl class="clearfix hide">
+  {#else#}
+  <dl class="clearfix hide">
+  {#/if#}
+    <dt><label for="addrid">所在区域：</label></dt>
+    <dd>
+      <span id="addrList">
+        <select name="addrid" id="addrid" class="input-large"></select>
+      </span>
+      <span class="input-tips"><s></s>请选择所在地</span>
+    </dd>
+  </dl>
+  {#if $type == 1#}
+  <dl class="clearfix hide">
+  {#else#}
+  <dl class="clearfix hide">
+  {#/if#}
+    <dt><label for="address">详细地址：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" data-regex=".{5,100}" />
+      <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+      <span class="input-tips"><s></s>请输入详细地址，5-100位</span>
+      <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="began">开工日期：</label></dt>
+    <dd><input class="input-medium" id="began" name="began" type="text" value="{#$began#}" /></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="end">竣工日期：</label></dt>
+    <dd><input class="input-large" id="end" name="end" type="text" value="{#$end#}" /></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="visit">是否接受参观：</label></dt>
+    <dd class="radio">
+      {#html_radios name="visit" values=$visitopt checked=$visit output=$visitnames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="click">浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+      <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+      <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="state">显示状态：</label></dt>
+    <dd class="radio">
+      {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$jsFile#}
+</body>
+</html>

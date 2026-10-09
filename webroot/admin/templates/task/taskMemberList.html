@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>会员管理</title>
+{#$cssFile#}
+<style>
+.list td {font-size: 15px;}
+.list td small {font-size: 90%;}
+.thead li{font-size: 14px;}
+.thead li .moneyA,.thead li .pointA,.thead li .bonusA,.thead li .recomdA{color: #999;text-decoration: none;}
+.thead li .moneyA.curr,.thead li .pointA.curr,.thead li .bonusA.curr,.thead li .recomdA.curr{color: #2672ec;}
+.thead li .moneyA i,.thead li .pointA i,.thead li .bonusA i,.thead li .recomdA i{display: inline-block;width: 18px;height: 20px;background: url(/static/images/ui/chosen-sprite.png) no-repeat -2px 3px;margin-left: 2px;}
+.thead li .moneyA.up i,.thead li .pointA.up i,.thead li .bonusA.up i,.thead li .recomdA.up i{background: url(/static/images/ui/chosen-sprite.png) no-repeat -20px 3px;}
+.uaccount {padding: 0px 4px; margin-right: 3px; display: inline-block; line-height: 16px; vertical-align: middle; margin-top: -1px; margin-bottom: 2px; color: #b1b1b1; text-align-last: justify;}
+</style>
+</head>
+<body>
+<div class="search">
+  <label>搜索：</label>
+  <select class="chosen-select" id="clevel" style="width: 95px;">
+    <option value="">会员等级</option>
+    <option value="">所有等级</option>
+    {#foreach from=$levelList item=level#}
+    <option value="{#$level.id#}">{#$level.typename#}</option>
+    {#/foreach#}
+  </select>
+  <input class="input-large" type="search" id="keyword" placeholder="请输入关键字，指定用户#123" title="输入#用户ID，可以快速搜索">
+  &nbsp;&nbsp;开通日期&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期">&nbsp;&nbsp;到&nbsp;&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期">&nbsp;&nbsp;
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <a href="javascript:;" class="btn btn-primary" id="addNew">添加会员</a>
+    &nbsp;&nbsp;
+    <span>共<span class="totalCount">0</span>个会员</span>
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row2">&nbsp;</li>
+  <li class="row5 left">会员ID</li>
+  <li class="row20 left">会员信息</li>
+  <li class="row10 left">会员等级</li>
+  <li class="row15 left">开通时间/结束时间</li>
+  <li class="row7 left">剩余刷新</li>
+  <li class="row7 left">剩余置顶</li>
+  <li class="row7 left">被举报</li>
+  <li class="row10 left">发布任务</li>
+  <li class="row10 left">领取任务</li>
+  <li class="row7">操作</li>
+</ul>
+
+<div class="list common mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="start"></span>
+  <span id="end"></span>
+</div>
+
+<script id="editForm" type="text/html">
+    <form action="" class="quick-editForm" name="editForm">
+        <dl class="clearfix">
+            <dt>会员ID：</dt>
+            <dd><input class="input-medium" type="text" name="uid" id="uid" value="" /></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>会员等级：</dt>
+            <dd><select name="level" id="level" class="input-large"></select></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>开通时间：</dt>
+            <dd><input name="open_time" type="datetime-local" id="open_time" class="input-large" placeholder="yyyy-mm-dd hh:ii:ss" /></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>结束时间：</dt>
+            <dd><input name="end_time" type="datetime-local" id="end_time" class="input-large" placeholder="yyyy-mm-dd hh:ii:ss" /></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>刷新券：</dt>
+            <dd><input class="input-mini" type="text" name="refresh_coupon" id="refresh_coupon" value="" /> 个</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>置顶时长：</dt>
+            <dd><input class="input-mini" type="text" name="bid_coupon" id="bid_coupon" value="" /> 小时</dd>
+        </dl>
+    </form>
+</script>
+
+<script>
+var adminPath = "{#$adminPath#}", levelListArr = {#$levelListArr#};
+</script>
+
+{#$jsFile#}
+</body>
+</html>

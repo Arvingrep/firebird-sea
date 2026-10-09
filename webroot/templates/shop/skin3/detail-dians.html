@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#$detail_title#}-{#$shop_title#}</title>
+<meta name="keywords" content="{#$shop_keywords#}"/>
+<meta name="description" content="{#$shop_description#}"/>
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico?v={#$cfg_staticVersion#}" type="image/x-icon"/>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all"/>
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all"/>
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/businessD-dians.css?v={#$cfg_staticVersion#}" media="all"/>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+{#if $detail_video#}
+<!-- <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/video-js.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/vsg-skin.css?v={#$cfg_staticVersion#}" media="all" /> -->
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/plyr.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/plyr.js"></script>
+{#/if#}
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$shop_channelDomain#}', cfg_staticPath = staticPath = '{#$cfg_staticPath#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+	var detailShopunit ='{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}' ;//商品单位
+	var detailID = '{#$detail_id#}';     //当前信息ID
+	var detailTitle = '{#$detail_title#}';
+	var detailPrice = '{#$detail_price#}';
+	var maxCount = '{#if $detail_states#}{#$detail_limit#}{#else#}{#$detail_limitcount#}{#/if#}';  //最多购买数量
+	var detailThumb = '{#changeFileSize url=$detail_litpic type="small"#}';   //当前商品缩略图
+	var detailUrl = '{#getUrlPath service="shop" template="detail" id=$detail_id#}';
+	var date = [];
+	{#if $detail_states==1 || $detail_states==2 || $detail_states==4 || $detail_states== 3#}
+	date = [{#$smarty.now#}, {#$detail_ktime#}, {#$detail_etime#}];
+	{#else if ($detail_ygstates == 1 ||$detail_ygstates == 2) && $detail_ktime>time() && ($detail_ktime - time())/60/60 <= $customhuodongygtime #}
+	date = [{#$smarty.now#}, {#$detail_ktime#}, {#$detail_etime#}];
+	{#/if#}
+	var prohuodongtype = '{#$detail_states#}'; //商品拼团
+	var huodongid = "{#$detail_hid#}";
+	var imconfig = {
+		'mod':'shop',
+		'chatid':"{#$detail_store['userid']#}",
+		'title': '{#$detail_title#}',
+		"price": '{#echoCurrency type="symbol"	#}{#$detail_price#}',
+		"imgUrl": '{#changeFileSize url={#$detail_litpic#} type="small"#}',
+		"link": '{#getUrlPath service="shop" template="detail" id=$detail_id#}',
+
+	}
+	//商品信息-商品颜色和尺寸
+	var sku_conf = {
+
+			//属性表
+			"property": [
+				{#foreach from=$detail_specificationArr item=spe#}
+				{
+					"name": "{#$spe.typename#}",
+					"options": [
+						{#foreach from=$spe.item item=item#}
+						{"id": "{#$item.id#}",	"name": "{#$item.name|parseStrSpecialChar#}"{#if $item.pic#}, "pic": "{#$item.pic#}"{#/if#}},
+						{#/foreach#}
+					]
+				},
+				{#/foreach#}
+			]
+
+			//属性值
+			,"data": {
+
+				{#foreach from=$detail_specification item=spe#}
+				"{#$spe.spe|replace:",":";"#}": {"id":{#$spe.id|default:1#}, price: '{#$spe.price[1]#}', mprice: '{#$spe.price[0]#}', stock: '{#$spe.price[2]#}'},
+				{#/foreach#}
+			},"pindata":{
+				{#foreach from=$detail_pinspecification item=spe#}
+				"{#$spe.spe|replace:",":";"#}": {"id":{#$spe.id|default:1#}, price: '{#$spe.price[1]#}', mprice: '{#$spe.price[0]#}', stock: '{#$spe.price[2]#}'},
+				{#if $spe.price[2] > 0#}
+				{#/if#}
+				{#/foreach#}
+			}
+	};
+	
+	//商品规格选择
+	var detail_inventory = '{#$detail_huodonginventory #}';  //库存
+	var modultype = '{#$detail_moduletype#}';
+	var storeId = "{#$detail_store['id']#}";
+	</script>
+</head>
+
+<body class="w1200">
+{#include file="top_Detail.html"#}
+{#$priceNrr = "."|explode:$detail_price#}
+{#$priceMrr = "."|explode:$detail_price#}
+{#$priceHrr = "."|explode:$detail_huodongprice#}
+{#$priceHrr = "."|explode:$detail_huodongprice#}
+{#$gnowmoney = "."|explode:$detail_gnowmoney#}
+<div class="bread">
+	<p><a href="{#$shop_channelDomain#}" target="_blank">{#$langData['siteConfig'][0][0]#}</a> >
+		{#foreach from=$detail_typename item=typename key=k name=foo#}
+		<a href="{#getUrlPath service='shop' template='list' param="typeid={#$detail_typeids[$k]#}"#}" target="_blank">{#$typename#}</a>
+		{#if !$smarty.foreach.foo.last#}>{#/if#}
+		{#/foreach#}
+	</p>
+</div>
+
+<div class="content clearfix fn-clear">
+	<div class="sjLeft">
+		<form action="{#getUrlPath service='shop' template='confirm-order'#}" id="buyForm" method="post">
+			<input type="hidden" name="pros[]" id="pros" value="" />
+			<input type="hidden" name="price" id="payPrice">
+			<input type="hidden" name="pinid" id="pinid">
+			<input type="hidden" name="ordertype" id="ordertype">
+			<input type="hidden" name="hid" id="hid" value="{#$detail_hid#}">
+			<input type="hidden" name="bid" id="bid" value="{#$detail_bargaid#}">
+
+			<input type="hidden" name="buytype" id="buytype" value="{#if $detail_states ==3#}bargain{#elseif $detail_states == 4#}pintuan{#elseif $detail_states == 2#}miaosha{#elseif $detail_states == 1#}qianggou{#/if#}">
+			<input type="hidden" name="confirmtype" id="confirmtype" value="1">
+			<input type="hidden" name="frompage" id="frompage" value="{#$detail_fromPage#}">
+			<dl class="singleGoods clearfix fn-clear">
+				<dt>
+					<div class="bigtobox">
+						<div class="tb-booth tb-pic tb-s310">
+							{#if $detail_states==1#}
+								<!-- {#if $detail_btime>time()#}
+									<div class="state q3"><p class="s1">抢购</p><p class="s2">未开始！</p></div>
+								{#elseif $detail_btime<time() && $detail_etime>time()#}
+									<div class="state q1"><p class="s1">抢购</p><p class="s2">已开始！</p></div>
+								{#elseif $detail_etime<time()#}
+								 	<div class="state q2"><p class="s1">抢购</p><p class="s2">已结束！</p></div>
+								{#/if#} -->
+							{#elseif $detail_states==2#}
+								<!-- {#if $detail_ktime>time()#}
+									<div class="state m3"><p class="s1">秒杀</p><p class="s2">未开始！</p></div>
+								{#elseif $detail_ktime<time() && $detail_etime>time()#}
+									<div class="state m1"><p class="s1">秒杀</p><p class="s2">已开始！</p></div>
+								{#elseif $detail_etime<time()#}
+									<div class="state m2"><p class="s1">秒杀</p><p class="s2">已结束！</p></div>
+								{#/if#} -->
+							{#/if#}
+							{#$picSource = $detail_pics[0].path#}
+							{#if $detail_litpic#}
+							{#$picSource =  $detail_litpic#}
+							{#/if#}
+							<a href="{#$picSource#}"><img src="{#$picSource#}" rel="{#$picSource#}" class="jqzoom" /></a>
+							<div  class="pro_show">
+
+									<a href="" data-tit="" data-id="">
+										<img src="" alt="" class="jqzoom1">
+									</a>
+
+							</div>
+						</div>
+						<div class="thumblistBox">
+							
+							<ul class="tb-thumb" id="thumblist">
+								{#if $detail_litpic#}
+								<li class="tb-selected">
+									<div class="tb-pic tb-s40"><a href="javascript:;">
+										<img src="{#changeFileSize url=$detail_litpic width='160' height='160'#}" mid="{#$detail_litpic#}" big="{#$detail_litpic#}" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></a>
+									</div>
+								</li>
+								{#/if#}
+								{#foreach from=$detail_pics item=pic key=k#}
+								{#if $k < 5 #}
+								<li{#if $k == 0 && !$detail_litpic#} class="tb-selected"{#/if#}>
+									<div class="tb-pic tb-s40"><a href="javascript:;">
+										<img src="{#changeFileSize url=$pic['path'] width='160' height='160'#}" mid="{#$pic.path#}" big="{#$pic.path#}" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></a>
+									</div>
+								</li>
+								{#/if#}
+								{#/foreach#}
+							</ul>
+						</div>
+					</div>
+					<div class="collectBtn ">
+						{#if $detail_collect == 1#}<a class="collect has" href="javascript:;" data-temp="detail" data-id="{#$detail_id#}"><i></i>已{#$langData['siteConfig'][19][240]#}</a>{#else#}<a class="collect" href="javascript:;" data-temp="detail" data-id="{#$detail_id#}"><i></i>{#$langData['siteConfig'][19][240]#}</a>{#/if#}
+						<a href="javascript:;" class="shareBtn newBtn_share" data-title="{#$detail_title#}" title="{#$detail_title#}" data-pic="{#$detail_pics[0].path#}"><i></i>{#$langData['siteConfig'][6][166]#}</a>
+						<!-- {#if $detail_is_tuikuan=='0' #}
+						<div class="tui tui_txt"><s></s>退换无忧</div>
+						{#else#}
+						<div class="notui tui_txt"><s></s>一经出售，概不退换</div>
+						{#/if#} -->
+					</div>
+				</dt>
+				<dd class="title">
+					<p>{#$detail_title#}</p>
+					<span>{#$detail_subtitle#}</span>
+				</dd>
+				<dd class="info">
+					{#if ($detail_ygstates == 1 && $detail_ktime>time() && ($detail_ktime - time())/60/60 <= $customhuodongygtime) || $detail_states == 1#}
+					<div class="qianggou cutDom">
+						{#if $detail_ktime>time()  #}
+							<div class="right">
+								距开始还剩<span><em class="hh"></em>:<em class="mm"></em>:<em class="ss"></em></span></div>
+						{#elseif $detail_ktime<time() && $detail_etime>time()#}
+							<div class="right">距结束还剩<span><b class="day"></b><em class="hh">00</em>:<em class="mm">00</em>:<em class="ss">00</em></span></div>
+						{#elseif $detail_etime<time()#}
+							<div class="right">已结束</div>
+						{#/if#}
+					</div>
+					{#elseif ($detail_ygstates == 2 && $detail_ktime>time() && ($detail_ktime - time())/60/60 <= $customhuodongygtime) || $detail_states == 2#}
+					<div class="miaosha cutDom">
+						{#if $detail_ktime>time() #}
+							<div class="right">
+								距开始还剩<span><em class="hh"></em>:<em class="mm"></em>:<em class="ss"></em></span></div>
+						{#elseif $detail_ktime<time() && $detail_etime>time()#}
+							<div class="right">距结束还剩<span><em class="hh">00</em>:<em class="mm">00</em>:<em class="ss">00</em></span></div>
+						{#elseif $detail_etime<time()#}
+							<div class="right">已结束</div>
+						{#/if#}
+					</div>
+					{#elseif $detail_states == 3#}
+					<div class="kanjia cutDom">
+						{#if $detail_ktime>time()#}
+							<div class="right">
+								距开始还剩<span><em class="hh"></em>:<em class="mm"></em>:<em class="ss"></em></span></div>
+						{#elseif $detail_ktime<time() && $detail_etime>time()#}
+							<div class="right">距结束还剩<span><b class="day"></b><em class="hh">00</em>:<em class="mm">00</em>:<em class="ss">00</em></span></div>
+						{#elseif $detail_etime<time()#}
+							<div class="right">已结束</div>
+						{#/if#}
+					</div>
+					{#elseif $detail_states == 4#}
+					<div class="pintuan cutDom">
+						<span class="pNum"><s></s>{#$detail_huodongnumber#}人团</span>
+						{#if $detail_ktime>time()#}
+							<div class="right">
+								距开始还剩<span><em class="hh"></em>:<em class="mm"></em>:<em class="ss"></em></span></div>
+						{#elseif $detail_ktime<time() && $detail_etime>time()#}
+							<div class="right">距结束还剩<span><b class="day"></b><em class="hh">00</em>:<em class="mm">00</em>:<em class="ss">00</em></span></div>
+						{#elseif $detail_etime<time()#}
+							<div class="right">已结束</div>
+						{#/if#}
+					</div>
+					{#/if#}
+					<ul class="yhBox">
+						{#if $detail_states != 3#}
+						{#* 价格 *#}
+						{#if $detail_state && $detail_ktime && $detail_ktime < time() && $detail_etime > time()#}
+						<li class="price"><label class="label">{#$langData['siteConfig'][42][30]#}：</label><div class="txt"><span class="moneyTxt"><i>{#echoCurrency type='symbol'#}</i><b>{#floatval($detail_huodongprice)#}</b></span></div><s>{#echoCurrency type='symbol'#}{#floatval($detail_price)#}</s>
+						</li>
+						{#else#}
+						<li class="price"><label class="label">{#$langData['siteConfig'][42][30]#}：</label><div class="txt"><span class="moneyTxt"><i>{#echoCurrency type='symbol'#}</i><b>{#floatval($detail_price)#}</b></span></div><s>{#echoCurrency type='symbol'#}{#floatval($detail_mprice)#}</s>
+						</li>
+						{#/if#}
+						{#else#}
+						<li class="oprice"><span class="label">原价：</span><label>{#$detail_price#}</label></li>
+						<li class="price"><span class="label">可砍至：</span><div class="txt"><span class="moneyTxt"><i>{#echoCurrency type="symbol"#}</i><b>{#$detail_huodongprice#} </b></span></div></li>
+						{#/if#}
+						<div class="sales">已售<span>{#if $detail_states#}{#$detail_huodongsales#}{#else#}{#$detail_sales#}{#/if#}</span>{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}</div>
+						{#if !$detail_states#}
+                        <!-- 分销用户独享s -->
+						{#if $cfg_fenxiaoFee_shop > 0#}
+						<li class="fenxiao_share" data-fee="{#$cfg_fenxiaoFee_shop#}">
+							<span><s class="fx_icon"></s>分享赚<s class="arr_icon"></s></span>邀请好友下单，可赚<b>{#echoCurrency type="symbol"#}{#if $detail_states#} {#($cfg_fenxiaoFee_shop * $detail_huodongprice)|string_format:"%.2f"#} {#else#}{#($cfg_fenxiaoFee_shop * $detail_price)|string_format:"%.2f"#}{#/if#}</b><s class="yqzq newBtn_share"></s>
+						</li>
+						{#else if $cfg_fenxiaoFee_intshop#}
+						<li class="fenxiao_share" >
+							<span><s class="fx_icon"></s>分享赚<s class="arr_icon"></s></span>邀请好友下单，可赚<b>{#echoCurrency type="symbol"#}{#$cfg_fenxiaoFee_intshop#}</b><s class="yqzq newBtn_share"></s>
+						</li>
+						{#/if#}
+						<!-- 分销用户独享e -->
+                        {#/if#}
+
+
+						<li class="q_li">
+							<span class="label">优惠：</span>
+
+							<div class="newqbox">
+								{#if $detail_quanarr && $detail_states!=3 #}
+								<div class="quanlistbox">
+									{#foreach from=$detail_quanarr key=k item=quan#}
+									{#if $k <=1#}
+									<label >{#if $quan.promotiotype==1#}
+									{#if $quan.basic_price > 0#}满{#floatval($quan.basic_price)#}打{#else#}无门槛{#/if#}{#floatval($quan.promotio)#}折
+									{#else#}
+									{#if $quan.basic_price > 0#}满{#floatval($quan.basic_price)#}减{#else#}无门槛{#/if#}{#floatval($quan.promotio)#}
+									{#/if#}</label>
+									{#/if#}
+									{#/foreach#}
+									<div class="qlistbox">
+										<div class="quan-list" >
+											{#foreach from=$detail_quanarr key=k item=quan#}
+											<div class="quan_dd  {#if $quan.shoptype==0#}shop_q{#/if#} {#if ($quan.etime- $smarty.now) <= 172800#}guoqi{#/if#} {#if $quan.is_selflingqu==0#}no_has{#/if#}">
+												<s class="guoqi_icon"></s>
+												<div class="quan_left">
+													<h2>{#if $quan.promotiotype==0#}{#echoCurrency type='symbol'#}{#/if#}<b>{#floatval($quan.promotio)#}</b>{#if $quan.promotiotype==1#}折{#/if#}<span>{#if $quan.shoptype==0#}指定商品{#else#}店铺券{#/if#}</span></h2>
+													<p class="useTip">{#$quan.name#}</p>
+													{#$dateArr = " "|explode:$quan.ymdetime#}
+													<p class="usetime">{#$dateArr[0]|replace:"-":"."#}到期 <span class="newCuslab fn-hide">新用户专享</span></p>
+													{#if $quan.is_selflingqu==1#}{#/if#}
+													<s class="state_icon"></s>
+													
+
+												</div>
+												<a href="javascript:;" class="toUse tohid {#if  $quan.is_selflingqu==0#} toGetquan {#/if#}" data-id="{#$quan.id#}"> {#if $quan.is_selflingqu==1#}立 即 使 用{#else#}立 即 领 取{#/if#}<s></s></a>
+											</div>
+											{#/foreach#}
+										</div>
+									</div>
+								</div>
+								{#/if#}
+
+								<!-- 参与活动的都不参与vip折扣 -->
+								{#if !$detail_states#}
+								<!-- 会员优惠 -->
+								{#if $userinfo && $userinfo.level && $userinfo.privilege && $userinfo.privilege['shop']&& $userinfo.privilege['shop'] != 10#}
+								<div class="vipyouhui" data-privilege="{#(10 - $userinfo.privilege['shop']) / 10 #}">
+									<s class="vipIcon"></s>{#$userinfo.levelName#}{#$userinfo.privilege['shop']#}折，预计可省{#echoCurrency type="symbol"#}<span class="vipJian">{#if $detail_states#} {#((10 - $userinfo.privilege['shop']) / 10 * $detail_huodongprice)|string_format:"%.2f" #} {#else#}{#((10 - $userinfo.privilege['shop']) / 10 * $detail_price)|string_format:"%.2f" #}{#/if#}</span>
+								</div>
+								{#/if#}
+								{#/if#}
+
+								{#if $cfg_returnPoint_shop && intval($cfg_returnPoint_shop * $detail_huodongprice) > 0#}
+								<div class="point" data-point="{#$cfg_returnPoint_shop#}"><s class="pointIcon"></s>购买可得<span class="pointGet" style="margin-right: 0">{#if $detail_states#} {#intval($cfg_returnPoint_shop * $detail_huodongprice)#} {#else#}{#intval($cfg_returnPoint_shop * $detail_price)#}{#/if#}</span>{#$cfg_pointName#}</div>
+								{#/if#}
+							</div>
+						</li>
+
+
+
+
+					</ul>
+					<div class="tuiType">
+						{#if $detail_is_tuikuan == 1#}
+						<span class="notui"><i></i>不支持退款</span>
+						{#else#}
+						<span class="tui1"><i></i>支持7天无理由退换</span>
+						{#/if#}
+					</div>
+					{#$textArr = "："|explode:$detail_logisticNote#}
+<!--					<div class="express_fee"><span class="label">运费：</span>{#if count($textArr)>1#}{#$textArr[1]#}{#else#}{#$textArr[0]#}{#/if#}</div>-->
+					<ul>
+						<em>{#$langData['shop'][0][6]#}</em>
+						<!-- {#if $detail_volume > 0#}<li><span class="label">{#$langData['siteConfig'][19][565]#}：</span><label>{#$detail_volume#}m³</label></li>{#/if#}
+						{#if $detail_weight > 0#}<li><span class="label">{#$langData['siteConfig'][19][566]#}：</span><label>{#$detail_weight#}kg</label></li>{#/if#} -->
+						{#if $detail_states ==1#}
+						<!-- <li><span class="label">{#$langData['shop'][5][33]#}：</span><label class="expiry"></label></li> -->
+
+						{#/if#}
+						{#if $detail_huodonginventory > 0 || $detail_inventory > 0#}
+						<li class="count fn-clear">
+							<span class="label">{#$langData['siteConfig'][19][311]#}</span>
+							<div class="num"><i class="down noclick"><span class="heng"></span></i><input type="text" value="{#if $detail_smallCount > 1#}{#$detail_smallCount#}{#else#}1{#/if#}" readonly ><i class="up"><span class="shu"></span><span class="heng"></span></i></div>
+							<var class="left">{#$langData['siteConfig'][19][525]#}<b>{#if $detail_states==1 || $detail_states==2 || $detail_states==3#}{#$detail_huodonginventory#}{#else#} {#$detail_inventory#}{#/if#}</b>{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}{#$langData['shop'][3][1]#}{#/if#}</var><cite style="display: none;">{#$langData['shop'][2][24]#}</cite>
+						</li>
+						{#/if#}
+						<li class="buy_mincount" {#if $detail_smallCount > 1 || $detail_packingCount > 1#}style="display: block;"{#else#}style="display: none;"{#/if#}>
+							<div class="mincoutDiv">
+								<div>
+									<span>最小起订量：{#$detail_smallCount#}；装箱数量：{#$detail_packingCount#}</span>
+									<div class="mincoutDiv2">
+										<!-- <a href="javascript:;" class="mincoutNote"></a> -->
+										<div class="mincoutTip" data-mincout="{#if $detail_smallCount > 1#}{#$detail_smallCount#}{#else#}1{#/if#}" data-eachcout="{#if $detail_packingCount > 1#}{#$detail_packingCount#}{#else#}1{#/if#}">最小起订量：{#$detail_smallCount#}；装箱数量：{#$detail_packingCount#} <b><s></s></b></div>
+									</div>
+
+								</div>
+
+							</div>
+						</li>
+
+					</ul>
+				</dd>
+				{#if ($detail_huodonginventory <= 0 && $detail_states) || ($detail_inventory <=0 && !$detail_states)#}
+				<dd class="cartBuy"><a class="btn nostore" href="javascript:;">{#$langData['siteConfig'][16][142]#}</a></dd>
+				{#else#}
+					{#if $detail_btime>time()#}
+						<dd class="cartBuy">
+							{#if $detail_states !=4#}
+							{#if $detail_states != 3#}
+							<a class="cart" href="javascript:;"><i></i>{#$langData['shop'][1][4]#}</a>
+							<a class="buyNow" href="javascript:;">{#$langData['siteConfig'][18][35]#}</a>
+							{#else#}
+							<a class="canjia_btn" href="javascript:;">{#if $detail_bargainingjoin <=0#}我要砍价{#else#}继续砍价{#/if#}
+								<div class="popCode">
+									<div class="code"><img src="{#$cfg_basehost#}/include/qrcode.php?data={#getUrlPath service="shop" template="detail" id=$detail_id#}" alt=""></div>
+									<p>手机扫码进行砍价</p>
+								</div>
+							</a>
+							<a class="buyNow yjbuy" href="javascript:;">原价购买</a>
+							{#/if#}
+							{#else#}
+							<a class="zjbuy" href="javascript:;" data-name="zjbuy"><h4>{#echoCurrency type="symbol"#}<b>{#$detail_price#}</b></h4>直接购买</a>
+							<a class="pindan" href="javascript:;" data-name="fqbuy"><h4>{#echoCurrency type="symbol"#}<b>{#$detail_huodongprice#}</b></h4>我要开团</a>
+							{#/if#}
+						</dd>
+					{#elseif $detail_etime>time()#}
+						<dd class="cartBuy">
+							{#if $detail_states !=4#}
+							{#if $detail_states != 3#}
+							<a class="cart" href="javascript:;"><i></i>{#$langData['shop'][1][4]#}</a>
+							<a class="buyNow" href="javascript:;">{#$langData['siteConfig'][18][35]#}</a>
+							{#else#}
+							<a class="canjia_btn" href="javascript:;">{#if $detail_bargainingjoin <=0#}我要砍价{#else#}继续砍价{#/if#}
+								<div class="popCode">
+									<div class="code"><img src="{#$cfg_basehost#}/include/qrcode.php?data={#getUrlPath service="shop" template="detail" id=$detail_id#}" alt=""></div>
+									<p>手机扫码进行砍价</p>
+								</div>
+							</a>
+							<a class="buyNow yjbuy" href="javascript:;">原价购买</a>
+							{#/if#}
+
+							{#else#}
+							<a class="zjbuy" href="javascript:;"><h4>{#echoCurrency type="symbol"#}<b>{#$detail_price#}</b></h4>直接购买</a>
+							<a class="pindan" href="javascript:;"><h4>{#echoCurrency type="symbol"#}<b>{#$detail_huodongprice#}</b></h4>我要开团</a>
+							{#/if#}
+						</dd>
+					{#else#}
+						<dd class="cartBuy">
+							{#if $detail_states !=4#}
+							{#if $detail_states != 3#}
+							<a class="cart" href="javascript:;"><i></i>{#$langData['shop'][1][4]#}</a>
+							<a class="buyNow" href="javascript:;">{#$langData['siteConfig'][18][35]#}</a>
+							{#else#}
+							<a class="canjia_btn" href="javascript:;">{#if $detail_bargainingjoin <=0#}我要砍价{#else#}继续砍价{#/if#}
+								<div class="popCode">
+									<div class="code"><img src="{#$cfg_basehost#}/include/qrcode.php?data={#getUrlPath service="shop" template="detail" id=$detail_id#}" alt=""></div>
+									<p>手机扫码进行砍价</p>
+								</div>
+							</a>
+							<a class="buyNow yjbuy" href="javascript:;">原价购买</a>
+							{#/if#}
+
+							{#else#}
+							<a class="zjbuy" href="javascript:;" data-name="zjbuy"><h4>{#echoCurrency type="symbol"#}<b>{#$detail_price#}</b></h4>直接购买</a>
+							<a class="pindan" href="javascript:;" data-name="fqbuy"><h4>{#echoCurrency type="symbol"#}<b>{#$detail_huodongprice#}</b></h4>我要开团</a>
+							{#/if#}
+						</dd>
+					{#/if#}
+				{#/if#}
+			</dl>
+
+		</form>
+
+		<!-- 相关推荐 -->
+		<div class="recBox">
+			<h2>相关推荐</h2>
+			<ul class="rec_ul fn-clear">
+				{#shop action="slist" return="list" typeid={#$detail_typeid#} store={#$detail_store['id']#} page="1" pageSize="6"#}
+				<li>
+					<a href="{#$list.url#}" class="probox">
+						<div class="imgbox"><img src="{#if $list.litpic#}{#changeFileSize url=$list['litpic'] width='320' height='320'#}{#else#}{#$cfg_staticPath#}images/404.jpg{#/if#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+						<div class="proinfo">
+							<p>{#$list.title#}</p>
+							<h4>{#echoCurrency type="symbol"#}{#$list.price#}</h4>
+						</div>
+					</a>
+				</li>
+				{#/shop#}
+			</ul>
+		</div>
+
+		<div class="detailBox">
+			<div class="left shopDetailBox">
+				<!-- 店铺信息 -->
+				<div class="shopDetail">
+					<h1><span>{#$detail_store['title']#}</span><a href="javascript:;" class="chat_btn" data-type="detail"></a></h1>
+					<div class="shopLogo"><img src="{#changeFileSize url=$detail_store['logo'] width='300' height='300'#}" alt=""></div>
+					<div class="btns_group">
+						<a href="{#$detail_store['domain']#}" class="toshop"><s></s>进店逛逛</a>
+
+						<a href="javascript:;" class="gz {#if $detail_storeCollect#}has{#/if#}"><s></s>{#if $detail_storeCollect#}已关注{#else#}关注店铺{#/if#}</a>
+					</div>
+					<div class="sjInfo">
+						<!-- <span><font class="left">{#$langData['siteConfig'][19][642]#}：</font><em>{#$detail_store['people']#}</em></span> -->
+						<span><font class="left">电&nbsp;&nbsp;&nbsp;话：</font><em>{#$detail_store['tel']#}</em></span>
+						<span><font class="left">地&nbsp;&nbsp;&nbsp;址：</font><em>{#$detail_store['addr'][0]#} {#$detail_store['addr'][1]#} {#$detail_store['address']#}</em></span>
+						<span><font class="left">经&nbsp;&nbsp;&nbsp;营：</font><em>{#$detail_store['project']#}</em></span>
+					</div>
+				</div>
+				<!-- 热销详情 -->
+				<div class="hotSaleBox">
+					<h1><span>热销排行榜</span></h1>
+					<ul>
+						{#shop action="slist" flag="2" orderby="1" page="1" pageSize="5"#}
+						<li>
+							<a href="{#$row.url#}" class="probox fn-clear">
+								<div class="proimg"><span class="lab">{#$_bindex.row#}</span><img src="{#changeFileSize url=$row['litpic'] width='140' height='140'#}" alt="{#$row.title#}"></div>
+								<div class="proinfo">
+									<p>{#$row.title#}</p>
+									<h2 class="price">{#echoCurrency type="symbol"#}{#$row.price#}</h2>
+								</div>
+							</a>
+						</li>
+						{#/shop#}
+					</ul>
+				</div>
+			</div>
+			<div class="rightCon">
+				{#if $detail_states == 4#}
+				<!-- 拼单列表 -->
+				<div class="pindanListBox  fn-hide">
+					<h2 class="fn-clear"><span><em>0</em>人正在拼单，可直接参与</span></h2>
+					<ul class="pindanList">
+					</ul>
+				</div>
+				{#/if#}
+				<div class="commentBox">
+					<div class="detailComment">
+						<div class="left">
+							<a class="on" href="javascript:;">{#$langData['waimai'][2][74]#}</a>
+							<a href="javascript:;">{#$langData['shop'][5][34]#}</a>
+						</div>
+						{#if $detail_states != 4#}
+						<div class="right">
+							{#if $detail_states == 3#}
+							<a class="canjia_btn" href="javascript:;">{#if $detail_bargainingjoin <=0#}找人帮砍{#else#}继续砍价{#/if#}
+								<div class="popCode">
+									<div class="code"><img src="{#$cfg_basehost#}/include/qrcode.php?data={#getUrlPath service="shop" template="detail" id=$detail_id#}" alt=""></div>
+									<p>手机扫码购买</p>
+								</div>
+							</a>
+							{#else#}
+							<a href="javascript:;" class="cart">加入购物车</a>
+							{#/if#}
+						</div>
+						{#/if#}
+					</div>
+					<div class="allCon">
+						<div class="con detailCon ">
+							
+							{#if ($detail_property && count($detail_property) > 0) || $detail_volume > 0 || $detail_weight > 0#}
+							<div class="detailCon_type fn-clear">
+								<ul>
+									{#if $detail_volume > 0#}<li><span class="label">{#$langData['siteConfig'][19][565]#}：</span><label>{#$detail_volume#}m³</label></li>{#/if#}
+									{#if $detail_weight > 0#}<li><span class="label">{#$langData['siteConfig'][19][566]#}：</span><label>{#$detail_weight#}kg</label></li>{#/if#}
+                                    {#if $detail_property#}
+									{#foreach from=$detail_property item=type#}
+									<li title="{#$type.val#}"><span>{#$type.typename#}：</span>{#$type.val#}</li>
+									{#/foreach#}
+                                    {#/if#}
+								</ul>
+							</div>
+							{#/if#}
+							<div class="detailbody">
+                                
+                                {#if $detail_video#}
+                                <div class="videoBox"><video src="{#$detail_video#}"></video></div>
+                                {#/if#}
+
+								{#$detail_body#}
+							</div>
+						</div>
+						<div class="con comentCon"  style="display: none;" >
+							<div class="rate">
+								<div class="left score"><span>{#$detail_rating * 100#}<em>%</em></span><p>好评度</p></div>
+								<div class="left percent">
+									<dl><dt>{#$langData['siteConfig'][19][335]#}<span>({#$detail_score1 * 20#}%)</span></dt><dd><span style=" width: {#$detail_score1 / 5 * 100#}%;"></span></dd></dl>
+									<dl><dt>{#$langData['siteConfig'][19][336]#}<span>({#$detail_score2 * 20#}%)</span></dt><dd><span style=" width: {#$detail_score2 / 5 * 100#}%;"></span></dd></dl>
+									<dl><dt>{#$langData['siteConfig'][19][338]#}<span>({#$detail_score3 * 20#}%)</span></dt><dd><span style=" width: {#$detail_score3 / 5 * 100#}%;"></span></dd></dl>
+								</div>
+							</div>
+							<div class="all-comment">
+								<div class="left commentSel">
+									<a class="on" href="javascript:;" data-filter="">全部<span class="score0">(0)</span></a>
+									<a href="javascript:;" data-filter="h">{#$langData['siteConfig'][18][6]#}<span class="score1">(0)</span></a>
+									<a href="javascript:;" data-filter="z">{#$langData['siteConfig'][19][368]#}<span class="score2">(0)</span></a>
+									<a href="javascript:;" data-filter="c">{#$langData['siteConfig'][19][369]#}<span class="score3">(0)</span></a>
+									<a href="javascript:;" data-filter="img">有图/有视频<span class="score4">(0)</span></a>
+								</div>
+							</div>
+							<div class="comment-list">
+								<p class="loading"><img src="{#$cfg_basehost#}/static/images/loading_h8.gif"></p>
+								<ul  id="comment-list">
+									
+								</ul>
+							<div class="pagination fn-clear"></div>
+						</div>
+					</div>
+				</div>
+
+				</div>
+			</div>
+		</div>
+	</div>
+
+</div>
+
+
+
+{#include file="bottom.html"#}
+<div class="quandalog">
+	<div class="quanbox">
+		<span class="closebtn"></span>
+		<h2>可领取优惠券 <span>共4张</span></h2>
+		<ul class="quancon">
+			<li><a href="#" class="fn-clear">
+				<div class="img">
+					<p class="price"><e>¥</e>300 </p>
+					<p class="contact">满4999可用</p>
+				</div>
+				<div class="info">
+					<p class="name">店铺优惠券</p>
+					<p class="zhu">全店商品通用</p>
+					<div class="count">已抢 60%</div>
+					<div class="progress">
+						<b style="width:60%"></b>
+					</div>
+					<span class="btn">立即领取</span>
+				</div>
+			</a></li>
+			<li><a href="#" class="fn-clear">
+				<div class="img">
+					<p class="price"><e>¥</e>300 </p>
+					<p class="contact">满4999可用</p>
+				</div>
+				<div class="info">
+					<p class="name">店铺优惠券</p>
+					<p class="zhu">全店商品通用</p>
+					<div class="count">已抢 60%</div>
+					<div class="progress">
+						<b style="width:60%"></b>
+					</div>
+					<span class="btn curr">立即领取</span>
+				</div>
+			</a></li>
+			<li><a href="#" class="fn-clear">
+				<div class="img">
+					<p class="price"><e>¥</e>300 </p>
+					<p class="contact">满4999可用</p>
+				</div>
+				<div class="info">
+					<p class="name">店铺优惠券</p>
+					<p class="zhu">全店商品通用</p>
+					<div class="count">已抢 60%</div>
+					<div class="progress">
+						<b style="width:60%"></b>
+					</div>
+					<span class="btn">立即领取</span>
+				</div>
+			</a></li>
+			<li><a href="#" class="fn-clear">
+				<div class="img">
+					<p class="price"><e>¥</e>300 </p>
+					<p class="contact">满4999可用</p>
+				</div>
+				<div class="info">
+					<p class="name">店铺优惠券</p>
+					<p class="zhu">全店商品通用</p>
+					<div class="count">已抢 60%</div>
+					<div class="progress">
+						<b style="width:60%"></b>
+					</div>
+					<span class="btn">立即领取</span>
+				</div>
+			</a></li>
+
+		</ul>
+	</div>
+	<div class="bg"></div>
+</div>
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.SuperSlide.2.1.1.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.imagezoom.min.js"></script>
+<!--[if lte IE 9]>
+<script src="{#$cfg_staticPath#}js/ui/requestAnimationFrame.js"></script>
+<![endif]-->
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.fly.min.js"></script>
+
+<script type="text/javascript" src="{#$templets_skin#}js/goodsD_v2.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

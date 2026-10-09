@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>配送员管理</title>
+{#$cssFile#}
+<script>
+var action = "{#$action#}", adminPath = "{#$adminPath#}",cityList = {#json_encode($city)#};
+</script>
+<style>
+.statusSwitch, .orderValidSwitch, .unitShowSwitch, .authTypeSwitch {display: none;}
+#shopList .shopNameInput, #shopList .tagInput, #shopList .orderPrefixInput {font-size:12px; color:black; display:none; width:100%;}
+.pop-one {background: #fff; border-radius:3px; position: fixed; top: 21%; left: 50%; margin-left: -135px;}
+.pop-two {width:400px; background: #fff; border-radius:3px; position: fixed; top: 21%; left: 50%; margin-left: -135px;}
+.meng {background:rgba(0,0,0,.5); position: fixed; width: 100%; height: 100%; left: 0; top: 0; z-index:9999;}
+.feng {background:rgba(0,0,0,.5); position: fixed; width: 100%; height: 100%; left: 0; top: 0; z-index:9999;}
+.pop-one .pop-cont {line-height: 25px; padding: 12px 10px; border-bottom: 1px solid #d2d6da;}
+.pop-bottom a {text-align: center; height: 40px; line-height: 40px; color: #007aff;}
+.pop-bottom a:first-child {border-right:1px solid #d2d6da;}
+.align-center, .div-align-center {text-align: center;}
+.webkit-box1 {display: -webkit-box; width: 100%;}
+.webkit-box1 >* {-webkit-box-flex: 1; width: 100%; display: block;}
+.order_true {cursor:pointer;} .aa{display:none;}
+.mybtn {float: right;}
+.pagination {display: block; text-align: right;}
+.pagination div {margin: 0;}
+.pagination .page_info {display: inline-block; line-height: 35px; margin-left: 15px;}
+.pagination ul>li.page_current span {background: #e8e8e8;}
+#shop_list_choose_chosen {width:200px !important;}
+</style>
+</head>
+
+<div class="main-content">
+
+  <div class="page-content">
+    <!-- /section:settings.box -->
+    <div class="page-content-area">
+
+      <div class="">
+		   <div class="choseCity"><form id="search_form" style="margin: 0;" action="waimaiCourier.php?"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}">
+
+           </form></div>
+
+
+        <form id="search" style="display: inline-block;" action="waimaiCourier.php?">
+          <select class="select" id="ctype" name="state" style="width: 130px;height: 38px; ">
+            <option value="">
+              {#if $state == 1#}
+               开工
+              {#elseif $state == 2#}
+              停工
+              {#elseif $state == 3#}
+              离职
+              {#else#}
+              骑手状态
+              {#/if#}
+            </option>
+            <option value="">全部</option>
+            <option value="1">开工</option>
+            <option value="2">停工</option>
+            <option value="3">离职</option>
+
+          </select>
+          <select class="select" id="clevel" name="status" style="width: 130px;height: 38px;">
+            <option value="">审核状态</option>
+            <option value="">全部</option>
+            <option value="1"{#if $status == 1#} selected{#/if#}>通过</option>
+            <option value="2"{#if $state == 2 || $peisongstatus == 1#} selected{#/if#}>待审</option>
+
+          </select>
+          <input class="input-large" type="search" name="keyword" id="keyword" placeholder="请输入要搜索的关键字" value="{#$keyword#}">
+          <button type="submit" class="btn btn-info" id="searchBtn">立即搜索</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </form>
+          <a class="btn btn-success" id="addNew" href="waimaiCourierAdd.php" style="color:#fff;">新建配送员</a>
+
+
+
+        <div id="shopList" class="grid-view">
+            <table class="table table-striped table-bordered table-hover">
+              <thead>
+                <tr>
+                  <th id="shopList_c0">ID</th>
+                  <th id="shopList_c0">城市</th>
+                  <th id="shopList_c0">姓名/手机</th>
+                  <!-- <th id="shopList_c1">用户名</th> -->
+<!--                  <th id="shopList_c2">年龄</th>-->
+<!--                  <th id="shopList_c3">性别</th>-->
+                  <!-- <th id="shopList_c4">手机号</th> -->
+                  <th id="shopList_c2">账户余额</th>
+
+                  <th id="shopList_c5">配送总量</th>
+                  <th id="shopList_c6">配送成功</th>
+                  <th id="shopList_c7">配送失败</th>
+                  <th id="shopList_c8">状态</th>
+                  <th id="shopList_c11">审核状态</th>
+                  <th class="button-column" id="shopList_c9">管理/注册时间</th>
+                  <th id="shopList_c10" style="text-align: center;">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#foreach from=$list item=l#}
+                <tr data-url="{#$l.url#}">
+                  <td width="50">{#$l.id#}</td>
+                  <td width="100">{#$l.cityname#}</td>
+                  <td width="100">{#$l.name#}<br />{#$l.phone#}</td>
+                  <!-- <td width="100">{#$l.username#}</td> -->
+<!--                  <td width="80">{#$l.age#}</td>-->
+<!--                  <td width="80">{#if $l.sex == 1#}男{#else#}女{#/if#}</td>-->
+                  <!-- <td width="150">{#$l.phone#}</td> -->
+                  <td width="80">{#$l.money#}</td>
+                  <td width="50">
+                    外卖：{#$l.total#}<br>
+                    跑腿：{#$l.paotuitotal#}<br>
+                    商城：{#$l.shoptotal#}<br>
+                  </td>
+                  <td width="50">
+                    外卖：{#$l.ok#}<br>
+                    跑腿：{#$l.paotuiok#}<br>
+                    商城：{#$l.shopok#}<br>
+                  </td>
+                  <td width="50">
+                    外卖：{#$l.failed#}<br>
+                    跑腿：{#$l.paofailed#}<br>
+                    商城：{#$l.shopfailed#}<br>
+                  </td>
+                  <td width="50">{#if $l.quit == 1#}<b style="color:#999">已离职<br/>{#if $l.offtime #}<span style="font-weight: normal;font-size: 0.6em !important;">{#$l.offtime|date_format:"%Y-%m-%d %H:%M:%S"#}</span>{#/if#}</b>{#else#}{#if $l.state == 1#}<b style="color:green">开工中</b>{#else#}<b style="color:red">已停工</b>{#/if#}{#/if#}</td>
+                  <td width="70">
+                    <label class="statusSwitch" style="display: inline-block;">
+                      <input class="ace ace-switch ace-switch-6" type="checkbox" data-id="{#$l.id#}"{#if $l.status#} checked="checked"{#/if#}>
+                      <span class="lbl"></span>
+                    </label>
+                  </td>
+                  <td width="100" style="text-align: center;">
+                    <a class="label label-success location" data-name="{#$l.name#}" data-id="{#$l.id#}" data-lng="{#$l.lng#}" data-lat="{#$l.lat#}" title="查看位置" href="javascript:;">查看位置</a>
+                    <br />{#if $l.regtime#}{#$l.regtime|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}
+                  </td>
+                  <td nowrap="nowrap" width="80" style="text-align: center;">
+                    <a href="waimaiCourierAdd.php?id={#$l.id#}" title="修改" data-name="{#$l.name#}" data-id="{#$l.id#}" class="green edit" style="padding-right:8px;"><i class="ace-icon fa fa-pencil bigger-130"></i></a>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <a title="删除" class="del red" data-id="{#$l.id#}" style="padding-right:8px;cursor:pointer;" ><i class="ace-icon fa fa-trash-o bigger-130"></i></a>
+                  </td>
+                </tr>
+                {#/foreach#}
+                {#if $list|@count == 0#}
+                <tr>
+                  <td colspan="12" style="height: 200px; line-height: 200px; text-align: center;">没有找到数据.</td>
+                </tr>
+                {#/if#}
+              </tbody>
+            </table>
+
+            {#$pagelist#}
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+{#$jsFile#}

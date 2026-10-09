@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var print_config = "{#if count($printret) ==0 #}1{#else#}{#count($printret)#}{#/if#}";
+var sid = "{#$id#}";
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+	modelType = "shop", adminPath = "{#$adminPath#}",
+	addrid = {#$addrid#}, addrListArr = {#$addrListArr#}, industry = {#$industry#}, industryListArr = {#$industryListArr#},
+	basehost = '{#$basehost#}', subdomain = '{#$subdomain#}';
+var mapCity = "{#$cfg_mapCity#}";
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="branchid">所属店铺：</label></dt>
+    <dd style="overflow: inherit; padding-left: 140px;">
+		<select class="chosen-select" name="branchid" id="branchid">
+			<option value="">请选择所属店铺</option>
+	  		{#foreach from=$companyArr item=shop#}
+	  		<option value="{#$shop.id#}"{#if $sid == $shop.id#} selected{#/if#}>{#$shop.title#}</option>
+	  		{#/foreach#}
+	  	</select>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="title">店铺分店名称：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="title" id="title" value="{#$title#}" maxlength="30" data-regex=".{3,30}" />
+      <span class="input-tips"><s></s>请输入店铺名称，3-30位</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="addrid">所在区域：</label></dt>
+    <dd>
+			<div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id={#$addrid#}>
+				{#if $addrid != '' && $addrid != "''"#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}
+			</div>
+			<input type="hidden" name="addrid" id="addrid" value={#$addrid#}>
+      <input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+    </dd>
+  </dl>
+	<dl class="clearfix">
+    <dt><label for="address">详细地址：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" maxlength="60" data-regex=".{2,60}" />
+      <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+      <span class="input-tips"><s></s>请输入详细地址，2-60位</span>
+      <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+    </dd>
+	</dl>
+  <dl class="clearfix">
+    <dt><label for="industry">经营行业：</label></dt>
+    <dd>
+      <span id="industryList">
+        <select name="industry" id="industry" class="input-large"></select>
+      </span>
+      <span class="input-tips"><s></s>请选择经营行业</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="project">主营项目：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="project" id="project" value="{#$project#}" maxlength="100" data-regex=".{2,100}" />
+      <span class="input-tips"><s></s>请输入主营项目，2-100位</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>店铺Logo：</dt>
+		<dd class="thumb fn-clear listImgBox">
+			<div class="uploadinp filePicker thumbtn{#if $litpic != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+			{#if $litpic != ""#}
+			<ul id="listSection1" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$litpic#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$litpic#}" data-val="{#$litpic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+			{#else#}
+			<ul id="listSection1" class="listSection thumblist fn-clear"></ul>
+			{#/if#}
+			<input type="hidden" name="litpic" value="{#$litpic#}" class="imglist-hidden" id="litpic">
+		</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="user">对应会员：</label></dt>
+    <dd style="position:static;">
+      <input class="input-medium" type="text" name="user" id="user" autocomplete="off" value="{#$username#}" />
+      <input type="hidden" name="userid" id="userid" value="{#$userid#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>此会员可以管理店铺信息</span>
+      <div id="userList" class="popup_key"></div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="people">联系人：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="people" id="people" value="{#$people#}" maxlength="30" data-regex=".{2,30}" />
+      <span class="input-tips"><s></s>请输入联系人，2-30位</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="tel">联系电话：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="tel" id="contact" value="{#$tel#}" maxlength="30" data-regex=".{7,30}" />
+      <span class="input-tips"><s></s>请输入联系电话，7-30位</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="qq">客服QQ：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="qq" id="qq" value="{#$qq#}" maxlength="30" data-regex="[1-9]\d*" />
+      <span class="input-tips"><s></s>请输入客服QQ，由数字组成</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+      <dt><label for="wechatcode">微信号：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="wechatcode" id="wechatcode" value="{#$wechatcode#}" maxlength="30"/>
+        <span class="input-tips"><s></s>请输入微信号</span>
+      </dd>
+    </dl>
+  <dl class="clearfix">
+    <dt><label for="click">浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+      <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+      <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="state">显示状态：</label></dt>
+    <dd class="radio">
+      {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="certi">认证状态：</label></dt>
+    <dd class="radio">
+      {#html_radios name="certi" values=$certiopt checked=$certi output=$certinames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#*
+    <div class="printcopy" >
+    {#if $printret#}
+    {#foreach from=$printret key=a item=b#}
+
+    <div class="printer" style="border: solid 1px;width: 480px; position: relative; margin-bottom: 20px;">
+      <dl class="clearfix">
+        <dt><label for="bind_print">是否开启打印机：</label></dt>
+        <dd class="radio">
+          <select name="print_config[{#$a#}][bind_print]" id="bind_print" class="input-medium">
+            <option value="0"{#if !$b['bind_print']#} selected{#/if#}>关闭</option>
+            <option value="1"{#if $b['bind_print']#} selected{#/if#}>开启</option>
+          </select>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="print_config">备注：</label></dt>
+        <dd><input type="text" class="input-large" id="print_config_mcode" name="print_config[{#$a#}][remarks]" value="{#$b['remarks']#}" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="print_config">打印机终端号：</label></dt>
+        <dd><input type="text" class="input-large" id="print_config_mcode" name="print_config[{#$a#}][mcode]" value="{#$b['mcode']#}" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="print_config">打印机密钥：</label></dt>
+        <dd><input type="text" class="input-large" id="print_config_msign" name="print_config[{#$a#}][msign]" value="{#$b['msign']#}" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="print_state">打印机状态：</label></dt>
+        <dd>
+          {#if $b['bind_print'] && $b['mcode'] != '' && $b['msign'] != ''#}
+          {#if $b['print_state'] == 1#}
+            <p style="padding:4px 0;vertical-align:middle;color:green">在线</p>
+          {#elseif $b['print_state'] == 2#}
+            <p style="padding:4px 0;vertical-align:middle;color:red">缺纸</p>
+          {#elseif $b['print_state'] == 3#}
+            <p style="padding:4px 0;vertical-align:middle;color:red">离线</p>
+          {#else#}
+            <p style="padding:4px 0;vertical-align:middle;color:#ccc">未知</p>
+          {#/if#}
+        {#else#}
+          <p style="padding:4px 0;vertical-align:middle;color:#ccc">未配置</p>
+        {#/if#}
+        </dd>
+      </dl>
+        <input type="hidden" name="print_config[{#$a#}][id]" type="text" value="{#$b['id']#}">
+       <div class="btn btn-sm btn-danger del" style="position: absolute; right: 2px; top: 2px;"  data-id="{#$b['id']#}" >删除</div>
+    </div>
+    {#/foreach#}
+    {#else#}
+    <div class="printer" style="border: solid 1px;width: 480px; position: relative; margin-bottom: 20px;">
+      <dl class="clearfix">
+        <dt><label for="bind_print">是否开启打印机：</label></dt>
+        <dd class="radio">
+          <select name="print_config[0][bind_print]" id="bind_print" class="input-medium">
+            <option value="0" >关闭</option>
+            <option value="1" >开启</option>
+          </select>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="print_config">备注：</label></dt>
+        <dd><input type="text" class="input-large" id="print_config_mcode" name="print_config[0][remarks]" value="" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="print_config">打印机终端号：</label></dt>
+        <dd><input type="text" class="input-large" id="print_config_mcode" name="print_config[0][mcode]" value="" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="print_config">打印机密钥：</label></dt>
+        <dd><input type="text" class="input-large" id="print_config_msign" name="print_config[0][msign]" value="" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="print_state">打印机状态：</label></dt>
+        <dd>
+
+        </dd>
+      </dl>
+      <input type="hidden" name="print_config[0][id]" type="text" value="">
+       <div class="btn btn-sm btn-danger del" style="position: absolute; right: 2px; top: 2px;" data-id="" >删除</div>
+    </div>
+    {#/if#}
+  <div class="btn btn-sm btn-success" id="copy" style="margin-left: 425px">新增</div>
+  </div>
+  *#}
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

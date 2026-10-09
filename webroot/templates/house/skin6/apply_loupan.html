@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+		<title>申请楼盘合作</title>
+		<meta name="keywords" content="{#$cfg_keywords#}">
+		<meta name="description" content="{#$cfg_description#}">
+		<link rel="stylesheet" type="text/css" media="all" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" />
+			<link rel="stylesheet" href="{#$templets_skin#}css/apply_loupan.css?v={#$cfg_staticVersion#}">
+			<link rel="stylesheet" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var masterDomain = '{#$cfg_basehost#}';
+		</script>
+
+	</head>
+	<body class='w1200'>
+	{#$pageCurr = 'hezuo'#}
+		{#include file="../../siteConfig/top1.html"#}
+		<div class="wrap">
+			<div class="info_box header">
+				<div class="logo"><img src="{#$house_logoUrl#}" alt="{#$house_channelName#}"></div>
+				<div class="kefu">
+					<s><img src="{#$templets_skin#}images/call.png" alt=""></s>
+					<p>客服热线</p>
+					{#$house_hotline#}
+				</div>
+			</div>
+		</div>
+		<div class="bg"><img  src="{#$templets_skin#}images/enter_zjuser_banner.png"></div>
+		<div class="formbox">
+			<form action="">
+				<h1>申请楼盘在线管理合作</h1>
+				<div class="inpbox">
+					<label for="title">楼盘名称：</label>
+					<div class="inp"><input type="text" placeholder="请输入楼盘名称" name="title"></div>
+				</div>
+				<div class="inpboxs">
+					<div class="inpbox">
+						<label for="name">联系人</label>
+						<div class="inp"><input type="text" placeholder="请输入联系人姓名" name="name"></div>
+					</div>
+					<div class="inpbox">
+						<label for="tel">联系方式：</label>
+						<div class="inp">
+                            <span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+                            <input type="tel" placeholder="请输入联系方式" name="tel">
+                            <!--国际区号弹窗-->
+                            <div class="areaCode_wrap areaCode_wrap2">
+                                <ul></ul>
+                            </div>
+                        </div>
+					</div>
+				</div>
+				<a href="javascript:;" class="submit"> 确认提交</a>
+			</form>
+		</div>
+		{#include file="footer.html"#}
+	</body>
+	<script>
+		$(function() {
+
+            //国际手机号获取
+            getNationalPhone();
+            function getNationalPhone(){
+                $.ajax({
+                        url: "/include/ajax.php?service=siteConfig&action=internationalPhoneSection",
+                        type: 'get',
+                        dataType: 'JSONP',
+                        success: function(data){
+                            if(data && data.state == 100){
+                                var phoneList = [], list = data.info;
+                                for(var i=0; i<list.length; i++){
+                                    phoneList.push('<li data-cn="'+list[i].name+'" data-code="'+list[i].code+'">'+list[i].name+' +'+list[i].code+'</li>');
+                                }
+                                $('.areaCode_wrap ul').append(phoneList.join(''));
+                            }else{
+                                $('.areaCode_wrap ul').html('<div class="loading">暂无数据！</div>');
+                            }
+                        },
+                        error: function(){
+                            $('.areaCode_wrap ul').html('<div class="loading">加载失败！</div>');
+                        }
+
+                })
+            }
+            //显示区号
+            $('.areaCode').bind('click', function(){
+                var par = $(this).closest('.inp');
+                var areaWrap =par.find('.areaCode_wrap');
+                if(areaWrap.is(':visible')){
+                areaWrap.fadeOut(300)
+                }else{
+                areaWrap.fadeIn(300);
+                return false;
+                }
+            });
+            //选择区号
+            $('.areaCode_wrap').delegate('li', 'click', function(){
+                var t = $(this), code = t.attr('data-code');
+                var par = t.closest('.inp');
+                var areaIcode = par.find(".areaCode");
+                areaIcode.find('i').html('+' + code);
+                $('#areaCode').val(code);
+            });
+
+            $('body').bind('click', function(){
+                $('.areaCode_wrap').fadeOut(300);
+            });
+            
+			$(".submit").click(function() {
+				var title = $("input[name='title']").val();
+				var name = $("input[name='name']").val();
+				var tel = $("input[name='tel']").val();
+				var form = $("form").serializeArray();
+                var areaCode = parseInt($('.areaCode i').text());
+				if(title==''){
+					alert('请输入楼盘名称')
+					return false;
+				}
+				if(name==''){
+					alert('请输入联系人')
+					return false;
+				}
+				if(tel==''){
+					alert('请输入联系方式：')
+					return false;
+				}
+				if(areaCode == 86 && !(/^1[3|4|5|8|6|7|9][0-9]\d{4,8}$/.test(tel))){
+                    alert("手机号码有误，请重填");
+                    return false;
+                }
+				$.ajax({
+					url: masterDomain+"/include/ajax.php?service=house&action=loupanCooperation&title="+title+"&name="+name+"&areaCode="+areaCode+"&tel="+tel, //提交接口
+					type: "GET",
+					async: false,
+					dataType: "json",
+					success: function (data) {
+						alert(data.info);
+						window.location.href = masterDomain+'/house/loupan';
+					},
+					error: function(){
+						alert("提交失败！请稍后再试");
+						return false;
+					}
+				});
+			})
+		})
+	</script>
+</html>

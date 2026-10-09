@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var action = '{#$action#}', adminPath = "{#$adminPath#}";
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <dl class="clearfix">
+    <dt>订单编号：</dt>
+    <dd class="singel-line">{#$ordernum#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>订单时间：</dt>
+    <dd class="singel-line">{#$orderdate#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>订单状态：</dt>
+    <dd class="singel-line">
+      {#if $orderstate == 0#}
+      <span class="muted">未付款</span>
+      {#elseif $orderstate == 1#}
+      已付款
+      {#elseif $orderstate == 2#}
+      <span class='text-error'>已过期</span>
+      {#elseif $orderstate == 3#}
+      <span class='text-info'>交易成功</span>
+      {#elseif $orderstate == 7#}
+      <span class='text-error'>已取消</span>
+      {#elseif $orderstate == 8#}
+      <span class='text-info'>退款中</span>
+      {#elseif $orderstate == 9#}
+      <span class='text-error'>退款成功</span>
+      {#/if#}
+    </dd>
+  </dl>
+  
+  {#if $orderstate == 9#}
+  <dl class="clearfix">
+    <dt>退款时间：</dt>
+    <dd class="singel-line">{#$retOkdate#}</dd>
+  </dl>
+  {#/if#}
+  
+
+  {#if ($orderstate == 8 && $retState == 1) || $orderstate == 9#}
+  <div style="padding: 5px 0; background:#f5f5f5;">
+    <dl class="clearfix">
+      <dt>退款原因：</dt>
+      <dd class="singel-line">{#$retType#}</dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>退款说明：</dt>
+      <dd class="singel-line">{#$retNote#}</dd>
+    </dl>
+    {#if $retPics|@count > 0#}
+    <dl class="clearfix">
+      <dt>退款凭证：</dt>
+      <dd class="singel-line">
+        {#foreach from=$retPics item=pics key=k#}
+        <a href="{#$pics.path#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics.val#}&type=small" /></a>
+        {#/foreach#}
+      </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt>申请时间：</dt>
+      <dd class="singel-line">{#$retDate#}</dd>
+    </dl>
+  </div>
+  {#/if#}
+
+
+  {#if $retSnote != ""#}
+  <div style="margin-top: 10px; padding: 5px 0; background:#f5f5f5;">
+    <dl class="clearfix">
+      <dt>卖家回复：</dt>
+      <dd class="singel-line">{#$retSnote#}</dd>
+    </dl>
+    {#if $retSpics|@count > 0#}
+    <dl class="clearfix">
+      <dt>回复凭证：</dt>
+      <dd class="singel-line">
+        {#foreach from=$retSpics item=pics key=k#}
+        <a href="{#$pics.path#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics.val#}&type=small" /></a>
+        {#/foreach#}
+      </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt>回复时间：</dt>
+      <dd class="singel-line">{#$retSdate#}</dd>
+    </dl>
+  </div>
+  {#/if#}
+
+
+
+  <dl class="clearfix">
+    <dt>下单会员：</dt>
+    <dd class="singel-line"><a href="javascript:;" data-id="{#$userid#}" class="userinfo">{#$username#}</a></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>旅游信息：</dt>
+    <dd class="singel-line"><a href="{#$prourl#}" target="_blank">{#$proname#}</a></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>订单总额：</dt>
+    <dd class="singel-line"><small>单价：</small>&yen;{#$orderprice#} × <small>数量：</small>{#$procount#} = <strong>&yen;{#$totalAmount#}</strong></dd>
+  </dl>
+
+  {#if $orderstate != 0#}
+  <dl class="clearfix">
+    <dt>付款方式：</dt>
+    <dd class="singel-line">{#$paytype#}<br />积分：<strong>{#$point#}</strong>&nbsp;&nbsp;余额：<strong>{#$balance#}</strong>&nbsp;&nbsp;另外支付：<strong>{#$payprice#}</strong></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>付款时间：</dt>
+    <dd class="singel-line">{#$paydate#}</dd>
+  </dl>
+  {#/if#}
+  
+  {#if $orderstate != 0#}
+  <dl class="clearfix">
+    <dt>旅游券：</dt>
+    <dd class="singel-line">
+      <table style="width:400px;">
+        <thead>
+          <tr align="left">
+            <th>券号</th>
+            <th>过期时间</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#section name=n loop=$cardnum#}
+          <tr>
+            <td>{#$cardnum[n][0]#}</td>
+            <td>{#$cardnum[n][2]#}</td>
+            <td>{#$cardnum[n][1]#}</td>
+          </tr>
+          {#/section#}
+        </tbody>
+      </table>
+    </dd>
+  </dl>
+  {#/if#}
+
+  {#if $type==1 || $type==2#}
+  <dl class="clearfix">
+    <dt>出行日期：</dt>
+    <dd class="singel-line">{#$walktime#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>联系人：</dt>
+    <dd class="singel-line">{#$people#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>联系方式：</dt>
+    <dd class="singel-line">{#$contact#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>身份证：</dt>
+    <dd class="singel-line">{#$idcard#}</dd>
+  </dl>
+  {#elseif $type==3#}
+  <dl class="clearfix">
+    <dt>入住日期：</dt>
+    <dd class="singel-line">{#$walktime#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>离店日期：</dt>
+    <dd class="singel-line">{#$departuretime#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>入住人：</dt>
+    <dd class="singel-line">
+    {#foreach from=$people key=K item=val#}
+      姓名：{#$val.name#} 身份证号：{#$val.id#} <br>
+    {#/foreach#}
+    </dd>
+  </dl>
+  {#elseif $type==4#}
+  <dl class="clearfix">
+    <dt>出行日期：</dt>
+    <dd class="singel-line">{#$walktime#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>联系人：</dt>
+    <dd class="singel-line">{#$people#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>联系方式：</dt>
+    <dd class="singel-line">{#$contact#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>邮箱 ：</dt>
+    <dd class="singel-line">{#$email#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>回寄人：</dt>
+    <dd class="singel-line">{#$backpeople#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>回寄联系方式：</dt>
+    <dd class="singel-line">{#$backcontact#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>回寄地址：</dt>
+    <dd class="singel-line">{#$backaddress#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>备注 ：</dt>
+    <dd class="singel-line">{#$note#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>申请人：</dt>
+    {#foreach from=$applicantinformationArr key=K item=val#}
+    {#if $K!=0#}
+    <dt>&nbsp;</dt>
+    {#/if#}
+    <dd class="singel-line">{#$langData['travel'][13][87]#}{#$val.name#} {#$langData['travel'][13][88]#}{#$val.birth#} {#$langData['travel'][13][89]#}{#$val.typename#}</dd>
+    {#/foreach#}
+  </dl>
+  {#/if#}
+
+  <!-- <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl> -->
+
+</form>
+
+{#$jsFile#}
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#if $seo_title != ""#}{#$seo_title#}{#else#}{#$langData['shop'][0][17]#}{#/if#}-{#$shop_title#}</title>
+<meta name="keywords" content="{#$shop_keywords#}"/>
+<meta name="description" content="{#$shop_description#}"/>
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico?v={#$cfg_staticVersion#}" type="image/x-icon"/>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all"/>
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all"/>
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/list.css?v={#$cfg_staticVersion#}" media="all"/>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$shop_channelDomain#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+</script>
+</head>
+<body>
+{#$pageUrl = {#getUrlPath service='shop' template='list'#}#}
+{#include file="top.html"#}
+
+<div class="contain">
+
+<div class="bread" id="J_crumbs">
+	<p class="fn-clear">
+		<span class="fn-left">
+			<a href="{#$shop_channelDomain#}">{#$langData['siteConfig'][0][0]#}</a>
+			> <a href="{#getUrlPath service='shop' template='list'#}#J_crumbs">{#$langData['shop'][5][47]#}</a>
+			{#if $brand#} > <a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#}#}#J_crumbs">{#$brandName#}</a>{#/if#}
+			{#if $typeid#}
+			{#foreach from=$typeNameArr item=typename key=k#}
+			> <a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} typeid={#$typeIdArr[$k]#} item='' specification=''#}#J_crumbs">{#$typename#}</a>
+			{#/foreach#}
+			{#/if#}
+		</span>
+
+		{#if $keywords != ""#}
+		<a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} keywords=''#}#J_crumbs" class="filter-item search fn-left">{#$langData['siteConfig'][19][18]#}：{#$keywords#}<span class="close">×</span></a>
+		{#/if#}
+	</p>
+</div>
+
+<div class="content clearfix">
+	<div class="select">
+		<div class="selCon">
+			<span>{#$langData['siteConfig'][19][563]#}</span><font>|</font>
+			<p>
+				<a{#if $brand == ""#} class="on"{#/if#} href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} brand=''#}#J_crumbs">{#$langData['siteConfig'][22][96]#}</a>
+				{#shop action="brand" return="br" category="$typeid" page=1 pageSize=999999#}
+				<a{#if $brand == $br.id#} class="on"{#/if#} href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} brand={#$br.id#}#}#J_crumbs">{#$br.title#}</a>
+				{#/shop#}
+			</p>
+		</div>
+		{#if $typeArr#}
+		<div class="selCon">
+			<span>{#$langData['siteConfig'][19][108]#}</span><font>|</font>
+			<p>
+				<a{#if $typeid == $typeIdArr[$typeIdArr|@count-1]#} class="on"{#/if#} href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} typeid={#$typeIdArr[$typeIdArr|@count-2]#} item='' specification=''#}#J_crumbs">{#$langData['siteConfig'][22][96]#}</a>
+				{#foreach from=$typeArr item=type#}
+				<a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} typeid={#$type.id#} item='' specification=''#}#J_crumbs">{#$type.typename#}</a>
+				{#/foreach#}
+			</p>
+		</div>
+		{#else#}
+		<div class="selCon">
+			<span>{#$langData['siteConfig'][19][108]#}</span><font>|</font>
+			<p>
+				<a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} typeid={#$typeIdArr[$typeIdArr|@count-3]#} item='' specification=''#}#J_crumbs">{#$langData['siteConfig'][22][96]#}</a>
+				{#shop action="type" return="type" type=$typeIdArr[$typeIdArr|@count-2]#}
+				<a{#if $typeid == $type.id#} class="on"{#/if#} href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} typeid={#$type.id#} item='' specification=''#}#J_crumbs">{#$type.typename#}</a>
+				{#/shop#}
+			</p>
+		</div>
+		{#/if#}
+
+		{#shop action="typeItem" typeid={#$typeid#}#}
+		{#if $row.listItem#}
+		<div class="selCon">
+			<span>{#$row.typeName#}</span><font>|</font>
+			<p>
+				<a{#if !in_array($row.id, $itemType)#} class="on"{#/if#} href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} item="{#$row.id#}:0"#}#J_crumbs">{#$langData['siteConfig'][22][96]#}</a>
+				{#foreach from=$row.listItem item=l#}
+				<a{#if in_array($l.id, $itemVal)#} class="on"{#/if#} href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} item="{#$row.id#}:{#$l.id#}"#}#J_crumbs">{#$l.val#}</a>
+				{#/foreach#}
+			</p>
+		</div>
+		{#/if#}
+		{#/shop#}
+
+		{#shop action="typeSpecification" typeid={#$typeid#}#}
+		{#if $row.listItem#}
+		<div class="selCon">
+			<span>{#$row.typeName#}</span><font>|</font>
+			<p>
+				<a{#if !in_array($row.id, $specificationType)#} class="on"{#/if#} href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} specification="{#$row.id#}:0"#}#J_crumbs">{#$langData['siteConfig'][22][96]#}</a>
+				{#foreach from=$row.listItem item=s#}
+				<a{#if in_array($s.id, $specificationVal)#} class="on"{#/if#} href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} specification="{#$row.id#}:{#$s.id#}"#}#J_crumbs">{#$s.val#}</a>
+				{#/foreach#}
+			</p>
+		</div>
+		{#/if#}
+		{#/shop#}
+	</div>
+
+	<div class="selectX">
+		<span class="left zh{#if $orderby == 0#} on{#/if#}"><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=''#}#J_crumbs">{#$langData['shop'][3][10]#}</a></span><font class="left">|</font>
+		<span class="left"><em{#if $orderby == 1 || $orderby == 2#} class="on"{#/if#}>{#if $orderby == 2#}{#$langData['shop'][3][12]#}{#elseif $orderby == 1#}{#$langData['shop'][3][11]#}{#else#}销量{#/if#}</em><i class="arrow-bottom"><em></em></i>
+			<ul style="display: none;">
+				{#if ($orderby != 1 && $orderby != 2) || $orderby == 1#}
+				<li><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=1#}#J_crumbs">{#$langData['shop'][3][11]#}</a></li>
+				<li><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=2#}#J_crumbs">{#$langData['shop'][3][12]#}</a></li>
+				{#/if#}
+				{#if $orderby == 2#}
+				<li><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=2#}#J_crumbs">{#$langData['shop'][3][12]#}</a></li>
+				<li><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=1#}#J_crumbs">{#$langData['shop'][3][11]#}</a></li>
+				{#/if#}
+			</ul>
+		</span>
+		<span class="left"><em{#if $orderby == 3 || $orderby == 4#} class="on"{#/if#}>{#if $orderby == 3#}{#$langData['shop'][3][14]#}{#elseif $orderby == 4#}{#$langData['shop'][3][13]#}{#else#}{#$langData['siteConfig'][19][428]#}{#/if#}</em><i class="arrow-bottom"><em></em></i>
+			<ul style="display:none">
+				{#if ($orderby != 3 && $orderby != 4) || $orderby == 3#}
+				<li><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=3#}#J_crumbs">{#$langData['shop'][3][14]#}</a></li>
+				<li><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=4#}#J_crumbs">{#$langData['shop'][3][13]#}</a></li>
+				{#/if#}
+				{#if $orderby == 4#}
+				<li><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=4#}#J_crumbs">{#$langData['shop'][3][13]#}</a></li>
+				<li><a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} orderby=3#}#J_crumbs">{#$langData['shop'][3][14]#}</a></li>
+				{#/if#}
+			</ul>
+		</span>
+		<span class="mon">{#$langData['siteConfig'][19][428]#}：</span>
+		<div class="price"><input type="text" id="price1" value="{#$price[0]#}" />{#echoCurrency type='symbol'#}</div>
+		<div class="line"></div>
+		<div class="price"><input type="text" id="price2" value="{#$price[1]#}" />{#echoCurrency type='symbol'#}</div>
+		<a href="javascript:;" id="search">{#$langData['siteConfig'][6][1]#}</a>
+
+		{#$flag0 = "0"#}
+		{#$flag1 = "1"#}
+		{#$flag2 = "2"#}
+		{#$flag3 = "3"#}
+
+		{#if in_array(0, $flagArr)#}
+		{#$flag0 = ""#}
+		{#/if#}
+
+		{#if in_array(1, $flagArr)#}
+		{#$flag1 = ""#}
+		{#/if#}
+
+		{#if in_array(2, $flagArr)#}
+		{#$flag2 = ""#}
+		{#/if#}
+
+		{#if in_array(3, $flagArr)#}
+		{#$flag3 = ""#}
+		{#/if#}
+
+		{#if $flag != ""#}
+		{#foreach from=$flagArr item=fg#}
+			{#if $fg != "0"#}
+				{#if $flag0 == ""#}
+					{#$flag0 = $flag0|cat:$fg#}
+				{#else#}
+					{#$flag0 = $flag0|cat:","|cat:$fg#}
+				{#/if#}
+			{#/if#}
+			{#if $fg != "1"#}
+				{#if $flag1 == ""#}
+					{#$flag1 = $flag1|cat:$fg#}
+				{#else#}
+					{#$flag1 = $flag1|cat:","|cat:$fg#}
+				{#/if#}
+			{#/if#}
+			{#if $fg != "2"#}
+				{#if $flag2 == ""#}
+					{#$flag2 = $flag2|cat:$fg#}
+				{#else#}
+					{#$flag2 = $flag2|cat:","|cat:$fg#}
+				{#/if#}
+			{#/if#}
+			{#if $fg != "3"#}
+				{#if $flag3 == ""#}
+					{#$flag3 = $flag3|cat:$fg#}
+				{#else#}
+					{#$flag3 = $flag3|cat:","|cat:$fg#}
+				{#/if#}
+			{#/if#}
+		{#/foreach#}
+		{#/if#}
+
+		<div class="filter">
+			<a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} flag={#$flag0#}#}#J_crumbs"{#if in_array(0, $flagArr)#} class="on"{#/if#}><s></s>{#$langData['siteConfig'][23][109]#}</a>
+			<a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} flag={#$flag1#}#}#J_crumbs"{#if in_array(1, $flagArr)#} class="on"{#/if#}><s></s>{#$langData['shop'][5][48]#}</a>
+			<a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} flag={#$flag2#}#}#J_crumbs"{#if in_array(2, $flagArr)#} class="on"{#/if#}><s></s>{#$langData['shop'][5][49]#}</a>
+			<a href="{#getUrlParam url={#$pageUrl#} data={#$pageParam#} flag={#$flag3#}#}#J_crumbs"{#if in_array(3, $flagArr)#} class="on"{#/if#}><s></s>{#$langData['shop'][5][50]#}</a>
+		</div>
+		<!--<div class="right">-->
+			<!--<span><em>{#$page#}</em>/<label id="totalPage">1<label></label></label></span><a class="pre" href="javascript:;">&lt;</a><a class="next" href="javascript:;">&gt;</a>-->
+		<!--</div>-->
+	</div>
+
+    <ul class="list clearfix fn-clear">
+        {#shop action="slist" return="list" title={#$keywords#} brand={#$brand#} typeid={#$typeid#} item={#$item#} specification={#$specification#} price="{#if $price#}{#$price[0]#},{#$price[1]#}{#/if#}" flag={#$flag#} image={#$image#} orderby={#$orderby#} page={#$page#} pageSize=15#}
+        <li><div class="con">{#if $list.hot == 1#}<em></em>{#/if#}<a href="{#$list.url#}" target="_blank">
+            <img src="{#changeFileSize url={#$list.litpic#} type='middle'#}" onerror="this.src='/static/images/404.jpg'" data-url="{#changeFileSize url={#$list.litpic#} type='middle'#}">
+            <p class="">{#$list.title#}</p>
+            <span>{#echoCurrency type='symbol'#}<strong>{#$list.price#}</strong> <!--em>优惠券</em--></span>
+            <i class="btn">立即购买</i>
+        </a></div></li>
+        {#/shop#}
+        {#if $pageInfo.totalCount == 0#}
+        <li class="empty">{#$langData['shop'][5][2]#}</li>
+        {#/if#}
+    </ul>
+
+	<!--分页-->
+	{#getPageList service='shop' template='list' pageType='dynamic' param="{#$pageParam#}&page=#page##J_crumbs"#}
+
+</div>
+</div>
+{#include file="bottom.html"#}
+<script type="text/javascript">
+	var totalCount = {#$pageInfo.totalCount|string_format:"%d"#}, totalPage = {#$pageInfo.totalPage|string_format:"%d"#}, atPage = {#$page#};
+	var priceUrl = '{#getUrlParam url={#$pageUrl#} data={#$pageParam#} price="pricePlaceholder"#}#J_crumbs';
+	var pageUrl = '{#getUrlParam url={#$pageUrl#} data="{#$pageParam#}&page=pagePlaceholder"#}#J_crumbs';
+</script>
+<script type="text/javascript" src="{#$templets_skin#}js/list.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

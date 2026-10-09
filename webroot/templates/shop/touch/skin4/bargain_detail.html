@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1,minimum-scale=1.0,maximum-scale=1.0, user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="format-detection" content="telephone=no" />
+<title>砍价</title>
+<meta name="apptitle" content="砍价">
+<meta name="keywords" content="{#$detail_keyword#}" />
+<meta name="description" content="{#$detail_description#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/bargain-detail.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/ui/html2canvas.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/jquery.inview.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$shop_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+	jQuery = $;
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var touch_poster = 1;  //是否有海报按钮
+	var yuanPrice = '{#$detail_gmoney#}'
+	var buyPrice = '{#$detail_gfinalmoney#}';
+	var detailID = '{#$detail_id#}';
+	var firstKan = '{#$detail_gnowmoney#}';//第一次进页面时砍掉价格
+	var fabuuid  = '{#$detail_userid#}';
+	var foruid   = '{#$detail_uid#}';
+    var kanUrl = "{#getUrlPath service='shop' template='detail' id="%id"#}";
+    var selfOpen = '{#$detail_is_self#}';  //本人打开为1 否则为0
+</script>
+</head>
+<body>
+	{#include file="../../../siteConfig/touch_top.html" pageTitle="砍价"#}
+	<!-- 海报 -->
+	<div class="html2Wrap html2ShopWrap">
+		<div class="html2_node" id="html2_node">
+			<div class="haibaoWrap">							
+				<div class="html2_rec">								
+					<div class="left_recimg"><img src="{#if $userinfo.photo#}{#$userinfo.photo#}{#else#}/static/images/noPhoto_40.jpg{#/if#}" /></div>
+					<div class="rignt_recinfo">
+						<h3>{#$detail_nickname#}</h3>
+						<p>“我正在抢这个宝贝，快帮我砍价助攻”</p>
+					</div>							
+				</div>
+				
+				<div class="wrapBox">
+										
+					<div class="himg_box2">
+						<img src="{#$detail_goodspic#}" />
+						<div class="det_info">
+							<p class="pro_price">{#echoCurrency type='symbol'#} <strong>{#$detail_gfinalmoney#}</strong></p>
+							<h3>{#$detail_goodstitle#}</h3>
+						</div>
+						
+					</div>					
+					
+					<div class="qrcodeBox fn-clear">
+						<div class="html2_qrcode1"><img src="/include/qrcode.php?data={#getUrlPath service='shop' template='bargain_detail'  id={#$detail_id#} #}"></div>
+						<div class="html2_info">				
+							<h3><span>长按识别二维码，即可帮TA砍价并且立即参加砍价活动</span></h3>
+						</div>
+					</div>
+					
+				</div>
+				<div class="aboutBox">
+					<h2 class="sTitle">{#$cfg_shareTitle#}</h2>
+					<p class="sDesc">{#$cfg_shareDesc#}</p>
+				</div>
+			</div>
+
+
+		</div>
+
+	</div>
+
+	<div class="container">
+		<div class="content1">
+			<span class="rule">规<br/>则</span>
+			<!-- 购买滚动信息 s-->
+			<div class="buyGun">
+				<div class="swiper-container">
+					<div class="swiper-wrapper">
+					</div>
+				</div>					
+			</div>
+			<!-- 购买滚动信息 e-->
+			<!-- 购买滚动信息 e-->
+			<div class="detInfo">
+				<div class="detImg"><img src="{#if $detail_userphoto#}{#$detail_userphoto#}{#else#}/static/images/noPhoto_40.jpg{#/if#}" alt=""></div>
+				<h3 class="detName">{#$detail_nickname#}</h3>
+
+				{#if $detail_state == 0 && $detail_is_self ==1#}
+				<p class="detP">“分享给好友，帮你砍价底价拿吧”</p>
+				{#/if#}
+				{#* 砍价过期 *#}
+				{#if $detail_state == 2#}
+				 <p class="detP disabled">“很遗憾，砍价已过期啦，看看别的吧”</p>
+				{#/if#}
+				{#* 砍价成功 *#}
+				{#if $detail_state == 1#}
+
+				 <p class="detP">“{#if $detail_is_self ==1#}恭喜您，宝贝{#else#}好友{#/if#}已经砍到底价啦”</p>
+				{#/if#}
+              
+              	<!-- 好友打开 -->
+				{#if $detail_state == 0 && $detail_is_self ==0#}
+             	 	<p class="detP">“我正在抢这个宝贝，快来帮我助攻”</p>
+				{#/if#}
+
+				{#$priceNrr = "."|explode:$detail_gfinalmoney#}
+				<div class="goodCon fn-clear">
+					<div class="goodImg"><a href="{#getUrlPath service='shop' template='detail'  id={#$detail_proid#}#}"><img src="{#$detail_goodspic#}" alt=""></a></div>
+					<div class="goodInfo">
+						<h4><a href="{#getUrlPath service='shop' template='detail'  id={#$detail_id#}#}">{#$detail_goodstitle#}</a></h4>
+						<p><em>{#echoCurrency type='symbol'#}</em><span>{#$priceNrr[0]#}</span>.{#$priceNrr[1]#}<i></i></p>
+					</div>
+				</div>
+			</div>
+			<!-- 购买滚动信息 e-->
+		</div>
+		<div class="content2">
+			<div class="kanCon">
+				{#$detail_startdate#}
+				<div class="jsTime fn-clear {#if $detail_state ==2#}disabled{#/if#}"  data-time="{#$detail_enddate#}" data-now="{#$smarty.now#}">
+					<div>
+						<i>距结束还剩：</i>
+						<span class="day">00</span><em class="speDot">:</em>
+						<span class="hour">00</span><em>:</em>
+						<span class="minute">00</span><em>:</em>
+						<span class="second">00</span>
+					</div>
+		  			
+				</div>
+				{#if $detail_state == 0#}
+				<h2 class="kanT">砍价进行中</h2>
+				{#elseif $detail_state == 1#}
+				 <h2 class="kanT">{#if $detail_is_self#}砍价成功{#else#}好友已经砍价成功啦{#/if#}</h2>
+				{#elseif $detail_state == 2#}
+				 <h2 class="kanT disabled">砍价已过期</h2>
+				{#/if#}
+              	<!-- 好友打开 已帮砍-->
+	
+                	<p class="hasTip {#if ($detail_is_kan == 0 && $fromShare && $detail_is_self == 0) || $detail_is_self == 1 #}fn-hide{#/if#}">已帮好友砍价啦</p>
+                	
+
+				{#* 已过期 加上类名 disabled*#}
+				<div class="hasCon {#if $detail_state == 2#} disabled {#/if#}">
+					<p class="kanPro">
+                        <s {#if $fromShare && $detail_is_kan == 1 && $detail_is_self == 0#}style="display:none;"{#/if#}></s>
+						<span class="kanSpan" {#if $fromShare && $detail_is_kan == 1 && $detail_is_self == 0#}style="display:none;"{#/if#}>已砍至{#echoCurrency type='symbol'#} <strong id="hasKan" data-price="{#$detail_gnowmoney#}">{#$detail_gnowmoney#}</strong></span>
+                      <i></i>
+                   </p>
+					<div class="yPrice fn-clear">
+						<span class="fn-left">原价<em>{#echoCurrency type='symbol'#}{#$detail_gmoney#}</em></span><span class="fn-right">最低<em class="nPrice">{#echoCurrency type='symbol'#}{#$detail_gfinalmoney#}</em></span>
+					</div>
+					{#*  砍价中  *#}
+						<!-- 自己砍一刀 -->
+					{#if $detail_is_self == 1#}
+						{#if $detail_state ==0#} {#* 未成功 *#}
+
+
+								<div class="selfKan" date-kantype="0" {#if $detail_is_kan !=0 || $customselfbargain== 0#}style="display:none;"{#/if#}><a href="javascript:;"></a></div>
+
+								<!-- 好友帮砍 -->
+								<div class="buyDiv fn-clear canbuy {#if  $customselfbargain ==1  && $detail_is_kan ==0 #}fn-hide{#/if#}" {#if $detail_is_kan ==0 && $customselfbargain == 1#}style="display:none;"{#/if#}>
+									{#if $customshopbargainingnomoney == 0#}
+									<a href="javascript:;" class="goBuy fn-left youBuy ">直接购买</a>
+									{#else#}
+									<a href="javascript:;" class="goBuy fn-left yuanGoBuy ">原价购买</a>
+									{#/if#}
+									
+									<a href="javascript:;" class="invite fn-right">邀请好友砍价</a>
+								</div>
+
+						{#elseif  $detail_state ==1#}
+							{#*  砍价成功  *#}
+							<div class="buyNow"><a href="javascript:;">立即购买</a></div>
+						{#else#}
+							{#*  砍价过期  *#}
+							<div class="buyDiv fn-clear disabled">
+								<a href="javascript:;" class="goBuy fn-left yuanGoBuy">原价购买</a>
+								<a href="javascript:;" class="invite fn-right disabled">邀请好友砍价</a>
+							</div>
+						{#/if#}
+                  	{#else#}
+						{#*  好友打开 未帮砍  *#}
+						<div class="friendKan" data-price="" {#if $detail_is_kan ==1 || $detail_state!=0#}style="display:none;"{#/if#}><a href="javascript:;">帮好友砍一刀</a></div>
+			            {#* 好友打开 已砍过/已过期/已成功 自己砍底价拿 *#}
+						<div class="selfBuy " {#if $detail_is_kan ==0 &&  $detail_state ==0#}style="display:none;"{#/if#}><a href="{#getUrlPath service='shop' template='detail'  id={#$detail_proid#}#}">我也要底价拿</a></div>
+					{#/if#}
+				</div>
+			</div>
+		</div>
+        {#*  好友打开  *#}
+		{#if $detail_is_self ==0#}
+        <div class="content4">
+			<div class="comTit"><h2><span>已有<strong>{#$detail_successcount#}</strong>人砍价成功</span><i></i></h2></div>
+			<div class="people_list">
+			    <div class="swiper-container">
+					<div class="swiper-wrapper">
+						{#foreach from=$detail_successresarr key=id item=i#}
+						<div class="swiper-slide fn-clear peLi">
+							<div class="peo_img"><img src="{#if $i.photo#}{#$i.photo#}{#else#}{#$cfg_staticPath#}images/noPhoto_100.jpg{#/if#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+							<p>“{#$i.nickname#}” 砍价成功</p>
+							<span>{#$i.pubdate|date_format:"%m-%d %H:%M"#}</span>
+							
+						</div>
+						{#/foreach#}
+			      	</div>
+				</div>
+		  	</div>
+		</div>
+      {#/if#}
+       {#*  本人打开  *#}
+		{#if $detail_is_self ==1#}
+		<div class="content3">
+			<h2 class="peoTit">好友助力榜</h2>
+			<ul>
+			</ul>
+			<div class="seeMore"><a href="javascript:;">查看更多</a></div>
+		</div>
+		{#else#}
+        {#*  好友打开  *#}
+      	<div class="content5">
+			<div class="comTit"><h2><span>更多砍价商品</span><i></i></h2></div>
+			<ul>
+			</ul>
+
+		</div>
+		{#/if#}
+
+	</div>
+<!-- 弹窗 -->
+<div class="comMask"></div>
+{#*  好友打开 添加类名 friendA  *#}
+<div class="selfAlert {#if $detail_is_self ==0#} friendA {#/if#}">
+	<div class="selefCon">
+		<s class="gongx"></s>
+        {#*  本人打开  *#}
+		{#if $detail_is_self ==1#}
+		<h2>为自己砍下<strong>{#echoCurrency type='symbol'#}<span id="num1">00.00</span></strong></h2>
+		<a href="javascript:;" class="goKan">继续砍价</a>
+		{#else#}
+         {#*  好友打开  *#}
+     	 <h2>砍了<strong>{#echoCurrency type='symbol'#}<span id="num1">00.00</span></strong></h2>
+		  <p>成功为好友“{#$detail_nickname#}”砍价{#echoCurrency type='symbol'#}<span id="bangPrice">10.22</span></p>
+		  <a href="javascript:;" class="goKan">我也要底价拿</a>
+		{#/if#}
+	</div>
+	<span class="closeAlert"></span>
+	
+</div>
+  
+{#*  本人打开  *#}
+<div class="comMask2"></div>
+<div class="buyAlert">
+	<s class="closeBuy"></s>
+	<h2>确定以当前价<strong>{#echoCurrency type='symbol'#}<span id="buyPr">0.00</span></strong>购买？</h2>
+	<p>该商品最低价格为{#echoCurrency type='symbol'#}{#$detail_gfinalmoney#}，建议砍至底价后购买更优惠哦</p>
+	<ul>
+		<li class="nowBuy"><a href="javascript:;">立即购买</a></li>
+		{#if  $detail_state ==1#}
+		<li class="goOn"><a href="javascript:;">继续砍价</a></li>
+		{#/if#}
+	</ul>
+</div>
+
+<!-- 规则弹窗 -->
+<div class="ruleAlert">
+	<s class="closeAlert"></s>
+	<h3 class="ruleT">活动规则</h3>
+	<div class="ruleCon">
+		{#$custom_shopKanjiaGuize#}
+	</div>
+	<h4 class="ruleh">最终解释权归本平台所有</h4>
+</div>
+
+<!-- 海报弹出s -->
+{#include file="../../../siteConfig/touch_poster.html"#}
+<!-- 海报弹出e -->
+<form action="{#getUrlPath service='shop' template='confirm-order'#}" data-action="{#$cfg_basehost#}/include/ajax.php?service=shop&action=confirm_order" method="get" id="buyForm">
+	<input type="hidden" name="kjid" id="bargainid" value="{#$detail_id#}">
+	<input type="hidden" name="bid" id="bid" value="{#$detail_id#}">
+	<input type="hidden" name="buytype" value="bargain">
+	<input type="hidden" name="hid" id="hid" value="{#$detail_hid#}">
+	<input type="hidden" name="directbuy" id="directbuy">
+	<input type="hidden" name="confirmtype" id="confirmtype" value="{#if $detail_confirmtype == 4#}0{#else#}{#$detail_confirmtype#}{#/if#}">
+</form>
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$detail_goodstitle#}',
+		"title": '江湖救急，速砍一刀',
+		"imgUrl": '{#$detail_goodspic#}',
+		"link": '{#getUrlPath service='shop' template='bargain_detail' id={#$detail_id#}#}',
+	};
+
+	var JubaoConfig = {
+		"module" : 'shop',
+		"action" : 'detail',
+		"id" : '{#$detail_id#}'
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/countUp.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+
+<script src="{#$templets_skin#}js/bargain-detail.js?v={#$cfg_staticVersion#}" charset="utf-8"></script>
+
+</body>
+</html>

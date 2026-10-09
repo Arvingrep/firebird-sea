@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>{#$langData['travel'][7][2]#}</title>{#* 订单填写 *#}
+<meta name="keywords" content="{#$travel_keywords#}">
+<meta name="description" content="{#$travel_keywords#}">
+<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="{#$templets_skin#}css/hotel-order.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" href="{#$templets_skin#}css/mobiscroll.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" href="{#$templets_skin#}css/calendar.css?v={#$cfg_staticVersion#}" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script>
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$travel_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', templets_skin = '{#$templets_skin#}', type = '{#$type#}', price = '{#$price#}';
+	var specialtimejson = '{#$specialtimejson#}';
+	var dayprice = [];
+	var totalBalance = '{#$userinfo.money#}';
+	// 积分抵扣
+	var hasPoint = '{#$userinfo.point#}';
+	jifen_ =  '{#$cfg_offset_travel#}';
+	var pointRatio = {#$cfg_pointRatio#};
+</script>
+{#* 微信分享 *#}
+{#$Share_description = {#$travel_description#}#}
+{#$Share_title = {#$travel_title#}#}
+{#$Share_img = {#$travel_logoUrl#}#}
+{#$Share_url = {#$travel_channelDomain#}#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_share.html"#}
+</head>
+<body>
+	<!--预订酒店订单-->
+	{#include file="../../../siteConfig/touch_top.html" pageTitle="{#$langData['travel'][7][2]#}"#}  {#*  订单填写   *#}
+
+	<!--订单相关s-->
+	<div class="orderbox">
+		<!--订单信息s-->
+		<div class="order-info">
+			<h3 class="hotel_name">{#$detail_title#}</h3>
+			<h2>{#$title#}</h2>
+			<p>{#$area#}m<sup>2</sup> {#$iswindowname#}  {#$typeidname#}  {#$breakfastname#}</p>
+		</div>
+		<!--订单信息e-->
+
+		<!--出行日期s-->
+		<div class="outdate">
+			<div class="row select-time">
+				<div class="zhu">
+					<span class="time entertime"></span></br>
+					<input type="text" class="input-enter none">
+					<span>{#$langData['travel'][7][3]#}</span>{#*  入住   *#}
+				</div>
+				<span class="night">{#$langData['travel'][7][5]#}</span>{#*  共1晚   *#}
+				<div class="zou">
+					<span class="time leavetime"></span></br>
+					<input type="text" class="input-leave none">
+					<span>{#$langData['travel'][7][4]#}</span>{#*  离店   *#}
+				</div>
+			</div>
+			<input type="hidden" id="datein" value="1"/>
+		</div>
+		<input type="hidden" name="walktime" id="walktime" value="">
+		<input type="hidden" name="departuretime" id="departuretime" value="">
+		<!--出行日期e-->
+	</div>
+	<!--订单相关e-->
+
+	<!--预订人信息s-->
+	<div class="orderinfoBox">
+			<input type="hidden" value="{#$id#}" id="proid" name="proid">
+		<dl>
+			<dt>
+				<h2>{#$langData['travel'][7][6]#}<em>每间房只需填写1位，入住时所持证件的姓名一致</em></h2>{#*  预订信息   *#}
+			</dt>
+			<dd>
+				<label for="contact">{#$langData['travel'][7][7]#}</label>{#*  房间数   *#}
+				<p class="num_room">
+					<a href="javascript:;" class="jian"></a>
+					<span>1</span>
+					<a href="javascript:;" class="add"></a>
+				</p>
+			</dd>
+
+			<dd>
+				<label for="tel">{#$langData['travel'][7][8]#}</label>{#*  联系方式   *#}
+				<p><input type="text" id="tel" name="tel"  placeholder="{#$langData['travel'][7][9]#}"/></p>{#*  用于接收通知   *#}
+			</dd>
+			<dd class="person">
+				<div class="per">
+					<label>房间1</label>
+					<p class="person_name"><input type="text" class="person_name" name="person_name"  placeholder="住客姓名"/></p>{#*  入住人姓名   *#}
+					<p class="person_id"><input type="text" class="person_id" name="person_id"  placeholder="住客身份证号"/></p>
+				</div>
+			</dd>
+		</dl>
+	</div>
+	<!--预订人信息e-->
+	{#if $userinfo.point > 0 && $cfg_offset_travel > 0#}
+	<div class="integral" data-dikou="{#$cfg_offset_travel#}" >
+		<p class="left">可用<span class="jifen">0</span>{#$cfg_pointName#}抵扣<span class="jian">0</span>{#echoCurrency type="short"#}</p>
+		<span class="gou hasgou"></span>
+	</div>
+	{#/if#}
+	<!--提交订单s-->
+		<div class="up_order">
+			<a class="right_btn publicpaybtn paotuipaybtn" href="javascript:;">{#$langData['travel'][7][12]#}</a>{#*  立即支付   *#}
+			<div class="left_info">
+				<div class="price_all"><div class="lprice">{#$langData['travel'][8][22]#}<span>{#echoCurrency type='symbol'#}<em>{#$totalAmount#}</em></span></div><a href="javascript:;">{#$langData['travel'][8][3]#}</a></div>{#*  价格明细   *#}
+			</div>
+		</div>
+	<!--提交订单e-->
+	<!--查看价格明细s-->
+	<div class="detail_price">
+		<h2>{#$langData['travel'][8][3]#}<i></i></h2>{#*  价格明细   *#}
+		{#if $specialtime#}
+		{#foreach from=$specialtime item=val#}
+		<dl>
+			<dt>{#$title#}-{#$langData['travel'][13][11]#}</dt>
+			<dd>{#$val.stime#}</dd>
+			<dd>{#$val['etime']#}<i>{#echoCurrency type='symbol'#}{#$val.price#}</i></dd>
+		</dl>
+		{#/foreach#}
+		{#else#}
+		<dl>
+			<dt>{#$title#}-{#$langData['travel'][13][11]#}</dt>
+			<dd>&nbsp;&nbsp;</dd>
+			<dd>&nbsp;&nbsp;<i>{#echoCurrency type='symbol'#}{#$price#}</i></dd>
+		</dl>
+		{#/if#}
+		<p class="detail_all">{#$langData['travel'][8][22]#}<span>{#echoCurrency type='symbol'#} <em>{#$price#}</em></span></p>{#*  总价   *#}
+	</div>
+	<!--查看价格明细e-->
+	<div class="mask"></div>
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script src="{#$templets_skin#}js/mobiscroll.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/mobiscroll.datetime.js?v={#$cfg_staticVersion#}"></script>
+
+<script src="{#$templets_skin#}js/hotel-order.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/calendar.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>报废列表</title>
+{#$cssFile#}
+<style>
+  .thead li.sort {cursor: default;}
+  .thead li s {display: inline-block;width: 0;height: 0;border:5px solid transparent;border-top-color: #ccc;vertical-align: middle;}
+  .thead li:hover s {border-top-color: #999;}
+  .thead li.curr s {border-top-color: #51a351;}
+  .nowrap {max-width:300px;white-space: nowrap;text-overflow: ellipsis;overflow:hidden;}
+</style>
+</head>
+
+<body>
+<div class="search">
+  <label>搜索：</label>
+  <input class="input-xlarge" type="search" id="keyword" placeholder="请输入要搜索的关键字">
+  &nbsp;&nbsp;提交日期&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期">&nbsp;&nbsp;到&nbsp;&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期">&nbsp;&nbsp;
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="selectBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="1">全选</a></li>
+        <li><a href="javascript:;" data-id="0">不选</a></li>
+      </ul>
+    </div>
+    <button class="btn" id="delBtn">删除</button>
+    <div class="btn-group" id="stateBtn"{#if $notice#} data-id="0"{#/if#}>
+      {#if $notice#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">未处理(<span class="totalGray"></span>)<span class="caret"></span></button>
+      {#else#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="totalCount"></span>)<span class="caret"></span></button>
+      {#/if#}
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>
+        <li><a href="javascript:;" data-id="0">未处理(<span class="totalGray"></span>)</a></li>
+        <li><a href="javascript:;" data-id="1">已处理(<span class="normal"></span>)</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row3">&nbsp;</li>
+  <li class="row10 left">用户信息</li>
+  <li class="row10 left">联系人</li>
+  <li class="row15 left">联系电话</li>
+  <li class="row25 left">车辆信息</li>
+  <li class="row15 left">提交时间</li>
+  <li class="row12">状态</li>
+  <li class="row10">操作</li>
+</ul>
+
+<div class="list common mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="mtype"></span>
+  <span id="level"></span>
+  <span id="start"></span>
+  <span id="end"></span>
+</div>
+
+<script id="quickEdit" type="text/html">
+  <form action="" class="quick-editForm" name="editForm">
+    <dl class="clearfix">
+      <dt>用户：</dt>
+      <dd id="userinfo"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>联系人：</dt>
+      <dd id="name"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>联系电话：</dt>
+      <dd id="phone"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>车辆信息：</dt>
+      <dd id="title"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>车辆照片：</dt>
+      <dd id="pics"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>提交时间：</dt>
+      <dd id="pubdate"></dd>
+    </dl>
+    <dl class="clearfix replyTime">
+      <dt>状态：</dt>
+      <dd>
+        <label><input type="radio" name="state" id="state0" value="0" />未处理</label>&nbsp;&nbsp;
+        <label><input type="radio" name="state" id="state1" value="1" />已处理</label>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>备注：</dt>
+      <dd><textarea id="note" name="note" style="width:90%; height:100px;" /></textarea></dd>
+    </dl>
+  </form>
+</script>
+
+<script>var adminPath = "{#$adminPath#}";</script>
+{#$jsFile#}
+</body>
+</html>

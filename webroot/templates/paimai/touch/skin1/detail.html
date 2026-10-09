@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<title>{#$detail_title#}</title>
+<meta name="apptitle" content="商品详情">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/vant/index.css" />
+<script src="{#$cfg_staticPath#}js/vue/vue.min.js"></script>
+<script src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+
+<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$paimai_channelDomain#}', cfg_staticPath = staticPath = '{#$cfg_staticPath#}',templets='{#$templets_skin#}';
+	var hideFileUrl = '{#$cfg_hideUrl#}', cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+	var enddate = '{#$detail_enddate#}'
+	var id = "{#$detail_id#}";
+	var add_money = '{#$detail_add_money#}'; //加价
+	var addreeAdd = '{#getUrlPath service="member" type="user" template="address"#}'
+
+	var currentState = 0;
+	{#if $detail_u_reg > 0 && $detail_startdate < time()#}
+		currentState = 1
+	{#else#}
+		currentState = 0
+	{#/if#}
+
+	{#if $detail_arcrank == 3 || $detail_enddate < time()#}
+		currentState = 3
+	{#/if#}
+
+	{#if $detail_u_success_num > 0#}
+		currentState = 2;
+		{#if ($detail_enddate + $detail_pay_limit * 3600) < time()#}
+			currentState = 4;
+		{#/if#}
+	{#/if#}
+
+	{#if $detail_u_success_num > 0 &&  $detail_u_reg_state == 5#}
+	currentState = 5;
+	{#/if#}
+
+	var cur_mon_start = '{#$detail_cur_mon_start#}'; //当前价格
+	var u_reg = '{#$detail_u_reg#}'; // 拍下的数量
+	var amount = '{#$detail_amount#}'; //保证金
+	var sale_num = '{#$detail_sale_num#}'; //已售卖的价格
+	var paiCount= '{#count($detail_pai)#}';
+	var startdate = '{#$detail_startdate#}';
+	var pics = '{#json_encode($detail_picsUrl)#}';
+	var litpic = '{#$detail_litpicUrl#}';
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$detail_store['title']#}',
+		"title": '{#$detail_title#}',
+        "imgUrl": '{#$detail_litpicUrl#}',
+		"link": '{#getUrlPath service='paimai' template='detail' id={#$detail_id#}#}',
+	};
+</script>
+
+</head>
+
+<body>
+	{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html" noVue="true"#}
+	<script src="{#$cfg_staticPath#}js/ui/vant/vant.min.js"></script>
+	<!-- 头部 -->
+	{#include file="../../../siteConfig/touch_top.html" pageTitle="{#$langData['shop'][7][0]#}"#} {#* 商品详情 *#}
+	<!-- 头部 end -->
+	<div id="MobileGoodInfo" class="{#if $detail_startdate > time() && $detail_enddate > time()#}nostart{#/if#}">
+		<div style="position:relative; height: 7.52rem; overflow: hidden;">
+		  <van-swipe class="swipe" :autoplay="5000" indicator-color="white" @change="swiperChange">
+			<van-swipe-item @click="swiperClick">
+				<img src="{#$detail_litpicUrl#}" onerror="this.src='/static/images/404.jpg'"/>
+			</van-swipe-item>
+			{#foreach from=$detail_picsUrl item="pic"#}
+			<van-swipe-item @click="swiperClick">
+				<img src="{#$pic#}" onerror="this.src='/static/images/404.jpg'"/>
+			</van-swipe-item>
+			{#/foreach#}
+		  </van-swipe>
+		  <div class="auction-card active {#if $detail_startdate > time() && $detail_enddate > time()#}green{#/if#}" v-show="currentState===0 || currentState === 1">
+			<div>
+			  <span>当前价</span>
+			  <span>
+				<i style="margin-right: 0.04rem;">{#echoCurrency type="symbol"#}</i>
+				<!-- <span style="font-size:.4rem">{#$detail_cur_mon_start#}</span> -->
+				<span style="font-size:.4rem">{{cur_mon_start}}</span>
+			  </span>
+			</div>
+			{#if $detail_startdate > time()#}
+			<div style="display: flex">
+				<div>距开拍</div>
+				<van-count-down :time="stime" format="HH:mm:ss"/>
+			  </div>
+			{#else#}
+			<div style="display: flex">
+			  <div>距结束</div>
+			  <van-count-down :time="time" format="DD:HH:mm:ss"/>
+			</div>
+			{#/if#}
+		  </div>
+		  <div class="auction-card active" v-show="currentState===2">
+			<div>
+			  <span>成交价</span>
+			  <span>
+				<i style="margin-right: 0.04rem;">{#echoCurrency type="symbol"#}</i>
+				<!-- <span style="font-size:.4rem;">{#$detail_cur_mon_start#}</span> -->
+				<span style="font-size:.4rem;">{{cur_mon_start}}</span>
+			  </span>
+			</div>
+			<div style="display: flex">
+			  <div>恭喜您！成功获拍</div>
+			</div>
+		  </div>
+		  <div class="auction-card inactive" v-show="[3,4,5].includes(currentState)">
+			<div>
+			  {#if $detail_sale_num > 0#}
+			  <span>成交价</span>
+			  <span>
+				<i style="margin-right: 0.04rem;">{#echoCurrency type="symbol"#}</i>
+				<span style="font-size:.4rem;">{{cur_mon_start}}</span>
+			  </span>
+			  {#else#}
+			  <span style="font-size:.28rem; font-weight: bold;">拍品未成功拍出</span>
+			  {#/if#}
+			</div>
+			<div style="display: flex">
+			  <div>结束时间</div>
+			  <div style="margin-left:.2rem;font-size: .3rem">{{enddate}}</div>
+			</div>
+		  </div>
+		</div>
+		<!--<div class="info-card">
+		   <RadioGroup v-model="currentState" direction="horizontal">
+			<Radio :name="0">可报名</Radio>
+			<Radio :name="1">可竞价</Radio>
+			<Radio :name="2">竞价成功待支付</Radio>
+			<Radio :name="3">已结束</Radio>
+			<Radio :name="4">违约</Radio>
+			<Radio :name="5">支付成功</Radio>
+		  </RadioGroup> 
+		</div>-->
+		<div class="info-card">
+		  <div class="product-name">{#$detail_title#}</div>
+		</div>
+		{#if count($detail_pai) > 0#}
+		<div class="info-card">
+		  <div style="font-weight:bold">竞价榜</div>
+		  {#foreach from=$detail_pai key='k' item='pai'#}
+		  <van-cell>
+			<template #title>
+				<!-- {#$pai.procount#} -->
+			  <span style="margin-right:.3rem" >{#$k + 1#}</span>
+			  <span style="margin-right:.3rem" class="nickanme">{#$pai.nickname#}</span>
+			  <span>{#if $k == 0#}领先{#else#}被超越{#/if#}</span>
+			</template>
+			<template #extra>
+			  <span>{#echoCurrency type="symbol"#}{#$pai.price_avg#}</span>
+			</template>
+		  </van-cell>
+		  {#/foreach#}
+		  </van-cell> 
+		  <van-cell class="button-cell">
+			<van-button size="small" @click="showRecordPopup=true">查看详情</van-button>
+		  </van-cell>
+		</div>
+		{#/if#}
+		<div class="info-card">
+			<div style="display:flex">
+			  <div style="margin-right: 0.36rem;font-size: .26rem;line-height: .26rem;font-weight: 700;color: #262626;flex-shrink: 0;margin-top: 0.17rem;">说明
+			  </div>
+			  <div class="auction-info">
+				<div class="label">
+					
+					<van-tag color="#f2270c" style="height:16px">起拍</van-tag>
+					<div>{#echoCurrency type="symbol"#}{#$detail_start_money#}</div>
+				</div>
+				<div class="label">
+
+					<van-tag color="#f2270c">加价</van-tag>
+					<div>{#echoCurrency type="symbol"#}{#$detail_add_money#}</div>
+				</div>
+				<div class="label">
+					<van-tag color="#f2270c">延时</van-tag>
+					<div>{#$detail_add_interval#}分钟/次<div class="desc-tip" @click="dialog('','竞拍最后5分钟内，若有用户出价，即进入延时竞价周期')"></div></div>
+
+				</div>
+				<div class="label">
+					<van-tag color="#f2270c">交保</van-tag>
+					<div>{#echoCurrency type="symbol"#}{#$detail_amount#}</div>
+
+				</div>
+				<div class="label">
+
+					<van-tag color="#f2270c">保留价</van-tag>
+					<div style="margin-right: 0.44rem;margin-left:.1rem">{#if $detail_min_money > 0#}有{#else#}无{#/if#}<div class="desc-tip" @click="dialog('','保留价是商家设置的最低成交价，用户出价需≥保留价才可获拍')"></div></div>
+				</div>
+			  </div>
+			</div>
+		</div>
+		<div class="info-card">
+		  <div style="font-weight:bold">{#$detail_store['title']#}</div>
+		  <van-grid :border="false" :column-num="2" :gutter="10">
+			<!-- <van-grid-item>
+			  <div>47747</div>
+			  <div>关注人数</div>
+			</van-grid-item> -->
+			<van-grid-item>
+			  <div>{#$detail_store['onsale']#}</div>
+			  <div>在拍拍品</div>
+			</van-grid-item>
+			<van-grid-item>
+			  <div>{#$detail_store['sale']#}</div>
+			  <div>全部拍品</div>
+			</van-grid-item>
+		  </van-grid>
+		  <div style="display: flex;justify-content: center">
+			<van-button round size="small" @click="goLink('{#$paimai_channelDomain#}/store-{#$detail_store['sid']#}')">全部拍品</van-button>
+		  </div>
+		</div>
+		<div class="info-card">
+		  <div style="font-weight:bold">拍品详情</div>
+		  <div class="product-info" >
+			{#$detail_body#}
+		  </div>
+		</div>
+		<van-popup v-model:show="showRecordPopup" position="bottom" :style="{ height: '50%' }">
+			<van-list
+			   v-model:loading="loading"
+			   :finished="finished"
+			   finished-text="没有更多了"
+			   @load="onLoad"
+		   >
+			 <div class="record-popup-title">竞价详情</div>
+			 <van-cell v-for="(item,ind) in list" :key="item">
+			   <template #title>
+				 <span style="margin-right:.3rem; ">{{ ind + 1 }}</span>
+				 <span style="margin-right:.3rem;  width: 2rem; overflow: hidden; display: inline-block; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;">{{item.nickname}}</span>
+				 <span>{{ind == 0  ? '领先' : '被超越'}}</span>
+			   </template>
+			   <template #extra>
+				 <span>{#echoCurrency type="symbol"#}{{item.price_avg}}</span>
+			   </template>
+			 </van-cell>
+			</van-list>
+		 </van-popup>
+		 <van-popup v-model:show="showEnsurePopup" closeable position="bottom" :style="{ height: '50%' }" class="regBox">
+			<div style="font-size: .3rem;text-align:center;padding:.3rem 0;font-weight: bold">{{currentState === 0 ? '报名' : '支付'}}</div>
+			<van-cell-group inset>
+			  <van-cell>
+				<template #title>保证金<span style="font-weight: bold;margin-left:.3rem;color:#c71622">{{mSymbol}}{{amount}}</span></template>
+			  </van-cell>
+			  <van-cell v-if="currentState == 2">
+				<template #title>竞拍价<span style="font-weight: bold;margin-left:.3rem;color:#c71622">{{mSymbol}}{{cur_mon_start}}</span></template>
+			  </van-cell>
+			  {#if $detail_maxnum != 1#}
+			  <van-cell class="canChange">
+				<div class="stepbox">数量 <van-stepper  style="margin-right: .2rem" min="1" max="{#$detail_maxnum#}" v-model="u_reg" ></div>
+			  </van-cell>
+			  {#/if#}
+			  <van-cell title="收货信息" class="addrTit"></van-cell>
+			  <van-field style="padding-right: 0"
+				  is-link
+				  readonly
+				  name="picker"
+				  placeholder="点击选择地址"
+				  v-model="defaultAddress"
+				  @click="showAddressPicker = true, currType='regist'"
+			  />
+			  
+			 
+			</van-cell-group>
+			<div class="van-action-bar van-safe-area-bottom" v-show="currentState===0">
+			  <van-button class="bottom-btn btn_fixed" color="linear-gradient(270deg,#f2140c,#ff6c33)" block @click="toPay('regist')">
+				确认并支付
+			  </van-button>
+			</div>
+			<div class="van-action-bar van-safe-area-bottom" v-show="currentState===2">
+			  <van-button class="bottom-btn btn_fixed" color="linear-gradient(270deg,#f2140c,#ff6c33)" block @click="toPay('pai')">
+				确认并支付
+			  </van-button>
+			</div>
+		  </van-popup>
+		  <van-popup v-model:show="showAddressPicker" position="bottom" :style="{ height: '60%' }" style="z-index:3000" round>
+		
+
+			<van-address-list class="addressList"
+			v-model="chosenAddressId"
+			:list="options"
+			@edit="onEdit"
+			@add="onAdd"
+			@select="onSelect"
+			edit-disabled="true"
+			add-disabled="true"
+			default-tag-text="默认"
+			
+		  />
+
+		  </van-popup>
+		  <div class="van-action-bar van-safe-area-bottom" v-show="currentState===0">
+			{#if $detail_startdate > time && $detail_u_reg > 0#}
+			<van-button class="bottom-btn btn_fixed " disabled color="linear-gradient(270deg,#f2140c,#ff6c33)" block @click="showPopEnsure()">
+				报名成功，请在开拍后参加开拍
+			  </van-button>
+			{#else#}
+			<van-button class="bottom-btn btn_fixed" color="linear-gradient(270deg,#f2140c,#ff6c33)" block @click="showPopEnsure()">
+			  立即参拍
+			</van-button>
+			{#/if#}
+		  </div>
+		  <div  class=" van-action-bar van-safe-area-bottom bidding-action-bar" v-show="currentState===1">
+			<div style="margin-left:.2rem" class="btn_groups">
+			  <!-- <div class="stepbox">数量 <van-stepper disabled style="margin-right: .2rem" min="1" max="{#$detail_maxnum#}" v-model="u_reg" ></div> -->
+			  <div class="stepbox">出价金额 <van-stepper v-model="currPrice" input-width="1rem" :min="cur_mon_start + add_money " step="{#$detail_add_money#}"></div>
+			  
+			</div>
+			<van-button class="bottom-btn  btn_fixed" color="linear-gradient(270deg,#f2140c,#ff6c33)" @click="pai()">出价</van-button>
+		  </div>
+		  <div  v-show="currentState===2" class=" van-action-bar van-safe-area-bottom">
+			<van-button class="bottom-btn  btn_fixed" color="linear-gradient(270deg,#f2140c,#ff6c33)" block @click="showEnsurePopup = true;currType='pai'">立即付款</van-button>
+		  </div>
+		  <div class="van-action-bar van-safe-area-bottom"  v-show="currentState===3">
+			<van-button class="bottom-btn  btn_fixed" color="linear-gradient(270deg,#f2140c,#ff6c33)" block
+					@click="goLink('{#getUrlPath service='paimai' template='list' #}')">查看更多拍品
+			</van-button>
+		  </div>
+		  <div class="van-action-bar van-safe-area-bottom"  v-show="currentState===4">
+			<van-button class="bottom-btn  btn_fixed" disabled color="rgb(156,156,156)" block>您已违约</van-button>
+		  </div>
+		  <div class="van-action-bar van-safe-area-bottom"  v-show="currentState===5">
+			<van-button class="bottom-btn  btn_fixed" disabled color="linear-gradient(270deg,#f2140c,#ff6c33)" block>拍卖已结束，您已成功支付</van-button>
+		  </div>
+
+
+		  <van-image-preview v-model="showImg" :images="images" :start-position="index">
+			<template v-slot:index>第{{ index }}页</template>
+		  </van-image-preview>
+		 
+	</div>
+	
+
+<script type="text/javascript">
+	var JubaoConfig = {
+		"module" : 'paimai',
+		"action" : 'detail',
+		"id" : '{#$detail_id#}'
+	};
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+</body>
+</html>

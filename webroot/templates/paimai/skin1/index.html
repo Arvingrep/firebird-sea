@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <meta name="keywords" content="{#$paimai_keywords#}" />
+    <meta name="description" content="{#$paimai_description#}" />
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico?v={#$cfg_staticVersion#}" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public_header.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/index.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/jquery-1.9.0.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/vue.js"></script>
+    <title>{#$paimai_title#}</title>
+    <script>
+        var listUrl  = '{#$paimai_channelDomain#}/list-{$cid}.html';
+        var detailUrl  = '{#$paimai_channelDomain#}/detail-{$id}.html';
+    </script>
+</head>
+<body class="w1200">
+    {#include file="public_top.html"#} 
+    <div id="Home">
+        <div class="bannerContainer">
+            <!-- 广告位 -->
+            <div  class="bannerBox">
+              <div class="slidewrap">
+                <div class="slide">
+                  <div class="bd">{#myad title="拍卖_模板一_电脑端_广告一" type="slide"#}</div>
+                  <div class="hd"><ul></ul></div>
+                </div>
+                <a href="javascript:;" class="prev"></a>
+                <a href="javascript:;" class="next"></a>
+              </div>
+            </div>
+            <div class="wrap minCon">
+                <div class="categorys">
+                    <ul class="categorys-main">
+                      <li class="item"  v-for="(item,ind) in tabList" v-if="ind <= 7" @mouseenter="handleCateMouseEnter(item.id)" @mouseleave="showCateChildren=false">
+                        <div class="item-cont">
+                          <b class="t-icon"></b>
+                          <a class="item-title" :href="listUrl.replace('{$cid}',item.id)">{{item.typename}}</a>
+                        </div>
+                        <i class="el-icon"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M340.864 149.312a30.592 30.592 0 0 0 0 42.752L652.736 512 340.864 831.872a30.592 30.592 0 0 0 0 42.752 29.12 29.12 0 0 0 41.728 0L714.24 534.336a32 32 0 0 0 0-44.672L382.592 149.376a29.12 29.12 0 0 0-41.728 0z"></path></svg></i>
+                      </li>
+                      <li class="item"   v-if="tabList.length > 8">
+                        <div class="item-cont">
+                          <b class="t-icon"></b>
+                          <a class="item-title" :href="listUrl.replace('-{$cid}','')">更多</a>
+                        </div>
+                        <i class="el-icon"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M340.864 149.312a30.592 30.592 0 0 0 0 42.752L652.736 512 340.864 831.872a30.592 30.592 0 0 0 0 42.752 29.12 29.12 0 0 0 41.728 0L714.24 534.336a32 32 0 0 0 0-44.672L382.592 149.376a29.12 29.12 0 0 0-41.728 0z"></path></svg></i>
+                      </li>
+                    </ul>
+                    <ul class="cate-children" @mouseenter="showCateChildren=true" @mouseleave="showCateChildren=false" v-show="showCateChildren">
+                        <li class="cd-list fore0 curr">
+                          <div class="cd-text">
+                            <a :href="item.url" v-for="item in childrenCate" >{{item.typename}}</a>
+                        </div>
+                        <div class="cd-img"></div>
+                      </li>
+                    </ul>
+                        
+                </div>
+            </div>
+        </div>
+        <div class="wrap proCon">
+            <div class="el-tabs el-tabs--top cate-tab">
+                <div class="el-tabs__nav-wrap is-top">
+                    <div class="el-tabs__nav-scroll">
+                        <div class="el-tabs__nav is-top" role="tablist" style="transform: translateX(0px);">
+                            <div class="el-tabs__active-bar is-top" style="width: 100px; "></div>
+                            <div :class="['el-tabs__item is-top',{'is-active' : tabsOn == 1}]" id="tab-all" @click="changeTab('')">全部</div>
+                            <div v-for="(item,i) in tabsArr" :class="['el-tabs__item is-top',{'is-active' : tabsOn == (i + 2)}]" :data-i="i"  @click="changeTab(item.id)">{{item.typename}}</div>
+                     
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="el-tabs__content">
+                <div class="el-tab-pane"  v-show="tabsOn == 1"> 
+                     <div class="conbox_1" v-if="goodsList.length > 0 || !finished">
+                        <div class="item J-item-li " v-for="item in goodsList" :key="item.id">
+                            <a target="_blank" :href="item.url" :title="item.title" class="J-card J-card--end">
+                              <div class="J-card_header">
+                                <img class="J-card_img loaded"
+                                     :src="item.litpic">
+                                <div class="J-card_timer">
+                                  <p class="J-card_timercontent">{{item.djs}} </p>
+                                </div>
+                              </div>
+                              <div class="J-card_title">
+                                <h3 style="-webkit-box-orient: vertical">
+                                  {{item.title}}
+                                </h3>
+                              </div>
+                              <div class="J-card_footer">
+                                <div class="J-card_unit">{#echoCurrency type='symbol'#}</div>
+                                <div class="J-card_price">{{item.cur_mon_start}}</div>
+                                <div class="J-card_number">{{item.pai_count}}次出价</div>
+                              </div>
+                            </a>
+                          </div>
+                          <div class="noData-text" v-if="!finished">加载中...</div>
+                     </div> 
+                     <div class="noData" v-else>
+                        <div class="noData-text">
+                            暂无数据
+                        </div>
+                     </div>
+                </div>
+                <div class="el-tab-pane" v-for="(tab,i) in tabsArr" v-show="tabsOn == (i + 2)">
+                    <div :class="'conbox_'+1" v-if="goodsList.length > 0">
+                        <div class="item J-item-li " v-for="item in goodsList" :key="item.id">
+                          <a target="_blank" :href="item.url" :title="item.title" class="J-card J-card--end">
+                            <div class="J-card_header">
+                              <img class="J-card_img loaded"
+                                   :src="item.litpic">
+                              <div class="J-card_timer">
+                                <p class="J-card_timercontent">  {{item.djs}} </p>
+                              </div>
+                            </div>
+                            <div class="J-card_title">
+                              <h3 style="-webkit-box-orient: vertical">
+                                {{item.title}}
+                              </h3>
+                            </div>
+                            <div class="J-card_footer">
+                              <div class="J-card_unit">{#echoCurrency type='symbol'#}</div>
+                              <div class="J-card_price">{{item.cur_mon_start}}</div>
+                              <div class="J-card_number">{{item.pai_count}}次出价</div>
+                            </div>
+                          </a>
+                        </div>
+                        
+                    </div>
+                    <div class="noData" v-else>
+                        <div class="noData-text">
+                            暂无数据
+                        </div>
+                     </div>
+                </div>
+            </div>
+        </div> 
+    </div>
+    {#include file="foot.html"#} 
+</body>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.SuperSlide.2.1.1.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/index.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

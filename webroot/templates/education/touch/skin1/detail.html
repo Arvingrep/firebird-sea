@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>{#$detail_title#}</title>
+<meta name="apptitle" content="{#$langData['education'][1][6]#}">		{#* 课程详情 *#}
+<meta name="keywords" content="{#$education_keywords#}">
+<meta name="description" content="{#$education_description#}">
+<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no,viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/swiper.min.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/ui/html2canvas.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+<script>
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$education_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', templets_skin = '{#$templets_skin#}';
+	var pageData = {
+		id: '{#$detail_id#}',
+		title: '{#$detail_title#}'
+
+	};
+	var JubaoConfig = {
+		"module" : 'education',
+		"action" : 'visa',
+		"id" : '{#$detail_id#}'
+	};
+	var imconfig = {
+			'mod':'education',
+			'chatid':"{#$detail_user['userid']#}",
+			'title': '{#$detail_title#}',
+			"price": '<em>{#echoCurrency type='symbol'#}</em>{#$detail_price#}',
+
+			"imgUrl": '{#changeFileSize url={#$detail_litpic#} type='small'#}',
+			"link": '{#getUrlPath service="education" template="detail" id=$detail_id#}',
+
+		};
+		var touch_poster = 1;  //是否有海报按钮
+
+</script>
+</head>
+<body>
+{#include file="../../../siteConfig/touch_top.html" pageTitle="{#$langData['education'][1][6]#}"#}  {#* 课程详情 *#}
+<!-- 海报s -->
+{#include file="../../../siteConfig/public_touch_poster.html" posterModule='educationDetail'#}
+{#include file="../../../siteConfig/touch_poster_3.7.html" posterType="educationModule"#}
+<!-- 海报 -->
+
+
+<div class="content">
+	<!-- 视频图片轮播 s-->
+	<div class="topSwiper">
+		<div class="swiper-container">
+	          <div class="swiper-wrapper">
+					{#foreach from=$detail_pics item=val#}
+		          	<div class="swiper-slide">
+	                    <img src="{#$val.path#}" width="100%" height="100%">
+					</div>
+					{#/foreach#}
+              </div>
+	          <div class="swiper-pagination"></div>
+	    </div>
+		<div class="markBox"></div>
+	</div>
+	<!-- 视频图片轮播 e-->
+
+	<!-- 视频图片弹出层 s-->
+	<div class="videoModal">
+		<div class="swiper-container">
+			  <i class="vClose"></i>
+        <div class="swiper-wrapper">
+			{#foreach from=$detail_pics item=val#}
+			<div class="swiper-slide"><img src="{#$val.path#}" /></div>
+			{#/foreach#}
+		</div>
+        <div class="swiper-pagination"></div>
+	    </div>
+	</div>
+	<!-- 视频图片弹出层 e-->
+</div>
+
+<div class="comp_content">
+	<p class="com_name">{#$detail_title#}</p>
+	<div class="comp_bottom">
+		<p class="p1"><span>{#echoCurrency type='symbol'#}</span><span>{#$detail_price#}</span>
+			{#if $detail_workArr && $detail_usertype==1 && count($detail_workArr)==1#}
+			<span class="typename">{#$detail_workArr[0]['typename']#}</span>
+			{#else#}
+			<span>{#$langData['education'][7][17]#}</span>
+			{#/if#}
+		</p>
+		<p class="p2"><span>{#$detail_sale#}</span><span>{#$langData['education'][7][19]#}</span></p>
+	</div>
+
+	<!-- 分销用户独享s -->
+	{#if $cfg_fenxiaoFee_education#}
+	<div class="fenxiao_share" >
+		<span>分享赚</span>邀请好友下单，可赚<em>{#echoCurrency type="symbol"#}{#if $detail_states#} {#round($cfg_fenxiaoFee_education * $detail_huodongprice,2)#} {#else#}{#round($cfg_fenxiaoFee_education * $detail_price,2)#}{#/if#}</em>
+	</div>
+	{#else if $cfg_fenxiaoFee_inteducation#}
+	<div class="fenxiao_share" >
+		<span>分享赚</span>邀请好友下单，可赚<em>{#echoCurrency type="symbol"#}{#$cfg_fenxiaoFee_inteducation#}</em>
+	</div>
+	{#/if#}
+	<!-- 分销用户独享e -->
+</div>
+<!-- 优惠券 s -->
+{#if $cfg_returnPoint_education#}
+<div class="youhui">
+	<div class="yhBox">
+		<!-- 会员优惠 -->
+
+		{#if $cfg_returnPoint_education#}
+		<div class="point"><span>{#$cfg_pointName#}</span>购买可得{#if $detail_states#} {#intval($cfg_returnPoint_education * $detail_huodongprice)#} {#else#}{#intval($cfg_returnPoint_education * $detail_price)#}{#/if#}{#$cfg_pointName#}</div>
+		{#/if#}
+	</div>
+</div>
+{#/if#}
+<!-- 优惠券 e -->
+{#if $detail_usertype==0#}
+<div class="per_info fn-clear">
+	<img src="{#changeFileSize url={#$detail_user.photo#} type='small'#}" alt="" class="per_info_img1">
+	<div class="per_info_con">
+		<p class="name">{#$detail_user.nickname#}</p>
+		<p class="name_info">
+			{#if $detail_user.certify#}
+			<span class="nam">{#$langData['education'][7][41]#}</span>
+			{#/if#}
+			{#if $detail_user.phoneCheck#}
+			<span class="pho">{#$langData['education'][7][40]#}</span>
+			{#/if#}
+		</p>
+	</div>
+	<a href="tel:{#$detail_user.phone#}" class="per_phone"><img src="{#$templets_skin#}images/ic_tell.png" alt="" class="per_info_img2"><span>{#$langData['education'][2][8]#}</span></a>	{#* 联系TA *#}
+</div>
+{#/if#}
+<div class="class_plan">
+	<h2 class="title">{#$langData['education'][1][7]#}</h2>		{#* 课程安排 *#}
+	{#if $detail_classtype == 0#}
+	<ul>
+		{#if $detail_workArr && count($detail_workArr)>1#}
+		{#foreach from=$detail_workArr key=k item=val#}
+		{#if $k>3#}
+		{#break#}
+		{#/if#}
+		<li>
+			<a href="{#$val.url#}">
+				<div class="plan_class"><h3>{#$val.classname#}</h3><p>{#echoCurrency type='symbol'#}<span>{#$val.price#}</span></p></div>
+				<div class="plan_time">
+					<p><img src="{#$templets_skin#}images/clock.png"><span class="time_start">{#$val.openStart#}</span><span>{#$langData['education'][7][38]#}</span><span class="time_end">{#$val.openEnd#}</span></p>
+					<p class="time_hour">{#$val.classhour#}{#$langData['education'][7][12]#}</p>
+				</div>
+				<div class="plan_address">
+					<a href="javascript:;"><img src="{#$templets_skin#}images/place.png"><span>{#$val.address#}</span></a>
+				</div>
+			</a>
+		</li>
+		{#/foreach#}
+		{#else#}
+		{#foreach from=$detail_workArr key=k item=val#}
+		{#if $k>0#}
+		{#break#}
+		{#/if#}
+		<li>
+			<a href="{#$val.url#}">
+				<div class="plan_time">
+					<p><img src="{#$templets_skin#}images/clock.png"><span class="time_start">{#$val.openStart#}</span><span>{#$langData['education'][7][38]#}</span><span class="time_end">{#$val.openEnd#}</span></p>
+					<p class="time_hour">{#$val.classhour#}{#$langData['education'][7][12]#}</p>
+				</div>
+				<div class="plan_address">
+					<a href="javascript:;"><img src="{#$templets_skin#}images/place.png"><span>{#$val.address#}</span></a>
+				</div>
+			</a>
+		</li>
+		{#/foreach#}
+		{#/if#}
+	</ul>
+	{#if $detail_workArr && count($detail_workArr)>1#}
+	<p class="all_class"><a href="{#getUrlPath service='education' template='class' id={#$detail_id#}#}">{#$langData['education'][1][13]#}</a></p>	{#* 全部课程安排 *#}
+	{#/if#}
+	{#elseif $detail_classtype == 1#}
+	<ul>
+
+
+		{#if $detail_classArr#}
+		{#foreach from=$detail_classArr key=ky item=v#}
+		{#foreach from=$v.manyclass key=k item=val#}
+
+		{#if $k>3#}
+		{#break#}
+		{#/if#}
+		<li>
+			<a href="{#$val.url#}">
+				<div class="plan_class"><h3>{#$val.classname#}</h3><p>{#echoCurrency type='symbol'#}<span>{#$val.price#}</span></p></div>
+				<div class="plan_time">
+					<p><img src="{#$templets_skin#}images/clock.png"><span class="time_start">{#$val.openStart#}</span><span>{#$langData['education'][7][38]#}</span><span class="time_end">{#$val.openEnd#}</span></p>
+					<p class="time_hour">{#$val.classhour#}{#$langData['education'][7][12]#}</p>
+				</div>
+				<div class="plan_address">
+					<a href="javascript:;"><img src="{#$templets_skin#}images/place.png"><span>{#$val.address#}</span></a>
+				</div>
+			</a>
+		</li>
+		{#/foreach#}
+		{#/foreach#}
+		{#else#}
+		{#foreach from=$detail_workArr key=k item=val#}
+		{#if $k>0#}
+		{#break#}
+		{#/if#}
+		<li>
+			<a href="{#$val.url#}">
+				<div class="plan_time">
+					<p><img src="{#$templets_skin#}images/clock.png"><span class="time_start">{#$val.openStart#}</span><span>{#$langData['education'][7][38]#}</span><span class="time_end">{#$val.openEnd#}</span></p>
+					<p class="time_hour">{#$val.classhour#}{#$langData['education'][7][12]#}</p>
+				</div>
+				<div class="plan_address">
+					<a href="javascript:;"><img src="{#$templets_skin#}images/place.png"><span>{#$val.address#}</span></a>
+				</div>
+			</a>
+		</li>
+		{#/foreach#}
+		{#/if#}
+	</ul>
+	{#if $detail_countclasstype >= 2 #}
+	<p class="all_class"><a href="{#getUrlPath service='education' template='class' id={#$detail_id#}#}">{#$langData['education'][1][13]#}</a></p>	{#* 全部课程安排 *#}
+	{#/if#}
+	{#/if#}
+</div>
+
+
+{#if $detail_workArr && count($detail_workArr)==1#}
+{#foreach from=$detail_workArr key=k item=val#}
+{#if $k>0#}
+{#break#}
+{#/if#}
+{#if !empty($val.teacherid)#}
+{#foreach from=$val.teacherArr key=k item=item#}
+<div class="teacher_info fn-clear">
+	<a href="{#$item.url#}">
+		<div class="left_b">
+			<img src="{#changeFileSize url={#$item.photo#} type='small'#}">
+		</div>
+		<div class="right_b fn-clear">
+			<div class="tec_name"><h1>{#$item.name#}</h1><span class="{#if $item.sex==1#}sex_nan{#else#}sex_nv{#/if#}"></span></div>
+			<div class="tec_class">主授课程：{#$item.courses#}</div>
+			<div class="tec_skill">
+				{#if $item.certifyState#}<span class="sk1">{#$langData['education'][7][29]#}</span>{#/if#}
+				{#if $item.degreestate#}<span class="sk2">{#$langData['education'][7][30]#} </span>{#/if#}
+			</div>
+		</div>
+	</a>
+</div>
+{#/foreach#}
+{#else#}
+<div class="teacher_info teacher_kong fn-clear">
+	<a href="javascript:;">
+		<div class="left_b">
+			<img src="{#$templets_skin#}images/kong.png">
+		</div>
+		<div class="right_b fn-clear">
+			<div class="tec_name"><h1>{#$langData['education'][1][3]#}</h1></div>  {#* 暂无教师安排 *#}
+		</div>
+	</a>
+</div>
+{#/if#}
+{#/foreach#}
+{#/if#}
+<div class="class_info">
+	<h2 class="title">{#$langData['education'][1][6]#}</h2>		{#* 课程详情 *#}
+	<div class="info_wrap">
+		{#* 课程简介 *#}
+		<div class="info_content">
+			<h3>{#$langData['education'][1][8]#}</h3>
+			{#$detail_coursesdesc#}
+		</div>
+
+		{#* 适用学员 *#}
+		<div class="info_content info_content2">
+			<h3>{#$langData['education'][1][9]#}</h3>
+			<ul>{#$detail_coursesrange#}</ul>
+		</div>
+
+		{#* 授课内容 *#}
+		<div class="info_content info_content2">
+			<h3>{#$langData['education'][1][10]#}</h3>
+			<ul>{#$detail_coursescontent#}</ul>
+		</div>
+
+		{#* 其他 *#}
+		<div class="info_content">
+			<h3>{#$langData['education'][1][11]#}</h3>
+			{#if $detail_coursesnotes#}
+			{#$detail_coursesnotes#}
+			{#else#}
+			<p>{#$langData['education'][7][37]#}</p>
+			{#/if#}
+		</div>
+	</div>
+</div>
+{#if $detail_usertype==1#}
+<div class="content3">
+	<a href="{#$detail_user.url#}">
+	<p class="ren_title">{#$detail_user.title#}</p>
+	<div class="cont3_company">
+		<img src="{#changeFileSize url={#$detail_user.photo#} type='small'#}" alt="">
+		<div>
+			<p class="com_adress">{#$detail_user.address#}</p>
+			<p class="com_type"><a href="tel:{#$detail_user.phone#}"><img src="{#$templets_skin#}images/phone.png" alt=""><span>{#$detail_user.phone#}</span></a></p>
+		</div>
+	</div>
+	</a>
+	<p class="peo_store"><a href="{#$detail_user.url#}">{#$langData['education'][1][12]#}</a></p>	{#* 进店看看 *#}
+</div>
+{#/if#}
+
+<!--收藏店铺-->
+<div class="peo_footer">
+	<ul>
+
+		<li class="follow-wrapper"><p class="follow-icon{#if $detail_collect#} active{#/if#} a-icon"></p><p class="text-follow">{#if $detail_collect#}{#$langData['homemaking'][8][84]#}{#else#}{#$langData['education'][0][2]#}{#/if#}</p></li>	{#* 收藏 *#}
+		{#if $detail_user.url#}
+		<li class="follow-wrapper">
+			<a href="{#$detail_user.url#}">
+				<p class="shop-icon a-icon"></p><p class="text-follow">{#$langData['homemaking'][0][9]#}</p>
+			</a>
+		</li>	{#* 商家 *#}
+		{#/if#}
+		<li class="follow-wrapper">
+			<a href="tel:{#$detail_user.phone#}">
+				<p class="tel-icon a-icon"></p><p class="text-follow">{#$langData['homemaking'][11][0]#}</p>
+			</a>
+		</li>	{#* 电话 *#}
+		{#if $detail_user.url#}
+		<li class="foot_li"><a class="zixun chat_to-Link" data-type="detail">{#$langData['education'][2][0]#}</a>
+			<span class="class_choose">{#$langData['education'][2][1]#}</span>
+		</li>
+		{#else#}
+		<li class="foot_li single_li"><a  class="zixun chat_to-Link" data-type="detail">{#$langData['education'][2][0]#}</a> </li>
+		{#/if#}
+		{#* 联系咨询 *#} 	{#* 选班报名 *#}
+	</ul>
+</div>
+
+<!--选择班级弹出层 s-->
+<div class="work_mask">
+    <div class="work_container">
+        <img src="{#$templets_skin#}images/work_close.png" alt="" class="work_close">
+       <p class="t1">{#$langData['education'][2][9]#}</p>		{#* 选择班级 *#}
+       <div class="choose">
+       	<ul class="choose_item">
+       		<li></li>
+       	</ul>
+       	<ul class="choose_items">
+			{#foreach from=$detail_workArr key=k item=val#}
+			   <li data-url="{#getUrlPath service='education' template='comfirm' id={#$val.id#}#}"><span>{#if $val.classname#}{#$val.classname#}{#else#}{#$detail_title#}{#/if#}</span><p><span>{#echoCurrency type='symbol'#}</span><span>{#$val.price#}</span></p></li>
+			{#/foreach#}
+       	</ul>
+       </div>
+      <div class="step">
+      	<ul>
+         <li class="cancel">{#$langData['education'][3][0]#}</li>		{#* 取消 *#}
+         <li class="next_step">{#$langData['education'][2][13]#}</li>		{#* 下一步 *#}
+       </ul>
+      </div>
+  </div>
+</div>
+<!--选择班级弹出层 e-->
+<script type="text/javascript">
+    var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '{#$detail_coursesdesc|replace:"\r\n":""|truncate:50:"..."#}',
+        "title": '{#$detail_title#}',
+        "imgUrl": '{#if $detail_pics[0]["path"]#}{#$detail_pics[0]["path"]#}{#else#}{#$education_logoUrl#}{#/if#}',
+        "link": '{#getUrlPath service="education" template="detail" id={#$detail_id#}#}',
+    };
+
+    document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$templets_skin#}js/swiper.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/jquery.smartScroll.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

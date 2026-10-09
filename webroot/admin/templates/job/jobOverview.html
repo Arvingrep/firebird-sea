@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>招聘管理平台</title>
+{#$cssFile#}
+<script>
+  var short = '元';
+  var newCheck = {#$newCheck|default:0#};
+  var changeCheck = {#$changeCheck|default:0#}
+  var agentCheck = {#$agentCheck|default:0#}
+  var fabuCheck = {#$fabuCheck|default:0#}
+  var fabuResumeCheck = {#$fabuResumeCheck|default:0#}
+  var jobFairJoinState = {#$jobFairJoinState|default:0#}
+  var showpop = '{#$smarty.get.showpop#}'
+</script>
+</head>
+
+<body>
+  <!-- 招聘管理平台  -->
+  <div class="pagebox" id="page" v-loading="all_loading">
+    <template>
+
+      <!-- 数据汇总 -->
+      <div class="allDataShow" >
+        <div class="dTitle">
+          <h2>招聘管理平台</h2>
+          <div class="right_txt">
+            <p>数据更新时间：{{refreshTime}}</p>
+            <div class="btns_group">
+              <a href="javascript:;" class="refresh" @click="reloadData">刷新</a>
+              <a href="{#getUrlPath service='job'#}" class="refresh" target="_blank">招聘首页</a>
+            </div>
+          </div>
+        </div>
+        <ul class="dataGridBox" v-cloak v-loading="baseInfo_loading && !all_loading">
+          <li class="d_company" data-url="job/jobCompany.php" data-id="jobCompanyphp" data-title="招聘企业" >
+            <div class="l_dShow" >
+              <h5>招聘企业</h5>
+              <h3>{{basicInfo.company ? basicInfo.company.totalCount : 0}}</h3>
+              <p><span>今日入驻 <em>{{basicInfo.company ? basicInfo.company.today : 0}}</em></span><i class="line"></i><span>昨日 <em>{{basicInfo.company ? basicInfo.company.yesterday : 0}}</em></span></p>
+            </div>
+            <div class="r_imgShow"><img src="/static/images/admin/job/d_company.png" alt=""></div>
+          </li>
+          <li class="d_job"  data-title="职位管理" data-url="job/jobPost.php" data-id="jobPostphp">
+            <div class="l_dShow">
+              <h5>在招职位</h5>
+              <h3>{{basicInfo.post ? basicInfo.post.totalCount : 0}}</h3>
+              <p><span>今日新增 <em>{{basicInfo.post ? basicInfo.post.today : 0}}</em></span><i class="line"></i><span>昨日 <em>{{basicInfo.post ? basicInfo.post.yesterday : 0}}</em></span></p>
+            </div>
+            <div class="r_imgShow"><img src="/static/images/admin/job/d_job.png" alt=""></div>
+          </li>
+          <li class="d_resume" data-title="人才简历管理" data-url="job/jobResume.php" data-id="jobResumephp">
+            <div class="l_dShow">
+              <h5>人才库</h5>
+              <h3>{{basicInfo.resume ? basicInfo.resume.totalCount : 0}}</h3>
+              <p><span>今日新增 <em>{{basicInfo.resume ? basicInfo.resume.today : 0}}</em></span><i class="line"></i><span>昨日 <em>{{basicInfo.resume ? basicInfo.resume.yesterday : 0}}</em></span></p>
+            </div>
+            <div class="r_imgShow"><img src="/static/images/admin/job/d_resume.png" alt=""></div>
+          </li>
+          <li class="d_income"  data-title="平台收入" data-url="member/platForm.php" data-id="platFormphp" data-type="finance">
+            <div class="l_dShow">
+              <h5>累计收益</h5>
+              <h3>{{basicInfo.income ? basicInfo.income.totalCount : 0}}</h3>
+              <p><span>今日 <em>{{basicInfo.income ? basicInfo.income.today : 0}}</em></span><i class="line"></i><span>昨日 <em>{{basicInfo.income ? basicInfo.income.yesterday : 0}}</em></span></p>
+            </div>
+            <div class="r_imgShow"><img src="/static/images/admin/job/d_income.png" alt=""></div>
+          </li>
+        </ul>
+      </div>
+  
+      <!-- 职位占比，待处理和招聘会 -->
+      <div class="modConBox flexBox">
+        <!-- 统计图 4组 -->
+        <div class="echartBox" v-cloak>
+          <div class="box_header">
+              <h3>{{ratio[currShow].title}}占比分析<a v-if="currShow == 'post' || currShow == 'pg'" :href="currShow == 'post' ? 'jobTypeRec.php':'jobTypePgRec.php'"  :data-id="'job_' + currShow" :data-title="ratio[currShow].title + '反馈'" class="add-page">{{ratio[currShow].title}}反馈</a></h3>
+              <ul>
+                <li v-for="(item,key) in ratio" @click="currShow = key,getPostRatio(key)" :class="{'active':currShow == key}">{{item.title}}</li>
+                <div class="line"></div>
+              </ul>
+          </div>
+          <div class="box_con" v-loading="ratioLoading">
+            <div class="ratio" id="ratio"></div>
+  
+            <!-- 图例 -->
+            <div class="ratioInfo">
+              <dl>
+                <dt>图例</dt>
+                <dd v-for="(item,ind) in ratio[currShow].data" :title="item.name" v-if="item.name != '其他' || item.value"><i :style="'background-color:'+colorArr[ind]+';'"></i><span>{{item.name}}</span></dd>
+              </dl>
+              <dl>
+                <dt>占比</dt>
+                <dd v-for="item in ratio[currShow].data" v-if="item.name != '其他' || item.value"><span>{{parseFloat(item.ratio.toFixed(2))}}%</span></dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+  
+        <!-- 待处理/招聘会 -->
+        <div class="optDataBox">
+          <!-- 待处理 -->
+          <div class="toOptBox">
+            <div class="box_header">
+              <h3>待处理</h3>
+            </div>
+            <div class="box_con">
+              <ul v-if="todoList">
+                <li v-for="item in todoList" @click="addPage(item)">
+                  <div class="opt_btn" @click.stop="editCheck(item)"></div>
+                  <h4>{{item.typename}}</h4>
+                  <div class="opt-count" v-if="!item.check ">
+                    <h3 v-if="item.id != 'fabuCheck'">{{item.val}}</h3>
+                    <div class="ul" v-else>
+
+                      <div class="li add-page" data-url="jobSentence.php?notice=1&type=0" data-id="jobSentencephptype0" data-title="招聘信息"><span>招聘</span><h3>{{item.pg ? item.pg : 0}}</h3></div>
+                      <div class="li add-page" data-url="jobSentence.php?notice=1&type=1" data-id="jobSentencephptype1" data-title="求职信息"><span>求职</span><h3>{{item.qz ? item.qz : 0}}</h3></div>
+                    </div>
+                  </div>
+                  <p v-else>免审核</p>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <!-- 招聘会 -->
+          <div class="jobfairsBox">
+            <div class="box_header">
+              <h3>招聘会</h3>
+              <a href="jobFairs.php"  data-id="jobFairsphp"  data-title="招聘会管理" class="link add-page">管理招聘会</a>
+            </div>
+            <div class="box_con" v-cloak>
+                <ul>
+                  <template v-if="fairsList.length">
+                    <li v-for="(item,ind) in fairsList" :class="{'endFair':item.state == 2}" @click="toLink(item)">
+                      <div class="fair_time"><h5>{{item.start}}-{{item.end}}</h5></div>
+                      <div class="fair_con">
+                        <div class="fair_info">
+                          <h3>{{item.title}}</h3>
+                          <div class="fair_detail">
+                            <p>
+                              <span>参会企业 <em>{{item.companyCount}}</em></span>
+                              <span v-if="item.type != 1 && item.companyPending">待审 <em class="red">{{item.companyPending}}</em></span>
+                              <i class="line"></i>
+                              <span>提供岗位 <em>{{item.post}}</em></span>
+                            </p>
+                            <div class="fair_state">{{item.state == 1 ? '进行中' : (item.state == 2 ? '已结束' : '即将开始')}}</div>
+                          </div>
+                          <div class="fair_organize" v-if="item.litpic || item.organizer || item.obj">
+                            <div class="o_pic" v-if="item.litpic"><img :src="item.litpic" alt=""></div>
+                            <div class="o_info">
+                              <h5>主办单位：{{item.organizer}}</h5>
+                              <p>面向对象：{{item.obj}}</p>
+                              <p v-if="item.type == 1">会场：{{item.venue}}</p>
+                              <p v-else>地区：{{item.cityname}}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="loadEnd" v-if="ind == (fairsList.length - 1)"><p>已显示全部招聘会</p></div>
+                    </li>
+                  </template>
+                  <template v-else>
+                    <li class="noData">
+                      <div class="fair_time">
+                          <h5>近期</h5>
+                          <p>暂无招聘会</p>
+                          <div class="btns_group">
+                            <a href="jobFairs.php?dopost=Add&type=2" class="add-page toLink" data-id="jobFairsphpdopostAdd"  data-title="发布招聘会">
+                              <div class="img"><img src="/static/images/admin/job/net_pic.png" alt=""></div>
+                              <div class="text">
+                                <h5>发布网络招聘会</h5>
+                                <p>网络招聘专题，线上招聘企业一键参与</p>
+                              </div>
+                            </a>
+                            <a href="jobFairs.php?dopost=Add&type=1" data-id="jobFairsphpdopostAdd" data-title="发布招聘会" class="add-page toLink">
+                              <div class="img"><img src="/static/images/admin/job/add_pic.png" alt=""></div>
+                              <div class="text">
+                                <h5>发布线下招聘会</h5>
+                                <p>设置会场信息、展位图、企业及职位信息</p>
+                              </div>
+                            </a>
+                          </div>
+                      </div>
+                    </li>
+                  </template>
+                </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+  
+      <!-- 今日统计/招聘资讯 -->
+      <div class="modConBox flexBox">
+        <!-- 今日统计 -->
+        <div class="todayDataBox" v-loading="data_loading">
+          <div class="box_header">
+            <h3>{{showBefore("title")}}统计</h3>
+            <div class="time-box">
+              <div id="platform-time-chose" class="time-chose">
+                  {#*  已弃用
+                  <span :class="['today',{'curr':dataForm.type == 1}]" @click="dataForm.type = 1">今日</span>
+                  <span :class="['week',{'curr':dataForm.type == 2}]" @click="dataForm.type = 2">周</span>
+                  <span :class="['month',{'curr':dataForm.type == 3}]" @click="dataForm.type = 3">月</span>
+                  <span :class="['year',{'curr':dataForm.type == 4}]" @click="dataForm.type = 4">月</span>
+                  <span :class="['self-define',{'curr':dataForm.start && dataForm.end}]" id="reportrange2"><em class="time-in">时间</em><i class="self-chose"></i></span>
+                  *#}
+                  <template v-for="(item,ind) in optArr" :key="ind">
+                    <div v-if="item.type" @click="changeShow(item)" :class="['inline_d',{'curr':dataForm.type == item.type}]">{{item.text}}</div>
+                    <div v-else :class="['self-define inline_d',{'curr':dataForm.type == item.type}]">
+                      <span v-if="!timeArea"><em class="time-in">时间</em><i class="self-chose"></i></span>
+                      <span v-else>{{timeArea.join('-')}}</span>
+                      <el-date-picker
+                        v-model="timeArea"
+                        type="daterange"
+                        start-placeholder="开始日期"
+                        end-placeholder="结束日期"
+                        value-format="yyyy/MM/dd"
+                        :editable="false"
+                        align="center"
+                        @change="checkDefine"
+                        :picker-options="pickerOptions"
+                        :default-time="['00:00:00', '23:59:59']">
+                      </el-date-picker>
+                    </div>
+                  </template>
+              </div>
+          </div>
+          </div>
+         
+          <div class="box_con orderList">
+            <div class="flex_dl">
+              <div class="order_company" v-if="allCount.company">
+                <div class="all_count">
+                  <h5>招聘企业订单</h5>
+                  <div class="placeholder" v-if="!allCount.company.old || !showBefore()" ></div>
+                  <h3><b>{{allCount.company.new.amount}}</b>{#echoCurrency type='short'#} <span>共{{allCount.company.new.count}}笔</span></h3>
+                  <p v-if="allCount.company.old && showBefore()" :class="checkNum(allCount.company) >= 0 ? 'up' : 'down'">{{showBefore()}}<em class="arr"></em>{{Math.abs(checkNum(allCount.company))}}%</p>
+                </div>
+              </div>
+              <div class="order_other "v-if="allCount.other">
+                <div class="all_count">
+                  <h5>其他/个人订单</h5>
+                  <div class="placeholder" v-if="!allCount.other.old || !showBefore()" ></div>
+                  <h3><b>{{allCount.other.new.amount}}</b>{#echoCurrency type='short'#} <span>共{{allCount.other.new.count}}笔</span></h3>
+                  <p v-if="allCount.other.old && showBefore()" :class="checkNum(allCount.other) >= 0 ? 'up' : 'down'">{{showBefore()}}<em class="arr"></em>{{Math.abs(checkNum(allCount.other))}}%</p>
+                </div>
+              </div>
+            </div>
+            <div class="flex_dr" id="scrollBox">
+              <ul class="d_ul" v-if="allCount && allCount.list_company">
+                <li v-for="item in allCount.list_company">
+                  <h5>{{item.typename}}</h5>
+                  <h3><b>{{item.new.count}}</b>份</h3>
+                  <p v-if="item.old" :class="checkNum(item) >= 0 ? 'up' : 'down'">{{showBefore()}}<em class="arr"></em>{{Math.abs(checkNum(item))}}%</p>
+                  <p v-else>共计 <span class="blue">￥{{item.new.amount}}</span></p>
+                </li>
+              </ul>
+              <ul class="d_ul">
+                <li v-for="item in allCount.list_other">
+                  <h5>{{item.typename}}</h5>
+                  <h3><b>{{item.new.count}}</b>份</h3>
+                  <p v-if="item.old" :class="checkNum(item) >= 0 ? 'up' : 'down'">{{showBefore()}}<em class="arr"></em>{{Math.abs(checkNum(item))}}%</p>
+                  <p v-else>共计 <span class="blue">￥{{item.new.amount}}</span></p>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+  
+        <!-- 资讯 -->
+        <div class="newsDataBox">
+          <div class="box_header">
+            <h3>招聘资讯</h3>
+            <div class="btns_group">
+              <a href="jobNewsList.php" data-id="jobNewsListphp"  data-title="资讯管理" class="add-page">管理</a>
+              <a href="jobNewsList.php?dopost=add" data-id="jobNewsListphpdopostadd"   data-title="发布资讯" class="add-page">发布资讯</a>
+            </div>
+          </div>
+          <div class="box_con">
+            <ul v-if="newsList.length">
+              <li v-for="item in newsList" :key="'news_' + item.id">
+                <a :href="item.url" target="_blank">
+                  <div class="list_pic" v-if="item.litpic"><img :src="item.litpic" onerror="this.src='/static/images/404.jpg'" alt=""></div>
+                  <div class="list_con">
+                    <h5><span>【{{item.typename}}】</span>{{item.title}} </h5>
+                    <p>{{item.pubdate}}</p>
+                  </div>
+                </a>
+              </li>
+            </ul>
+            <div class="noData" v-else>
+              <div class="btns_group">
+                <a href="jobNewsType.php" data-id="jobNewsTypephp"  data-title="资讯分类管理" class="add-page type_btn">
+                  <div class="icon"></div>
+                  <div class="text">管理资讯分类</div>
+                </a>
+                <a href="jobNewsList.php?dopost=add" data-id="jobNewsListphpdopostadd"   data-title="发布资讯" class="add-page fabu_btn">
+                  <div class="icon"></div>
+                  <div class="text">发布招聘资讯</div>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+      </div>
+    </template>
+
+    <!-- 弹窗 -->
+    <div class="popConBox" v-if="showPop" v-cloak>
+      <div class="pop_mask"></div>
+      <div class="popBox jobOverviewPop" v-if="currCheck && currCheck.id" v-show="showPop">
+          <div class="pop_header">
+            <h4>{{currCheck.id == 'changeCheck' ? '企业敏感信息修改' : currCheck.typename}}</h4>
+            <a href="javascript:;" class="closePop" @click="showPop = false"></a>
+          </div>
+          <div class="pop_con">
+            <div class="options">
+              <div :class="['opt',{'currChose':ind == currCheck.check}]" @click="currCheck.check = ind" v-for="(item,ind) in 2">
+                <span class="quan"></span>
+                <span class="text">{{ind ? '免审核' : '需审核'}}</span>
+              </div>
+            </div>
+            <div class="check_quick" >
+              <div class="info_tip" v-if="currCheck.id == 'changeCheck'"><i class="el-icon-info"></i> 敏感信息有：公司名称（简称）、企业名称（全称）、LOGO、营业执照</div>
+              <el-checkbox v-model="currCheck.quick" v-if="currCheck.val && currCheck.url">一键审核通过：{{currCheck.val}}个待审核{{currCheck.typename.replace('审核','')}}</el-checkbox>
+            </div>
+          </div>
+          <div class="pop_foot">
+            <div class="btns_group">
+              <a href="javascript:;" class="cancle" @click="showPop = false">取消</a>
+              <a href="javascript:;" class="confirm" @click="upCheckState()">确定</a>
+            </div>
+          </div>
+      </div>
+    </div>
+
+    
+  </div>
+
+    
+<script>
+  var adminPath = "{#$adminPath#}", token = "{#$token#}";
+</script>
+{#$jsFile#}
+</body>
+</html>

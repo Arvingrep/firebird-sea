@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+  atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 0,  //图集配置
+	addrid = {#$addrid#}, addrListArr = {#$addrListArr#}, mapCity = "{#$mapCity#}",
+	imglist = {"list1": {#$imglist#},}, modelType = "renovation", adminPath = "{#$adminPath#}";
+var service = 'renovation';
+</script>
+</head>
+
+<body>
+<div class="btn-group config-nav" data-toggle="buttons-radio">
+  <button type="button" class="btn active">基本信息</button>
+  <button type="button" class="btn">配套设施</button>
+  <button type="button" class="btn">小区相册</button>
+</div>
+
+<div class="info-tips hide" id="infoTip"></div>
+
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <div class="item">
+    <dl class="clearfix">
+      <dt><label for="title">小区名称：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="title" id="title" value="{#$title#}" maxlength="60" data-regex=".{3,60}" />
+        <span class="input-tips"><s></s>请输入小区名称，3-60位</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="addrid">区域板块：</label></dt>
+      <dd>
+        <div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id={#$addrid#}>
+  				{#if $addrid != '' && $addrid != "''"#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}
+  			</div>
+  			<input type="hidden" name="addrid" id="addrid" value={#$addrid#}>
+        <input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="address">小区地址：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" data-regex=".{5,100}" />
+        <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+        <span class="input-tips"><s></s>请输入小区地址，5-100位</span>
+        <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>小区图片：</dt>
+      <dd class="thumb clearfix listImgBox">
+  			<div class="uploadinp filePicker thumbtn{#if $litpic != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+  			{#if $litpic != ""#}
+  			<ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$litpic#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$litpic#}&type=small" data-val="{#$litpic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+  			{#else#}
+  			<ul id="listSection1" class="listSection thumblist clearfix"></ul>
+  			{#/if#}
+  			<input type="hidden" name="litpic" value="{#$litpic#}" class="imglist-hidden" id="litpic">
+  		</dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="price">报价：</label></dt>
+      <dd>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="price" id="price" value="{#$price#}" data-regex="\d*\.?\d+" />
+          <span class="add-on" style="margin-right:10px;">{#echoCurrency type="short"#}/㎡</span>
+          <span class="input-tips"><s></s>请输入报价，可输入小数</span>
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="tese">小区特色：</label></dt>
+      <dd>
+        <input class="input-xxlarge" type="text" name="tese" id="tese" value="{#$tese#}" maxlength="100" data-regex=".{0,100}" />
+        <span class="input-tips"><s></s>请输入小区特色，0-100位</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="protype">物业类型：</label></dt>
+      <dd class="radio">
+        {#html_checkboxes name='protype' values=$protypeval output=$protypeval selected=$protype separator="&nbsp;&nbsp;"#}
+        <span class="input-tips"><s></s>请选择物业类型</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="buildtype">建筑类型：</label></dt>
+      <dd id="buildTypeInput">
+        <input class="input-xlarge" type="text" name="buildtype" id="buildtype" value="{#$buildtype#}" /><br />
+        {#html_checkboxes name='buildlist' values=$buildlist output=$buildlist separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="zhuangxiu">装修情况：</label></dt>
+      <dd>
+        <span id="zhuangxiuList">
+          <select name="zhuangxiu" id="zhuangxiu" class="input-large">
+            {#html_options options=$zhuangxiuList selected=$zhuangxiu#}
+          </select>
+        </span>
+        <span class="input-tips"><s></s>请选择装修情况</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="huanxian">环线位置：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="huanxian" id="huanxian" value="{#$huanxian#}" />
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="kfs">开发商：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="kfs" id="kfs" value="{#$kfs#}" />
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="buildage">产权年限：</label></dt>
+      <dd>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="buildage" id="buildage" value="{#$buildage#}" />
+          <span class="add-on">年</span>
+        </div>
+        <label for="opendate" class="ml30">竣工时间：</label>
+        <div class="input-prepend input-append">
+          <input class="input-small" type="text" name="opendate" id="opendate" value="{#$opendate#}" />
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="buildarea">建筑面积：</label></dt>
+      <dd>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="buildarea" id="buildarea" value="{#$buildarea#}" />
+          <span class="add-on">㎡</span>
+        </div>
+        <label for="planarea" class="ml30">占地：</label>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="planarea" id="planarea" value="{#$planarea#}" />
+          <span class="add-on">㎡</span>
+        </div>
+        <label for="planhouse" class="ml30">总&nbsp;&nbsp;户&nbsp;&nbsp;数：</label>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="planhouse" id="planhouse" value="{#$planhouse#}" />
+          <span class="add-on">户</span>
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="rongji">容积率：</label></dt>
+      <dd>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="rongji" id="rongji" value="{#$rongji#}" />
+        </div>
+        <label for="green" class="ml30">绿化：</label>
+        <div class="input-prepend input-append">
+          <input class="input-mini" type="text" name="green" id="green" value="{#$green#}" />
+          <span class="add-on">%</span>
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="property">物业公司：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="property" id="property" value="{#$property#}" />
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="proprice">物业费：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="proprice" id="proprice" value="{#$proprice#}" />
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="note">小区概述：</label></dt>
+      <dd><textarea id="note" name="note" rows="6" class="input-xxlarge">{#$note#}</textarea></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="click">浏览次数：</label></dt>
+      <dd>
+        <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+        <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+        <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="state">显示状态：</label></dt>
+      <dd class="radio">
+        {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+  </div>
+  <div class="item hide">
+    <dl class="clearfix">
+      <dt>&nbsp;</dt>
+      <dd><a href="javascript:;" id="addConfig" class="btn btn-info">增加一条</a></dd>
+    </dl>
+    {#$configHtml#}
+  </div>
+  <div class="item hide">
+    <dl class="clearfix">
+      <dt>上传照片：</dt>
+      <dd class="listImgBox hide">
+  			<div class="list-holder">
+  				<ul id="listSection2" class="clearfix listSection"></ul>
+  				<input type="hidden" name="imglist" value='{#$imglist#}' class="imglist-hidden" id="imglist">
+  			</div>
+  			<div class="btn-section clearfix">
+  				<div class="uploadinp filePicker" id="filePicker2" data-type="desc" data-count="999" data-size="{#$atlasSize#}" data-imglist="list1"><div id="flasHolder"></div><span>添加图片</span></div>
+  				<div class="upload-tip">
+  					<p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+  				</div>
+  			</div>
+  		</dd>
+    </dl>
+  </div>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$jsFile#}
+</body>
+</html>

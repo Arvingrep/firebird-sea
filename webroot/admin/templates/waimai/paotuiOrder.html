@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>跑腿订单</title>
+{#$cssFile#}
+<script>
+var action = "{#$action#}", adminPath = "{#$adminPath#}", state = "{#$state#}",cityList={#json_encode($city)#};
+</script>
+<style>
+.pagination {display: block; text-align: right;}
+.pagination div {margin: 0;}
+.pagination .page_info {display: inline-block; line-height: 35px; margin-left: 15px;}
+.pagination ul>li.page_current span {background: #e8e8e8;}
+.chzn-container {vertical-align: middle;}
+.tab-content {overflow: visible;}
+td hr {margin:5px 0;}
+.refundYes {color: red;font-weight: bold;}
+.refundNo {color: green;font-weight: bold;}
+.bgtxt {background:#ddd;padding:1px;margin:3px 0px;}
+.refund {padding:0 4px;line-height: 18px;}
+td hr {margin:5px 0;}
+.refundYes {color: red;font-weight: bold;}
+.refundNo {color: green;font-weight: bold;}
+.bgtxt {background:#ddd;padding:1px;margin:3px 0px;}
+.refund {padding:0 4px;line-height: 18px;}
+.shaixuan input[type=text]{width: 140px;}
+.searchform{display: inline-block;}
+.nav-tabs>li>a .badge {background: none; color: #666;}
+.nav-tabs>li.active>a .badge {background: #d15b47; color: #fff;}
+</style>
+</head>
+
+<body class="no-skin">
+<div class="main-content">
+
+  <div class="page-content">
+
+    <div class="page-content-area">
+
+      <div class="col-xs-12">
+        <div class="tabbable">
+          <ul class="nav nav-tabs" id="myTab">
+            <li{#if $state == 3#} class="active"{#/if#}><a href="paotuiOrder.php?state=3">已确认订单<span class="badge badge-danger">{#$state3#}</span></a></li>
+            <li{#if $state == 4#} class="active"{#/if#}><a href="paotuiOrder.php?state=4">已接单<span class="badge badge-danger">{#$state4#}</span></a></li>
+            <li{#if $state == 5#} class="active"{#/if#}><a href="paotuiOrder.php?state=5">配送中订单<span class="badge badge-danger">{#$state5#}</span></a></li>
+            <li{#if $state == 1#} class="active"{#/if#}><a href="paotuiOrder.php?state=1">成功订单<span class="badge badge-danger">{#$state1#}</span></a></li>
+            <li{#if $state == 7#} class="active"{#/if#}><a href="paotuiOrder.php?state=7">失败订单<span class="badge badge-danger">{#$state7#}</span></a></li>
+            <li{#if $state == 6#} class="active"{#/if#}><a href="paotuiOrder.php?state=6">已取消订单<span class="badge badge-danger">{#$state6#}</span></a></li>
+          </ul>
+          <div class="tab-content">
+           <span style="float:left;margin-top:5px;margin-right:5px;">
+
+             <div class="choseCity"><form id="search_form" style="margin: 0;" action="paotuiOrder.php">
+			 <input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}">
+			 <input type="hidden" id="state" name="state"  value="{#$state#}">
+			 </form>
+           </div>
+         <div  style="display: inline-block">
+              {#if $state == 2#}
+              <button class="btn btn-success" id="confirmObj">确认订单</button>
+              <button class="btn btn-danger" id="failedObj">无效订单</button>
+              {#/if#}
+              {#if $state == 3 || $state == 4 || $state == 5#}
+              <button class="btn btn-success" id="okObj">成功订单</button>
+              <button class="btn btn-danger" id="failedObj">失败订单</button>
+           <!-- <button class="btn btn-warning" id="printObj">打印订单</button> -->
+              {#/if#}
+              {#if $state == 1#}
+           <!-- <button class="btn btn-warning" id="printObj">打印订单</button> -->
+              {#/if#}
+            </div>
+             <form id="search" style="display: inline-block;" action="paotuiOrder.php?">
+                   <div class="form-group shaixuan" >
+              <input id="searchkeyword" type="text" id = "searchkeyword" name="keyword" placeholder="请搜索关键词" value="{#$keyword#}">
+              <input id="waimaiOrder_start_time" type="text" id = "start_time" name="start_time" value="{#$start_time#}" placeholder="选择时间" autocomplete="off"> 至
+			  <input id="waimaiOrder_end_time" type="text" id = "end_time" name="end_time" value="{#$end_time#}" placeholder="选择时间" autocomplete="off">
+              <input type="hidden" id="state" name="state"  value="{#$state#}">
+              <button type="submit" class="btn btn-info" id="searchBtn">立即搜索</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                   </div>
+           </form>
+            </span>
+              {#if $state == 3 || $state == 4 || $state == 5#}
+              <span style="float:right">
+                <select class="chosen-select" name="courier_id" id="courier_id">
+                  <option value="0">请选择</option>
+                  {#foreach from=$courier item=c#}
+                  <option value="{#$c.id#}"{#if $c.id == $courier_id#} selected{#/if#}>{#$c.cityname#}-{#$c.name#}</option>
+                  {#/foreach#}
+                </select>
+                <a href="javascript:;" class="btn no-border btn-success" id="setCourier">设置配送员</a>
+                {#if $state == 4 || $state == 5#}
+                <a href="javascript:;" class="btn no-border btn-danger" id="cancelCourier">取消配送员</a>
+                {#/if#}
+                <!-- <a href="waimaiMapAssign.php" class="btn no-border btn-primary" id="map">地图派单</a> -->
+                <!--<a  class="btn no-border btn-danger">取消配送员</a>-->
+              </span>
+              {#/if#}
+
+            <div style="clear:both"></div>
+            <div id="order-grid-open" class="grid-view">
+              <table id="list" class="table table-striped table-bordered table-hover">
+                <thead>
+                  <tr>
+                    <th class="checkbox-column" id="order-grid-open_c0"><input type="checkbox" value="1" name="order-grid-open_c0_all" id="order-grid-open_c0_all"></th>
+                    <th id="order-grid-open_c1">订单编号</th>
+                    <th id="order-grid-open_c2">类型</th>
+                    <th id="order-grid-open_c3">服务内容</th>
+                    <th id="order-grid-open_c4">顾客ID</th>
+                    <th id="order-grid-open_c5">姓名</th>
+                    <th id="order-grid-open_c6">电话</th>
+                    <th id="order-grid-open_c10">跑腿费</th>
+                    <th id="order-grid-open_c12">总金额</th>
+                    {#if $state == 4 || $state == 5 || $state == 1 || $state == 6 || $state == 7#}
+                    <th id="order-grid-open_c13">配送员</th>
+                      {#if $state == 4 || $state == 5#}
+                    <th id="order-grid-open_c14">系统备注</th>
+                      {#/if#}
+                    {#/if#}
+                    {#if $state == 6 || $state == 7#}
+                    <th id="order-grid-open_c15">失败原因</th>
+                    <th id="order-grid-open_c16">退款状态</th>
+                    {#/if#}
+                    <th id="order-grid-open_c17">下单时间</th>
+                    {#if $state == 1#}
+                    <th id="order-grid-open_c18">完成时间</th>
+                    <th id="order-grid-open_c19">完成速度（分钟）</th>
+                    {#/if#}
+                    <th id="order-grid-open_c20">付款方式</th>
+                    <!-- <th id="order-grid-open_c21">分站</th> -->
+                    <th class="button-column" id="order-grid-open_c22">操作</th></tr>
+                </thead>
+                <tbody>
+                  {#foreach from=$list item=l#}
+                  <tr data-id="{#$l.id#}">
+                    <td width="30"><input value="{#$l.id#}" id="order-grid-open_c0_0" type="checkbox" name="selectorderl[]"></td>
+                    <td width="60">{#$l.cityName#}<br />{#$l.ordernum#}</td>
+                    <td width="60">{#if $l.type==1#}帮我买<br /><br />送达时间：<br />{#$l.totime#}{#else#}帮我送<br /><br />取件时间：<br />{#$l.gettime#}<br />预计送达：<br />{#$l.totime#}{#/if#}</td>
+                    <td width="90">
+                      <div>姓名：{#$l.person#}</div>
+                      <div>联系电话：{#$l.tel#}</div>
+                      <div>商品描述：{#$l.shop#}</div>
+                      <div>{#if $l.type==1#}购买地址{#else#}取货地址{#/if#}：{#$l.buyaddress#}</div>
+                      <div>收货地址：{#$l.address#}</div>
+                      <div>商品价值：{#$l.price#}</div>
+                      <div>备注信息：{#$l.note#}</div>
+                    </td>
+                    <td width="60"><a href="javascript:;" class="userinfo" data-id="{#$l.uid#}">{#$l.username#}</a></td>
+                    <td width="90">{#$l.person#}</td>
+                    <td width="90">{#$l.tel#}</td>
+                    <td style="word-break: break-all;" width="80">{#$l.freight#}</td>
+                    <td style="word-break: break-all;" width="80">{#$l.amount#}</td>
+                    {#if $state == 4 || $state == 5 || $state == 1 || $state == 6 || $state == 7#}
+                    <td width="100">{#$l.peisongname#}({#$l.peisongtel#})</td>
+                      {#if $state == 4 || $state == 5#}
+                    <td width="100">{#$l.peisongidlog#}</td>
+                      {#/if#}
+                    {#/if#}
+                    {#if $state == 6 || $state == 7#}
+                    <td width="100">{#$l.failed#}</td>
+                    <td width="100" class="refrundState">
+                      {#if $l.paystate == 0#}
+                        <div class="refundYes">未付款</div>
+                      {#else#}
+                        {#if $l.refrundstate == 1#}
+                          {#if $l.paytype != '货到付款'#}
+                          <div class="refundYes">已退款</div>
+                          <div class="bgtxt">退款状态：退款成功</div>
+                          <div class="bgtxt">退款时间：{#$l.refrunddate|date_format:"%Y-%m-%d %H:%M:%S"#}</div>
+                          <div class="bgtxt">退款流水号：{#$l.refrundno#}</div>
+                          <div class="bgtxt">退款操作员帐号：{#$l.refrundadmin#}</div>
+                          {#else#}
+                          <div class="refundNo">未退款</div>
+                          {#/if#}
+                        {#else#}
+                          <div class="refundNo">未退款</div>
+                        {#/if#}
+                      {#/if#}
+                    </td>
+                    {#/if#}
+                    <td width="40">{#$l.pubdate|date_format:"%y-%m-%d %H:%M:%S"#}</td>
+                    {#if $state == 1#}
+                    <td width="40">{#$l.okdate|date_format:"%y-%m-%d %H:%M:%S"#}</td>
+                    <td width="50">{#ceil(($l.okdate-$l.pubdate)/60)#}</td>
+                    {#/if#}
+                    <td width="50"><b style="color:green">{#$l.paytype#}</b></td>
+                    <!-- <td width="50">{#$l.cityName#}</td> -->
+                    <td width="80" class="button-column">
+                      <a title="查看" class="green orderdetail" data-id="{#$l.id#}" data-num="{#$l.ordernum#}" style="padding-right:8px;" href="paotuiOrderDetail.php?id={#$l.id#}"><i class="ace-icon fa fa-search bigger-130"></i></a>
+                      {#if $state == 7 && $l.paystate == 1 && $l.refrundstate == 0 && $l.amount > 0 && $l.paytype != '货到付款'#}<br><a class="label label-sm label-danger refund" href="javascript:;">退款</a>{#/if#}
+                    </td>
+                  </tr>
+                  {#/foreach#}
+
+                  {#if $list|@count == 0#}
+                  <tr>
+                    <td colspan="{#if $state == 1 || $state == 4 || $state == 5#}{#if $state == 4 || $state == 5#}16{#else#}17{#/if#}{#elseif $state == 7 || $state == 6#}17{#else#}14{#/if#}" style="height: 200px; line-height: 200px; text-align: center;">没有找到数据.</td>
+                  </tr>
+                  {#/if#}
+                </tbody>
+              </table>
+
+              {#$pagelist#}
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    </div>
+  </div>
+
+{#$jsFile#}

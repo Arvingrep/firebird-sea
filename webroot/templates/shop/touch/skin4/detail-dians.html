@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+	<title>{#$detail_title#}</title>
+	<meta name="apptitle" content="商品详情">
+	<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}">
+	<script src="{#$cfg_staticPath#}js/ui/html2canvas.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript">
+		var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$shop_channelDomain#}', cfg_staticPath = staticPath = '{#$cfg_staticPath#}',templets='{#$templets_skin#}';
+		var hideFileUrl = '{#$cfg_hideUrl#}', cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+		jQuery = $;
+		var isdetailFlag = true;//针对购物车 详情页特加
+		var detailID = '{#$detail_id#}';     //当前商品信息ID
+		var storeid  = '{#$detail_store['id']#}';     //商家ID
+		var detailTitle = '{#$detail_title#}';
+		var detailPrice = '{#$detail_price#}';
+	    var maxCount = '{#if $detail_states#}{#$detail_limit#}{#else#}{#$detail_limitcount#}{#/if#}';  //最多购买数量
+		var detailinventory = '{#$detail_inventory#}';//库存
+		var detailThumb = "{#changeFileSize url={#$detail_litpic#} type='small'#}";   //当前商品缩略图
+		var detailUrl = '{#getUrlPath service="shop" template="detail" id=$detail_id#}';
+		var date = [];
+		var prohuodongtype = '{#$detail_states#}';
+		var bargainingurl = '{#if $userinfo#}{#getUrlPath service="shop" template="bargain_detail"  id="%id"#}{#else#}{#$cfg_basehost#}/login.html{#/if#}';
+		{#if $detail_flag|strpos:"3" !== false#}
+		date = [{#$smarty.now#}, {#$detail_ktime#}, {#$detail_etime#}];
+		{#/if#}
+
+		var serviceTime = "{#$smarty.now#}";
+		var jsTime = parseInt((new Date()).valueOf()/1000);
+		var timeOffset = parseInt(jsTime - serviceTime);
+
+		var huodongid = "{#$detail_hid#}";
+		var moduletype = "{#$detail_moduletype#}";
+		//商品信息-商品颜色和尺寸
+		var sku_conf = {
+
+				//属性表
+				"property": [
+							{#foreach from=$detail_specificationArr item=spe#}
+							{
+								"name": "{#$spe.typename#}",
+								"options": [
+											{#foreach from=$spe.item item=item#}
+											{"id": "{#$item.id#}",	"name": "{#$item.name|parseStrSpecialChar#}"{#if $item.pic#}, "pic": "{#$item.pic#}"{#/if#}},
+											{#/foreach#}
+										]
+							},
+							{#/foreach#}
+				],"tuanproperty":[
+						{#if $detail_moduletype == 1#}
+						{
+							"name": "套餐多规格",
+								"options": [
+							{#foreach from=$detail_specificationArr item=spe#}
+							{#foreach from=$spe.item item=item#}
+							{"id": "{#$item.id#}",	"name": "{#$item.name#}"{#if $item.pic#}, "pic": "{#$item.pic#}"{#/if#}},
+							{#/foreach#}
+							{#/foreach#}
+									]
+						},
+						{#/if#}
+				]
+
+				//属性值
+				,"data": {
+
+					{#foreach from=$detail_specification item=spe#}
+						{#if $spe.price[2] > 0#}{#/if#}
+						"{#$spe.spe|replace:",":";"#}": {"id":{#$spe.id#}, price: '{#$spe.price[1]#}', mprice: '{#$spe.price[0]#}', stock: '{#$spe.price[2]#}'},
+						
+					{#/foreach#}
+				},"pindata":{
+					{#foreach from=$detail_pinspecification item=spe#}
+						{#if $spe.price[2] > 0#}
+						// "{#$spe.spe|replace:"-":";"#}": {price: {#$spe.price[1]#}, mprice: {#$spe.price[0]#}, stock: {#$spe.price[2]#}},
+						"{#$spe.spe|replace:",":";"#}": {"id":{#$spe.id#}, price: '{#$spe.price[1]#}', mprice: '{#$spe.price[0]#}', stock: '{#$spe.price[2]#}'},
+						{#/if#}
+					{#/foreach#}
+				}
+			};
+
+			//商品规格选择
+			var detail_video='{#$detail_video#}';
+			var imconfig = {
+				'mod':'shop',
+				'chatid':"{#$detail_store['userid']#}",
+				'title': '{#$detail_title#}',
+				"price": '<em>{#echoCurrency type="symbol"#}</em>{#$detail_price#}',
+				"imgUrl": '{#changeFileSize url={#$detail_litpic#} type='small'#}',
+				"link": '{#getUrlPath service="shop" template="detail" id=$detail_id#}',
+
+			};
+			var detailShopunit ='{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}' ;//商品单位
+
+			var touch_poster = 1;  //是否有海报按钮
+			var userinfo = '{#$userinfo.photo#}';
+			var userStatus = '{#$detail_userStatus#}';
+			
+	</script>
+
+</head>
+
+<body>
+	
+<!-- 头部 -->
+{#include file="../../../siteConfig/touch_top.html" pageTitle="{#$langData['shop'][7][0]#}"#} {#* 商品详情 *#}
+<!-- 头部 end -->
+<!-- 海报s -->
+{#include file="../../../siteConfig/public_touch_poster.html" posterModule='shopDetail'#}
+{#include file="../../../siteConfig/touch_poster_3.7.html" posterType="shopDetail"#}
+<!-- 海报 -->
+
+<!-- 导航栏 s-->
+<ul class="det-tab">
+	<li class="active">{#$langData['shop'][7][4]#}<s></s></li>   {#* 宝贝 *#}
+	<li>{#$langData['siteConfig'][19][365]#}<s></s></li>  {#* 评价 *#}
+	<li>{#$langData['siteConfig'][41][66]#}<s></s></li>  {#* 详情 *#}
+	<li>{#$langData['siteConfig'][23][109]#}<s></s></li>  {#* 推荐 *#}
+</ul>
+<!-- 导航栏 e-->
+<div class="mainWrap">
+	<div class="mainBox">
+		<!-- 视频图片轮播 s-->
+		<div class="topSwiper msend">
+			<div class="swiper-container">
+				<div class="swiper-wrapper">
+					{#if !empty($detail_video)#}
+					<div class="swiper-slide video-box">
+						<img src="{#$detail_litpic#}" width="100%" height="100%">
+						<div class="imgplay"><img src="{#$templets_skin#}images/viplay.png" alt=""></div>
+					</div>
+					{#/if#}
+					{#if $detail_litpic#}
+					<div class="swiper-slide"><img src="{#$detail_litpic#}" width="100%" height="100%" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';" ></div>
+					{#/if#}
+					{#foreach from=$detail_pics item=pic#}
+					<div class="swiper-slide"><img src="{#if $pic.path#}{#changeFileSize url={#$pic.path#} type='large'#}{#else#}{#$cfg_staticPath#}images/404.jpg{#/if#}" width="100%" height="100%" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';" ></div>
+					{#/foreach#}
+				</div>
+				<div class="swiper-pagination"></div>
+			</div>
+		</div>
+		<!-- 视频图片轮播 e-->
+		<!-- 购买滚动信息 -->
+		<div class="buyGun {#if $detail_states==1 || $detail_states==2#}redbuyGun{#/if#}">
+			<div class="swiper-container">
+				<div class="swiper-wrapper">
+				</div>
+			</div>
+		</div>
+		<!--			<div class="living">-->
+		<!--				<div class="musicwrap">-->
+		<!--					<dl class="music">-->
+		<!--					 <dd class="m1"></dd>-->
+		<!--					 <dd class="m2"></dd>-->
+		<!--					 <dd class="m3"></dd>-->
+		<!--					</dl>-->
+		<!--				</div>-->
+		<!--				<p>{#$langData['siteConfig'][15][22]#}</p> {#* 直播中 *#}-->
+		<!--			</div>-->
+		
+		{#if $detail_states==1#}
+		<!-- 抢购信息 s-->
+		{#if $detail_etime>time()#}
+		<!-- 抢购已开始显示 -->
+		<div class="qginfo">
+			<div class="lqgbg l"></div>
+			<div class="l">
+				{#* 价格 --  已抢1件*#}
+				<span class="nprice"><em>{#echoCurrency type='symbol'#}</em><b>{#floatval($detail_huodongprice)#}</b></span>
+				<span class="nqginfo">{#$langData['siteConfig'][19][428]#}<span class="yprice">{#echoCurrency type='symbol'#} {#floatval($detail_price)#}</span><span class="hasQ">{#if $detail_huodongsales > 0#}已抢{#$detail_huodongsales#}{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}{#else#}热抢中{#/if#}</span></span>
+			</div>
+			<div class="r">
+				<div class="rtime">
+					{#* 距离本场结束 *#}
+					<span class="spTxt">{#$langData['shop'][7][7]#}</span>
+					<div class="jsTime fn-clear" data-time="{#$detail_etime#}">
+						<span class="day">00</span><em class="speDot">天</em>
+						<span class="hour">00</span><em>:</em>
+						<span class="minute">00</span><em>:</em>
+						<span class="second">00</span>
+					</div>
+				</div>
+
+			</div>
+		</div>
+		{#else#}
+		<!-- 抢购已结束 -->
+		<div class="qginfo">
+			<div class="lqgbg l"></div>
+			<div class="l">
+				{#* 价格 --  已抢1件*#}
+				<span class="nprice"><em>{#echoCurrency type='symbol'#}</em><b>{#floatval($detail_huodongprice)#}</b></span>
+				<span class="nqginfo">{#$langData['siteConfig'][19][428]#}<span class="yprice">{#echoCurrency type='symbol'#} {#floatval($detail_price)#}</span><span class="hasQ">{#if $detail_huodongsales > 0#}已抢{#$detail_huodongsales#}{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}{#else#}热抢中{#/if#}</span></span>
+			</div>
+			<div class="r">
+				<div class="rtime">
+					<span class="spTxtEnd">{#$langData['shop'][7][8]#}</span> {#* 抢购已结束 *#}
+				</div>
+
+			</div>
+		</div>
+		{#/if#}
+		<!-- 抢购信息 e-->
+
+
+		{#elseif $detail_states==2#}
+		<!-- 秒杀信息 s-->
+		<div class="msinfo">
+			<div class="l">
+				{#* 价格 --  已抢1件*#}
+				<span class="nprice"><em>{#echoCurrency type='symbol'#}</em><b>{#floatval($detail_huodongprice)#}</b></span>
+				<span class="nqginfo">{#$langData['siteConfig'][19][428]#}<span class="yprice">{#echoCurrency type='symbol'#} {#floatval($detail_price)#}</span><span class="hasQ">{#if $detail_huodongsales > 0#}已抢{#$detail_huodongsales#}{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}{#else#}热抢中{#/if#}</span></span>
+			</div>
+			<div class="r">
+
+				{#if $detail_etime<time()#}
+
+				<!-- 秒杀已结束显示 -->
+				<div class="rbg"></div>
+				<p class="pend">{#$langData['shop'][7][9]#}</p> {#* 秒杀已结束 *#}
+				{#elseif $detail_ktime<time()#}
+				<!-- 秒杀已开始显示 -->
+				<div class="rbg"></div>
+				<div class="rtime">
+					<span class="spTxt">{#$langData['shop'][7][10]#}</span> {#* 距结束 *#}
+					<div class="jsTime fn-clear" data-time="{#$detail_etime#}">
+						<span class="day">00</span><em class="speDot">天</em>
+						<span class="hour">00</span><em>:</em>
+						<span class="minute">00</span><em>:</em>
+						<span class="second">00</span>
+					</div>
+				</div>
+				{#/if#}
+			</div>
+		</div>
+		<!-- 秒杀信息 e-->
+		{#elseif $detail_states ==3#}
+		{#if $detail_ktime>time()#}
+		<!--未开始-->
+
+		{#elseif $detail_etime>time()#}
+		<div class="kanInfo">
+			<div class="l">
+				<p><em>{#echoCurrency type='symbol'#}</em>{#$detail_huodongprice#}<i></i></p>
+				<span>{#echoCurrency type='symbol'#} {#$detail_price#}</span>
+			</div>
+			<div class="rKan">已砍{#$detail_ykcount#}{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}</div> {#* 已砍<em>1</em>件 *#}
+		</div>
+		{#/if#}
+		<!-- 抢购预告开始 -->
+		{#elseif $detail_ygstates==1  && $detail_ktime >= time() && ($detail_ktime - time())/60/60 <= $customhuodongygtime#}
+		<div class="qginfo">
+			<div class="lqgbg l"></div>
+			<div class="l">
+				{#* 价格 --  已抢1件*#}
+				<span class="nprice"><em>{#echoCurrency type='symbol'#}</em><b>{#floatval($detail_huodongprice)#}</b></span>
+				<span class="nqginfo">{#$langData['siteConfig'][19][428]#}<span class="yprice">{#echoCurrency type='symbol'#} {#floatval($detail_price)#}</span><span class="hasQ">{#if $detail_huodongsales > 0#}已抢{#$detail_huodongsales#}{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}{#else#}热抢中{#/if#}</span></span>
+			</div>
+			<div class="r">
+				<div class="rtime">
+					{#* 距离本场开始 *#}
+					<span class="spTxt">{#$langData['shop'][7][6]#}</span>
+					<div class="jsTime fn-clear" data-time="{#$detail_ktime#}">
+						<span class="day">00</span><em class="speDot">天</em>
+						<span class="hour">00</span><em>:</em>
+						<span class="minute">00</span><em>:</em>
+						<span class="second">00</span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- 秒杀预告开始 -->
+		{#elseif $detail_ygstates==2  && $detail_ktime >= time() && ($detail_ktime - time())/60/60 <= $customhuodongygtime#}
+
+		<div class="msinfo">
+			<div class="l">
+				{#* 价格 --  已抢1件*#}
+				<span class="nprice"><em>{#echoCurrency type='symbol'#}</em><b>{#floatval($detail_huodongprice)#}</b></span>
+				<span class="nqginfo">{#$langData['siteConfig'][19][428]#}<span class="yprice">{#echoCurrency type='symbol'#} {#floatval($detail_price)#}</span><span class="hasQ">{#if $detail_huodongsales > 0#}已抢{#$detail_huodongsales#}{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}{#else#}热抢中{#/if#}</span></span>
+			</div>
+			<div class="r">
+				<div class="rbg"></div>
+				<div class="rtime">
+					{#* 距开始 *#}
+					<span>{#$langData['shop'][5][73]#}</span>
+					<div class="jsTime fn-clear" data-time="{#$detail_ktime#}">
+						<span class="day">00</span><em class="speDot">天</em>
+						<span class="hour">00</span><em>:</em>
+						<span class="minute">00</span><em>:</em>
+						<span class="second">00</span>
+					</div>
+				</div>
+			</div>
+		</div>
+		{#/if#}
+
+		<!-- 商品信息s -->
+		<div class="shopInfo">
+			{#if $detail_states!=1 && $detail_states!=2 && $detail_states!=3 && $detail_ygstates != 2  && $detail_ygstates != 1#}
+			<div class="info_price">
+				<span class="nprice"><em>{#echoCurrency type='symbol'#}</em><b>{#if $detail_states==4#} {#floatval($detail_huodongprice)#} {#else#}{#floatval($detail_price)#}{#/if#}</b></span>
+				<span class="jiag">{#$langData['siteConfig'][19][428]#}</span> {#* 价格*#}
+				<span class="yprice">{#echoCurrency type='symbol'#}{#if $detail_states==4 || $detail_states == 3#} {#floatval($detail_price)#} {#else#} {#floatval($detail_mprice)#} {#/if#}</span>
+				{#if $detail_states==4#}<span class="pNum"><s>{#$detail_huodongnumber#}</s><em>人团</em></span>{#/if#}
+			</div>
+			{#elseif !$detail_states || $detail_states==1 && $detail_etime<time() #}
+			<div class="info_price"><span class="nprice"><em>{#echoCurrency type='symbol'#}</em><b>{#floatval($detail_price)#}</b></span><span class="yprice">{#echoCurrency type='symbol'#} {#floatval($detail_mprice)#}</span></div>
+			
+			{#/if#}
+			<div class="info_box fn-clear">
+				<p class="soucang {#if $detail_collect == 1#}hascang{#/if#}">
+					<i></i>
+					{#*已收藏 -- 收藏*#}
+					<span>{#if $detail_collect == 1#}{#$langData['siteConfig'][44][0]#}{#else#}{#$langData['siteConfig'][19][240]#}{#/if#}</span>
+				</p>
+				<h2>{#$detail_title#}</h2>
+			</div>
+
+            {#if !$detail_states#}
+			<!-- 分销用户独享s -->
+			{#if $cfg_fenxiaoFee_shop > 0#}
+			<div class="fenxiao_share" >
+				<span>分享赚</span>邀请好友下单，可赚<em>{#echoCurrency type="symbol"#}{#if $detail_states#} {#round($cfg_fenxiaoFee_shop * $detail_huodongprice,2)#} {#else#}{#round($cfg_fenxiaoFee_shop * $detail_price,2)#}{#/if#}</em>
+			</div>
+			{#else if $cfg_fenxiaoFee_intshop#}
+			<div class="fenxiao_share" >
+				<span>分享赚</span>邀请好友下单，可赚<em>{#echoCurrency type="symbol"#}{#$cfg_fenxiaoFee_intshop#}</em>
+			</div>
+			{#/if#}
+			<!-- 分销用户独享e -->
+            {#/if#}
+            
+			<!--				<span class="yunfei">{#$detail_logisticNote#}</span>-->
+			<div class="bo_info">
+				<div class="tuiType">
+					{#if $detail_is_tuikuan == 1#}
+					<div class="noTui"><span>不支持退款</span><i></i></div>
+					{#else#}
+					<span>支持7天无理由退换</span><i></i>
+					{#/if#}
+				</div>
+				<!-- <span class="address">{#$detail_store['addr'][0]#} {#$detail_store['addr'][1]#}</span> -->
+				{#if !$detail_states#}
+				<span class="xiaol" data-state="{#$detail_states#}">{#if $detail_sales > 0 || $detail_huodongsales > 0#}{#if $detail_sales!=0#}{#$langData['siteConfig'][19][518]#}{#$detail_sales#} {#else#}{#$langData['siteConfig'][19][518]#}{#$detail_huodongsales#}{#/if#}{#else#}{#/if#}</span>
+				{#/if#}
+			</div> {#* 已售 *#}
+		</div>
+		<!-- 商品信息e -->
+		<!-- 优惠券 s -->
+		<div class="youhui fn-hide">
+			{#* 优惠 *#}
+			<em class="comtit">{#$langData['siteConfig'][19][870]#}</em>
+			<div class="yhBox">
+				{#if $detail_quanarr && ( $detail_ktime > time() || $detail_etime < time())#}
+				<div class="qyouhui">
+					<p class="quan">
+						{#if $k <=2#}
+						{#foreach from=$detail_quanarr key=k item=quan#}
+						<span>{#if $quan.promotiotype==1#}
+						{#if $quan.basic_price > 0#}满{#floatval($quan.basic_price)#}打{#else#}无门槛{#/if#}{#floatval($quan.promotio)#}折
+						{#else#}{#if $quan.basic_price > 0#}满{#floatval($quan.basic_price)#}{#else#}无门槛{#/if#}减{#floatval($quan.promotio)#}{#/if#}</span>
+						{#/foreach#}
+						{#/if#}
+					</p>
+					<p class="receive"><em>{#$langData['shop'][7][12]#}</em> <s class="right"></s></p>
+					{#* 领券 *#}
+				</div>
+				{#/if#}
+				<!-- 参与活动的都不参与vip折扣 -->
+				{#if !$detail_states#}
+				<!-- 会员优惠 -->
+				{#if $userinfo && $userinfo.level && $userinfo.privilege && $userinfo.privilege['shop']&& $userinfo.privilege['shop'] != 10#}
+				<div class="vipyouhui">
+					<div class="vipIcon"><span>{#$userinfo.levelName#}</span></div> {#$userinfo.levelName#}{#$userinfo.privilege['shop']#}折，预计可省{#echoCurrency type="symbol"#}{#if $detail_states#} {#((10 - $userinfo.privilege['shop']) / 10 * $detail_huodongprice)|string_format:"%.2f" #} {#else#}{#((10 - $userinfo.privilege['shop']) / 10 * $detail_price)|string_format:"%.2f" #}{#/if#}
+				</div>
+				{#/if#}
+				{#/if#}
+
+				{#if $cfg_returnPoint_shop && ((intval($cfg_returnPoint_shop * $detail_price) > 0 && !$detail_states)  || (intval($cfg_returnPoint_shop * $detail_huodongprice) > 0 && $detail_states))#}
+				<div class="point" data-point="{#intval($cfg_returnPoint_shop * $detail_price)#}"><span>{#$cfg_pointName#}</span>购买可得{#if $detail_states#} {#intval($cfg_returnPoint_shop * $detail_huodongprice)#} {#else#}{#intval($cfg_returnPoint_shop * $detail_price)#}{#/if#}{#$cfg_pointName#}</div>
+				{#/if#}
+			</div>
+		</div>
+		<!-- 优惠券 e -->
+
+		<!-- 规格、参数 s-->
+		<div class="{#if $detail_specificationArr || $detail_property || $detail_smallCount > 1 || $detail_packingCount > 1#}goods_tp{#/if#}">
+			{#if $detail_specificationArr#}
+			<div class="goods_box btn-guige">
+				<div class="guigeTop">
+					{#* 规格 -- 请选择*#}
+					<span class="comtit">{#$langData['siteConfig'][42][107]#}</span>
+					<input type="text" value="{#$langData['siteConfig'][7][2]#} {#foreach from=$detail_specificationArr item=spe#} {#$spe.typename#}{#/foreach#}" class="inpSelect" readonly unselectable="on" onfocus="this.blur()">
+					<s class="right"></s>
+				</div>
+
+				<div class="guigeBot fn-clear">
+					<div class="leftIn"></div>
+					<div class="rIn"></div>
+				</div>
+			</div>
+			{#/if#}
+			{#if $detail_property || $detail_smallCount > 1 || $detail_packingCount > 1#}
+			<div class="goods_box btn-parm">
+				<span class="comtit">{#$langData['siteConfig'][19][90]#}</span> {#* 参数*#}
+				<div class="but_count">
+					{#if $detail_smallCount > 1 || $detail_packingCount > 1#}
+					<div class="mincoutDiv {#if $detail_property#}hha{#/if#}">起订量{#$detail_smallCount#}，装箱数量{#$detail_packingCount#}</div>
+					{#/if#}
+					{#if $detail_property#}
+					<p class="parmp">{#foreach from=$detail_property item=type#}{#if $type.val#}{#$type.typename#}&nbsp;{#/if#}{#/foreach#}</p>
+					{#/if#}
+				</div>
+				<s class="right"></s>
+			</div>
+			{#/if#}
+			{#* 数量 *#}
+			<div class="goods_box" style="display: none"><span class="comtit">{#$langData['siteConfig'][19][311]#}</span><p class="sizeBtn"><a href="javascript:;" class="numbtn reduce">－</a><input type="number" class="count" value="{#if $detail_smallCount > 1#}{#$detail_smallCount#}{#else#}1{#/if#}"><a href="javascript:;" class="numbtn add">＋</a></p></div>
+		</div>
+		<!-- 规格、参数 e-->
+		{#if $detail_states ==4 && $detail_etime>time()#}
+		<!-- 拼单 s-->
+		<div class="people">
+			{#* 1人在拼单，可直接参与 -- 查看全部 *#}
+			<div class="info_title fn-clear">{#$langData['shop'][7][13]|replace:'1':'<em id="totalcount"></em>'#}<a href="javascript:;">{#$langData['siteConfig'][16][3]#}<s></s></a>
+				{#* 倒计时 *#}
+				<div class="jsTime fn-clear" data-time="{#$detail_etime#}">
+					{#$langData['shop'][7][14]#}：
+					<span class="day">00</span><em class="speDot">天</em>
+					<span class="hour">00</span><em>:</em>
+					<span class="minute">00</span><em>:</em>
+					<span class="second">00</span>
+				</div>
+			</div>
+			<div class="people_list">
+				<div class="swiper-container">
+					<div class="swiper-wrapper">
+
+					</div>
+				</div>
+			</div>
+		</div>
+		{#/if#}
+		<!-- 拼单 e-->
+		<!-- 砍价 s-->
+		{#if $detail_states ==3 && $detail_etime>time()#}
+		{#if $detail_kjstate == 1 && !$detail_oid#}
+		<!--砍价已成功 未购买 -->
+		<div class="kanprocess kanIng kanend">
+			<h3 class="kanTit">砍价成功</h3> {#* 砍价成功 *#}
+			<div class="kanCon">
+				<div class="floorPrice gonBuy tobuy"><a href="javascript:;">{#$langData['siteConfig'][18][35]#}</a></div> {#* 立即购买 *#}
+				<div class="jsTime fn-clear" data-time="{#$detail_etime#}"  data-now="{#$smarty.now#}">
+					{#* 距活动结束还剩 *#}
+					<div>
+						<i>{#$langData['shop'][7][21]#}：</i>
+						<span class="day">00</span><em class="speDot">天</em>
+						<span class="hour">00</span><em>:</em>
+						<span class="minute">00</span><em>:</em>
+						<span class="second">00</span>
+					</div>
+
+				</div>
+			</div>
+
+		</div>
+
+		{#elseif $detail_bargainingjoin <=0#}
+		<div class="kanprocess">
+			{#* 砍价流程 *#}
+			<h3 class="kanTit">{#$langData['shop'][7][15]#}</h3>
+			<ul>
+				{#* 挑选商品 *#}
+				<li><img src="{#$templets_skin#}images/kanjia/sp.png" alt=""><p>{#$langData['shop'][7][16]#}</p></li>
+				{#* 分享砍价 *#}
+				<li><img src="{#$templets_skin#}images/kanjia/kan.png" alt=""><p>{#$langData['shop'][7][17]#}</p></li>
+				{#* 砍价成功 *#}
+				<li><img src="{#$templets_skin#}images/kanjia/peo.png" alt=""><p>{#$langData['shop'][7][18]#}</p></li>
+				{#* 底价拿走 *#}
+				<li><img src="{#$templets_skin#}images/kanjia/buy.png" alt=""><p>{#$langData['shop'][7][19]#}</p></li>
+			</ul>
+			{#* 我要底价拿走 *#}
+			<!--				{#if $userinfo#}{#getUrlPath service='shop' template='bargain_detail'  id={#$detail_id#}#}{#else#}{#$cfg_basehost#}/login.html{#/if#}"-->
+			<div class="floorPrice tooBuy kj"><a href="javascript:;">{#$langData['shop'][7][20]#}</a></div>
+			<div class="jsTime fn-clear" data-time="{#$detail_etime#}">
+				{#* 距活动结束还剩 *#}
+				<div>
+					<i>{#$langData['shop'][7][21]#}：</i>
+					<span class="day">00</span><em class="speDot">天</em>
+					<span class="hour">00</span><em>:</em>
+					<span class="minute">00</span><em>:</em>
+					<span class="second">00</span>
+				</div>
+
+			</div>
+		</div>
+		{#else#}
+
+		<!--砍价进行中 -->
+		<div class="kanprocess kanIng">
+			<h3 class="kanTit">{#$langData['shop'][7][22]#}</h3> {#* 砍价进行中 *#}
+			<div class="kanCon">
+				<div class="hasKan">
+					{#* 已砍 --  还能再砍*#}
+					{#$langData['shop'][7][23]#}<em>{#echoCurrency type='symbol'#}</em><strong>{#$detail_yk_money|string_format:"%.2f"#}</strong>，{#$langData['shop'][7][24]#}<em>{#echoCurrency type='symbol'#}</em><strong>{#$detail_hs_money#}</strong>
+				</div>
+				<div class="floorPrice gonBuy"><a href="{#getUrlPath service='shop' template='bargain_detail'  id={#$detail_bargaid#}#}">继续砍价</a></div> {#* 继续砍价 *#}
+				<div class="jsTime fn-clear" data-time="{#$detail_etime#}"  data-now="{#$smarty.now#}">
+					{#* 距活动结束还剩 *#}
+					<div>
+						<i>{#$langData['shop'][7][21]#}：</i>
+						<span class="day">00</span><em class="speDot">天</em>
+						<span class="hour">00</span><em>:</em>
+						<span class="minute">00</span><em>:</em>
+						<span class="second">00</span>
+					</div>
+
+				</div>
+			</div>
+
+		</div>
+		{#/if#}
+		{#/if#}
+		<!-- 砍价 e-->
+
+	</div>
+	<!-- 评价 s-->
+	<div class="mainBox">
+		<div class="commentWrap">
+			<div class="pjTop">
+				{#* 评价 -- 好评度 *#}
+				<span>{#$langData['siteConfig'][19][365]#}</span><strong class="all">0</strong>
+				<h3><a href="{#getUrlPath service='shop' template='comment_detail'  id={#$detail_id#}#}">{#$langData['shop'][7][26]#} <em class="hpl">0.00%</em><s class="right"></s></a></h3>
+			</div>
+			<ul class="com-tab fn-clear">
+				{#* 全部 *#}
+				<li class="active"><a href="javascript:;">{#$langData['siteConfig'][9][0]#}</a></li>
+				{#* 好评 *#}
+				<li data-type="h"><a href="javascript:;">{#$langData['siteConfig'][19][367]#}(<em class="hp">0</em>)</a></li>
+				{#* 中评 *#}
+				<li data-type="z"><a href="javascript:;">{#$langData['siteConfig'][19][368]#}(<em class="zp">0</em>)</a></li>
+				{#* 差评 *#}
+				<li data-type="c"><a href="javascript:;">{#$langData['siteConfig'][19][369]#}(<em class="cp">0</em>)</a></li>
+			</ul>
+			<div class="comment-box">
+				<ul class="com-list">
+				</ul>
+				<div class="cotmorebox"><a href="{#getUrlPath service='shop' template='comment_detail'  id={#$detail_id#}#}">{#$langData['shop'][7][27]#}</a></div> {#* 查看全部评论 *#}
+			</div>
+		</div>
+		<!-- 店铺信息 相似推荐 s-->
+		<div class="recombox">
+			<div class="sbotop">
+				<div class="sbleft">
+					<a href="{#$detail_store['domain']#}"><img src="{#if $detail_store['logo']#}{#$detail_store['logo']#}{#else#}{#$cfg_staticPath#}images/404.jpg{#/if#}" alt="{#$detail_store['title']#}" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';"></a>
+				</div>
+				<div class="sbright">
+					<div class="sbt">
+						<h3><a href="{#$detail_store['domain']#}">{#$detail_store['title']#}</a></h3>
+						<p class="fn-clear">
+							<span class="rzcon"><i></i>商家认证</span> {#* 执照认证 *#}
+							{#if $detail_store['promotion'] > 0#}<span class="bzjcon"><i></i>{#$langData['shop'][7][29]#}</span>{#/if#} {#* 保证金 *#}
+							<span class="wepay"><i></i>{#$langData['shop'][7][30]#}</span> {#* 主流支付 *#}
+						</p>
+						<a href="{#$detail_store['domain']#}"><s class="right"></s></a>
+					</div>
+
+					<ul>
+						{#* 进店逛逛 *#}
+						<li><a href="{#$detail_store['domain']#}">{#$langData['shop'][0][12]#}</a></li>
+						{#* 全部宝贝 *#}
+						<li><a href="{#$detail_store['domain']#}">{#$langData['shop'][7][31]#}</a></li>
+						{#if $detail_storeCollect != 1#}
+						<li>
+							<!-- <a href="javascript:;" class="btn-care cared">{#$langData['siteConfig'][19][845]#}</a>  {#* 已关注 *#} -->
+							
+							<a href="javascript:;" class="btn-care">{#$langData['shop'][7][32]#}</a>  {#* 关注店铺 *#}
+						</li>
+						{#/if#}
+					</ul>
+
+				</div>
+			</div>
+			<div class="sbomain">
+				{#* 店铺推荐 *#}
+				<h2 class="sbTitle">{#$langData['shop'][7][33]#}</h2>
+				<div class="sbocon fn-clear">
+					{#shop action="slist" return="list" typeid={#$detail_typeid#} store={#$detail_store['id']#} page="1" pageSize="3"#}
+					<div class="conbox">
+						<a href="{#$list.url#}">
+							<div class="imgbox">
+								<img src="{#if $list.litpic#}{#changeFileSize url={#$list.litpic#} type='middle'#}{#else#}{#$cfg_staticPath#}images/404.jpg{#/if#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/404.jpg';">
+							</div>
+							<div class="txtbox">
+								<p>{#$list.title#}</p>
+								<span>{#echoCurrency type='symbol'#}<em>{#floatval($list.price)#}</em></span>
+							</div>
+						</a>
+					</div>
+					{#/shop#}
+				</div>
+			</div>
+		</div>
+		<!--店铺信息 相似推荐 e-->
+	</div>
+	<!-- 评价 e-->
+	<!-- 详情介绍 s -->
+	<div class="detailBox mainBox">
+		{#* 详情介绍 *#}
+		<h3 class="detIt"><i></i>{#$langData['shop'][7][34]#}</h3>
+		<div class="det-con picshow">
+			{#if empty($detail_mbody)#}
+			{#$detail_body#}
+			{#else#}
+			{#$detail_mbody#}
+			{#/if#}
+		</div>
+	</div>
+	<!-- 详情介绍 e -->
+	<!-- 为你推荐 s-->
+	<!-- <div class="other mainBox">
+		<div class="command-list-tit">
+			<h2></h2>
+			<span><i></i>{#$langData['shop'][0][8]#}</span> {#* 为你推荐 *#}
+		</div>
+		<ul class="goodlist fn-clear">
+		</ul>
+		<div class="morebox"><a href="javascript:;">{#$langData['siteConfig'][6][52]#}</a></div> {#* 查看更多 *#}
+	</div> -->
+
+	<!-- 为你推荐 s-->
+	<div class="other mainBox">
+		<!-- 精选推荐 -->
+		<div class="command-list">
+			<div class="command-list-tit">
+				<h2></h2>
+				<span><i></i>{#$langData['shop'][0][8]#}</span>
+			</div>
+			<div class="command-list-con ">
+				<div class="listbox">
+					<ul class="goodlist fn-clear fn-left"></ul>
+					<ul class="goodlist fn-clear fn-left"></ul>
+					<div class="loading">数据加载中~</div>
+				</div>
+				
+			</div>
+		</div>
+		<!-- 精选推荐 end-->
+	</div>
+	<!-- 为你推荐 e-->
+	<!-- 为你推荐 e-->
+</div>
+
+<div class="footer fn-clear" data-stock="{#$detail_inventory#}">
+	
+	<div class="fbox fn-clear">
+		{#* 店铺 -- 客服 *#}
+		<div class="shop topcart shopgocart "><a href="{#getUrlPath service='shop' template='cart' param="{#if $pagetype#}pagetype={#$pagetype#}{#/if#}"#}" class="cart-btn"><img src="{#$templets_skin#}images/fscart.png" alt=""><span>购物车</span><em class="cart num">0</em></a></div>
+		{#if $detail_store['userid']#}<div class="chat chat_to-Link" data-type="detail"><a href="javascript:;"><img src="{#$templets_skin#}images/fchat2.png" alt=""><span>咨询</span></a></div>{#/if#}
+	</div>
+	{#if $detail_prostate != 0 ||  $detail_inventory <= 0 || ($detail_huodonginventory <= 0 && $detail_states)#}
+	<div class="proTip">
+		{#if $detail_prostate == 1#}
+		<p>商品已经下架了，先看看别的吧</p>
+		{#else if $detail_prostate == 2#}
+		<p>掌柜正在补货中，还有更多好货不要错过哦~</p>
+		{#else if $detail_inventory <= 0 || ($detail_huodonginventory <= 0 && $detail_states)#}
+		<p>商品已经售完，还有更多好货不要错过哦</p>
+		{#/if#}
+	</div>
+	{#/if#}
+	{#if $detail_prostate == 1#}
+	<div class="fbox no_inventory disabled">已下架</div>
+	{#else if $detail_prostate == 2#}
+	<div class="fbox no_inventory disabled">补货中</div>
+	{#else#}
+	<!-- 还有库存 s -->
+	{#if ($detail_inventory > 0 && !$detail_states) ||  ($detail_huodonginventory > 0 && $detail_states)#}
+	{#$priceNrr = "."|explode:$detail_price#}
+	{#$priceMrr = "."|explode:$detail_price#}
+	{#$priceHrr = "."|explode:$detail_huodongprice#}
+	{#$priceHrr = "."|explode:$detail_huodongprice#}
+	{#$gnowmoney = "."|explode:$detail_gnowmoney#}
+	<!-- 抢购 -->
+	{#if $detail_states==1#}
+	{#if $detail_etime>time()#}
+	<div class="fbox addCart noClick">{#$langData['shop'][1][4]#}</div> {#* 加入购物车 *#}
+	<div class="fbox gobuy">{#$langData['siteConfig'][18][35]#}</div> {#* 立即购买 *#}
+	{#else#}
+	<div class="fbox addCart noClick">{#$langData['shop'][1][4]#}</div> {#* 加入购物车 *#}
+	<div class="fbox gobuy disabled">{#$langData['siteConfig'][19][507]#}</div> {#* 已结束 *#}
+	{#/if#}
+	<!-- 秒杀 -->
+	{#elseif $detail_states==2#}
+	{#if $detail_etime<time()#}
+	<!-- 秒杀已结束显示 -->
+	<div class="fbox addCart noClick">{#$langData['shop'][1][4]#}</div> {#* 加入购物车 *#}
+	<div class="fbox gobuy disabled">{#$langData['siteConfig'][19][507]#}</div> {#* 已结束 *#}
+	{#elseif $detail_ktime<time()#}
+	<!-- 秒杀已开始显示 -->
+	<div class="fbox addCart noClick">{#$langData['shop'][1][4]#}</div> {#* 加入购物车 *#}
+	<div class="fbox gobuy">{#$langData['siteConfig'][18][35]#}</div> {#* 立即购买 *#}
+	{#/if#}
+	{#elseif $detail_states ==3#}
+	<!-- 砍价成功 未下单 -->
+	{#if $detail_kjstate == 1 && !$detail_oid#}
+	<div class=" gobuy kan nowbuy"><p>{#echoCurrency type='symbol'#}<strong>{#$priceHrr[0]#}</strong>.{#$priceHrr[1]#}</p>底价购买</div> {#* 底价购买 *#}
+	<div class=" kan bangkan ing"><a href="{#getUrlPath service='shop' template='bargain_detail'  id={#$detail_bargaid#}#}">砍价详情</a></div>  {#* 砍价详情 *#}
+	{#elseif $detail_bargainingjoin >0#}
+	{#if $customshopbargainingnomoney ==0#}
+	<div class=" gobuy kan nowbuy"><p>{#echoCurrency type='symbol'#}<strong>{#$gnowmoney[0]#}</strong>.{#$gnowmoney[1]#}</p>{#$langData['shop'][7][36]#}</div> {#* 现价购买 *#}
+	<div class=" kan bangkan ing"><a href="{#getUrlPath service='shop' template='bargain_detail'  id={#$detail_bargaid#}#}">继续砍价</a></div>  {#* 继续砍价 *#}
+	{#else#}
+	<div class=" gobuy kan originbuy"><p>{#echoCurrency type='symbol'#}<strong>{#$priceMrr[0]#}</strong>.{#$priceMrr[1]#}</p>{#$langData['shop'][7][38]#}</div> {#* 原价购买 *#}
+	<div class=" kan bangkan"><a href="{#getUrlPath service='shop' template='bargain_detail'  id={#$detail_bargaid#}#}">继续砍价</a></div>  {#* 继续砍价 *#}
+	{#/if#}
+	{#else#}
+	<div class=" gobuy kan originbuy"><p>{#echoCurrency type='symbol'#}<strong>{#$priceMrr[0]#}</strong>.{#$priceMrr[1]#}</p>{#$langData['shop'][7][38]#}</div> {#* 原价购买 *#}
+	<div class=" kan bangkan kj"><a href="javascript:;">{#$langData['shop'][7][37]#}</a></div>  {#* 找人帮砍 *#}
+	{#/if#}
+	{#elseif $detail_states ==4#}
+	<div class="fbox gobuy pindan" data-name="zjbuy" data-price="{#$detail_price#}"><p>{#echoCurrency type='symbol'#}<strong>{#$priceMrr[0]#}</strong>.{#$priceMrr[1]#}</p>{#$langData['shop'][7][39]#}</div> {#* 单独购买 *#}
+	<div class="fbox gobuy pindan pinbuy" data-name="fqbuy" data-price="{#$detail_huodongprice#}"><p>{#echoCurrency type='symbol'#}<strong>{#$priceHrr[0]#}</strong>.{#$priceHrr[1]#}</p>{#$langData['shop'][7][40]#}</div> {#* 发起拼单 *#}
+	<!-- 抢购预告	 -->
+	{#elseif $detail_ygstates==1 && $detail_ktime >= time() && ($detail_ktime - time())/60/60 <= $customhuodongygtime#}
+	<div class="fbox addCart noClick">{#$langData['shop'][1][4]#}</div> {#* 加入购物车 *#}
+	<div class="fbox gobuy disabled">{#$langData['shop'][6][16]#}</div> {#* 即将开始 *#}
+	<!-- 秒杀预告	 -->
+	{#elseif $detail_ygstates==2 && $detail_ktime >= time() && ($detail_ktime - time())/60/60 <= $customhuodongygtime#}
+	<div class="fbox addCart noClick">{#$langData['shop'][1][4]#}</div> {#* 加入购物车 *#}
+	<div class="fbox gobuy disabled">{#$langData['shop'][6][16]#}</div> {#* 即将开始 *#}
+	{#else#}
+	<!-- 常规 -->
+	<div class="fbox addCart noClick">{#$langData['shop'][1][4]#}</div> {#* 加入购物车 *#}
+	<div class="fbox gobuy">{#$langData['siteConfig'][18][35]#}</div> {#* 立即购买 *#}
+	{#/if#}
+	<!-- 还有库存 s -->
+
+	<!-- 没有库存 s -->
+	{#else#}
+	<div class="fbox no_inventory disabled">已售罄</div>
+	{#/if#}
+	<!-- 没有库存 e -->
+	{#/if#}
+</div>
+<!-- 退款说明弹窗 -->
+<div class="tkcomMak"></div>
+<div class="tkAlert">
+	<h1>服务说明</h1>
+	
+	{#if $detail_is_tuikuan == 1#}
+	<dl>
+		<dt class="noTuiKuan">不支持退款</dt>
+		<dd>此商品购买后不支持退款，请按需购买</dd>
+	</dl>
+	{#else#}
+	<dl>
+		<dt>支持7天无理由退换</dt>
+		<dd>满足相应条件（剪标/洗涤/激活/拆封/使用后不支持）时，消费者可申请“7天无理由退换货”</dd>
+	</dl>
+	{#/if#}
+	<a href="javascript:;" class="tkFinish">完成</a>
+</div>
+
+<div class="color-box">
+	<div class="color-main" id="color-main">
+		<div class="color-main-box">
+			<div class="color-info">
+				<div class="color-info-img">
+					{#if $detail_specificationArr[0].typename == '颜色'#}
+					<!-- 有颜色的时候取第一个颜色图片 -->
+					{#$csrc = $detail_specificationArr[0].item[0].pic#}
+					<img data-src="{#if $csrc#}{#$csrc#}{#else#}{#$detail_litpic#}{#/if#}" src="{#if $csrc#}{#$csrc#}{#else#}{#$detail_litpic#}{#/if#}" alt="">
+					{#else#}
+					<img data-src="{#$detail_litpic#}" src="{#$detail_litpic#}" alt="">
+					{#/if#}
+				</div>
+				<div class="color-info-txt">
+					{#$priceArr = "."|explode:$detail_price#}
+					<p class="color-info-price">{#echoCurrency type='symbol'#}<b id="price">{#$priceArr[0]#}<em>.{#$priceArr[1]#}</em></b></p>
+					<p class="color-info-num">{#$langData['siteConfig'][19][525]#}<i id="stock">{#$detail_inventory#}</i>{#if $detail_shopunit#}{#$detail_shopunit#}{#else#}件{#/if#}</p>
+				</div>
+				<a href="javascript:;" class="closed"></a>
+			</div>
+			<div class="scrollbox indexscrollbox" id="scrollbox">
+				<div class="scroll" >
+					<div id="skuObj">
+					</div>
+					<div class="color-info-ul fn-clear countUl">
+						<h3 style="float:left;">{#$langData['siteConfig'][19][311]#}</h3>
+						<div class="color-info-account">
+							<span class="fs reduce"></span>
+							<input type="number" class="count" value="{#if $detail_smallCount > 1#}{#$detail_smallCount#}{#else#}1{#/if#}">
+							<span class="bn fs add"></span>
+						</div>
+
+					</div>
+					<div class="buy_mincount" style="display: none;">
+						<div class="mincoutTip" data-mincout="{#if $detail_smallCount > 1#}{#$detail_smallCount#}{#else#}1{#/if#}" data-eachcout="{#if $detail_packingCount > 1#}{#$detail_packingCount#}{#else#}1{#/if#}"></div>
+					</div>
+				</div>
+			</div>
+
+		</div>
+	</div>
+	<div>
+		{#if $detail_states==1#}
+		{#if $detail_ktime>time()#}
+		<div class="color-footer color-footer-select">
+			<a href="javascript:;" class="add-cart disabled">{#$langData['siteConfig'][6][1]#}</a> {#* 确定 *#}
+			<a href="javascript:;" class="buy-cart disabled">{#$langData['shop'][6][16]#}</a> {#* 即将开始 *#}
+		</div>
+		<div class="color-footer color-footer-cart dn">
+			<a href="javascript:;" class="add-cart disabled">{#$langData['siteConfig'][6][1]#}</a> {#* 确定 *#}
+		</div>
+		<div class="color-footer color-footer-once dn">
+			<a href="javascript:;" class="buy-cart disabled">{#$langData['shop'][6][16]#}</a> {#* 即将开始 *#}
+		</div>
+		{#elseif $detail_etime>time()#}
+		<div class="color-footer color-footer-select">
+			<a href="javascript:;" class="add-cart">{#$langData['shop'][1][4]#}</a> {#* 加入购物车 *#}
+			<a href="javascript:;" class="buy-cart">{#$langData['siteConfig'][18][35]#}</a>  {#* 立即购买 *#}
+		</div>
+		<div class="color-footer color-footer-cart dn">
+			<a href="javascript:;" class="add-cart">{#$langData['siteConfig'][6][1]#}</a> {#* 确定 *#}
+		</div>
+		<div class="color-footer color-footer-once dn">
+			<a href="javascript:;" class="buy-cart">{#$langData['siteConfig'][18][35]#}</a>  {#* 立即购买 *#}
+		</div>
+		{#else#}
+		<div class="color-footer color-footer-select">
+			<a href="javascript:;" class="add-cart disabled">{#$langData['siteConfig'][6][1]#}</a>  {#* 确定 *#}
+			<a href="javascript:;" class="buy-cart disabled">{#$langData['siteConfig'][19][507]#}</a> {#* 已结束 *#}
+		</div>
+		<div class="color-footer color-footer-cart dn">
+			<a href="javascript:;" class="add-cart disabled">{#$langData['siteConfig'][6][1]#}</a>  {#* 确定 *#}
+		</div>
+		<div class="color-footer color-footer-once dn">
+			<a href="javascript:;" class="buy-cart disabled">{#$langData['siteConfig'][19][507]#}</a> {#* 已结束 *#}
+		</div>
+		{#/if#}
+		{#elseif $detail_states==2#}
+		<!-- 秒杀未开始显示 -->
+		{#if $detail_ktime>time()#}
+		<div class="color-footer color-footer-select">
+			<a href="javascript:;" class="add-cart disabled">{#$langData['siteConfig'][6][1]#}</a>  {#* 确定 *#}
+			<a href="javascript:;" class="buy-cart disabled">{#$langData['shop'][6][16]#}</a> {#* 即将开始 *#}
+		</div>
+		<div class="color-footer color-footer-cart dn">
+			<a href="javascript:;" class="add-cart disabled">{#$langData['siteConfig'][6][1]#}</a>  {#* 确定 *#}
+		</div>
+		<div class="color-footer color-footer-once dn">
+			<a href="javascript:;" class="buy-cart disabled">{#$langData['shop'][6][16]#}</a> {#* 即将开始 *#}
+		</div>
+		{#elseif $detail_etime<time()#}
+		<!-- 秒杀已结束显示 -->
+		<div class="color-footer color-footer-select">
+			<a href="javascript:;" class="add-cart disabled">{#$langData['siteConfig'][6][1]#}</a>  {#* 确定 *#}
+			<a href="javascript:;" class="buy-cart disabled">{#$langData['siteConfig'][19][507]#}</a> {#* 已结束 *#}
+		</div>
+		<div class="color-footer color-footer-cart dn">
+			<a href="javascript:;" class="add-cart disabled">{#$langData['siteConfig'][6][1]#}</a>  {#* 确定 *#}
+		</div>
+		<div class="color-footer color-footer-once dn">
+			<a href="javascript:;" class="buy-cart disabled">{#$langData['siteConfig'][19][507]#}</a> {#* 已结束 *#}
+		</div>
+		{#elseif $detail_ktime<time()#}
+		<!-- 秒杀已开始显示 -->
+		<div class="color-footer color-footer-select">
+			<a href="javascript:;" class="add-cart">{#$langData['shop'][1][4]#}</a> {#* 加入购物车 *#}
+			<a href="javascript:;" class="buy-cart">{#$langData['siteConfig'][18][35]#}</a> {#* 立即购买 *#}
+		</div>
+		<div class="color-footer color-footer-cart dn">
+			<a href="javascript:;" class="add-cart">{#$langData['siteConfig'][6][1]#}</a>  {#* 确定 *#}
+		</div>
+		<div class="color-footer color-footer-once dn">
+			<a href="javascript:;" class="buy-cart">{#$langData['siteConfig'][18][35]#}</a> {#* 立即购买 *#}
+		</div>
+		{#/if#}
+		{#else#}
+		<div class="color-footer color-footer-select">
+			<a href="javascript:;" class="add-cart">{#$langData['shop'][1][4]#}</a> {#* 加入购物车 *#}
+			<a href="javascript:;" class="buy-cart">{#$langData['siteConfig'][18][35]#}</a>  {#* 立即购买 *#}
+		</div>
+		<div class="color-footer color-footer-cart dn">
+			<a href="javascript:;" class="add-cart">{#$langData['siteConfig'][6][1]#}</a>  {#* 确定 *#}
+		</div>
+		<div class="color-footer color-footer-once dn">
+			<a href="javascript:;" class="buy-cart" data-name="">{#$langData['siteConfig'][18][35]#}</a>  {#* 立即购买 *#}
+		</div>
+		{#/if#}
+
+	</div>
+</div>
+
+<div class="mask"></div>
+<!-- 参数弹窗 -->
+<div class="comMak"></div>
+<div class="paramAlert">
+	<h2>{#$langData['shop'][0][18]#}</h2> {#* 产品参数 *#}
+	<div class="paramBox">
+		{#if $detail_smallCount > 1 || $detail_packingCount > 1#}
+		<p class="pbox mincoutNote"><span>购买数量</span>起订量{#$detail_smallCount#}&nbsp;&nbsp;装箱数量{#$detail_packingCount#} <a href="javascript:;"></a></p>
+		<p class="pbox mincoutTip"><span>&nbsp;&nbsp;</span>购买数量需为最小起订量+装箱数量倍数之和</p>
+		{#/if#}
+		{#foreach from=$detail_property item=type#}
+		{#if $type.val#}
+		<p class="pbox"><span>{#$type.typename#}</span>{#$type.val#}</p>
+		{#/if#}
+		{#/foreach#}
+	</div>
+
+	<div class="finishA">
+		<a href="javascript:;">{#$langData['siteConfig'][6][3]#}</a> {#* 完成 *#}
+	</div>
+
+</div>
+<!-- 优惠券弹窗 -->
+<div class="quanAlert">
+	<span class="errorTip"></span>
+	<h4>{#$langData['shop'][7][41]#}</h4> {#* 优惠券 *#}
+	<ul>
+		{#foreach from=$detail_quanarr key=k item=quan#}
+		<li data-num="1" class="{#if $quan.is_selflingqu ==1#}chosed{#/if#} {#if $quan.bear ==0#}shopQuan{#else#}platformQuan{#/if#}" >
+		<!-- 新用户专享 -->
+		<!--				<em class="newUse">{#$langData['shop'][7][42]#}</em> {#* 新用户专享 *#}-->
+		<i class="hasChose"></i>
+		<div class="lMoney">
+			{#if $quan.promotiotype ==0#}
+			<em>{#echoCurrency type='symbol'#}</em>{#floatval($quan.promotio)#}
+			{#else#}
+			{#floatval($quan.promotio)#}<em>折</em>
+			{#/if#}
+		</div>
+		<div class="rUse">
+			<p class="useNeed">{#if $quan.basic_price > 0#}满{#floatval($quan.basic_price)#}可用{#else#}无门槛{#/if#}</p>
+			<span>{#if $quan.bear == 1#}商城通用券{#else#}{#if $quan.shoptype ==0#}店铺券{#else#}商品优惠券{#/if#}{#/if#}</span>
+			<p class="useEnd">{#$quan.ymdetime#}{#$langData['siteConfig'][39][11]#}</p>  {#* 到期 *#}
+			{#if $quan.is_selflingqu ==1#}
+			<a href="javascript:;" class="canGet noChose" data-id="{#$quan.id#}">继续领取</a> {#* 立即领取 *#}
+			{#else#}
+			<a href="javascript:;" class="canGet" data-id="{#$quan.id#}">{#$langData['shop'][7][43]#}</a> {#* 立即领取 *#}
+			{#/if#}
+		</div>
+		</li>
+		{#/foreach#}
+	</ul>
+	<div class="closeQuan"><a href="javascript:;">完成</a></div>  {#* 关闭 *#}
+</div>
+
+<!-- 服务说明弹窗 -->
+<div class="fuwuAlert">
+	<h4>{#$langData['shop'][7][44]#}</h4>  {#* 服务说明 *#}
+	<div class="fuwuBox">
+		<dl class="fn-clear">
+			<dt class="rzcon"><i></i></dt>
+			<dd>
+				<a href="{#getUrlPath service='shop' template='store-quality' param="storeid={#$detail_store['id']#}"#}" class="zhizhaoBox">
+					<h5>资质认证</h5>  {#* 执照认证 *#}
+					<p>{#$langData['shop'][7][47]#}</p>   {#* 商家已通过营业执照认证 *#}
+					<span class="zizhiMore">查看<i></i></span>
+				</a>
+			</dd>
+		</dl>
+		{#if $detail_store['promotion'] > 0#}
+		<dl class="fn-clear">
+			<dt class="bzjcon"><i></i></dt>
+			<dd>
+				<h5>{#$langData['shop'][7][29]#}</h5>  {#* 保证金 *#}
+				<p>商家已缴纳{#$detail_store['promotion']#}{#echoCurrency type='short'#}店铺保证金</p>
+			</dd>
+		</dl>
+		{#/if#}
+		<dl class="fn-clear">
+			<dt class="wepay"><i></i></dt>
+			<dd>
+				<h5>{#$langData['shop'][7][30]#}</h5>  {#* 主流支付 *#}
+				{#$i = 0#}
+				<p>商家支持{#siteConfig action="payment"#}{#if $i < 4#}{#if $i != 0 #}、{#/if#}{#$row['pay_name']#}{#$i = $i + 1#}{#/if#}{#/siteConfig#}等多种主流支付方式</p>
+			</dd>
+		</dl>
+	</div>
+
+	<div class="finishA">
+		<a href="javascript:;">{#$langData['siteConfig'][6][3]#}</a> {#* 完成 *#}
+	</div>
+</div>
+<!-- 拼单列表弹框 -->
+<div class="pd_list">
+	<div class="bgCover"></div>
+	<div class="modal-main">
+		<div class="pd_txt">{#$langData['shop'][7][45]#}</div> {#* 正在拼单 *#}
+		<div class="pd_title_list pd_title_txt">
+			<ul >
+				{#shop action="pinuserList" return="list" tid={#$detail_hid#} pageSize=20#}
+				<li class="fn-clear time_each">
+					<div class="list_img"><img src="{#$list.photo|default:'/static/images/default_user.jpg'#}"></div>
+					<div class="list_time"><p>{#$list.name#}</p><p class="time_show" data-time="{#$list.enddate#}" data-now="{#$list.now#}">{#$langData['siteConfig'][45][44]#}{#$list.time#}</p></div> {#* 剩余 *#}
+					<a href="{#$list.url#}">{#$langData['shop'][7][46]#}</a> {#* 去拼单 *#}
+				</li>
+				{#/shop#}
+			</ul>
+		</div>
+		<i class="close"></i>
+	</div>
+</div>
+
+
+<!-- 视频图片弹出层 s-->
+<div class="videoModal">
+	<div class="swiper-container">
+		<i class="vClose"></i>
+		<div class="swiper-bg"></div>
+		<div class="swiper-wrapper">
+
+		</div>
+		<div class="swiper-pagination"></div>
+	</div>
+</div>
+<!-- 视频图片弹出层 e-->
+
+<!--&lt;!&ndash; 评论区图片大图展示 s&ndash;&gt;-->
+<div class="bigBoxShow">
+	<div class="swiper-container bigSwiper">
+		<i class="vClose"></i>
+		<div class="swiper-wrapper">
+
+		</div>
+		<div class="swiper-pagination bigPagination"></div>
+	</div>
+</div>
+<!--&lt;!&ndash; 评论区图片大图展示 e&ndash;&gt;-->
+
+<!-- 规格图片放大 s-->
+<div class="guigeBoxShow">
+	<div class="swiper-container guigeSwiper">
+		<i class="vClose"></i>
+		<div class="swiper-wrapper">
+
+		</div>
+		<div class="swiper-pagination guigePagination"></div>
+	</div>
+</div>
+<!-- 规格图片放大 e-->
+
+<div class="error"></div>
+<div class="wechat-popup">
+	<div class="con">
+		<a href="javascript:;" class="close">×</a>
+		{#if $cfg_weixinQr#}
+		<dl><dt><img src="{#$cfg_weixinQr#}"></dt><dd>{#$cfg_weixinName#}<br>微信中长按识别</dd></dl>
+		{#/if#}
+		{#if $cfg_miniProgramQr#}
+		<dl><dt><img src="{#$cfg_miniProgramQr#}"></dt><dd>{#$cfg_miniProgramName#}<br>微信中长按识别</dd></dl>
+		{#/if#}
+	</div>
+</div>
+<div class="topcart" style="display:none;"><div class="cart-con"><div class="cartlist"><ul></ul></div></div></div>
+<form action="{#getUrlPath service='shop' template='confirm-order'#}" data-action="{#$cfg_basehost#}/include/ajax.php?service=shop&action=confirm_order" method="get" id="buyForm">
+	<input type="hidden" name="pros[]" id="pros" value="">
+	<input type="hidden" name="price" id="payPrice">
+	<input type="hidden" name="ordertype" id="ordertype">
+	<input type="hidden" name="hid" id="hid" value="{#if $detail_states#}{#$detail_hid#}{#/if#}">
+	<input type="hidden" name="confirmtype" id="confirmtype" value="1">
+	<input type="hidden" name="frompage" id="fromPage" value="2">
+	<input type="hidden" name="bid" id="bid" value="{#$detail_bargaid#}">
+	<input type="hidden" name="adsid" id="adsid" value="{#$detail_addressid#}">
+	<input type="hidden" name="buytype" id="buytype" value="{#if $detail_states ==3#}bargain{#elseif $detail_states == 4#}pintuan{#elseif $detail_states == 2#}miaosha{#elseif $detail_states == 1#}qianggou{#/if#}">
+	{#if $detail_states ==3 && $detail_bargainingjoin >0#}
+	<input type="hidden" name="kjid" id="bargainid" value="{#$detail_bargaid#}">
+	<input type="hidden" name="buytype" value="bargain">
+	<input type="hidden" name="directbuy" id="directbuy">
+	{#/if#}
+</form>
+
+<!-- 图片放大 -->
+{#include file="../../../siteConfig/bigimg_1.2.html"#}
+<script>
+	var atpage = 1,
+			pageSize = 20,
+			keywords = '{#$keywords#}';
+</script>
+
+
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$detail_store['title']#}',
+		"title": '{#$detail_title#}',
+		"imgUrl": '{#$detail_litpic#}',
+		"link": '{#getUrlPath service='shop' template='detail' id={#$detail_id#}#}',
+	};
+	var JubaoConfig = {
+		"module" : 'shop',
+		"action" : 'detail',
+		"id" : '{#$detail_id#}'
+	};
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/jquery.smartScroll.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/common.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/goodsD.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+</body>
+</html>

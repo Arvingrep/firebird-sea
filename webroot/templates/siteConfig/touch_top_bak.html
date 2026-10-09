@@ -1,0 +1,593 @@
+
+{#* 分享时使用 *#}
+<meta property="og:image" content="{#if $detail_litpic#}{#$detail_litpic#}{#elseif $detail_imgGroup[0]#}{#$detail_imgGroup[0]#}{#elseif $detail_thumbnail#}{#$detail_thumbnail#}{#else#}{#$shareAdvancedUrl#}{#/if#}" />
+<meta property="og:description" content="" />
+<link rel="canonical" href="{#$HTTP_URI#}">
+<img src="{#if $detail_litpic#}{#$detail_litpic#}{#elseif $detail_imgGroup[0]#}{#$detail_imgGroup[0]#}{#elseif $detail_thumbnail#}{#$detail_thumbnail#}{#else#}{#$shareAdvancedUrl#}{#/if#}" id="firstImage" style="display: none;" />
+
+{#$pageGrayCss#} {#* 页面变灰 *#}
+{#if $site_map == "amap"#}
+{#$amap_jscode#} {#* 高德地图安全密钥 *#}
+{#/if#}
+
+{#if $isByteMiniprogram&&!$needByte#}
+<script src="https://lf3-cdn-tos.bytegoofy.com/goofy/developer/jssdk/jssdk-1.2.1.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+{#/if#}
+
+{#* 如果是上架中状态，隐藏IM聊天入口 *#}
+{#if $cfg_ios_shelf && ($is_app || $isminiprogram)#}
+<style>.chat_to-Link {display: none!important;}</style>
+{#/if#}
+{#if $from == 'wmsj'#}
+<style>
+.fastNav {display: none!important;}
+</style>
+{#/if#}
+<style>
+	.hideEle{visibility: hidden; opacity: 0; pointer-events: none;}
+</style>
+
+<script>var cfg_timezone = '{#$cfg_timezone#}';</script>
+
+{#if !$noHeader#}
+<div class="header {#$headTheme#}"{#if $from == 'wmsj'#} style="display: -webkit-box!important;"{#/if#}>
+	{#if $pageLeft != ""#}
+	{#$pageLeft#}
+	{#else#}
+	<div class="header-l">
+		{#if $selBackUrl#}	<!-- 2023.12.15修改 如果需要指定后退到某个页面，那就自己设置selBackUrl -->
+		<a href="{#$selBackUrl#}"  class="goBack"></a>
+		{#elseif $template!='index'#} 
+		<a href="javascript:;" onclick="history.go(-1)" class="goBack"></a>
+		{#else#}
+		<a href="{#$cfg_basehost#}"  class="goBack"></a>
+		{#/if#}
+	</div>
+	{#/if#}
+	<div class="header-address">
+		<span>{#$pageTitle#}</span>
+	</div>
+	{#if $from != 'wmsj'#}
+	<div class="header-search {#if $noCountMsg == 2#}hideEle{#/if#}">
+		{#if $pageRight != ""#}
+		{#$pageRight#}
+		{#else#}
+		<a href="javascript:;" class="dropnav"></a>
+		{#/if#}
+	</div>
+	{#else#}
+	<div class="header-search"><a href="javascript:;" style="background: none;">&nbsp;</a></div>
+	{#/if#}
+</div>
+
+<div class="navBox_4" id="navBox_4">
+	<div class="boxall_nav">
+		<!--便捷导航s-->
+		<div class="pub-fast_nav" id="fast_nav">
+			<h2>{#$langData['siteConfig'][37][87]#}<i class="close_btn"></i></h2>    {#* 全局导航 *#}
+
+			<ul>
+				<li class="">
+					<a href="{#$cfg_basehost#}">
+						<i><img src="{#$cfg_staticPath#}images/blank.gif" data-src="{#$cfg_staticPath#}images/top_fast1.png"/></i>
+						<p>{#$langData['siteConfig'][0][0]#}</p>    {#* 首页 *#}
+					</a>
+				</li>
+				<li class="message_num">
+					<a href="{#$member_userDomain#}/message.html">
+						<i><img src="{#$cfg_staticPath#}images/blank.gif" data-src="{#$cfg_staticPath#}images/top_fast2.png"/></i>
+						<p>{#$langData['siteConfig'][19][239]#}</p>    {#* 消息 *#}
+					</a>
+				</li>
+				<li class="memberUrl">
+					<a href="{#$member_userDomain#}?appFullScreen" data-url="{#$member_userDomain#}?appFullScreen">
+						<i><img src="{#$cfg_staticPath#}images/blank.gif" data-src="{#$cfg_staticPath#}images/top_fast3.png"/></i>
+						<p>{#$langData['siteConfig'][0][7]#}</p>    {#* 会员中心 *#}
+					</a>
+				</li>
+				<li class="HN_PublicShare" style="display: block !important;">
+					<a href="javascript:;">
+						<i><img src="{#$cfg_staticPath#}images/blank.gif" data-src="{#$cfg_staticPath#}images/top_fast5.png"/></i>
+						<p>{#$langData['siteConfig'][6][166]#}</p>    {#* 分享 *#}
+					</a>
+				</li>
+
+			</ul>
+		</div>
+		<!--便捷导航e-->
+		<div class="navlist_4" id="navlist_4">
+			<ul class="clearfix fn-clear">
+				{#if !$cfg_ios_shelf#}
+				{#if in_array("shop", $installModuleArr)#}<li><a data-name="{#$langData['siteConfig'][22][12]#}" data-code='cart' href="{#getUrlPath service='shop' template='cart'#}"><span class="imgbox"><img src="{#$cfg_staticPath#}images/blank.gif" data-src="{#$cfg_basehost#}/static/images/admin/nav/shop_car.png?v={#$cfg_staticVersion#}" class=""></span><span class="txtbox">{#$langData['siteConfig'][22][12]#}</span></a></li>{#/if#}
+				{#/if#}
+				{#loop service="siteConfig" action="siteModule" return="module" type="1"#}
+				{#if $module.code != 'special' && $module.code != 'website'#}
+				<li data-wx="{#$module.wx#}">
+					<a data-name="{#$module.name#}" data-code="{#if !$module.disabled#}{#$module.code#}{#/if#}" href="{#$module.url#}"{#if $module.target#} target="_blank"{#/if#}>
+						<span class="imgbox"><img src="{#$cfg_staticPath#}images/blank.gif" data-src="{#$module.icon#}"></span>
+						<span class="txtbox" style="{#if $module.color#} color: {#$module.color#};{#/if#}{#if $module.bold#} font-weight: 700;{#/if#}">{#$module.name#}</span>
+					</a>
+				</li>
+				{#/if#}
+				{#/loop#}
+				<!-- 分享 s -->
+				<!--<li class="HN_PublicShare"><a href="javascript:;"><span class="imgbox"><img src="{#$cfg_staticPath#}images/blank.gif" data-src="{#$cfg_basehost#}/static/images/admin/nav/share.png?v={#$cfg_staticVersion#}" class="nav_23"></span><span class="txtbox">{#$langData['siteConfig'][6][166]#}</span></a></li>-->
+				<!-- 分享 e -->
+				<!-- 举报 s -->
+				<li class="HN_Jubao"><a href="javascript:;"><span class="imgbox"><img src="{#$cfg_staticPath#}images/blank.gif" data-src="{#$cfg_basehost#}/static/images/admin/nav/jubao.png?v={#$cfg_staticVersion#}" class="nav_23"></span><span class="txtbox">{#$langData['siteConfig'][6][30]#}</span></a></li>
+				<!-- 举报 e -->
+			</ul>
+		</div>
+		<i class="w_bg"></i>
+	</div>
+	<div class="bg" id="shearBg"></div>
+</div>
+{#/if#}
+
+
+<!-- <div class="JuError">{#$langData['siteConfig'][24][2]#}</div>  {#* 请选择举报类型 *#} -->
+<div class="JuMask"></div>
+<div class="JuPop JubaoBox">
+	<div class="JuHead">
+		<a href="javascript:;" class="JuClosePop JuClose"></a>
+		<h2>举报内容</h2>
+	</div>
+	<div class="JuContent">
+		<dl class="JuDl JuReason">
+			<dt><b>*</b><span>选择举报理由</span><em class="tip-line">请选择举报理由</em></dt>
+			<dd class="JuList">
+				<ul class="fn-clear Jubao-article">
+					<li>{#$langData['siteConfig'][24][3]#}</li>      {#* 垃圾广告 *#}
+					<li>{#$langData['siteConfig'][24][4]#}</li>      {#* 色情淫秽 *#}
+					<li>{#$langData['siteConfig'][24][5]#}</li>      {#* 政治反动 *#}
+					<li>{#$langData['siteConfig'][24][6]#}</li>      {#* 钓鱼诈骗 *#}
+					<li>{#$langData['siteConfig'][24][7]#}</li>      {#* 网络敲诈 *#}
+					<li>{#$langData['siteConfig'][24][8]#}</li>      {#* 内容侵权 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-info">
+					<li>{#$langData['siteConfig'][24][9]#}</li>      {#* 冒用电话 *#}
+					<li>{#$langData['siteConfig'][24][10]#}</li>      {#* 虚假信息 *#}
+					<li>{#$langData['siteConfig'][24][11]#}</li>      {#* 违法信息 *#}
+					<li>{#$langData['siteConfig'][24][12]#}</li>      {#* 服务糟糕 *#}
+					<li>{#$langData['siteConfig'][24][13]#}</li>      {#* 骗子信息 *#}
+					<li>{#$langData['siteConfig'][24][14]#}</li>      {#* 虚假电话 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-house">
+					<li>{#$langData['siteConfig'][24][15]#}</li>      {#* 房源已交易 *#}
+					<li>{#$langData['siteConfig'][24][16]#}</li>      {#* 中介冒充个人 *#}
+					<li>{#$langData['siteConfig'][24][17]#}</li>      {#* 图片或内容含微信等联系方式 *#}
+					<li>{#$langData['siteConfig'][24][18]#}</li>      {#* 虚假(如房源、价格等虚假) *#}
+					<li>{#$langData['siteConfig'][24][19]#}</li>      {#* 诈骗（如提前收取各类费用等） *#}
+					<li>{#$langData['siteConfig'][24][20]#}</li>      {#* 涉黄违法 *#}
+					<li>{#$langData['siteConfig'][24][21]#}</li>      {#* 电话虚假(如空号、无人接听) *#}
+					<li>{#$langData['siteConfig'][24][22]#}</li>      {#* 房源无法带看 *#}
+					<li>{#$langData['siteConfig'][24][23]#}</li>      {#* 图片与实际不符 *#}
+					<li>{#$langData['siteConfig'][24][24]#}</li>      {#* 价格与实际差异较大 *#}
+					<li>{#$langData['siteConfig'][24][25]#}</li>      {#* 房源不在该小区 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-job">
+					{#if $dopost == 'detail' || $dopost == 'pgzg'#}
+					<li><s></s>{#$langData['siteConfig'][24][21]#}</li>      {#* 电话虚假(如空号、无人接听) *#}
+					<li><s></s>{#$langData['siteConfig'][24][26]#}</li>    {#* 非法收费（培训费、介绍费等） *#}
+					<li><s></s>{#$langData['siteConfig'][24][27]#}</li>    {#* 职位虚假（薪资、工作地点等） *#}
+					<li><s></s>{#$langData['siteConfig'][24][20]#}</li>    {#* 涉黄违法 *#}
+					<li><s></s>{#$langData['siteConfig'][24][28]#}</li>    {#* 招聘刷单刷钻人员 *#}
+					<li><s></s>{#$langData['siteConfig'][24][29]#}</li>    {#* 职介冒充直招 *#}
+					<li><s></s>{#$langData['siteConfig'][24][30]#}</li>    {#* 招生培训信息（非招聘） *#}
+					<li><s></s>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+					{#elseif $dopost == 'resume' || $dopost == 'pgqz'#}
+					<li><s></s>虚假简历</li>
+					<li><s></s>空号/停机/无联系方式</li>
+					<li><s></s>违法/诈骗简历</li>
+					<li><s></s>广告简历</li>
+					<li><s></s>人身攻击/污言秽语</li>
+					<li><s></s>其他原因</li>
+					{#/if#}
+				</ul>
+				<ul class="fn-clear Jubao-dating">
+					<li>{#$langData['siteConfig'][24][31]#}</li>    {#* 盗用他人的照片做为自己的照片 *#}
+					<li>{#$langData['siteConfig'][24][32]#}</li>    {#* 该用户的个人档案里含有不恰当（色情淫秽）的信息 *#}
+					<li>{#$langData['siteConfig'][24][33]#}</li>    {#* 该用户对我很粗鲁无礼/辱骂我 *#}
+					<li>{#$langData['siteConfig'][24][34]#}</li>    {#* 该用户散布垃圾信息 *#}
+					<li>{#$langData['siteConfig'][24][35]#}</li>    {#* 该用户是酒托/饭托/诈骗犯 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-tieba">
+					<li>{#$langData['siteConfig'][24][36]#}</li>    {#* 广告垃圾 *#}
+					<li>{#$langData['siteConfig'][24][37]#}</li>    {#* 政治有害类 *#}
+					<li>{#$langData['siteConfig'][24][38]#}</li>    {#* 暴恐类 *#}
+					<li>{#$langData['siteConfig'][24][39]#}</li>    {#* 淫秽色情类 *#}
+					<li>{#$langData['siteConfig'][24][40]#}</li>    {#* 头像、签名档 *#}
+					<li>{#$langData['siteConfig'][24][41]#}</li>    {#* 赌博类 *#}
+					<li>{#$langData['siteConfig'][24][42]#}</li>    {#* 私服外挂类 *#}
+					<li>{#$langData['siteConfig'][24][43]#}</li>    {#* 诈骗类 *#}
+					<li>{#$langData['siteConfig'][24][44]#}</li>    {#* 违规内容 *#}
+					<li>{#$langData['siteConfig'][24][45]#}</li>    {#* 恶意灌水 *#}
+					<li>{#$langData['siteConfig'][24][46]#}</li>    {#* 重复发帖 *#}
+					<li>{#$langData['siteConfig'][24][47]#}</li>    {#* 其他有害类 *#}
+				</ul>
+				<ul class="fn-clear Jubao-huodong">
+					<li>{#$langData['siteConfig'][24][48]#}</li>    {#* 联系电话虚假 *#}
+					<li>{#$langData['siteConfig'][24][49]#}</li>    {#* 骗子信息（酒托、饭托、色情服务等） *#}
+					<li>{#$langData['siteConfig'][24][50]#}</li>    {#* 虚假、违法信息 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-video">
+					<li>{#$langData['siteConfig'][24][51]#}</li>    {#* 无法播放 *#}
+					<li>{#$langData['siteConfig'][24][52]#}</li>    {#* 播放卡 *#}
+					<li>{#$langData['siteConfig'][24][53]#}</li>    {#* 画面和声音有问题 *#}
+					<li>{#$langData['siteConfig'][24][54]#}</li>    {#* 不良内容 *#}
+					<li>{#$langData['siteConfig'][24][55]#}</li>    {#* 侵权投诉 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-huangye">
+					<li>{#$langData['siteConfig'][24][56]#}</li>    {#* 电话被冒用 *#}
+					<li>{#$langData['siteConfig'][24][57]#}</li>    {#* 企业被冒用 *#}
+					<li>{#$langData['siteConfig'][24][59]#}</li>    {#* 虚假、违法信息 *#}
+					<li>{#$langData['siteConfig'][24][59]#}</li>    {#* 侵权投诉 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-image">
+					<li>{#$langData['siteConfig'][24][60]#}</li>    {#* 色情暴力 *#}
+					<li>{#$langData['siteConfig'][24][61]#}</li>    {#* 政治反动 *#}
+					<li>{#$langData['siteConfig'][24][62]#}</li>    {#* 原图无法显示 *#}
+					<li>{#$langData['siteConfig'][24][63]#}</li>    {#* 与查询内容不符 *#}
+					<li>{#$langData['siteConfig'][24][64]#}</li>    {#* 侵权投诉 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-live">
+					<li>{#$langData['siteConfig'][24][31]#}</li>    {#* 盗用他人的照片做为自己的照片 *#}
+					<li>{#$langData['siteConfig'][24][32]#}</li>    {#* 该用户的个人档案里含有不恰当（色情淫秽）的信息 *#}
+					<li>{#$langData['siteConfig'][24][33]#}</li>    {#* 该用户对我很粗鲁无礼/辱骂我 *#}
+					<li>{#$langData['siteConfig'][24][34]#}</li>    {#* 该用户散布垃圾信息 *#}
+					<li>{#$langData['siteConfig'][24][35]#}</li>    {#* 该用户是酒托/饭托/诈骗犯 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-business">
+					<li>{#$langData['siteConfig'][24][56]#}</li>    {#* 电话被冒用 *#}
+					<li>{#$langData['siteConfig'][24][57]#}</li>    {#* 企业被冒用 *#}
+					<li>{#$langData['siteConfig'][24][58]#}</li>    {#* 虚假、违法信息 *#}
+					<li>{#$langData['siteConfig'][24][59]#}</li>    {#* 侵权投诉 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-member">
+					<li>{#$langData['siteConfig'][24][3]#}</li>      {#* 垃圾广告 *#}
+					<li>{#$langData['siteConfig'][24][4]#}</li>      {#* 色情淫秽 *#}
+					<li>{#$langData['siteConfig'][24][5]#}</li>      {#* 政治反动 *#}
+					<li>{#$langData['siteConfig'][24][6]#}</li>      {#* 钓鱼诈骗 *#}
+					<li>{#$langData['siteConfig'][24][7]#}</li>      {#* 网络敲诈 *#}
+					<li>{#$langData['siteConfig'][24][8]#}</li>      {#* 内容侵权 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-renovation">
+					<li>{#$langData['siteConfig'][24][9]#}</li>      {#* 冒用电话 *#}
+					<li>{#$langData['siteConfig'][24][10]#}</li>      {#* 虚假信息 *#}
+					<li>{#$langData['siteConfig'][24][11]#}</li>      {#* 违法信息 *#}
+					<li>{#$langData['siteConfig'][24][12]#}</li>      {#* 服务糟糕 *#}
+					<li>{#$langData['siteConfig'][24][13]#}</li>      {#* 骗子信息 *#}
+					<li>{#$langData['siteConfig'][24][14]#}</li>      {#* 虚假电话 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-user">
+					<li>{#$langData['siteConfig'][24][31]#}</li>    {#* 盗用他人的照片做为自己的照片 *#}
+					<li>{#$langData['siteConfig'][24][32]#}</li>    {#* 该用户的个人档案里含有不恰当（色情淫秽）的信息 *#}
+					<li>{#$langData['siteConfig'][24][33]#}</li>    {#* 该用户对我很粗鲁无礼/辱骂我 *#}
+					<li>{#$langData['siteConfig'][24][34]#}</li>    {#* 该用户散布垃圾信息 *#}
+					<li>{#$langData['siteConfig'][24][35]#}</li>    {#* 该用户是酒托/饭托/诈骗犯 *#}
+					<li>{#$langData['siteConfig'][19][201]#}</li>      {#* 其他 *#}
+				</ul>
+				<ul class="fn-clear Jubao-sfcar">
+					<li>{#$langData['siteConfig'][24][3]#}</li>   {#* 垃圾广告 *#}
+                    <li>{#$langData['siteConfig'][24][4]#}</li>   {#* 色情淫秽 *#}
+                    <li>{#$langData['siteConfig'][24][5]#}</li>   {#* 政治反动 *#}
+                    <li>{#$langData['siteConfig'][24][6]#}</li>   {#* 钓鱼诈骗 *#}
+                    <li>{#$langData['siteConfig'][24][7]#}</li>   {#* 网络敲诈 *#}
+                    <li>{#$langData['siteConfig'][24][8]#}</li>   {#* 内容侵权 *#}
+                    <li>{#$langData['siteConfig'][24][47]#}</li>       {#* 其他有害类 *#}
+				</ul>
+			</dd>
+		</dl>
+		<dl class="JuDl JuDescBox">
+			<dt><span>举报描述</span></dt>
+			<dd class="JuText">
+				<textarea name="JuDesc" id="JuDesc" placeholder="请描述您的理由，以便工作人员更好的判断"></textarea>
+				<div class="JuTextCount"><span>0</span>/100</div>
+			</dd>
+		</dl>
+		<dl class="JuDl JuDescBox">
+			<dt><b>*</b><span>联系方式</span><em class="tip-line">请输入联系方式</em></dt>
+			<dd class="JuTel">
+				<div class="JuTelBox">
+					<span class="Ju_areaCode" data-code="86">+86</span>
+					<input type="tel" name="Ju_tel" id="Ju_tel" maxlength="11" placeholder="输入您的手机号码">
+				</div>
+			</dd>
+		</dl>
+		<a href="javascript:;" class="JubaoBox-submit JuSubmit JuDisabled">提交</a>
+	</div>
+</div>
+<!-- 区域选择 -->
+<div class="phoneCodeMask"></div>
+<div class="phoneCodePop">
+	<h2>选择地区   <a href="javascript:;" class="back">{#$langData['business'][1][5]#}</a></h2>     {#* 选择地区----返回 *#}
+	<div class="Ju_areaList"><ul>
+		{#loop service="siteConfig" action='internationalPhoneSection' return="item"#}
+		<li data-cn="{#$item.name#}" data-code="{#$item.code#}"><span>{#$item.name#}<span><em class="fn-right">+{#$item.code#}</em></li>
+		{#/loop#}
+	</ul></div>
+</div>
+
+
+
+<script type='text/javascript' src='{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/ui/iscroll.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/ui/noscroll.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.qrcode.min.js?v={#$cfg_staticVersion#}"></script>
+<style>
+
+		.header .header-l.hideArr{opacity: 0; pointer-events: none;}
+</style>
+<script>
+	var has_touch_top = true;
+	var cookiePre = '{#$cfg_cookiePre#}';
+	var user_member  =  '{#$member_userDomain#}';
+	var defaultindex = 'siteConfig'
+	var noCountMsg = '{#$noCountMsg#}'; //是否统计消息
+    var cfg_useWxMiniProgramLogin = {#$useWxMiniProgramLogin|default:0#};  //启用小程序原生登录
+	var topMsgInterval = null;
+	$(function(){
+		var miniprogram = false;
+		if(window.__wxjs_environment == 'miniprogram'){
+			miniprogram = true;
+		}else{
+			if(navigator.userAgent.toLowerCase().match(/micromessenger/)) {
+				if(typeof(wx) != 'undefined'){
+					wx.miniProgram.getEnv(function (res) {
+						miniprogram = res.miniprogram;
+					});
+				}
+			}
+		
+
+			if(navigator.userAgent.toLowerCase().match(/huoniao_ios/) && $(".memberUrl").length > 0){
+				var mUrl = $(".memberUrl a").attr('data-url');
+				if(mUrl.indexOf('appIndex=1') <= -1){
+					mUrl = mUrl.indexOf('?') > -1 ? (mUrl + '&appIndex=1') : (mUrl + '?appIndex=1')
+					$(".memberUrl a").attr('href',mUrl)
+				}
+			}
+		}
+		if(miniprogram){
+			$("#navlist_4 li[data-wx='0']").remove();
+		}
+		var cookie = $.cookie("HN_float_hide");
+
+		$('#navBox_4 .close_btn,#shearBg').click(function(){
+			closeShearBox()
+		})
+		$('#navlist_4 li').click(function(){
+	        setTimeout(function(){
+	            closeShearBox();
+	        }, 500);
+	    })
+		function closeShearBox(){
+		    $('.fixFooter').show();
+		    $('.header').removeClass('open');
+		    $('#navBox_4').hide();
+		    $('#navBox_4 .bg').css({'height':'0','opacity':0});
+		}
+	});
+		//获取消息数目
+		function getMessageNum_top(){
+			var test_stime = new Date();
+			console.log("getMessageNum_top start");
+			$.ajax({
+		       url: '/include/ajax.php?service=member&action=message&type=tongji&im=1',
+		       type: "GET",
+		       dataType: "json",
+		       timeout: 3000,
+		       success: function (data) {
+
+					var test_etime = new Date();
+					// console.log("getMessageNum_top end " + (test_etime-test_stime));
+
+			       var html = [];
+			       if(data.state == 100){
+				       	var info = data.info.pageInfo;
+				       	var count = info.im + info.unread + info.upunread + info.commentunread ;
+				       	$('.message_num').find('em').remove();
+				       	if(count<=99 && count>0){
+				       		$('.message_num').find('a i').prepend('<em>'+count+'</em>');
+				       		$('.dropnav').html('<em></em>')
+				       	}else if(count>99){
+				       		$('.message_num').find('a i').prepend('<em>99+</em>');
+				       		$('.dropnav').html('<em></em>')
+				       	}
+
+						//底部消息
+						if($('.footer_4_3 .message_show').size() > 0){
+							var footer_4_3 = $('.footer_4_3 li.message_show');
+							if(footer_4_3.find('a').attr('href').indexOf('message') > 0){
+								footer_4_3.find('em').remove();
+						       	if(count<=99 && count>0){
+						       		footer_4_3.find('a i').prepend('<em>'+count+'</em>');
+						       		footer_4_3.attr('data-unread',info.unread);
+						       		footer_4_3.attr('data-im',info.im);
+						       		footer_4_3.attr('data-upunread',info.upunread);
+						       		footer_4_3.attr('data-commentunread',info.commentunread)
+						       	}else if(count>99){
+						       		footer_4_3.find('a i').prepend('<em>99+</em>')
+						       	}
+							}
+						}
+
+			       }
+		       },
+		       error: function(){
+		         // $('.loading').html('<span>'+langData['siteConfig'][37][80]+'</span>');  //请求出错请刷新重试
+		       }
+		    });
+		}
+		var userid
+		if(cookiePre){
+			userid = $.cookie(cookiePre+"login_user");
+		}
+		if(userid == null || userid == ""){
+           console.log(langData['siteConfig'][37][81])//登录之后可以查看新消息
+		}else if(noCountMsg != 2){
+			setTimeout(function(){
+				getMessageNum_top();
+				topMsgInterval = setInterval(getMessageNum_top,10000)
+			},3000);
+			pageShowCheck(5)
+			$(document).on('visibilitychange', function (e) {
+				if (e.target.visibilityState === "visible") {
+					// 页面显示
+					topMsgInterval = setInterval(getMessageNum_top,10000)
+					pageShowCheck(5)
+				} else if (e.target.visibilityState === "hidden") {
+					// 页面隐藏
+					clearInterval(topMsgInterval)
+				}
+			});
+			function pageShowCheck(timeOut){ // timeOut => 单位是分钟 一段时间过后 修改定时器  interval请求时间间隔 单位是秒
+				let next_timeOut = timeOut;
+				switch(timeOut){
+					case 5: 
+						next_timeOut = 10,
+						interval = 10;
+						break;
+					case 10: 
+						next_timeOut = 20,
+						interval = 20;
+						break;
+					case 20: 
+						next_timeOut = 30,
+						interval = 30;
+						break;
+					case 30: 
+						next_timeOut = 60,
+						interval = 60;
+						break;
+					case 60: 
+						next_timeOut = 0,
+						interval = 0;
+						break;
+				}
+				setTimeout(() => {
+					clearInterval(topMsgInterval)
+					if(timeOut && interval && $('#fast_nav').size() == 0){
+						topMsgInterval = setInterval(getMessageNum_top,interval * 1000)
+					}
+					if(next_timeOut){
+						pageShowCheck(next_timeOut)
+					}
+				},timeOut * 60 * 1000);
+			}
+			
+		}
+
+		if($(".phoneCodePop").closest('.gz-address').length > 0){
+			$("body").append($('.phoneCodeMask'))
+			$("body").append($('.JuMask'))
+			$("body").append($('.JubaoBox'))
+			$("body").append($('.phoneCodePop'))
+		}
+
+		//举报
+
+	$('.JubaoBox .JuList li').click(function() {
+		var txt = $(this).text();
+		$(this).addClass('juChose').siblings('li').removeClass('juChose');
+		if( $(".JuList li.juChose").length != 0 && $("#Ju_tel").val() != ''){
+			$('.JuSubmit').removeClass('JuDisabled')
+		}else{
+			$('.JuSubmit').addClass('JuDisabled')
+		}
+		$(this).closest('dl').find('.tip-line').removeClass('red focus')
+	});
+
+	//计算输入的字数
+	$('textarea#JuDesc').on('input propertychange', function() {
+		var length = 100;
+		var content_len = $("#JuDesc").val().length;
+		var in_len = length - content_len;
+		if (content_len >= 100) {
+			$("#JuDesc").val($("#JuDesc").val().substring(0, 100));
+		}
+		$('.JuTextCount span').text($("#JuDesc").val().length);
+
+
+
+	});
+
+	$("textarea#JuDesc,#Ju_tel").focus(function(){
+		var dl = $(this).closest('.JuDl');
+		dl.siblings('dl').hide();
+		if($(this).attr('id') != 'Ju_tel'){
+			// $('.JuSubmit').hide()
+		}
+	})
+	$("textarea#JuDesc,#Ju_tel").blur(function(){
+		var dl = $(this).closest('.JuDl');
+		dl.siblings('dl').show();
+		$('.JuSubmit').show()
+	});
+
+
+	$('#Ju_tel').on('input propertychange', function() {
+		$(this).closest('dl').find('.tip-line').removeClass('red focus')
+		if($(this).val() != '' && $(".JuList li.juChose").length != 0){
+			$('.JuSubmit').removeClass('JuDisabled')
+		}else{
+			$('.JuSubmit').addClass('JuDisabled')
+		}
+
+	})
+
+	//选择区号
+	$('.Ju_areaList li').click(function() {
+		var t = $(this);
+		var code = t.attr('data-code');
+		$(".Ju_areaCode").text('+'+code).attr('data-code',code);
+		$(".phoneCodeMask").removeClass('show')
+		$(".phoneCodePop").css('transform', 'translateY(100%)');
+		setTimeout(function(){
+			$(".phoneCodePop").hide()
+		},300)
+	})
+
+	$('.Ju_areaCode').click(function() {
+		$(".phoneCodeMask").addClass('show')
+		$(".phoneCodePop").show()
+		setTimeout(function(){
+			$(".phoneCodePop").css('transform', 'translateY(0)');
+
+		},100)
+	})
+
+
+	// 获取相关配置
+	function getModConfig(){
+		$.ajax({
+	      url: '/include/ajax.php?service=siteConfig&action=siteDefaultIndex',
+	      type: "POST",
+	      dataType: "json",
+	      success: function (data) {
+
+	       	if(data.state == 100){
+	       		if(data.info.defaultindex == 'info'){
+	       			$("body>.header .header-l").addClass('hideArr');
+	       		}
+	       	}
+	      },
+	      error: function(){}
+	    });
+	}
+</script>
+{#if $privatePhone#}
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/privatePhone_touch.html"#}
+{#/if#}

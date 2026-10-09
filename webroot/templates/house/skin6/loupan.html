@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#if $loupan_seotitle != ""#}{#$loupan_seotitle#}楼盘{#else#}【{#$siteCityInfo['name']#}楼盘_{#$siteCityInfo['name']#}新房楼盘_{#$siteCityInfo['name']#}新房价格信息】{#/if#}-{#$house_title#}</title>
+<meta name="keywords" content="{#$siteCityInfo['name']#}楼盘,{#$siteCityInfo['name']#}新楼盘,{#$siteCityInfo['name']#}新房价格信息" />
+<meta name="description" content="{#$siteCityInfo['name']#}楼盘频道提供{#$siteCityInfo['name']#}最新新楼盘、{#$siteCityInfo['name']#}开盘楼盘、在售楼盘、房价等信息查询，让您快捷的找新房楼盘，更多{#$siteCityInfo['name']#}新房楼盘信息尽在{#$siteCityInfo['name']#}{#$cfg_shortname#}" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/loupan.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$house_channelDomain#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}';
+	var atpage = 1, totalCount = 0, pageSize = 10;
+	var detail = {
+		addrid : {#$addrid|default:0#},
+		business : {#$business|default:0#},
+		subway : {#$subway|default:0#},
+		station : {#$station|default:0#},
+	}
+    var keywords = '{#$keywords#}';
+	var priceTitle = '{#$priceTitle#}';
+</script>
+</head>
+
+<body class="w1200">
+{#include file="../../siteConfig/top1.html"#}
+
+{#$pageCurr = 'loupan'#}
+{#include file="top.html"#}
+
+{#$addridName = ''#}
+{#$businessName = ''#}
+{#$subwayName = ''#}
+{#$subwayStationName = ''#}
+{#$priceName = ''#}
+{#$typeName = ''#}
+{#$buildName = ''#}
+{#$stationCount = 0#}
+
+<div class="wrap">
+	<div class="crumb fn-clear">
+		<div class="location">
+			<a href="{#$house_channelDomain#}">首页</a> > <a href="{#getUrlPath service='house' template='loupan'#}">楼盘</a>
+		</div>
+	</div>
+	<div class="filter">
+      	<div class="filterlist">
+          	<dl class="t-fi fn-clear">
+                <dt>位置</dt>
+                <dd class="fn-clear">
+                    <ul class="t-fi-item fn-clear">
+                        <li class="area{#if $from == "" && $subway == 0#} curr{#/if#}"><a href="javascript:;">区域找房<i class="idown"></i></a></li>
+                        {#if $cfg_subway_state#}<li class="subway{#if $from == "subway" || $subway != 0#} curr{#/if#}"><a href="javascript:;">{#$cfg_subway_title#}<i class="idown"></i></a></li>{#/if#}
+                    </ul>
+                </dd>
+                <div class="sub-fi areabox"{#if $from == "" && $subway == 0#} style="display: block;"{#/if#}>
+                    <s><i></i></s>
+                    <div class="pos-item">
+                        <a href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway=0 station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"data-id="0"{#if $addrid == 0#} class="curr"{#/if#}>不限</a>
+                        {#house action="addr" return='addr'#}
+                        {#if $addr.id == $addrid#}
+                        {#$addridName = $addr.typename#}
+                        {#/if#}
+                        <a href="{#getUrlPath service='house' template='loupan' addrid={#$addr.id#} business=0 subway=0 station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"data-id="{#$addr.id#}"{#if $addrid == $addr.id#} class="curr"{#/if#}>{#$addr.typename#}</a>
+                        {#/house#}
+                    </div>
+                    {#if $addrid != 0#}
+                    <div class="pos-sub-item" style="display:block;">
+                        <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business=0 subway=0 station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $business == 0#} class="curr"{#/if#}>不限</a>
+                        {#house action="addr" type=$addrid return='addr'#}
+                        {#if $addr.id == $business#}
+                        {#$businessName = $addr.typename#}
+                        {#/if#}
+                        <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$addr.id#} subway=0 station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $business == $addr.id#} class="curr"{#/if#}>{#$addr.typename#}</a>
+                        {#/house#}
+                    </div>
+                    {#else#}
+                    <div class="pos-sub-item"></div>
+                    {#/if#}
+                </div>
+                <!--地铁找房-->
+                <div class="sub-fi subwaybox"{#if $from == "subway" || $subway != 0#} style="display:block"{#/if#}>
+                    <s><i></i></s>
+                    <div class="pos-item">
+                        <a href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway=0 station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} param="{#if $orderby != ""#}orderby={#$orderby#}&from=subway{#else#}from=subway{#/if#}"#}"{#if $subway == 0#} class="curr"{#/if#}>不限</a>
+                        {#siteConfig action="subway" return='sub' city={#$siteCityInfo['cityid']#}#}
+                        {#if $sub.id == $subway#}
+                            {#$subwayName = $sub.title#}
+                        {#/if#}
+                        <a href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$sub.id#} station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $subway == $sub.id#} class="curr"{#/if#}>{#$sub.title#}</a>
+                        {#/siteConfig#}
+                    </div>
+                    {#if $subway != 0#}
+                    <div class="pos-sub-item">
+                        <div class="pos-sub-title subway-sub-title">
+                            {#siteConfig action="subwayStation" return='subwayStation' type=$subway#}
+                            {#if $subwayStation.id == $station#}
+                                {#$subwayStationName = $subwayStation.title#}
+                            {#/if#}
+                            {#$stationCount = $_bindex.subwayStation #}
+                            {#if $_bindex.subwayStation < 14#}
+                                {#if $_bindex.subwayStation == 1#}
+                                    <div class="direction-line left-direction" data-id="{#$stationCount#}">
+                                        <a class="ditie-sub-point all {#if $station == 0#}show{#/if#}"  href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+                                            <div class="first-line">
+                                                <div class="station-point sub-pos-unit">
+                                                    <div class="red-point"></div>
+                                                </div>
+                                            </div>
+                                            <div class="station-name">
+                                                不限
+                                            </div>
+                                        </a>
+
+										<a class="ditie-sub-point {#if $station == $subwayStation.id#} show{#/if#}" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$subwayStation.id#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+	                                        <div class="first-line">
+	                                            <div class="line-info {#if $_bindex.subwayStation == 1#}no-left{#/if#}"></div>
+	                                            <div class="station-point sub-pos-unit">
+	                                                <div class="red-point"></div>
+	                                            </div>
+	                                        </div>
+	                                        <div class="station-name">
+	                                            {#$subwayStation.title#}
+	                                        </div>
+	                                    </a>
+                                {#else#}
+                                    <a class="ditie-sub-point {#if $station == $subwayStation.id#} show{#/if#}" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$subwayStation.id#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+                                        <div class="first-line">
+                                            <div class="line-info"></div>
+                                            <div class="station-point sub-pos-unit">
+                                                <div class="red-point"></div>
+                                            </div>
+                                        </div>
+                                        <div class="station-name">
+                                            {#$subwayStation.title#}
+                                        </div>
+                                    </a>
+                                {#/if#}
+                            {#else if $_bindex.subwayStation > 13 && $_bindex.subwayStation <28#}
+                                {#if $_bindex.subwayStation == 14#}
+                                    </div>
+                                    <div class="direction-line  right-direction">
+                                        <a class="ditie-sub-point{#if $station == $subwayStation.id#} show{#/if#}" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$subwayStation.id#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+                                            <div class="side-bar right">
+                                                <div class="heng"></div>
+                                                <div class="shu"></div>
+                                            </div>
+                                            <div class="first-line">
+                                                <div class="line-info"></div>
+                                                <div class="station-point sub-pos-unit ">
+                                                    <div class="red-point"></div>
+                                                </div>
+                                            </div>
+                                            <div class="station-name">
+                                                {#$subwayStation.title#}
+                                            </div>
+                                        </a>
+                                {#else#}
+                                        <a class="ditie-sub-point {#if $station == $subwayStation.id#} show{#/if#}" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$subwayStation.id#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+                                            <div class="first-line">
+                                                <div class="line-info"></div>
+                                                <div class="station-point sub-pos-unit ">
+                                                    <div class="red-point"></div>
+                                                </div>
+                                            </div>
+                                            <div class="station-name">
+                                                {#$subwayStation.title#}
+                                            </div>
+                                        </a>
+                                {#/if#}
+                            {#else if $_bindex.subwayStation > 27&& $_bindex.subwayStation <41#}
+                                {#if $_bindex.subwayStation == 28#}
+                                    </div>
+                                    <div class="direction-line left-direction">
+                                        <a class="ditie-sub-point{#if $station == $subwayStation.id#} show{#/if#}" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$subwayStation.id#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+                                            <div class="side-bar left">
+                                                <div class="heng"></div>
+                                                <div class="shu"></div>
+                                            </div>
+                                            <div class="first-line">
+                                                <div class="line-info"></div>
+                                                <div class="station-point sub-pos-unit ">
+                                                    <div class="red-point"></div>
+                                                </div>
+                                            </div>
+                                            <div class="station-name">
+                                                {#$subwayStation.title#}
+                                            </div>
+                                        </a>
+                                {#else#}
+                                        <a class="ditie-sub-point {#if $station == $subwayStation.id#} show{#/if#}" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$subwayStation.id#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+                                            <div class="first-line">
+                                                <div class="line-info"></div>
+                                                <div class="station-point sub-pos-unit ">
+                                                    <div class="red-point"></div>
+                                                </div>
+                                            </div>
+                                            <div class="station-name">
+                                                {#$subwayStation.title#}
+                                            </div>
+                                        </a>
+                                {#/if#}
+                             {#else $_bindex.subwayStation >41#}
+                                 {#if $_bindex.subwayStation == 42#}
+                                    </div>
+                                    <div class="direction-line  right-direction">
+                                        <a class="ditie-sub-point{#if $station == $subwayStation.id#} show{#/if#}" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$subwayStation.id#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+                                            <div class="side-bar right">
+                                                <div class="heng"></div>
+                                                <div class="shu"></div>
+                                            </div>
+                                            <div class="first-line">
+                                                <div class="line-info"></div>
+                                                <div class="station-point sub-pos-unit ">
+                                                    <div class="red-point"></div>
+                                                </div>
+                                            </div>
+                                            <div class="station-name">
+                                                {#$subwayStation.title#}
+                                            </div>
+                                        </a>
+                                 {#else#}
+                                        <a class="ditie-sub-point {#if $station == $subwayStation.id#} show{#/if#}" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$subwayStation.id#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">
+                                            <div class="first-line">
+                                                <div class="line-info"></div>
+                                                <div class="station-point sub-pos-unit ">
+                                                    <div class="red-point"></div>
+                                                </div>
+                                            </div>
+                                            <div class="station-name">
+                                                {#$subwayStation.title#}
+                                            </div>
+                                        </a>
+                                 {#/if#}
+
+                            {#/if#}
+
+                            {#/siteConfig#}
+                            </div>
+                        </div>
+                    </div>
+                    {#/if#}
+                </div>
+                <!--地铁找房-->
+
+            </dl>
+            {#$priceTitle = ''#}
+            <dl class="o-fi fn-clear">
+                <dt>均价</dt>
+                <dd class="fn-clear">
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $price == ""#} class="curr"{#/if#}>不限</a>
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="0,8" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $price == "0,8"#}class="curr"{#/if#}>8千以下</a>
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="8,10" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $price == "8,10"#}class="curr"{#/if#}>8千-1万</a>
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="10,15" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $price == "10,15"#} class="curr"{#/if#}>1-1.5万</a>
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="15,20" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $price == "15,20"#} class="curr"{#/if#}>1.5-2万</a>
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="20,25" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $price == "20,25"#} class="curr"{#/if#}>2-2.5万</a>
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="25,30" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $price == "25,30"#} class="curr"{#/if#}>2.5-3万</a>
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="30,0" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $price == "30,0"#} class="curr"{#/if#}>3万以上</a>
+                    <div class="price">
+                        <div class="inp_price">
+                            <input type="input" class="p1" maxlength="5" id="price1" value="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');"><em>-</em>
+                            <input type="input" class="p2" maxlength="5" id="price2" value="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">万
+                            <a href="javascript:;" id="price_sure"class="btn" >确定</a>
+                        </div>
+                    </div>
+                    {#if $priceArr[0] !=0 &&  $priceArr[1] ==0#}
+                        {#if $priceArr[0]>=10#}
+                        {#$priceTitle=$priceArr[0]/10|cat:'万以上'#}
+                        {#else#}
+                        {#$priceTitle=$priceArr[0]|cat:'千以上'#}
+                        {#/if#}
+                    {#else if $priceArr[0] !=0 &&  $priceArr[1] !=0#}
+                        {#if $priceArr[0]<10#}
+                        {#$priceTitle=$priceArr[0]|cat:'千-'|cat:$priceArr[1]/10|cat:'万'#}
+                        {#else#}
+                        {#$priceTitle=($priceArr[0]/10)|cat:'-'|cat:$priceArr[1]/10|cat:'万'#}
+                        {#/if#}
+                    {#else $priceArr[0]==0 && $priceArr[1]!=0#}
+                        {#if $priceArr[1]>=10#}
+                        {#$priceTitle=$priceArr[1]/10|cat:'万以下'#}
+                        {#else#}
+                        {#$priceTitle=$priceArr[1]|cat:'千以下'#}
+                        {#/if#}
+                    {#/if#}
+
+                </dd>
+            </dl>
+            <dl class="o-fi fn-clear">
+                <dt>类型</dt>
+                <dd class="fn-clear">
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid=0 salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $typeid == 0#} class="curr"{#/if#}>不限</a>
+                    {#house action="item" return="item" type="1"#}
+                    {#if $item.id == $typeid#}
+                    {#$typeName = $item.typename#}
+                    {#/if#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$item.id#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}"{#if $typeid == $item.id#} class="curr"{#/if#}>{#$item.typename#}</a>
+                    {#/house#}
+                </dd>
+            </dl>
+            <dl class="more fn-clear">
+                <dd class="fn-clear">
+                    <div class="item salestate " data-type="salestate">
+                        <label title="销售状态"><span class="{#if $salestate != ""#} cur{#/if#}">{#$salestatename#}</span><s class="idown"></s></label>
+                        <ul>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate="" times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">不限</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#}  salestate=0 times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">待售</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#}  salestate=1 times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">在售</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#}  salestate=2 times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">尾盘</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#}  salestate=3 times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">售完</a></li>
+                        </ul>
+                    </div>
+                    <div class="item times" data-type="times">
+                        <label title="开盘时间"><span {#if $times#}class="cur"{#/if#}>{#$timesname#}</span><s class="idown"></s></label>
+                        <ul>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times="" zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">不限</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times='today' zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">今日开盘</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times='tomorrow' zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">明日开盘</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times='yesterday' zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">昨日开盘</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times='tmonth' zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">本月开盘</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times='nmonth' zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">下月开盘</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times='lmonth' zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">上月开盘</a></li>
+                        </ul>
+                    </div>
+                    <div class="item zhuangxiu" data-type="zhuangxiu">
+                        <label title="装修情况"><span class="{#if $zhuangxiu != ""#} cur{#/if#}">{#$zhuangxiuname#}</span><s class="idown"></s></label>
+                        <ul>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu="" buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">不限</a></li>
+                            {#house action="item" return="item" type="2"#}
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$item.id#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">{#$item.typename#}</a></li>
+                            {#/house#}
+                        </ul>
+                    </div>
+                    <div class="item buildtype " data-type="buildtype">
+                        <label title="建筑类型"><span class="{#if $buildtype != ""#} cur{#/if#}">{#if $buildtype == ""#}建筑类型{#else#}{#$buildtype#}{#/if#}</span><s class="idown"></s></label>
+                        <ul>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype="" tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">不限</a></li>
+                            {#house action="item" return="item" type="3"#}
+
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$item.typename#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">{#$item.typename#}</a></li>
+                            {#/house#}
+                        </ul>
+                    </div>
+                    <div class="item tuandate" data-type="tuandate">
+                        <label title="开团时间"><span class="{#if $tuandate != ""#} cur{#/if#}">{#$tuandatename#}</span><s class="idown"></s></label>
+                        <ul>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate='' filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">不限</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate='today' filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">今日开团</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate='tomorrow' filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">明日开团</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate='yesterday' filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">昨日开团</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate='tmonth' filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">本月开团</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate='nmonth' filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">下月开团</a></li>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate='lmonth' filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}">上月开团</a></li>
+                        </ul>
+                    </div>
+                    <div class="item feature" data-type="feature">
+                        <label title="楼盘特色"><span class="{#if $feature != ""#} cur{#/if#}">{#$featurename#}</span><s class="idown"></s></label>
+                        <ul>
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature='' #}">不限</a></li>
+                            {#house action="item" return="item" type="666"#}
+                            <li><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$item.id#} #}">{#$item.typename#}</a></li>
+                            {#/house#}
+                        </ul>
+                    </div>
+                </dd>
+            </dl>
+      	</div>
+        {#if $keywords != "" || $addrid != 0 || $subway != 0 || $price != "" || $typeid != 0 || $salestate !="" || $times !="" || $zhuangxiu !=0 || $buildtype !="" || $tuandate !="" || $feature !=""#}
+        <div class="deletebox">
+            <dl class="fi-state fn-clear" style="display: block;">
+                <dt>已选条件</dt>
+                <dd class="fn-clear">
+                    {#if $keywords#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="" feature={#$feature#} #}" title="位置" class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$keywords#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $addrid#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}" title="位置" class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$addridName#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $business#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business=0 subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}" title="位置" class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$businessName#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $subway#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway=0 station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}"  class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$subwayName#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $station#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station=0 price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}"  class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$subwayStationName#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $price#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}"#} feature={#$feature#}"  class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span id="pricetext">{#$priceTitle#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $typeid#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid=0 salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}"  class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$typeName#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $salestate != ""#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate="" times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}"  class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$salestatename#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $times#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times="" zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}" class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$timesname#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $zhuangxiu#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu=0 buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}" class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$zhuangxiuname#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $buildtype#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype="" tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}"  class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$buildtype#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $tuandate !=""#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate="" filter={#$filter#} keywords="{#$keywords#}" feature={#$feature#} #}"  class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$tuandatename#}</span><i class="idel"></i></a>
+                    {#/if#}
+                    {#if $feature#}
+                    <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords="{#$keywords#}" feature='' #}" class="selected-info" data-group="0" data-level="1" data-type="subway" data-id="9"><span>{#$featurename#}</span><i class="idel"></i></a>
+                    {#/if#}
+                </dd>
+
+                <a class="btn_clear" href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway=0 station=0 price='' typeid=0 salestate="" times="" zhuangxiu=0 buildtype="" tuandate="" filter='' keywords='' feature='' #}">清空条件</a>
+            </dl>
+        </div>
+        {#/if#}
+
+	</div>
+</div>
+
+<div class="wrap totalCount">
+	共找到 <b>0</b> 个符合条件的楼盘
+</div>
+
+<div class="wrap fn-clear">
+	<div class="sidebar">
+      	<div class="SearchBox">
+			<form action="{#getUrlPath service='house' template='loupan'#}" method="get">
+				<input type="search" placeholder="搜楼盘..." name="keywords" class="inp"/>
+				<input type="submit" value="搜索" class="submit">
+			</form>
+		</div>
+		<div class="mapbox">
+			<a href="{#getUrlPath service='house' template='map' action='loupan'#}" class="smap" target="_blank">
+				<img src="{#$templets_skin#}images/mapImg.png" alt="">
+				<span>试试地图找房</span>
+			</a>
+		</div>
+		<div class="lp_box">
+			<div class="lp_title">最近浏览的楼盘</div>
+			<ul>
+				{#$_bindex = ""#}
+				{#house action=loupanHistory pageSize=3 return=loupan#}
+				{#if $_bindex.loupan < 4#}
+				<li>
+					<a href="{#$loupan.url#}" target="_blank">
+						<p title="{#$loupan.title#}">{#$loupan.title#}</p>
+						<p>{#if $loupan.price == 0#}待定{#else#}{#$loupan.price#}{#if $loupan.ptype == 1#}{#echoCurrency type='short'#}/{#echoCurrency type='areasymbol'#}{#else#}万{#echoCurrency type='short'#}/套{#/if#}{#/if#}{#if $loupan.addr#}<span>{#$loupan.addr[$loupan.addr|count-2]#}</span>{#/if#}</p>
+					</a>
+				</li>
+				{#/if#}
+				{#/house#}
+			</ul>
+		</div>
+		<div class="lp_box">
+			<div class="lp_title">热门楼盘</div>
+			<ul>
+				{#house action=loupanList filter="hot" pageSize=3 return=loupan#}
+				<li>
+					<a href="{#$loupan.url#}" target="_blank">
+						<p title="{#$loupan.title#}">{#$loupan.title#}</p>
+						<p>{#if $loupan.price == 0#}待定{#else#}{#$loupan.price#}{#if $loupan.ptype == 1#}{#echoCurrency type='short'#}/{#echoCurrency type='areasymbol'#}{#else#}万{#echoCurrency type='short'#}/套{#/if#}{#/if#}{#if $loupan.addr#}<span>{#$loupan.addr[$loupan.addr|count-2]#}</span>{#/if#}</p>
+					</a>
+				</li>
+				{#/house#}
+			</ul>
+		</div>
+		<div class="lp_box">
+			<div class="lp_title">本月最新楼盘</div>
+			<ul>
+				{#house action="loupanList" return="loupan" times="tmonth" page="1" pageSize="5"#}
+				<li>
+					<a href="{#$loupan.url#}" target="_blank">
+						<p title="{#$loupan.title#}">{#$loupan.title#}</p>
+						<p>{#if $loupan.price == 0#}待定{#else#}{#$loupan.price#}{#if $loupan.ptype == 1#}{#echoCurrency type='short'#}/{#echoCurrency type='areasymbol'#}{#else#}万{#echoCurrency type='short'#}/套{#/if#}{#/if#}{#if $loupan.addr#}<span>{#$loupan.addr[$loupan.addr|count-2]#}</span>{#/if#}</p>
+					</a>
+				</li>
+				{#/house#}
+			</ul>
+		</div>
+		<div class="lp_box">
+			<div class="lp_title">楼盘动态</div>
+			<ul class="lp_news">
+				{#house action="loupanNewsList" return="list" rand="1" page="1" pageSize="8"#}
+				<li><a href="{#$list.url#}" title="{#$list.title#}" target="_blank"><em>•</em>{#$list.title#}</a></li>
+				{#/house#}
+			</ul>
+		</div>
+	</div>
+	<div class="main">
+		<div class="m-t fn-clear">
+			<ul>
+
+                {#$hotFilter = "hot"#}
+                {#$tuanFilter = "tuan"#}
+
+                <li{#if !$hot && $filter != "hot" && $filter != "tuan" && !$tuan && !$video && !$qj && !$shapan#} class="curr"{#/if#}><a href="{#getUrlPath service='house' template='loupan' addrid=0 business=0 subway=0 station=0 price="" typeid=0 salestate="" times="" zhuangxiu=0 buildtype="" tuandate="" filter="" keywords={#$keywords#} feature={#$feature#} #}">全部楼盘</a></li>
+                <li class="{#if $hot || in_array('hot', $filterArr)#} curr{#/if#}"><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$hotFilter#} keywords={#$keywords#} feature={#$feature#} #}">热销楼盘</a></li>
+                <li class="{#if $tuan || in_array('tuan', $filterArr)#} curr{#/if#}"><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$tuanFilter#} keywords={#$keywords#} feature={#$feature#}#}">团购楼盘</a></li>
+                <li class="{#if $video#} curr {#/if#}"><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} keywords={#$keywords#} feature={#$feature#} param="video=1"#}">视频看房</a></li>
+                <li {#if $qj#} class="curr"{#/if#} ><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} keywords={#$keywords#} feature={#$feature#} param="qj=1"#}">全景看房</a></li>
+                <li {#if $shapan#} class="curr"{#/if#} ><a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} keywords={#$keywords#} feature={#$feature#} param="shapan=1"#}">沙盘看房</a></li>
+
+
+			</ul>
+		</div>
+		<div class="m-o">
+			<div class="m-l">
+                <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} param="shapan={#$shapan#}&qj={#$qj#}&video={#$video#}"#}"{#if $orderby == ""#} class="curr"{#/if#}>默认排序</a>
+                <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} param="shapan={#$shapan#}&qj={#$qj#}&video={#$video#}&orderby={#if $orderby == 3#}4{#else#}3{#/if#}"#}" class="ob{#if $orderby == 3 || $orderby == 4#} curr{#/if#}{#if $orderby == 4#} up{#/if#}">开盘时间<s></s></a>
+                <a href="{#getUrlPath service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} param="shapan={#$shapan#}&qj={#$qj#}&video={#$video#}&orderby={#if $orderby == 1#}2{#else#}1{#/if#}"#}" class="ob{#if $orderby == 1 || $orderby == 2#} curr{#/if#}{#if $orderby == 2#} up{#/if#}">价格<s></s></a>
+
+			</div>
+		</div>
+		<div class="lplist">
+			<ul>
+                {#$addr = $addrid#}
+                {#if $business != 0#}
+                {#$addr = $business#}
+                {#/if#}
+                {#house action="loupanList" return="loupan" addrid={#$addr#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} orderby={#$orderby#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} video={#$video#} qj={#$qj#} shapan={#$shapan#} page={#$page#} pageSize="10"#}
+                <li class="fn-clear" data-id="8">
+                    <div class="imgbox fn-left">
+                        <a href="{#$loupan.url#}" target="_blank"><img src="{#$loupan.litpic#}" onerror="this.src='/static/images/404.jpg'" alt="" /></a>
+                        <div class="markbox">
+                            {#if $loupan.salestate == 0#}
+                            <span class="m_mark m_ds">待售</span>
+                            {#elseif $loupan.salestate == 1#}
+                            <span class='m_mark m_zs'>在售</span>
+                            {#elseif $loupan.salestate == 2#}
+                            <span class='m_mark m_wp'>尾盘</span>
+                            {#elseif $loupan.salestate == 3#}
+                            <span class='m_mark m_sk'>售罄</span>
+                            {#/if#}
+
+                            {#if $loupan.existing == 0#}
+                            <span class="m_mark2 m_xf">现房</span>
+                            {#else#}
+                            <span class="m_mark2 m_qf">期房</span>
+                            {#/if#}
+                        </div>
+                    </div>
+                    <div class="infobox fn-left">
+                        <div class="lptit fn-clear">
+                            <a href="{#$loupan.url#}" target="_blank"><h2>{#$loupan.title#}</h2></a>
+                            {#if $loupan.price != 0#}
+                            <span class="lpprice"><b>{#$loupan.price#}</b>{#if $loupan.ptype == 1#}{#echoCurrency type='short'#}/{#echoCurrency type='areasymbol'#}{#else#}万{#echoCurrency type='short'#}/套{#/if#}</span>
+                            {#else#}
+                            <span class="lpprice"><b>待定</b></span>
+                            {#/if#}
+                        </div>
+                        <div class="lpinf fn-clear">
+                            <span class="sp_l fn-left">{#$loupan.hx_room[0]#}居/ {#$loupan.hx_room[1]#}居 - {#$loupan.hx_area[0]#}~{#$loupan.hx_area[1]#}{#echoCurrency type='areaname'#}</span>
+                            <span class="sp_r fn-right"><i class="ilptel"></i> {#$loupan.tel#}</span>
+                        </div>
+                        <p class="lpinf">{#if $loupan.addr#}[{#$loupan.addr[{#$loupan.addr|count#}-1]#}] {#/if#}{#$loupan.address#}</p>
+                        <p class="lpinf">开发商： {#$loupan.investor#}</p>
+                        <p class="lpinf">开盘时间：{#if $loupan.deliverdate#}{#$loupan.deliverdate|date_format:'%Y-%m-%d'#}{#else#}待定{#/if#}</p>
+                        <div class="lpbottom fn-clear">
+                            <div class="lpmark fn-left">
+                                {#foreach from=$loupan.buildtype item=btype#}
+                                <span title="{#$btype#}">{#$btype#}</span>
+                                {#/foreach#}
+                            </div>
+                            <div class="btn_box fn-right">
+                                <a href="javascript:;" class="btn_sc"><i class="isc"></i> 收藏</a>
+                                <a href="javascript:;" data-title="{#$loupan.title#}" class="btn_share" data-url="{#$loupan.url#}" data-pic="{#$loupan.litpic#}"><i class="ishare"></i> 分享</a>
+                            </div>
+                        </div>
+                        <div class="codebox">
+                            <div class="qrcode">
+                                <div id="qrcode"></div>
+                            </div>
+                        </div>
+                    </div></li>
+                {#/house#}
+
+                {#if $pageInfo.totalCount == 0#}
+                <li class="empty">抱歉！ 未找到相关楼盘</li>
+                {#/if#}
+
+            </ul>
+		</div>
+        {#getPageList service='house' template='loupan' addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price={#$price#} typeid={#$typeid#} salestate={#$salestate#} times=$times zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} param="orderby={#$orderby#}"#}
+
+	</div>
+</div>
+
+{#include file="footer.html"#}
+<script>
+    var stationCount = {#$stationCount#};
+    var totalCount = {#$pageInfo.totalCount|string_format:"%d"#};
+    var priceUrl ='{#getUrlPath service="house" template="loupan" addrid={#$addrid#} business={#$business#} subway={#$subway#} station={#$station#} price="pricePlaceholder" typeid={#$typeid#} salestate={#$salestate#} times={#$times#} zhuangxiu={#$zhuangxiu#} buildtype={#$buildtype#} tuandate={#$tuandate#} filter={#$filter#} keywords={#$keywords#} feature={#$feature#} #}';
+</script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.qrcode.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/loupan.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

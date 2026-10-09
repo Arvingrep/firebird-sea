@@ -1,0 +1,592 @@
+<style>
+  /* 新增支付弹窗样式 */
+  .payMask{position: fixed; left: 0; top: 0; bottom: 0; right: 0; background: rgba(0,0,0,.7);z-index: 1003; display: none;}
+  .payPop{width: 660px; padding-bottom: 30px;border-radius: 10px; background: #fff; position: fixed; left: 0; right: 0; margin: auto; top: 15%; z-index: 1003; animation: popup .3s ease-in-out; display: none; z-index: 99999}
+  .dsPop{z-index: 99999}
+  .payPop h2.payTitle{font-size: 24px; color: #000; font-weight: bold; text-align: center; padding-top: 20px}
+  .payPop .close_payPop{ display: block; width: 20px; height: 20px; background: url(/static/images/close_pc.png) no-repeat center/cover; position: absolute; opacity: .6; right: 14px; top: 14px;}
+  .payPop .payInfoShow{margin: 20px 20px 0; height: 60px; background: #F7F8FA; border-radius: 6px; padding: 0 16px; box-sizing: border-box;}
+  .payPop .payInfoShow h2{float: left; font-size: 14px; color: #37373B;  padding-top: 6px}
+  .payPop .payInfoShow h2 span{color: #FF653B; font-weight: bold; margin-left: 8px;}
+  .payPop .payInfoShow h2 b{font-size: 26px;color: #FF653B;}
+  .payPop .payInfoShow p{float: right; color:#494A4D; font-size: 14px; line-height: 60px;}
+  .payPop .payInfoShow .payCutDown{color: #A2A5AB;}
+  .payPop .payInfoShow .payCutDown b{font-weight: bold; font-size: 16px; color:#FF653B; }
+  .payPop .payListBox{margin: 0 20px 0;}
+  .payPop .payListBox .pay_item{cursor: pointer; overflow: hidden;}
+  .payPop .payListBox .pay_item.disabled_pay{cursor: no-drop;}
+  .payPop .payListBox .payBox1 .pay_item.chose_pay{border: solid 1px #4A84F7; box-shadow: 0px 5px 10px 0px rgba(182, 185, 191, 0.3);}
+  .payPop .payListBox .payBox1 .pay_item{height: 56px; border-radius: 6px; border: 1px solid #EEE; margin-top: 10px; padding: 16px 20px; box-sizing: border-box; transition: height .3s;}
+  .payPop .payListBox .payBox1 .pay_item .pay_radio{display: inline-block; width: 16px; height: 16px; border-radius: 50%; box-sizing: border-box; border: solid 1px #C4C4C4; vertical-align: middle; margin-right: 18px;}
+  .payPop .payListBox .payBox1 .pay_item.chose_pay .pay_radio{background: url(/static/images/pay/chosed.png) no-repeat center/cover; border: none; width: 18px; height: 18px; margin-right: 16px;}
+  .payPop .payListBox .payBox1 .pay_item.disabled_pay .pay_radio{background: #f2f2f2;}
+  .payPop .payListBox .payBox1 .pay_item input[type='radio']{opacity: 0;}
+  .payPop .payListBox .pay_item_img{display: inline-block; width: 24px; height: 24px; vertical-align: middle; }
+  .payPop .payListBox .pay_item_img img{display: block; width: 100%; height: 100%; object-fit: cover;}
+  .payPop .payListBox span{color: #37373B; font-size: 16px; margin-left: 7px; vertical-align: middle; font-weight: bold;}
+  .payPop .payListBox .pay_qr{position: relative;}
+  .payPop .payListBox .pay_qr_reload s{display: inline-block;}
+  .payPop .payListBox .pay_qr_reload{font-size: 14px; color: #A2A4AB; position: absolute; right: 20px; top: 22px; display: none;}
+  .payPop .payListBox .payBox1 .pay_item.chose_pay .pay_qr_reload{display: block;}
+  .payPop .payListBox .payBox1 .pay_item.chose_pay .pay_qr_reload s{display: inline-block; width: 20px ; height: 20px; background: url(/static/images/pay/refresh.png) no-repeat center/cover; vertical-align: middle; margin-right: 3px; margin-bottom: 4px;}
+  .payPop .payListBox .payBox1 .pay_item.chose_pay .pay_qr_reload:hover s{animation: rotate_ 1 .6s linear; transform-origin: center;}
+  .payPop .payListBox .payBox1 .pay_item.chose_pay.pay_qr{height: 240px; }
+  .payPop .payListBox .pay_qr_box{text-align: center; margin-top: 24px;}
+  .payPop .payListBox #payQr{width: 150px; height: 150px; display: inline-block; vertical-align: middle;}
+  .payPop .payListBox #payQr img,.payPop .payListBox .pay_WA .pay_img_Box img{display: block; width: 100%; height: 100%; object-fit: cover;}
+  .payPop .payListBox .pay_WA{display: inline-block; vertical-align: middle; margin-left: 18px; text-align: left;}
+  .payPop .payListBox .pay_WA .pay_img_Box div{display: inline-block; width: 40px; height: 40px;}
+  .payPop .payListBox .pay_WA p{font-size: 14px; color: #A2A4AB;}
+  .payPop .payListBox .payBox1 .pay_item em{font-size: 14px; font-weight: normal; margin-left: 8px;}
+  .payPop .payListBox .payBox1 .pay_item.disabled_pay span{color: #B1B1B3}
+  .payPop .payListBox .other_pay_box{margin-top: 34px;}
+  .payPop .payListBox .other_pay_box.block_box dt{display:none;}
+  .payPop .payListBox .other_pay_box.block_box{margin-top:0;}
+  .payPop .payListBox .other_pay_box.block_box dd{display:block; margin-top:10px; padding:16px 20px;}
+  .payPop .payListBox .other_pay_box dt{font-size: 14px; color: #999; margin-bottom: 16px;}
+  .payPop .payListBox .other_pay_box .pay_item{display: inline-block; border-radius: 6px; border: 1px solid #EEE; padding: 10px 12px; margin-right:8px; min-width: 150px;}
+  .payPop .payListBox .other_pay_box .pay_item_img{margin-left: 0;}
+  .payPop .payListBox .payBox1 .pay_item{position: relative;}
+  .payPop .payListBox .payBox1 .pay_item.chose_pay.pay_balance{height: 126px;}
+  .payPop .payListBox .payBox1 .pay_item.chose_pay.pay_balance.noPwd{height: 112px;}
+  .payPop .payListBox .payBox1 .pay_item .payPwdBox{height: 70px; background: #F7F8FA; position: absolute; left: 0; right: 0; top: 56px; box-sizing: border-box; padding:16px;}
+  .payPop .payListBox .payBox1 .pay_item.noPwd .payPwdBox{height:56px; font-size: 12px; color: #6B6B73; font-weight: normal; padding: 10px 18px; line-height: 32px;}
+  .payPop .payListBox .payBox1 .pay_item.noPwd .payPwdBox a.toSetPwd{width: 76px; height: 32px; display: inline-block; background: #fff; border-radius: 4px; border: solid 1px #eee; text-align: center; margin-left: 13px;}
+  .payPop .payListBox .payBox1 .pay_check_pwd{display: block; width: 200px; height: 60px; border-radius: 30px; color: #fff; font-size: 18px; line-height: 60px;margin:26px auto 0; text-align: center; background: #3377FF; box-shadow: 0px 5px 23px 0px rgba(51, 119, 255, 0.3); }
+  .payPop .payListBox .payBox1 .pay_check_pwd.noClick{background: #7FB0FF; pointer-events: none;}
+  .payPop .payListBox .payPwdBox{text-align: right; color: #37373B; font-size: 15px; font-weight: bold; }
+  .payPop .payListBox .payPwdBox ul{display: inline-block; vertical-align: middle; width: 236px;  border: 1px solid #C6C6CC; border-radius: 4px; background: #fff; margin: 0 8px; padding:4px 0; box-sizing: border-box; position: relative; }
+  .payPop .payListBox .payPwdBox ul li{float: left; width:38px; height: 28px; border-right: solid 1px #eee; text-align: center; color: #333; }
+  .payPop .payListBox .payPwdBox ul input{position: absolute; left: 0; right: 0; bottom: 0; top: 0;width: 100%; background: none; border: none; color:rgba(255,255,255,0); -webkit-user-select:none;
+    -moz-user-select:none;
+    -ms-user-select:none;
+    user-select:none; }
+  .payPop .payListBox .payPwdBox ul input:focus{outline:2px solid #3377FF; user-select: none; height: 100%;}
+  .payPop .payListBox .payPwdBox ul li em{margin: 0 !important; font-size: 18px !important; display: block; width: 100%; height: 100%; line-height: 28px;}
+  .payPop .payListBox .payPwdBox ul li:last-child{border-right: none;}
+  .payPop .payListBox .payPwdBox a{font-weight: normal; font-size: 12px; color: #8E8E99}
+  .pay_hide{display: none !important; }
+  .payPop .payListBox .payPwdBox ul input::selection {
+    background:rgba(255,255,255,0);
+    color:rgba(255,255,255,0);
+  }
+  .payPop .payListBox .payPwdBox ul input::-moz-selection {
+    background:rgba(255,255,255,0);
+    color:rgba(255,255,255,0);
+  }
+  .payPop .payListBox .payPwdBox ul input::-webkit-selection {
+    background:rgba(255,255,255,0);
+    color:rgba(255,255,255,0);
+  }
+
+  .payBeforeLoading{display: none; width: 56px; height: 56px; border-radius: 10px;  background: rgba(0,0,0,.9) ; background-size: 25px; position: fixed; left: 0; right: 0; margin: auto; top: 50%; z-index: 999999999;}
+  .payBeforeLoading::before{content: ''; background: url(/templates/member/touch/images/loading.png) no-repeat center; background-size: 25px; position: absolute; left: 0; right: 0; margin: auto; top: 0; bottom: 0; animation:rotate_ 1s infinite linear;}
+  @keyframes rotate_{
+    0%{ transform: rotate(0deg);}
+    50%{ transform: rotate(180deg);}
+    100%{ transform: rotate(360deg);}
+  }
+
+</style>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/axios.min.js"></script>
+<script type="text/javascript">
+  var serviceTime = '{#$smarty.now#}';
+  var jsTime = (new Date()).valueOf();
+  var timeOffset = serviceTime*1000 - jsTime;
+  var masDomain = '{#$cfg_basehost#}';
+
+  var peerpay   = "{#getUrlPath service='member' type='user' template='daipay'#}";
+</script>
+<!--publicpaybtn公共按钮-->
+<div id="payPage">
+  <!-- 支付遮罩 -->
+  <div class="payMask" ></div>
+  <!-- 支付弹窗 -->
+  <div class="payPop" >
+    <div class="payBeforeLoading"></div>
+    <a href="javascript:;" class="close_payPop" @click="closePayPop"></a>
+    <h2 class="payTitle">收银台</h2>
+    <!-- 支付金额 -->
+		<div class="payInfoShow">
+			<h2>订单总价<span>{#echoCurrency type="symbol"#}</span><b id="amout">0.00</b></h2>
+			<p>剩余支付时间：<span class="payCutDown"><b class="phh">00</b>时<b class="pmm">00</b>分<b class="pss">00</b>秒</span></p>
+		</div>
+    <!-- 支付方式选择 -->
+    <div class="payListBox">
+      <div class="payBox1">
+        <!-- 手机扫码支付 -->
+        <div class="pay_qr pay_item chose_pay" v-if="alipay || wxpay">
+          <span class="pay_radio"><input type="radio" name=""></span>
+          <div class="pay_item_img"><img src="/static/images/pay/qr_pay.png" alt=""></div>
+          <span>手机扫码支付</span>
+          <!-- <a href="javascript:;" class="pay_qr_reload" @click="reQrReload"><s></s>刷新</a> -->
+          <div class="pay_qr_box">
+            <div id="payQr"><img src="" alt=""></div>
+            <div class="pay_WA">
+              <div class="pay_img_Box">
+                <div class="pay_al" v-if="alipay"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/alipay.png" alt=""></div>
+                <div class="pay_wx" v-if="wxpay"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/wxpay.png" alt=""></div>
+              </div>
+              <p>使用<em style="margin-left: 0" v-if="alipay">支付宝、</em><em v-if="wxpay" style="margin-left: 0">微信</em>扫码支付</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 不可以 disabled_pay 选中 chose_pay-->
+        <div class="pay_item pay_balance {#if $userinfo.paypwdCheck == 0#}noPwd{#/if#}" data-balance="{#$userinfo.money#}">
+          <span class="pay_radio"><input type="radio" name="balance"></span>
+          <div class="pay_item_img"><img src="/static/images/pay/balance_pay.png" alt=""></div>
+          <span>余额<em class="balance_tip">(<b id="moneyinfo"></b>可用: {#echoCurrency type="symbol"#}{#$userinfo.money#})</em></span>
+          {#if $userinfo.paypwdCheck != 0#}
+          <div class="payPwdBox">
+            支付密码
+            <ul>
+              <input type="tel" id="payPwd" autocomplete='off'  v-model="paypwdTxt" maxlength="6" onclick="moveEnd(this)">
+              <li v-for="n in 6">
+  							<em v-if="paypwd[n-1]">•</em>
+  						</li>
+            </ul>
+            <a href="{#getUrlPath service='member' type='user' template='security-paypwdEdit'#}" class="fpwt">{#$langData['siteConfig'][5][2]#}?</a>{#* 忘记密码 *#}
+          </div>
+          {#else#}
+          <div class="payPwdBox">
+            为了您的账户安全，请尽快设置支付密码 <a href="{#$member_userDomain#}/security-paypwdEdit.html" class="toSetPwd">去设置</a>
+          </div>
+          {#/if#}
+        </div>
+        {#if $userinfo.paypwdCheck != 0#}
+        <div class="payBtns" style="display:none;">
+          <a href="javascript:;" class="pay_check_pwd noClick" @click="toPay()">立即支付</a>
+          <a href="javascript:;" class="pay_check_pwd pay_hide">去充值</a>
+        </div>
+        {#/if#}
+      </div>
+      <dl class="other_pay_box">
+        <dt>其他支付方式</dt>
+        {#$aliPay = 0#}
+        {#$wxPay = 0#}
+        {#siteConfig action="payment"#}
+        <!-- 微信 -->
+        {#if $row.pay_code == "wxpay" || $row.pay_code == "yabandpay_wxpay"#}
+        {#$wxPay = 1#}
+        {#/if#}
+        <!-- 支付宝 -->
+        {#if $row.pay_code == "globalalipay" || $row.pay_code == "alipay" || $row.pay_code == "yabandpay_alipay"#}
+        {#$aliPay = 1#}
+        {#/if#}
+
+        {#if $row.pay_code != "wxpay" && $row.pay_code != "alipay"#}
+        <dd class="pay_item" id="devpayObj" data-code="{#$row.pay_code#}">
+          <div class="pay_item_img">
+            {#if $row.pay_code == 'globalalipay' || $row.pay_code == 'yabandpay_alipay'#}
+            <img src="{#$cfg_basehost#}/api/payment/alipay/alipay.png">
+            {#else if $row.pay_code == 'fomopay_wxpay' ||  $row.pay_code == 'yabandpay_wxpay'#}
+            <img src="{#$cfg_basehost#}/api/payment/wxpay/wxpay.png">
+            {#else#}
+            <img src="{#$cfg_basehost#}/api/payment/{#$row.pay_code#}/{#$row.pay_code#}.png">
+
+            {#/if#}
+          </div>
+          <span>{#$row.pay_name#}</span>
+        </dd>
+        {#/if#}
+<!--        {#if $row.pay_code == "rfbp_icbc"#}-->
+<!--        <dd class="pay_item" id="rfbp_icbcObj" data-code="{#$row.pay_code#}">-->
+<!--          <div class="pay_item_img"><img src="{#$cfg_basehost#}/api/payment/rfbp_icbc/rfbp_icbc.png"></div>-->
+<!--          <span>{#$row.pay_name#}</span>-->
+<!--        </dd>-->
+<!--        {#/if#}-->
+<!--        {#if $row.pay_code == "unionpay"#}-->
+<!--        <dd class="pay_item" id="rfbp_icbcObj" data-code="{#$row.pay_code#}">-->
+<!--          <div class="pay_item_img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/paypal.png"></div>-->
+<!--          <span>{#$row.pay_name#}</span>-->
+<!--        </dd>-->
+<!--        {#/if#}-->
+<!--        {#if $row.pay_code == "paypal"#}-->
+<!--        <dd class="pay_item" data-code="{#$row.pay_code#}">-->
+<!--          <div class="pay_item_img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/paypal.png"></div>-->
+<!--          <span>{#$row.pay_name#}</span>-->
+<!--        </dd>-->
+<!--        {#/if#}-->
+        {#/siteConfig#}
+        {#if $peerpayState && !$peerpay && $huodongtype!=3 && $huodongtype!=4 #}
+
+          {#if $service == 'shop' && count($cartList) > 1#}
+
+          {#else#}
+          <dd class="pay_item" data-code="peerpay">
+            <div class="pay_item_img"><img src="{#$cfg_basehost#}/templates/member/touch/images/pay/daipay.png"></div>
+            <span>找人代付</span>
+          </dd>
+          {#/if#}
+        {#/if#}
+      </dl>
+    </div>
+
+    <!--会员充值相关-->
+    <input type="hidden" name="level"  id="plevel" value="" />
+    <input type="hidden" name="day"  id="pday" value="" />
+    <input type="hidden" name="daytype"  id="pdaytype" value="" />
+    <input type="hidden" name="ordertype"  id="ordertype" value="" />
+    <input type="hidden" name="service"  id="service" value="" />
+    <input type="hidden" name="action_1"  id="action_1" value="" />
+    <input type="hidden" name="action_2"  id="action_2" value="" />
+
+    <!---->
+  </div>
+</div>
+<script type="text/javascript">
+  var alipay = '{#$aliPay#}';
+  var wxpay = '{#$wxPay#}';
+  //光标移动到最后
+  function moveEnd(obj,type) {
+    obj.focus();
+    var len;
+    if(type){
+      len = obj.innerText.length;
+    }else{
+
+      len = obj.value.length;
+    }
+    if (document.selection) {
+    var sel = obj.createTextRange();
+    sel.moveStart('character', len);
+    sel.collapse();
+    sel.select();
+    } else if (typeof obj.selectionStart == 'number'
+    && typeof obj.selectionEnd == 'number') {
+    obj.selectionStart = obj.selectionEnd = len;
+    }
+  }
+
+  var checkPayResult = null;
+  var orderurl = '';
+ // 倒计时
+  function payCutDown(EndDate){
+
+     ordernum = typeof(shopordernum) == 'undefined' ||shopordernum == '' ? ordernum : shopordernum;
+    var nowDate = (new Date()).valueOf() + timeOffset;
+    timeArea = EndDate * 1000 - nowDate;
+    if(checkPayResult == null && typeof(timer_trade) == 'undefined'){
+      checkTradeResult(ordernum)
+    }
+
+
+    if(timeArea < 0){
+      $(".payCutDown").hide()
+      return false;
+    }
+    leftd = Math.floor(timeArea/(1000*60*60*24)),  //计算天数
+    lefth = Math.floor(timeArea/(1000*60*60)%24),  //计算小时数
+    leftm = Math.floor(timeArea/(1000*60)%60),  //计算分钟数
+    lefts = Math.floor(timeArea/1000%60);  //计算秒数
+    return '<b class="phh">'+(lefth>9?lefth:"0"+lefth)+'</b>时<b class="pmm">'+(leftm>9?leftm:"0"+leftm)+'</b>分<b class="pss">'+(lefts>9?lefts:"0"+lefts)+'</b>秒'
+
+
+
+  }
+
+
+  function checkTradeResult(ordernum){
+    checkPayResult = setInterval(function(){
+
+        $.ajax({
+          type: 'POST',
+          async: false,
+          url: '/include/ajax.php?service=member&action=tradePayResult&order=' + ordernum,
+          dataType: 'json',
+          success: function(str){
+            if(str.state == 100 && str.info != ""){
+              //如果已经支付成功，则跳转到会员中心页面
+               location.href = str.info;
+            }
+          }
+        });
+
+      }, 2000);
+  }
+	var payVue = new Vue({
+    	el:"#payPage",
+      data:{
+        paypwdTxt:'',
+        paypwd:[],
+        alipay:Number(alipay),
+        wxpay:Number(wxpay),
+        useBalance:0,
+      },
+      mounted(){
+        var tt = this;
+        if($(".payBox1 .pay_item").length == 1){
+          $(".payBox1 .pay_item .pay_radio").css('display','none');
+        }
+
+        if($(".payBox1 .pay_item").length == 0){
+          $(".other_pay_box").addClass('block_box')
+        }
+        // 切换支付方式
+        $(".payBox1 .pay_item").click(function() {
+          var t = $(this);
+          t.addClass('chose_pay').siblings().removeClass('chose_pay');
+          if(t.hasClass('pay_balance')){
+            $("#payPage .payBtns").show();
+            tt.useBalance = 1;
+          }else{
+            $("#payPage .payBtns").hide();
+            tt.useBalance = 0;
+          }
+        });
+        if($("#payPage .other_pay_box dd").length == 0){
+          $("#payPage .other_pay_box").hide()
+        }
+        // 判断时间差是否为0
+        // timeFlag = 1;
+        // var cutDown =  setInterval(function() {
+        //   if(!timeFlag){
+        //     clearInterval(cutDown);
+        //   }
+        //   $('.payInfoShow .payCutDown').html(tt.payCutDown())
+        // },1000)
+
+        $(".other_pay_box .pay_item").click(function () {
+          var t = $(this);
+          var payType = t.attr('data-code');
+          ordernum = typeof(shopordernum) == 'undefined' ||shopordernum == '' ? ordernum : shopordernum;
+          if(payType != 'peerpay'){
+            window.open(masDomain+'/include/ajax.php?service='+service+'&action=pay&paytype='+payType+'&ordernum='+ordernum);
+
+          }else{
+            peerpay += '?module='+service+'&ordernum='+ordernum;
+            window.open(peerpay);
+          }
+        })
+      },
+      methods:{
+        // 关闭弹窗
+        closePayPop(){
+          $('.payMask,.payPop').hide();
+          if(typeof(timer_trade) != 'undefined'){
+            clearInterval(timer_trade)
+          }
+          clearInterval(checkPayResult);
+          if($(".publicpaybtn").hasClass('disabled')){
+            if($(".publicpaybtn a").length){
+
+              $(".publicpaybtn").removeClass('disabled').find('a').html('去付款');
+            }else{
+              $(".publicpaybtn").removeClass('disabled').html('去付款');
+            }
+          }
+
+          if(orderurl != ''){
+            window.location.href = orderurl;
+          }
+        },
+
+        reQrReload(){
+          if(typeof(ds_vue) != 'undefined'){
+            ds_vue.showPayPop(ds_vue.ds_num,1)
+          }else{
+            $(".publicpaybtn").click();
+          }
+
+
+
+        },
+        toPay(){
+          var tt = this;
+          tt.paypwdTxt = tt.paypwdTxt.replace(/[^\d]/g,'');
+          var paramstr = '';
+
+
+          siteservice = $("#service").val();
+          var param = '';
+
+          ordertypev = $("#ordertype").val();
+          var actionurl = '&action=pay';
+          if(ordertypev!='' && typeof(ordertypev)!='undefined'){
+            actionurl = '&action='+ordertypev;
+            paramstr = '&ordertype='+ordertypev+'&final=1&action='+ordertypev;
+
+          }
+          if(typeof(siteservice) !='undefined' || siteservice!=''){
+            if(ordertypev == 'refreshTop') {
+
+              service = siteservice;
+
+              var type = $("#refreshTopForm input[name='type']").val();
+              var module = $("#refreshTopForm input[name='module']").val();
+              var act = $("#refreshTopForm input[name='act']").val();
+              var aid = $("#refreshTopForm input[name='aid']").val();
+              var config  = $("#refreshTopForm input[name='config']").val();
+              var amount = $("#refreshTopForm input[name='amount']").val();
+              var ordertype = $("#refreshTopForm input[name='action']").val();
+              var tourl = $("#refreshTopForm input[name='tourl']").val();
+
+              paramstr = "&action=pay&type=" + type + "&module=" + module + "&act=" + act + "&aid=" + aid + "&amount=" + amount + "&ordertype=" + ordertype + "&tourl=" + tourl+"&config="+config;
+
+            }else if (ordertypev == 'payEncourage'){
+              service = siteservice;
+              var type = $("#payEncourage input[name='type']").val();
+              var module = $("#payEncourage input[name='module']").val();
+              var act = $("#payEncourage input[name='act']").val();
+              var aid = $("#payEncourage input[name='aid']").val();
+              var config  = $("#payEncourage input[name='config']").val();
+              var amount = $("#payEncourage input[name='amount']").val();
+              var ordertype = $("#payEncourage input[name='action']").val();
+              var tourl = $("#payEncourage input[name='tourl']").val();
+              paramstr = "&type=" + type + "&module=" + module + "&act=" + act + "&aid=" + aid + "&amount=" + amount + "&ordertype=" + ordertype + "&tourl=" + tourl+"&config="+config;
+            }else if(ordertypev!=''){
+
+              $("#payform input[name='createtype']").val(0);
+              $("#payform input[name='paytype']").val('money');
+              param  = $("#payform ").serialize();
+
+
+            }
+          }
+
+          if (typeof(upordertype) !='undefined') {
+            /*用户升级*/
+            var level = $("#plevel").val();
+            var day = $("#pday").val();
+            var daytype = $("#pdaytype").val();
+
+
+            paramstr += '&action=pay&level='+level+'&day='+day+'&daytype='+daytype+'&ordertype='+upordertype+'&final=1';
+          }
+
+          if($('#action_1').val() !=''){
+            /*商家入驻*/
+            paramstr  = "&action_1=checkJoinPayAmount&action_2=joinBusinessPay";
+
+            actionurl = '&action=joinBusinessPay';
+
+          }
+
+          if(ordertypev == 'promotion'){
+            param = '';
+
+            paramstr += '&amount='+$("#totalPrice").val();
+          }
+
+          if(siteservice == 'shop'){
+
+            var pros = $("#pros").val();
+            paramstr += "&final=1&pros="+pros+"&addressid="+$("#addressid").val();
+            ordernum = typeof(shopordernum) == 'undefined' ||shopordernum == '' ? ordernum : shopordernum;
+          }
+          $.ajax({
+            type: "POST",
+            url: "/include/ajax.php?service="+service+actionurl+"&paytype=money&ordernum="+ordernum+paramstr+"&useBalance=1&balance="+order_amount+"&paypwd="+tt.paypwdTxt,
+            data:param,
+            dataType: "json",
+            success: function (data) {
+              if(data && data.state == 100){
+
+                if(typeof(siteservice) !='undefined' && siteservice == 'siteConfig'){
+                  tourl   = $("#refreshTopForm input[name='tourl']").val();
+
+                  window.location.href = tourl;
+                }else{
+
+                  window.location.href = data.info;
+                }
+              }else{
+                alert(data.info);//订单不存在
+                $(".pay_check_pwd").addClass('noClick');
+              }
+            },
+            error: function(){
+              alert(langData['siteConfig'][6][203]);//网络错误，请重试！
+            }
+          });
+        }
+
+      },
+      watch:{
+        paypwdTxt:function() {
+          var tt = this;
+          tt.paypwdTxt = tt.paypwdTxt.replace(/[^\d]/g,'')
+          tt.paypwd = tt.paypwdTxt.split('');
+          if(tt.paypwd.length == 6){
+
+            var paramstr = '';
+
+            siteservice = $("#service").val();
+            if(typeof(siteservice) !='undefined' && siteservice == 'siteConfig'){
+              /*刷新置顶*/
+              service = siteservice;
+
+              var ordertype  = $("#refreshTopForm input[name='action']").val();
+
+              paramstr = "&ordertype="+ordertype;
+
+            }
+
+            ordertype = $("#ordertype").val();
+
+            if(typeof (ordertype) !='undefined' && ordertype!=''){
+
+              paramstr = '&ordertype='+ordertype;
+            }
+            if(ordertype == 'fabupay'){
+              service = $("#service").val();
+
+              module = $("#module").val();
+              /*发布支付*/
+
+              paramstr = '&module='+module+'&ordertype=fabuPay';
+            }
+
+            if (typeof(upordertype) !='undefined') {
+              /*用户升级*/
+              paramstr += '&ordertype='+upordertype;
+            }
+
+            var actionstr = 'checkPayAmount';
+            if($('#action_1').val() !=''){
+              /*商家入驻*/
+              paramstr  = "&action_1=checkJoinPayAmount&action_2=joinBusinessPay";
+
+              actionstr = 'checkJoinPayAmount';
+            }
+            var pros = $("#pros").val();
+            if(siteservice == 'shop' && typeof(pros) != 'undefined'){
+              paramstr +='&pros='+pros+"&addressid="+$("#addressid").val();
+              // ordernum = '';
+            }
+            $(".payBeforeLoading").show()
+            $.ajax({
+              url: "/include/ajax.php?service="+service+paramstr+"&action="+actionstr+"&ordernum="+ordernum+"&paypwd="+tt.paypwdTxt+"&useBalance="+tt.useBalance+"&balance="+order_amount,
+              type: "POST",
+              dataType: "json",
+              success: function (data) {
+                $(".payBeforeLoading").hide()
+                if(data && data.state == 100){
+
+                  $(".pay_check_pwd").removeClass('noClick');
+                }else{
+                  alert(data.info);//订单不存在
+                  $(".pay_check_pwd").addClass('noClick');
+                  tt.paypwdTxt = ''
+                  tt.paypwd = [];
+                }
+              },
+              error: function(){
+                $(".payBeforeLoading").hide()
+                alert(langData['siteConfig'][6][203]);//网络错误，请重试！
+                $(".pay_check_pwd").addClass('noClick');
+              }
+            });
+
+
+          }else{
+            $(".pay_check_pwd").addClass('noClick');
+          }
+        }
+      }
+  })
+
+
+</script>
