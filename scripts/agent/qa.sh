@@ -4,12 +4,22 @@
 #   REJECTED → 评论缺陷清单 + issue 重新打 agent:dev（触发 Dev Agent 返工，最多 AGENT_MAX_ATTEMPTS 次）
 # 独立性：默认用与 Dev Agent 不同厂商的模型（codex），只读沙箱，不能改代码。
 # 用法：scripts/agent/qa.sh <pr-number>
-# 环境：GH_TOKEN（PAT）、QA_AGENT_CMD、AGENT_AUTO_MERGE（默认 1）、N8N_AGENT_EVENT_WEBHOOK（可选）
+# 环境：GH_TOKEN（PAT）、AGENT_AUTO_MERGE（默认 1）、N8N_AGENT_EVENT_WEBHOOK（可选）
+#       GATES_JOB_RESULT   托管 runner 上 gates job 的结论，必须为 success 才可能 ACCEPTED
+#                          （本地手动运行时需显式设置，否则一律打回）
+#       QA_AGENT_CMD       可选覆盖，按 shell 语法解析，末尾须接受「输出文件」参数
+# 可信边界：本脚本、gates.sh、RULES 一律取自 main（workflow 检出 base 分支后 self_copy），
+#           被审查的 PR 代码只作为数据检出到工作区。
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+self_copy qa.sh "$@"
 cd "$ROOT_DIR"
 
 PR="${1:?用法: qa.sh <pr-number>}"
-QA_AGENT_CMD="${QA_AGENT_CMD:-codex exec -s read-only --skip-git-repo-check -o}"
+if [ -n "${QA_AGENT_CMD:-}" ]; then
+  eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
+else
+  QA_CMD=(codex exec -s read-only --skip-git-repo-check -o)
+fi
 AUTO_MERGE="${AGENT_AUTO_MERGE:-1}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
@@ -26,7 +36,11 @@ notify qa_started "QA Agent 开始验收 PR #${PR}" "$ISSUE" "$PR"
 
 # 1. 确定性门禁（真实执行）
 GATE_RC=0
-scripts/agent/gates.sh origin/main > "$TMP/gates.md" 2>&1 || GATE_RC=$?
+GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=1 bash "$AGENT_SELF_DIR/gates.sh" origin/main > "$TMP/gates.md" 2>&1 || GATE_RC=$?
+if [ "${GATES_JOB_RESULT:-}" != "success" ]; then
+  GATE_RC=1
+  printf '\n> ❌ 托管 runner 上的 gates job 结论为 `%s`（须为 success）\n' "${GATES_JOB_RESULT:-未提供}" >> "$TMP/gates.md"
+fi
 
 # 2. LLM 对抗审查
 SPEC="（PR 未关联 issue）"
@@ -39,7 +53,7 @@ DIFF_BYTES="$(wc -c < "$TMP/diff.patch" | tr -d ' ')"
   echo
   echo "## 需求（Issue #${ISSUE:-?}）"; echo "$SPEC"
   echo
-  echo "## 工程铁律"; cat .agents/RULES.md
+  echo "## 工程铁律"; git show origin/main:.agents/RULES.md
   echo
   echo "## 确定性门禁结果"; cat "$TMP/gates.md"
   echo
@@ -59,9 +73,8 @@ DIFF_BYTES="$(wc -c < "$TMP/diff.patch" | tr -d ' ')"
   echo "规则：有任何 blocker 或 major => REJECTED；只有 minor 可 ACCEPTED。"
 } > "$TMP/prompt.md"
 
-log "🛡️ 调用 QA Agent: ${QA_AGENT_CMD%% *}"
-# shellcheck disable=SC2086
-${QA_AGENT_CMD} "$TMP/verdict.txt" - < "$TMP/prompt.md" > "$TMP/qa.log" 2>&1 || log "⚠️ QA Agent 非 0 退出"
+log "🛡️ 调用 QA Agent: ${QA_CMD[0]}"
+agent_env "${QA_CMD[@]}" "$TMP/verdict.txt" - < "$TMP/prompt.md" > "$TMP/qa.log" 2>&1 || log "⚠️ QA Agent 非 0 退出"
 [ -s "$TMP/verdict.txt" ] || tail -n 40 "$TMP/qa.log" > "$TMP/verdict.txt"
 
 # 3. 解析裁定（解析失败 => fail-closed 判 REJECTED）
@@ -95,12 +108,12 @@ if [ "$VERDICT" = "ACCEPTED" ]; then MARK="$QA_MARK_ACCEPT"; BADGE="🟢 ACCEPTE
 {
   echo "$MARK"
   echo "## 🛡️ 独立 QA 验收：${BADGE}"
-  echo "> commit \`${HEAD_SHA:0:8}\` · 第 ${ATTEMPT} 轮 · QA 模型：\`${QA_AGENT_CMD%% *}\`${RUN_URL:+ · [运行日志](${RUN_URL})}"
+  echo "> commit \`${HEAD_SHA:0:8}\` · 第 ${ATTEMPT} 轮 · QA 模型：\`${QA_CMD[0]}\`${RUN_URL:+ · [运行日志](${RUN_URL})}"
   echo
   tail -n +2 "$TMP/result.md"
   echo
   cat "$TMP/gates.md"
-} > "$TMP/comment.md"
+} | redact > "$TMP/comment.md"
 gh pr comment "$PR" -R "$REPO" -F "$TMP/comment.md" >/dev/null
 
 if [ "$VERDICT" = "ACCEPTED" ]; then

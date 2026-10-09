@@ -3,15 +3,26 @@
 # 触发：.github/workflows/agent-dev.yml（issue 打上 agent:dev 标签）
 # 用法：scripts/agent/dev.sh <issue-number>
 # 环境：GH_TOKEN（必须是 PAT/App token，GITHUB_TOKEN 开的 PR 不会触发 CI）
-#       DEV_AGENT_CMD（默认 claude -p，限定工具集；提示词从 stdin 传入。
-#                      换 codex：DEV_AGENT_CMD='codex exec -s workspace-write -'）
-#       N8N_AGENT_EVENT_WEBHOOK（可选）
+#       DEV_AGENT_CMD（可选，覆盖默认命令，按 shell 语法解析；提示词从 stdin 传入。
+#                      例：DEV_AGENT_CMD="codex exec -s workspace-write -"）
+#       N8N_AGENT_EVENT_WEBHOOK / N8N_AGENT_EVENT_TOKEN（可选）
+# 安全：agent 进程不持有任何 token（agent_env）；工具限定在仓库目录内；
+#       对 .github/、scripts/agent/、.agents/ 的任何改动（含新增文件）都会被丢弃。
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+self_copy dev.sh "$@"
 cd "$ROOT_DIR"
+PROTECTED=(.github scripts/agent .agents)
 
 ISSUE="${1:?用法: dev.sh <issue-number>}"
 BRANCH="agent/issue-${ISSUE}"
-DEV_AGENT_CMD="${DEV_AGENT_CMD:-claude -p --permission-mode acceptEdits --max-turns 80 --allowedTools Read,Edit,Write,Glob,Grep,Bash(git diff:*),Bash(git status:*),Bash(php -l:*),Bash(node --check:*),Bash(helm template:*),Bash(helm lint:*)}"
+# 用数组保存命令：工具规则里含空格（如 "Bash(php -l:*)"），不能靠字符串分词
+if [ -n "${DEV_AGENT_CMD:-}" ]; then
+  eval "DEV_CMD=(${DEV_AGENT_CMD})"   # 仓库变量，仅 owner 可设
+else
+  DEV_CMD=(claude -p --permission-mode acceptEdits --max-turns 80
+    --allowedTools "Read(./**)" "Edit(./**)" "Glob" "Grep"
+                   "Bash(php -l:*)" "Bash(node --check:*)" "Bash(helm lint deploy/helm/firebird-site)")
+fi
 
 ensure_labels
 TITLE="$(gh issue view "$ISSUE" -R "$REPO" --json title -q .title)"
@@ -66,7 +77,7 @@ PROMPT_FILE="$(mktemp)"; trap 'rm -f "$PROMPT_FILE"' EXIT
   fi
   echo
   echo "## 工程铁律（.agents/RULES.md 全文）"
-  cat .agents/RULES.md
+  git show origin/main:.agents/RULES.md
   echo
   echo "## 硬性要求"
   echo "1. 只实现单一核心 AC，不做范围扩张；火鸟后台已有的配置能力不要重写。"
@@ -78,17 +89,17 @@ PROMPT_FILE="$(mktemp)"; trap 'rm -f "$PROMPT_FILE"' EXIT
 } > "$PROMPT_FILE"
 
 # 4. 施工
-log "🚧 调用 Dev Agent: ${DEV_AGENT_CMD%% *}"
+log "🚧 调用 Dev Agent: ${DEV_CMD[0]}"
 SUMMARY_FILE="$(mktemp)"
 # 提示词走 stdin（claude --allowedTools 是可变参数，会吞掉位置参数）
-# shellcheck disable=SC2086
-if ! ${DEV_AGENT_CMD} < "$PROMPT_FILE" > "$SUMMARY_FILE" 2>&1; then
+if ! agent_env "${DEV_CMD[@]}" < "$PROMPT_FILE" > "$SUMMARY_FILE" 2>&1; then
   log "⚠️ Dev Agent 非 0 退出，继续检查产出"
 fi
-SUMMARY="$(tail -n 30 "$SUMMARY_FILE")"
+SUMMARY="$(tail -n 30 "$SUMMARY_FILE" | redact)"
 
-# 防越权：Dev Agent 不得修改流水线自身
-git checkout -q HEAD -- .github scripts/agent 2>/dev/null || true
+# 防越权：丢弃对受保护路径的一切改动——已跟踪文件还原 + 未跟踪新文件删除
+git checkout -q HEAD -- "${PROTECTED[@]}" 2>/dev/null || true
+git clean -fdq -- "${PROTECTED[@]}"
 
 if [ -z "$(git status --porcelain)" ]; then
   gh issue comment "$ISSUE" -R "$REPO" -b "⚠️ Dev Agent 本轮无任何产出（空交付）。
@@ -108,7 +119,8 @@ fi
 git add -A
 git -c user.name="firebird-dev-agent" -c user.email="dev-agent@users.noreply.github.com" \
   commit -q -m "feat(agent): #${ISSUE} ${TITLE}"
-git push -q -u origin "$BRANCH"
+# checkout 不持久化凭据（persist-credentials: false），推送时由 gh 临时提供
+git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -q -u origin "$BRANCH"
 
 # 6. 开/更新 PR（GH_TOKEN 为 PAT，才能触发 ci-verify / QA）
 if [ -z "$PR" ]; then

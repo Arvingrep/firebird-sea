@@ -64,12 +64,18 @@ sequenceDiagram
 |---|---|---|---|
 | secret | `AGENT_GH_TOKEN` | ✅ | fine-grained PAT（本仓库 Contents / Issues / Pull requests 读写）。**不能用 `GITHUB_TOKEN`**：它推的提交/开的 PR/打的标签不会触发后续 workflow |
 | var | `N8N_AGENT_EVENT_WEBHOOK` | 建议 | `https://n8n.k8shome.com/webhook/firebird-agent-event` |
+| secret | `N8N_AGENT_EVENT_TOKEN` | 建议 | 事件 webhook 的 Header Auth token（`X-Firebird-Token`），与下方 n8n 凭据、GKE Secret 三处一致 |
 | var | `AGENT_AUTO_MERGE` | | 默认 `1`；设 `0` 即改为「QA 通过后人工合并」 |
 | var | `AGENT_MAX_ATTEMPTS` | | QA 打回上限，默认 `3` |
 | var | `DEV_AGENT_CMD` / `QA_AGENT_CMD` | | 覆盖默认 agent 命令（提示词均走 stdin；`QA_AGENT_CMD` 需以输出文件参数结尾，如 `... -o`） |
 | secret | `GCP_SA_KEY` | ✅ | 已有，CI 推 GAR |
 
 本机 runner：`scripts/agent/setup-runner.sh`（标签 `firebird-agent`，launchd 常驻，复用本机 claude/codex 登录态）。
+
+n8n / GKE 侧：
+- 导入 `agent_pipeline_events_to_tg.json` 后：Webhook 节点绑定 **Header Auth** 凭据（Name `X-Firebird-Token`，Value = 上面的 token），Telegram 节点绑定 Bot 凭据，**然后激活**——未激活时生产 webhook 路径 404，CI 与 PostSync 通知会静默失败。
+- `tg_to_github_issues_project`：TG Trigger 必须是 **typeVersion 1.2** 且填 Restrict to Chat/User IDs；Agent 节点为 `promptType=define`，后接「2b. 解析 Spec JSON」Code 节点。
+- GKE `default` 命名空间：`kubectl --context gcp-gke -n default create secret generic firebird-n8n-event-token --from-literal=token=<同一 token>`（PostSync 通知 Job 读取，缺失时不带鉴权头）。
 
 ## 5. 安全边界
 
@@ -79,7 +85,14 @@ sequenceDiagram
     若不限制发送人，任何给 bot 发消息的人都能以 owner 身份触发 Dev Agent 并一路自动合并上线；
   - `agent-qa` 只对本仓库 `agent/*` 分支运行，拒绝 fork PR（`qa.sh` 二次校验 `isCrossRepository`）；
   - 建议在 Settings → Actions 开启「Require approval for all outside collaborators」。
-- Dev Agent 的产出里对 `.github/` 和 `scripts/agent/` 的改动会被丢弃，不能篡改自己的考官。
+- Dev Agent 不能篡改考官，三层防护：
+  1. 施工后对 `.github/`、`scripts/agent/`、`.agents/` 执行 `git checkout` + `git clean`（已跟踪改动与**新增文件**都丢弃）；
+  2. Agent 分支上 gates 的「受保护路径未改动」检查；
+  3. QA 的脚本、`gates.sh`、`RULES.md` 一律取自 main（agent-qa 检出 base 分支并 `self_copy`），PR 代码只作为被审数据。
+- Agent 进程不持有任何凭据：checkout 使用 `persist-credentials: false`，运行 agent 时清空 `GH_TOKEN` 等环境变量（`agent_env`），推送时才由 `gh auth git-credential` 临时提供。
+- Dev Agent 工具白名单：`Read(./**)`、`Edit(./**)`、Glob、Grep、`php -l`、`node --check`、`helm lint deploy/helm/firebird-site`；仓库外读写与 `git diff --output` 实测被拒。
+- 所有发到公开 PR / Issue 的 agent 输出先经 `redact` 脱敏（GitHub token、Authorization 头、私钥块、TG bot token）。
+- 合并需同时满足：托管 runner 上的 gates job = success（`GATES_JOB_RESULT`）、本地复跑门禁通过、QA 无 blocker/major。本机缺 php/helm 时门禁记为 SKIP，以托管 runner 结果为准。
 - 自动合并带 `--match-head-commit`：QA 之后再推的提交不会被带进 main。
 - 门禁拦截私钥 / 助记词 / TG Bot Token 进入 diff（RULES 资金安全禁区）。
 
@@ -87,7 +100,7 @@ sequenceDiagram
 
 ```bash
 make agent-dev ISSUE=12     # 本地手动跑一次 Dev Agent（需 gh 登录）
-make agent-qa PR=34         # 本地手动跑一次 QA
+GATES_JOB_RESULT=success make agent-qa PR=34   # 本地手动跑一次 QA（须声明托管 gates 已通过，否则一律打回）
 make gates                  # 当前分支对 origin/main 跑确定性门禁
 
 # 发布状态 / 回滚（hub 集群）
@@ -98,3 +111,9 @@ argocd app rollback firebird-manila <ID>   # 回滚后 Image Updater 仍会追�
 ```
 
 暂停全自动：`AGENT_AUTO_MERGE=0`（保留 QA，只停合并）；或删 issue 上的 `agent:dev` 标签。
+
+## 7. 已知限制
+
+- php 与 api 两个镜像由 Image Updater 各自独立追踪，CI 先推 php 后推 api，最长约一个检查周期（2 分钟）内两者版本可能错位；chart 改动（`targetRevision: main`）会先于镜像生效。当前两者接口兼容，若将来出现不兼容变更，需改为单一触发 tag 或写回 git。
+- Dev / QA 均为 LLM，存在被需求文本或 diff 中的提示词注入影响的可能；入口已限定为 Arvin 本人（TG chat/user ID、GitHub owner），QA 采用异厂商模型与 fail-closed 解析降低风险。
+

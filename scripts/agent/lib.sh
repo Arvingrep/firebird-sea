@@ -4,7 +4,35 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# 仓库根目录。dev.sh/qa.sh 会把 scripts/agent 复制到临时目录再执行（见 self_copy），
+# 此时由 AGENT_ROOT 指回真正的仓库。
+ROOT_DIR="${AGENT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+AGENT_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 从当前（可信）检出复制 scripts/agent 到临时目录后重新执行自身：
+# 之后的 git checkout 无论切到哪个分支，都不会改变正在运行的脚本（bash 按需读取脚本文件），
+# 也保证 QA 的裁判脚本来自 main 而不是被审查的 PR。
+self_copy() { # self_copy <script-name> "$@"
+  [ -n "${AGENT_SELF_COPIED:-}" ] && return 0
+  local tmp; tmp="$(mktemp -d)"
+  cp -R "$AGENT_SELF_DIR" "$tmp/agent"
+  AGENT_SELF_COPIED=1 AGENT_ROOT="$ROOT_DIR" exec bash "$tmp/agent/$1" "${@:2}"
+}
+
+# 对外发布（PR 正文/评论/TG）前脱敏：GitHub token、Bearer/basic 头、私钥块、TG bot token。
+redact() {
+  sed -E \
+    -e 's/(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}/[REDACTED]/g' \
+    -e 's/github_pat_[A-Za-z0-9_]{20,}/[REDACTED]/g' \
+    -e 's/(x-access-token:)[^@[:space:]]+/\1[REDACTED]/g' \
+    -e 's/([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]:[[:space:]]*([Bb][Aa][Ss][Ii][Cc]|[Bb][Ee][Aa][Rr][Ee][Rr]|[Tt][Oo][Kk][Ee][Nn])[[:space:]]+)[A-Za-z0-9+\/=._-]+/\1[REDACTED]/g' \
+    -e 's/[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}/[REDACTED]/g' \
+    -e '/-----BEGIN [A-Z ]*PRIVATE KEY-----/,/-----END [A-Z ]*PRIVATE KEY-----/c\
+[REDACTED PRIVATE KEY]'
+}
+
+# 以「无凭据环境」运行 agent：去掉所有 token 环境变量
+agent_env() { env -u GH_TOKEN -u GITHUB_TOKEN -u AGENT_GH_TOKEN -u N8N_AGENT_EVENT_TOKEN "$@"; }
 REPO="${GITHUB_REPOSITORY:-Arvingrep/firebird-sea}"
 MAX_ATTEMPTS="${AGENT_MAX_ATTEMPTS:-3}"
 QA_MARK_REJECT="<!-- agent-qa:REJECTED -->"
@@ -23,7 +51,9 @@ notify() {
     process.stdout.write(JSON.stringify({ source: "github-actions", stage, message, repo,
       issue: issue ? Number(issue) : null, pr: pr ? Number(pr) : null, run_url: run || null }));
   ' "$1" "$2" "${3:-}" "${4:-}" "$REPO" "${RUN_URL:-}" \
-  | curl -fsS -m 10 -H 'Content-Type: application/json' --data-binary @- "$url" >/dev/null 2>&1 \
+  | curl -fsS -m 10 -H 'Content-Type: application/json' \
+      ${N8N_AGENT_EVENT_TOKEN:+-H "X-Firebird-Token: ${N8N_AGENT_EVENT_TOKEN}"} \
+      --data-binary @- "$url" >/dev/null 2>&1 \
   || log "⚠️ n8n 通知失败（忽略）: $1"
 }
 

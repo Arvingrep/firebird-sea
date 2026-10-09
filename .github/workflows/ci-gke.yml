@@ -70,16 +70,26 @@ jobs:
             --cache-to type=gha,mode=max \
             -t "$API_IMAGE_TAG" -t "$API_IMAGE_LATEST" -f deploy/docker/Dockerfile.api .
 
-      - name: 5. 通知 n8n（→ TG）：镜像已推送，等待 Image Updater + ArgoCD 上线
-        if: always()
+  # 独立通知 job：任一前置 job 失败（含 test-and-verify 被跳过构建）都能发出告警
+  notify:
+    needs: [test-and-verify, build-and-push]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/agent
+      - name: 通知 n8n（→ TG）
         env:
           N8N_AGENT_EVENT_WEBHOOK: ${{ vars.N8N_AGENT_EVENT_WEBHOOK }}
-          GITHUB_SHA_SHORT: ${{ github.sha }}
-          JOB_STATUS: ${{ job.status }}
+          N8N_AGENT_EVENT_TOKEN: ${{ secrets.N8N_AGENT_EVENT_TOKEN }}
+          SHA: ${{ github.sha }}
+          VERIFY: ${{ needs.test-and-verify.result }}
+          BUILD: ${{ needs.build-and-push.result }}
         run: |
           source scripts/agent/lib.sh
-          if [ "$JOB_STATUS" = "success" ]; then
-            notify image_pushed "GAR 镜像已推送 ${GITHUB_SHA_SHORT:0:8}，Image Updater ≤2 分钟内发现并由 ArgoCD 同步上线"
+          if [ "$BUILD" = "success" ]; then
+            notify image_pushed "GAR 镜像已推送 ${SHA:0:8}，Image Updater ≤2 分钟内发现并由 ArgoCD 同步上线"
           else
-            notify deploy_failed "main ${GITHUB_SHA_SHORT:0:8} 镜像构建失败，未上线"
+            notify deploy_failed "main ${SHA:0:8} 未上线：verify=${VERIFY} build=${BUILD}"
           fi

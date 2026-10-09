@@ -3,9 +3,12 @@
 # 用法：scripts/agent/gates.sh [base-ref]     （默认 origin/main）
 # 输出：stdout 为 Markdown 报告；任一 FAIL => 退出码 1。
 # 阈值：GATE_MAX_ADDED（默认 300，不含 docs/ 与 .agents/）
+# 环境：GATE_REPO_DIR       被检查的仓库目录（QA 用 main 上的本脚本检查 PR 检出）
+#       GATE_AGENT_BRANCH=1 Agent 分支：禁止改动 .github/、scripts/agent/、.agents/
+#       GATE_REQUIRE_TOOLS=1 缺 php/helm 判 FAIL（托管 runner 上为权威结果）；否则记为 SKIP
 
 set -uo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+cd "${GATE_REPO_DIR:-$(dirname "${BASH_SOURCE[0]}")/../..}"
 
 BASE="${1:-origin/main}"
 MAX_ADDED="${GATE_MAX_ADDED:-300}"
@@ -14,6 +17,16 @@ CHANGED="$(git diff --name-only --diff-filter=ACMR "$RANGE")"
 FAILS=0; ROWS=""
 
 row() { ROWS+="| $1 | $2 | ${3:-} |"$'\n'; [ "$2" = "❌ FAIL" ] && FAILS=$((FAILS+1)); return 0; }
+missing_tool() { # missing_tool <检查项> <工具>
+  if [ "${GATE_REQUIRE_TOOLS:-0}" = "1" ]; then row "$1" "❌ FAIL" "runner 缺少 $2"
+  else row "$1" "⚠️ SKIP" "本机缺少 $2，以托管 runner 的 gates 结果为准"; fi
+}
+
+# 0. 受保护路径：Agent 分支不得改动流水线与规范自身（含新增文件）
+if [ "${GATE_AGENT_BRANCH:-0}" = "1" ]; then
+  PROT="$(git diff --name-only "${BASE}...HEAD" | grep -E '^(\.github|scripts/agent|\.agents)/' || true)"
+  [ -z "$PROT" ] && row "受保护路径未改动" "✅ PASS" || row "受保护路径未改动" "❌ FAIL" "$(echo $PROT | head -c 160)"
+fi
 
 # 1. 非空交付
 if [ -n "$CHANGED" ]; then row "非空交付" "✅ PASS" "$(printf '%s\n' "$CHANGED" | wc -l | tr -d ' ') 个文件"
@@ -49,20 +62,23 @@ DEBUG="$(git diff "$RANGE" -- '*.php' '*.js' '*.ts' '*.vue' ':(exclude)scripts/*
 [ -z "$DEBUG" ] && row "无调试残留" "✅ PASS" || row "无调试残留" "❌ FAIL" "$(echo "$DEBUG" | head -n1 | head -c 120)"
 
 # 8. 改动文件语法
-SYN_FAIL=""
+SYN_FAIL=""; NEED_PHP=0
 while IFS= read -r f; do
   [ -f "$f" ] || continue
   case "$f" in
-    *.php) command -v php >/dev/null && { php -l "$f" >/dev/null 2>&1 || SYN_FAIL+="$f "; } ;;
+    *.php) if command -v php >/dev/null; then php -l "$f" >/dev/null 2>&1 || SYN_FAIL+="$f "; else NEED_PHP=1; fi ;;
     *.js)  node --check "$f" >/dev/null 2>&1 || SYN_FAIL+="$f " ;;
     *.sh)  bash -n "$f" 2>/dev/null || SYN_FAIL+="$f " ;;
     *.json) node -e 'JSON.parse(require("fs").readFileSync(process.argv[1]))' "$f" 2>/dev/null || SYN_FAIL+="$f " ;;
   esac
 done <<< "$CHANGED"
 [ -z "$SYN_FAIL" ] && row "改动文件语法" "✅ PASS" || row "改动文件语法" "❌ FAIL" "$SYN_FAIL"
+[ "$NEED_PHP" = "1" ] && missing_tool "PHP 语法" php
 
 # 9. Helm 多站点渲染（chart 有改动时）
-if printf '%s\n' "$CHANGED" | grep -q '^deploy/helm/' && command -v helm >/dev/null; then
+if printf '%s\n' "$CHANGED" | grep -q '^deploy/helm/' && ! command -v helm >/dev/null; then
+  missing_tool "Helm 多站点渲染" helm
+elif printf '%s\n' "$CHANGED" | grep -q '^deploy/helm/'; then
   HF=""
   helm lint deploy/helm/firebird-site >/dev/null 2>&1 || HF+="lint "
   for v in deploy/helm/firebird-site/values-*.yaml; do

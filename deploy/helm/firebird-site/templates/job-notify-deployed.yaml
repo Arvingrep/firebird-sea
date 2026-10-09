@@ -20,10 +20,18 @@ spec:
           resources:
             requests: { cpu: 5m, memory: 8Mi }
             limits: { memory: 32Mi }
+          env:
+            - name: N8N_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.deployNotify.tokenSecret.name | quote }}
+                  key: {{ .Values.deployNotify.tokenSecret.key | quote }}
+                  optional: true
           command: ["sh", "-c"]
           args:
             - >-
-              curl -sS -m 10 --retry 3 --retry-delay 5 --retry-all-errors -H 'Content-Type: application/json'
+              curl -fsS -m 10 --retry 3 --retry-delay 5 --retry-all-errors -H 'Content-Type: application/json'
+              ${N8N_TOKEN:+-H "X-Firebird-Token: $N8N_TOKEN"}
               -d '{"source":"argocd","stage":"deployed","site":"{{ .Values.siteId }}","image":"{{ .Values.image.tag }}","message":"ArgoCD 同步完成，{{ .Values.domain }} 已上线"}'
               {{ .Values.deployNotify.webhook | quote }} || true
 {{- end }}

@@ -20,7 +20,11 @@ jobs:
           fetch-depth: 0
       - uses: azure/setup-helm@v4
       - name: 门禁（分支 diff：增量 / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
+        env:
+          GATE_REQUIRE_TOOLS: "1"
+          GATE_AGENT_BRANCH: ${{ startsWith(github.head_ref, 'agent/') && '1' || '0' }}
         run: |
+          command -v php >/dev/null || { echo "runner 缺少 php"; exit 1; }
           set -o pipefail
           scripts/agent/gates.sh "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Helm 多站点模板合成
@@ -42,14 +46,20 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
       N8N_AGENT_EVENT_WEBHOOK: ${{ vars.N8N_AGENT_EVENT_WEBHOOK }}
+      N8N_AGENT_EVENT_TOKEN: ${{ secrets.N8N_AGENT_EVENT_TOKEN }}
       QA_AGENT_CMD: ${{ vars.QA_AGENT_CMD }}
       AGENT_AUTO_MERGE: ${{ vars.AGENT_AUTO_MERGE || '1' }}
       AGENT_MAX_ATTEMPTS: ${{ vars.AGENT_MAX_ATTEMPTS || '3' }}
+      # 托管 runner 上 gates job 的结论（含 test-helm 等全部步骤），非 success 不得合并
+      GATES_JOB_RESULT: ${{ needs.gates.result }}
     steps:
+      # 检出 base（main）而不是 PR：qa.sh / gates.sh / RULES 这些「裁判」必须来自 main，
+      # PR 代码由 qa.sh 自行检出为被审数据
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.base_ref }}
           fetch-depth: 0
-          token: ${{ secrets.AGENT_GH_TOKEN }}
+          persist-credentials: false
       - name: QA 验收（通过 → squash 合并 → ci-gke 构建 → Image Updater → ArgoCD）
         run: |
           [ -n "$QA_AGENT_CMD" ] || unset QA_AGENT_CMD

@@ -29,14 +29,16 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
       N8N_AGENT_EVENT_WEBHOOK: ${{ vars.N8N_AGENT_EVENT_WEBHOOK }}
+      N8N_AGENT_EVENT_TOKEN: ${{ secrets.N8N_AGENT_EVENT_TOKEN }}
       DEV_AGENT_CMD: ${{ vars.DEV_AGENT_CMD }}
       AGENT_MAX_ATTEMPTS: ${{ vars.AGENT_MAX_ATTEMPTS || '3' }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # 用 PAT 推送：GITHUB_TOKEN 推的提交/开的 PR 不会触发后续 workflow
-          token: ${{ secrets.AGENT_GH_TOKEN }}
+          # 不把 token 写进 .git/config（Dev Agent 能读工作区）；推送时 dev.sh 经 gh 临时取凭据。
+          # 必须用 PAT 推送：GITHUB_TOKEN 推的提交/开的 PR 不会触发后续 workflow。
+          persist-credentials: false
       - name: Dev Agent 施工并开 PR
         run: |
           [ -n "$DEV_AGENT_CMD" ] || unset DEV_AGENT_CMD
