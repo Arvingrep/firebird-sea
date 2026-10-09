@@ -1,0 +1,47 @@
+{
+  "name": "一人AI团队：多Agent流水线事件推送TG",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "firebird-agent-event",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "node-agent-event-webhook",
+      "name": "流水线事件 Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "firebird-agent-event"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ICON = { dev_started: '🤖', dev_done: '📬', qa_started: '🛡️', qa_accepted: '🟢', qa_rejected: '🔴', merged: '🔀', merge_failed: '⚠️', blocked: '🛑', image_pushed: '📦', deployed: '🚀', deploy_failed: '💥' };\nconst repo = 'https://github.com/Arvingrep/firebird-sea';\nreturn $input.all().map(({ json }) => {\n  const e = json.body || json;\n  const lines = [`${ICON[e.stage] || 'ℹ️'} <b>${e.stage || 'event'}</b>`, (e.message || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))];\n  if (e.issue) lines.push(`Issue: <a href=\"${repo}/issues/${e.issue}\">#${e.issue}</a>`);\n  if (e.pr) lines.push(`PR: <a href=\"${repo}/pull/${e.pr}\">#${e.pr}</a>`);\n  if (e.site) lines.push(`站点: ${e.site}`);\n  if (e.image) lines.push(`镜像: <code>${String(e.image).split(':').pop().slice(0, 12)}</code>`);\n  if (e.run_url) lines.push(`<a href=\"${e.run_url}\">运行日志</a>`);\n  return { json: { text: lines.join('\\n') } };\n});"
+      },
+      "id": "node-agent-event-format",
+      "name": "格式化消息",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "2057618975",
+        "text": "={{ $json.text }}",
+        "additionalFields": { "parse_mode": "HTML", "disable_web_page_preview": true }
+      },
+      "id": "node-agent-event-tg",
+      "name": "推送开发者TG",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "流水线事件 Webhook": { "main": [[{ "node": "格式化消息", "type": "main", "index": 0 }]] },
+    "格式化消息": { "main": [[{ "node": "推送开发者TG", "type": "main", "index": 0 }]] }
+  }
+}

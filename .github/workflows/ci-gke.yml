@@ -3,6 +3,13 @@ name: "CI: Build & Push to GAR (ArgoCD 负责部署)"
 on:
   push:
     branches: [ main ]
+    # 纯文档/任务/看板变更不产出新镜像（否则 Image Updater 会滚动一次无意义发布）
+    paths-ignore:
+      - 'docs/**'
+      - '.agents/**'
+      - 'apps/bmad-dashboard/**'
+      - 'automation/n8n/**'
+      - '**/*.md'
   workflow_dispatch:
     inputs:
       site_target:
@@ -63,12 +70,16 @@ jobs:
             --cache-to type=gha,mode=max \
             -t "$API_IMAGE_TAG" -t "$API_IMAGE_LATEST" -f deploy/docker/Dockerfile.api .
 
-      - name: 5. 触发 Telegram 手机通知（镜像已推送，ArgoCD 将自动同步上线）
-        if: success()
+      - name: 5. 通知 n8n（→ TG）：镜像已推送，等待 Image Updater + ArgoCD 上线
+        if: always()
+        env:
+          N8N_AGENT_EVENT_WEBHOOK: ${{ vars.N8N_AGENT_EVENT_WEBHOOK }}
+          GITHUB_SHA_SHORT: ${{ github.sha }}
+          JOB_STATUS: ${{ job.status }}
         run: |
-          TARGET="${{ github.event.inputs.site_target || 'manila' }}"
-          MSG="📦 *【镜像已构建推送 GAR】*%0A城市分站: *${TARGET}*%0A版本 Commit: \`${{ github.sha }}\`%0A状态: *🟡 等待 ArgoCD + Image Updater 自动同步上线*"
-          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && [ -n "${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}" ]; then
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-              -d "chat_id=${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}&text=${MSG}&parse_mode=Markdown" > /dev/null || true
+          source scripts/agent/lib.sh
+          if [ "$JOB_STATUS" = "success" ]; then
+            notify image_pushed "GAR 镜像已推送 ${GITHUB_SHA_SHORT:0:8}，Image Updater ≤2 分钟内发现并由 ArgoCD 同步上线"
+          else
+            notify deploy_failed "main ${GITHUB_SHA_SHORT:0:8} 镜像构建失败，未上线"
           fi

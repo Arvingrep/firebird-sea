@@ -1,9 +1,13 @@
-.PHONY: help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes test-mcp
+.PHONY: gates agent-dev agent-qa agent-runner help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes test-mcp
 
 help:
 	@echo "=========================================================="
 	@echo "🔥 火鸟模式东南亚（菲律宾）一人 AI 团队基地操作指令"
 	@echo "=========================================================="
+	@echo "  make agent-runner     - 🤖 注册本机自托管 runner（多 Agent 流水线，见 docs/internal/AGENT_PIPELINE.md）"
+	@echo "  make agent-dev        - Dev Agent 施工 GitHub Issue (例: make agent-dev ISSUE=12)"
+	@echo "  make agent-qa         - 独立 QA Agent 验收 PR (例: make agent-qa PR=34)"
+	@echo "  make gates            - 当前分支对 origin/main 跑确定性门禁"
 	@echo "  make hermes           - 🏛️  启动 Agent 2 (Hermes) 执行全链路独立红队总验收"
 	@echo "  make test-mcp         - ⚡ 验证 n8n MCP Server 协议及 4 核心工作流端到端状态"
 	@echo "  make setup            - 初始化基地目录与环境检查"
@@ -57,8 +61,19 @@ verify:
 	@./scripts/verify-task.sh
 
 accept:
-	@chmod +x scripts/agent-accept.sh
-	@./scripts/agent-accept.sh $(TASK)
+	@bash scripts/acceptance-runner.sh $(TASK)
+
+gates:
+	@bash scripts/agent/gates.sh origin/main
+
+agent-dev:
+	@bash scripts/agent/dev.sh $(ISSUE)
+
+agent-qa:
+	@bash scripts/agent/qa.sh $(PR)
+
+agent-runner:
+	@bash scripts/agent/setup-runner.sh
 
 test-coins:
 	@node scripts/test-coins-ph.js

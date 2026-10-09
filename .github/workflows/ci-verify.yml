@@ -1,44 +1,56 @@
 name: CI Verify & Quality Gate
 
+# PR → ① 确定性门禁（GitHub 托管 runner，所有 PR）
+#    → ② 独立 QA Agent（本机自托管 runner，仅 agent/* 分支）→ 通过即自动合并 / 打回触发返工
 on:
   pull_request:
     branches: [ main ]
-  push:
-    branches: [ 'feat/**', 'fix/**' ]
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
-  verify-and-test:
-    name: 🛡️ 一人 AI 团队工程门禁与独立验收
+  gates:
+    name: 🔒 确定性门禁
     runs-on: ubuntu-latest
     steps:
-      - name: 1. 检出代码
-        uses: actions/checkout@v4
-
-      - name: 2. 配置 Node.js 20 运行环境
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: 20
-
-      - name: 3. 执行 Dev Agent 防臃肿纯净度门禁
+          fetch-depth: 0
+      - uses: azure/setup-helm@v4
+      - name: 门禁（分支 diff：增量 / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
         run: |
-          chmod +x scripts/dev-check.sh
-          ./scripts/dev-check.sh
+          set -o pipefail
+          scripts/agent/gates.sh "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Helm 多站点模板合成
+        run: ./scripts/test-helm.sh
 
-      - name: 4. 执行 Coins.ph 真实行情与 HMAC-SHA256 鉴权探针
+  agent-qa:
+    name: 🛡️ 独立 QA Agent
+    needs: gates
+    # 门禁失败也要跑：由 QA 把失败项写成打回意见，驱动 Dev Agent 返工
+    if: >-
+      always() &&
+      startsWith(github.head_ref, 'agent/') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, firebird-agent]
+    timeout-minutes: 30
+    concurrency:
+      group: agent-qa-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+      N8N_AGENT_EVENT_WEBHOOK: ${{ vars.N8N_AGENT_EVENT_WEBHOOK }}
+      QA_AGENT_CMD: ${{ vars.QA_AGENT_CMD }}
+      AGENT_AUTO_MERGE: ${{ vars.AGENT_AUTO_MERGE || '1' }}
+      AGENT_MAX_ATTEMPTS: ${{ vars.AGENT_MAX_ATTEMPTS || '3' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AGENT_GH_TOKEN }}
+      - name: QA 验收（通过 → squash 合并 → ci-gke 构建 → Image Updater → ArgoCD）
         run: |
-          node scripts/test-coins-ph.js
-
-      - name: 5. 启动独立验收智能体 (Agent 2) 红队验收
-        run: |
-          chmod +x scripts/agent-accept.sh
-          ./scripts/agent-accept.sh TASK-001
-
-      - name: 6. 验证 GKE Helm 多站点模板合成
-        run: |
-          chmod +x scripts/test-helm.sh
-          ./scripts/test-helm.sh
-
-      - name: 7. 检查工作区代码整洁度与脱水状态
-        run: |
-          chmod +x scripts/clean-bloat.sh
-          ./scripts/clean-bloat.sh
+          [ -n "$QA_AGENT_CMD" ] || unset QA_AGENT_CMD
+          scripts/agent/qa.sh "${{ github.event.pull_request.number }}"

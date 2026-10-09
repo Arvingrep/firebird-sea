@@ -32,7 +32,7 @@
 
 ## 3. 工作流清单（automation/n8n/workflows/）
 
-4 条「一人AI团队」工作流已通过 `n8n import:workflow` 导入到 GKE 实例并验收（`n8n list:workflow` 可见全 4 条）：
+「一人AI团队」工作流（前 4 条已通过 `n8n import:workflow` 导入到 GKE 实例并验收）：
 
 | 文件 | 名称 | 触发 | 依赖凭据 |
 |---|---|---|---|
@@ -40,6 +40,7 @@
 | `tg_to_github_issues_project.json` | TG 语音随笔转 GitHub Issue/看板 | Telegram Trigger | AI 模型、GitHub、Telegram |
 | `tg_voice_to_linear_spec.json` | TG 语音/随笔提炼 TaskSpec → Linear | Telegram Trigger | AI 模型、Linear、Telegram |
 | `usdt_payment_alert.json` | USDT 入账与对账超时告警 | Webhook `payment-status-webhook` | Telegram |
+| `agent_pipeline_events_to_tg.json` | 多 Agent 流水线事件（Dev/QA/合并/构建/上线）推送 TG，见 `AGENT_PIPELINE.md` | Webhook `firebird-agent-event` | Telegram |
 
 > 当前均为 **未激活（active=false）**。激活前需在 n8n UI 配好各节点凭据
 > （Telegram Bot Token / GitHub / Linear / AI 模型等）——属资金/账号绑定的红线动作，由 Arvin 本人操作。

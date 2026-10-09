@@ -45,5 +45,5 @@ gantt
 
 1. **每个 Story 必须产出两份证据**：
    - Dev Agent 提交的 Git 代码变更与 Docs 变更。
-   - Acceptance Agent 独立执行 `./scripts/agent-accept.sh <TASK-ID>` 签发的验收报告。
+   - Acceptance Agent 独立执行 `scripts/agent/qa.sh`（PR）/ `scripts/acceptance-runner.sh <TASK-ID>`（本地） 签发的验收报告。
 2. **不允许跨越里程碑交付**：M1 的资金与鉴权底座必须获 Acceptance Agent 绿标签发，方可进入 M2 的总代理分站业务层。

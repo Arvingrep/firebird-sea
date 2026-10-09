@@ -1,5 +1,7 @@
 # 主题研讨：BMAD 闭环全链路自动化落地架构 (n8n vs GitHub Actions vs 双 Agent)
 
+> ✅ 方案 C 已落地，实现与配置见 [`AGENT_PIPELINE.md`](AGENT_PIPELINE.md)。第 12 步「CI 升级 Helm」已改为 Image Updater + ArgoCD 拉取式发布。
+
 > **核心议题**：
 > 从“手机 TG 随口语音”到“GKE 自动上线闭环”，全流程究竟该由谁驱动？
 > 是用纯 n8n 搞定一切？还是纯靠 GitHub？怎样设计才能既不失一人团队的极致敏捷，又绝对杜绝“开发与验收同体”的系统自嗨？
@@ -60,7 +62,7 @@ sequenceDiagram
 
     rect rgb(15, 23, 42)
     note right of QAAgent: 【独立红队验收卡点】
-    GH->>QAAgent: 9. PR 触发独立验收工作流 (agent-accept.sh)
+    GH->>QAAgent: 9. PR 触发独立验收工作流 (scripts/agent/qa.sh)
     QAAgent->>QAAgent: 10. 执行边界测试、Coins.ph 盘口探针、Docs 卡点
     alt 验收失败 (REJECT)
         QAAgent->>GH: 11a. 在 PR 留下缺陷证据，自动把 Issue 退回 In Progress
@@ -138,6 +140,6 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **1. 需求录入期 (n8n + LLM)** | • 脑暴随口一说变成 10 个零碎任务<br>• 需求边界不断蔓延 (Scope Creep) | • **需求强制单点化**：LLM 提炼时只保留 1 个核心可验证目标，次要优化自动降为注释。<br>• **复用原生优先**：凡是火鸟系统原本具备的配置，禁止新建代码任务。 | `automation/n8n/workflows/tg_to_github_issues_project.json` (内置脱水 Prompt) |
 | **2. 编码施工期 (Dev Agent)** | • 随意 `npm install` 巨型三方库<br>• 过度设计：写 5 层抽象类封装简单功能<br>• 生成无用样板代码与冗余类型 | • **零冗余依赖守则 (Zero-Dep Rule)**：严禁引入未批准的依赖，优先 Node/PHP 标准库。<br>• **KISS 原则**：单一函数解决绝不用工厂类，严禁多余胶水代码。 | `.agents/RULES.md` (明确依赖禁令与精简要求) |
-| **3. 独立验收期 (Acceptance Agent)** | • 遗留 `.bak`、`test.php`、临时大日志<br>• 5 行逻辑写了 300 行死代码<br>• 缺少真实测试的自我催眠代码 | • **代码增量脱水审查**：单次 PR 超过 200 行增量即触发警报并审查冗余度。<br>• **死代码与垃圾扫描**：扫描未引用的函数、死循环、遗留日志与大文件。 | `scripts/agent-accept.sh`<br>`make accept TASK=...` |
+| **3. 独立验收期 (Acceptance Agent)** | • 遗留 `.bak`、`test.php`、临时大日志<br>• 5 行逻辑写了 300 行死代码<br>• 缺少真实测试的自我催眠代码 | • **代码增量脱水审查**：单次 PR 超过 200 行增量即触发警报并审查冗余度。<br>• **死代码与垃圾扫描**：扫描未引用的函数、死循环、遗留日志与大文件。 | `scripts/agent/gates.sh`<br>`scripts/agent/qa.sh` |
 | **4. 发布运维期 (GKE / Docker)** | • 镜像包含编译工具链导致体积 > 1GB<br>• 日志打满磁盘导致 OOM / 磁盘爆满<br>• 看板数百张卡片堆积造成决策瘫痪 | • **Alpine 多阶段构建**：生产镜像剥离编译链，体积压缩至 < 100MB。<br>• **自动归档与剪枝**：已上线的 Issue 自动归入 `archive/`，`make clean-bloat` 一键清理临时构建。 | `deploy/helm/firebird-site`<br>`make clean-bloat` |
 
