@@ -90,7 +90,7 @@ n8n / GKE 侧：
   2. Agent 分支上 gates 的「受保护路径未改动」检查；
   3. QA 的脚本、`gates.sh`、`RULES.md` 一律取自 main（agent-qa 检出 base 分支并 `self_copy`），PR 代码只作为被审数据。
 - Agent 进程不持有任何凭据：checkout 使用 `persist-credentials: false`，运行 agent 时清空 `GH_TOKEN` 等环境变量（`agent_env`），推送时才由 `gh auth git-credential` 临时提供。
-- Dev Agent 工具白名单仅 `Read(./**)`、`Edit(./**)`、Glob、Grep，**不放行任何 Bash**（`node --check:*` 之类前缀规则可借 `-r` 等参数执行任意代码）；仓库外读写实测被拒。
+- Dev Agent 工具白名单仅 `Read(./**)`、`Edit(./**)`、`Grep(./**)`、`Glob(./**)`（裸 Grep/Glob 实测可读仓库外），**不放行任何 Bash**（`node --check:*` 之类前缀规则可借 `-r` 等参数执行任意代码）；仓库外读写实测被拒。
 - `.git` 防护：施工前快照 `.git/config`，施工后还原并清空 `.git/hooks`；之后的 git 调用一律 `-c core.hooksPath=/dev/null -c core.fsmonitor=false`，commit/push 加 `--no-verify`。
 - 所有发到公开 PR / Issue 的 agent 输出先经 `redact` 脱敏（GitHub token、Authorization 头、私钥块、TG bot token）。
 - 合并需同时满足：托管 runner 上的 gates job = success（`GATES_JOB_RESULT`）、本地复跑门禁通过、QA 无 blocker/major。本机缺 php/helm 时门禁记为 SKIP，以托管 runner 结果为准。

@@ -20,7 +20,8 @@ if [ -n "${DEV_AGENT_CMD:-}" ]; then
   eval "DEV_CMD=(${DEV_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
   DEV_CMD=(claude -p --permission-mode acceptEdits --max-turns 80
-    --allowedTools "Read(./**)" "Edit(./**)" "Glob" "Grep")
+    --allowedTools "Read(./**)" "Edit(./**)" "Grep(./**)" "Glob(./**)")
+  # Grep/Glob 必须带路径限定：裸 "Grep"/"Glob" 实测可读仓库外（/etc/hosts），限定后被拒
   # 不放行任何 Bash：带 :* 的前缀规则可借参数执行任意代码（如 node --check -r ./x.js），
   # 语法/Helm 检查由 gates.sh 负责
 fi
