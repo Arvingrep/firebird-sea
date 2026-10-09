@@ -22,7 +22,13 @@ log "🤖 Dev Agent 认领 #${ISSUE}: ${TITLE}"
 git fetch -q origin main
 if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
   git fetch -q origin "$BRANCH"; git checkout -q -B "$BRANCH" "origin/$BRANCH"
-  git merge -q --no-edit origin/main || die "与 main 冲突，需人工处理"
+  if ! git merge -q --no-edit origin/main; then
+    git merge --abort 2>/dev/null || true
+    set_label "$ISSUE" "agent:blocked" "agent:dev"
+    gh issue comment "$ISSUE" -R "$REPO" -b "🛑 \`${BRANCH}\` 与 main 冲突，Dev Agent 不自动解决冲突，请人工 rebase 后重新打 agent:dev。" >/dev/null
+    notify blocked "#${ISSUE} 分支与 main 冲突，需人工处理" "$ISSUE"
+    exit 1
+  fi
   MODE="返工"
 else
   git checkout -q -B "$BRANCH" origin/main

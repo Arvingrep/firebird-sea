@@ -75,7 +75,7 @@ sequenceDiagram
 
 - 仓库是**公开**的，而 Agent 跑在本机自托管 runner 上，因此：
   - `agent-dev` 只响应 `sender == 仓库 owner` 的 `agent:dev` 标签，或 owner 本人的 `workflow_dispatch`；
-  - n8n TG Trigger 限定 chat/user ID = Arvin 本人。**这一条是闸门的前提**：n8n 用 owner 的 OAuth 建 Issue，
+  - n8n TG Trigger（**typeVersion ≥ 1.2**，1.1 只显示该选项、运行时不过滤）限定 chat/user ID = Arvin 本人。**这一条是闸门的前提**：n8n 用 owner 的 OAuth 建 Issue，
     若不限制发送人，任何给 bot 发消息的人都能以 owner 身份触发 Dev Agent 并一路自动合并上线；
   - `agent-qa` 只对本仓库 `agent/*` 分支运行，拒绝 fork PR（`qa.sh` 二次校验 `isCrossRepository`）；
   - 建议在 Settings → Actions 开启「Require approval for all outside collaborators」。
