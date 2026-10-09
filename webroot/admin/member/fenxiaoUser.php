@@ -95,7 +95,7 @@ if ($action == "getList") {
     $result = $dsql->dsqlOper($archives, "results");
     $totalRefuse = $result[0]['total'];
 
-    $state = $_REQUEST['state']; //框架有对state参数做特殊处理，此处修复
+
     if ($state != "") {
         $where .= " AND f.`state` = $state";
     }

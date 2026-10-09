@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<style>
+.content {padding:20px 50px;}
+.content table {width:100%;vertical-align:middle; color:#333; font-size:14px; border-left:1px solid #d7d7d7; border-bottom:1px solid #d7d7d7;}
+.content table th {height:30px; text-align:center; vertical-align:middle; font-weight:500; border:1px solid #d7d7d7; border-left:none; border-bottom:none; background:#ededed;}
+.content table td {padding:5px; min-width:90px; text-align:center; vertical-align:middle; border:1px solid #d7d7d7; border-left:none; border-bottom:none; background:#fff;}
+.content table td input {height:15px; margin:0;}
+.content tbody > tr:nth-child(odd) > td {background-color: #f9f9f9;}
+.content table tr.curr td {background: #eef6ff;}
+.content table tr.cancel td, .content table tr.cancel td span {color:#eee !important;}
+.content p {margin-top:30px;text-align: center;}
+.variable.article_prop{display: block !important;}
+.variable.variable-{#$mold#} {display: block;}
+.variable.variable-{#$mold#}.inline {display: inline;}
+#listSection1:empty + input + .fg {height:30px;}
+
+/*下拉搜索select2.js覆盖样式*/
+.select2-container .select2-choice {height:32px !important;line-height: 32px !important;font-size: 14px;background-image:none !important;
+  border-radius: 2px !important;
+  background-color: #fff!important;
+    border: 1px solid #ccc !important;
+    -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,0.075)!important;
+    -moz-box-shadow: inset 0 1px 1px rgba(0,0,0,0.075)!important;
+    box-shadow: inset 0 1px 1px rgba(0,0,0,0.075);!important}
+.select2-container .select2-choice div {border-radius: 0 2px 2px 0 !important;}
+
+#media_manager + span {display: none;font-size: 14px;}
+#media_manager.show {display: inline !important;}
+#media_manager.show + span {display: inline;}
+.editform .clearfix>dd.fn-clear{overflow: visible;}
+.fn-left{float: left; margin-left: 10px;}
+.fn-clear::after{clear: both; content: ''; display: block; }
+/* .leftOff dd{transform: translateX(-50px);} */
+.forSource{display: none !important;}
+.reEditItemInfo{display: none;}
+.editInfoBox.reEdit .forSource{display: inline-block  !important;}
+.editInfoBox.reEdit .reEditItemInfo{display: block  !important;}
+.editInfoBox.reEdit .forWriter{display: none;}
+</style>
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+	atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 0;  //图集配置
+var imglist = {"list1": {#$imglist#},},
+	typeListArr = {#$typeListArr#}, action = '{#$action#}', modelType = '{#$action#}',
+	cfg_term = "pc", adminPath = "{#$adminPath#}", staticPath = '{#$cfg_staticPath#}';
+var cityid = {#$cityid#}, cityList = {#$cityList#};
+var id = {#$id|default:0#};
+var mold = {#$mold#};
+var detail = {
+  videotype: {#$videotype|default:0#},
+  media: {#$media|default:0#},
+  media_arctype: {#$media_arctype|default:0#}
+};
+var typeMediaListArr = {#$typeMediaListArr#};
+</script>
+</head>
+
+<body>
+{#if $auditConfig['switch'] && $id#}
+<div class="btn-group config-nav" data-toggle="buttons-radio" style="margin-bottom:15px;">
+  <button type="button" class="btn active" data-type="info">信息内容</button>
+  <button type="button" class="btn" data-type="audit">审核流程</button>
+  <button type="button" class="btn" data-type="editLog">修改记录</button>
+</div>
+{#/if#}
+<div class="item">
+  <form action="" method="post" name="editform" id="editform" class="editform">
+    <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+    <input type="hidden" name="id" id="id" value="{#$id#}" />
+    <input type="hidden" name="token" id="token" value="{#$token#}" />
+    <dl class="clearfix">
+      <dt><label for="module">城市：</label></dt>
+      <dd style="overflow: visible; padding-left: 140px;" >
+        <!-- <select class="chosen-select" id="cityid" name="cityid" style="width: auto; min-width: 150px;"></select> -->
+		<div class="choseCity">
+			<input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value="{#$cityid#}">
+		</div>
+
+      </dd>
+    </dl>
+
+
+
+    <dl class="clearfix">
+      <dt>新闻类型：</dt>
+      <dd class="radio">
+        {#html_radios name="mold" values=$mold_val checked=$mold output=$mold_name separator="&nbsp;&nbsp;"#}
+        <!-- <span class="input-tips" style="display:inline-block;"><s></s>短视频类型仅支持在APP端上传并发布</span> -->
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="title">信息标题：</label></dt>
+      <dd>
+        <input class="input-xxlarge" type="text" name="title" id="title" data-regex=".{1,60}" maxlength="60" value="{#$title#}" />
+        <div class="color_pick"><em style="background:{#$color#};"></em></div>
+        <span class="input-tips"><s></s>请输入信息标题，1-60个汉字</span>
+        <input type="hidden" name="color" id="color" value="{#$color#}" />
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="subtitle">短标题：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="subtitle" id="subtitle" data-regex=".{0,36}" maxlength="36" value="{#$subtitle#}" />
+        <span class="input-tips"><s></s>请输入简略标题，0-36个汉字</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>信息分类：</dt>
+      <dd style="overflow:visible;">
+        <div class="btn-group" id="typeBtn" style="margin-left:10px;">
+          <button class="btn dropdown-toggle" type="button" data-toggle="dropdown">{#$typename#}<span class="caret"></span></button>
+        </div>
+        <input type="hidden" name="typeid" id="typeid" value="{#$typeid#}" />
+        <span class="input-tips"><s></s>请选择信息分类</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>自定义属性：</dt>
+      <dd class="radio">{#html_checkboxes name='flags' values=$flag output=$flagList selected=$flagitem separator="&nbsp;&nbsp;"#}</dd>
+    </dl>
+    {#if $flags|strpos:'t' !== false#}
+    <dl class="clearfix" id="rDiv">
+    {#else#}
+    <dl class="clearfix hide" id="rDiv">
+    {#/if#}
+      <dt><label for="redirecturl">跳转地址：</label></dt>
+      <dd>
+        <input class="input-xlarge" type="text" name="redirecturl" id="redirecturl" value="{#$redirecturl#}" data-regex="[a-zA-z]+:\/\/[^\s]+" />
+        <span class="input-tips"><s></s>请输入网址，以http://开头</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="click">浏览次数：</label></dt>
+      <dd>
+        <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+        <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="1" data-regex="[1-9]\d*" value="{#$weight#}" />
+        <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>缩略图：</dt>
+  		<dd class="thumb clearfix listImgBox">
+  			<div class="uploadinp filePicker thumbtn{#if $litpic != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+  			{#if $litpic != ""#}
+  			<ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$litpic|escape:"url"#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$litpic|escape:"url"#}" data-val="{#$litpic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+  			{#else#}
+  			<ul id="listSection1" class="listSection thumblist clearfix"></ul>
+  			{#/if#}
+  			<input type="hidden" name="litpic" value="{#$litpic#}" class="imglist-hidden" id="litpic">
+        <div class="clearfix fg"></div>
+        <p class="variable variable-2 variable-3" style="font-size:14px;color:#999;">本地上传视频时如果不上传缩略图，系统将在提交后自动生成（会有一定延时，如果附件使用远程服务器，需要设置允许跨域请求）</p>
+  		</dd>
+    </dl>
+    <dl class="clearfix variable variable-0">
+      <dt>排版方式：</dt>
+      <dd class="radio">
+        {#html_radios name="typeset" values=$typeset_val checked=$typeset output=$typeset_name separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="media">所属自媒体：</label></dt>
+      <dd class="fn-clear">
+        <div class="fn-left">
+          <input class="input-medium inpBox floatDiv" type="text"  id="mediaText" value="{#$mediaName#}" autocomplete="off" />
+          <input name="media" type="hidden" id="media" style="width: 305px" value="{#$media#}" data-value="{#$mediaName#}" />
+          <div id="media_list" class="popup_key"></div>
+        </div>
+        <div class="fn-left">
+          <label for="">&nbsp;&nbsp;对应会员：</label>
+          <input type="hidden" name="admin" id="admin" value="{#$admin#}" />
+          <span class="input-tips"><s></s>请输入网站对应会员名</span>
+          <select id="media_manager" class="show">
+            <option value="">请先选择所属自媒体</option>
+          </select>
+        </div>
+      
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>栏目：</dt>
+      <dd style="overflow:visible;">
+        <div class="btn-group" id="typeMediaBtn" style="margin-left:10px;">
+          <button class="btn dropdown-toggle" type="button" data-toggle="dropdown">{#$media_arctypename#}<span class="caret"></span></button>
+        </div>
+        <input type="hidden" name="media_arctype" id="media_arctype" value="{#$media_arctype#}" />
+        <span class="input-tips" style="display:inline-block;"><s></s>政企号才有此功能</span>
+      </dd>
+    </dl>
+    <dl class="clearfix variable variable-0 article_prop">
+      <dt>性质：</dt>
+      <dd class="radio">
+        <label><input type="radio" name="article_prop" value="0"{#if $prop == 0#} checked="checked"{#/if#}>原创</label>&nbsp;&nbsp;
+        <label><input type="radio" name="article_prop" value="1"{#if $prop == 1#} checked="checked"{#/if#}>转载/二改</label>&nbsp;&nbsp;
+      </dd>
+    </dl>
+    <div class="editInfoBox {#if $source#}reEdit{#/if#}">
+      <dl class="clearfix leftOff ">
+        <dt class="forSource"><label for="source">来源：</label></dt>
+        <dt class="forWriter"><label for="writer">编辑：</label></dt>
+        <dd class="fn-clear">
+          <div class="fn-left forSource">
+            
+            <input class="input-medium" type="text" name="source" id="source" placeholder="信息来源" value="{#$source#}" /><button type="button" class="btn chooseData" data-type="source">选择</button>
+          
+          </div>
+          <div class="fn-left">
+            <label for="writer" class="ml30 forSource">编辑：</label>
+            <input class="input-xlarge" type="text" name="writer" id="writer" placeholder="信息作者" value="{#$writer#}" />
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix reEditItemInfo" >
+        <dt><label for="writer">来源网址：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="sourceurl" id="sourceurl" placeholder="来源网址" value="{#$sourceurl#}" style="width: 425px;" />
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="writer">发布时间：</label></dt>
+        <dd>
+          <div class="input-append form_datetime" style="margin: 0;">
+              <input class="input-medium" type="text" name="pubdate" id="pubdate" date-language="ch" value="{#$pubdate#}" />
+              <span class="add-on"><i class="icon-time"></i></span>
+            </div>
+        </dd>
+      </dl>
+    </div>
+    
+    <!-- 正文 -->
+    <dl class="clearfix variable variable-0{#if $id && ($body || $mbody)#} variable-1{#/if#}">
+      <dt>信息内容：</dt>
+      <dd>
+        <div style="padding: 3px 0 15px;">
+          <label><input name="dellink" type="checkbox" id="dellink" value="1"{#if $customDelLink#} checked{#/if#} />删除非站内链接</label> <small>[<a href="javascript:;" id="allowurl">配置</a>]</small>
+          <label style="margin-left:15px;"><input name="autolitpic" type="checkbox" id="autolitpic" value="1"{#if $customAutoLitpic#} checked{#/if#} />提取第一张图片为缩略图</label>
+  		<div class="hide">
+  	        分页方式：<label><input name="sptype" type="radio" value="hand" id="hand" checked="1" />手动</label>
+  	                <label><input name="sptype" type="radio" value="auto" id="auto" />自动</label>
+  	        大小：<input class="input-mini" name="spsize" type="text" id="spsize" value="5" size="5" /> K
+  		</div>
+  		</div>
+        <ul class="nav nav-tabs" style="margin-bottom:5px;">
+          <li class="active"><a href="#pc">电脑端</a></li>
+          <li><a href="#mobile">移动端</a></li>
+        </ul>
+        <div id="pc">
+        	<script id="body" name="body" type="text/plain" style="width:85%;height:500px">{#$body#}</script>
+        </div>
+        <div id="mobile" class="hide">
+        	<script id="mbody" name="mbody" type="text/plain" style="width:85%;height:500px">{#$mbody#}</script>
+        </div>
+      </dd>
+    </dl>
+    <!-- 图集 -->
+    <dl class="clearfix variable variable-1">
+      <dt>信息图集：</dt>
+  		<dd class="listImgBox hide">
+  			<div class="list-holder">
+  				<ul id="listSection2" class="clearfix listSection"></ul>
+  				<input type="hidden" name="imglist" value='{#$imglist#}' class="imglist-hidden">
+  			</div>
+  			<div class="btn-section clearfix">
+  				<div class="uploadinp filePicker" id="filePicker2" data-type="desc" data-count="999" data-size="{#$atlasSize#}" data-imglist="list1"><div id="flasHolder"></div><span>添加图片</span></div>
+  				<div class="upload-tip">
+  					<p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+  				</div>
+  			</div>
+  		</dd>
+    </dl>
+    {#*
+    <dl class="clearfix variable variable-2">
+      <dt>视频缩略图：</dt>
+      <dd class="thumb clearfix listImgBox">
+        <div class="uploadinp filePicker thumbtn{#if $videoface != ""#} hide{#/if#}" id="filePicker3" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+        {#if $videoface != ""#}
+        <ul id="listSection3" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_3_1"><a href='{#$cfg_attachment#}{#$videoface|escape:"url"#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$videoface|escape:"url"#}" data-val="{#$videoface#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+        {#else#}
+        <ul id="listSection3" class="listSection thumblist clearfix"></ul>
+        {#/if#}
+        <input type="hidden" name="videoface" value="{#$videoface#}" class="imglist-hidden" id="videoface">
+      </dd>
+    </dl>
+    *#}
+    <dl class="clearfix variable variable-2">
+      <dt><label>视频类型：</label></dt>
+      <dd class="radio">
+        {#html_radios name="videotype" values=$videotypeArr checked=$videotype output=$videotypeNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    {#if $videotype == 0#}
+    <dl class="clearfix variable variable-2 type0">
+    {#else#}
+    <dl class="clearfix variable variable-2 hide type0">
+    {#/if#}
+      <dt>上传视频：</dt>
+      <dd>
+        <input name="video" type="hidden" id="video" value="{#if !$videotype#}{#$videourl#}{#/if#}" />
+        <div class="spic{#if ($videotype == 1 || ($video == 0 && $videourl == "") )#} hide{#/if#}">
+          <div class="sholder" id="videoPreview">
+            {#if !$videotype && $videourl != ""#}
+              <a href="/include/videoPreview.php?f=" data-id="{#$videourl#}">预览视频</a>
+            {#/if#}
+          </div>
+          <a href="javascript:;" class="reupload">重新上传</a>
+        </div>
+        <iframe src ="/include/upfile.inc.php?mod={#$action#}&type=video&obj=video&filetype=video" style="width:100%; height:25px;{#if !$videotype && $videourl != ""#} display: none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+      </dd>
+    </dl>
+    {#if $videotype == 1#}
+    <dl class="clearfix variable variable-2 type1">
+    {#else#}
+    <dl class="clearfix variable variable-2 hide type1">
+    {#/if#}
+      <dt><label for="videourl">视频地址：</label></dt>
+      <dd><input class="input-xxlarge" type="text" name="videourl" id="videourl" value="{#if $videotype == 1#}{#$videourl#}{#/if#}" placeholder="目前仅支持第三方平台的通用代码播放" /></dd>
+    </dl>
+    {#if $videotype == 1#}
+    <dl class="clearfix variable variable-2 type1">
+    {#else#}
+    <dl class="clearfix variable variable-2 hide type1">
+    {#/if#}
+        <dt><label for="hour">视频时长：</label></dt>
+        <dd>
+        <span>
+          <input class="input-mini" type="number" name="hour" min="0" id="hour" value="{#$hour#}" />小时
+          <input class="input-mini" type="number" name="minute" min="0" id="minute" value="{#$minute#}" />分钟
+          <input class="input-mini" type="number" name="second" min="0" id="second" value="{#$second#}" />秒
+        </span>
+        </dd>
+    </dl>
+    {#*短视频*#}
+    <dl class="clearfix variable variable-3">
+      <dt>视频：</dt>
+      <dd>
+        <input name="video" type="hidden" id="video3" value="{#$videourl#}" />
+        <div class="spic{#if $videotype == 1 || ($video == 0 && $videourl == "")#} hide{#/if#}">
+          <div class="sholder" id="videoPreview">
+            {#if $videourl != ""#}
+              <a href="/include/videoPreview.php?f=" data-id="{#$videourl#}">预览视频</a>
+            {#/if#}
+          </div>
+          <a href="javascript:;" class="reupload">重新上传</a>
+        </div>
+        <iframe src ="/include/upfile.inc.php?mod={#$action#}&type=video&obj=video3&filetype=video" style="width:100%; height:25px;{#if $videourl != ""#} display: none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="keywords">关键字：</label></dt>
+      <dd>
+        <input class="input-xxlarge" type="text" name="keywords" id="keywords" data-regex=".{0,50}" maxlength="50" placeholder="用于搜索引擎，50汉字以内" value="{#$keywords#}" />
+        <a href="javascript:;" class="autoget variable variable-0 inline" data-type="keywords">自动获取</a>
+        <span class="input-tips"><s></s>用于搜索引擎，50汉字以内</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="description">内容摘要：</label></dt>
+      <dd>
+        <textarea name="description" id="description" placeholder="10~200汉字之内" data-regex=".{0,200}">{#$description#}</textarea>
+        <a href="javascript:;" class="autoget variable variable-0 inline" data-type="description">自动获取</a>
+        <span class="input-tips"><s></s>10~200汉字之内</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>评论开关：</dt>
+      <dd class="radio">
+        {#html_radios name="notpost" values=$postopt checked=$notpost output=$postnames separator="&nbsp;&nbsp;"#}
+        {#if $need_audit == 0 || $need_audit == 2#}
+        <label for="arcrank">阅读权限：
+          <select name="arcrank" id="arcrank" class="input-medium">
+            {#html_options options=$arcrankList selected=$arcrank#}
+          </select>
+        </label>
+        {#/if#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>打赏开关：</dt>
+      <dd class="radio">
+        {#html_radios name="reward_switch" values=$rewardopt checked=$reward_switch output=$rewardnames separator="&nbsp;&nbsp;"#}
+        <span class="input-tips" style="display:inline-block;"><s></s>如果开启打赏，请同时在新闻设置中启用打赏功能</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>专题：</dt>
+      <dd>
+        <select name="zhuanti" id="zhuanti" class="input-medium">
+          <option value="">请选择</option>
+          {#foreach from=$zhuantList item="zt"#}
+          <option value="{#$zt.id#}"{#if $zt.id == $zhuanti_par#} selected=""{#/if#}>{#$zt.typename#}</option>
+          {#/foreach#}
+        </select>
+        <select name="zhuantitype" id="zhuantitype" class="input-medium">
+          <option value="">请选择</option>
+          {#if $zhuantList2#}
+          {#foreach from=$zhuantList2 item="zt"#}
+          <option value="{#$zt.id#}"{#if $zt.id == $zhuanti#} selected=""{#/if#}>{#$zt.typename#}</option>
+          {#/foreach#}
+          {#/if#}
+        </select>
+      </dd>
+    </dl>
+    {#*
+    <dl class="clearfix">
+      <dt>发布时间</dt>
+      <dd><input type="text" class="input-medium" name="pubdate" id="pubdate" value="{#$pubdate#}"></dd>
+    </dl>
+    *#}
+    {#if $admin_edit#}
+    <dl class="clearfix formbtn">
+      <dt>&nbsp;</dt>
+      <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+    </dl>
+    {#else#}
+    <dl class="clearfix formbtn">
+      <dt>&nbsp;</dt>
+      <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit" disabled>确认提交</button></dd>
+    </dl>
+    {#/if#}
+  </form>
+</div>
+<div class="item hide" id="audit">
+  <div class="content">
+    <table>
+      <thead>
+        <tr>
+          <th>职位</th>
+          <th>审核人</th>
+          <th>审核状态</th>
+          <th>审核时间</th>
+          <th>备注</th>
+          <th>操作{#$adminid#}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#if $audit_log#}
+        {#foreach from=$audit_log item=audit#}
+        <tr {#if $levelID == $audit.id#} class="curr"{#elseif ($audit['or'] && $audit.ok && !$audit.do)#} class="cancel"{#/if#}>
+          <td>{#$audit.typename#}</td>
+          <td class="nickname">{#$audit.nickname#}</td>
+          <td class="state">{#if $audit.state == 0#}<span style="color:#ccc;">待审核</span>{#elseif $audit.state == 1#}<span style="color:#51a351;">审核通过</span>{#elseif $audit.state == 2#}<span style="color:#da4f49;">审核拒绝</span>{#/if#}</td>
+          <td class="pubdate">{#if $audit.state != 0#}{#$audit.pubdate|date_format: "%Y-%m-%d %H:%M:%S"#}{#/if#}</td>
+          <td class="note">{#$audit.note#}</td>
+          {#if $audit.do#}
+          <td>
+            <button class="btn btn-small btn-success" type="submit" name="button" id="btnSuccess"{#if $audit.state == 1#} disabled{#/if#}>审核通过</button>
+            <button class="btn btn-small btn-danger" type="submit" name="button" id="btnRefuse"{#if $audit.state == 2#} disabled{#/if#}>审核拒绝</button>
+          </td>
+          {#else#}
+          <td><span style="color:#ccc;">{#$audit.doinfo#}</span></td>
+          {#/if#}
+        </tr>
+        {#/foreach#}
+        {#else#}
+          <tr>
+            <td colspan="6">没有审核记录</td>
+          </tr>
+        {#/if#}
+      </tbody>
+    </table>
+    {#if $audit_history#}
+    <p class="audit_history">审核记录</p>
+    <table>
+      <thead>
+        <tr>
+          <th>职位</th>
+          <th>审核人</th>
+          <th>详情</th>
+          <th>备注</th>
+          <th>操作时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#if $audit_history#}
+        {#foreach from=$audit_history item=log#}
+        <tr>
+          <td>{#$log.typename#}</td>
+          <td class="nickname">{#$log.nickname#}</td>
+          <td>{#if $log.oldstate == 0#}待审核{#elseif $log.oldstate == 1#}审核通过{#elseif $log.oldstate == 2#}审核拒绝{#/if#} => {#if $log.newstate == 0#}待审核{#elseif $log.newstate == 1#}审核通过{#elseif $log.newstate == 2#}审核拒绝{#/if#}</td>
+          <td>{#$log.note#}</td>
+          <td>{#$log.pubdate|date_format: "%Y-%m-%d %H:%M:%S"#}</td>
+        </tr>
+        {#/foreach#}
+        {#/if#}
+      </tbody>
+    </table>
+    {#/if#}
+  </div>
+</div>
+<div class="item hide" id="editLog">
+  <div class="content">
+    <table>
+      <thead>
+        <tr>
+          <th>操作人</th>
+          <th>操作时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#if $audit_edit#}
+        {#foreach from=$audit_edit item=edit#}
+        <tr>
+          <td>{#$edit.nickname#}</td>
+          <td>{#$edit.pubdate|date_format:'%Y-%m-%d %H:%M:%S'#}</td>
+        </tr>
+        {#/foreach#}
+        {#else#}
+        <tr>
+          <td colspan="2">暂无记录</td>
+        </tr>
+        {#/if#}
+      </tbody>
+    </table>
+  </div>
+</div>
+<dl class="fn-clear hide">
+  <dt>音频：</dt>
+  <dd class="thumb fn-clear listImgBox">
+    <div class="uploadinp filePicker thumbtn" id="filePicker_audio" data-type-real="audio" data-type="filenail" data-mime="{#$audioType|replace:";":","#}" data-accept="{#$audioType#}" data-count="20" data-size="{#$audioSize#}" data-imglist=""><div></div><span></span></div>
+    <ul id="listSection_audio" class="listSection thumblist fn-clear"></ul>
+    <input type="hidden" name="" value="" class="imglist-hidden">
+  </dd>
+</dl>
+{#$editorFile#}
+<script type='text/javascript' src='/include/ueditor/addCustomizeButton.js?v={#$cfg_staticVersion#}'></script>
+{#$jsFile#}
+</body>
+</html>

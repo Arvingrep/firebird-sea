@@ -1,5 +1,5 @@
 
-var pageVue = new Vue({
+var page = new Vue({
   el:'#page',
   data:{
     navList:navList,  //左侧导航
@@ -143,7 +143,7 @@ var pageVue = new Vue({
 
       var url = '';
 
-      if(currid == 22){
+      if(currid == 3){
 
         if(type == 'video'){
           /*视频*/
@@ -158,7 +158,7 @@ var pageVue = new Vue({
         /*全景*/
         url = masterDomain + '/include/ajax.php?service=house&action=loupanMangeList&type=quanjing&loupanid='+loupanid+"&page="+atpage+"&pageSize=8";
 
-      }else if(currid == 23){
+      }else if(currid == 5){
 
         /*户型*/
         url = masterDomain + '/include/ajax.php?service=house&action=apartmentList&act=loupan&loupanid='+loupanid+"&page="+atpage+"&pageSize=8";
@@ -174,7 +174,7 @@ var pageVue = new Vue({
         tt.loading = false;
         var data = response.data;
         if(data.state ==100){
-          if(currid==22){
+          if(currid==3){
             if(type == 'video'){
 
               tt.videoList = data.info.list;
@@ -184,7 +184,7 @@ var pageVue = new Vue({
             }
           }else if(currid==4){
             tt.quanjingList = data.info.list;
-          }else if(currid==23){
+          }else if(currid==5){
             tt.huxingList   = data.info.list;
           }
            totalCount = data.info.pageInfo.totalCount;

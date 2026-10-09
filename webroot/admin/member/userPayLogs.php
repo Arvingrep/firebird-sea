@@ -93,7 +93,7 @@ if($dopost == "getList"){
         $length = strlen($sKeyword);
         // 查询订单号
         if($length==16){
-            $twehre .= " AND (`ordernum`= '$sKeyword' OR `param` like '%$sKeyword%' OR FIND_IN_SET('$sKeyword', `body`))";
+            $twehre .= " AND (`ordernum`= '$sKeyword' OR `param` like '%$sKeyword%')";
         }elseif(is_numeric($sKeyword)){
             $twehre .= " AND `uid` = $sKeyword";
         }else{
@@ -147,9 +147,9 @@ if($dopost == "getList"){
             // 3.处理用户
             $list[$key]['userid']  = $val['uid'] ? $val['uid'] :"-1";
 
-            $list[$key]['user'] = $val['nickname'] ? $val['nickname'] : ($val['username'] ? $val['username'] : "未知(id:".$val['uid'].")");
+            $list[$key]['user'] = $val['nickname'] ? $val['nickname'] : ($val['username'] ? $val['username'] : "未知");
 
-            // $list[$key]['userid'] = $list[$key]['user']=="未知"? -1 : $list[$key]['userid']; // 没有名字的也返回未知
+            $list[$key]['userid'] = $list[$key]['user']=="未知"? -1 : $list[$key]['userid']; // 没有名字的也返回未知
 
             // 4.处理title标题
             // 通用支付
@@ -157,31 +157,25 @@ if($dopost == "getList"){
                 $param = $val['param'];
                 $arr = unserialize($param);
                 $subject = strip_tags($arr['subject']);
-                $body = $val['body'] ? unserialize($val['body']) : $val['body'];
-                $body = is_array($body) ? $body : $val['body'];
 
-                //如果取消到数据，用模块信息代替
-                if(!$subject){
+                    //如果取消到数据，用模块信息代替
+                    if(!$subject){
 
-                    //从body中提取
-                    if(is_array($body)){
-                        $subject = $body['title'];
-                    }else{
-
-                        $moduleName = getModuleTitle(array('name' => $val['ordertype']));
-                        if($moduleName){
-                            $subject = $moduleName . '消费';
+                        //从body中提取
+                        $body = $val['body'] ? unserialize($val['body']) : $val['body'];
+                        if(is_array($body)){
+                            $subject = $body['title'];
                         }else{
-                            $subject = $val['ordernum'] ? $val['ordernum'] : $val['ordertype'];
+
+                            $moduleName = getModuleTitle(array('name' => $val['ordertype']));
+                            if($moduleName){
+                                $subject = $moduleName . '消费';
+                            }else{
+                                $subject = $val['ordernum'] ? $val['ordernum'] : $val['ordertype'];
+                            }
                         }
+
                     }
-
-                }
-
-                //合并付款的情况，将所有订单号都显示出来
-                if($val['ordernum'] != $body && strstr($body, ',')){
-                    $subject .= '，合并订单：' . $body;
-                }
 
                 $list[$key]['title'] = $subject;
             }

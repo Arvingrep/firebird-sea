@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+	atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 0;  //图集配置
+	//imglist = {#$imglist#},
+   var typeListArr = {#$typeListArr#}, action = '{#$action#}', modelType = '{#$action#}',
+	cfg_term = "pc", adminPath = "{#$adminPath#}", staticPath = '{#$cfg_staticPath#}', mapCity = "{#$mapCity#}";
+//var cityid = {#$cityid#}, cityList = {#$cityList#};
+var pulltype = {#$pulltype#};
+var pullurl_pc = '{#$pullurl_pc#}';
+var pullurl_touch = '{#$pullurl_touch#}';
+</script>
+<style>
+.placeholder {height: 33px;width:178px;margin-bottom: 10px;border:1px solid #ccc;border-radius:4px;}
+.menu .sort {cursor: move;}
+.menu .url {margin-left: -1px !important;}
+.menu .btn {cursor: pointer;}
+.menu .add {margin-left: 10px !important;}
+.menu .dn {color:#999;}
+.menu .dn.active {color:#333;}
+.menu .input-append .active, .input-prepend .active {border-color: #ccc;}
+</style>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="title">直播标题：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="title" id="title" data-regex=".{1,60}" maxlength="60" value="{#$title#}" />
+      <div class="color_pick"><em style="background:{#$color#};"></em></div>
+      <span class="input-tips"><s></s>请输入直播标题，1-60个汉字</span>
+      <input type="hidden" name="color" id="color" value="{#$color#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>直播分类：</dt>
+    <dd style="overflow:visible;">
+      <div class="btn-group" id="typeBtn" style="margin-left:10px;">
+        <button class="btn dropdown-toggle" type="button" data-toggle="dropdown">{#$typename#}<span class="caret"></span></button>
+      </div>
+      <input type="hidden" name="typeid" id="typeid" value="{#$typeid#}" />
+      <span class="input-tips"><s></s>请选择信息分类</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="click">直播浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="replay">回放浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="number" name="replay" min="0" id="replay" value="{#$replay#}" /></span>
+    </dd>
+  </dl>
+  {#if $state = 2#}
+  <dl class="clearfix">
+    <dt><label for="click">直播时长：</label></dt>
+    <dd>
+      <span>
+        <input class="input-mini" type="number" name="minute" min="0" id="minute" value="{#$minute#}" />分钟
+        <input class="input-mini" type="number" name="second" min="0" id="second" value="{#$second#}" />秒
+      </span>
+    </dd>
+  </dl>
+  {#/if#}
+  <dl class="clearfix">
+    <dt>缩略图：</dt>
+		<dd class="thumb clearfix listImgBox">
+			<div class="uploadinp filePicker thumbtn{#if $litpic != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+			{#if $litpic != ""#}
+			<ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$litpic#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$litpic#}&type=small" data-val="{#$litpic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+			{#else#}
+			<ul id="listSection1" class="listSection thumblist clearfix"></ul>
+			{#/if#}
+			<input type="hidden" name="litpic" value="{#$litpic#}" class="imglist-hidden" id="litpic">
+		</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="writer">发布时间：</label></dt>
+    <dd>
+        <div class="input-append form_datetime" style="margin: 0;">
+          <input class="input-medium" type="text" name="pubdate" id="pubdate" date-language="ch" value="{#$pubdate#}" />
+          <span class="add-on"><i class="icon-time"></i></span>
+        </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>横竖屏：</label></dt>
+    <dd class="radio">
+      {#html_radios name="way" values=$wayArr checked=$way output=$wayNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+	<dl class="clearfix">
+    <dt><label>直播类型：</label></dt>
+    <dd class="radio">
+      {#html_radios name="livetype" values=$livetypeArr checked=$livetype output=$livetypeNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#if $livetype==1#}
+  <dl class="clearfix" id="type1">
+  {#else#}
+  <dl class="clearfix hide" id="type1">
+  {#/if#}
+    <dt><label for="password">加密密码：</label></dt>
+    <dd><input class="input-xxlarge" type="text" name="password" id="password" value="{#if $password#}{#$password#}{#/if#}" placeholder="填写密码" /><span class="input-tips"><s></s>请填写密码</span></dd>
+  </dl>
+  {#if $livetype==2#}
+  <dl class="clearfix" id="type2">
+  {#else#}
+  <dl class="clearfix hide" id="type2">
+  {#/if#}
+    <dt><label for="startmoney">收费金额：</label></dt>
+    <dd>
+        <div class="input-prepend input-append">
+            <span class="add-on">直播收费</span>
+            <input class="input-small" type="number" name="startmoney" value="{#$startmoney#}">
+            <span class="add-on">元</span>
+        </div><br />
+        <div class="input-prepend input-append">
+            <span class="add-on">回放收费</span>
+            <input class="input-small" type="number" name="endmoney" value="{#$endmoney#}">
+            <span class="add-on">元</span>
+        </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>流畅度：</label></dt>
+    <dd class="radio">
+      {#html_radios name="flow" values=$flowArr checked=$flow output=$flowNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <!--<dl class="clearfix">
+    <dt>是否直播：</dt>
+    <dd class="radio">
+      <label for="state">
+        <select name="state" id="state" class="input-medium">
+          {#html_options options=$stateList selected=$state#}
+        </select>
+      </label>
+    </dd>
+  </dl>-->
+  <dl class="clearfix">
+    <dt><label>拉流地址：</label></dt>
+    <dd class="radio">
+      {#html_radios name="pulltype" values=$pulltypeArr checked=$pulltype output=$pulltypeNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix pullurlCon">
+    <dt><label for="pullurl_pc">拉流地址(电脑端)：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="pullurl_pc" id="pullurl_pc" value="{#$pullurl_pc#}"{#if $pulltype == 0#} readonly=""{#/if#} />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="pullurl_touch">拉流地址(移动端)：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="pullurl_touch" id="pullurl_touch" value="{#$pullurl_touch#}"{#if $pulltype == 0#} readonly=""{#/if#} />
+    </dd>
+  </dl>
+  <!-- 正文 -->
+  <dl class="clearfix">
+    <dt><label>直播菜单：</label></dt>
+    <dd>
+      <ul class="menu" style="margin-left:0;">
+        {#if $menuArr#}
+        {#foreach from=$menuArr item='cfg' key='k'#}
+        <li data-idx="{#$k#}">
+          <div class="input-prepend input-append">
+            <span class="add-on sort">排序</span>
+            <input class="input-small name" type="text" name="menu[{#$k#}][name]" placeholder="菜单名称" value="{#$cfg.name#}">
+            <input class="input-middle url" type="text" name="menu[{#$k#}][url]" placeholder="菜单链接" value="{#$cfg.url#}"{#if $cfg.sys > -1#}readonly=""{#/if#}>
+            <input type="hidden" name="menu[{#$k#}][show]" class="show" value="{#$cfg.show#}">
+            <input type="hidden" name="menu[{#$k#}][sys]" class="sys" value="{#$cfg.sys#}">
+            {#if $cfg.show == '1'#}
+            <span class="add-on btn dn active">显示</span>
+            {#else#}
+            <span class="add-on btn dn">隐藏</span>
+            {#/if#}
+            <span class="add-on btn del">删除</span>
+            <span class="add-on btn add">新增</span>
+          </div>
+        </li>
+        {#/foreach#}
+        {#else#}
+        <li data-idx="0">
+          <div class="input-prepend input-append">
+            <span class="add-on sort">排序</span>
+            <input class="input-small name" type="text" name="menu[0][name]" placeholder="菜单名称" value="介绍">
+            <input class="input-middle url" type="text" name="menu[0][url]" placeholder="菜单链接" value="" readonly="">
+            <input type="hidden" name="menu[0][show]" class="show" value="1">
+            <input type="hidden" name="menu[0][sys]" class="sys" value="0">
+            <span class="add-on btn dn active">显示</span>
+            <span class="add-on btn del">删除</span>
+            <span class="add-on btn add">新增</span>
+          </div>
+        </li>
+        <li data-idx="1">
+          <div class="input-prepend input-append">
+            <span class="add-on sort">排序</span>
+            <input class="input-small name" type="text" name="menu[1][name]" placeholder="菜单名称" value="图文">
+            <input class="input-middle url" type="text" name="menu[1][url]" placeholder="菜单链接" value="" readonly="">
+            <input type="hidden" name="menu[1][show]" class="show" value="1">
+            <input type="hidden" name="menu[1][sys]" class="sys" value="1">
+            <span class="add-on btn dn active">显示</span>
+            <span class="add-on btn del">删除</span>
+            <span class="add-on btn add">新增</span>
+          </div>
+        </li>
+        <li class="sys" data-idx="2">
+          <div class="input-prepend input-append">
+            <span class="add-on sort">排序</span>
+            <input class="input-small name" type="text" name="menu[2][name]" placeholder="菜单名称" value="互动">
+            <input class="input-middle url" type="text" name="menu[2][url]" placeholder="菜单链接" value="" readonly="">
+            <input type="hidden" name="menu[2][show]" class="show" value="1">
+            <input type="hidden" name="menu[2][sys]" class="sys" value="2">
+            <span class="add-on btn dn active">显示</span>
+            <span class="add-on btn del">删除</span>
+            <span class="add-on btn add">新增</span>
+          </div>
+        </li>
+        <li class="sys" data-idx="3">
+          <div class="input-prepend input-append">
+            <span class="add-on sort">排序</span>
+            <input class="input-small name" type="text" name="menu[3][name]" placeholder="菜单名称" value="商品">
+            <input class="input-middle url" type="text" name="menu[3][url]" placeholder="菜单链接" value="" readonly="">
+            <input type="hidden" name="menu[3][show]" class="show" value="1">
+            <input type="hidden" name="menu[3][sys]" class="sys" value="3">
+            <span class="add-on btn dn active">显示</span>
+            <span class="add-on btn del">删除</span>
+            <span class="add-on btn add">新增</span>
+          </div>
+        </li>
+        <li class="sys" data-idx="4">
+          <div class="input-prepend input-append">
+            <span class="add-on sort">排序</span>
+            <input class="input-small name" type="text" name="menu[4][name]" placeholder="菜单名称" value="榜单">
+            <input class="input-middle url" type="text" name="menu[4][url]" placeholder="菜单链接" value="" readonly="">
+            <input type="hidden" name="menu[4][show]" class="show" value="1">
+            <input type="hidden" name="menu[4][sys]" class="sys" value="4">
+            <span class="add-on btn dn active">显示</span>
+            <span class="add-on btn del">删除</span>
+            <span class="add-on btn add">新增</span>
+          </div>
+        </li>
+        {#/if#}
+      </ul>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="adv">广告标题：</label></dt>
+    <dd>
+      <span><input class="input-xlarge" type="text" name="adv" min="0" id="adv" value="{#$adv#}" /></span>
+      <span class="input-tips"><s></s>留空则没有广告</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>直播简介：</dt>
+    <dd>
+      <script id="note" name="note" type="text/plain" style="width:85%;height:500px">{#$note#}</script>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="lnglat">坐标：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="lnglat" id="lnglat" value="{#$lnglat#}" data-regex=".{2,100}" />
+      <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+      <span class="input-tips"><s></s>请输入坐标信息</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>自定义属性：</dt>
+    <dd class="radio">{#html_checkboxes name='flags' values=$flag output=$flagList selected=$flagitem separator="&nbsp;&nbsp;"#}</dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+</form>
+
+<script id="menuTpl" type="text/html">
+  <li data-idx="100">
+    <div class="input-prepend input-append">
+      <span class="add-on sort">排序</span>
+      <input class="input-small name" type="text" name="menu[100][name]" placeholder="菜单名称" value="">
+      <input class="input-middle url" type="text" name="menu[100][url]" placeholder="菜单链接" value="">
+      <input type="hidden" name="menu[100][show]" class="show" value="1">
+      <input type="hidden" name="menu[0][sys]" class="sys" value="-1">
+      <span class="add-on btn dn active">显示</span>
+      <span class="add-on btn del">删除</span>
+      <span class="add-on btn add">新增</span>
+    </div>
+  </li>
+</script>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

@@ -1,50 +1,7 @@
 var action, objId = $('.house-list'), lei = 0;
 
 $(function(){
-  $.ajax({
-		url: `/include/ajax.php?service=house&action=route&route=consumer/myData`,
-		type: "POST",
-		dataType: "json",
-		success: function (data) {
-			if(data?.state == 100){
-				let info = data.info;
-        let broker = Boolean(info.role.isStoreManage||info.role.isBroker||info.role.isOnlyBroker);
-        $('.fbc-secondHand,.fbc-rent').click(function(){
-          let type=$(this).attr('data-type'); //sale:二手房 zu:租房
-          if(broker){ //经纪人
-            if(navigator.userAgent.toLowerCase().match(/micromessenger/)){ //微信小程序
-              wx.miniProgram.redirectTo({url:`/pages/packages/house/broker/fabu_house_${type}/fabu_house_${type}`})
-            }else{
-              location.href=`${houseDomain}/broker/fabu_house_${type}?${app_platform?'appFullScreen=1':''}`;
-            }
-          }else{ //个人
-            if(navigator.userAgent.toLowerCase().match(/micromessenger/)){ //微信小程序
-              wx.miniProgram.redirectTo({url:`/pages/packages/house/member/publish/publish?${type=='zu'?'type=1':0}`})
-            }else {
-              location.href=`${houseDomain}/member/publish?${type=='zu'?'type=1':''}${app_platform?'&appFullScreen=1':''}`;
-            }
-          }
-        })
-			}else{
-        $('.fbc-secondHand,.fbc-rent').click(function(){
-          if(!loginUserId){
-            location.href=`${masterDomain}/login.html`;
-            return false;
-          }
-          let type=$(this).attr('data-type'); //sale:二手房 zu:租房 
-          if(navigator.userAgent.toLowerCase().match(/micromessenger/)){ //微信小程序
-            wx.miniProgram.redirectTo({url:`/pages/packages/house/member/publish/publish?${type=='zu'?'type=1':''}`})
-          }else {
-            location.href=`${houseDomain}/member/publish?${type=='zu'?'type=1':''}${app_platform?'&appFullScreen=1':''}`;
-          }
-        })
-			}
-		},
-		error: function(){ 
-			alert('身份信息获取失败！')
-		}
-	});
-  return
+
   // 选择房源类型
   $('#payform #type').val(type);
   $('.house-type .cell').click(function(){

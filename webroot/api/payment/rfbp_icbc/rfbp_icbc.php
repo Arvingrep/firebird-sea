@@ -21,9 +21,6 @@ if(isset($set_modules) && $set_modules == TRUE){
 	/* 名称 */
     $payment[$i]['pay_name'] = "工行E商通";
 
-	/* 所属公司 */
-    $payment[$i]['title'] = "中国工商银行";
-
     /* 版本号 */
     $payment[$i]['version']  = '1.0.0';
 

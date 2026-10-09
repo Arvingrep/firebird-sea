@@ -41,8 +41,7 @@ $leimuallarr = array(
     'shangpinxiaoshou'  =>'商品销售',
     'yonghujili'        =>'用户激励',
     'payPhone'          =>'付费查看电话',
-    'tixian'            =>'提现手续费',
-    'zhaopin'           =>'城市招聘'
+    'tixian'            =>'提现手续费'
 );
 
 if($dopost == "getList" || $do == "export"){
@@ -212,7 +211,7 @@ if($dopost == "getList" || $do == "export"){
     $wherecityid = '';
 
     if (!empty($cityid)) {
-        $wherecityid .= getWrongCityFilter('a.`cityid`', $cityid);
+        $wherecityid .= getWrongCityFilter('`cityid`', $cityid);
     }
 
     $module = '';
@@ -225,40 +224,40 @@ if($dopost == "getList" || $do == "export"){
             $module = $v['name'];
         }
 
-        $sql1 = $dsql->SetQuery("SELECT  count(*) as allcount FROM `#@__member_money` a LEFT JOIN `#@__member` m ON m.`id` = a.`userid` WHERE ((a.`ordertype` != '' AND a.`platform` !=0 AND a.`showtype` = 1) or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND a.`ordertype` = '" . $module . "' $wherecityid AND a.`showtype`  = 1" . $where);
+        $sql1 = $dsql->SetQuery("SELECT  count(`id`) as allcount FROM `#@__member_money` a WHERE ((a.`ordertype` != '' AND `platform` !=0 AND `showtype` = 1) or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND `ordertype` = '" . $module . "' $wherecityid AND `showtype`  = 1" . $where);
         $res1 = $dsql->dsqlOper($sql1, "results");
 
         $modulemoneyarr[$k]['subject'] = $v['subject'];
         $modulemoneyarr[$k]['name'] = $v['name'];
         $modulemoneyarr[$k]['allcount'] = $res1[0]['allcount'];
 
-        $sql1 = $dsql->SetQuery("SELECT  SUM(`platform`) as allcommission FROM `#@__member_money` a LEFT JOIN `#@__member` m ON m.`id` = a.`userid` WHERE ((a.`ordertype` != '' AND a.`platform` !=0 AND a.`showtype` = 1) or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND a.`ordertype` = '" . $module . "' $wherecityid AND a.`showtype`  = 1 AND a.`type` = 1" . $where);
+        $sql1 = $dsql->SetQuery("SELECT  SUM(`platform`) as allcommission FROM `#@__member_money` a WHERE ((a.`ordertype` != '' AND `platform` !=0 AND `showtype` = 1) or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND `ordertype` = '" . $module . "' $wherecityid AND `showtype`  = 1 AND `type` = 1" . $where);
         $res1 = $dsql->dsqlOper($sql1, "results");
         $modulemoneyarr[$k]['allcommission'] = (float)$res1[0]['allcommission'];
     }
     
     /*会员升级以及置顶等相关*/
-    $msql = $dsql->SetQuery("SELECT  count(*) as allcount FROM `#@__member_money` a LEFT JOIN `#@__member` m ON m.`id` = a.`userid` WHERE ((a.`platform` !=0 AND a.`showtype` = 1 AND a.`ordertype` != '') or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND (a.`ordertype` = '' OR a.`ordertype` = 'member') $wherecityid" . $where);
+    $msql = $dsql->SetQuery("SELECT  count(`id`) as allcount FROM `#@__member_money` a WHERE ((`platform` !=0 AND `showtype` = 1 AND `ordertype` != '') or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND (`ordertype` = '' OR `ordertype` = 'member') $wherecityid" . $where);
     $mres = $dsql->dsqlOper($msql, "results");
     $mamber = array();
     $mamber['subject'] = '会员相关';
     $mamber['name'] = 'member';
     $mamber['allcount'] = $mres[0]['allcount'];
 
-    $msql = $dsql->SetQuery("SELECT  SUM(a.`platform`) as allcommission  FROM `#@__member_money` a LEFT JOIN `#@__member` m ON m.`id` = a.`userid` WHERE ((a.`platform` !=0 AND a.`showtype` = 1 AND a.`ordertype` != '') or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND (a.`ordertype` = '' OR a.`ordertype` = 'member') $wherecityid AND a.`type` = 1" . $where);
+    $msql = $dsql->SetQuery("SELECT  SUM(`platform`) as allcommission  FROM `#@__member_money` a WHERE ((`platform` !=0 AND `showtype` = 1 AND `ordertype` != '') or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND (`ordertype` = '' OR `ordertype` = 'member') $wherecityid AND `type` = 1" . $where);
     $mres = $dsql->dsqlOper($msql, "results");
     $mamber['allcommission'] = (float)$mres[0]['allcommission'];
     array_push($modulemoneyarr, $mamber);
 
     /*系统*/
-    $ssql = $dsql->SetQuery("SELECT count(*) as allcount FROM `#@__member_money` a LEFT JOIN `#@__member` m ON m.`id` = a.`userid` WHERE ((a.`ordertype` != '' AND a.`platform` !=0 AND a.`showtype` = 1) or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND a.`ordertype` = 'siteConfig' $wherecityid AND a.`showtype`  = 1" . $where);
+    $ssql = $dsql->SetQuery("SELECT count(`id`) as allcount FROM `#@__member_money` a WHERE ((a.`ordertype` != '' AND `platform` !=0 AND `showtype` = 1) or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND `ordertype` = 'siteConfig' $wherecityid AND `showtype`  = 1" . $where);
     $sres = $dsql->dsqlOper($ssql, "results");
     $site = array();
     $site['subject'] = '系统相关';
     $site['name'] = 'siteConfig';
     $site['allcount'] = $sres[0]['allcount'];
 
-    $ssql = $dsql->SetQuery("SELECT  SUM(`platform`) as allcommission FROM `#@__member_money` a LEFT JOIN `#@__member` m ON m.`id` = a.`userid` WHERE ((a.`ordertype` != '' AND a.`platform` !=0 AND a.`showtype` = 1) or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND a.`ordertype` = 'siteConfig' $wherecityid AND a.`showtype`  = 1 AND a.`type` = 1" . $where);
+    $ssql = $dsql->SetQuery("SELECT  SUM(`platform`) as allcommission FROM `#@__member_money` a WHERE ((a.`ordertype` != '' AND `platform` !=0 AND `showtype` = 1) or (a.`montype` = 1 AND a.`info` != '分销商每月返现')) AND `ordertype` = 'siteConfig' $wherecityid AND `showtype`  = 1 AND `type` = 1" . $where);
     $sres = $dsql->dsqlOper($ssql, "results");
     $site['allcommission'] = (float)$sres[0]['allcommission'];
     array_push($modulemoneyarr, $site);

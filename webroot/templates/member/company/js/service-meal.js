@@ -8,8 +8,8 @@ $(function(){
     var packageItem = [];
 
     var timer_trade  = null;
-	// $('.privilege li:nth-child(2n)').css('margin-right','0');
-	// $('.trade li:nth-child(3n)').css('margin-right','0');
+	$('.privilege li:nth-child(2n)').css('margin-right','0');
+	$('.trade li:nth-child(3n)').css('margin-right','0');
 
 
    //获取要定位元素距离浏览器顶部的距离
@@ -396,6 +396,7 @@ $(function(){
 	});
 
 	getJoinOrder()
+	console.log(huoniao)
 	// 获取开通记录
 	function getJoinOrder(){
 		$.ajax({

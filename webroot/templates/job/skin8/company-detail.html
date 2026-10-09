@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>公司详情-{#$detail_title#}</title>
+<meta name="keywords" content="{#$detail_title#},招聘网,招聘信息,互联网招聘" />
+<meta name="description" content="{#$detail_title#},招聘网,求职网,互联网招聘,{#$cfg_shortname#}招聘是互联网领域垂直招聘网站,互联网职业机会尽在{#$cfg_shortname#}招聘" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/swiper-bundle.min.css?v={#$cfg_staticVersion#}"> 
+<link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/company_detail.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$job_channelDomain#}', staticPath = '{#$cfg_staticPath#}',member_userDomain='{#$member_userDomain#}',templets_skin='{#$templets_skin#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var pageUrl = '{#$detail_domain#}';
+	var pointLon = '{#$detail_lnglat[0]#}', pointLat = '{#$detail_lnglat[1]#}', title = '{#$detail_title#}', pointAddr = '{#$detail_addr[0]#} {#$detail_addr[1]#} {#$detail_address#}';
+	var site_map = '{#$site_map#}';
+	var MapImg_URL = '';
+	var OpenMap_URL = '';
+	var pageData = {
+			title: '{#$detail_title#}',
+			address: '{#$detail_address#}',
+			lat: '{#$detail_lat#}',
+			lng: '{#$detail_lng#}',
+			mapType: '{#$site_map#}',
+			mapKey: '{#$site_map_key#}'
+		};
+	var companyid={#$detail_id#}; //勿删
+	var userid='{#$userinfo.userid#}' //勿删
+	var imconfig;
+	var ucid='{#$job_cid#}'; //当前登录用户的公司id
+	var postCertificate='{#$detail_delivery_limit_certifyState#}'; //设置限制实名投递
+</script>
+</head>
+
+<body class="w1200">
+{#$pageMark = "company"#}
+{#include file="top.html"#}
+	
+<div class="pagebox" id="page">
+	<el-collapse-transition v-cloak>
+		<div class="fixedTop" v-show="fixedtop">
+			<div class="companyInfoBox">
+				<div class="wrap fn-clear">
+					<div class="info_left fn-left">
+						<div class="clogo fn-left">
+							<img src="{#$detail_logo_url#}" onerror="this.src='/static/images/404.jpg'">
+						</div>
+						<div class="cdetail fn-left">
+							<h2><b>{#$detail_title#}</b>{#if $detail_famous==1#}<span><i>名企</i></span>{#/if#}{#if $detail_certification==1#}<em class="icon"></em>{#/if#}</h2>
+							<p><span>{#$detail_scale#}</span><em>|</em><span>{#$detail_nature#}</span><em>|</em><span>{#foreach from=$detail_industry item=item key=index#}{#$item#}{#if count($detail_industry)!=$index+1#}、{#/if#}{#/foreach#}</span></p>
+						</div>
+					</div>
+					<div class="info_right fn-right">
+						<div class="btn_care {#if $detail_collect==1#}has_care{#/if#}" data-id="{#$detail_id#}">
+							<img src="{#$templets_skin#}images/confirmBl.png" class="has_care">
+							<img src="{#$templets_skin#}images/addW.png" class="no_care">
+							<span>{#if $detail_collect==1#}已{#/if#}关注</span>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="wrap">
+				<div class="tabBox">
+					<a href="javascript:;" :class="{'currOn':currOn == 0}" @click="tabChange(0)" data-id="0">企业信息</a>
+					<a href="javascript:;" :class="{'currOn':currOn == 1}" @click="tabChange(1)"  data-id="1">招聘职位（{#$detail_post_count#}）</a>
+					<s class="line"></s>
+				</div>
+			</div>
+		</div>
+	</el-collapse-transition>
+	<div class="companyInfoBox fn-clear" v-cloak>
+		<div class="wrap">
+			<div class="info_left fn-left">
+				<div class=" fn-clear" style="display: flex;align-items: center;">
+					<div class="clogo fn-left">
+						<img src="{#$detail_logo_url#}" onerror="this.src='/static/images/404.jpg'">
+					</div>
+					<div class="cdetail fn-left">
+						<h2><b>{#$detail_title#}</b>{#if $detail_famous==1#}<span><i>名企</i></span>{#/if#}{#if $detail_certification==1#}<em class="icon"></em>{#/if#}</h2>
+						{#if $detail_site#}<a href="{#$detail_site#}" class="internet" target="_blank"><s></s>公司官网</a>{#/if#}
+						<p><span>成立于{#$detail_enterprise_establish|date_format:"%Y"#}年</span><em>|</em><span>{#$detail_scale#}</span><em>|</em><span>{#$detail_nature#}</span></p>
+						<p>
+							{#foreach from=$detail_industry item=item key=index#}{#$item#}{#if count($detail_industry)!=$index+1#}、{#/if#}
+							{#/foreach#}
+						</p>
+					</div>
+				</div>
+				<div class="tabBox">
+					<a href="javascript:;" :class="{'currOn':currOn == 0}" @click="tabChange(0)" data-id="0">企业信息</a>
+					<a href="javascript:;" :class="{'currOn':currOn == 1}" @click="tabChange(1)"  data-id="1">招聘职位（{#$detail_post_count#}）</a>
+					<s class="line"></s>
+				</div>
+			</div>
+			<div class="info_right fn-right">
+				<div class="btn_care {#if $detail_collect==1#}has_care{#/if#}" data-id="{#$detail_id#}">
+					<img src="{#$templets_skin#}images/confirmBl.png" class="has_care">
+					<img src="{#$templets_skin#}images/addW.png" class="no_care">
+					<span>{#if $detail_collect==1#}已{#/if#}关注</span>
+				</div>
+				<div class="btnGroups">
+					<el-button round class="btn_showPost" type="text" @click="posterFn(0)"><s></s>招聘海报</el-button>
+					<el-button round class="btn_share shareBox" type="text">
+						<s></s>分享
+                        <div class="shareListPop">
+                            <div class="sh-con">
+                                <h5>{#$langData['info'][4][44]#}</h5> {#* 微信扫码分享</b>或点击分享到 *#}
+                                <div class="shareWayBox">
+                                    <div class="wxQrShare">
+                                        <div class="wxQr"><img
+                                                src="/include/qrcode.php?data={#getUrlPath service='job' template='company-list' param="id=$detail_id&{#if $userinfo && $userinfo.userid#}fromShare={#$userinfo.userid#}{#/if#}"#}" alt="">
+										</div>
+                                    </div>
+                                    <div class="otherShare">
+                                        <ul>
+                                            <ul>
+                                                <li class="qzone">
+													<a href="http://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?url={#getUrlPath service='job' template='company-list' id={#$detail_id#} param="{#if $userinfo &&$userinfo.userid#}fromShare={#$userinfo.userid#}{#/if#}"#}&desc={#$detail_titlenew|truncate:100:"":true#}&pics={#$detail_imglist[0]['path']|default:$info_logoUrl#}" target="_blank" class="sharea">QQ空间</a>
+												</li>
+                                                <li class="qq">
+													<a href="http://connect.qq.com/widget/shareqq/index.html?url={#getUrlPath service='job' template='company-list' id={#$detail_id#} param="{#if $userinfo &&$userinfo.userid#}fromShare={#$userinfo.userid#}{#/if#}"#}&desc={#$detail_titlenew|truncate:100:"":true#}&title={#$detail_titlenew|truncate:100:"":true#}&summary={#$detail_titlenew|truncate:100:"":true#}&pics={#$detail_imglist[0]['path']|default:$info_logoUrl#}" target="_blank" class="sharea">QQ好友</a>
+												</li>
+                                                <li class="sina">
+													<a href="http://service.weibo.com/share/share.php?url={#getUrlPath service='job' template='company-list' id={#$detail_id#} param="{#if $userinfo &&$userinfo.userid#}fromShare={#$userinfo.userid#}{#/if#}"#}&title={#$detail_titlenew|truncate:100:"":true#}&pic={#$detail_imglist[0]['path']|default:$info_logoUrl#}" target="_blank" class="sharea">新浪微博</a>
+												</li>
+                                            </ul>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+					</el-button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="wrap conWrap fn-clear"  v-cloak>
+		<div class="left_wrap">
+			{#if ($detail_pics && count($detail_pics)!=0)||$detail_body#}
+			<!-- 公司简介 -->
+			<dl class="conDl company_detail">
+				<dt>公司简介</dt>
+				{#if $detail_body#}
+				<dd class="con ">
+					<div class="text_con">
+						{#str_replace("\n","<br>",$detail_body)#}
+					</div>
+					<a href="javascript:;" class="btn_open">展开更多<i class="el-icon el-icon-arrow-down"></i></a>
+				</dd>
+				{#/if#}
+				{#if $detail_pics && count($detail_pics)!=0#}
+				<dd class="con">
+					<div class="swiperBox">
+						<div class="left_swiper">
+							<div class="img-swiper">
+								<div class="swiper-wrapper">
+									{#foreach from=$detail_pics item=item#}
+									<div class="swiper-slide"><img src="{#$item.pic#}" onerror="this.src='/static/images/404.jpg'" style="object-fit: cover;"></div>
+									{#/foreach#}
+									
+								</div>
+								<!-- Add Arrows -->
+								<div class="button-next"></div>
+								<div class="button-prev"></div>
+							</div>
+						</div>
+						<div class="right_swiper">
+							<div  thumbsSlider="" class=" thumb-swiper" {#if count($detail_pics)>5#}style="padding:30px 0px"{#/if#}>
+								<div class="swiper-wrapper">
+									{#foreach from=$detail_pics item=item#}
+									<div class="swiper-slide"><img src="{#$item.pic#}" onerror="this.src='/static/images/404.jpg'" style="width: 100%;height: 100%;object-fit: cover;"></div>
+									{#/foreach#}
+								</div>
+								{#if count($detail_pics)>5#}
+								<div class="button-next"></div>
+								<div class="button-prev"></div>
+								{#/if#}
+							</div>
+						</div>
+					</div>
+				</dd>
+				{#/if#}
+			</dl>
+			{#/if#}
+			{#if $detail_welfareNames && count($detail_welfareNames)!=0#}
+			<!-- 员工福利 -->
+			<dl  class="conDl">
+				<dt>员工福利</dt>
+				<dd>
+					{#foreach from=$detail_welfareNames item#}
+					<el-tag effect="plain" class="lab" >{#$item#}</el-tag>
+					{#/foreach#}
+				</dd>
+			</dl>
+			{#/if#}
+			<!-- 工商信息 -->
+			<div class="conDl">
+				<dt>工商信息</dt>
+				<dd class="fn-clear">
+					<div class="gs_item">
+						<label class="" for="">公司全称</label>
+						<span {#if !$detail_full_name#}style="color:#888"{#/if#}>{#$detail_full_name|default:'暂无数据'#}</span>
+					</div>
+					<div class="gs_item">
+						<label class="" for="">企业类型</label>
+						<span {#if !$detail_enterprise_type#}style="color:#888"{#/if#}>{#$detail_enterprise_type|default:'暂无数据'#}</span>
+					</div>
+					<div class="gs_item">
+						<label class="" for="">注册资本</label>
+						<span {#if !$detail_enterprise_money#}style="color:#888"{#/if#}>{#$detail_enterprise_money|default:'暂无数据'#}</span>
+					</div>
+					<div class="gs_item">
+						<label class="" for="">法定代表人</label>
+						<span {#if !$detail_enterprise_people#}style="color:#888"{#/if#}> {#$detail_enterprise_people|default:'暂无数据'#}</span>
+					</div>
+					<div class="gs_item">
+						<label class="" for="">人员规模</label>
+						<span {#if !$detail_scale#}style="color:#888"{#/if#}> {#$detail_scale|default:'暂无数据'#}</span>
+					</div>
+					<div class="gs_item">
+						<label class="" for="">成立日期</label>
+						<span {#if !$detail_enterprise_establish#}style="color:#888"{#/if#}> {#$detail_enterprise_establish|date_format:"%Y-%m-%d"|default:'暂无数据'#}</span>
+					</div>
+					<div class="gs_item">
+						<label class="" for="">数据来源</label>
+						<span title="{#if $detail_changeGs#}企业自行填报{#else#}$detail_config.gsName{#/if#}"><img src="{#$cfg_staticPath#}images/job/businInfoFrom_icon.png?v={#$cfg_staticVersion#}"></span>
+					</div>
+				</dd>
+				<el-divider class="dl_divider"></el-divider>
+
+			</div>
+
+
+			<dl class="conDl company_post">
+				<dt>招聘职位</dt>
+				<dd class="postListBox" v-if="totalPage!=0">
+					<div class="shaixuanBox">
+						<div class="area">
+							<label for="">区域：</label>
+							<div class="inline_div">
+								<span class="on">不限</span>
+								{#job action="addr" type="{#$siteCityInfo['cityid']#}" service="job" return="address" company="{#$detail_id#}"#}
+								<span data-addr="{#$address.id#}">{#$address.typename#}</span>
+								{#/job#}
+							</div>
+						</div>
+						<el-divider class="shai_divider"></el-divider>
+						<div class="jobs">
+							<label>职位：</label>
+							<div class="inline_div">
+								<span class="on">不限</span>
+								{#job service="job" action="postType" return="jobs" id="{#$detail_id#}"#}
+								<span data-job="{#$jobs.id#}">{#$jobs.typename#}</span>
+								{#/job#}
+							</div>
+						</div>
+					</div>
+					<ul class="clh-items">
+						{#job service="job" action="postList" return="data" page=1 pageSize="15" company=$detail_id orderby=4#}
+						<li>
+							<a href="{#getUrlPath service='job' template='job' id=$data.id#}" target="_blank">
+								<div class="left">
+									<div class="title"><span>{#$data.title#}</span>
+										<div class="talk chat_to-Link" data-type="detail" data-item='{#json_encode($data)#}'>立即沟通</div>
+									</div>
+									<div class="salary" {#if $data.mianyi#}style="font-size:15px"{#/if#}>{#if $data.mianyi#}面议{#else#}{#$data.show_salary#} {#if $data.dy_salary>12#}·{#$data.dy_salary#}<span>薪</span>{#/if#}{#/if#}
+									</div>
+									<div class="require">{#foreach from=$data.job_addr_detail.addrName item=item key=index#}{#if $index!=0#}{#$item#}{#/if#}
+										{#/foreach#}{#if $data.experience&&$data.job_addr_detail.addrName#}<span>|</span>{#/if#}{#$data.experience#}{#if $data.experience&&$data.educational#}<span>|</span>{#/if#}{#$data.educational#}{#if $data.educational&&$data.nature#}<span>|</span>{#/if#}{#$data.nature#}
+									</div>
+									<div class="label">
+										{#foreach from=$data.tag item=item#}
+										<div>{#$item#}</div>
+										{#/foreach#}
+									</div>
+								</div>
+								<div class="right {#if $data.has_delivery==1#}had{#/if#}">
+									<div class="name"><span>{#$data.companyDetail.title#} </span></div>
+									<div class="time">{#$data.postTime#}</div>
+									<div class="btn" {#if count($data.tag)!=0#}style="margin-top:34px"{#/if#}>
+										{#if $data.collect==0#}
+										<div class="collect" data-id="{#$data.id#}"><span>收藏</span></div>
+										{#else#}
+										<div class="collect has" data-id="{#$data.id#}"><span>已收藏</span></div>
+										{#/if#}
+										{#if $data.has_delivery==1#}
+										<div class="hadpub">已投递</div>
+										{#elseif $data.has_delivery_company==0#}
+										<div class="pub" data-id="{#$data.id#}" data-type="{#$data.typeid#}" data-name="{#$data.type#}" data-state="{#$data.has_delivery#}"><span>投递简历</span></div>
+										{#/if#}
+									</div>
+								</div>
+							</a>
+						</li>
+						{#/job#}
+					</ul>
+					<el-pagination  class="nobg"
+					background
+					layout="prev, pager, next"
+					:total="totalPage"
+					:page-size="15"
+					data-id="{#$detail_id#}">
+					</el-pagination>
+				</dd>
+				<dd v-else style="color:#888;font-size:14px">暂无在招职位</dd>
+			</dl>
+		</div>
+		<div class="right_wrap">
+			<dl class="company_addr conDl">
+				<dt>
+					<b>公司地址</b>
+					<el-divider></el-divider>
+				</dt>
+				<dd>
+					<p>{#$detail_address#}</p>
+					<a class="mapbox appMapBtn" href="javascript:;" target="_blank">
+						<img class="appMapImg" src="/static/images/blank.gif" alt="">
+						<div class="to_map"><s></s>查看大图</div>
+					</a>
+				</dd>
+			</dl>
+			<dl class="company_addr conDl workInfo">
+				<dt>
+					<b>上班时间</b>
+					<el-divider></el-divider>
+				</dt>
+				<dd>
+					{#if $detail_work_time_s&&$detail_work_time_e#}<p class="work_time"><s></s>{#$detail_work_time_s#}-{#$detail_work_time_e#}</p>{#/if#}
+					{#if $detail_rest_flag!=0#}<p class="weekenday_Getaway"><s></s>{#if $detail_rest_flag==1#}双休{#else#}单休{#/if#} {#if $detail_work_over==2#}不加班{#/if#}</p>{#/if#}
+				</dd>
+				<dd class="advBox">
+					<a class="adv" href="{#if !$job_cid#}{#$cfg_basehost#}/supplier/job/company_info.html{#else#}{#$cfg_basehost#}/supplier/job{#/if#}" target="_blank"><img src="{#$templets_skin#}images/fabuBanner.png"></a>
+					<a class="adv" href="{#$member_userDomain#}/job-resume.html" target="_blank"><img src="{#$templets_skin#}images/creBanner.png"></a>
+				</dd>
+			</dl>
+		</div>
+	</div>
+	<!-- 投递成功弹窗 -->
+	<div class="sendpop">
+		<!-- 确认投递（相同职位类型） -->
+		<div class="s-same">
+			<img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+			<div class="ss-title">
+				<img src="{#$templets_skin#}images/warning_icon.png">
+				<p>确定投递<span>个人简历1？</span></p>
+			</div>
+			<div class="ss-text">
+				<p>该职位类型为<span>销售主管</span>，请确认是否匹配</p>
+				<p class="text">请勿重复投递</p>
+			</div>
+			<div class="ss-btn">
+				<div class="cancel" data-state="0">取消</div>
+				<div class="confirm" data-state="1">确认投递</div>
+			</div>
+		</div>
+		{#if $cfg_app_ios_download || $cfg_app_android_download#}
+		<!-- 投递成功（有app） -->
+		<div class="s-appsucceed">
+			<div class="sa-close"><img src="{#$templets_skin#}images/close.png"></div>
+			<div class="sa-title">
+				<img src="{#$templets_skin#}images/confirmCBlue.png">
+				<span>简历投递成功！请静候佳音</span>
+			</div>
+			<p class="sa-text">下载{#$cfg_appname#}APP，随时获取投递进度，第一时间与HR沟通联系</p>
+			<div class="sa-mobile">
+				<img src="{#$cfg_basehost#}/include/qrcode.php?data={#getUrlPath service='siteConfig' template='mobile'#}">
+			</div>
+		</div>
+		{#else#}
+		<!-- 投递成功（无app） -->
+		<div class="s-succeed">
+			<img src="{#$templets_skin#}images/sendresume.png">
+			<p>简历投递成功！请静候佳音</p>
+		</div>
+		{#/if#}
+		<!-- 已经投递过 -->
+		<div class="s-had">
+			<div>
+				<img src="{#$templets_skin#}images/warning_icon.png">
+				<p>你已投递过该职位，请勿重复投递</p>
+			</div>
+		</div>
+		<!-- 实名认证 -->
+		<div class="s-certificate">
+			<img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+			<div class="ss-title">
+				<img src="{#$templets_skin#}images/warning_icon.png">
+				<p>该企业限制实名验证投递</p>
+			</div>
+			<div class="ss-text">
+				<p>认证后可提高求职成功率哦</p>
+			</div>
+			<div class="ss-btn">
+				<div class="cancel" data-state="0">先看看</div>
+				<a class="certificate" href="{#$member_userDomain#}/security-chCertify.html" target="_blank">去实名认证</a>
+			</div>
+		</div>
+		<!-- 公司投递 -->
+		<div class="s-company" style="width: 480px;">
+			<img src="{#$templets_skin#}images/close_icon.png" class="ss-close">
+			<div class="ss-title">
+				<img src="{#$templets_skin#}images/warning_icon.png">
+				<p>温馨提示：您正在使用招聘企业账号进行求职操作</p>
+			</div>
+			<div class="ss-text">
+				<p>如登录的不是您个人账号，可更换账号后创建简历、投递职位</p>
+			</div>
+			<div class="ss-btn">
+				<div class="cancel" data-state="0">好的，我知道了</div>
+			</div>
+		</div>
+	</div>
+	<!-- 多个简历弹窗 -->
+	<div class="moreResume">
+		<div class="mr-content">
+			<img src="{#$templets_skin#}images/close_icon.png" class="mr-close">
+			<div class="mr-title">
+				<div>
+					<img src="{#$templets_skin#}images/warning_icon.png">
+					<p>默认简历<span>个人简历1？</span>正在审核中</p>
+				</div>
+				<p>请稍后尝试</p>
+			</div>
+			<div class="mr-btn">
+				<div class="change">更换简历</div>
+				<div class="close">好的</div>
+			</div>
+		</div>
+		<div class="mr-select">
+			<img src="{#$templets_skin#}images/close_icon.png" class="mr-close">
+			<p class="mrs-title">请选择简历后投递</p>
+			<div class="mrs-select">
+				<span>投递简历：</span>
+				<div class="mrs-input">
+					<input type="text" placeholder="请选择简历" readonly>
+					<i></i>
+					<ul></ul>
+				</div>
+			</div>
+			<div class="mrs-btn">
+				<div class="cancel">取消</div>
+				<div class="confirm">确认投递</div>
+			</div>
+		</div>
+	</div>
+	<!-- 海报弹窗 -->
+	<div class="poster" @click="posterFn(1)">
+		<!-- 生成海报 -->
+		<div class="p-produce" onclick="event.stopPropagation()">
+			<!-- 关闭按钮 -->
+			<img src="{#$templets_skin#}images/close.png" class="pp-close" @click="posterFn(1)" title="关闭">
+			<p class="pp-title">生成招聘海报</p>
+			<div class="pp-steps">
+				<!-- 步骤1-选择展示职位 -->
+				<div class="step1">
+					<p class="title">1.选择海报展示职位</p>
+					<ul>
+						<li :data-id="item.id" :data-index="index" v-for="(item,index) in jobtype" :class="{'active':posterId.includes(item.id)}">
+							<div class="select"></div>
+							<span>{{item.title}}</span>
+							<div>{{item.show_salary}}</div>
+						</li>
+						<li class="unfold" @click="foldFn(0)">全部职位</li>
+						<li class="fold" @click="foldFn(1)">收起职位</li>
+					</ul>
+				</div>
+				<!-- 步骤2-选择生成模板 -->
+				<div class="step2">
+					<p class="title">2.选择模板生成</p>
+					<ul>
+						<li v-for="(item,index) in posterData" :key="item.id" v-show="item.type==posterType">
+							<img :src="item.litpic">
+							<div class="btn" @click="produceFn(item.id)">
+								<div>生成海报</div>
+							</div>
+						</li>
+					</ul>
+				</div>
+			</div>
+			<div class="pp-nopost">
+				<img src="{#$templets_skin#}images/nonesearch.png">
+				{#if $job_cid==$detail_id#}
+				<p>公司还未发布职位，请先发布职位哦</p>
+				<a href="{#$cfg_basehost#}/supplier/job/postManage.html">发布职位</a>
+				{#else#}
+				<p>还未发布职位，无法生成招聘海报哦</p>
+				{#/if#}
+			</div>
+			<!-- 拖拽区域 -->
+			<div class="pp-drag"></div>
+		</div>
+		<!-- 保存海报 -->
+		<div class="p-save" onclick="event.stopPropagation()" @click="posterFn(2)">
+			<div class="pp-poster" onclick="event.stopPropagation()">
+				<div class="pp-loading">
+					<img src="{#$templets_skin#}images/loading.gif" class="loading">
+					<p>生成中...</p>
+				</div>
+				<div class="pp-show"><img src="" class="ppp-showimg" @load="loadFn()"></div>
+				<a @click="psaveFn" href="javascript:;">保存至本地</a>
+			</div>
+		</div>
+		<!-- 弹窗 -->
+		<div class="p-warning">
+			<p>温馨提示：8个以下职位展示效果更好</p>
+		</div>
+	</div>
+</div>
+
+{#include file="footer.html" theme='gray'#}
+<script charset="UTF-8" src="{#$cfg_staticPath#}js/publicOpenMap.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper-bundle.min.js?v={#$cfg_staticVersion#}"></script>
+<script>
+	var page='{#$pageInfo.totalCount#}';
+</script>
+<script type="text/javascript" src="{#$templets_skin#}js/company_detail.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

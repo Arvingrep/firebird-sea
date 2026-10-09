@@ -18,11 +18,11 @@ $(function(){
         port = $('#port').val(),
         requirepass = $('#requirepass').val();
     if(server == '' || port == '' || requirepass == ''){
-      alert('请填写完整');
+      $.dialog.alert('请填写完整');
     }
     var reg = /^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$/;
     if(!reg.test(server)){
-      alert('服务器地址不正确');
+      $.dialog.alert('服务器地址不正确');
       return false;
     }
 
@@ -45,7 +45,7 @@ $(function(){
     let state = $("input[name='open']:checked").val()
       state = parseInt(state);
     if(state && needCheck){
-      alert('请检测配置是否可用');
+      $.dialog.alert('请检测配置是否可用');
       return;
     }
     huoniao.operaJson("?action=save", $('#editform').serialize(), function (val) {

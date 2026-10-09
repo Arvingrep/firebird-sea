@@ -165,14 +165,11 @@ Vue.component('qiangdan-box',{
 				var data = response.data;
 				var npage = this.page;
 				if(data.state==100 && data.info.list.length>0){
-				    let _dlists = [];
 					if(npage==1){
-						_dlists = data.info.list;
+						this.dlists = data.info.list;
 					}else{
-				// 		_dlists = this.dlists.concat(data.info.list);
-						_dlists = [...this.dlists, ...data.info.list];
+						this.dlists = this.dlists.concat(data.info.list);
 					}
-					this.dlists = deepUnique(_dlists);
 					npage = npage + 1;
 					this.page = npage;
 					this.load_on = false;
@@ -659,14 +656,3 @@ function showErr(data) {
 		});
 	}, 1500);
  }
-
-
-function deepUnique(arr) {
-  const seen = new Set();
-  return arr.filter(item => {
-    // 如果是数组，递归处理
-    const normalized = Array.isArray(item) ? deepUnique(item) : item;
-    const key = JSON.stringify(normalized);
-    return seen.has(key) ? false : seen.add(key);
-  });
-}

@@ -195,6 +195,11 @@ if($cfg_basehost_ != str_replace("www.", "", $httpHost) && empty($_GET['service'
 	$subDomain = explode("-", $subDomain);
 	$subDomain = $subDomain[0];
 
+	if($subDomain == "member"){
+		header("Location: /b/");
+		die;
+	}
+
 	if($subDomain != "user"){
 		$sql = $dsql->SetQuery("SELECT * FROM `#@__domain` WHERE `domain` = '$subDomain'");
 		$results = $dsql->dsqlOper($sql, "results");
@@ -1129,7 +1134,7 @@ if($service != "member"){
 	$ischeck = explode($busiDomain, $dirDomain);
     include HUONIAOINC . '/config/business.inc.php';
 	//如果是访问的企业会员域名，模板选择企业会员的模板
-	if(count($ischeck) > 1 && (substr($ischeck[1], 0, 1) == "/" || substr($ischeck[1], 0, 1) == "" || substr($ischeck[1], 0, 1) == "?") && $template != "ssoUserRedirect" && $template != "ssoUser" && $template != "sso" && $template != "ssoUserCenter"){
+	if(((count($ischeck) > 1 && (substr($ischeck[1], 0, 1) == "/" || substr($ischeck[1], 0, 1) == "" || substr($ischeck[1], 0, 1) == "?") && $template != "ssoUserRedirect" && $template != "ssoUser" && $template != "sso" && $template != "ssoUserCenter")) || strpos($template, 'business') !== false || strpos($template, 'diancan') !== false){
 		$tpl = "/templates/member/company/";
         $huoniaoTag->assign('userTemplateType', 2);
 

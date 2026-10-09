@@ -97,7 +97,7 @@ if(file_exists($tpl."/".$templates)){
 	$huoniaoTag->assign('payPhoneFenxiaoChecked', (int)$cfg_payPhoneFenxiao);
 
 	$huoniaoTag->assign('payPhoneFenxiaoFee', (float)$cfg_payPhoneFenxiaoFee);
-	$huoniaoTag->assign('payPhoneModule', $cfg_payPhoneModule && is_string($cfg_payPhoneModule) ? explode(',', $cfg_payPhoneModule) : array());
+	$huoniaoTag->assign('payPhoneModule', $cfg_payPhoneModule ? explode(',', $cfg_payPhoneModule) : array());
 
 	$huoniaoTag->assign('tencentGDT_app_id', $cfg_tencentGDT_app_id);
 	$huoniaoTag->assign('tencentGDT_placement_id', $cfg_tencentGDT_placement_id);

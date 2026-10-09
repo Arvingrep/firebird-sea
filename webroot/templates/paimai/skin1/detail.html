@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$detail_title#}-{#$paimai_title#}</title>
+    <meta name="keywords" content="{#$paimai_keywords#}"/>
+    <meta name="description" content="{#$paimai_description#}"/>
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico?v={#$cfg_staticVersion#}" type="image/x-icon"/>
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" href="{#$cfg_staticPath#}css/ui/element_ui_index.css?v={#$cfg_staticVersion#}">
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public_header.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/jquery-1.9.0.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/vue.js"></script>
+    <script src="{#$cfg_staticPath#}js/ui/element_ui_index.js?v={#$cfg_staticVersion#}"></script>
+    <script>
+        var id = "{#$detail_id#}";
+        var masterDomain  = "{#$cfg_basehost#}";
+        var paimai_channelDomain = "{#$paimai_channelDomain#}";
+        var  cookiePre = '{#$cfg_cookiePre#}';
+        var userid = '{#$userinfo.userid#}';
+        var litpic = "{#$detail_litpicUrl#}"
+        var pics = {#if count($detail_picsUrl) > 0#}{#json_encode($detail_picsUrl)#}{#else#}[]{#/if#};
+    </script>
+</head>
+<body class="w1200">
+    {#include file="public_top.html"#} 
+    <div class="wrap">
+        <div id="GoodInfo" v-cloak>
+            <!-- <div class="el-breadcrumb" >
+                <span class="el-breadcrumb__item">
+                    <span class="el-breadcrumb__inner is-link" role="link">首页</span>
+                    <i class="el-icon el-breadcrumb__separator">
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M340.864 149.312a30.592 30.592 0 0 0 0 42.752L652.736 512 340.864 831.872a30.592 30.592 0 0 0 0 42.752 29.12 29.12 0 0 0 41.728 0L714.24 534.336a32 32 0 0 0 0-44.672L382.592 149.376a29.12 29.12 0 0 0-41.728 0z"></path></svg>
+                    </i>
+                </span>
+                <span class="el-breadcrumb__item">
+                    <span class="el-breadcrumb__inner is-link" role="link">商品列表</span>
+                    <i class="el-icon el-breadcrumb__separator">
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M340.864 149.312a30.592 30.592 0 0 0 0 42.752L652.736 512 340.864 831.872a30.592 30.592 0 0 0 0 42.752 29.12 29.12 0 0 0 41.728 0L714.24 534.336a32 32 0 0 0 0-44.672L382.592 149.376a29.12 29.12 0 0 0-41.728 0z"></path></svg>
+                    </i>
+                </span>
+                <span class="el-breadcrumb__item" aria-current="page">
+                    <span class="el-breadcrumb__inner" role="link">商品详情</span>
+                    <i class="el-icon el-breadcrumb__separator">
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M340.864 149.312a30.592 30.592 0 0 0 0 42.752L652.736 512 340.864 831.872a30.592 30.592 0 0 0 0 42.752 29.12 29.12 0 0 0 41.728 0L714.24 534.336a32 32 0 0 0 0-44.672L382.592 149.376a29.12 29.12 0 0 0-41.728 0z"></path></svg>
+                    </i>
+                </span>
+            </div> -->
+            <el-breadcrumb separator-class="el-icon-arrow-right">
+              <el-breadcrumb-item :to="{ path: '{#$paimai_channelDomain#}' }" data-link="{#$paimai_channelDomain#}">首页</el-breadcrumb-item>
+              <el-breadcrumb-item :to="{ path: '{#$paimai_channelDomain#}/list.html'}" data-link="{#$paimai_channelDomain#}/list.html">商品列表</el-breadcrumb-item>
+              <el-breadcrumb-item>商品详情</el-breadcrumb-item>
+            </el-breadcrumb>
+            <!-- 商品详情 s-->
+            <div class="pm-main">
+                <div class="pm-preview-wrap">
+                  <div class="pm-preview" v-cloak>
+                    <imgzoom>
+                      <img :src="imgList[activeImgIndex]" style="width: 350px; height: 350px;"/>
+                    </imgzoom>
+                    <div class="nav">
+                      <button class="prev" @click="preImgList"></button>
+                      <div class="list">
+                        <ul :style="{left:imgListPosition+'px'}">
+                          <li @mouseenter="handleActiveImg(index)" v-for="(item,index) in imgList"
+                              :class="{active:activeImgIndex===index}">
+                            <img width="50" height="50" :src="item" alt=""/>
+                          </li>
+                        </ul>
+                      </div>
+                      <button class="next" @click="nextImgList"></button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pm-item-info" :class="{'stage-1':currentState <= 1,'stage-2':currentState >= 2}" v-cloak>
+                  <div class="pm-name">{#$detail_title#}</div>
+                  <div v-show="currentState===0">
+                    
+                    <div class="mt" v-if="goodInfo.startdate < currentTime">
+                      <div class="state"><span>正在进行</span></div>
+                      <div class="startTime">结束时间：<span v-html="tiemText"></span></div>
+                      <div class="times">
+                        <span><em>{{goodInfo.reg_count}}</em>人报名</span>
+                        <!-- <span><em>24</em>人围观</span><span><em>13</em>人关注提醒</span> -->
+                      </div>
+                    </div>
+                    <div class="mt nostart" v-else>
+                      <div class="state "><span>即将开始</span></div>
+                      <div class="startTime">距离开拍：<span v-html="tiemText"></span></div>
+                      <div class="times">
+                        <span><em>{{goodInfo.reg_count}}</em>人报名</span>
+                        <!-- <span><em>24</em>人围观</span><span><em>13</em>人关注提醒</span> -->
+                      </div>
+                    </div>
+                    <div class="mc">
+                      <div class="price current">
+                        <div class="label">当前价</div>
+                        <div class="number"><span>{#echoCurrency type="symbol"#}</span><em role="button" tabindex="0" class="lrc-tooltip-item">{{goodInfo.cur_mon_start}}</em></div>
+                      </div>
+                      <div class="price base">
+                        <div class="label">起拍价</div>
+                        <div class="number"><span>{#echoCurrency type="symbol"#}</span><em role="button" tabindex="0" class="lrc-tooltip-item">{{goodInfo.start_money}}</em></div>
+                      </div>
+                      <div class="buttons">
+                        <button v-if="!goodInfo.u_reg" class="button" style="cursor: pointer" data-url="{#getUrlPath service='paimai' template='confirm' id=$detail_id#}" @click="targetTo('{#getUrlPath service='paimai' template='confirm' id=$detail_id param="type=reg"#}')">
+                          <span>立即报名</span><em>（{{goodInfo.amount}}元保证金）</em>
+                        </button>
+                        <button v-else class="button disabled"><span>报名成功，请在开拍后参加开拍</span></button>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-show="currentState===1" v-cloak>
+                    <div class="mt" v-if="goodInfo.startdate < currentTime">
+                      <div class="state"><span>正在进行</span></div>
+                      <div class="startTime">结束时间：<span v-html="tiemText"></span></div>
+                      <div class="times">
+                        <span><em>{{goodInfo.reg_count}}</em>人报名</span>
+                        <!-- <span><em>24</em>人围观</span><span><em>13</em>人关注提醒</span> -->
+                      </div>
+                    </div>
+                    
+                    <div class="mc">
+                      <div class="price current">
+                        <div class="label">当前价</div>
+                        <div class="number"><span>{#echoCurrency type="symbol"#}</span><em role="button" tabindex="0" class="lrc-tooltip-item">{{goodInfo.cur_mon_start}}</em>
+                        </div>
+                        <em class="pm-myBidPrice" v-if="goodInfo.pai && goodInfo.pai.length > 0 && userid == goodInfo.pai[0].uid">由我出价</em></div>
+                      <div class="pm-bid-wrapper">
+                        <div class="pm-counter" style="border:none">
+                          出价金额：
+                          <el-input-number v-model="currPrice" controls-position="right" @change="handleChange" :step="goodInfo.add_money " :min="goodInfo.cur_mon_start + goodInfo.add_money "  ></el-input-number>
+                          数量：
+                          <el-input-number v-model="num_buy" :disabled="true" controls-position="right" @change="handleChange" :min="1"  ></el-input-number>
+                        </div>
+                        <button class="button bid-button" style="margin-right: 10px" @click="pai()">确认出价
+                        </button>
+                        <div>
+                          <button class="pm-refresh" @click="getNewPrice">
+                            <span></span><em>价格刷新</em>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="m pm-summary" v-show="currentState===2">
+                    <div class="mt">
+                      <div class="state"><span>拍卖结束</span></div>
+                      <div class="result"><em>恭喜您！成功获拍</em></div>
+                      <div class="endtime">结束时间：
+                        <!-- 2022年05月29日 12:15:07　1人报名　6人围观　0人关注提醒 -->
+                        {{transTime(goodInfo.enddate)}}  {{goodInfo.reg_count}}人报名　
+                      </div>
+                    </div>
+                    <div class="mc qrfix">
+                      <el-alert :title="'恭喜您成功获拍，请在'+goodInfo.pay_limit+'小时内支付尾款'" type="warning" :closable="false"></el-alert>
+                     
+                      <div class="price deal">
+                        <div class="label">成交价</div>
+                        <div class="number"><span>{#echoCurrency type='symbol'#}</span><em role="button" tabindex="0" class="lrc-tooltip-item">{{goodInfo.cur_mon_start}}</em></div>
+                        <div class="extra">（剩余货款{#echoCurrency type='symbol'#}{{goodInfo.cur_mon_start}}）</div>
+                      </div>
+                      <div class="buttons">
+                        <button class="button" @click="targetTo('{#getUrlPath service='paimai' template='confirm' id=$detail_id param="type=pai"#}')">立即付款</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="m pm-summary" v-show="currentState===3">
+                    <div class="mt">
+                      <div class="state"><span>拍卖结束</span></div>
+                      <div class="result"><span>拍卖已结束，{{goodInfo.sale_num > 0 ? '拍品成功拍出' : '拍品未成功拍出'}}</span></div>
+                      <div class="endtime">结束时间：
+                        {{transTime(goodInfo.enddate)}}  {{goodInfo.reg_count}}人报名　
+                      </div>
+                    </div>
+                    <div class="mc">
+                      <div class="price deal">
+                        <div class="label">成交价</div>
+                        <div class="number"><span>{#echoCurrency type='symbol'#}</span><em role="button" tabindex="0" class="lrc-tooltip-item">{{goodInfo.cur_mon_start}}</em></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="m pm-summary" v-show="currentState===4">
+                    <!--违约-->
+                    <div class="mt">
+                      <div class="state"><span>违约</span></div>
+                      <div class="result"><i>您已违约</i></div>
+                      <div class="endtime">结束时间：
+                        2022年05月29日 12:15:07　1人报名　
+                      </div>
+                    </div>
+                    <div class="mc">
+                      <div class="price deal">
+                        <div class="label">成交价</div>
+                        <div class="number"><span>{#echoCurrency type='symbol'#}</span><em role="button" tabindex="0" class="lrc-tooltip-item">{{goodInfo.cur_mon_start}}</em></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="m pm-summary" v-show="currentState===-1">
+                    <div class="mt">
+                      <div class="state"><span>支付成功</span></div>
+                      <div class="startTime"><span>拍卖已结束，您已成功支付</span></div>
+                    </div>
+                    <div class="mc">
+                      <div class="price current">
+                        <div class="label">成交价</div>
+                        <div class="number"><span>{#echoCurrency type="symbol"#}</span><em role="button" tabindex="0" class="lrc-tooltip-item">{{goodInfo.cur_mon_start}}</em></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mb" style="overflow: visible;margin-bottom: 5px">
+                    <div class="pm-tips">
+                      <div class="list description fn-clear"><h3>拍卖说明</h3>
+                        <ul>
+                          <li><span>起拍价：</span><em>{#echoCurrency type="symbol"#}{{goodInfo.start_money}}</em></li>
+                          <li><span>加价幅度：</span><em>{#echoCurrency type="symbol"#}{{goodInfo.add_money}}</em></li>
+                          <li><span>保证金：</span><em>{#echoCurrency type="symbol"#}{{goodInfo.amount}}</em></li>
+                          <li><span>保留价：</span><em>{{goodInfo.min_money ? ('{#echoCurrency type="symbol"#}' + goodInfo.min_money) : '无'}}</em>
+                            <el-popover
+                                placement="top-start"
+                                :width="400"
+                                trigger="hover"
+                                content="保留价是该拍品由商家设置能够接受的最低成交价，当成交价低于保留价时，商品会流拍。"
+                            >
+                              <template #reference>
+                                <i role="button" tabindex="0" class="lrc-tooltip-item">?</i>
+                              </template>
+                            </el-popover>
+                          
+                          </li>
+                          <li><span>延时周期：</span><em>{{goodInfo.add_interval}}分钟/次</em>
+                            <el-popover
+                                placement="top-start"
+                                :width="400"
+                                trigger="hover"
+                                :content="'竞拍最后'+goodInfo.add_interval+'分钟内，若有用户出价，即进入延时竞价周期'"
+                            >
+                              <template #reference>
+                                <i role="button" tabindex="0" class="lrc-tooltip-item">?</i>
+                              </template>
+                            </el-popover>
+                           
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="pm-deals" :class="{fold:!expandRecord}" >
+                    <el-divider>此拍品被出价{{goodInfo.pai?goodInfo.pai.length:0}}次</el-divider>
+                    
+                    <div class="smc" v-if=" goodInfo.pai && goodInfo.pai.length > 0">
+                      <ul>
+                        <li v-for="(item,index) in goodInfo.pai"><em>{{item.nickname}}</em><em>{#echoCurrency type="symbol"#}{{item.price_avg}}<span v-if="index == 0">最高价</span></em><em>{{returnHumanTime(item.date,1)}}</em></li>
+                       
+                      </ul>
+                    </div>
+                    <div class="smb" @click="expandRecord=!expandRecord" v-if="goodInfo.pai && goodInfo.pai.length > 0"></div>
+                    <div v-else class="noPai"><p >暂无出价</p></div>
+                  </div>
+                </div>
+            </div>
+            <div class="pm-flow pm-flow-zhenpin">
+              <div class="title">竞拍流程：</div>
+              <ul class="content">
+                <li class="item item0" clstag="pageclick|keycount|Zhenpinproduct_Actionflow|Zhenpinproduct_0">
+                  <a href="javascript:;"><i></i><em>交保证金</em></a>
+                </li>
+                <li class="item item1" clstag="pageclick|keycount|Zhenpinproduct_Actionflow|Zhenpinproduct_1"><span></span><a
+                   href="javascript:;"><i></i><em>参与竞拍</em></a></li>
+                <li class="item item2" clstag="pageclick|keycount|Zhenpinproduct_Actionflow|Zhenpinproduct_2"><span></span><a
+                   href="javascript:;"><i></i><em>竞拍成功</em></a></li>
+                <li class="item item3" clstag="pageclick|keycount|Zhenpinproduct_Actionflow|Zhenpinproduct_3"><span></span><a
+                   href="javascript:;"><i></i><em>支付货款</em></a></li>
+                <li class="item item4" clstag="pageclick|keycount|Zhenpinproduct_Actionflow|Zhenpinproduct_4"><span></span><a
+                   href="javascript:;"><i></i><em>交易完成</em></a></li>
+              </ul>
+            </div>
+            <div class="pm-main" style="background-color: #fff">
+              <div class="pm-side">
+                <div class="m pm-shop">
+                  <div class="mt" :title="(goodInfo.store && goodInfo.store.title ? goodInfo.store.title : '' )">{{(goodInfo.store && goodInfo.store.title)?goodInfo.store.title : ''}}<a :href="(goodInfo.store && goodInfo.store.url ?  goodInfo.store.url : '')"  target="_blank"></a></div>
+                  <div class="mc">
+                    <ul class="numbers">
+                      <li><span>{{goodInfo.store.onsale}}</span><em>在拍拍品</em></li>
+                      <li><span>{{goodInfo.store.sale}}</span><em>全部拍品</em></li>
+                    </ul>
+                    <div class="operate">
+                      <a href="{#getUrlPath service='paimai' template='store' id=$detail_store['sid']#}" target="_blank">全部拍品</a>
+                    </div>
+                  </div>
+                </div>
+                <div class="m pm-hot">
+                  <div class="mt">热门拍卖</div>
+                  <div class="mc">
+                    <div class="pm-good" v-for="item in goodList">
+                      <div class="p-img">
+                        <a :href="item.url" target="_blank">
+                          <img alt="" class="lrc-image  img-loaded" :title="item.title" :src="item.litpic">
+                        </a>
+                      </div>
+                      <div class="p-name">
+                        <a :href="item.url" target="_blank">{{item.title}}</a>
+                      </div>
+                      <div class="p-price">当前价 {#echoCurrency type="symbol"#}{{item.start_money}}</div>
+                    </div>
+                  
+                    
+                   
+                  </div>
+                </div>
+              </div>
+              <div class="pm-content">
+                
+
+                <el-tabs v-model="activeTab">
+                  <el-tab-pane label="拍品详情" name="first">
+                    <div class="product-info" v-html="goodInfo.body">
+                    </div>
+                  </el-tab-pane>
+                  <el-tab-pane :label="'出价记录('+totalCount+')'" name="second" style="padding:0 20px 20px">
+                    <el-table size="large" :data="priceList" stripe style="width: 100%;margin-bottom: 15px;">
+                      <el-table-column prop="" label="状态" width="180">
+                        <template slot-scope="scope">
+                          <span style="margin-left: 10px">{{ scope.$index == 0 ? '领先' : '' }}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column prop="price_avg" label="价格" width="180"> </el-table-column>
+                      <el-table-column prop="nickname" label="竞拍人"> </el-table-column>
+                      <el-table-column prop="date" label="时间"> </el-table-column>
+                    </el-table>
+                    <div style="display: flex;justify-content: right" v-if="totalPage > 1">
+                      <el-pagination background layout="prev, pager, next" :total="totalPage" @current-change="handleCurrentChange"/>
+                    </div>
+                  </el-tab-pane>
+                </el-tabs>
+              </div>
+            </div>
+            <!-- 商品详情 e-->
+        </div>
+    </div>
+    {#include file="foot.html"#} 
+</body>
+<script src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

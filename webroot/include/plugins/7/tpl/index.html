@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>汽车品牌初始数据导入</title>
+	<link rel='stylesheet' type='text/css' href='{#$cfg_basehost#}/static/css/admin/bootstrap.css?v={#$cfg_staticVersion#}' />
+	<style type="text/css">
+		.w-tip {right: 10px;}
+		.step0 {padding: 20px;}
+		.step0 ul {width: 101%; padding: 10px 0 20px; margin: 0;}
+		.step0 li {float: left; border: 1px solid #ddd; width: 180px; height: 35px; line-height: 35px; list-style: none; padding: 4px; margin: 0 10px 10px 0; border-radius: 4px;}
+		.step0 li a {display: block; padding: 0 5px;}
+		.step0 li strong {font-weight: 500;}
+		.step0 li span {float: right;}
+		.step0 li a:hover {text-decoration: none; background: #f1f1f1;}
+		.step0 .empty {text-align: center; line-height: 200px;}
+		.alreadyCollection {border-bottom: 1px solid #ddd; margin-bottom: 20px;}
+	</style>
+	<script type="text/javascript">
+		var state0coutnallty =  '{#$state0coutnallty#}';
+		var state0coutnall 	 =  '{#$state0coutnall#}';
+	</script>
+</head>
+<body>
+	<div class="step0">
+    <div class="alreadyCollection">
+        <h4>汽车品牌：</h4>
+        <ul class="clearfix">
+            <li><strong>已同步</strong><span>{#$state1coutnallty#}</span></li>
+            <li><strong>未同步</strong><span>{#$state0coutnallty#}</span></li>
+        </ul>
+    </div>
+
+    <div class="notCollection">
+        <h4>汽车车款：</h4>
+        <ul class="clearfix">
+             <li><strong>已同步</strong><span>{#$state1coutnall#}</span></li>
+            <li><strong>未同步</strong><span>{#$state0coutnall#}</span></li>
+        </ul>
+    </div>
+    <button class="btn btn-big btn-primary" data-type="brandtype" onclick="start(this)">开始同步</button>
+
+   <div>
+    <table id="load" width="700" border="0" bgcolor="#FAFAFA" cellpadding="0" cellspacing="0" bordercolor="#000000" style="border-collapse:collapse;display: none;margin-left: 25px;margin-top: 0px;margin-bottom: 30px;">
+        <tr>
+            <td><br><br>
+                <table id="load2" width="100%" border="1" cellspacing="0" cellpadding="0" bordercolor="#287BCE" style="border-collapse:collapse;display: none;">
+                    <tr bgcolor="#F7F7F6">
+                        <td width="20%" height="100" valign="middle">
+                            <table align='center' width='500'>
+                                <tr>
+                                    <td colspan='2' align='center' id="progressPersent"><font size="2">
+                                        正在同步中，请稍后...
+                                    </font>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td id='tdOne' height='25' style="width: 1%; background-color: #0a7bcc"> </td>
+                                    <td id='tdTwo' height='25' style="background-color: #999999;width:500px;"> </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>　
+</div>
+</div>
+<script src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v=1531357464"></script>
+<script type="text/javascript">
+	function start(obj) {
+    	var type = $(obj).data('type');
+
+        if(state0coutnallty ==0 && state0coutnall ==0 ){
+        	alert("没有需要同步的数据");
+        	return false;
+        }
+    	$("#load").css('display', 'block');
+        $("#load2").css('display', 'block');
+        $(obj).attr('disabled',true);
+        $.ajax({
+            type: "GET",
+            url: "?action="+type,
+            data: {
+            },
+            async:true,
+            dataType: "json",
+
+            success: function(data){
+
+                if(data.code == 201){
+                    $("#tdTwo").css("background-color",'#0a7bcc');
+                    $("#progressPersent").html('已完成');
+                }else if (data.code == 200) {
+                    var per = data.data;
+                    //增加宽度
+                    $("#tdOne").css("width",per);
+                    //显示比率
+                    $("#progressPersent").html('当前已完成：' + per);
+
+                    setTimeout(function(){
+                        get("getspeed");
+                    },1000);
+
+                }
+            }
+        })
+    }
+
+    var load 	= $("#load").css('display');
+    var load2 	= $("#load2").css('display');
+
+
+    if( load2!='none' && load!='none'){
+	    setInterval(function(){
+	        get("getspeed");
+	    }, 1000);
+	}
+    function get(type) {
+     	 $.ajax({
+            type: "GET",
+            url: "?action="+type,
+            data: {
+            },
+            async:true,
+            dataType: "json",
+            success: function(data){
+                if(data.code == 201){
+                    $("#tdTwo").css("background-color",'#0a7bcc');
+                    $("#progressPersent").html('已完成');
+                }else if (data.code == 200) {
+                    var per = data.data;
+                    //增加宽度
+                    $("#tdOne").css("width",per);
+                    //显示比率
+                    $("#progressPersent").html('当前已完成：' + per);
+
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>

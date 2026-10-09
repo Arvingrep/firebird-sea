@@ -84,7 +84,7 @@ $(function(){
 
 	//搜索
 	$("#searchBtn").bind("click", function(){
-		var starttime = $("#stime").val(), endtime = $("#etime").val(), stype = $("#searchType").val(), keyword = $("#keyword").val();
+		var starttime = $("#stime").val(), endtime = $("#etime").val(), keyword = $("#keyword").val();
 		//时间对比
 		if(starttime != "" && endtime != "" && Date.ParseString(starttime) - Date.ParseString(endtime) > 0){
 			$.dialog.alert("结束时间必须大于开始时间！");
@@ -93,7 +93,6 @@ $(function(){
 
 		$("#start").html(starttime);
 		$("#end").html(endtime);
-		$("#stype").html(stype);
 		$("#keywords").html($.trim(keyword));
 		$("#list").attr("data-atpage", 1);
 		getList();
@@ -251,7 +250,6 @@ function getList(){
 	$("#loading").html("加载中，请稍候...").show();
 	var start    = $("#start").html(),
 		end      = $("#end").html(),
-		stype    = $("#stype").html(),
 		keywords = $("#keywords").html(),
 		admin    = $("#cadmin").val(),
 		pagestep = $("#pageBtn").attr("data-id") ? $("#pageBtn").attr("data-id") : "10",
@@ -261,7 +259,6 @@ function getList(){
 		data.push("start="+start);
 		data.push("end="+end);
 		data.push("admin="+admin);
-		data.push("stype="+stype);
 		data.push("keywords="+keywords);
 		data.push("pagestep="+pagestep);
 		data.push("page="+page);

@@ -1,8 +1,8 @@
-var pageVue = new Vue({
+var page = new Vue({
 	el:'#page',
 	data:{
 		navList:navList,
-		currid:currid,
+		currid:5,
 		hoverid:'',
 		buildtypelist:buildtypenames,  //建筑类型
 		buildtype:buildtype,
@@ -10,10 +10,6 @@ var pageVue = new Vue({
 	    room:0,  //室
 	    hall:0,   //厅
 	    guard:0,   //卫
-		status:status, //状态
-		panoramaType:panoramaType, //全景类型
-		main:main,
-		villa:villa,
 		loading:false, //加载中
 		delNow:0,
 	},
@@ -28,6 +24,7 @@ var pageVue = new Vue({
 			$(".change_account").hide()
 		},
 		changeDel(d){
+			alert(333)
 			var tt = this;
 			tt.delNow = d
 		},
@@ -62,30 +59,16 @@ var pageVue = new Vue({
 				if(id!=''){
 					dopost = 'edit';
 				}
-				let formData = form.serialize();
-				let arr = formData.split('&');
-				let params = {};
-				arr.forEach(item => {
-				  let [key, value] = item.split('=');
-				  params[key] = value;
-				});
-				// 检查条件并修改 panoramaType
-				if ((params.panoramaType == '1' && !params.panoramaUrl) || (params.panoramaType == '2' && !params.panorama)) {
-				  params.panoramaType = '0';
-				}
-				// 转换回数组形式
-				arr = Object.keys(params).map(key => `${key}=${params[key]}`);
-				formData=arr.join('&');
+
 				axios({
 					method: 'post',
-					data:formData,
+					data:form.serialize(),
 					url: masterDomain + '/include/ajax.php?service=house&action=apartmentAdd&dopost='+dopost+'&loupanid='+loupanid+'&aid='+id,
 				})
 				.then((response)=>{
 					var data = response.data;
 					if(data.state ==100){
 						alert(data.info);
-						location.href= masterDomain+"/supplier/loupan/huxing.html"
 					}else{
 						alert(data.info);
 					}

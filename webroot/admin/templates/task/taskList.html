@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>任务管理</title>
+{#$cssFile#}
+<style>
+.list td {font-size: 15px;}
+.list td small {font-size: 90%;}
+.thead li{font-size: 14px;}
+.thead li .moneyA,.thead li .pointA,.thead li .bonusA,.thead li .recomdA{color: #999;text-decoration: none;}
+.thead li .moneyA.curr,.thead li .pointA.curr,.thead li .bonusA.curr,.thead li .recomdA.curr{color: #2672ec;}
+.thead li .moneyA i,.thead li .pointA i,.thead li .bonusA i,.thead li .recomdA i{display: inline-block;width: 18px;height: 20px;background: url(/static/images/ui/chosen-sprite.png) no-repeat -2px 3px;margin-left: 2px;}
+.thead li .moneyA.up i,.thead li .pointA.up i,.thead li .bonusA.up i,.thead li .recomdA.up i{background: url(/static/images/ui/chosen-sprite.png) no-repeat -20px 3px;}
+.uaccount {padding: 0px 4px; margin-right: 3px; display: inline-block; line-height: 16px; vertical-align: middle; margin-top: -1px; margin-bottom: 2px; color: #b1b1b1; text-align-last: justify;}
+</style>
+</head>
+<body>
+<div class="search">
+  <label>搜索：</label>
+  <select class="chosen-select" id="clevel" style="width: 95px;">
+    <option value="">会员等级</option>
+    <option value="">所有等级</option>
+    {#foreach from=$levelList item=level#}
+    <option value="{#$level.id#}">{#$level.typename#}</option>
+    {#/foreach#}
+  </select>
+  <select class="chosen-select" id="ctype" style="width: 95px;">
+    <option value="">任务类型</option>
+    <option value="">所有类型</option>
+    {#foreach from=$typeList item=type#}
+    <option value="{#$type.id#}">{#$type.typename#}</option>
+    {#/foreach#}
+  </select>
+  <input class="input-large" type="search" id="keyword" placeholder="请输入关键字，指定用户#123" title="输入#用户ID，可以快速搜索">
+  &nbsp;&nbsp;发布日期&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期">&nbsp;&nbsp;到&nbsp;&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期">&nbsp;&nbsp;
+  &nbsp;&nbsp;任务单价&nbsp;&nbsp;<input class="input-mini" type="text" id="sprice" placeholder="金额">&nbsp;&nbsp;-&nbsp;&nbsp;<input class="input-mini" type="text" id="eprice" placeholder="金额">&nbsp;&nbsp;
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="selectBtn">
+        <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="1">全选</a></li>
+          <li><a href="javascript:;" data-id="0">不选</a></li>
+        </ul>
+      </div>
+      <div class="btn-group" id="operaBtn" style="display: none;">
+        <button class="btn dropdown-toggle" data-toggle="dropdown">批量操作<span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="1">审核通过</a></li>
+          <li><a href="javascript:;" data-id="2">审核拒绝</a></li>
+          <li><a href="javascript:;" data-id="3">删除任务</a></li>
+          <li><a href="javascript:;" data-id="4">冻结任务</a></li>
+          <li><a href="javascript:;" data-id="5">取消冻结</a></li>
+        </ul>
+      </div>
+      <span class="statusTips" style="display: none; font-size: 12px; color: #666; margin: 3px 0 0 5px;" data-toggle="tooltip" data-placement="bottom" title="" data-original-title="未付款、未审核、审核拒绝的任务可以直接删除；已审核、已暂停的可以冻结；已冻结的可以取消冻结。"><i class="icon-question-sign" style="margin-top: 3px;"></i>操作提示</span>
+      <div class="btn-group" id="stateBtn"{#if $notice#} data-id="0"{#/if#}>
+        <button class="btn dropdown-toggle" data-toggle="dropdown">{#if $notice#}待审核{#else#}全部信息{#/if#}(<span class="{#if $notice#}state0{#else#}totalCount{#/if#}"></span>)<span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>
+          <li><a href="javascript:;" data-id="01">未付款(<span class="state01"></span>)</a></li>
+          <li><a href="javascript:;" data-id="0">未审核(<span class="state0"></span>)</a></li>
+          <li><a href="javascript:;" data-id="1">已审核(<span class="state1"></span>)</a></li>
+          <li><a href="javascript:;" data-id="2">审核拒绝(<span class="state2"></span>)</a></li>
+          <li><a href="javascript:;" data-id="3">已暂停(<span class="state3"></span>)</a></li>
+          <li><a href="javascript:;" data-id="4">已冻结(<span class="state4"></span>)</a></li>
+          <li><a href="javascript:;" data-id="5">已完成(<span class="state5"></span>)</a></li>
+          <li class="divider"></li>
+          <li><a href="javascript:;" data-id="6">推荐(<span class="state6"></span>)</a></li>
+          <li><a href="javascript:;" data-id="7">极速审核(<span class="state7"></span>)</a></li>
+        </ul>
+      </div>
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row2">&nbsp;</li>
+  <li class="row6 left">任务ID</li>
+  <li class="row20 left">任务信息</li>
+  <li class="row17 left">会员信息</li>
+  <li class="row10 left">价格信息</li>
+  <li class="row15 left">时间信息</li>
+  <li class="row10 left">领取情况</li>
+  <li class="row10 left">状态</li>
+  <li class="row10">操作</li>
+</ul>
+
+<div class="list common mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="start"></span>
+  <span id="end"></span>
+  <span id="startMoney"></span>
+  <span id="endMoney"></span>
+</div>
+
+<script id="editForm" type="text/html">
+    <style>.quick-editForm{max-height: 600px; overflow-y: auto;}.quick-editForm dt {width: 140px;}.task-items{border-bottom: 1px solid #ccc; margin-bottom: 10px; padding-bottom: 5px;}.task-image{display: inline-block; width: 100px; height: 100px; object-fit: cover;}.ui_main{vertical-align: top;}</style>
+    <form action="" class="quick-editForm" name="editForm">
+        <dl class="clearfix">
+            <dt>任务标题：</dt>
+            <dd><span id="title"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>提交限时：</dt>
+            <dd><span id="tj_time"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>审核限时：</dt>
+            <dd><span id="sh_time"></span></dd>
+        </dl>
+        <div class="js_sh_obj hide">
+            <dl class="clearfix">
+                <dt>极速审核限时：</dt>
+                <dd><span id="js_sh_time"></span></dd>
+            </dl>
+            <dl class="clearfix">
+                <dt>极速审核开始时间：</dt>
+                <dd><span id="js_began_time"></span></dd>
+            </dl>
+            <dl class="clearfix">
+                <dt>极速审核结束时间：</dt>
+                <dd><span id="js_end_time"></span></dd>
+            </dl>
+            <dl class="clearfix">
+                <dt>极速审核历史记录：</dt>
+                <dd id="js_log" style="max-height: 265px; overflow-y: auto; margin-right: 100px;"></dd>
+            </dl>
+        </div>        
+        <dl class="clearfix">
+            <dt>领取条件/限制：</dt>
+            <dd><span id="note"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>平台说明：</dt>
+            <dd><span id="platform_tips"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>视频讲解：</dt>
+            <dd><span id="video"></span></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>任务步骤：</dt>
+            <dd id="steps"></dd>
+        </dl>
+        <dl class="steps_last_edit hide clearfix" style="background-color: #f1f1f1;">
+            <dt>修改前的任务步骤：</dt>
+            <dd id="steps_last_edit"></dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>支付金额：</dt>
+            <dd><span id="amount"></span>(<span id="pay_type"></span>)</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>支付时间：</dt>
+            <dd><span id="pay_time"></span></dd>
+        </dl>
+    </form>
+</script>
+
+<script>
+var adminPath = "{#$adminPath#}", levelListArr = {#$levelListArr#};
+</script>
+
+{#$jsFile#}
+</body>
+</html>

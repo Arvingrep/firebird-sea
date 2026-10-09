@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>搜索主播/直播</title>
+<meta name="keywords" content="{#$live_keywords#}" />
+<meta name="description" content="{#$live_description#}" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/search.css?v={#$cfg_staticVersion#}" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+    var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$live_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+    var hideFileUrl = {#$cfg_hideUrl#};
+    var cookiePre = '{#$cfg_cookiePre#}';
+    var QRcode = '{#$cfg_basehost#}/include/qrcode.php?data=';
+    var type = '{#$type#}', num = 0;
+</script>
+</head>
+<body class="w1200">
+<!--导航 s-->
+{#include file="_top.html"#}
+<!--导航 e-->
+<div class="mainBox wrap">
+    <div class="select_bar fn-clear">
+        <ul class="cateList fn-left">
+            <li{#if $type==''#} class="curr"{#/if#}><a href="{#getUrlPath service='live' template='search'#}">综合</a></li>
+            <li{#if $type==1#} class="curr"{#/if#}><a href="{#getUrlPath service='live' template='search' type=1 param="keywords={#$keywords#}"#}">主播</a></li>
+            <li{#if $type==2#} class="curr"{#/if#}><a href="{#getUrlPath service='live' template='search' type=2 param="keywords={#$keywords#}"#}">直播</a></li>
+        </ul>
+        <div class="sele_r fn-right ">
+            <div class="sort fn-left">
+                <a href="{#getUrlPath service='live' template='search' type=$type#}"><span {#if $orderby==''#}class="curr"{#/if#}>默认排序</span></a>
+                <a href="{#getUrlPath service='live' template='search' type=$type orderby='1'#}"><span {#if $orderby==1#}class="curr"{#/if#}>热度最高</span></a>
+            </div>
+        </div>
+    </div>
+    <div class="filter">
+        {#if $type==''#}
+        <div class="container all {#if $type==''#}show{#/if#}">
+            <div class="select_x fn-clear zb_head">相关主播(<em id="anchornum">0</em>)  
+                <span class="more fn-right"><a href="{#getUrlPath service='live' template='search' type=1#}" >更多></a></span>
+            </div>
+            <div class="zhuBo_Box">
+                <ul class="fn-clear">
+                </ul>
+            </div>
+
+            <div class="select_x fn-clear livestate">相关直播(<em id="livenum">4574</em>) <a class="curr" data-id="" href="javascript:;">全部</a><a data-id="1" href="javascript:;">直播中</a><a data-id="2" href="javascript:;">精彩回放</a><a href="javascript:;" data-id="0">节目预告</a>{#**#} <span class="more fn-right"><a href="{#getUrlPath service='live' template='search' type=2#}">更多></a></span></div>
+            <div class="conBox">
+                <ul class="conList fn-clear">
+                </ul>
+            </div>
+        </div>
+        {#/if#}
+        {#if $type==1#}
+        <div class="container zhuBo {#if $type==1#}show{#/if#}">
+            <div class="select_x fn-clear">相关主播(<em id="zhubonum">0</em>)  <span class="more fn-right"><a href="{#getUrlPath service='live' template='search' type=1#}">更多></a></span></div>
+            <div class="zhuBo_Box">
+                <ul class="fn-clear">
+                    {#live action="alive" return="row" orderby="3" title={#$keywords#}  page={#$page#} pageSize="24"#}
+                    <li>
+                        <a target="_blank" href="{#$cfg_basehost#}/user/{#$row.user#}">
+                        <div class="img_box"><div class="img"><img src="{#changeFileSize url={#$row.photo#} type='small'#}" alt=""></div> {#if $row.online#}<i></i>{#/if#}</div>
+                        </a>
+                        <div class="info">
+                            <p class="name"><em>{#$row.nickname#}</em> {#if $row.certifyState#}<i></i>{#/if#}</p>
+                            <p class="num">{#$row.totalFans#}人关注</p>
+                            {#if $row.isMfollow!=2#}
+                            <div class="btn_box">
+                                {#if $row.isMfollow==1#}
+                                <div data-id="{#$row.user#}" class="btn curr"><i></i><span>已关注</span></div>
+                                {#else#}
+                                <div data-id="{#$row.user#}" class="btn"><i></i><span>关注</span></div>
+                                {#/if#}
+                                <div class="appo_sec">
+                                    <p><i></i>关注成功！</p>
+                                </div>
+                            </div>
+                            {#/if#}
+                        </div>
+                    </li>
+                    {#/live#}
+                    {#if $pageInfo.totalCount == 0#}
+                    <p class="loading">抱歉！ 未找到相关主播</p>
+                    {#/if#}
+                </ul>
+                <script>
+                    num = '{#$pageInfo.totalCount#}';
+                </script>
+                {#getPageList service='live' template='search' type={#$type#} orderby="3" param="keywords={#$keywords#}"#}
+            
+            </div>
+        </div>
+        {#/if#}
+        {#if $type==2#}
+        <div class="container zhiBo {#if $type==2#}show{#/if#}">
+            <div class="select_x">相关直播(<em id="zhulivenum">0</em>) <a {#if $state==''#}class="curr"{#/if#} href="{#getUrlPath service='live' template='search' type=2#}">全部</a><a {#if $state==1#}class="curr"{#/if#} href="{#getUrlPath service='live' template='search' type=2 orderby={#$orderby#} state=1 param="keywords={#$keywords#}"#}">直播中</a><a {#if $state==2#}class="curr"{#/if#} href="{#getUrlPath service='live' template='search' type=2 orderby={#$orderby#} state=2 param="keywords={#$keywords#}"#}">精彩回放</a>{#*<a href="#">节目预告</a>*#}</div>
+            <div class="conBox">
+                <ul class="conList fn-clear">
+                    {#live action="alive" return="row" orderby={#$orderby#} state={#$state#} title={#$keywords#}  page={#$page#} pageSize="16"#}
+                    <li><a target="_blank" href="{#$row.url#}">
+                        <div class="img_box">
+                            <img src="{#changeFileSize url="{#$row.litpic#}" type="small"#}" alt="">
+                            {#if $row.state==1#}
+                            <i class="live"></i>
+                            {#elseif $row.state==2#}
+                            <i class="hui">精彩回放</i>
+							{#else#}
+							<i class="yu">预告</i>
+                            {#/if#}
+                            <!-- <div class="daojishi"><span class="h">00</span>:<span class="m">56</span>:<span class="s">51</span></div>
+                            <i class="yu"></i> -->
+                            <div class="item-mask"></div>
+                            <i class="btn-link__hover_i"></i>
+                        </div>
+                        <div class="info">
+                            <p class="tit sliceFont3" data-num="18">{#$row.title#}</p>
+                            <div class="user fn-clear"><div class="u_logo"><img src="{#changeFileSize url="{#$row.photo#}" type="small"#}" alt=""></div><span class="name"><em>{#$row.nickname#}</em></span> <span class="num fn-right"><i></i>{#$row.click#}</span></div>
+                        </div>
+                    </a></li>
+                    {#/live#}
+                </ul>
+
+                <script>
+                        num = '{#$pageInfo.totalCount#}';
+                </script>
+                {#getPageList service='live' template='search' state={#$state#} type={#$type#} orderby={#$orderby#} param="keywords={#$keywords#}"#}
+
+               
+            </div>
+        </div>
+        {#/if#}
+    </div>
+</div>
+
+<!--底部 s-->
+{#include file="footer.html"#}
+<!--底部 e-->
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/search.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

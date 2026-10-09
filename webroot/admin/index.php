@@ -32,7 +32,7 @@ $userid = $userLogin->getUserID();
 
 //已开通的城市分站数量
 $siteCityCount = 0;
-$sql = $dsql->SetQuery("SELECT count(*) totalCount FROM `#@__site_city` c LEFT JOIN `#@__site_area` a ON a.`id` = c.`cid` WHERE a.`id` != '' AND c.`state` = 1");
+$sql = $dsql->SetQuery("SELECT count(c.`id`) totalCount FROM `#@__site_city` c LEFT JOIN `#@__site_area` a ON a.`id` = c.`cid` WHERE a.`id` != '' AND c.`state` = 1 ORDER BY c.`id`");
 $ret = $dsql->dsqlOper($sql, "results");
 if($ret){
     $siteCityCount = $ret[0]['totalCount'];
@@ -88,7 +88,7 @@ elseif($dopost == "realtimedata"){
 
         //统计手续费信息
         $totalCharge = $todayCharge = $yesterdayCharge = 0;
-        $_sql = $dsql->SetQuery("SELECT SUM(`pt_charge`) as total, SUM(CASE WHEN `pubdate` >= $today_start THEN `pt_charge` ELSE 0 END) AS today, SUM(CASE WHEN `pubdate` >= $yesterday_start AND `pubdate` < $today_start THEN `pt_charge` ELSE 0 END) AS yesterday FROM `#@__pay_log` WHERE `state` = 1");
+        $_sql = $dsql->SetQuery("SELECT SUM(`pt_charge`) as total, (SELECT SUM(`pt_charge`) FROM `#@__pay_log` WHERE `pubdate` >= $today_start AND `state` = 1) today, (SELECT SUM(`pt_charge`) FROM `#@__pay_log` WHERE `pubdate` >= $yesterday_start AND `pubdate` < $today_start AND `state` = 1) yesterday FROM `#@__pay_log` WHERE `state` = 1");
         $_ret = $dsql->dsqlOper($_sql, "results");
         if($_ret){
             $totalCharge = $_ret[0]['total'];
@@ -102,8 +102,7 @@ elseif($dopost == "realtimedata"){
     }
     
     //总注册人数，在线总人数，今日注册人数
-    // $sql = $dsql->SetQuery("SELECT count(*) total, (SELECT count(*) FROM `#@__member` WHERE (`mtype` = 1 OR `mtype` = 2) AND $time - `online` <= 300) online, (SELECT count(*) FROM `#@__member` WHERE (`mtype` = 1 OR `mtype` = 2) AND `regtime` >= $today_start) today FROM `#@__member` WHERE (`mtype` = 1 OR `mtype` = 2)");
-    $sql = $dsql->SetQuery("SELECT count(*) AS total, SUM(CASE WHEN $time - `online` <= 300 THEN 1 ELSE 0 END) AS online, SUM(CASE WHEN `regtime` >= $today_start THEN 1 ELSE 0 END) AS today FROM `#@__member` WHERE `mtype` IN (1, 2);");
+    $sql = $dsql->SetQuery("SELECT count(`id`) total, (SELECT count(`id`) FROM `#@__member` WHERE (`mtype` = 1 OR `mtype` = 2) AND $time - `online` <= 300) online, (SELECT count(`id`) FROM `#@__member` WHERE (`mtype` = 1 OR `mtype` = 2) AND `regtime` >= $today_start) today FROM `#@__member` WHERE (`mtype` = 1 OR `mtype` = 2)");
     $ret = $dsql->dsqlOper($sql, "results");
     if($ret){
         $realtimedata['totalMember'] = (int)$ret[0]['total'];
@@ -112,7 +111,7 @@ elseif($dopost == "realtimedata"){
     }
 
     //商家总数，今日新增，昨日新增
-    $sql = $dsql->SetQuery("SELECT count(*) total, (SELECT count(*) FROM `#@__business_list` WHERE `pubdate` >= $today_start AND `state` != 3 AND `state` != 4 ".$cityidFilter.") today, (SELECT count(*) FROM `#@__business_list` WHERE `pubdate` >= $yesterday_start AND `pubdate` < $today_start AND `state` != 3 AND `state` != 4 ".$cityidFilter.") yesterday FROM `#@__business_list` WHERE `state` != 3 AND `state` != 4 ".$cityidFilter."");
+    $sql = $dsql->SetQuery("SELECT count(`id`) total, (SELECT count(`id`) FROM `#@__business_list` WHERE `pubdate` >= $today_start AND `state` != 3 AND `state` != 4 ".$cityidFilter.") today, (SELECT count(`id`) FROM `#@__business_list` WHERE `pubdate` >= $yesterday_start AND `pubdate` < $today_start AND `state` != 3 AND `state` != 4 ".$cityidFilter.") yesterday FROM `#@__business_list` WHERE `state` != 3 AND `state` != 4 ".$cityidFilter."");
     $ret = $dsql->dsqlOper($sql, "results");
     if($ret){
         $realtimedata['totalBusiness'] = (int)$ret[0]['total'];
@@ -148,7 +147,7 @@ elseif($dopost == "realtimedata"){
     $realtimedata['promotion'] = floatval(sprintf("%.2f", $info3[0] - $info2[0]));
 
     //分销商总数，今日新增，昨日新增
-    $sql = $dsql->SetQuery("SELECT count(*) total, (SELECT count(*) FROM `#@__member_fenxiao_user` f LEFT JOIN `#@__member` m  ON m.`id` = f.`uid` WHERE m.`id` != '' AND f.`pubdate` >= $today_start) today, (SELECT count(*) FROM `#@__member_fenxiao_user` f LEFT JOIN `#@__member` m  ON m.`id` = f.`uid` WHERE m.`id` != '' AND f.`pubdate` >= $yesterday_start AND `pubdate` < $today_start) yesterday FROM `#@__member_fenxiao_user` f LEFT JOIN `#@__member` m  ON m.`id` = f.`uid` WHERE m.`id` != ''");
+    $sql = $dsql->SetQuery("SELECT count(f.`id`) total, (SELECT count(f.`id`) FROM `#@__member_fenxiao_user` f LEFT JOIN `#@__member` m  ON m.`id` = f.`uid` WHERE m.`id` != '' AND f.`pubdate` >= $today_start) today, (SELECT count(f.`id`) FROM `#@__member_fenxiao_user` f LEFT JOIN `#@__member` m  ON m.`id` = f.`uid` WHERE m.`id` != '' AND f.`pubdate` >= $yesterday_start AND `pubdate` < $today_start) yesterday FROM `#@__member_fenxiao_user` f LEFT JOIN `#@__member` m  ON m.`id` = f.`uid` WHERE m.`id` != ''");
     $ret = $dsql->dsqlOper($sql, "results");
     if($ret){
         $realtimedata['totalFenxiao'] = (int)$ret[0]['total'];
@@ -861,7 +860,7 @@ elseif($dopost == "getAdminNotice"){
 
     //提现
     if(testPurview('withdraw')){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member_withdraw` WHERE `state` = 0");
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__member_withdraw` WHERE `state` = 0");
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -878,7 +877,7 @@ elseif($dopost == "getAdminNotice"){
 
     //提取保障金
     if(testPurview('bondLog')){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member_promotion` p LEFT JOIN `#@__member` m ON m.`id` = p.`uid` WHERE p.`type` = 0 AND p.`state` = 0" . getCityFilter('m.`cityid`'));
+        $sql = $dsql->SetQuery("SELECT count(p.`id`) as c FROM `#@__member_promotion` p LEFT JOIN `#@__member` m ON m.`id` = p.`uid` WHERE p.`type` = 0 AND p.`state` = 0" . getCityFilter('m.`cityid`'));
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -896,7 +895,7 @@ elseif($dopost == "getAdminNotice"){
 
     //认证
     if(testPurview('memberEdit')){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member` WHERE `certifyState` = 3" . $cityidFilter);
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__member` WHERE `certifyState` = 3" . $cityidFilter);
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -912,7 +911,7 @@ elseif($dopost == "getAdminNotice"){
         }
 
         
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member` WHERE `licenseState` = 3" . $cityidFilter);
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__member` WHERE `licenseState` = 3" . $cityidFilter);
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -930,7 +929,7 @@ elseif($dopost == "getAdminNotice"){
 
     //注销
     if(testPurview('memberEdit')){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member` WHERE `is_cancellation` = 1" . $cityidFilter);
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__member` WHERE `is_cancellation` = 1" . $cityidFilter);
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -948,7 +947,7 @@ elseif($dopost == "getAdminNotice"){
 
     //昵称审核
     if(testPurview('memberEdit')){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member` WHERE `nickname_audit` != ''" . $cityidFilter);
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__member` WHERE `nickname_audit` != ''" . $cityidFilter);
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -966,7 +965,7 @@ elseif($dopost == "getAdminNotice"){
 
     //头像审核
     if(testPurview('memberEdit')){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member` WHERE `photo_audit` != ''" . $cityidFilter);
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__member` WHERE `photo_audit` != ''" . $cityidFilter);
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -984,7 +983,7 @@ elseif($dopost == "getAdminNotice"){
 
     //商家店铺
     if(testPurview('businessList')){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__business_list` WHERE `state` = 0" . $cityidFilter);
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__business_list` WHERE `state` = 0" . $cityidFilter);
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1011,20 +1010,20 @@ elseif($dopost == "getAdminNotice"){
 
             /*评论查询*/
             if ($name!='' && $name != 'waimai' && testPurview($name . 'Common')){
-                $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment` WHERE `ischeck` = 0 AND `type` like '$name%'");
+                $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment_all` WHERE `ischeck` = 0 AND `type` like '$name%'");
                 if ($name == 'tuan') {
-                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment` WHERE `ischeck` = 0 AND `type` like 'tuan-order%'");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment_all` WHERE `ischeck` = 0 AND `type` like 'tuan-order%'");
                 }else if ($name == 'info') {
                     
 
                 }else if ($name == 'video') {
-                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment` WHERE `ischeck` = 0 AND `type` like 'video-%'");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment_all` WHERE `ischeck` = 0 AND `type` like 'video-%'");
                 }else if($name == 'house'){
                     $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__housecommon` WHERE `ischeck` = 0 AND `replydate` = 0");
                     $title = '学校';
                 }else if($name == 'travel'){
                         /*视频管理*/
-                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment` WHERE `ischeck` = 0");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment_all` WHERE 1 = 1 AND `ischeck` = 0");
                         $where0 = " AND `type` = 'travel-video'";
                         $state0 = $dsql->dsqlOper($sql.$where0, "results");
                         if(is_numeric($state0[0]['c']) && $state0[0]['c'] > 0){
@@ -1092,7 +1091,7 @@ elseif($dopost == "getAdminNotice"){
                             ));
                         }
                 }elseif($name == 'marry'){
-                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment` WHERE `ischeck` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__public_comment_all` WHERE 1 = 1 AND `ischeck` = 0");
                     $where0 = " AND `type` = 'marry-store'";
                     $state0 = $dsql->dsqlOper($sql.$where0, "results");
                     if(is_numeric($state0[0]['c']) && $state0[0]['c'] > 0){
@@ -1142,7 +1141,7 @@ elseif($dopost == "getAdminNotice"){
             if($name == "article"){
 
                 if(testPurview('editarticle')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__articlelist_all` WHERE `del` = 0 AND `arcrank` = 0 AND `waitpay` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__articlelist_all` WHERE `del` = 0 AND `arcrank` = 0 AND `waitpay` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1158,7 +1157,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview('editselfmedia')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__article_selfmedia` WHERE (`state` = 0 || (`state` != 0 &&`editstate` = 0) )" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__article_selfmedia` WHERE (`state` = 0 || (`state` != 0 &&`editstate` = 0) )" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1175,7 +1174,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //分类信息
             }elseif($name == "info" && testPurview('editInfo')){
-                $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__infolist` WHERE `arcrank` = 0 AND `waitpay` = 0 AND `del` = 0" . $cityidFilter);
+                $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__infolist` WHERE `arcrank` = 0 AND `waitpay` = 0 AND `del` = 0" . $cityidFilter);
                 $ret = $dsql->dsqlOper($sql, "results");
                 $count = $ret[0]['c'];
                 if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1194,7 +1193,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //商家审核
                 if(testPurview('tuanStore')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__tuan_store` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__tuan_store` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1211,7 +1210,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //团购审核
                 if(testPurview('editTuan')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__tuanlist` l LEFT JOIN `#@__tuan_store` s ON s.`id` = l.`sid` WHERE l.`arcrank` = 0" . getCityFilter('s.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(l.`id`) as c FROM `#@__tuanlist` l LEFT JOIN `#@__tuan_store` s ON s.`id` = l.`sid` WHERE l.`arcrank` = 0" . getCityFilter('s.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1230,7 +1229,7 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name == "house"){
 
                 //信息订阅
-                // $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_notice` n LEFT JOIN `#@__house_loupan` l ON l.`id` = n.`aid` WHERE n.`state` = 0" . getCityFilter('l.`cityid`'));
+                // $sql = $dsql->SetQuery("SELECT count(n.`id`) as c FROM `#@__house_notice` n LEFT JOIN `#@__house_loupan` l ON l.`id` = n.`aid` WHERE n.`state` = 0" . getCityFilter('l.`cityid`'));
                 // $ret = $dsql->dsqlOper($sql, "results");
                 // $count = $ret[0]['c'];
                 // if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1245,7 +1244,7 @@ elseif($dopost == "getAdminNotice"){
                 // }
 
                 //楼盘团购
-                $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_loupantuan` n LEFT JOIN `#@__house_loupan` l ON l.`id` = n.`aid` WHERE n.`state` = 0" . getCityFilter('l.`cityid`'));
+                $sql = $dsql->SetQuery("SELECT count(n.`id`) as c FROM `#@__house_loupantuan` n LEFT JOIN `#@__house_loupan` l ON l.`id` = n.`aid` WHERE n.`state` = 0" . getCityFilter('l.`cityid`'));
                 $ret = $dsql->dsqlOper($sql, "results");
                 $count = $ret[0]['c'];
                 if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1261,7 +1260,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //中介公司
                 if(testPurview('zjComEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_distributor_company` WHERE `status` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_zjcom` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1278,7 +1277,7 @@ elseif($dopost == "getAdminNotice"){
 
                 // 经纪人
                 if(testPurview('zjUserEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_distributor_company_user` WHERE `status` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_zjuser` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1295,7 +1294,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //二手房
                 if(testPurview('houseSaleEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_property_listing` WHERE `property_type`=2 AND `audit_status`=0 AND `is_deleted`=0 AND `is_invalid`=0 AND `waitpay`=0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_sale` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1312,7 +1311,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //出租房
                 if(testPurview('houseZuEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_property_listing` WHERE `property_type`=3 AND `audit_status`=0 AND `is_deleted`=0 AND `is_invalid`=0 AND `waitpay`=0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_zu` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1329,7 +1328,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //写字楼
                 if(testPurview('houseXzlEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_xzl` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_xzl` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1346,7 +1345,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //商铺
                 if(testPurview('houseSpEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_sp` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_sp` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1363,7 +1362,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //厂房仓库
                 if(testPurview('houseCfEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_cf` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_cf` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1380,7 +1379,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //车位
                 if(testPurview('houseCwEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_cw` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_cw` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1397,7 +1396,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //求租求购
                 if(testPurview('houseDemand')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__housedemand` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__housedemand` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1414,7 +1413,7 @@ elseif($dopost == "getAdminNotice"){
 
                 /*楼盘合作*/
                 if(testPurview('houseCooperation')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__house_coop` WHERE `state` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__house_coop` WHERE `state` = 0");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1434,7 +1433,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //店铺审核
                 if(testPurview('shopStoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__shop_store` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__shop_store` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1451,7 +1450,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //订单管理
                 if(testPurview('shopOrder')){
-                    $sql = $dsql->SetQuery("SELECT count(*) c FROM `#@__shop_order` o  LEFT JOIN  `#@__shop_store` e ON o.`store` = e.`id` WHERE 1 = 1 ".$cityidFilter." AND o.`orderstate` = 1 AND o.`protype` = 0  AND 1 = (CASE	WHEN  o.`pinid` != 0 THEN CASE WHEN o.`pinstate` THEN 1 ELSE 0 END ELSE 1=1 END )");
+                    $sql = $dsql->SetQuery("SELECT count(o.`id`) c FROM `#@__shop_order` o  LEFT JOIN  `#@__shop_store` e ON o.`store` = e.`id` WHERE 1 = 1 ".$cityidFilter." AND o.`orderstate` = 1 AND o.`protype` = 0  AND 1 = (CASE	WHEN  o.`pinid` != 0 THEN CASE WHEN o.`pinstate` THEN 1 ELSE 0 END ELSE 1=1 END )");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1468,7 +1467,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //分店审核
                 if(testPurview('shopBranchStoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__shop_branch_store` b LEFT JOIN `#@__shop_store` s ON s.`id` = b.`branchid` WHERE b.`state` = 0 AND s.`id` != ''" . getCityFilter('b.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(b.`id`) as c FROM `#@__shop_branch_store` b LEFT JOIN `#@__shop_store` s ON s.`id` = b.`branchid` WHERE b.`state` = 0 AND s.`id` != ''" . getCityFilter('b.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1485,7 +1484,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //商品审核
                 if(testPurview('productEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__shop_product` l LEFT JOIN `#@__shop_store` s ON s.`id` = l.`store` WHERE l.`state` = 0" . getCityFilter('s.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(l.`id`) as c FROM `#@__shop_product` l LEFT JOIN `#@__shop_store` s ON s.`id` = l.`store` WHERE l.`state` = 0" . getCityFilter('s.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1502,7 +1501,7 @@ elseif($dopost == "getAdminNotice"){
 
                 /*活动审核通知*/
                 if(testPurview('huodongProductList')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__shop_huodongsign` b LEFT JOIN `#@__shop_product` l ON b.`proid` = l.`id` LEFT JOIN `#@__shop_store` s ON s.`id` = l.`store` WHERE b.`state` = 0" . getCityFilter('s.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(l.`id`) as c FROM `#@__shop_huodongsign` b LEFT JOIN `#@__shop_product` l ON b.`proid` = l.`id` LEFT JOIN `#@__shop_store` s ON s.`id` = l.`store` WHERE b.`state` = 0" . getCityFilter('s.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1520,7 +1519,7 @@ elseif($dopost == "getAdminNotice"){
 
                 /*商城配送审核*/
                 if(testPurview('shopStoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__shop_store` WHERE `psaudit` = 1" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__shop_store` WHERE `psaudit` = 1" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1537,7 +1536,7 @@ elseif($dopost == "getAdminNotice"){
 
                 /*平台介入订单*/
                 if(testPurview('shopKeFuOrder')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__shop_order_product` o LEFT JOIN `#@__shop_order` l ON o.`orderid` = l.`id` LEFT JOIN `#@__shop_store` store ON store.`id` = l.`store` WHERE o.`user_refundtype` = 2 AND o.`ret_ptaudittype` = 0 AND l.`orderstate` = 6" . getCityFilter('store.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(o.`id`) as c FROM `#@__shop_order_product` o LEFT JOIN `#@__shop_order` l ON o.`orderid` = l.`id` LEFT JOIN `#@__shop_store` store ON store.`id` = l.`store` WHERE o.`user_refundtype` = 2 AND o.`ret_ptaudittype` = 0 AND l.`orderstate` = 6" . getCityFilter('store.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1557,7 +1556,7 @@ elseif($dopost == "getAdminNotice"){
                 //装修公司
             }elseif($name == "renovation"){
                 if(testPurview('renovationStoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_store` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_store` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1573,7 +1572,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview('renovationZhaobiao')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_zhaobiao` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_zhaobiao` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1590,7 +1589,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview('renovationStoreaptitudes')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_storeaptitudes` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_storeaptitudes` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1606,7 +1605,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview('renovationConstruction')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_construction` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_construction` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1635,7 +1634,7 @@ elseif($dopost == "getAdminNotice"){
                         $_where = ' AND 1 = 2';
                     }
 
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_team` WHERE `state` = 0" . $_where);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_team` WHERE `state` = 0" . $_where);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1660,12 +1659,12 @@ elseif($dopost == "getAdminNotice"){
                         foreach($loupanResult as $key => $loupan){
                             array_push($houseid, $loupan['id']);
                         }
-                        $where = " AND `company` in (".join(",", $houseid).")";
+                        $where .= " AND `company` in (".join(",", $houseid).")";
                     }else{
-                        $where = " AND 1 = 2";
+                        $where .= " AND 1 = 2";
                     }
 
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_foreman` WHERE `state` = 0" . $where);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_foreman` WHERE `state` = 0" . $where);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1695,7 +1694,7 @@ elseif($dopost == "getAdminNotice"){
                         $_where = " AND 1 = 2";
                     }
 
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_case` WHERE `state` = 0" . $_where);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_case` WHERE `state` = 0" . $_where);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1726,7 +1725,7 @@ elseif($dopost == "getAdminNotice"){
                         $_where = " AND 1 = 2";
                     }
 
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_diary` WHERE `state` = 0" . $_where);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_diary` WHERE `state` = 0" . $_where);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1743,7 +1742,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview('renovationArticlesList')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_article` WHERE `state` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_article` WHERE `state` = 0");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1760,7 +1759,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview('renovationRese')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_rese` r LEFT JOIN `#@__renovation_store` s ON s.`id` = r.`company` WHERE r.`state` = 0" . getCityFilter('s.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(r.`id`) as c FROM `#@__renovation_rese` r LEFT JOIN `#@__renovation_store` s ON s.`id` = r.`company` WHERE r.`state` = 0" . getCityFilter('s.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1777,7 +1776,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview('renovationEntrust')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_entrust` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__renovation_entrust` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1794,7 +1793,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview('renovationVisit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__renovation_visit` v LEFT JOIN `#@__renovation_construction` c ON v.`conid` = c.`id` WHERE v.`state` = 0" . getCityFilter('c.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(v.`id`) as c FROM `#@__renovation_visit` v LEFT JOIN `#@__renovation_construction` c ON v.`conid` = c.`id` WHERE v.`state` = 0" . getCityFilter('c.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1816,7 +1815,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //公司
                 if(testPurview('jobCompanyEdit')) {
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__job_company` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__job_company` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if (is_numeric($count) && ($count > 0 || $show0)) {
@@ -1831,7 +1830,7 @@ elseif($dopost == "getAdminNotice"){
                     }
 
                     //修改敏感信息
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__job_company` WHERE `changeState` = 1" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__job_company` WHERE `changeState` = 1" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if (is_numeric($count) && ($count > 0 || $show0)) {
@@ -1848,7 +1847,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //职位
                 if(testPurview('jobPost')) {
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__job_post` WHERE `state` = 0 AND (`valid` >= ".time()." OR `valid`=0)" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__job_post` WHERE `state` = 0 AND (`valid` >= ".time()." OR `valid`=0)" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if (is_numeric($count) && ($count > 0 || $show0)) {
@@ -1865,7 +1864,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //简历
                 if(testPurview('jobResumephp')) {
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__job_resume` r left join `#@__member` m on r.`userid`=m.`id` WHERE r.`need_complete` = 1 AND r.`state` = 0" . getCityFilter('r.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(r.`id`) as c FROM `#@__job_resume` r left join `#@__member` m on r.`userid`=m.`id` WHERE r.`need_complete` = 1 AND r.`state` = 0" . getCityFilter('r.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if (is_numeric($count) && ($count > 0 || $show0)) {
@@ -1882,7 +1881,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //普工求职
                 if(testPurview('jobSentencephptype0Edit')) {
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__job_qz` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__job_qz` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     if(is_array($ret)){
                         $count = $ret[0]['c'];
@@ -1901,7 +1900,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //普工招聘
                 if(testPurview('jobSentencephptype1Edit')) {
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__job_pg` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__job_pg` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     if(is_array($ret)){
                         $count = $ret[0]['c'];
@@ -1926,7 +1925,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //配送员未审核
                 if(testPurview('waimaiCourier')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__waimai_courier` WHERE `status` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__waimai_courier` WHERE `status` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -1945,18 +1944,18 @@ elseif($dopost == "getAdminNotice"){
                 if(testPurview("waimaiOrder")){
 
                     $date = GetMkTime(time());
-                    //$sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`state` = 2 AND s.`del` = 0" . getCityFilter('s.`cityid`'));
+                    //$sql = $dsql->SetQuery("SELECT count(o.`id`) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`state` = 2 AND s.`del` = 0" . getCityFilter('s.`cityid`'));
 
                     //统计新的外卖订单时，区分普通订单和预定订单，预定订单未到接单时间，即（预定时间-配送时间）时，不参与统计
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`state` = 2 AND s.`del` = 0 AND (o.`reservesongdate` = 0 OR (o.`reservesongdate` > 0 AND ('$date' > (o.`reservesongdate` - s.`delivery_time`*60))))" . getCityFilter('s.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(o.`id`) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`state` = 2 AND s.`del` = 0 AND (o.`reservesongdate` = 0 OR (o.`reservesongdate` > 0 AND ('$date' > (o.`reservesongdate` - s.`delivery_time`*60))))" . getCityFilter('s.`cityid`'));
                     /*出餐超时*/
-                    //$chucansql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE (o.`state` = 3 OR  o.`state` = 4)  AND s.`del` = 0 AND (('$date' - o.`paydate`)/60) > s.`chucan_time`" . getCityFilter('s.`cityid`'));
+                    //$chucansql = $dsql->SetQuery("SELECT count(o.`id`) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE (o.`state` = 3 OR  o.`state` = 4)  AND s.`del` = 0 AND (('$date' - o.`paydate`)/60) > s.`chucan_time`" . getCityFilter('s.`cityid`'));
 
                     //因为新增了订单预定逻辑，所以计算出餐超时时，需要区分，普通订单，以付款时间为标准计算，预定订单，以预定配送时间为标准计算
-                    $chucansql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE (o.`state` = 3 OR  o.`state` = 4)  AND s.`del` = 0 AND ((o.`reservesongdate` = 0 AND (('$date' - o.`paydate`)/60) > s.`chucan_time`) OR (o.`reservesongdate` > 0 AND (('$date' - (o.`reservesongdate` - s.`delivery_time`*60))/60) > s.`chucan_time`))" . getCityFilter('s.`cityid`'));
+                    $chucansql = $dsql->SetQuery("SELECT count(o.`id`) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE (o.`state` = 3 OR  o.`state` = 4)  AND s.`del` = 0 AND ((o.`reservesongdate` = 0 AND (('$date' - o.`paydate`)/60) > s.`chucan_time`) OR (o.`reservesongdate` > 0 AND (('$date' - (o.`reservesongdate` - s.`delivery_time`*60))/60) > s.`chucan_time`))" . getCityFilter('s.`cityid`'));
 
                     /*配送超时*/
-                    $peisongsql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`state` = 5 AND s.`del` = 0 AND (('$date' - o.`peidate`)/60) > s.`delivery_time`" . getCityFilter('s.`cityid`'));
+                    $peisongsql = $dsql->SetQuery("SELECT count(o.`id`) as c FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`state` = 5 AND s.`del` = 0 AND (('$date' - o.`peidate`)/60) > s.`delivery_time`" . getCityFilter('s.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2020,7 +2019,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 if(testPurview("paotuiOrder")){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__paotui_order` WHERE `state` = 3" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__paotui_order` WHERE `state` = 3" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2064,7 +2063,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //外卖商品价格需要审核
                 if(testPurview('waimaiShop')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__waimai_shop` s WHERE s.`del` = 0 AND EXISTS (SELECT 1 FROM `#@__waimai_list` WHERE `review_price` > 0 AND `sid` = s.`id`)" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(s.`id`) as c FROM `#@__waimai_shop` s WHERE s.`del` = 0 AND EXISTS (SELECT 1 FROM `#@__waimai_list` WHERE `review_price` > 0 AND `sid` = s.`id`)" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2085,7 +2084,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //经销商
                 if(testPurview('carStoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__car_store` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__car_store` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2102,7 +2101,7 @@ elseif($dopost == "getAdminNotice"){
 
                 // 顾问
                 if(testPurview('gwUserEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__car_adviser` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__car_adviser` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2119,7 +2118,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //二手车
                 if(testPurview('carEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__car_list` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__car_list` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2136,7 +2135,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //汽车报废
                 if(testPurview('carScrap')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__car_scrap` WHERE `state` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__car_scrap` WHERE `state` = 0");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2154,7 +2153,7 @@ elseif($dopost == "getAdminNotice"){
                 //自助建站
             }elseif($name == "website" && testPurview('websiteEdit')){
 
-                $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__website` w LEFT JOIN `#@__member` m ON m.`id` = w.`userid` WHERE w.`state` = 0 AND m.`id` != ''");
+                $sql = $dsql->SetQuery("SELECT count(w.`id`) as c FROM `#@__website` w LEFT JOIN `#@__member` m ON m.`id` = w.`userid` WHERE w.`state` = 0 AND m.`id` != ''");
                 $ret = $dsql->dsqlOper($sql, "results");
                 $count = $ret[0]['c'];
                 if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2170,7 +2169,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //贴吧社区
             }elseif($name == "tieba" && testPurview('tiebaEdit')){
-                $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__tieba_list` WHERE `state` = 0 AND `waitpay` = 0 AND `del` = 0" . $cityidFilter);
+                $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__tieba_list` WHERE `state` = 0 AND `waitpay` = 0 AND `del` = 0" . $cityidFilter);
                 $ret = $dsql->dsqlOper($sql, "results");
                 $count = $ret[0]['c'];
                 if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2186,7 +2185,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //活动
             }elseif($name == "huodong" && testPurview('huodongEdit')){
-                $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__huodong_list` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
+                $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__huodong_list` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
                 $ret = $dsql->dsqlOper($sql, "results");
                 $count = $ret[0]['c'];
                 if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2204,7 +2203,7 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name == "homemaking"){
                 //家政服务
                 if(testPurview('homemakingEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__homemaking_list` WHERE `state` = 0 " . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__homemaking_list` WHERE `state` = 0 " . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2221,7 +2220,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //家政公司
                 if(testPurview('homemakingStoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__homemaking_store` WHERE `state` = 0 " . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__homemaking_store` WHERE `state` = 0 " . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2247,7 +2246,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__homemaking_personal` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__homemaking_personal` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2265,7 +2264,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //保姆/月嫂
                 if(testPurview('nannyEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__homemaking_nanny` WHERE `state` = 0 " . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__homemaking_nanny` WHERE `state` = 0 " . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2282,7 +2281,7 @@ elseif($dopost == "getAdminNotice"){
 
                 /*客服介入订单*/
                 if(testPurview('kefuOrder')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__homemaking_order` o LEFT JOIN `#@__homemaking_refund` r ON r.`orderid` = o.`id` LEFT JOIN `#@__homemaking_list` l ON l.`id` = o.`proid` WHERE o.`orderstate` = 8 AND r.`service` = 1" . getCityFilter('l.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(o.`id`) as c FROM `#@__homemaking_order` o LEFT JOIN `#@__homemaking_refund` r ON r.`orderid` = o.`id` LEFT JOIN `#@__homemaking_list` l ON l.`id` = o.`proid` WHERE o.`orderstate` = 8 AND r.`service` = 1" . getCityFilter('l.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2302,7 +2301,7 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name == "marry"){
                 //婚嫁公司
                 if(testPurview('storeEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_store` WHERE `state` = 0 " . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_store` WHERE `state` = 0 " . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2329,7 +2328,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_hotelfield` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_hotelfield` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2357,7 +2356,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_hotelmenu` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_hotelmenu` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2385,7 +2384,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_host` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_host` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2413,7 +2412,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_weddingcar` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_weddingcar` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2441,7 +2440,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 7 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 7 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2469,7 +2468,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 10 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 10 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2497,7 +2496,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 1 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 1 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2525,7 +2524,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 2 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 2 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2553,7 +2552,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 3 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 3 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2581,7 +2580,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 9 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 9 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2609,7 +2608,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 4 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 4 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2637,7 +2636,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 5 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 5 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2665,7 +2664,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 6 AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_plancase` WHERE `state` = 0 AND `typeid` = 6 AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2693,7 +2692,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_planmeal` WHERE `type` = 0  AND `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_planmeal` WHERE `type` = 0  AND `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2721,7 +2720,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_planmeal` WHERE `type` = 1  AND `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_planmeal` WHERE `type` = 1  AND `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2749,7 +2748,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_planmeal` WHERE `type` = 2  AND `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_planmeal` WHERE `type` = 2  AND `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2777,7 +2776,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_planmeal` WHERE `type` = 3  AND `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_planmeal` WHERE `type` = 3  AND `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2805,7 +2804,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_planmeal` WHERE `type` = 4  AND `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_planmeal` WHERE `type` = 4  AND `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2833,7 +2832,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_planmeal` WHERE `type` = 5  AND `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_planmeal` WHERE `type` = 5  AND `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2861,7 +2860,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__marry_planmeal` WHERE `type` = 6  AND `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__marry_planmeal` WHERE `type` = 6  AND `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2881,7 +2880,7 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name == "travel"){
                 //旅游公司
                 if(testPurview('travelstoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__travel_store` WHERE `state` = 0 " . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__travel_store` WHERE `state` = 0 " . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2898,7 +2897,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //旅游视频
                 if(testPurview('travelvideoEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__travel_video` WHERE `state` = 0 ");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__travel_video` WHERE `state` = 0 ");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2915,7 +2914,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //旅游攻略
                 if(testPurview('travelstrategyEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__travel_strategy` WHERE `state` = 0 ");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__travel_strategy` WHERE `state` = 0 ");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2942,7 +2941,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__travel_rentcar` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__travel_rentcar` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2970,7 +2969,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__travel_hotel` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__travel_hotel` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -2998,7 +2997,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__travel_ticket` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__travel_ticket` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3026,7 +3025,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__travel_visa` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__travel_visa` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3054,7 +3053,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__travel_agency` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__travel_agency` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3074,7 +3073,7 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name == "education"){//教育
                 //教育公司
                 if(testPurview('educationstoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__education_store` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__education_store` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3091,7 +3090,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //教育家教
                 if(testPurview('educationfamilyEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__education_tutor` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__education_tutor` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3108,7 +3107,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //教育留言
                 if(testPurview('educationWord')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__education_word` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__education_word` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3125,7 +3124,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //教育课程
                 if(testPurview('educationcoursesEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__education_courses` WHERE `state` = 0 AND `waitpay` = 0 ");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__education_courses` WHERE `state` = 0 AND `waitpay` = 0 ");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3152,7 +3151,7 @@ elseif($dopost == "getAdminNotice"){
                     }
                     $ids = rtrim($ids, ',');
                     if($ids){
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__education_teacher` WHERE `state` = 0  AND `company` in ($ids)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__education_teacher` WHERE `state` = 0  AND `company` in ($ids)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3171,7 +3170,7 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name == "pension"){//养老
                 //养老公司
                 if(testPurview('pensionstoreEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__pension_store` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__pension_store` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3188,7 +3187,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //老人信息
                 if(testPurview('pensionelderlyEdit')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__pension_elderly` WHERE `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__pension_elderly` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3206,7 +3205,7 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name == "circle"){//圈子
                 
                 if(testPurview('circleList')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__circle_dynamic_all` WHERE `state` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__circle_dynamic_all` WHERE `state` = 0");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3223,7 +3222,7 @@ elseif($dopost == "getAdminNotice"){
 
             }elseif($name == "sfcar"){//顺风车
                 if(testPurview('sfcarList')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__sfcar_list` WHERE `state` = 0 AND `waitpay` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__sfcar_list` WHERE `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3251,7 +3250,7 @@ elseif($dopost == "getAdminNotice"){
                         }
                         $idList = join(",", $list);
 
-                        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__integral_order` WHERE `orderstate` = 1 AND `proid` in ($idList)");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__integral_order` WHERE `orderstate` = 1 AND `proid` in ($idList)");
                         $ret = $dsql->dsqlOper($sql, "results");
                         $count = $ret[0]['c'];
                     }
@@ -3272,7 +3271,7 @@ elseif($dopost == "getAdminNotice"){
                 if(testPurview('liveList')){
 
                     $count = 0;
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__livelist` WHERE `arcrank` = 0 AND `waitpay` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__livelist` WHERE `arcrank` = 0 AND `waitpay` = 0");
                     $results = $dsql->dsqlOper($archives, "results");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
@@ -3291,7 +3290,7 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name =='awardlegou'){
 
                 if(testPurview('awardlegouProList')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__awardlegou_list` l LEFT JOIN `#@__business_list` s ON s.`id` = l.`sid` WHERE l.`state` = 0" . getCityFilter('s.`cityid`'));
+                    $sql = $dsql->SetQuery("SELECT count(l.`id`) as c FROM `#@__awardlegou_list` l LEFT JOIN `#@__business_list` s ON s.`id` = l.`sid` WHERE l.`state` = 0" . getCityFilter('s.`cityid`'));
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3309,7 +3308,7 @@ elseif($dopost == "getAdminNotice"){
                 if(testPurview('awardlegouOrderList')){
 
                     $count = 0;
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__awardlegou_order` WHERE  `orderstate` = 9");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__awardlegou_order` WHERE  `orderstate` = 9");
                     $results = $dsql->dsqlOper($archives, "results");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
@@ -3330,7 +3329,7 @@ elseif($dopost == "getAdminNotice"){
             elseif($name == "paimai"){
                 if(testPurview('paimaiStore')){
                     $count = 0;
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__paimai_store` WHERE  `state` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__paimai_store` WHERE  `state` = 0");
                     $results = $dsql->dsqlOper($archives, "results");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
@@ -3347,7 +3346,7 @@ elseif($dopost == "getAdminNotice"){
                 }
                 if(testPurview('paimaiList')){
                     $count = 0;
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__paimailist` WHERE  `arcrank` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__paimailist` WHERE  `arcrank` = 0");
                     $results = $dsql->dsqlOper($archives, "results");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
@@ -3364,7 +3363,7 @@ elseif($dopost == "getAdminNotice"){
                 }
                 if(testPurview('paimaiOrderList')){
                     $count = 0;
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__paimai_order` WHERE  `type`='pai' and `orderstate`=1");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__paimai_order` WHERE  `type`='pai' and `orderstate`=1");
                     $results = $dsql->dsqlOper($archives, "results");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
@@ -3384,7 +3383,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //任务悬赏
                 if(testPurview('taskList')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__task_list` WHERE `state` = 0 AND `haspay` = 1");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__task_list` WHERE `state` = 0 AND `haspay` = 1");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3401,7 +3400,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //任务悬赏问题反馈
                 if(testPurview('taskFeedback')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__task_feedback` WHERE `state` = 0");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__task_feedback` WHERE `state` = 0");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3418,7 +3417,7 @@ elseif($dopost == "getAdminNotice"){
 
                 //任务悬赏举报维权
                 if(testPurview('taskReport')){
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__task_report` WHERE `state` = 1");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__task_report` WHERE `state` = 1");
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3441,7 +3440,7 @@ elseif($dopost == "getAdminNotice"){
                 if(testPurview('datingMember')){
 
                     //交友用户
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__dating_member` WHERE `type` = 0 AND `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__dating_member` WHERE `type` = 0 AND `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3456,7 +3455,7 @@ elseif($dopost == "getAdminNotice"){
                     }
 
                     //交友红娘
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__dating_member` WHERE `type` = 1 AND `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__dating_member` WHERE `type` = 1 AND `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3471,7 +3470,7 @@ elseif($dopost == "getAdminNotice"){
                     }
 
                     //交友门店
-                    $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__dating_member` WHERE `type` = 2 AND `state` = 0" . $cityidFilter);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__dating_member` WHERE `type` = 2 AND `state` = 0" . $cityidFilter);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $count = $ret[0]['c'];
                     if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3490,9 +3489,9 @@ elseif($dopost == "getAdminNotice"){
             }elseif($name == "zhaopin"){ //城市招聘
                 $today = GetMkTime(date("Y-m-d 00:00:00")); //今天
                 // //统计全职审核，即全部未审核和审核拒绝的全职职位数量
-                // $sql = $dsql->SetQuery("SELECT count(*) fullPostReview FROM `#@__zhaopin_post` WHERE `category` = 1 AND `status` IN (1,3) AND `del` = 0 AND `waitPay` = 0".getCityWhere());
+                // $sql = $dsql->SetQuery("SELECT count(`id`) fullPostReview FROM `#@__zhaopin_post` WHERE `category` = 1 AND `status` IN (1,3) AND `del` = 0 AND `waitPay` = 0".getCityWhere());
                 //统计全职待审核数量
-                $sql = $dsql->SetQuery("SELECT count(*) fullPostReview FROM `#@__zhaopin_post` WHERE `category` = 1 AND `status` = 1 AND `del` = 0 AND `waitPay` = 0".getCityWhere());
+                $sql = $dsql->SetQuery("SELECT count(`id`) fullPostReview FROM `#@__zhaopin_post` WHERE `category` = 1 AND `status` = 1 AND `del` = 0 AND `waitPay` = 0".getCityWhere());
                 $fullPostReview = (int)$dsql->getOne($sql);
                 if(testPurview('zhaopinPostListquanzhiList')){
                     $count = $fullPostReview;
@@ -3509,9 +3508,9 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 // //统计兼职审核，即全部未审核和审核拒绝的兼职职位数量
-                // $sql = $dsql->SetQuery("SELECT count(*) partPostReview FROM `#@__zhaopin_post` WHERE `category` = 2 AND `status` IN (1,3) AND `del` = 0 AND `waitPay` = 0".getCityWhere());
+                // $sql = $dsql->SetQuery("SELECT count(`id`) partPostReview FROM `#@__zhaopin_post` WHERE `category` = 2 AND `status` IN (1,3) AND `del` = 0 AND `waitPay` = 0".getCityWhere());
                 //统计兼职待审核数量
-                $sql = $dsql->SetQuery("SELECT count(*) partPostReview FROM `#@__zhaopin_post` WHERE `category` = 2 AND `status` = 1 AND `del` = 0 AND `waitPay` = 0".getCityWhere());
+                $sql = $dsql->SetQuery("SELECT count(`id`) partPostReview FROM `#@__zhaopin_post` WHERE `category` = 2 AND `status` = 1 AND `del` = 0 AND `waitPay` = 0".getCityWhere());
                 $partPostReview = (int)$dsql->getOne($sql);
                 if(testPurview('zhaopinPostListjianzhiList')){
                     $count = $partPostReview;
@@ -3528,12 +3527,9 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 // //统计简历审核，即全部未审核和审核拒绝的简历数量
-                // $sql = $dsql->SetQuery("SELECT count(*) resumeReview FROM `#@__zhaopin_resume` WHERE `status` IN (1,3) AND `del` = 0".getCityWhere());
+                // $sql = $dsql->SetQuery("SELECT count(`id`) resumeReview FROM `#@__zhaopin_resume` WHERE `status` IN (1,3) AND `del` = 0".getCityWhere());
                 //统计简历待审核数量
-                //$sql = $dsql->SetQuery("SELECT count(*) resumeReview FROM `#@__zhaopin_resume` WHERE `status` = 1 AND `del` = 0".getCityWhere());
-                //待审核的简历包括已审核通过但是完善度小于57
-                require_once(HUONIAOROOT."/api/handlers/zhaopin.config.php");
-                $sql = $dsql->SetQuery("SELECT count(*) resumeReview FROM `#@__zhaopin_resume` WHERE (`status` = 1 OR (`status` = 2 AND `name` != '' AND `completion` > 0 AND `completion` < ".$completionStandard.")) AND `del` = 0".getCityWhere());
+                $sql = $dsql->SetQuery("SELECT count(`id`) resumeReview FROM `#@__zhaopin_resume` WHERE `status` = 1 AND `del` = 0".getCityWhere());
                 $resumeReview = (int)$dsql->getOne($sql);
                 if(testPurview('zhaopinResumeList')){
                     $count = $resumeReview;
@@ -3550,9 +3546,9 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 // //统计营业执照审核，即全部未审核和审核拒绝的营业执照数量
-                // $sql = $dsql->SetQuery("SELECT count(*) licenseReview FROM `#@__zhaopin_company_license_log` WHERE `status` IN (1,3)".getCityWhere());
+                // $sql = $dsql->SetQuery("SELECT count(`id`) licenseReview FROM `#@__zhaopin_company_license_log` WHERE `status` IN (1,3)".getCityWhere());
                 //统计营业执照待审核数量
-                $sql = $dsql->SetQuery("SELECT count(*) licenseReview FROM `#@__zhaopin_company_license_log` WHERE `status` = 1".getCityWhere());
+                $sql = $dsql->SetQuery("SELECT count(`id`) licenseReview FROM `#@__zhaopin_company_license_log` WHERE `status` = 1".getCityWhere());
                 $licenseReview = (int)$dsql->getOne($sql);
                 if(testPurview('zhaopinCompanyLicenseList')){
                     $count = $licenseReview;
@@ -3569,7 +3565,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 //统计全职信息被举报
-                $sql = $dsql->SetQuery("SELECT count(*) fullPostComplain FROM `#@__member_complain` WHERE `state` = 0 AND `module` = 'zhaopin' AND `action` = 'quanzhi'".getCityWhere());
+                $sql = $dsql->SetQuery("SELECT count(`id`) fullPostComplain FROM `#@__member_complain` WHERE `state` = 0 AND `module` = 'zhaopin' AND `action` = 'quanzhi'".getCityWhere());
                 $fullPostComplain = (int)$dsql->getOne($sql);
                 if(testPurview('siteComplain')){
                     $count = $fullPostComplain;
@@ -3586,7 +3582,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 //统计兼职信息被举报
-                $sql = $dsql->SetQuery("SELECT count(*) partPostComplain FROM `#@__member_complain` WHERE `state` = 0 AND `module` = 'zhaopin' AND `action` = 'jianzhi'".getCityWhere());
+                $sql = $dsql->SetQuery("SELECT count(`id`) partPostComplain FROM `#@__member_complain` WHERE `state` = 0 AND `module` = 'zhaopin' AND `action` = 'jianzhi'".getCityWhere());
                 $partPostComplain = (int)$dsql->getOne($sql);
                 if(testPurview('siteComplain')){
                     $count = $partPostComplain;
@@ -3603,7 +3599,7 @@ elseif($dopost == "getAdminNotice"){
                 }
 
                 //统计简历被举报
-                $sql = $dsql->SetQuery("SELECT count(*) resumeComplain FROM `#@__member_complain` WHERE `state` = 0 AND `module` = 'zhaopin' AND `action` = 'resume'".getCityWhere());
+                $sql = $dsql->SetQuery("SELECT count(`id`) resumeComplain FROM `#@__member_complain` WHERE `state` = 0 AND `module` = 'zhaopin' AND `action` = 'resume'".getCityWhere());
                 $resumeComplain = (int)$dsql->getOne($sql);
                 if(testPurview('siteComplain')){
                     $count = $resumeComplain;
@@ -3642,13 +3638,13 @@ elseif($dopost == "getAdminNotice"){
 
                     //今日简历异常投递
                     if ($zhaopinConfig['abnormalDeliverDayCount'] > 0) {
-                        $sql = $dsql->SetQuery("SELECT count(*) resumeAbnormal FROM (SELECT count(*) AS total,`userid` FROM `#@__zhaopin_resume_post_log` WHERE `time_post` > ".$today.getCityWhere()." GROUP BY `userid` HAVING `total` >= ".$zhaopinConfig['abnormalDeliverDayCount'].") r");
+                        $sql = $dsql->SetQuery("SELECT count(`userid`) resumeAbnormal FROM (SELECT count('id') AS total,`userid` FROM `#@__zhaopin_resume_post_log` WHERE `time_post` > ".$today.getCityWhere()." GROUP BY `userid` HAVING `total` >= ".$zhaopinConfig['abnormalDeliverDayCount'].") r");
                         $resumeAbnormalPost = (int)$dsql->getOne($sql);
                     }
 
                     //今日电话异常拨打
                     if ($zhaopinConfig['abnormalCallTelDayCount'] > 0) {
-                        $sql = $dsql->SetQuery("SELECT count(*) dialAbnormal FROM (SELECT count(*) AS total,`userid` FROM `#@__zhaopin_ptc_dial_log` WHERE `addtime` > ".$today.getCityWhere()." GROUP BY `userid`, `resumeid` HAVING `total` >= ".$zhaopinConfig['abnormalCallTelDayCount'].") r");
+                        $sql = $dsql->SetQuery("SELECT count(`userid`) dialAbnormal FROM (SELECT count('id') AS total,`userid` FROM `#@__zhaopin_ptc_dial_log` WHERE `addtime` > ".$today.getCityWhere()." GROUP BY `userid`, `resumeid` HAVING `total` >= ".$zhaopinConfig['abnormalCallTelDayCount'].") r");
                         $dialAbnormal = (int)$dsql->getOne($sql);
                     }
                 }
@@ -3688,7 +3684,7 @@ elseif($dopost == "getAdminNotice"){
 
     /*举报管理*/
     if(testPurview("siteComplain")){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member_complain` WHERE `state` = 0" . $cityidFilter);
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__member_complain` WHERE `state` = 0" . $cityidFilter);
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3704,7 +3700,7 @@ elseif($dopost == "getAdminNotice"){
     }
     /*意见反馈*/
     if(testPurview("suggestion")){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member_suggestion` WHERE `state` = 0 ");
+        $sql = $dsql->SetQuery("SELECT count(`id`) as c FROM `#@__member_suggestion` WHERE `state` = 0 ");
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3720,7 +3716,7 @@ elseif($dopost == "getAdminNotice"){
     }
     //分销商
     if(testPurview('fenxiaoUser')){
-        $sql = $dsql->SetQuery("SELECT count(*) as c FROM `#@__member_fenxiao_user` u LEFT JOIN `#@__member` m ON m.`id` = u.`uid` WHERE u.`state` = 0 AND m.`id` IS NOT NULL" . getCityFilter('m.`cityid`'));
+        $sql = $dsql->SetQuery("SELECT count(u.`id`) as c FROM `#@__member_fenxiao_user` u LEFT JOIN `#@__member` m ON m.`id` = u.`uid` WHERE u.`state` = 0 AND m.`id` IS NOT NULL" . getCityFilter('m.`cityid`'));
         $ret = $dsql->dsqlOper($sql, "results");
         $count = $ret[0]['c'];
         if(is_numeric($count) && ($count > 0 || $show0)){
@@ -3766,7 +3762,7 @@ elseif($dopost == "getAdminNotice"){
     }
 
     //查询消息通知
-    $sql = $dsql->SetQuery("SELECT count(*) c FROM `#@__site_admin_notice`");
+    $sql = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__site_admin_notice`");
     $ret = $dsql->dsqlOper($sql, "results");
     $hasnew = $ret[0]['c'];
 
@@ -4272,10 +4268,6 @@ if(file_exists($tpl."/".$templates)){
 	// 服务器信息
 	$huoniaoTag->assign("server_time", date("Y-m-d H:i:s", time()));
 	$huoniaoTag->assign("server_dir", HUONIAOROOT);
-
-    global $cfg_ffmpeg;
-    $cfg_ffmpeg = (int)$cfg_ffmpeg;
-    $huoniaoTag->assign('cfg_ffmpeg', $cfg_ffmpeg);
 
     //渲染页面
     $huoniaoTag->display($templates);

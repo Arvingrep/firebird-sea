@@ -41,7 +41,6 @@ if(!empty($_POST)){
 	$cfg_businessfenxiaoAmount = (int)$businessfenxiaoAmount;
 	$cfg_fenxiaoQrType      = (int)$fenxiaoQrType;
     $cfg_memberBinding      = (int)$memberBinding;
-	$cfg_fenxiaoBinding      = (int)$fenxiaoBinding;
 
     $cfg_fenxiaoOfflineItems = isset($fenxiaoOfflineItems) ? join(',',$fenxiaoOfflineItems) : '';
 
@@ -113,7 +112,6 @@ if(!empty($_POST)){
 	$configFile .= "\$cfg_fenxiaoNote = '".$cfg_fenxiaoNote."';\r\n";
 	$configFile .= "\$cfg_fenxiaoQrType = ".$cfg_fenxiaoQrType.";\r\n";
     $configFile .= "\$cfg_memberBinding = ".$cfg_memberBinding.";\r\n";
-	$configFile .= "\$cfg_fenxiaoBinding = ".$cfg_fenxiaoBinding.";\r\n";
     $configFile .= "\$cfg_fenxiaoOfflineItems = '"._RunMagicQuotes($cfg_fenxiaoOfflineItems)."';\r\n";
 	$configFile .= "?".">";
 
@@ -193,11 +191,6 @@ if(file_exists($tpl."/".$templates)){
     $huoniaoTag->assign('memberBinding', array('0', '1'));
     $huoniaoTag->assign('memberBindingNames',array('开启','关闭'));
     $huoniaoTag->assign('memberBindingChecked', (int)$cfg_memberBinding);
-
-	//推荐人范围限制
-    $huoniaoTag->assign('fenxiaoBinding', array('0', '1'));
-    $huoniaoTag->assign('fenxiaoBindingNames',array('所有人','仅限分销商'));
-    $huoniaoTag->assign('fenxiaoBindingChecked', (int)$cfg_fenxiaoBinding);
 
 	//我的团队显示内容
 	$huoniaoTag->assign('fenxiaoOfflineItems', $cfg_fenxiaoOfflineItems ? explode(',', $cfg_fenxiaoOfflineItems) : array());

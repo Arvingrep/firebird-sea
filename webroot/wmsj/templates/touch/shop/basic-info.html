@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+	<title>{#$langData['siteConfig'][19][22]#}</title> {#*   店铺列表   *#}
+	<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+	<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/base_info.css?v={#$cfg_staticVersion#}">
+	<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+	<script>
+		var status = {#$status#}; //店铺状态
+		var ordervalid = {#$ordervalid#};  //外卖下单
+		var shopid = '{#$sid#}';
+		var cityid ="{#$cityid#}",site_map = '{#$site_map#}';
+		var thumbSize = {#$thumbSize#}, thumbType = '{#$thumbType#}', atlasSize = {#$atlasSize*1024*1024#}, atlasType = '{#$atlasType#}', atlasMax = 2;
+		var otherpeisong = {#json_encode($otherpeisong)#};
+		var billingpeisong = {#json_encode($billingpeisong)#};
+		var otherpeisongStr = {#json_encode($otherpeisongStr)#};
+		var thingcategoryStr = {#json_encode($thingcategoryStr)#};
+		var ysShopType = {#json_encode($ysShopType)#};
+		var category = '{#$category#}';
+		var defaultValue = category=='0'?['','']:category.split(',');
+
+		console.log(defaultValue);
+
+	</script>
+</head>
+<body>
+
+<div id="page" class="gz-address">
+	<div class="gz-addr-wrap" id="gzAddNewObj">
+		<!-- 头部 s-->
+		<div class="top_box">
+			<div class="headbox">
+				<a href="javascript:;" onclick="javascript:history.go(-1);" class="back_btn goBack"></a>
+				<div class="htitle">{#$langData['siteConfig'][19][22]#}</div>    {#*   基本信息   *#}
+
+			</div>
+		</div>
+		<!-- 头部 e-->
+		<form class="shop_detail" id="submitForm">
+			<!-- 店铺名 -->
+			<div class="detail_box">
+				<div class="inpbox">
+					<label for="shopname">{#$langData['siteConfig'][19][174]#}</label> {#*  店铺名称 *#}
+					<input type="text" placeholder="{#$langData['siteConfig'][19][174]#}" name="shopname" value="{#$shopname#}">{#*  店铺名称 *#}
+				</div>
+			</div>
+
+			<!-- 店铺信息 -->
+			<ul class="detail_box">
+				{#if $custom_otherpeisong == 2#}
+				<li class="inpbox select_inp">
+					<label for="shoptype">跑腿公司 <s @click="showTip"></s>	<div class="shareTip" v-show="tipShow" v-cloak>选择“智能推荐”为自动选择配送最快速度以及配送费最低的第三方配送提供给买家</div></label> {#*  跑腿公司 *#}
+
+					<input type="text" placeholder="{#$langData['waimai'][1][239]#}"  value="{#$paotuitype#}" readonly="true" id="otherpeisong" @click="">{#*  请选择 *#}
+					<input type="hidden" placeholder="{#$langData['waimai'][1][239]#}" name="otherpeisong" value="{#$paotuitype#}" id="otherpeisongid" >{#*  请选择 *#}
+
+				</li>
+				<li class="inpbox select_inp">
+					<label for="shoptype">行业类型</label> {#*  行业类型 *#}
+					<input type="text" placeholder="{#$langData['waimai'][1][239]#}" name="category_1" value="" readonly="true" id="Config_category_id">{#*  请选择 *#}
+					<input type="hidden" placeholder="{#$langData['waimai'][1][239]#}" name="category" value="{#$type.one_type_code#},{#$childtype.two_type_code#}" id="Config_category_id_2" >{#*  请选择 *#}
+					<ul id="typeList" data-type="treelist" style="display:none;" class="mbsc-comp">
+						{#foreach from=$ysShopType item=type#}
+						<li data-val="{#$type.one_type_code#}">
+							<span>{#$type.one_type_name#}</span>
+							<ul>
+								{#foreach from=$type.child item=childtype#}
+								<li data-val="{#$childtype.two_type_code#}">{#$childtype.two_type_name#}</li>
+								{#/foreach#}
+							</ul>
+						</li>
+						{#/foreach#}
+					</ul>
+
+				</li>
+			{#/if#}
+				{#if $custom_otherpeisong == 3#}
+				<li class="inpbox select_inp " style="{#if $cuszhipeisong == 0#}display:none{#/if#}">
+					<label for="shoptype">发单模式 <s @click="showTip"></s>	<div class="shareTip" v-show="tipShow" v-cloak></div></label>
+					<input type="text" placeholder="{#$langData['waimai'][1][239]#}"  value="{#$billingtype#}" readonly="true" id="billingpeisong">{#*  请选择 *#}
+					<input type="hidden" placeholder="{#$langData['waimai'][1][239]#}" name="billingtype" value="{#$billingtype#}" id="billingpeisongid" >{#*  请选择 *#}
+				</li>
+
+				<li id='specify'  class="inpbox select_inp" {#if $cuszhipeisong == 0 || $billingtype !=3 #}style="display: none" {#/if#} >
+					<label for="peisongtype">指定配送 <s @click="showTip"></s>	<div class="shareTip" v-show="tipShow" v-cloak></div></label>
+					<input type="text" placeholder="{#$langData['waimai'][1][239]#}"  value="{#$specify#}" readonly="true" id="otherpeisongStr">{#*  请选择 *#}
+					<input type="hidden" placeholder="{#$langData['waimai'][1][239]#}" name="specify" value="{#$specify#}" id="otherpeisongStrid" >{#*  请选择 *#}
+				</li>
+
+				<li class="inpbox select_inp" >
+					<label for="wupintype">物品类别 <s @click="showTip"></s>	<div class="shareTip" v-show="tipShow" v-cloak></div></label>
+					<input type="text" placeholder="{#$langData['waimai'][1][239]#}"  value="{#$thingcategory#}" readonly="true" id="thingcategoryStr">{#*  请选择 *#}
+					<input type="hidden" placeholder="{#$langData['waimai'][1][239]#}" name="thingcategory" value="{#$thingcategory#}" id="thingcategoryStrid" >{#*  请选择 *#}
+				</li>
+				{#/if#}
+
+				<li class="inpbox select_inp">
+					<label for="shoptype">{#$langData['waimai'][1][35]#}</label> {#*  店铺分类 *#}
+					<input type="text" placeholder="{#$langData['waimai'][1][239]#}" name="shoptype" value="{#foreach from=$typeArr item=type#}{#if in_array($type.id, $typeid)#} {#$type.title#}{#/if#}{#/foreach#}" readonly="true" id="Config_type_id" @click="shopTypeShow">{#*  请选择 *#}
+				</li>
+				<li class="inpbox">
+					<label for="phone">{#$langData['siteConfig'][19][56]#}</label> {#*  联系电话 *#}
+					<input type="text" placeholder="{#$langData['siteConfig'][19][56]#}" value="{#$phone#}" name="phone">{#*  联系电话 *#}
+				</li>
+				<li class="inpbox select_inp gz-addr-seladdr"  data-ids="" data-id="{#$cityid#}">
+					<label for="shopcity">{#$langData['waimai'][11][85]#}</label> {#*  城市 *#}
+					<input type="hidden" name="cityid" id="cityid" value="{#$cityid#}">
+					<input type="text" readonly="" placeholder="{#$langData['waimai'][1][239]#}" value="{#$cityname#}" name="shopcity" id="cityName">{#*  请选择 *#}
+				</li>
+			</ul>
+
+			<!-- 店铺信息 -->
+			<ul class="detail_box">
+				<li class="inpbox">
+					<label for="address">{#$langData['waimai'][1][37]#}</label> {#*  店铺地址 *#}
+					<input type="text" placeholder="{#$langData['waimai'][11][86]#}" value="{#$address#}" name="address">{#*  请填写具体地址 *#}
+				</li>
+				<li class="inpbox ">
+					<label for="coordX">{#$langData['waimai'][5][39]#} <a href="javascript:;" class="getCoord" @click="getCoord">自动获取</a></label> {#*  店铺纬度 自动获取 *#}
+					<input type="text"  placeholder="{#$langData['waimai'][5][39]#}" value="{#$coordX#}" name="coordX">{#*  店铺经度 *#}
+				</li>
+				<li class="inpbox ">
+					<label for="coordY">{#$langData['waimai'][5][40]#}</label> {#*  店铺经度 *#}
+					<input type="text" placeholder="{#$langData['waimai'][5][40]#}" value="{#$coordY#}" name="coordY">{#*  店铺纬度 *#}
+				</li>
+			</ul>
+			<!-- 店铺描述 -->
+			<dl class="detail_box descr_box">
+				<dt>{#$langData['waimai'][1][74]#}</dt> {#* 店铺描述 *#}
+				<dd><textarea rows="" cols="" value="" name="description" placeholder="{#$langData['waimai'][11][88]#}">{#$description#}</textarea></dd>
+			</dl>
+
+			<!-- 营业资质 -->
+			<dl class="detail_box yingye_card">
+				<dt>{#$langData['waimai'][11][89]#}</dt> {#* 营业资质 *#}
+				<dd >
+					{#if $business_license_img#}<div id="WU_FILE_0" class="thumbnail litpic"><img data-val="{#$business_license_img_pathSource#}" src="{#$business_license_img#}"><div class="del_btn" @click="delimg()"></div></div>{#/if#}
+					<div class="upload_btn" style="{#if $business_license_img#}display: none;{#/if#}"  data-type="yycard" id="filePicker1">{#$langData['waimai'][11][90]#}</div>{#* 上传营业执照 *#}
+				</dd>
+				<dd data-type="foodcard">
+					{#if $food_license_img#}<div id="WU_FILE_1" class="thumbnail litpic"><img data-val="{#$food_license_img_pathSource#}" src="{#$food_license_img#}"><div class="del_btn" @click="delimg()"></div></div>{#/if#}
+					<div class="upload_btn" style="{#if $food_license_img#}display: none;{#/if#}" data-type="foodcard" id="filePicker2">{#$langData['waimai'][11][91]#}</div>{#* 上传食品经营许可证 *#}
+				</dd>
+			</dl>
+
+			<button type="button" class="save_btn" data-type="basic-info" @click="dataSubmit()">保存</button>
+		</form>
+
+	</div>
+	<div class="loading_icon" v-if="LOADING"></div>
+	<div class="gz-sel-addr gz-sel-addr-hide" id="gzSelAddr">
+		<div class="gz-sel-addr-header">
+			<h3>{#$langData['siteConfig'][7][2]#}</h3>
+			<button class="gz-sel-addr-close" id="gzSelAddrCloseBtn"></button>
+		</div>
+		<ul class="gz-sel-addr-nav"></ul>
+		<div class="gz-sel-addr-list"></div>
+	</div>
+
+	<div class="gz-sel-addr-mask"></div>
+	<div class="mask_scroll"  @click="cancelChose"></div>
+	<div class="scroll_box">
+		<div class="scroll_head">
+			<a href="javascript:;" class="cancel_btn" @click="cancelChose">{#$langData['waimai'][2][43]#}</a>  {#*  取消  *#}
+			<div class="htitle">{#$langData['waimai'][11][92]#}</div>  {#*  店铺类型  *#}
+			<a href="javascript:;" class="sure_btn" @click="sureChose">{#$langData['waimai'][3][33]#}</a>  {#*  确定  *#}
+		</div>
+		<div class="select_box">
+			<ul class="fn-clear">
+				{#foreach from=$typeArr item=type#}
+				<li class="item{#if in_array($type.id, $typeid)#}chose_before chosed{#/if#}" data-id="{#$type.id#}" @click="select()"><i></i><a href="javascript:;">{#$type.title#}</a></li>
+				{#/foreach#}
+			</ul>
+		</div>
+	</div>
+</div>
+
+</body>
+<script src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<!-- <script src="{#$templets_skin#}js/zepto.deferred.js?v={#$cfg_staticVersion#}"></script> -->
+<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$cfg_staticPath#}js/webuploader/webuploader.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/basic-info.js?v={#$cfg_staticVersion#}"></script>
+</html>

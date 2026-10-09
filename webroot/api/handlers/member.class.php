@@ -336,24 +336,6 @@ class member
             $detail['wechat_subscribe'] = $results[0]['wechat_subscribe'];
             $detail['online']           = isApp() ? 1 : $results[0]['online'];  //APP端临时不判断是否离线
 
-            //如果有分站id，则判断分站是否有独立公众号配置且用户是否有关注当前分站的公众号
-            if (isset($_param['cityid']) && (int)$_param['cityid'] > 0) {
-                $_cityid = (int)$_param['cityid'];
-                //先判断分站是否有独立公众号，有才做额外判断
-                $wechatConfig = getCityAdvancedConfig('wechat', '', $_cityid);
-                if ($wechatConfig != false) {
-                    //查询用户是否有关注当前分站的公众号
-                    $sql = $dsql->SetQuery("SELECT `subscribe` FROM `#@__member_wechat_subscribe` WHERE `cityid` = ".$_cityid." AND `userid` = ".$id);
-                    $ret = $dsql->dsqlOper($sql, "results");
-                    if ($ret != null && is_array($ret)) {
-                        $detail['wechat_subscribe'] = $ret[0]['subscribe'];
-                    } else {
-                        //没有查询到就默认未关注
-                        $detail['wechat_subscribe'] = 0;
-                    }
-                }
-            }
-
             //区域
             $detail['cityid']           = $results[0]['cityid'];
             $detail['addrid']           = $results[0]['addr'];
@@ -894,7 +876,7 @@ class member
 
             //房产中介
             if (in_array('house', $installModuleArr)) {
-                $archives = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company` WHERE `uid` = " . $id);
+                $archives = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjcom` WHERE `userid` = " . $id);
                 $results  = $dsql->dsqlOper($archives, "results");
                 if ($results) {
                     $sid = $results[0]['id'];
@@ -1136,9 +1118,9 @@ class member
                 $homepageData['usercountall'] = $usercountall;
                 $homepageData['allcount'] = $allcount;
 
-                //房产经纪人
+                //房产经济人
                 if (in_array("house", $installModuleArr)) {
-                    $housesql  = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company_user` WHERE `uid` = $id AND `status` = 1");
+                    $housesql  = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjuser` WHERE `userid` = $id AND `state` = 1");
                     $houseres  = $dsql->dsqlOper($housesql, "results");
                     if ($houseres) {
                         $param = array(
@@ -1238,18 +1220,6 @@ class member
             $detail['homepageData'] = $homepageData;
         }
 
-        //判断会员是否是分销商
-        if ($userid == $id || $isloginUser) {
-            if(!$simple){
-                $detail['is_fenxiao'] = 0;
-                $sql = $dsql->SetQuery("SELECT `id` FROM `#@__member_fenxiao_user` WHERE `state` = 1 AND `uid` = ".$id);
-                $ret = $dsql->dsqlOper($sql, "results");
-                if ($ret != null && is_array($ret)) {
-                    $detail['is_fenxiao'] = 1;
-                }
-            }
-        }
-
 
         return $detail;
     }
@@ -1307,31 +1277,17 @@ class member
 
             //个人身份
             array_push($tableData, array(
-                'table' => array("house_xzl", "house_sp", "house_cf", "house_cw"),
+                'table' => array("house_sale", "house_zu", "house_xzl", "house_sp", "house_cf", "house_cw"),
                 'param' => " AND l.`usertype` = 0 AND l.`userid` = $userid"
             ));
 
             //经纪人身份
             array_push($tableData, array(
-                'table' => array("house_xzl", "house_sp", "house_cf", "house_cw"),
-                'join' => " LEFT JOIN `#@__house_distributor_company_user` z ON z.`id` = l.`userid`",
+                'table' => array("house_sale", "house_zu", "house_xzl", "house_sp", "house_cf", "house_cw"),
+                'join' => " LEFT JOIN `#@__house_zjuser` z ON z.`id` = l.`userid`",
                 'param' => " AND l.`usertype` = 1 AND z.`userid` = $userid"
             ));
 
-
-            //新房产-二手房+出租房+新房源
-
-            //个人身份
-            array_push($tableData, array(
-                'table' => array("house_property_listing"),
-                'param' => " AND l.`listing_nature` = 1 AND l.`creator_uid` = $userid"
-            ));
-
-            //经纪人身份
-            array_push($tableData, array(
-                'table' => array("house_property_listing"),
-                'param' => " AND l.`listing_nature` = 2 AND l.`creator_uid` = $userid"
-            ));
         }
         
         //招聘简历
@@ -1522,7 +1478,7 @@ class member
 
                             //经纪人主页
                         } elseif ($_name == 'house') {
-                            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company_user` WHERE `status` = 1 AND `uid` = " . $id);
+                            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjuser` WHERE `state` = 1 AND `userid` = " . $id);
                             $ret = $dsql->dsqlOper($sql, "results");
                             if ($ret) {
                                 $param = array(
@@ -1649,10 +1605,6 @@ class member
         $archives = $dsql->SetQuery("SELECT * FROM `#@__member` WHERE `state` = 1 AND `mtype` != 0 AND `mtype` != 3 AND `id` = " . $id);
         $results = $dsql->dsqlOper($archives, "results");
         if ($results) {
-
-            if(!$cfg_BusinessJoinConfig){
-                $cfg_BusinessJoinConfig = getBusinessJoinConfig();
-            }
 
             if ($results[0]['mtype'] == 2) {
 
@@ -1886,7 +1838,7 @@ class member
                                         //房产
                                     } elseif ($v == 'house') {
 
-                                        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company` WHERE `status` = 1 AND `uid` = " . $id);
+                                        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjcom` WHERE `state` = 1 AND `userid` = " . $id);
                                         $ret = $dsql->dsqlOper($sql, "results");
                                         if ($ret) {
                                             $param = array(
@@ -2307,12 +2259,12 @@ class member
 
         if ($type == 'tongji') {
             //点赞未读
-            $_archives = $dsql->SetQuery("SELECT count(`id`) totalCount FROM `#@__public_up` WHERE `isread` = 0 and `uid` = " . $uid);
-            $upunread = (int)$dsql->getOne($_archives);
+            $_archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_up_all` WHERE `isread` = 0 and `uid` = " . $uid);
+            $upunread = $dsql->dsqlOper($_archives, "totalCount");
 
             //评论未读
             $where_ = " AND `userid` = '$uid'";
-            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `ischeck` = 1" . $where_);
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1" . $where_);
             $ret = $dsql->dsqlOper($sql, "results");
             $sidList = array();
             foreach ($ret as $k => $v) {
@@ -2324,8 +2276,8 @@ class member
                 $whereC = " AND  `masterid` = '$uid' AND `sid` = '0'";
             }
 
-            $_archives = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment` WHERE `isread` = 0 " . $whereC);
-            $commentunread = (int)$dsql->getOne($_archives);
+            $_archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `isread` = 0 " . $whereC);
+            $commentunread = $dsql->dsqlOper($_archives, "totalCount");
         }
 
         //未读
@@ -5883,10 +5835,6 @@ class member
                 $temp     = $this->param['temp'];  // template、action
                 $page     = $this->param['page'];
                 $pageSize = $this->param['pageSize'];
-
-                //新房产增加
-                $community = (int)$this->param['community'];//小区id
-                $state = (int)$this->param['state'];//状态 二手房租房：1-在售 3-下架 ; //新房状态 0-全部 1-待售 2-在售 4-售罄
             }
         }
 
@@ -5918,28 +5866,6 @@ class member
             } elseif ($module == 'marry') {
 
                 $where .= " AND c.`action` like '%$type%'";
-            } elseif ($module == 'house') {
-                $where .= " AND c.`action` like '%$type%'";
-
-                if($type=='listing_detail_2'){ //二手房
-                    $leftsql = " LEFT JOIN `#@__house_property_listing` l ON c.`aid` = l.`id` ";
-                    $where .= " AND l.`property_type` = 2";
-                    if($community)  $where .= " AND l.`building_id` = $community";
-                    if($state)  $where .= " AND l.`sale_status` = $state";
-                }elseif($type=='listing_detail_3'){ //出租房
-                    $leftsql = " LEFT JOIN `#@__house_property_listing` l ON c.`aid` = l.`id` ";
-                    $where .= " AND l.`property_type` = 3";
-                    if($community)  $where .= " AND l.`building_id` = $community";
-                    if($state) $where .= " AND l.`sale_status` = $state";
-                }elseif($type=='loupan_detail'){ //新房
-                    $leftsql = " LEFT JOIN `#@__house_loupan` l ON c.`aid` = l.`id` ";
-                    if($state){
-                        $state = $state-1; //匹配楼盘表状态
-                        $where .= " AND l.`salestate` = $state";
-                    }
-                }else{//小区+其他旧版的房源信息
-                    $where .= " AND c.`action` = '$type'";  
-                }
             } else {
 
                 $where .= " AND c.`action` = '$type'";
@@ -6121,17 +6047,6 @@ class member
                             $act = 'cwDetail';/*车位*/
                             $template = 'cw-detail';
                             $collecttype = 7;
-                            break;
-                        //新房产增加
-                        case 'listing_detail_2':
-                            $act = 'newListingDetail';/*二手房*/
-                            $template = 'new-listing-detail';
-                            $collecttype = 1;
-                            break;
-                        case 'listing_detail_3':
-                            $act = 'newListingDetail';/*出租房*/
-                            $template = 'new-listing-detail';
-                            $collecttype = 2;
                             break;
                     }
 
@@ -7430,6 +7345,8 @@ class member
                     $dsql->dsqlOper($sql, "update");
                 }
 
+
+
                 //支付成功后跳转页面
                 global $cfg_payReturnType;
                 global $cfg_payReturnUrlPc;
@@ -8294,14 +8211,9 @@ class member
             $source = 2;
         }
 
-        //如果是外卖商家提现，就修改source的值
-        if ($from == 'wmsj') {
-            $source = 3;
-        }
-
         //验证类型
         $realname = $username = $wechat_openid = $wechat_mini_openid = '';
-        $sql = $dsql->SetQuery("SELECT `realname`, `username`, `wechat_openid`, `wechat_mini_openid`, `wechat_app_openid`, `wechat_wmsj_openid` FROM `#@__member` WHERE `id` = " . $userid);
+        $sql = $dsql->SetQuery("SELECT `realname`, `username`, `wechat_openid`, `wechat_mini_openid`, `wechat_app_openid` FROM `#@__member` WHERE `id` = " . $userid);
         $ret = $dsql->dsqlOper($sql, "results");
         if ($ret) {
             $realname = $ret[0]['realname'];
@@ -8309,24 +8221,14 @@ class member
             $wechat_openid = $ret[0]['wechat_openid'];
             $wechat_mini_openid = $ret[0]['wechat_mini_openid'];
             $wechat_app_openid = $ret[0]['wechat_app_openid'];
-            $wechat_wmsj_openid = $ret[0]['wechat_wmsj_openid'];
 
-            //如果是新版本的微信转账接口，则判断相应的openid是否存在
-            if ($cfg_withdrawWxVersion == 4) {
-                if ($bank == 'weixin' && $source == 2 && !$wechat_app_openid) {
-                    return array("state" => 200, "info" => '请退出登录后使用微信授权重新登录后重试！');
-                }
-    
-                //验证外卖商家提现openid
-                if ($bank == 'weixin' && $source == 3 && !$wechat_wmsj_openid) {
-                    return array("state" => 200, "info" => '请退出登录后使用微信授权重新登录后重试！');
-                }
-            } else {
-                if ($bank == 'weixin' && !$wechat_openid && !$wechat_mini_openid) {
-                    return array("state" => 200, "info" => '请退出登录后使用微信授权重新登录后重试！');  //请先绑定微信账号
-                }
+            if ($bank == 'weixin' && !$wechat_openid && !$wechat_mini_openid) {
+                return array("state" => 200, "info" => '请退出登录后使用微信授权重新登录后重试！');  //请先绑定微信账号
             }
 
+            if ($bank == 'weixin' && $source == 2 && !$wechat_app_openid) {
+                return array("state" => 200, "info" => '请退出登录后使用微信授权重新登录后重试！');
+            }
         }
 
         $ordernum = create_ordernum();
@@ -8379,7 +8281,6 @@ class member
                             'name' => $realname,
                             'amount' => $amount_,
                             'wechat_app_openid' => $wechat_app_openid,
-                            'wechat_wmsj_openid' => $wechat_wmsj_openid,
                         );
 
                         require_once(HUONIAOROOT . "/api/payment/wxpay/wxpayTransfers.php");
@@ -8390,10 +8291,6 @@ class member
 
                             //如果返回值带有不重复字段noretry，则直接打印结果
                             if (isset($return['noretry']) && $return['noretry'] == 1) {
-                                //接口报错后，需要把提现记录删除
-                                $sql = $dsql->SetQuery("DELETE FROM `#@__member_withdraw` WHERE `id` = $wid");
-                                $dsql->dsqlOper($sql, "update");
-
                                 return $return;
                             } else {
                                 // 加载支付方式操作函数
@@ -8412,10 +8309,6 @@ class member
                                         return $return;
                                     }
                                 }else{
-                                    //接口报错后，需要把提现记录删除
-                                    $sql = $dsql->SetQuery("DELETE FROM `#@__member_withdraw` WHERE `id` = $wid");
-                                    $dsql->dsqlOper($sql, "update");
-                                    
                                     return $return;
                                 }
                             }
@@ -9128,10 +9021,6 @@ class member
 
         $module = trim($param['module']);  //要开通的特权标识
         $time = (int)$param['time'];  //要开通的时长
-
-        if(!$cfg_BusinessJoinConfig){
-            $cfg_BusinessJoinConfig = getBusinessJoinConfig();
-        }
 
         //商家入驻配置信息
         $businessConfig = $cfg_BusinessJoinConfig;
@@ -10502,8 +10391,7 @@ class member
         $ordertype = explode('_filter_', $ordertype);
         $ordertype = $ordertype[0];
         if (method_exists($this, $ordertype)) {
-            $ret = $this->$ordertype();
-            return $ret;
+            $this->$ordertype();
         } else {
             die(self::$langData['siteConfig'][30][47]); //操作错误！
         }
@@ -10963,14 +10851,7 @@ class member
             return $order;
         } else {
 
-            $order = createPayForm("member", $ordernum, $payprice, $paytype, $langData['siteConfig'][21][107], $param);
-
-            // if(is_array($order)){
-            //     $order['timeout'] = $time + 3600;
-            // }
-            return $order;
-
-            // createPayForm("member", $ordernum, $payprice, $paytype, $langData['siteConfig'][21][107], $param);
+            createPayForm("member", $ordernum, $payprice, $paytype, $langData['siteConfig'][21][107], $param);
         }
     }
 
@@ -11068,10 +10949,6 @@ class member
         $atpage = $pageSize * ($page - 1);
         $where = " LIMIT $atpage, $pageSize";
         $results = $dsql->dsqlOper($archives . $where, "results");
-
-        if(!$cfg_BusinessJoinConfig){
-            $cfg_BusinessJoinConfig = getBusinessJoinConfig();
-        }
 
         //商家入驻配置
         $businessJoinConfig = $cfg_BusinessJoinConfig;
@@ -12462,12 +12339,7 @@ class member
         $tab = "";
         if ($module == "house") {
             if (empty($type)) die(self::$langData['siteConfig'][33][13]);
-            if(in_array($type,array('sale','zu'))){
-                $tab = "house_property_listing";
-            }else{
-                $tab = "house_" . $type;
-            }
-            
+            $tab = "house_" . $type;
         } elseif ($module == "car" || $module == "huodong" || $module == "tieba" || $module == "vote" || $module == "sfcar") {
             $tab = $module . "_list";
         } elseif ($module == "education") {
@@ -12502,7 +12374,7 @@ class member
                 if ($waitPay == '1') {
                     $amount = $results[0]['waitPrice'];
                 }
-                //$waitPay = $results[0]['waitPay'];
+                //                $waitPay = $results[0]['waitPay'];
             }
             if ($module == 'info') {
 
@@ -12575,9 +12447,7 @@ class member
             if ($ordernum) {
                 $paysql = $dsql->SetQuery("SELECT `amount`,`pubdate`,`body`  FROM `#@__pay_log` WHERE `ordernum` = '$ordernum' AND `state` = 0");
                 $payres = $dsql->dsqlOper($paysql, "results");
-                if(is_array($payres) && empty($payres)){
-                    die("支付错误!");
-                } 
+                if (is_array($payres) && empty($payres)) die("支付错误！");
 
                 $timeout = $payres[0]['pubdate'] + 3600;
 
@@ -12856,26 +12726,19 @@ class member
                 $arcrank = $_arcrank;  //状态保持不变
             }
 
-            $upd = "";
             if ($state == 1) {
                 $upd = ', `state` = ' . $arcrank;
                 if ($module == 'article' || $module == 'info' || $module == 'live') {
                     $upd = ', `arcrank` = ' . $arcrank;
-                }else if($module == 'house' && $tab=="house_property_listing"){
-                     //兼容新版二手房+出租房
-                    $upd = ", `publish_time` = '$pubdate', `audit_status` = " . $arcrank;
                 }
             } else {
                 $upd = ', `state` = 1';
                 if ($module == 'article' || $module == 'info' || $module == 'live') {
                     $upd = ', `arcrank` = 1';
-                }else if($module == 'house' && $tab=="house_property_listing"){
-                    //兼容新版二手房+出租房
-                    $upd = ", `publish_time` = '$pubdate', `audit_status` = 1";
                 }
             }
 
-            $sql = $dsql->SetQuery("UPDATE `#@__" . $tab . "` SET `waitpay` = 0" . $upd . " WHERE `id` = $aid");
+            $sql = $dsql->SetQuery("UPDATE `#@__" . $tab . "` SET `waitpay` = 0, `pubdate` = '$pubdate'" . $upd . " WHERE `id` = $aid");
             $dsql->dsqlOper($sql, "update");
 
             //直播
@@ -13019,8 +12882,6 @@ class member
 
         //用户信息
         $userinfo = $userLogin->getMemberInfo();
-        $sql = $dsql->SetQuery("SELECT `id`, `dcoid`, `meal` FROM `#@__house_distributor_company_user` WHERE `uid` = $uid AND `status` = 1");
-        $dcuser = $dsql->getArr($sql);
 
         $alreadyFabu = 0;
         if ($module == "info") {
@@ -13040,7 +12901,7 @@ class member
 
                 $tab = array();
                 if ($module == "house") {
-                    $tab = array("house_property_listing", "house_xzl", "house_sp", "house_cf", "house_cw");
+                    $tab = array("house_sale", "house_zu", "house_xzl", "house_sp", "house_cf", "house_cw");
                 } elseif ($module == "car" || $module == "huodong" || $module == "tieba" || $module == "vote") {
                     $tab = array($module . "_list");
                 } elseif ($module == "education") {
@@ -13057,19 +12918,7 @@ class member
                 }
 
                 foreach ($tab as $key => $value) {
-                    $twhere = " AND `pubdate` >= $today AND `pubdate` < $tomorrow";
-                    if($module=='house'){
-                        if($tab == 'house_property_listing'){
-                            $twhere = " AND `creator_uid`=$uid AND `publish_time` >= $today AND `publish_time` < $tomorrow";
-                        }else{
-                            $usql = $dcuser ? "{$dcuser['id']}, $uid":$uid;
-                            $twhere .= " AND `userid` IN ($usql)";
-                        }
-                    }else{
-                        $twhere .= " AND $admin = $uid";
-                    }
-
-                    $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__" . $value . " WHERE 1=1 AND `alonepay` = 0 AND `waitpay` = 0 $twhere");
+                    $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__" . $value . "` WHERE `" . $admin . "` = $uid AND `pubdate` >= $today AND `pubdate` < $tomorrow AND `alonepay` = 0 AND `waitpay` = 0");
                     $ret = $dsql->dsqlOper($sql, "results");
                     if ($ret) {
                         $alreadyFabu += $ret[0]['total'];
@@ -13092,7 +12941,7 @@ class member
 
                         $tab = array();
                         if ($module == "house") {
-                            $tab = array("house_property_listing", "house_xzl", "house_sp", "house_cf", "house_cw");
+                            $tab = array("house_sale", "house_zu", "house_xzl", "house_sp", "house_cf", "house_cw");
                         } elseif ($module == "car" || $module == "huodong" || $module == "tieba" || $module == "vote") {
                             $tab = array($module . "_list");
                         } elseif ($module == "education") {
@@ -13109,19 +12958,7 @@ class member
                         }
 
                         foreach ($tab as $key => $value) {
-                            $twhere = " AND `pubdate` >= $today AND `pubdate` < $tomorrow";
-                            if($module=='house'){
-                                if($tab == 'house_property_listing'){
-                                    $twhere = " AND `creator_uid`=$uid AND `publish_time` >= $today AND `publish_time` < $tomorrow";
-                                }else{
-                                    $usql = $dcuser ? "{$dcuser['id']}, $uid":$uid;
-                                    $twhere .= " AND `userid` IN ($usql)";
-                                }
-                            }else{
-                                $twhere .= " AND $admin = $uid";
-                            }
-
-                            $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__" . $value . " WHERE 1=1 AND `alonepay` = 0 AND `waitpay` = 0 $twhere");
+                            $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__" . $value . "` WHERE `" . $admin . "` = $uid AND `pubdate` >= $today AND `pubdate` < $tomorrow AND `alonepay` = 0 AND `waitpay` = 0");
                             $ret = $dsql->dsqlOper($sql, "results");
                             if ($ret) {
                                 $alreadyFabu += $ret[0]['total'];
@@ -13159,7 +12996,7 @@ class member
 
                     $tab = array();
                     if ($module == "house") {
-                        $tab = array("house_property_listing", "house_xzl", "house_sp", "house_cf", "house_cw");
+                        $tab = array("house_sale", "house_zu", "house_xzl", "house_sp", "house_xzl");
                     } elseif ($module == "car" || $module == "huodong" || $module == "tieba" || $module == "vote" || $module == "sfcar") {
                         $tab = array($module . "_list");
                     } elseif ($module == "education") {
@@ -13178,19 +13015,7 @@ class member
                     }
 
                     foreach ($tab as $key => $value) {
-                        $twhere = " AND `pubdate` >= $today AND `pubdate` < $tomorrow";
-                        if($module=='house'){
-                            if($tab == 'house_property_listing'){
-                                $twhere = " AND `creator_uid`=$uid AND `publish_time` >= $today AND `publish_time` < $tomorrow";
-                            }else{
-                                $usql = $dcuser ? "{$dcuser['id']}, $uid":$uid;
-                                $twhere .= " AND `userid` IN ($usql)";
-                            }
-                        }else{
-                            $twhere .= " AND $admin = $uid";
-                        }
-
-                        $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__" . $value . " WHERE 1=1 AND `alonepay` = 0 AND `waitpay` = 0 $twhere");
+                        $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__" . $value . "` WHERE `" . $admin . "` = $uid AND `pubdate` >= $today AND `pubdate` < $tomorrow AND `alonepay` = 0 AND `waitpay` = 0");
                         $ret = $dsql->dsqlOper($sql, "results");
                         if ($ret) {
                             $alreadyFabu += $ret[0]['total'];
@@ -13389,9 +13214,7 @@ class member
         //商城
         if (in_array("shop", $installModuleArr) && verifyModuleAuth(array("module" => "shop"))) {
             $totalAmount = $totalCount = 0;
-
-            //统计实物订单
-            $sql = $dsql->SetQuery("SELECT o.`id`,o.`shopFee`,o.`ordernum` FROM `#@__shop_order` o LEFT JOIN `#@__shop_store` s ON s.`id` = o.`store` WHERE o.`protype` = 0 AND s.`userid` = '$userid' AND o.`orderstate` = 3 AND o.`okdate` >= $began AND o.`okdate` <= $end");
+            $sql = $dsql->SetQuery("SELECT o.`id`,o.`shopFee`,o.`ordernum` FROM `#@__shop_order` o LEFT JOIN `#@__shop_store` s ON s.`id` = o.`store` WHERE s.`userid` = '$userid' AND o.`orderstate` = 3 AND o.`okdate` >= $began AND o.`okdate` <= $end");
             $ret = $dsql->dsqlOper($sql, "results");
             if ($ret && is_array($ret)) {
                 foreach ($ret as $key => $value) {
@@ -13434,25 +13257,6 @@ class member
                     }
                 }
             }
-
-            //统计电子券订单
-            $sql = $dsql->SetQuery("SELECT `cardnum` FROM `#@__shopquan` WHERE `usedate` >= $began AND `usedate` <= $end AND `ret_state` = 0 AND `proid` IN (SELECT p.`id` FROM `#@__shop_product` p LEFT JOIN `#@__shop_store` s ON s.`id` = p.`store` WHERE s.`userid` = '$userid')");
-            $ret = $dsql->dsqlOper($sql, "results");
-            if($ret){
-                foreach ($ret as $key => $value) {
-                    $cardnum   = $value['cardnum'];
-                    $info = '商城电子券收入：' . $cardnum;
-
-                    //根据订单号查询member_money表的实际收入
-                    $sql = $dsql->SetQuery("SELECT `amount` FROM `#@__member_money` WHERE `userid` = $userid AND `type` = 1 AND `ordertype` = 'shop' AND `showtype` = 0 AND `info` = '$info'");
-                    $ret = $dsql->dsqlOper($sql, "results");
-                    if ($ret) {
-                        $totalCount++;
-                        $totalAmount += $ret[0]['amount'];
-                    }
-                }
-            }
-
             array_push($data, array(
                 "module" => "shop",
                 "count"  => (int)$totalCount,
@@ -15192,12 +14996,23 @@ class member
 
         //验证分站是否绑定的独立小程序
         if($appid && $appid != $cfg_miniProgramAppid){
-            $config = getMiniProgramCityAdvancedConfig($appid);
-            if($config){
-                $cfg_miniProgramAppid = $config['appid'];
-                $cfg_miniProgramAppsecret = $config['appsecret'];
-            }
-            else{
+            $sql = $dsql->SetQuery("SELECT `config` FROM `#@__site_city` WHERE `config` LIKE '%$appid%' ORDER BY `id` DESC LIMIT 1");
+            $ret = $dsql->dsqlOper($sql, "results");
+            if($ret){
+                $config = $ret[0]['config'];
+                $config = unserialize($config);
+                if(is_array($config)){
+                    $cfg_miniProgramAppid = $config['siteConfig']['miniProgramAppid'];
+                    $cfg_miniProgramAppsecret = $config['siteConfig']['miniProgramAppsecret'];
+
+                    if(!$cfg_miniProgramAppid || !$cfg_miniProgramAppsecret){
+                        return array("state" => 200, "info" => "该小程序在系统后台绑定错误，请检查后重试！");
+                    }
+
+                }else{
+                    return array("state" => 200, "info" => "该小程序在系统后台绑定错误，请检查后重试！");
+                }
+            }else{
                 return array("state" => 200, "info" => "该小程序未在系统后台绑定，请检查后重试！");
             }
         }
@@ -15221,11 +15036,9 @@ class member
         $data = objtoarr($data);
 
         $openid = $data['openid'];
-        $unionid = isset($data['unionid']) ? $data['unionid'] : $openid;
+        $unionid = isset($data['unionid']) ? $data['unionid'] : "";
         $session_key = $data['session_key'];
         $field_session = $session_key . '#' . GetMktime(time());
-
-        if(!$unionid) return array("state" => 200, "info" => "获取用户唯一标识失败！");
 
         //保存到数据库中，以备支付时，没有取到unionid时使用
         $sql = $dsql->SetQuery("SELECT `id` FROM `#@__site_wxmini_unionid` WHERE `appid` = '$appid' AND `conn` = '$unionid'");
@@ -15249,19 +15062,11 @@ class member
         // 如果用openid会创建第二个账号
         if ($unionid) {
 
-            $sql = $dsql->SetQuery("SELECT `id`, `wechat_mini_openid`, `state` FROM `#@__member` WHERE `wechat_conn` = '$unionid' AND (`mtype` = 1 OR `mtype` = 2)");
+            $sql = $dsql->SetQuery("SELECT `id`, `wechat_mini_openid` FROM `#@__member` WHERE `wechat_conn` = '$unionid' AND (`mtype` = 1 OR `mtype` = 2)");
             $ret = $dsql->dsqlOper($sql, "results");
             if ($ret) {
                 $newUser = 0;
                 $uid = $ret[0]['id'];
-                $state = (int)$ret[0]['state'];
-
-                if ($state == 0) {
-                    return array("state" => 200, "info" => "账号审核中，请稍候重试！");
-                }
-                else if ($state == 2) {
-                    return array("state" => 200, "info" => "账号审核失败，请联系客服处理！");
-                }
 
                 $field_openid = ", `wechat_mini_openid` = '$openid'";
 
@@ -15274,13 +15079,12 @@ class member
                 $access_token = $token['access_token'];
                 $refresh_token = $token['refresh_token'];
 
-                $useragent = $_SERVER['HTTP_USER_AGENT'];
-                $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
-                
-                $sql = $dsql->SetQuery("UPDATE `#@__member` SET `wechat_mini_session` = '$field_session', `access_token_wxmini` = '" . urldecode($access_token) . "', `refresh_token_wxmini` = '" . urldecode($refresh_token) . "', `online` = '$time' " . $field_openid . ", `logincount` = `logincount` + 1, `lastlogintime` = '$time', `lastloginip` = '$ip', `lastloginipaddr` = '$ipaddr' WHERE `id` = $uid");
+                $sql = $dsql->SetQuery("UPDATE `#@__member` SET `wechat_mini_session` = '$field_session', `access_token_wxmini` = '" . urldecode($access_token) . "', `refresh_token_wxmini` = '" . urldecode($refresh_token) . "', `online` = '$time' " . $field_openid . " WHERE `id` = $uid");
                 $dsql->dsqlOper($sql, "update");
 
                 //记录登录日志
+                $useragent = $_SERVER['HTTP_USER_AGENT'];
+                $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
                 $sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '微信小程序', '$useragent')");
                 $dsql->dsqlOper($sql, "update");
     
@@ -15541,7 +15345,7 @@ class member
 
             //记录登录日志
             $useragent = $_SERVER['HTTP_USER_AGENT'];
-            $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+            $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
             $sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '微信小程序', '$useragent')");
             $dsql->dsqlOper($sql, "update");
 
@@ -15616,7 +15420,7 @@ class member
 
                 //记录登录日志
                 $useragent = $_SERVER['HTTP_USER_AGENT'];
-                $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+                $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
                 $_sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '微信小程序', '$useragent')");
                 $dsql->dsqlOper($_sql, "update");
 
@@ -15684,7 +15488,7 @@ class member
         // $userData = json_decode($_REQUEST['userData'], true);
 
         if($base64){
-            $userData = json_decode(urldecode(base64_decode($_REQUEST['userData'])), true);
+            $userData = json_decode(base64_decode($_REQUEST['userData']), true);
         }else{
             $userData = json_decode($_REQUEST['userData'], true);
         }
@@ -15708,9 +15512,9 @@ class member
         // $phoneData = json_decode($_REQUEST['phoneData'], true);
 
         if($base64){
-            $phoneData = json_decode(urldecode(base64_decode($_REQUEST['phoneData'])), true);
+            $phoneData = json_decode(base64_decode($_REQUEST['phoneData']), true);
         }else{
-            $phoneData = json_decode(urldecode($_REQUEST['phoneData']), true);
+            $phoneData = json_decode($_REQUEST['phoneData'], true);
         }
 
         $phone_code      = str_replace(' ', '+', $phoneData['code']);
@@ -15736,12 +15540,22 @@ class member
 
         //验证是否绑定的独立小程序
         if($appid && $appid != $cfg_miniProgramAppid){
-            $config = getMiniProgramCityAdvancedConfig($appid);
-            if($config){
-                $cfg_miniProgramAppid = $config['appid'];
-                $cfg_miniProgramAppsecret = $config['appsecret'];
-            }
-            else{
+            $sql = $dsql->SetQuery("SELECT `config` FROM `#@__site_city` WHERE `config` LIKE '%$appid%' ORDER BY `id` DESC LIMIT 1");
+            $ret = $dsql->dsqlOper($sql, "results");
+            if($ret){
+                $config = $ret[0]['config'];
+                $config = unserialize($config);
+                if(is_array($config)){
+                    $cfg_miniProgramAppid = $config['siteConfig']['miniProgramAppid'];
+                    $cfg_miniProgramAppsecret = $config['siteConfig']['miniProgramAppsecret'];
+
+                    if(!$cfg_miniProgramAppid || !$cfg_miniProgramAppsecret){
+                        return array("state" => 200, "info" => "该小程序在系统后台绑定错误，请检查后重试！");
+                    }
+                }else{
+                    return array("state" => 200, "info" => "该小程序在系统后台绑定错误，请检查后重试！");
+                }
+            }else{
                 return array("state" => 200, "info" => "该小程序未在系统后台绑定，请检查后重试！");
             }
         }
@@ -15778,7 +15592,7 @@ class member
         }
 
         $openid = $data['openid'];
-        $unionid = isset($data['unionid']) ? $data['unionid'] : $openid;
+        $unionid = isset($data['unionid']) ? $data['unionid'] : "";
         $session_key = $data['session_key'];
         $field_session = $session_key.'#'.GetMktime(time());
 
@@ -15912,10 +15726,9 @@ class member
             $field_openid = "";
             // $field_session = $session_key . '#' . GetMktime(time());
             // 强制更新
-            // if(empty($ret[0]['wechat_mini_openid'])){
-            //因为分站支持绑定独立小程序，在分站登录成功后，这个openid也要更新下，不然支付会有问题
+            if(empty($ret[0]['wechat_mini_openid'])){
                 $field_openid = ", `wechat_mini_openid` = '$openid'";
-            // }
+            }
 
             $ip   = GetIP();
             $ipaddr = getIpAddr($ip);
@@ -15933,7 +15746,7 @@ class member
 
             //记录登录日志
             $useragent = $_SERVER['HTTP_USER_AGENT'];
-            $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+            $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
             $sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '微信小程序', '$useragent')");
             $dsql->dsqlOper($sql, "update");
 
@@ -15998,7 +15811,7 @@ class member
 
                     //记录登录日志
                     $useragent = $_SERVER['HTTP_USER_AGENT'];
-                    $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+                    $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
                     $sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '微信小程序', '$useragent')");
                     $dsql->dsqlOper($sql, "update");
 
@@ -16120,7 +15933,7 @@ class member
 
                 //记录登录日志
                 $useragent = $_SERVER['HTTP_USER_AGENT'];
-                $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+                $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
                 $_sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '微信小程序', '$useragent')");
                 $dsql->dsqlOper($_sql, "update");
 
@@ -16199,9 +16012,9 @@ class member
 
         //用户信息
         if($base64){
-            $userData = json_decode(urldecode(base64_decode($_REQUEST['userData'])), true);
+            $userData = json_decode(base64_decode($param['userData']), true);
         }else{
-            $userData = json_decode($_REQUEST['userData'], true);
+            $userData = json_decode($param['userData'], true);
         }
 
         $_byteMiniLoginLog->DEBUG("userData：" . json_encode($userData));
@@ -16220,9 +16033,9 @@ class member
 
         //手机号码信息
         if($base64){
-            $phoneData = json_decode(base64_decode($_REQUEST['phoneData']), true);
+            $phoneData = json_decode(base64_decode($param['phoneData']), true);
         }else{
-            $phoneData = json_decode($_REQUEST['phoneData'], true);
+            $phoneData = json_decode($param['phoneData'], true);
         }
 
         $_byteMiniLoginLog->DEBUG("phoneData：" . json_encode($phoneData));
@@ -16367,7 +16180,7 @@ class member
 
                 //记录登录日志
                 $useragent = $_SERVER['HTTP_USER_AGENT'];
-                $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+                $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
                 $sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '抖音小程序', '$useragent')");
                 $dsql->dsqlOper($sql, "update");
 
@@ -16411,7 +16224,7 @@ class member
 
             //记录登录日志
             $useragent = $_SERVER['HTTP_USER_AGENT'];
-            $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+            $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
             $sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '抖音小程序', '$useragent')");
             $dsql->dsqlOper($sql, "update");
 
@@ -16513,7 +16326,7 @@ class member
 
             //记录登录日志
             $useragent = $_SERVER['HTTP_USER_AGENT'];
-            $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+            $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
             $_sql = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$uid', '$time', '$_ip', '$ipaddr', '抖音小程序', '$useragent')");
             $dsql->dsqlOper($_sql, "update");
 
@@ -16997,7 +16810,8 @@ class member
                 $regfrom = getCurrentTerminal();
 
                 //安全考虑，默认密码不设置，以备修改密码时不需要输入原密码 2021.07.08
-                $archives = $dsql->SetQuery("INSERT INTO `#@__member` (`mtype`, `username`, `password`, `nickname`, `areaCode`, `phone`, `phoneCheck`, `regtime`, `regip`, `regipaddr`, `state`, `purviews`, `sourceclient`, `regfrom`) VALUES ('$mtype', '$phone', '', '$nickname', '$areaCode', '$phone', '1', '$times', '$ip', '$ipaddr', '1', '', '$sourceclient', '$regfrom')");
+                $archives = $dsql->SetQuery("INSERT INTO `#@__member` (`mtype`, `username`, `password`, `nickname`, `areaCode`, `phone`, `phoneCheck`, `regtime`, `regip`, `regipaddr`, `state`, `purviews`, `sourceclient`, `regfrom`)
+VALUES ('$mtype', '$phone', '', '$nickname', '$areaCode', '$phone', '1', '$times', '$ip', '$ipaddr', '1', '', '$sourceclient', '$regfrom')");
                 $aid = $dsql->dsqlOper($archives, "lastid");
 
                 if (is_numeric($aid)) {
@@ -17108,7 +16922,7 @@ class member
 
                 //保存到主表
                 $useragent = $_SERVER['HTTP_USER_AGENT'];
-                $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+                $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
                 $archives = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$userid', '" . GetMkTime(time()) . "', '$_ip', '$ipaddr', '$loginPlatform', '$useragent')");
                 $dsql->dsqlOper($archives, "update");
 
@@ -17565,7 +17379,7 @@ class member
                     }
                     //修改
                     if ($order['common'] == 1) {
-                        $sql = $dsql->SetQuery("UPDATE `#@__public_comment` SET `masterid` = '$masterid', `ischeck` = '$ischeck', `ipaddr` = '$ipaddr', `ip` = '$ip', `dtime` = '$dtime', `content` = '$content', `pics` = '$pics', `sco3` = '$sco3', `sco2` = '$sco2', `sco1` = '$sco1', `rating` = '$rating', `isanony` = '$isanony' WHERE `oid` = '$orderid'");
+                        $sql = $dsql->SetQuery("UPDATE `#@__public_comment_all` SET `masterid` = '$masterid', `ischeck` = '$ischeck', `ipaddr` = '$ipaddr', `ip` = '$ip', `dtime` = '$dtime', `content` = '$content', `pics` = '$pics', `sco3` = '$sco3', `sco2` = '$sco2', `sco1` = '$sco1', `rating` = '$rating', `isanony` = '$isanony' WHERE `oid` = '$orderid'");
                         $results  = $dsql->dsqlOper($sql, "update");
 
                         //记录用户行为日志
@@ -17574,8 +17388,8 @@ class member
                         //新增
                     } else {
                         $masterid = (int)$masterid;
-                        $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment` (`pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `sco2`, `sco3`, `speid`, `specation`, `masterid`, `isanony`) VALUES ('0', '$type', '$proid', '$orderid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$sco2', '$sco3', '$speid', '$specation', '$masterid', '$isanony')");
-                        $aid = $dsql->dsqlOper($sql, "lastid");
+                        $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment_all` (`pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `sco2`, `sco3`, `speid`, `specation`, `masterid`, `isanony`) VALUES ('0', '$type', '$proid', '$orderid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$sco2', '$sco3', '$speid', '$specation', '$masterid', '$isanony')");
+                        $aid = $dsql->dsqlOper($sql, "lastid", null, "public_comment");
 
                         //记录用户行为日志
                         memberLog($userid, 'member', 'comment', $aid, 'insert', '发表评价(shop=>' . $orderid . ')', '', $sql);
@@ -17671,7 +17485,7 @@ class member
                 $proid = $order['store']['id'];
                 //修改
                 if ($order['common'] == 1) {
-                    $sql = $dsql->SetQuery("UPDATE `#@__public_comment` SET `masterid` = '$masterid', `ischeck` = '$ischeck', `ipaddr` = '$ipaddr', `ip` = '$ip', `dtime` = '$dtime', `content` = '$content', `pics` = '', `sco3` = '$sco3', `sco2` = '$sco2', `sco1` = '$sco1', `rating` = '$rating' WHERE `oid` = '$pid'");
+                    $sql = $dsql->SetQuery("UPDATE `#@__public_comment_all` SET `masterid` = '$masterid', `ischeck` = '$ischeck', `ipaddr` = '$ipaddr', `ip` = '$ip', `dtime` = '$dtime', `content` = '$content', `pics` = '', `sco3` = '$sco3', `sco2` = '$sco2', `sco1` = '$sco1', `rating` = '$rating' WHERE `oid` = '$pid'");
                     // var_dump($sql);die;
                     $results  = $dsql->dsqlOper($sql, "update");
 
@@ -17680,9 +17494,9 @@ class member
 
                     //新增
                 } else {
-                    $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment` (`pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `sco2`, `sco3`, `speid`, `specation`, `masterid`) VALUES ('0', '$type', '$aid', '$pid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$sco2', '$sco3', '0', '0', '$masterid')");
+                    $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment_all` (`pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `sco2`, `sco3`, `speid`, `specation`, `masterid`) VALUES ('0', '$type', '$aid', '$pid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$sco2', '$sco3', '0', '0', '$masterid')");
                     // var_dump($sql);die;
-                    $aid = $dsql->dsqlOper($sql, "lastid");
+                    $aid = $dsql->dsqlOper($sql, "lastid", null, "public_comment");
 
                     //记录用户行为日志
                     memberLog($userid, 'member', 'comment', $aid, 'update', '发表评价(homemaking=>' . $pid . ')', '', $sql);
@@ -17760,7 +17574,7 @@ class member
         }
 
         if ($aid && $pid) {
-            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `type` = '$type' AND `aid` = $aid AND `pid` = 0");
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `type` = '$type' AND `aid` = $aid AND `pid` = 0");
             $ret = $dsql->dsqlOper($sql, "results");
             if (!$ret) {
                 $pid = 0;
@@ -17796,7 +17610,7 @@ class member
                     return array("state" => 200, "info" => "订单信息错误");
                 }
                 // 验证评价是否已存在
-                $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `aid` = '$aid' AND `oid` = '$oid' AND `userid` = '$userid' AND `type` = '$type'");
+                $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `aid` = '$aid' AND `oid` = '$oid' AND `userid` = '$userid' AND `type` = '$type'");
                 $ret = $dsql->dsqlOper($sql, "results");
                 if ($ret) {
                     return array("state" => 200, "info" => "您已经评价过该商品");
@@ -17813,12 +17627,12 @@ class member
         //查询评价信息 团购、外卖需要这一步，其他的不需要
         $commentid = 0;
         if ($type == 'tuan-order' || $type == 'waimai-order' || $type == 'paotui-order') {
-            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `type` = '$type' and `oid` = '$oid'");
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `type` = '$type' and `oid` = '$oid'");
             $res = $dsql->dsqlOper($sql, "results");
             $commentid = $res[0]['id'];
         }
         if ($commentid > 0 && !empty($oid)) {
-            $sql = $dsql->SetQuery("UPDATE `#@__public_comment` SET `masterid` = '$masterid', `ischeck` = '$ischeck', `ipaddr` = '$ipaddr', `ip` = '$ip', `dtime` = '$dtime', `content` = '$content', `pics` = '$pics', `sco3` = '$sco3', `sco2` = '$sco2', `sco1` = '$sco1', `rating` = '$rating', `peisongid` = '$peisongid', `star` = '$star', `starps` = '$starps', `contentps` = '$contentps', `isanony` = '$isanony' WHERE `oid` = '$oid'");
+            $sql = $dsql->SetQuery("UPDATE `#@__public_comment_all` SET `masterid` = '$masterid', `ischeck` = '$ischeck', `ipaddr` = '$ipaddr', `ip` = '$ip', `dtime` = '$dtime', `content` = '$content', `pics` = '$pics', `sco3` = '$sco3', `sco2` = '$sco2', `sco1` = '$sco1', `rating` = '$rating', `peisongid` = '$peisongid', `star` = '$star', `starps` = '$starps', `contentps` = '$contentps', `isanony` = '$isanony' WHERE `oid` = '$oid'");
             $results  = $dsql->dsqlOper($sql, "update");
             if ($results == "ok") {
 
@@ -17831,8 +17645,8 @@ class member
             }
         } else {
             // 取得评论分表表名
-            $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment` (`masterid`, `pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `sco2`, `sco3`, `speid`, `specation`, `peisongid`, `star`, `starps`, `contentps`, `isanony`, `time`) VALUES ('$masterid', '$pid', '$type', '$aid', '$oid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$sco2', '$sco3', '$speid', '$specation', '$peisongid', '$star', '$starps', '$contentps', '$isanony', '$time')");
-            $ret = $dsql->dsqlOper($sql, "lastid");
+            $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment_all` (`masterid`, `pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `sco2`, `sco3`, `speid`, `specation`, `peisongid`, `star`, `starps`, `contentps`, `isanony`, `time`) VALUES ('$masterid', '$pid', '$type', '$aid', '$oid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$sco2', '$sco3', '$speid', '$specation', '$peisongid', '$star', '$starps', '$contentps', '$isanony', '$time')");
+            $ret = $dsql->dsqlOper($sql, "lastid", null, "public_comment");
             if ($ischeck == 1 &&  $type == 'tieba-detail') {
                 $increasetieba = $dsql->SetQuery("UPDATE `#@__tieba_list` SET `comment` = `comment` +1 WHERE `id` = '$aid'  ");
                 $dsql->dsqlOper($increasetieba, "update");
@@ -17848,7 +17662,7 @@ class member
         if ($pid == 0) {
             $tid   =  $masterid;
         } else {
-            $_sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = '$pid'");
+            $_sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = '$pid'");
             $_ret = $dsql->dsqlOper($_sql, "results");
             if ($_ret) {
                 $tid   = $_ret[0]['userid'];
@@ -17966,7 +17780,7 @@ class member
             }
 
             if ($check) {
-                $archives = $dsql->SetQuery("SELECT `id`, `userid`, `content`, `dtime`, `ip`, `ipaddr`, `zan`, `zan_user`, `ischeck` FROM `#@__public_comment` WHERE `id` = " . $ret);
+                $archives = $dsql->SetQuery("SELECT `id`, `userid`, `content`, `dtime`, `ip`, `ipaddr`, `zan`, `zan_user`, `ischeck` FROM `#@__public_comment_all` WHERE `id` = " . $ret);
                 $results  = $dsql->dsqlOper($archives, "results");
                 if ($results) {
                     $list['id']       = (int)$results[0]['id'];
@@ -18056,7 +17870,7 @@ class member
 
         $sid = $id;
 
-        $sql = $dsql->SetQuery("SELECT `id`, `pid`, `rid`, `aid`, `type`, `masterid` FROM `#@__public_comment` WHERE `id` = $id");
+        $sql = $dsql->SetQuery("SELECT `id`, `pid`, `rid`, `aid`, `type`, `masterid` FROM `#@__public_comment_all` WHERE `id` = $id");
         $ret = $dsql->dsqlOper($sql, "results");
         if ($ret) {
             // 回复一级评论
@@ -18064,7 +17878,7 @@ class member
                 $rid = 0;
                 $parent = $ret[0];
             } else {
-                $sql = $dsql->SetQuery("SELECT `id`, `pid`, `rid`, `aid`, `type` FROM `#@__public_comment` WHERE `id` = " . $ret[0]['pid']);
+                $sql = $dsql->SetQuery("SELECT `id`, `pid`, `rid`, `aid`, `type` FROM `#@__public_comment_all` WHERE `id` = " . $ret[0]['pid']);
                 $res = $dsql->dsqlOper($sql, "results");
                 if ($res) {
                     $rid = $ret[0]['rid'] ? $ret[0]['rid'] : $ret[0]['id'];
@@ -18117,13 +17931,13 @@ class member
             if ($rid == 0) {
                 $rid = $sid;
             }
-            $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = '$rid'");
+            $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = '$rid'");
             $ret = $dsql->dsqlOper($sql, "results");
             if ($ret) {
                 $tid   = $ret[0]['userid'];
             }
             $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment` (`masterid`, `pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `isanony`, `rid`, `sid`) VALUES ('$masterid', '$pid', '$type', '$aid', '$oid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$isanony', '$rid', '$sid')");
-            $ret = $dsql->dsqlOper($sql, "lastid");
+            $ret = $dsql->dsqlOper($sql, "lastid", null, "public_comment");
             if (is_numeric($ret)) {
 
                 //记录用户行为日志
@@ -18164,9 +17978,11 @@ class member
                 );
 
                 if ($check) {
-                    $archives = $dsql->SetQuery("SELECT `id`, `userid`, `content`, `dtime`, `ip`, `ipaddr`, `zan`, `zan_user`, `ischeck` FROM `#@__public_comment` WHERE `id` = " . $ret);
+                    $archives = $dsql->SetQuery("SELECT `id`, `userid`, `content`, `dtime`, `ip`, `ipaddr`, `zan`, `zan_user`, `ischeck` FROM `#@__public_comment_all` WHERE `id` = " . $ret);
                     $results  = $dsql->dsqlOper($archives, "results");
                     if ($results) {
+
+
                         updateAdminNotice($noticemodule, $part, $param);
                         $list['id']       = $results[0]['id'];
                         $list['userinfo'] = $userLogin->getMemberInfo($results[0]['userid']);
@@ -18231,7 +18047,7 @@ class member
         }
 
         // 评论信息
-        $sql = $dsql->SetQuery("SELECT `userid`, `zan_user`, `type` FROM `#@__public_comment` WHERE `id` = $id AND `ischeck` = 1");
+        $sql = $dsql->SetQuery("SELECT `userid`, `zan_user`, `type` FROM `#@__public_comment_all` WHERE `id` = $id AND `ischeck` = 1");
         $ret = $dsql->dsqlOper($sql, "results");
         if ($ret) {
 
@@ -18278,7 +18094,7 @@ class member
 
 
 
-            $sql = $dsql->SetQuery("UPDATE `#@__public_comment` SET `zan` = " . count($zan_user_arr) . ", `zan_user` = '" . join(",", $zan_user_arr) . "' WHERE `id` = $id");
+            $sql = $dsql->SetQuery("UPDATE `#@__public_comment_all` SET `zan` = " . count($zan_user_arr) . ", `zan_user` = '" . join(",", $zan_user_arr) . "' WHERE `id` = $id");
             $ret = $dsql->dsqlOper($sql, "update");
             if ($ret == "ok") {
                 return self::$langData['siteConfig'][20][244]; //操作成功;
@@ -18353,7 +18169,7 @@ class member
         if ($u == 1) {
             $where1 .= " AND `userid` = '$userid'";
             if ($onlyself == 1) {
-                $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `ischeck` = 1" . $where1);
+                $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1" . $where1);
                 $ret = $dsql->dsqlOper($sql, "results");
                 $sidList = array();
                 foreach ($ret as $k => $v) {
@@ -18442,9 +18258,9 @@ class member
 
         if (!$isAjax) {
             if ($type == 'tieba-detail') {
-                $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `pid` = 0 AND `ischeck` = 1" . $where_tieba);
+                $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `pid` = 0 AND `ischeck` = 1" . $where_tieba);
             } else {
-                $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `ischeck` = 1" . $where);
+                $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1" . $where);
             }
             //总条数
             $totalCount = $dsql->dsqlOper($archives, "totalCount");
@@ -18461,16 +18277,16 @@ class member
             );
 
             // 好中差评
-            $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment` WHERE `ischeck` = 1 AND `sco1` = 1" . $where);
-            $sco1_ = (int)$dsql->getOne($sql);
-            $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment` WHERE `ischeck` = 1 AND `sco1` = 2" . $where);
-            $sco2_ = (int)$dsql->getOne($sql);
-            $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment` WHERE `ischeck` = 1 AND `sco1` = 3" . $where);
-            $sco3_ = (int)$dsql->getOne($sql);
-            $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment` WHERE `ischeck` = 1 AND `sco1` = 4" . $where);
-            $sco4_ = (int)$dsql->getOne($sql);
-            $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment` WHERE `ischeck` = 1 AND `sco1` = 5" . $where);
-            $sco5_ = (int)$dsql->getOne($sql);
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `sco1` = 1" . $where);
+            $sco1_ = $dsql->dsqlOper($sql, "totalCount");
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `sco1` = 2" . $where);
+            $sco2_ = $dsql->dsqlOper($sql, "totalCount");
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `sco1` = 3" . $where);
+            $sco3_ = $dsql->dsqlOper($sql, "totalCount");
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `sco1` = 4" . $where);
+            $sco4_ = $dsql->dsqlOper($sql, "totalCount");
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `sco1` = 5" . $where);
+            $sco5_ = $dsql->dsqlOper($sql, "totalCount");
 
             $pageinfo['sco1'] = $sco1_;
             $pageinfo['sco2'] = $sco2_;
@@ -18479,8 +18295,8 @@ class member
             $pageinfo['sco5'] = $sco5_;
 
             //好中差平
-            $sql = $dsql->SetQuery("SELECT `sco1` s1, `sco2`s2, `sco3` s3 ,`rating` FROM `#@__public_comment` WHERE `ischeck` = 1 " . $where);
-            $ress = $dsql->dsqlOper($sql, "results");
+            $sql = $dsql->SetQuery("SELECT `sco1` s1, `sco2`s2, `sco3` s3 ,`rating` FROM `#@__public_comment_all` WHERE `ischeck` = 1 " . $where);
+            $ress    = $dsql->dsqlOper($sql, "results");
             $hao  = 0;
             $cha  = 0;
             $zhong = 0;
@@ -18502,7 +18318,7 @@ class member
             $pageinfo['sco8'] = $cha;
 
             //好评率
-            $sql    = $dsql->SetQuery("SELECT avg(c.`sco1`) s1, avg(c.`sco2`) s2, avg(c.`sco3`) s3 FROM `#@__public_comment` c WHERE c.`ischeck` = 1" . $where);
+            $sql    = $dsql->SetQuery("SELECT avg(c.`sco1`) s1, avg(c.`sco2`) s2, avg(c.`sco3`) s3 FROM `#@__public_comment_all` c WHERE c.`ischeck` = 1" . $where);
             $res    = $dsql->dsqlOper($sql, "results");
             $score1 = (int)$res[0]['s1'];  //分项1
             $score2 = (int)$res[0]['s2'];  //分项2
@@ -18513,8 +18329,10 @@ class member
             $pageinfo['score3'] = $score3;
 
             // 带图片的
-            $sql = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment` WHERE `ischeck` = 1 AND `pics` != ''" . $where);
-            $pageinfo['pic'] = (int)$dsql->getOne($sql);
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `pics` != ''" . $where);
+            $res = $dsql->dsqlOper($sql, "totalCount");
+
+            $pageinfo['pic'] = $res;
         }
 
         if ($sco1) {
@@ -18543,7 +18361,7 @@ class member
             }
         }
 
-        $archives = $dsql->SetQuery("SELECT `id`, `pid`, `sid`, `type`, `ipaddr`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `zan`, `zan_user`, `isanony`, `specation`, `peisongid`, `star`, `starps`, `contentps`, `reply`, `replydate`, `time`,`top`, `masterid` FROM `#@__public_comment` WHERE `ischeck` = 1" . $where . $where_limit);
+        $archives = $dsql->SetQuery("SELECT `id`, `pid`, `sid`, `type`, `ipaddr`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `zan`, `zan_user`, `isanony`, `specation`, `peisongid`, `star`, `starps`, `contentps`, `reply`, `replydate`, `time`,`top`, `masterid` FROM `#@__public_comment_all` WHERE `ischeck` = 1" . $where . $where_limit);
         $results = $dsql->dsqlOper($archives, "results");
         $aaa = is_array($results) ? count($results) : 0;
         $list = array();
@@ -18554,7 +18372,7 @@ class member
                 if ($u == 1) { //只调取别人的评论自己的评论,取上一级评论;
                     if ($onlyself == 1) {
                         if (!empty($value['sid'])) {
-                            $sql = $dsql->SetQuery("SELECT `id`, `content` FROM `#@__public_comment` WHERE `ischeck` = 1 AND `id` = " . $value['sid']);
+                            $sql = $dsql->SetQuery("SELECT `id`, `content` FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `id` = " . $value['sid']);
                             $ret = $dsql->dsqlOper($sql, "results");
                             if (!empty($ret[0]['id'])) {
                                 $list[$key]['parent']['id']      = $ret[0]['id'];
@@ -18601,7 +18419,7 @@ class member
                         
                         //如果是评论的别人的评论，则查询上级
                         if($value['sid']){
-                            $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $value['sid']);
+                            $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $value['sid']);
                             $_userid = $dsql->getOne($archives);
                             
                             $this->param = $_userid;
@@ -18714,7 +18532,7 @@ class member
                         }
                     }
                 } else {
-                    $sql = $dsql->SetQuery("SELECT o.`id`, o.`shop` shopname, o.`ordernum` ordernumstore FROM (`#@__public_comment` c LEFT JOIN `#@__paotui_order` o ON c.`oid` = o.`id`) WHERE c.`oid` = " . $value['oid']);
+                    $sql = $dsql->SetQuery("SELECT o.`id`, o.`shop` shopname, o.`ordernum` ordernumstore FROM (`#@__public_comment_all` c LEFT JOIN `#@__paotui_order` o ON c.`oid` = o.`id`) WHERE c.`oid` = " . $value['oid']);
                     $shop = $dsql->dsqlOper($sql, "results");
                     if ($shop) {
                         $list[$key]['detail']['id']    = $shop[0]['id'];
@@ -18767,8 +18585,12 @@ class member
 
                     //回复数量
                     $replynums = 0;
-                    $sql = $dsql->SetQuery("SELECT count(`id`) t FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'tieba-detail' AND `pid` = " . $value['id']);
-                    $list[$key]['replynums'] = (int)$dsql->getOne($sql);
+                    $sql = $dsql->SetQuery("SELECT count(`id`) t FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'tieba-detail' AND `pid` = " . $value['id']);
+                    $ret = $dsql->dsqlOper($sql, "results");
+                    if ($ret) {
+                        $replynums = $ret[0]['t'];
+                    }
+                    $list[$key]['replynums'] = $replynums;
                 }
 
                 if ($userid != -1) {
@@ -18844,14 +18666,14 @@ class member
         if ($sid) {
             $where = " AND `sid` = $sid";
 
-            $archives = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1" . $where);
+            $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1" . $where);
 
-            $archives_ = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1 AND `sid` = $sid AND `ischeck` = 1");
+            $archives_ = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1 AND `sid` = $sid AND `ischeck` = 1");
 
             //总条数
-            $totalCount = (int)$dsql->getOne($archives);
+            $totalCount = $dsql->dsqlOper($archives, "totalCount");
             //总条数包含三级评论
-            $totalCount_all = (int)$dsql->getOne($archives_);
+            $totalCount_all = $dsql->dsqlOper($archives_, "totalCount");
 
             //总分页数
             $totalPage = ceil($totalCount / $pageSize);
@@ -18867,14 +18689,14 @@ class member
             );
         }
         if ($rid != 0) {
-            $archives = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1" . $where);
+            $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1" . $where);
 
-            $archives_ = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1 AND `rid` = $rid AND `ischeck` = 1");
+            $archives_ = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1 AND `rid` = $rid AND `ischeck` = 1");
 
             //总条数
-            $totalCount = (int)$dsql->getOne($archives);
+            $totalCount = $dsql->dsqlOper($archives, "totalCount");
             //总条数包含三级评论
-            $totalCount_all = (int)$dsql->getOne($archives_);
+            $totalCount_all = $dsql->dsqlOper($archives_, "totalCount");
 
             //总分页数
             $totalPage = ceil($totalCount / $pageSize);
@@ -18889,14 +18711,14 @@ class member
                 "totalCount_all" => $totalCount_all,
             );
         } elseif ($pid != 0) {
-            $archives = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1" . $where);
+            $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1" . $where);
 
-            $archives_ = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1 AND `pid` = $pid AND `ischeck` = 1");
+            $archives_ = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1 AND `pid` = $pid AND `ischeck` = 1");
 
             //总条数
-            $totalCount = (int)$dsql->getOne($archives);
+            $totalCount = $dsql->dsqlOper($archives, "totalCount");
             //总条数包含三级评论
-            $totalCount_all = (int)$dsql->getOne($archives_);
+            $totalCount_all = $dsql->dsqlOper($archives_, "totalCount");
 
             //总分页数
             $totalPage = ceil($totalCount / $pageSize);
@@ -18912,7 +18734,7 @@ class member
             );
         }
 
-        $archives = $dsql->SetQuery("SELECT * FROM `#@__public_comment` WHERE 1 = 1" . $where);
+        $archives = $dsql->SetQuery("SELECT * FROM `#@__public_comment_all` WHERE 1 = 1" . $where);
         $order = " ORDER BY `id` ASC";
         $atpage = $pageSize * ($page - 1);
         $where = " LIMIT $atpage, $pageSize";
@@ -18945,7 +18767,7 @@ class member
                 //如果是回复的别人，这里查询出来回复的谁
                 $reply_to_user = array();
                 if($value['sid']){
-                    $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $value['sid']);
+                    $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $value['sid']);
                     $ret = $dsql->dsqlOper($sql, "results");
                     if($ret){
                         $this->param = $ret[0]['userid'];
@@ -18965,7 +18787,7 @@ class member
 
                 if ($rid) {
                     $sid = $value['sid'];
-                    $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $sid);
+                    $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $sid);
                     $ret = $dsql->dsqlOper($sql, "results");
                     if ($ret) {
                         $uid = $ret[0]['userid'];
@@ -19027,7 +18849,8 @@ class member
         $param = $this->param;
         $id    = (int)$param['id'];
 
-        $sql = $dsql->SetQuery("SELECT * FROM `#@__public_comment` WHERE `id` = $id ");
+        // $sql = $dsql->SetQuery("SELECT * FROM `#@__public_comment_all` WHERE `id` = $id AND `isCheck` = 1 AND `pid` = 0");
+        $sql = $dsql->SetQuery("SELECT * FROM `#@__public_comment_all` WHERE `id` = $id ");
         $ret = $dsql->dsqlOper($sql, "results");
         if ($ret) {
             $detail = array();
@@ -19115,13 +18938,13 @@ class member
 
         if (empty($id)) return array("state" => 200, "info" => self::$langData['siteConfig'][33][13]); //参数错误
 
-        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `id` = '$id'");
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `id` = '$id'");
         $ret = $dsql->dsqlOper($sql, "results");
         if ($ret) {
-            $sql = $dsql->SetQuery("DELETE FROM `#@__public_up` WHERE `type` = '1' and `tid` = '$id'");
+            $sql = $dsql->SetQuery("DELETE FROM `#@__public_up_all` WHERE `type` = '1' and `tid` = '$id'");
             $dsql->dsqlOper($sql, "update");
 
-            $archives = $dsql->SetQuery("DELETE FROM `#@__public_comment` WHERE `id` = '$id'");
+            $archives = $dsql->SetQuery("DELETE FROM `#@__public_comment_all` WHERE `id` = '$id'");
             $results = $dsql->dsqlOper($archives, "update");
             if ($results != "ok") {
 
@@ -19177,7 +19000,7 @@ class member
             if (empty($id) || empty($module) || empty($temp)) return array("state" => 200, "info" => self::$langData['siteConfig'][33][13]); //参数错误
         }
 
-        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_up`  WHERE `type` = '$type' and `action` = '$temp' and `module` = '$module' and `tid` = '$id' and `ruid` = '$userid'");
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_up_all`  WHERE `type` = '$type' and `action` = '$temp' and `module` = '$module' and `tid` = '$id' and `ruid` = '$userid'");
         $res = $dsql->dsqlOper($sql, "results");
 
         $param = array(
@@ -19210,7 +19033,7 @@ class member
             }
 
             if ($results == 'ok') {
-                $archives = $dsql->SetQuery("DELETE FROM `#@__public_up` WHERE `type` = '$type' and `action` = '$temp' and `module` = '$module' and `tid` = '$id' and `ruid` = '$userid'");
+                $archives = $dsql->SetQuery("DELETE FROM `#@__public_up_all` WHERE `type` = '$type' and `action` = '$temp' and `module` = '$module' and `tid` = '$id' and `ruid` = '$userid'");
                 $dsql->dsqlOper($archives, "update");
 
                 // 清除缓存
@@ -19271,8 +19094,8 @@ class member
                 return array("state" => 200, "info" => self::$langData['siteConfig'][21][72]); //操作失败，请重试！
             } else {
                 //插入点赞人信息
-                $archives = $dsql->SetQuery("INSERT INTO `#@__public_up` (`uid`, `tid`, `ruid`, `module`, `action`, `puctime`, `type`) VALUES ('$uid', '$id', '$userid', '$module', '$temp', '$puctime', '$type')");
-                $aid = $dsql->dsqlOper($archives, "lastid");
+                $archives = $dsql->SetQuery("INSERT INTO `#@__public_up_all` (`uid`, `tid`, `ruid`, `module`, `action`, `puctime`, `type`) VALUES ('$uid', '$id', '$userid', '$module', '$temp', '$puctime', '$type')");
+                $aid = $dsql->dsqlOper($archives, "lastid", null, "public_up");
                 // 清除缓存
                 if ($module == 'article' && $temp == 'detail') {
                     checkCache("article_list", $id);
@@ -19335,22 +19158,6 @@ class member
 
         $userid = $userLogin->getMemberID();
 
-
-        if (!empty($tid)) {
-            $where .= " AND `tid` in ($tid)";
-        }
-        if ($gettype) {
-            $where .= " AND `module` = '$gettype'";
-        }
-
-        if (!empty($module)) {
-            $where .= " and `module` = '$module'";
-        }
-        
-        if ($type != '') {
-            $where .= " AND `type` = '$type'";
-        }
-
         //谁给我点赞
         if ($u == 1) {
             $where .= " AND `uid` = '$userid' AND `ruid` != '$userid'";
@@ -19359,6 +19166,21 @@ class member
         //我给谁点赞
         if ($u == 2) {
             $where .= " AND `ruid` = '$userid'";
+        }
+
+        if (!empty($tid)) {
+            $where .= " AND `tid` in ($tid)";
+        }
+        if ($gettype) {
+            $where .= " AND `module` = '" . $gettype . "'";
+        }
+
+        if ($type != '') {
+            $where .= " AND `type` = '$type'";
+        }
+
+        if (!empty($module)) {
+            $where .= " and module='$module'";
         }
 
         if (!empty($temp)) {
@@ -19370,7 +19192,7 @@ class member
 
         $order = " ORDER BY `puctime` DESC, `id` DESC";
 
-        $archives_count = $dsql->SetQuery("SELECT count(*) FROM `#@__public_up` l WHERE 1 = 1" . $where);
+        $archives_count = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_up_all` l WHERE 1 = 1" . $where);
         //总条数
         $totalResults = $dsql->dsqlOper($archives_count, "results", "NUM");
         $totalCount = (int)$totalResults[0][0];
@@ -19387,7 +19209,7 @@ class member
             "totalCount" => $totalCount
         );
 
-        $archives = $dsql->SetQuery("SELECT `id`, `uid`, `tid`, `ruid`, `puctime`, `type`, `action`, `module` FROM `#@__public_up` l WHERE 1 = 1" . $where);
+        $archives = $dsql->SetQuery("SELECT `id`, `uid`, `tid`, `ruid`, `puctime`, `type`, `action`, `module` FROM `#@__public_up_all` l WHERE 1 = 1" . $where);
         $atpage = $pageSize * ($page - 1);
         $where = " LIMIT $atpage, $pageSize";
         $results = $dsql->dsqlOper($archives . $where1 . $order . $where, "results");
@@ -19436,7 +19258,7 @@ class member
                             $action = "detail";
                         }
                         $commentcontent = '';
-                        $sql = $dsql->SetQuery("SELECT `aid`, `oid`, `content` FROM `#@__public_comment` WHERE `id` = '" . $val['tid'] . "' ");
+                        $sql = $dsql->SetQuery("SELECT `aid`, `oid`, `content` FROM `#@__public_comment_all` WHERE `id` = '" . $val['tid'] . "' ");
                         $ret = $dsql->dsqlOper($sql, "results");
                         if ($ret) {
                             $commentcontent = $ret[0]['content'];
@@ -19523,14 +19345,14 @@ class member
                     }
                 } else {
                     $commentcontent = '';
-                    $sql = $dsql->SetQuery("SELECT `aid`, `oid`, `content` FROM `#@__public_comment` WHERE `id` = '" . $val['tid'] . "' ");
+                    $sql = $dsql->SetQuery("SELECT `aid`, `oid`, `content` FROM `#@__public_comment_all` WHERE `id` = '" . $val['tid'] . "' ");
                     $ret = $dsql->dsqlOper($sql, "results");
                     if ($ret) {
                         $commentcontent = $ret[0]['content'];
                         $tid = $ret[0]['oid'];
                     }
 
-                    $sql = $dsql->SetQuery("SELECT o.`id`, o.`shop` shopname, o.`ordernum` ordernumstore FROM (`#@__public_comment` c LEFT JOIN `#@__paotui_order` o ON c.`oid` = o.`id`) WHERE c.`oid` = " . $tid);
+                    $sql = $dsql->SetQuery("SELECT o.`id`, o.`shop` shopname, o.`ordernum` ordernumstore FROM (`#@__public_comment_all` c LEFT JOIN `#@__paotui_order` o ON c.`oid` = o.`id`) WHERE c.`oid` = " . $tid);
                     $shop = $dsql->dsqlOper($sql, "results");
                     if ($shop) {
                         $list[$key]['detail']['id']    = $shop[0]['id'];
@@ -21500,12 +21322,12 @@ class member
 
         if ($type == 'zan') { //点赞
 
-            $archives = $dsql->SetQuery("UPDATE `#@__public_up` SET `isread` = 1 WHERE `isread` = 0 and `uid` = '$uid'");
+            $archives = $dsql->SetQuery("UPDATE `#@__public_up_all` SET `isread` = 1 WHERE `isread` = 0 and `uid` = '$uid'");
             $res = $dsql->dsqlOper($archives, "update");
         } else {
             //评论未读
             $where_ = " AND `userid` = '$uid'";
-            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `ischeck` = 1" . $where_);
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `ischeck` = 1" . $where_);
             $ret = $dsql->dsqlOper($sql, "results");
             $sidList = array();
             foreach ($ret as $k => $v) {
@@ -21517,7 +21339,7 @@ class member
                 $whereC = " AND  `masterid` = '$uid' AND `sid` = '0'";
             }
 
-            $archives = $dsql->SetQuery("UPDATE `#@__public_comment` SET `isread` = 1 WHERE `isread` = 0 " . $whereC);
+            $archives = $dsql->SetQuery("UPDATE `#@__public_comment_all` SET `isread` = 1 WHERE `isread` = 0 " . $whereC);
             $res = $dsql->dsqlOper($archives, "update");
         }
 
@@ -21781,40 +21603,40 @@ class member
 
                     switch ($value['name']) {
                             // case 'article':
-                            //     $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__articlelist_all` WHERE `admin` = $uid ANd `arcrank` = 1");
+                            //     $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__articlelist_all` WHERE `admin` = $uid ANd `arcrank` = 1");
                             //     $result = $dsql->dsqlOper($sql,"results");
                             //     $showModule['articlecountall'] = $result[0]['countall'];
                             // break;
                         case 'tieba':
-                            $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__tieba_list` WHERE `uid` = $uid ANd `state` = 1");
+                            $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__tieba_list` WHERE `uid` = $uid ANd `state` = 1");
                             $result = $dsql->dsqlOper($sql, "results");
                             $showModule[$key]['countall']       = $result[0]['countall'];
                             $showModule[$key]['modulename']     = $value['name'];
                             $showModule[$key]['title']          = $value['title'];
                             break;
                         case 'huodong':
-                            $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__huodong_list` WHERE `uid` = $uid ANd `state` = 1");
+                            $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__huodong_list` WHERE `uid` = $uid ANd `state` = 1");
                             $result = $dsql->dsqlOper($sql, "results");
                             $showModule[$key]['countall']           = $result[0]['countall'];
                             $showModule[$key]['modulename']         = $value['name'];
                             $showModule[$key]['title']              = $value['title'];
                             break;
                         case 'live':
-                            $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__livelist` WHERE `user` = $uid ANd `arcrank` = 1");
+                            $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__livelist` WHERE `user` = $uid ANd `arcrank` = 1");
                             $result = $dsql->dsqlOper($sql, "results");
                             $showModule[$key]['countall']           = $result[0]['countall'];
                             $showModule[$key]['modulename']         = $value['name'];
                             $showModule[$key]['title']              = $value['title'];
                             break;
                         case 'education':
-                            $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__education_courses` WHERE `userid` = $uid ANd `state` = 1 AND `usertype` = 0");
+                            $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__education_courses` WHERE `userid` = $uid ANd `state` = 1 AND `usertype` = 0");
                             $result = $dsql->dsqlOper($sql, "results");
                             $showModule[$key]['countall']           = $result[0]['countall'];
                             $showModule[$key]['modulename']         = $value['name'];
                             $showModule[$key]['title']              = $value['title'];
                             break;
                         case 'car':
-                            $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__car_list` WHERE `userid` = $uid ANd `state` = 1");
+                            $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__car_list` WHERE `userid` = $uid ANd `state` = 1");
                             $result = $dsql->dsqlOper($sql, "results");
                             $showModule[$key]['countall']           = $result[0]['countall'];
                             $showModule[$key]['modulename']         = $value['name'];
@@ -21822,7 +21644,7 @@ class member
 
                             break;
                         case 'vote':
-                            $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__vote_list` WHERE `admin` = $uid ANd `arcrank` = 1");
+                            $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__vote_list` WHERE `admin` = $uid ANd `arcrank` = 1");
                             $result = $dsql->dsqlOper($sql, "results");
                             $showModule[$key]['countall']           = $result[0]['countall'];
                             $showModule[$key]['modulename']         = $value['name'];
@@ -21830,7 +21652,7 @@ class member
 
                             break;
                             // case 'circle':
-                            //     $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__circle_dynamic_all` WHERE `userid` = $uid ANd `state` = 1");
+                            //     $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__circle_dynamic_all` WHERE `userid` = $uid ANd `state` = 1");
                             //     $result = $dsql->dsqlOper($sql,"results");
                             //     $showModule['allcount'] += $result[0]['countall'];
                             //     $showModule[$key]['countall']           = $result[0]['countall'];
@@ -21840,7 +21662,7 @@ class member
                             //     break;
                         case 'info':
                             $now = GetMkTime(time());
-                            $sql    = $dsql->SetQuery("SELECT count(*) countall FROM `#@__infolist` WHERE `userid` = $uid AND `is_valid` = 0 AND `waitpay` = 0 AND `arcrank` = 1  AND `valid` >= " . $now . " ");
+                            $sql    = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__infolist` WHERE `userid` = $uid AND `is_valid` = 0 AND `waitpay` = 0 AND `arcrank` = 1  AND `valid` >= " . $now . " ");
                             $result = $dsql->dsqlOper($sql, "results");
                             $showModule[$key]['countall']           = $result[0]['countall'];
                             $showModule[$key]['modulename']         = $value['name'];
@@ -21849,7 +21671,7 @@ class member
                             break;
                         case 'house':
                             $where = " WHERE `userid` = $uid AND `state` = 1 AND `usertype` = 0";
-                            $sql    = $dsql->SetQuery("SELECT sum(cnt) countall FROM (SELECT count(*) as cnt FROM `#@__house_sale` " . $where . "  union all SELECT count(*) as cnt FROM `#@__house_zu` " . $where . " union all SELECT count(*) as cnt FROM `#@__house_xzl`" . $where . " union all SELECT count(*) as cnt FROM `#@__house_sp` " . $where . " union all SELECT count(*) as cnt FROM `#@__house_cf` " . $where . " union all SELECT count(*) as cnt FROM `#@__house_cw` " . $where . " ) t");
+                            $sql    = $dsql->SetQuery("SELECT sum(cnt) countall FROM (SELECT count(`id`) as cnt FROM `#@__house_sale` " . $where . "  union all SELECT count(`id`) as cnt FROM `#@__house_zu` " . $where . " union all SELECT count(`id`) as cnt FROM `#@__house_xzl`" . $where . " union all SELECT count(`id`) as cnt FROM `#@__house_sp` " . $where . " union all SELECT count(`id`) as cnt FROM `#@__house_cf` " . $where . " union all SELECT count(`id`) as cnt FROM `#@__house_cw` " . $where . " ) t");
                             $result = $dsql->dsqlOper($sql, "results");
                             $showModule[$key]['countall']           = $result[0]['countall'];
                             $showModule[$key]['modulename']         = $value['name'];
@@ -21858,7 +21680,7 @@ class member
                     }
 
                     // if($value['name'] == "article"){
-                    //     $sql    = $dsql->SetQuery("SELECT count(*) FROM `#@__articlelist_all` WHERE `admin` = $uid ANd `arcrank` = 1");
+                    //     $sql    = $dsql->SetQuery("SELECT count(`id`) FROM `#@__articlelist_all` WHERE `admin` = $uid ANd `arcrank` = 1");
                     //     $result = $dsql->dsqlOper($sql,"totalCount");
                     //     var_dump($result);die;
                     // }
@@ -21868,10 +21690,10 @@ class member
         $isMobile = isMobile();
 
         if (in_array('travel', $installModuleArr)) {
-            $stlysql = $dsql->SetQuery("SELECT count(*) countall FROM `#@__travel_strategy` WHERE `userid` =$uid AND `state` = 1  AND `usertype` = 0");
+            $stlysql = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__travel_strategy` WHERE `userid` =$uid AND `state` = 1  AND `usertype` = 0");
             $stlyres = $dsql->dsqlOper($stlysql, "results");
 
-            $vilysql = $dsql->SetQuery("SELECT count(*) countall FROM `#@__travel_video` WHERE `userid` =$uid AND `state` = 1  AND `usertype` = 0");
+            $vilysql = $dsql->SetQuery("SELECT count(`id`) countall FROM `#@__travel_video` WHERE `userid` =$uid AND `state` = 1  AND `usertype` = 0");
             $vilyres = $dsql->dsqlOper($vilysql, "results");
 
             if (!$isMobile) {
@@ -22059,7 +21881,8 @@ class member
             //保存到主表
             $regfrom = getCurrentTerminal();
             $nickname = preg_replace('/(1[345789]{1}[0-9])[0-9]{4}([0-9]{4})/is', "$1****$2", $phone);
-            $archives = $dsql->SetQuery("INSERT INTO `#@__member` (`mtype`, `username`, `password`, `nickname`, `areaCode`, `phone`, `phoneCheck`, `regtime`, `regip`, `regipaddr`, `state`, `purviews`, `sourceclient`, `regfrom`) VALUES ('$mtype', '$phone', '', '$nickname', '$areaCode', '$phone', '1', '$times', '$ip', '$ipaddr', '1', '', '$sourceclient', '$regfrom')");
+            $archives = $dsql->SetQuery("INSERT INTO `#@__member` (`mtype`, `username`, `password`, `nickname`, `areaCode`, `phone`, `phoneCheck`, `regtime`, `regip`, `regipaddr`, `state`, `purviews`, `sourceclient`, `regfrom`)
+VALUES ('$mtype', '$phone', '', '$nickname', '$areaCode', '$phone', '1', '$times', '$ip', '$ipaddr', '1', '', '$sourceclient', '$regfrom')");
             $aid = $dsql->dsqlOper($archives, "lastid");
 
             if (is_numeric($aid)) {
@@ -22138,7 +21961,7 @@ class member
 
         //保存到主表
         $useragent = $_SERVER['HTTP_USER_AGENT'];
-        $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+        $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
         $archives = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$userid', '" . GetMkTime(time()) . "', '$_ip', '$ipaddr', '$loginPlatform', '$useragent')");
         $dsql->dsqlOper($archives, "update");
 
@@ -22184,7 +22007,7 @@ class member
                 $listarr    = $memberList = array();
                 if ($module == 'article') {
                     $where_ = " AND `userid` = '$uid'";
-                    $sql = $dsql->SetQuery("SELECT `id`,`userid` FROM `#@__public_comment` WHERE `ischeck` = 1" . $where_);
+                    $sql = $dsql->SetQuery("SELECT `id`,`userid` FROM `#@__public_comment_all` WHERE `ischeck` = 1" . $where_);
                     $ret = $dsql->dsqlOper($sql, "results");
                     $sidList = array();
                     foreach ($ret as $k => $v) {
@@ -22196,13 +22019,11 @@ class member
                         $whereC = " AND  `masterid` = '$uid' AND `sid` = '0'";
                     }
 
-                    $archives  = $dsql->SetQuery(" SELECT count(*) totalCount FROM  (SELECT `id`, `userid`, `replydate` datetime, 'pl' type  FROM `#@__public_comment` WHERE `isread` = 0 " . $whereC . " UNION ALL SELECT `id`, `ruid` userid, `puctime` datetime, 'dz' type FROM `#@__public_up` WHERE `isread` = 0 and `uid` = " . $uid . ")  AS tableall ORDER BY tableall.`datetime` DESC");
-                    $messcount = (int)$dsql->getOne($archives);
+                    $archives  = $dsql->SetQuery(" SELECT * FROM  (SELECT `id`,`userid`,`replydate`,'pl' type ,`replydate` datetime FROM `#@__public_comment_all` WHERE `isread` = 0 " . $whereC . " UNION ALL SELECT `id`,`ruid` userid,`puctime` datetime ,'dz' type FROM `#@__public_up_all` WHERE `isread` = 0 and `uid` = " . $uid . ")  AS tableall ORDER BY tableall.`datetime` DESC");
+                    $messcount = $dsql->dsqlOper($archives, "totalCount");
 
-                    
                     if ($messcount != 0) {
                         $memberList = array();
-                        $archives  = $dsql->SetQuery(" SELECT * FROM  (SELECT `id`, `userid`, `replydate` datetime, 'pl' type  FROM `#@__public_comment` WHERE `isread` = 0 " . $whereC . " UNION ALL SELECT `id`, `ruid` userid, `puctime` datetime, 'dz' type FROM `#@__public_up` WHERE `isread` = 0 and `uid` = " . $uid . ")  AS tableall ORDER BY tableall.`datetime` DESC");
                         $messres = $dsql->dsqlOper($archives . " LIMIT 0,3", "results");
                         foreach ($messres as $k => $v) {
                             $membersql       = $dsql->SetQuery("SELECT `photo` FROM `#@__member` WHERE  `id` = '" . $v['userid'] . "'");
@@ -22308,9 +22129,8 @@ class member
 
                     if ($results) {
                         foreach ($results as $k => $v) {
-                            $detailHandels = new handlers($v['module'], $v['module2'] == '' ? 'detail' :  $v['module2']);
-                            $detailConfig  = $detailHandels->getHandle($v['aid']); 
- 
+                            $detailHandels = new handlers($v['module'], $v['module2'] == '' ? 'detail' : $v['module2']);
+                            $detailConfig  = $detailHandels->getHandle($v['aid']); //echo"<pre>";print_R($detailConfig);die;
                             if (is_array($detailConfig) && $detailConfig['state'] == 100) {
                                 $detailConfig = $detailConfig['info'];
                                 $detailConfig['lid']        = $v['id'];
@@ -22733,7 +22553,7 @@ class member
 
             /*经纪人套餐相关*/
             if ($results['ctype'] == 'jingjirentaocan') {
-                $sql = $dsql->SetQuery("SELECT `paytype` FROM `#@__house_distributor_company_user_order` WHERE `ordernum` = '" . $results['ordernum'] . "' AND `state` = 0");
+                $sql = $dsql->SetQuery("SELECT `paytype` FROM `#@__house_zjuser_order` WHERE `ordernum` = '" . $results['ordernum'] . "' AND `state` = 0");
                 $res = $dsql->dsqlOper($sql, "results");
 
                 if ($res) {
@@ -23120,7 +22940,7 @@ class member
 
             /*经纪人套餐相关*/
             if ($results['ctype'] == 'jingjirentaocan') {
-                $sql = $dsql->SetQuery("SELECT `paytype` FROM `#@__house_distributor_company_user_order` WHERE `ordernum` = '" . $results['ordernum'] . "' AND `state` = 0");
+                $sql = $dsql->SetQuery("SELECT `paytype` FROM `#@__house_zjuser_order` WHERE `ordernum` = '" . $results['ordernum'] . "' AND `state` = 0");
                 $res = $dsql->dsqlOper($sql, "results");
 
                 if ($res) {
@@ -23958,7 +23778,7 @@ class member
 
         $sid = $id;
 
-        $sql = $dsql->SetQuery("SELECT `id`, `pid`, `rid`, `aid`, `type`, `masterid` FROM `#@__public_comment` WHERE `id` = $id");
+        $sql = $dsql->SetQuery("SELECT `id`, `pid`, `rid`, `aid`, `type`, `masterid` FROM `#@__public_comment_all` WHERE `id` = $id");
         $ret = $dsql->dsqlOper($sql, "results");
         if ($ret) {
             // 回复一级评论
@@ -23966,7 +23786,7 @@ class member
                 $rid = 0;
                 $parent = $ret[0];
             } else {
-                $sql = $dsql->SetQuery("SELECT `id`, `pid`, `rid`, `aid`, `type` FROM `#@__public_comment` WHERE `id` = " . $ret[0]['pid']);
+                $sql = $dsql->SetQuery("SELECT `id`, `pid`, `rid`, `aid`, `type` FROM `#@__public_comment_all` WHERE `id` = " . $ret[0]['pid']);
                 $res = $dsql->dsqlOper($sql, "results");
                 if ($res) {
                     //                    $rid = $ret[0]['rid'] ? $ret[0]['rid'] : $ret[0]['id'];
@@ -24023,13 +23843,13 @@ class member
             if ($rid == 0) {
                 $rid = $sid;
             }
-            $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = '$rid'");
+            $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = '$rid'");
             $ret = $dsql->dsqlOper($sql, "results");
             if ($ret) {
                 $tid   = $ret[0]['userid'];
             }
-            $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment` (`masterid`, `pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `isanony`, `rid`, `sid`) VALUES ('$masterid', '$pid', '$type', '$aid', '$oid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$isanony', '$rid', '$sid')");
-            $ret = $dsql->dsqlOper($sql, "lastid");
+            $sql = $dsql->SetQuery("INSERT INTO `#@__public_comment_all` (`masterid`, `pid`, `type`, `aid`, `oid`, `userid`, `rating`, `sco1`, `content`, `pics`, `audio`, `video`, `dtime`, `ip`, `ipaddr`, `ischeck`, `zan`, `zan_user`, `isanony`, `rid`, `sid`) VALUES ('$masterid', '$pid', '$type', '$aid', '$oid', '$userid', '$rating', '$sco1', '$content', '$pics', '$audio', '$video', '$dtime', '$ip', '$ipaddr', '$ischeck', '0', '', '$isanony', '$rid', '$sid')");
+            $ret = $dsql->dsqlOper($sql, "lastid", null, "articlelist");
             if (is_numeric($ret)) {
                 if ($ischeck == 1) {
                     $param = array(
@@ -24066,7 +23886,7 @@ class member
                 );
 
                 if ($check) {
-                    $archives = $dsql->SetQuery("SELECT `id`, `userid`, `content`, `dtime`, `ip`, `ipaddr`, `zan`, `zan_user`, `ischeck` FROM `#@__public_comment` WHERE `id` = " . $ret);
+                    $archives = $dsql->SetQuery("SELECT `id`, `userid`, `content`, `dtime`, `ip`, `ipaddr`, `zan`, `zan_user`, `ischeck` FROM `#@__public_comment_all` WHERE `id` = " . $ret);
                     $results  = $dsql->dsqlOper($archives, "results");
                     if ($results) {
 
@@ -24129,13 +23949,13 @@ class member
         }
         $where .= " AND `ischeck` = 1";
         if ($rid != 0) {
-            $archives = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1" . $where);
+            $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1" . $where);
 
-            $archives_ = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1 AND `rid` = $rid AND `ischeck` = 1");
+            $archives_ = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1 AND `rid` = $rid AND `ischeck` = 1");
             //总条数
-            $totalCount = (int)$dsql->getOne($archives);
+            $totalCount = $dsql->dsqlOper($archives, "totalCount");
             //总条数包含三级评论
-            $totalCount_all = (int)$dsql->getOne($archives_);
+            $totalCount_all = $dsql->dsqlOper($archives_, "totalCount");
 
             //总分页数
             $totalPage = ceil($totalCount / $pageSize);
@@ -24150,14 +23970,14 @@ class member
                 "totalCount_all" => $totalCount_all,
             );
         } elseif ($pid != 0) {
-            $archives = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1" . $where);
+            $archives = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1" . $where);
 
-            $archives_ = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE 1 = 1 AND `pid` = $pid AND `ischeck` = 1");
+            $archives_ = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE 1 = 1 AND `pid` = $pid AND `ischeck` = 1");
 
             //总条数
-            $totalCount = (int)$dsql->getOne($archives);
+            $totalCount = $dsql->dsqlOper($archives, "totalCount");
             //总条数包含三级评论
-            $totalCount_all = (int)$dsql->getOne($archives_);
+            $totalCount_all = $dsql->dsqlOper($archives_, "totalCount");
 
             //总分页数
             $totalPage = ceil($totalCount / $pageSize);
@@ -24173,7 +23993,7 @@ class member
             );
         }
 
-        $archives = $dsql->SetQuery("SELECT * FROM `#@__public_comment` WHERE 1 = 1" . $where);
+        $archives = $dsql->SetQuery("SELECT * FROM `#@__public_comment_all` WHERE 1 = 1" . $where);
         $order = " ORDER BY `id` ASC";
         $atpage = $pageSize * ($page - 1);
         $where = " LIMIT $atpage, $pageSize";
@@ -24206,7 +24026,7 @@ class member
                 //如果是回复的别人，这里查询出来回复的谁
                 $reply_to_user = array();
                 if($value['sid']){
-                    $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $value['sid']);
+                    $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $value['sid']);
                     $ret = $dsql->dsqlOper($sql, "results");
                     if($ret){
                         $this->param = $ret[0]['userid'];
@@ -24226,7 +24046,7 @@ class member
 
                 if ($rid) {
                     $sid = $value['sid'];
-                    $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $sid);
+                    $sql = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $sid);
                     $ret = $dsql->dsqlOper($sql, "results");
                     if ($ret) {
                         $uid = $ret[0]['userid'];
@@ -25028,10 +24848,8 @@ class member
      */
     function bindFxRelation()
     {
-        global $dsql;
         global $userLogin;
         global $cfg_onlinetime;
-        global $cfg_memberBinding;
 
         $userid = $userLogin->getMemberID();
         if ($userid == -1) {
@@ -25040,75 +24858,12 @@ class member
 
         $param = $this->param;
         $fromShare = (int)$param['fromShare'];  //来源用户ID
-        $nowTime = GetMkTime(time());//当前时间，绑定的时候保存绑定时间
         if ($fromShare) {
-            // PutCookie('fromShare', $fromShare, $cfg_onlinetime * 60 * 60);
-            // $userLogin->registGiving($userid, true,false);
-
-            //防止出现两个会员之前循环推荐
-            $sql = $dsql->SetQuery("SELECT `from_uid`, `cityid`, `regtime` FROM `#@__member` WHERE `id` = " . $fromShare);
-            $res = $dsql->dsqlOper($sql, "results");
-            $datatime = $nowTime - $res[0]['regtime'];
-
-            require_once(HUONIAOINC.'/config/fenxiaoConfig.inc.php');
-            $fenxiaoBinding = (int)$cfg_fenxiaoBinding;
-
-            $pass = false;
-            if ($fenxiaoBinding == 1) {
-                //分销商查询
-                $sql = $dsql->SetQuery("SELECT `id` FROM `#@__member_fenxiao_user` where `uid` = '$fromShare' AND `state`=1");
-                $fxuid = $dsql->getOne($sql);
-                $pass = $fxuid ? true : false;
-            } else {
-                $pass = true;
-            }
-
-            //判断老会员绑定推荐人，是否在300秒内注册
-            if((($datatime > 300 && $cfg_memberBinding == 0) || $datatime < 300) && $res[0]['from_uid'] != $userid){
-
-                //推荐人的分站
-			    $_cityid = (int)$res[0]['cityid'];
-
-                //查询当前用户的分站
-                $sql = $dsql->SetQuery("SELECT `cityid` FROM `#@__member` WHERE `id` = " . $userid);
-                $res = $dsql->dsqlOper($sql, "results");
-                $__cityid = (int)$res[0]['cityid'];
-
-                //如果新注册的用户还没有绑定分站，则以推荐用户的分站为准
-                
-                $nowTime = GetMkTime(time());//当前时间，绑定的时候保存绑定时间
-
-                if($pass){
-                    if(!$__cityid){
-                        $sql = $dsql->SetQuery("UPDATE `#@__member` SET `from_uid` = $fromShare, `cityid` = '$_cityid', `from_bindtime` = '$nowTime' WHERE `id` = $userid AND `from_uid` = 0");
-                    }else{
-                        $sql = $dsql->SetQuery("UPDATE `#@__member` SET `from_uid` = $fromShare, `from_bindtime` = '$nowTime' WHERE `id` = $userid AND `from_uid` = 0");
-                    }
-                    $ret = $dsql->dsqlOper($sql, "update");
-                }
-                
-                /*if(!$__cityid){
-                    $sql = $dsql->SetQuery("UPDATE `#@__member` SET `from_uid` = $fromShare, `cityid` = '$_cityid' WHERE `id` = $userid AND `from_uid` = 0");
-                }else{
-                    $sql = $dsql->SetQuery("UPDATE `#@__member` SET `from_uid` = $fromShare WHERE `id` = $userid AND `from_uid` = 0");
-                }
-                $ret = $dsql->dsqlOper($sql, "update");*/
-
-                //记录会员变动日志
-                require_once HUONIAOROOT."/api/payment/log.php";
-                $_memberLog= new CLogFileHandler(HUONIAOROOT.'/log/member/'.date('Y-m-d').'.log', true);
-                $_memberLog->DEBUG($sql, true);
-                
-                return '绑定成功';
-            }
-            else{
-                return array("state" => 200, "info" => "不在绑定规则内，时间间隔：" . $datatime . '，系统开关：' . $cfg_memberBinding . '，已绑推荐人：' . $res[0]['from_uid'] . '，登录人：' . $userid);
-            }
-            
+            PutCookie('fromShare', $fromShare, $cfg_onlinetime * 60 * 60);
+            $userLogin->registGiving($userid, false,false);
         }
-        else{
-            return array("state" => 200, "info" => "fromShare不得为空");
-        }
+
+
 
     }
 

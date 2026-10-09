@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>搜索</title>{#* 景点门票 *#}
+<meta name="keywords" content="{#$travel_keywords#}">
+<meta name="description" content="{#$travel_description#}">
+<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" href="{#$templets_skin#}css/search.css?v={#$cfg_staticVersion#}" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/vue/vue.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script>
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$travel_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}';
+	var page = 1, pageSize = 10, detailListId = 'ticket', templets_skin = '{#$templets_skin#}';
+</script>
+</head>
+<style type="text/css">
+	.tabType::-webkit-scrollbar{display: none}
+</style>
+<body>
+	{#include file="../../../siteConfig/touch_top.html" pageTitle="搜索"#}  {#*  景点门票   *#}
+	<div class="page" id="page">
+		<div class="searchbox" >
+			<div class="inpbox">
+				<input type="text" placeholder="输入景点、酒店、目的地" name="keywords" v-model="keywords" enterkeyhint="search" @keydown="searcning">
+				<s class="clear_inp" @click="clearKeywords" v-if="keywords!=''"></s>
+			</div>
+			<a v-if="searchpage" href="javascript:;" onclick="history.go(-1)" class="cancel_btn">取消</a>
+			<a v-else href="javascript:;" class="cancel_btn" @click="backPage">取消</a>
+		</div>
+		<div class="searchpage" v-clock v-show="searchpage">
+			<dl class="history" v-if="travelHistory.length > 0">
+				<dt>历史搜索 <a href="javascript:;" class="del_btn" @click="del_history"></a></dt>
+				<dd v-for="item in travelHistory" v-if="item" @click="toSearch(item)"><a href="javascript:;">{{item}}</a></dd>
+			</dl>
+			<dl class="hot" v-show="hotSearch.length > 0">
+				<dt><span>热门搜索</span></dt>
+				<dd :class="{'hot':item.rec}" v-for="item in hotSearch"><a href="javascript:;" @click="toSearch(item.oldkeyword)">{{item.oldkeyword}}</a></dd>
+
+
+			</dl>
+		</div>
+		<div class="searchList" v-clock v-show="!searchpage">
+			<div class="tabType" style="">
+				<ul>
+					<li class="on_tab">全部</li>
+					<li data-type="1">景点</li>
+					<li data-type="2">旅行社</li>
+					<li data-type="3">酒店</li>
+					<li data-type="4">一日游</li>
+					<li data-type="5">跟团游</li>
+					<li data-type="6">租车</li>
+					<li data-type="7">签证</li>
+				</ul>
+			</div>
+			<div class="list" v-if="searchList.length > 0 || loading">
+				<ul v-if="searchList.length > 0 ">
+					<li :class="[{'hasAddr':item.searchtype !=4 && item.searchtype!=5},{'noHasAddr':item.searchtype ==4 || item.searchtype==5}]" v-for="item in searchList">
+						<a :href="item.url">
+							<div class="litpic">
+								<span class="lt_lab" v-if="item.flagname">{{item.flagname}}</span>
+								<img :src="item.litpic" :alt="item.title" onerror="this.src='/static/images/404.jpg'">
+								<span class="typename" v-if="item.searchtype==1">景点</span>
+								<span class="typename" v-if="item.searchtype==2">旅行社</span>
+								<span class="typename" v-if="item.searchtype==3">酒店</span>
+								<span class="typename" v-if="item.searchtype==4">一日游</span>
+								<span class="typename" v-if="item.searchtype==5">跟团游</span>
+								<span class="typename" v-if="item.searchtype==6">租车</span>
+								<span class="typename" v-if="item.searchtype==7">签证</span>
+							</div>
+							<div class="detail">
+								<h2>{{item.title}}</h2>
+								<div class="labs"><span v-for="(tag,i) in item.tagAll" v-if="i<3">{{tag.jc}}</span></div>
+								<div class="price" v-if="item.price && item.searchtype!=4 && item.searchtype!=5"><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(parseFloat(item.price).toFixed(2))}}</b></span>起</div>
+								<div class="txt" v-if="item.searchtype==2">联系人：{{item.contact}}</div>
+								<div class="txt" v-if="item.searchtype==2">联系方式：{{item.tel}}</div>
+								<div :class="['address', {'flexAddr':item.searchtype!=3}]">
+									<div class="price" v-if="item.price && (item.searchtype==4 || item.searchtype==5)"><span>{#echoCurrency type="symbol"#}<b>{{parseFloat(parseFloat(item.price).toFixed(2))}}</b></span>起</div>
+									<span v-if="(item.searchtype==3 || item.searchtype==1) && item.distance">距您{{item.distance}}</span>
+									<span v-if="item.searchtype==4 || item.searchtype==5">{{item.travelservice}}</span>
+
+									<span v-else-if='item.addrname && item.addrname.length'><em v-if="item.searchtype==3">|</em> {{item.addrname[0]}} {{item.addrname[1]}}</span>
+								</div>
+							</div>
+						</a>
+					</li>
+					<!-- <li class="hasAddr">
+						<a href="#">
+							<div class="litpic">
+								<span class="lt_lab">5A景区</span>
+								<img src="" alt="">
+								<span class="typename">酒店/名宿</span>
+							</div>
+							<div class="detail">
+								<h2>三亚鹿回头风景区</h2>
+								<div class="labs"><span>随订随用</span><span>随时退</span></div>
+								<div class="price"><span>{#echoCurrency type="symbol"#}<b>45</b></span>起</div>
+								<div class="address flexAddr">
+									<span>距您2.5km</span>
+									<span>江苏 姑苏区</span>
+								</div>
+							</div>
+						</a>
+					</li>
+					<li class="hasAddr">
+						<a href="#">
+							<div class="litpic">
+								<span class="lt_lab">5A景区</span>
+								<img src="" alt="">
+								<span class="typename">酒店/名宿</span>
+							</div>
+							<div class="detail">
+								<h2>三亚鹿回头风景区</h2>
+								<div class="labs"><span>随订随用</span><span>随时退</span></div>
+								<div class="price"><span>{#echoCurrency type="symbol"#}<b>45</b></span>起</div>
+								<div class="address flexAddr">
+									<span>距您2.5km</span>
+									<span>江苏 姑苏区</span>
+								</div>
+							</div>
+						</a>
+					</li>
+					<li class="hasAddr">
+						<a href="#">
+							<div class="litpic">
+								<span class="lt_lab">5A景区</span>
+								<img src="" alt="">
+								<span class="typename">酒店/名宿</span>
+							</div>
+							<div class="detail">
+								<h2>三亚鹿回头风景区</h2>
+								<div class="labs"><span>随订随用</span><span>随时退</span></div>
+								<div class="price"><span>{#echoCurrency type="symbol"#}<b>45</b></span>起</div>
+								<div class="address flexAddr">
+									<span>距您2.5km</span>
+									<span>江苏 姑苏区</span>
+								</div>
+							</div>
+						</a>
+					</li>
+					<li class="hasAddr">
+						<a href="#">
+							<div class="litpic">
+								<span class="lt_lab">5A景区</span>
+								<img src="" alt="">
+								<span class="typename">酒店/名宿</span>
+							</div>
+							<div class="detail">
+								<h2>三亚鹿回头风景区</h2>
+								<div class="labs"><span>随订随用</span><span>随时退</span></div>
+								<div class="price"><span>{#echoCurrency type="symbol"#}<b>45</b></span>起</div>
+								<div class="address flexAddr">
+									<span>距您2.5km</span>
+									<span>江苏 姑苏区</span>
+								</div>
+							</div>
+						</a>
+					</li>
+					<li class="hasAddr">
+						<a href="#">
+							<div class="litpic">
+								<span class="lt_lab">5A景区</span>
+								<img src="" alt="">
+								<span class="typename">酒店/名宿</span>
+							</div>
+							<div class="detail">
+								<h2>三亚鹿回头风景区</h2>
+								<div class="labs"><span>随订随用</span><span>随时退</span></div>
+								<div class="price"><span>{#echoCurrency type="symbol"#}<b>45</b></span>起</div>
+								<div class="address flexAddr">
+									<span>距您2.5km</span>
+									<span>江苏 姑苏区</span>
+								</div>
+							</div>
+						</a>
+					</li>
+					<li class="hasAddr">
+						<a href="#">
+							<div class="litpic">
+								<span class="lt_lab">5A景区</span>
+								<img src="" alt="">
+								<span class="typename">酒店/名宿</span>
+							</div>
+							<div class="detail">
+								<h2>三亚鹿回头风景区</h2>
+								<div class="labs"><span>随订随用</span><span>随时退</span></div>
+								<div class="price"><span>{#echoCurrency type="symbol"#}<b>45</b></span>起</div>
+								<div class="address flexAddr">
+									<span>距您2.5km</span>
+									<span>江苏 姑苏区</span>
+								</div>
+							</div>
+						</a>
+					</li>
+					<li class="hasAddr">
+						<a href="#">
+							<div class="litpic">
+								<span class="lt_lab">5A景区</span>
+								<img src="" alt="">
+								<span class="typename">酒店/名宿</span>
+							</div>
+							<div class="detail">
+								<h2>三亚鹿回头风景区</h2>
+								<div class="labs"><span>随订随用</span><span>随时退</span></div>
+								<div class="price"><span>{#echoCurrency type="symbol"#}<b>45</b></span>起</div>
+								<div class="address flexAddr">
+									<span>距您2.5km |  姑苏区</span>
+								</div>
+							</div>
+						</a>
+					</li>
+					<li class="noHasAddr">
+						<a href="#">
+							<div class="litpic">
+								<span class="lt_lab">5A景区</span>
+								<img src="" alt="">
+								<span class="typename">酒店/名宿</span>
+							</div>
+							<div class="detail">
+								<h2>三亚鹿回头风景区三亚鹿回头风景区三亚鹿回头风景区三亚鹿回头风景区</h2>
+								<div class="labs"><span>随订随用</span><span>随时退</span></div>
+								<div class="flexAddr address">
+									<div class="price"><span>{#echoCurrency type="symbol"#}<b>45</b></span>起</div>
+									<span>天下国旅旅游团</span>
+								</div>
+							</div>
+						</a>
+					</li> -->
+
+				</ul>
+				<div class="loading">{{loadingText}}</div>
+			</div>
+			<div class="noData" v-if="searchList.length == 0 && !searchpage && !loading">
+					<div class="noimg">
+						<img src="{#$templets_skin#}images/noData.png" alt="">
+					</div>
+					<p>搜索不到您要的结果，换个关键词试试</p>
+			</div>
+		</div>
+	</div>
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$travel_description#}',
+		"title": '{#if $list_typename#}{#$list_typename#}{#else#}{#$langData["travel"][1][0]#}{#/if#}',
+		"imgUrl": '{#$travel_logoUrl#}',
+		"link": '{#getUrlPath service="travel" template="ticket"#}',
+	};
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+<script type='text/javascript' src="{#$cfg_staticPath#}js/detail2list.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/search.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

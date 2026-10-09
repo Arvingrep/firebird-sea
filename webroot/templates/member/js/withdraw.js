@@ -61,9 +61,7 @@ new Vue({
 			// 选择银行的数据
 			bankNameData: {},
 			// element ui弹窗提示
-			isMessageShowing: false,
-			withdrawUrl:window.location.href,
-			withdrawPop:false,
+			isMessageShowing: false
 		}
 	},
 	methods: {
@@ -196,7 +194,6 @@ new Vue({
 		},
 		// 微信提现,提交方法
 		submitWeixin() {
-			console.log('微信提现');
 			if (!this.isChecked) {
 				this.showMessage('请勾选提现协议')
 				return;
@@ -327,10 +324,6 @@ new Vue({
 		},
 		// 表单提交按钮,不同的提现方式,调用不同的提现方法
 		submitBtn() {
-			if(this.withdrawWay == 2){
-				this.withdrawPop = true; //微信提现弹窗提示
-				return false;
-			}
 			if (this.amountNum == '') {
 				this.showMessage('请输入提现金额')
 				return;

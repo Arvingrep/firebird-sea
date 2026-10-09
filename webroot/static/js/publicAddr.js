@@ -444,11 +444,6 @@ $(function(){
             });
 
             gzAddrSeladdrCurr.removeClass("gz-no-sel").attr("data-ids", ids.join(" ")).attr("data-id", id).html(addrname.join("/"));
-            if(ids.length > 0){
-                gzAddrSeladdrCurr.addClass("hasChoseAddr");
-            }else{
-                gzAddrSeladdrCurr.addClass("hasChoseAddr");
-            }
             if(gzAddrSeladdrCurr.hasClass('carAddrbtn')){//发布二手车特有 2021-3-4
                 var pardl = $('#addrid').closest('dl');
                 var hline = pardl.find(".tip-inline");

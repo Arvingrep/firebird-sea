@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>chat</title>
+    <style>
+        html {overflow:hidden;}
+        body {overflow:hidden;padding:0;margin:0;width:100%;height:100%;background:#ececec;}
+        ul {padding:0;margin:0;}
+        ul li {padding-top:5px;list-style-type:none;}
+        input::-webkit-input-placeholder {color:#fbbe8a;}
+        #chat {margin:1%;}
+        .left {float: left; width: 25%; height: 600px; padding: 0.3%; margin-right: 2%; background-color:#fdfff2;border:3px solid #dad7e4; overflow-y: auto;}
+        .left h4 {margin: 10px 0;}
+        .left li {height: 50px; list-style: none; padding: 0 3px; cursor: pointer; margin-bottom: 5px;}
+        .left li img {width: 50px; height: 50px; display: inline-block; vertical-align: middle; margin-right: 5px; float: left;}
+        .left li:hover {text-decoration: underline; background: #fff;}
+        .left li.curr {font-weight: 700; color: red;}
+        .left li p {position: relative; overflow: hidden;}
+        .left li small {color: #f60;}
+        .left li span {display: block; font-size: 14px; padding-top: 5px;}
+        .right {float: left; width: 70%; height:600px;background-color:#fdfff2;border:3px solid #dad7e4;box-sizing:border-box;padding:0.3%;}
+        .tag {text-align:center;color:#98f0d3;}
+        .padding-left-30 {padding-left:10px;}
+        .avatar {width:30px;height:30px;border-radius:10px;display:inline-block;vertical-align:middle;}
+        .name {color:#fbbe8a;display:inline-block;vertical-align:middle;font-size:16px;}
+        .log {background:white;overflow:auto;width:90%;height:73%;box-sizing:border-box;border:1px solid #2c2b2e;margin-left:1%;padding:20px 0 0 20px;}
+        .log-title {font-size:26px;padding-left: 10px;}
+        .form {width:100%;}
+        .msg {margin:20px 0 0 1%;padding:20px 0 20px 20px;height:50px;width:80%;font-size:40px;border:1px solid #2c2b2e;display:inline-block;vertical-align:middle;}
+        .send {width:8%;height:54px;margin-top:18px;display:inline-block;vertical-align:middle;}
+        .clearfix:after {visibility:hidden;display:block;font-size:0;content:" ";clear:both;height:0;}
+
+        .timeSplit {text-align: center;}
+    </style>
+</head>
+
+<body>
+<div class="chat">
+    <div id="chat" class="clearfix">
+        <div class="left">
+            <h4>直播间列表：</h4>
+            <ul>
+                <li><a href="?room=1">测试直播</a></li>
+                <li><a href="?room=2">测试直播2</a></li>
+            </ul>
+        </div>
+        <div class="right clearfix">
+            <div class="log-title" id="welcome"></div>
+            <div id="mine" class="log"></div>
+            <div class="form">
+                <input id="msg" type="text" class="msg" placeholder="请输入聊天内容!"/>
+                <button id="send" class="send">发送消息</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/core/jquery-1.8.3.min.js"></script>
+<script>
+
+var chatLib, AccessKeyID, userinfo, chatToken, chatServer;
+var isload = false, page = 1, pageSize = 20, totalPage = 1, stop = 0, time = Math.round(new Date().getTime()/1000).toString();
+
+$(function(){
+
+    var room = getQueryString('room');
+
+    //im sdk
+    var kumanIMLib = function (wsHost) {
+
+        var lib = this;
+
+        this.timeOut = 30000;  // 每30秒发送一次心跳
+        this.timeOutObj = null;
+
+        // 重置心跳
+        this.reset = function(){
+            clearTimeout(this.timeOutObj);
+            lib.start();
+        }
+
+        // 启动心跳
+        this.start = function(){
+            lib.timeOutObj = setInterval(function(){
+                lib.socket.send('HeartBeat');
+            }, lib.timeOut);
+        }
+
+        // 初始化连接
+        if (window['WebSocket']) {
+            this.socket = new WebSocket(wsHost);
+            //this.socket.onopen = this.evt.onopen;  // 连接成功
+
+            // 关闭
+            this.socket.onclose = function(){
+                lib.socket = new WebSocket(lib.socket.url);
+            };
+
+            // 异常
+            this.socket.onerror = function(){
+                this.close();
+            };
+
+            // 收到消息
+            this.socket.onmessage = function (evt) {
+                lib.reset();  //重置心跳
+                var msg = JSON.parse(evt.data);
+                switch (msg.contentType) {
+                    case "init":
+                        console.log(msg.content);
+                        break;
+                    default:
+                        if(userinfo['uid'] != msg.from && msg.type == 'chat'){
+                            createEle(msg, '', 1, lib);
+                        }
+                        break;
+                }
+
+            };
+
+        } else {
+            alert('您的浏览器不支持WebSockets.');
+            return false;
+        }
+
+        this.start();  //启动心跳检测
+
+    };
+
+
+    //初始化
+    if(room){
+        $.ajax({
+            url: '/include/ajax.php?service=siteConfig&action=getImToken',
+            type: 'post',
+            dataType: 'json',
+            success: function(data){
+                if(data.state == 100){
+                    var info = data.info;
+                    userinfo = info;
+                    chatToken = info.token;
+                    chatServer = info.server;
+                    AccessKeyID = info.AccessKeyID;
+
+                    $("#welcome").html("你好：" + userinfo['name']);
+
+                    //创建连接
+                    chatLib = new kumanIMLib(chatServer + "?AccessKeyID=" + AccessKeyID + "&token=" + chatToken + "&type=chat");
+
+                    loadMessage();
+
+                    //加入聊天室
+                    var data = {
+                        mark: 'chatRoom' + room,
+                        from: chatToken,
+                    }
+                    $.ajax({
+                        url: '/include/ajax.php?service=siteConfig&action=joinChatRoom',
+                        data: data,
+                        type: 'post',
+                        dataType: 'json',
+                        success: function(data){
+                            console.log(data);
+                        },
+                        error: function(){
+
+                        }
+                    });
+
+                }else{
+                    alert(data.info);
+                }
+            },
+            error: function(){
+                alert('网络错误，初始化失败！');
+            }
+        });
+    }
+
+
+    //创建历史对话
+    var appendLog = function (ele, item, type, time) {
+        var log = $('#'+ele);
+
+        if(log.find('.item').size() == 0){
+            log.append('<div class="timeSplit" data-time="'+time+'">'+getDateDiff(time)+'</div>');
+        }else{
+            if(type != 'prepend'){
+                var lastTime = parseInt(log.find('.item:last').attr('data-time'));
+                var timeCalcu = time-lastTime;
+            }else{
+                var lastTime = parseInt(log.find('.timeSplit:eq(0)').attr('data-time'));
+                var timeCalcu = lastTime-time;
+            }
+
+            if(timeCalcu > 300){
+                if(type != 'prepend'){
+                    log.append('<div class="timeSplit" data-time="'+time+'">'+getDateDiff(time)+'</div>');
+                }else{
+                    log.prepend('<div class="timeSplit" data-time="'+time+'">'+getDateDiff(time)+'</div>');
+                }
+            }
+        }
+
+        if(type != 'prepend'){
+            log.append(item);
+            log.scrollTop(log[0].scrollHeight - log.innerHeight());
+        }else{
+            log.prepend(item);
+            stop += log.find('.item:eq(0)').outerHeight();
+            log.scrollTop(stop);
+        }
+    }
+
+    // 业务层
+    var createEle = function(data, type, newMessage, lib){
+
+        var from = data.from;
+        var sf = false;
+
+        //拼接对话
+        var fromUser = data.name;
+        if (from == userinfo['uid']) {
+            fromUser = "<span style='color: red;'>你</span>";
+            sf = true;
+        }
+
+        var text = fromUser + " 说:<br />";
+
+        // 文本
+        if(data.contentType == "text"){
+            text += data.content;
+        }
+
+        // 图片
+        if(data.contentType == 'image'){
+            content = data.content;
+            text += '<img src="/include/attachment.php?f='+content.url+'" />';
+        }
+
+        var item = '<div class="item" data-time="'+data.time+'"'+(sf ? ' style="text-align: right;"' : '')+'>'+text+'</div>'
+        appendLog('mine', item, type, data.time);
+
+    };
+
+
+    //发消息
+    $("#send").bind('click', function(event) {
+        var msg = document.getElementById("msg").value;
+
+        msg = msg.trim();
+        if (! msg) {
+            return false;
+        }
+
+        if (msg == '') {
+            alert("消息内容为空");
+            return false;
+        }
+
+        var time = Math.round(new Date().getTime()/1000).toString();
+        var imgData = {
+            fileSize: "2203",
+            fileType: ".png",
+            name: "15570260876393.png",
+            original: "aficon1.png",
+            poster: "",
+            state: "SUCCESS",
+            turl: "http://gz.215000.com/uploads/article/thumb/large/2019/05/05/15570260876393.png",
+            type: "thumb",
+            url: "VlRsVE9sTTdWbUpWWlE9PQ==",
+            height: "110",
+            width: "110"
+        };
+        var data = {
+            content: msg,
+            contentType: "text",
+            mark: 'chatRoom' + room,
+            from: chatToken,
+            time: time
+        }
+        $.ajax({
+            url: '/include/ajax.php?service=siteConfig&action=sendImChatRoom',
+            data: data,
+            type: 'post',
+            dataType: 'json',
+            success: function(data){
+                chatLib.reset();
+            },
+            error: function(){
+
+            }
+        });
+
+        data.from = userinfo['uid'];
+        data.name = userinfo['name'];
+        data.photo = userinfo['photo'];
+        createEle(data);
+        $('#msg').val('');//清空消息
+    });
+
+    document.getElementById("msg").onkeyup = function(event) {
+        if (event.keyCode == "13") {
+            $("#send").trigger("click");
+        }
+    };
+
+
+    //加载聊天记录
+    function loadMessage(type){
+
+        if(isload || page > totalPage) return false;
+        isload = true;
+
+        $.ajax({
+            url: '/include/ajax.php?service=siteConfig&action=getImChatRoomLog',
+            data: {from: chatToken, mark: "chatRoom" + room, page: page, pageSize: pageSize, time: time},
+            type: 'post',
+            dataType: 'json',
+            success: function(data){
+				console.log(room)
+                if(data && data.state == 100){
+                    data = data.info;
+                    var pageInfo = data.pageInfo;
+                    var list = data.list;
+
+                    if(page == 1){
+                        list.reverse();
+                    }
+
+                    totalPage = pageInfo.totalPage;
+
+                    for(var i = 0; i < list.length; i++){
+                        var data = {
+                            content: list[i].content,
+                            contentType: list[i].type,
+                            from: list[i].uid,
+                            name: list[i].name,
+                            photo: list[i].photo,
+                            type: "person",
+                            time: list[i].time
+                        }
+                        createEle(data, type);
+                    }
+                    setTimeout(function(){
+                        isload = false;
+                    }, 1000);
+
+                    //最后一页显示时间
+                    if(page > 1 && page == pageInfo.totalPage){
+                        var time = parseInt($('#mine').find('.item:eq(0)').attr('data-time'));
+                        $('#mine').prepend('<div class="timeSplit" data-time="'+time+'">'+getDateDiff(time)+'</div>');
+                    }
+
+                    page++;
+
+                }else{
+                    console.log(data.info);
+                    isload = false;
+                }
+            },
+            error: function(){
+                console.log('network error');
+                isload = false;
+            }
+        });
+
+    }
+
+    $('#mine').scroll(function() {
+        var scroH = $(this).scrollTop();  //滚动高度
+
+        stop = scroH;
+        if(scroH < 50 && !isload){  //距离顶部大于100px时
+            loadMessage('prepend');
+        }
+    });
+
+
+
+    function getDateDiff(theDate){
+        var nowTime = (new Date());    //当前时间
+        var date = (new Date(theDate*1000));    //当前时间
+        var today = new Date(nowTime.getFullYear(), nowTime.getMonth(), nowTime.getDate()).getTime(); //今天凌晨
+        var yestday = new Date(today - 24*3600*1000).getTime();
+        var is = date.getTime() < today && yestday <= date.getTime();
+
+        var Y = date.getFullYear(),
+        M = date.getMonth() + 1,
+        D = date.getDate(),
+        H = date.getHours(),
+        m = date.getMinutes(),
+        s = date.getSeconds();
+        //小于10的在前面补0
+        if (M < 10) {
+            M = '0' + M;
+        }
+        if (D < 10) {
+            D = '0' + D;
+        }
+        if (H < 10) {
+            H = '0' + H;
+        }
+        if (m < 10) {
+            m = '0' + m;
+        }
+        if (s < 10) {
+            s = '0' + s;
+        }
+
+        if(is){
+            return '昨天 ' + H + ':' + m;
+        }else if(date > today){
+            return H + ':' + m;
+        }else{
+            return Y + '-' + M + '-' + D + '&nbsp;' + H + ':' + m;
+        }
+    }
+
+    function transTimes(timestamp, n){
+		
+        const dateFormatter = huoniao.dateFormatter(timestamp);
+        const year = dateFormatter.year;
+        const month = dateFormatter.month;
+        const day = dateFormatter.day;
+        const hour = dateFormatter.hour;
+        const minute = dateFormatter.minute;
+        const second = dateFormatter.second;
+        
+		if(n == 1){
+			return (year+'-'+month+'-'+day+' '+hour+':'+minute+':'+second);
+		}else if(n == 2){
+			return (year+'-'+month+'-'+day);
+		}else if(n == 3){
+			return (month+'-'+day);
+		}else if(n == 4){
+			return (hour+':'+minute);
+		}else{
+			return 0;
+		}
+	}
+
+
+    function getQueryString(name) {
+        var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+        var r = window.location.search.substr(1).match(reg);
+        if (r != null) return unescape(r[2]);
+        return null;
+    }
+
+
+
+})
+</script>
+</body>
+</html>

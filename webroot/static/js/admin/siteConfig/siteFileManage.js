@@ -392,19 +392,11 @@ function getList() {
     huoniao.operaJson("?dopost=getList", data.join("&"), function (val) {
         var obj = $("#list"), list = [], i = 0, listArr = val.list;
         if (val.state == "100") {
-
-            huoniao.operaJson("?dopost=getList&action=getTotalSize", data.join("&"), function (val) {
-                if(val.state == "100"){
-                    $('.totalSize').html('&nbsp;' + val.info + '&nbsp;');
-                }else{
-                    $('.totalSize').html('&nbsp;统计失败&nbsp;');
-                }
-            });
-            
             huoniao.hideTip();
 
             obj.attr("data-totalpage", val.pageInfo.totalPage);
             $('.totalCount').html('&nbsp;' + val.pageInfo.totalCount + ' 个&nbsp;');
+            $('.totalSize').html('&nbsp;' + val.pageInfo.totalSize + '&nbsp;');
 
             for (i; i < listArr.length; i++) {
 

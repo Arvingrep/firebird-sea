@@ -2516,7 +2516,6 @@ $(function () {
         },
     }
     function checkModule() {
-        if(cfg_ffmpeg) return;  //如果已经开启了ffmpeg，则不需要该功能
         if (permission_list.article != undefined) {
             opearModuleData.list.push({ 'name': 'articleUpdateVideotime_face' }); // 新闻模块 获取已发布(本地上传)视频的时长及封面
             opearModuleData.list.push({ 'name': 'articleUeditorVideo_face' }); // 新闻模块 获取已发布(本地上传)视频的时长及封面

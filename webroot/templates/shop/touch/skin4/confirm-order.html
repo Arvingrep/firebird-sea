@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{#$langData['siteConfig'][6][141]#}</title>
+<meta name="apptitle" content="{#$langData['siteConfig'][6][141]#}">
+<meta name="format-detection" content="telephone=no">  
+<meta http-equiv="x-rim-auto-match" content="none">  
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/confirm.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+
+	{#$paramStr = ''#}
+	{#foreach from=$logitcpros item=kk key="k"#}
+	{#if $k == count($logitcpros) -1#}
+	{#$paramStr = $paramStr|cat:$kk#}
+	{#else#}
+	{#$paramStr = $paramStr|cat:$kk|cat:'|'#}
+	{#/if#}
+	{#/foreach#}
+
+<script type="text/javascript">
+var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$shop_channelDomain#}', cfg_staticPath = staticPath = '{#$cfg_staticPath#}';
+	var id = 0, lng = "", lat = "", site_map = "{#$site_map#}";
+var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+var carlist = {#if $cartList#}{#json_encode($cartList|default:[])#}{#else#}''{#/if#};
+carlist = typeof(carlist) == 'object' ? JSON.stringify(carlist) : ''
+// 积分抵扣
+var hasPoint = '{#$userinfo.point#}';
+jifen_ =  '{#$cfg_offset_shop#}';
+var pointRatio = '{#$cfg_pointRatio#}';
+var shop_dis = '{#$userinfo.privilege['shop']#}';
+var confirmtype = '{#if $frompage==2 || $confirmtype == 4#}1{#else#}{#$confirmtype#}{#/if#}';//1送到家 0-到店优惠 2-详情页过来
+var frompage = '{#$frompage#}';
+var addressAdd = '{#getUrlPath service='member' type='user' template='address_add' param="logitcpros=$paramStr&$urlParam"#}&from=order';
+var addressList = '{#getUrlPath service='member' type='user' template='address' param="logitcpros=$paramStr&$urlParam"#}&from=order';
+var adsid = '{#$adsid#}';
+var isdetailFlag = true;
+var privilege = {#json_encode($privilege)#};
+var userinfovip = {
+    level : {#$userinfo['level']#},
+    levelName : '{#$userinfo['levelName']#}',
+    levelIcon : '{#$userinfo['levelIcon']#}',
+    birthday : '{#$userinfo['birthday']|date_format:'%m%d'#}',
+    delivery_count : '{#$userinfo['delivery_count']#}'
+}
+</script>
+</head>
+
+<body>
+
+	<div class="container" id="p1">
+
+		<!-- 头部 -->
+		{#$pageTitle = $langData['siteConfig'][6][141]#}
+		{#include file="../../../siteConfig/touch_top.html" pageRight="<a href='javascript:;' class='notMenu'></a>"#}
+		<!-- 头部 end -->
+
+		<!-- 详情页跳转过来特有 包含到店优惠和送到家两种情况 -->
+		{#if $confirmtype == '2'#}
+		<div class="confirmTab">
+			<ul>
+				<li><a href="javascript:;" data-id="1">到店消费</a></li>
+				<li><a href="javascript:;" data-id="2">送到家</a></li>
+			</ul>
+		</div>
+		{#/if#}
+		<!-- 两种情况都存在时 加类名 addressTwo -->
+		<div class="twoWrap {#if $confirmtype == 1 || ($frompage == 1 && $confirmtype == 0) || $confirmtype == 0#}twoWrap1{#/if#}"  style="{#if $confirmtype == '2'#}margin-top: 0{#/if#}">
+			<div class="comTwo busInfo {#if $confirmtype == 2 || ($frompage == 1 && $confirmtype == 0) || ($confirmtype == 0 && count($cartList) == 1)#}twoshow{#/if#}" >
+				<p class="bustxt">商家地址</p>
+				<p class="busaddress">{#$cartList[0]['address']#}</p>
+				<div class="busmap" id="busmap" style="pointer-events: none"></div>
+				{#if !(($confirmtype == 0 && count($cartList) > 1)  &&  $frompage != '1')#}
+				<div class="busTel">
+					<label for="customtel">手机号</label>
+					<input type="text" placeholder="请填写联系方式，以便更好地享受服务" name="customtel" id="customtel" value="{#$userinfo.phone#}">
+				</div>
+				{#/if#}
+			</div>
+			<div class="address {#if $confirmtype == 2 || $frompage == 2#}addressTwo{#/if#}  {#if $confirmtype == 1 || $frompage == 2#}twoshow{#/if#} comTwo">
+				<a href="{#if $address != 0#}{#getUrlPath service='member' type='user' template='address' param="logitcpros=$paramStr&confirmtype=$confirmtype"#}{#else#}{#getUrlPath service='member' type="user" template='address_add' param="logitcpros=$paramStr&confirmtype=$confirmtype"#}{#/if#}&from=order" class="t addressbox">
+					<div class="address-box">
+
+						{#$address = 0#}
+						{#member action="address"#}
+						{#if $adsid== 0 &&  $_bindex.row == 1#}
+							{#$address = $row.id#}
+							<div class="address-info">
+								<div class="addrName">{#if $row.default == 1#}<span class="defaultT">默认</span>{#/if#}{#$row.addrname#}</div>
+								<span class="address-txt">{#$row.address#}</span>
+								<div class="addrPerson">
+									<span class="name">{#$row.person#}</span>
+									<span class="tel">{#if $row.mobile != "" && $row.tel != ""#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#/if#}</span>
+								</div>
+							</div>
+						{#else if $adsid == $row.id#}
+							{#$address = $row.id#}
+							<!-- <div class="address-info">
+								<span class="name">{#$row.person#}</span>
+								<span class="tel">{#if $row.mobile != "" && $row.tel != ""#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#/if#}</span>
+								<span class="address-txt">{#$row.address#}</span>
+							</div> -->
+
+							<div class="address-info">
+								<div class="addrName">{#if $row.default == 1#}<span class="defaultT">默认</span>{#/if#}{#$row.addrname#}</div>
+								<span class="address-txt">{#$row.address#}</span>
+								<div class="addrPerson">
+									<span class="name">{#$row.person#}</span>
+									<span class="tel">{#if $row.mobile != "" && $row.tel != ""#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#/if#}</span>
+								</div>
+							</div>
+						{#/if#}
+						{#/member#}
+
+						{#if $address == 0#}
+						<div class="address-info empty">+添加收货地址</div>
+						{#/if#}
+						<i class="icon-right"></i>
+					</div>
+				</a>
+			</div>
+
+		</div>
+		
+		<div class="cart-main">
+			<form data-action="/include/ajax.php?service=shop&action=dealTouch" method="post" id="payform">
+				<input type="hidden" name="pros" id="pros" value="{#$pros#}" />
+				<input type="hidden" name="addressid" id="address" value="{#$address#}" />
+				<input type="hidden" name="paytype" id="paytype" value="wxpay" />
+				<input type="hidden" name="buytype" id="buytype" value="{#$buytype#}" />
+				<input type="hidden" name="bargainid" id="bargainid" value="{#$bid#}" />
+				<input type="hidden" name="pinid" id="pinid" value="{#$pinid#}" />
+				<input type="hidden" name="hid" id="hid" value="{#$hid#}" />
+				<input type="hidden" name="directbuy" id="directbuy" value="{#$directbuy#}" />
+				<input type="hidden" name="ordertype" id="pordertype" value="{#$ordertype#}" />
+				<!-- 支付方式 线上支付 货到付款 -->
+				<input type="hidden" name="payway" id="payway" value="2" />
+				<ul>
+
+					{#$totalPrice = 0#}
+					{#$totalCount = 0#}
+					{#$totalCoupon = 0#}
+					{#$totalPoint = 0#}
+					{#foreach from=$cartList key= k item="cart"#}
+                  	{#$shopTotalPrice = 0#}
+					<li class="cart-list" data-id="{#$cart.sid#}">
+						<div class="shop-name" data-lng="{#$cart.lng#}" data-lat="{#$cart.lat#}">
+							<div class="shop-name-info">
+								<span><a href="javascript:;">{#$cart.store#}</a></span>
+							</div>
+						</div>
+						<div class="shop-list">
+							<ul>
+                                {#if is_array($cart.logistic)#}
+                                    {#$storePrice = $cart.logistic.logistic#}
+                                    {#$storePrice1 = $cart.logistic.logistic#}
+                                {#else#}
+                                    {#$storePrice = $cart.logistic#}
+                                    {#$storePrice1 = $cart.logistic#}
+                                {#/if#}
+
+								{#$storeCount = 0#}
+                                {#$totalPrice = $totalPrice + $storePrice#}
+								{#foreach from=$cart.list item="list" key='k1'#}
+								{#$storePrice = $storePrice + $list.price * $list.count#}
+								{#$storePrice1 = $storePrice1 + $list.price * $list.count + $list.amount#}
+
+								{#$totalPrice = $totalPrice + $list.price * $list.count#}
+
+								{#$storeCount = $storeCount + $list.count#}
+								{#$totalCount = $totalCount + $list.count#}
+								{#$totalCoupon = $totalCoupon + $list.coupon * $list.count#}
+								{#$totalPoint = $totalPoint + $list.point * $list.count#}
+								{#$shopTotalPrice = $shopTotalPrice + $list.price * $list.count#}
+								<!-- 一个店铺 多个商品并存在两种配送方式时 加类名 speLi-->
+								<li class="shop-list-li" data-id="{#$list.id#}"  data-limit="{#$list.limit#}" data-inventor="{#$list.inventor#}" data-specation="" data-price="{#$list.price#}" data-oprice="{#$list.price + $list.amount / $list.count#}" data-vipjian="{#$list.amount / $list.count#}">
+									<a href="javascript:;">
+										<div class="shop-info">
+											<div class="shop-info-img">
+												<img src="{#$list.thumb#}" alt="{#$list.title#}">
+											</div>
+											<div class="shop-info-txt">
+												<div class="shop-info-guige">
+													<h3>{#$list.title#}</h3>
+													<div class="shop-info-color">
+														<span>{#$list.speInfo#}</span>
+													</div>
+													<!-- 到店优惠特有 -->
+													{#if $confirmtype == 0 && $list.is_tuikuan == 0#}
+													<div class="evertimeTui">
+														<span>随时退</span>
+														<span>过期退</span>
+													</div>
+													{#/if #}
+												</div>
+												<div class="shop-info-price">
+													{#$priceArr = "."|explode:($list.price + ($list.amount / $list.count))#}
+													<p class="price"><em>{#echoCurrency type='symbol'#}</em><strong>{#$priceArr[0]#}</strong><span>.{#if $priceArr[1]#}{#$priceArr[1]#}{#else#}00{#/if#}</span></p>
+													<span class="num">x{#$list.count#}</span>
+												</div>
+											</div>
+										</div>
+									</a>
+									<!-- 购买数量 详情页下单特有-->
+									{#if $confirmtype == 2 || ($frompage == 1 ) || $frompage == 2#}
+									<div class="shop-item fn-clear buyItem">
+										<label>购买数量</label>
+										<!-- 最小起订量：；装箱数量： -->
+										<div class="shop-info-num" data-mincout="{#if $list.smallCount#}{#$list.smallCount#}{#else#}1{#/if#}" data-eachcout="{#if $list.packingCount#}{#$list.packingCount#}{#else#}1{#/if#}">
+											<span class="rec {#if $list.count==$list.smallCount#}disabled{#/if#}"></span><span class="num"><em>{#if $list.count#}{#$list.count#}{#else#}1{#/if#}</em></span><span class="append {#if $list.limit >0 && $list.count >= $list.limit#}disabled{#/if#}"></span>
+										</div>
+									</div>
+									{#/if#}
+									
+									{#if $k1 == (count($cart.list) - 1)#}
+									{#if $confirmtype != 0#}
+									<div class="shop-item fn-clear peisongItem" data-logistic="{#$cart.logistic#}" data-orlog="{#$cart.logistic#}">
+										<label>配送方式</label>
+										<span class="midDesc">{#if $cart.logistic_errMsg#}<code style="color: red;" class="logistic_errMsg">{#$cart.logistic_errMsg#}</code>{#/if#}<span class="ps" {#if $cart.logistic_errMsg#} style="display: none;"{#/if#}>{#if $list.logistictype == 1#}商家配送{#elseif $list.logistictype == 0#}普通快递{#elseif $list.logistictype == 2#}平台配送{#else#}运费计算错误{#/if#}</span></span>
+										<div class="fn-right rope {#if $userinfo.privilege && $userinfo.privilege['delivery'][0] &&  $cart.mlogistic > 0 || ($cart.logistic && (!$userinfo.privilege || !$userinfo.privilege['delivery'][0]))#}{#else#}fn-hide{#/if#}">
+											
+											<span class="ps_yh {#if $cart.mlogistic <= $cart.logistic#}fn-hide{#/if#} ">
+												
+												<span class="{#if $userinfo.privilege['delivery']#}{#else#}fn-hide{#/if#}">{#if $userinfo.privilege['delivery'][0]['type'] == 'discount'#}会员配送费{#$userinfo.privilege['delivery'][0]['val']#}折{#else#}享受免配送费({#$userinfo.delivery_count#}次){#/if#}</span>
+												
+												<s>{#echoCurrency type="symbol"#}<b>{#$cart.mlogistic#}</b></s>
+											</span>
+											
+											
+											<!-- 优惠后的配送价格 -->
+											
+											<em class="{#if $cart.logistic_errMsg#}fn-hide{#/if#}">{#if $cart.mlogistic == 0#}{#$langData['shop'][3][2]#}{#else#}{#echoCurrency type='symbol'#}{#$cart.logistic#}{#/if#}</em>
+											
+										</div>
+									</div>
+									{#/if#}
+									<div class="shop-msg {#if $confirmtype == 0#}mrt{#/if#}" >
+										<label>订单备注</label>
+										<!-- <form method="get"> -->
+											<input type="text" name="note[{#$list.sid#}]" value="" class="shop-msg-input" placeholder="选填，请先和商家协商一致">
+										<!-- </form> -->
+									</div>
+								    {#/if#}
+								</li>
+
+								{#/foreach#}
+							</ul>
+						</div>
+						<!-- 一个店铺 多个商品并存在两种配送方式时  quan-item2-->
+						{#if  !$hid#}
+						<div class="shop-item fn-clear quan-item quan-item2 {#if empty($cart.quanarr)#}fn-hide{#/if#}" data-quankey="{#$k#}" data-total="{#$shopTotalPrice#}" data-quanjian="" data-quanid="">
+							<label>店铺优惠</label>
+							<span class="midDesc"></span>
+							<p class="qdprice"><em>-{#echoCurrency type='symbol'#}</em><strong>00</strong><span>.00</span></p>
+							<span class="fn-right quanNochose">
+								<em class="quan_touse">{#count($cart.quanarr)#}张可用</em>
+								<em class="quan_use fn-hide"></em>
+							</span>
+						</div>
+						{#/if#}
+
+						<div class="shop-item-price fn-clear"  >
+							<label>共{#$storeCount#}件</label>
+							<span class="midji">小计：</span>
+							{#$storepriceArr = "."|explode:$storePrice1#}
+							<p class="shoptprice" data-shopprice="{#$storePrice#}" data-vipjian="{#$list.amount#}"><em>{#echoCurrency type='symbol'#}</em><strong>{#$storepriceArr[0]#}</strong><span>.{#if $storepriceArr[1]#}{#$storepriceArr[1]#}{#else#}00{#/if#}</span></p>
+						</div>
+					</li>
+					{#/foreach#}
+
+					<!-- 积分抵扣 -->
+					<li class="otherInfoLi">
+						{#if $userinfo.point > 0 && $cfg_offset_shop > 0#}
+						<div class="jfdi">
+							<div class="jfleft">
+								<s class="jficon"></s>
+								<span class="jftip">{#$cfg_pointName#}抵现</span>
+							</div>
+
+							<div class="jianPrice">
+								<em>-{#echoCurrency type="symbol"#}</em>
+								<p class="jian"><strong>00</strong><span>.00</span></p>
+							</div>
+							<div class="jfright">不使用积分</div>
+						</div>
+						{#/if#}
+						{#if $userinfo.privilege && $userinfo.privilege['shop'] > 0 &&( $huodongstates == 0 || !$buytype)#}
+						<div class="vipJian" data-jian="{#floatval($totalPrice * $userinfo.privilege['shop'] / 100)|string_format:'%.2f'#}">
+							<div class="vipleft">
+								<s class="vipicon"></s>
+								<span>{#$userinfo.levelName#}<em class="vip_dis">{#$userinfo.privilege['shop']#}</em>折</span>
+							</div>
+
+
+							{#foreach from=$priceinfo item="value"#}
+							{#$amountPice = $amountPice + $value['amount']#}
+							{#/foreach#}
+							{#$amountPiceArr = "."|explode:$amountPice#}
+							{#if $amountPice#}
+							<div class="vipdescPrice">
+								<em>-{#echoCurrency type="symbol"#}</em>
+								<p class="vip_jian" data-desc="{#$amountPice#}" data-desc_curr="{#$amountPice#}"><strong>{#$amountPiceArr[0]|default:0#}</strong><span>.{#if $amountPiceArr[1]#}{#$amountPiceArr[1]#}{#else#}00{#/if#}</span></p>
+							</div>
+							{#/if#}
+						</em>
+						</div>
+						{#/if#}
+
+					</li>
+					<!-- 如果只有在线支付的时候，就不显示这条 只有货到付款的时候，显示文字，就不用选择了  到店优惠时也无此项-->
+					{#if $confirmtype != 0 && $delivery#}
+					<li class="shoppayLi morePay">
+						<label>支付方式</label>
+						<div class="shoppayt"><span>在线支付</span><i></i></div>
+					</li>
+					{#/if#}
+					<!-- 到店优惠特有 -->
+					{#if ($confirmtype == 0 && count($cartList) > 1)  &&  $frompage != '1'#}
+					<li class="telLi">
+						<label for="customtel">手机号</label>
+						<input type="text" placeholder="请填写手机号" name="customtel" id="customtel">
+					</li>
+					{#/if#}
+				</ul>
+			</form>
+		</div>
+		<!-- 底部 -->
+		<div class="footer">
+			<div class="total-num r" data-totalPrice="{#$totalPrice#}">
+				<p class="totNum">共{#$totalCount#}件，</p>
+				<span class="totheji">合计:</span>
+				{#$totPiceArr = "."|explode:$totalPrice#}
+				<p class="totPrice">
+					<em>{#echoCurrency type='symbol'#}</em>
+					<strong>{#$totPiceArr[0]#}</strong>
+					<span>.{#if isset($totPiceArr[1])#}{#$totPiceArr[1]#}{#else#}00{#/if#}</span>
+				</p>
+			</div>
+			<div class="account-btn r">
+				{#if $peerpayState && !$peerpay && $huodongtype!=3 && $huodongtype!=4 && count($cartList) <= 1#}
+				 <a href="javascript:;" class="shareTo" data-paytype="1">找人付</a>
+				{#/if#}
+
+				<a href="javascript:;" class="submit publicpaybtn" data-paytype="0">{#$langData['siteConfig'][6][164]#}</a>
+			</div>
+
+		</div>
+		<!-- 底部 end -->
+
+	</div>
+
+
+<div class="topcart fn-hide speCart"><div class="cart-con"><div class="cartlist"><ul></ul></div></div></div>
+
+	<!-- 区号弹出层 s -->
+  <div class="layer_code">
+    {#* 国籍/地区  *#}
+    <div class="layer_search"><p>{#$langData['siteConfig'][19][285]#}</p><em class="layer_close"></em></div>
+    <div class="layer_list" id="layer_list">
+      <ul>
+      </ul>
+    </div>
+  </div>
+  	<!-- 区号弹出层 e -->
+  	<div class="mask-code" id="maskReg"></div>
+	<div id="popupReg-captcha-mobile"></div>
+
+	<!-- 优惠券弹窗 -->
+	<div class="quan_mask"></div>
+	<div class="quan_pop">
+		<h2 class="pop_tit">
+			<b>优惠券</b>
+			<a href="javascript:;" class="noUse">不使用优惠</a>
+		</h2>
+		<div class="qtab_box">
+			<a href="javascript:;" class="q_user on_tab">可用优惠券(<span id="quan">0</span>)</a>
+			<a href="javascript:;" class="q_nouse">不可用优惠券(<span id="noquan">0</span>)</a>
+		</div>
+		<div class="qtab_con">
+			<div class="quseListBox">
+				<ul class="qlist quseList">
+
+				</ul>
+				<div class="btn_box"><a href="javascript:;" class="btn_sure">确定</a></div>
+			</div>
+			<div class="qnouseListBox  fn-hide">
+				<ul class="qlist ">
+
+				</ul>
+			</div>
+		</div>
+	</div>
+
+	<!-- 积分抵现弹窗 -->
+	<div class="jifMask"></div>
+	<div class="jf_pop">
+		<div class="jfTop"><strong>{#$cfg_pointName#}抵现</strong><span>{#$cfg_pointName#}只可抵用订单部分金额</span></div>
+		<div class="myjf">我的{#$cfg_pointName#}：<strong>{#$userinfo.point#}</strong></div>
+		<ul>
+			{#if $userinfo.point > 0 && $cfg_offset_shop > 0#}
+			<li class="integral">
+				<p class="left">使用<span class="jifen">0</span>{#$cfg_pointName#}抵扣<span class="jian">0</span>{#echoCurrency type="short"#}</p>
+				<span class="gou hasgou"></span>
+			</li>
+			{#/if#}
+			<li class="nousejf"><a href="javascript:;"><em>不使用积分</em><span class="gou"></span></a></li>
+
+		</ul>
+		<div class="jfsure"><a href="javascript:;">确定</a></div>
+	</div>
+
+	<!-- 支付方式弹窗 -->
+	<div class="zhifMask"></div>
+	<div class="zhif_pop">
+		<div class="zhifTop"><strong>支付方式</strong></div>
+		<ul>
+			<li class=""><a href="javascript:;" data-type="2"><em>在线支付</em><span class="gou hasgou"></span></a></li>
+			<li><a href="javascript:;" data-type="1"><em>货到付款</em><span class="gou"></span></a></li>
+
+		</ul>
+		<div class="zhifsure"><a href="javascript:;">确定</a></div>
+	</div>
+	<!-- 配送方式弹窗 -->
+	<div class="psMask"></div>
+	<div class="ps_pop">
+		<div class="psTop"><strong>配送方式</strong></div>
+		<ul>
+			<li><a href="javascript:;">
+				<div>
+					<em>普通配送</em>
+					<span class="psspan"></span>
+				</div>
+				<span class="gou hasgou"></span></a>
+			</li>
+		</ul>
+		<div class="pssure"><a href="javascript:;">完成</a></div>
+	</div>
+
+	<div class="error"></div>
+
+	<script type="text/javascript">
+	var totalAmount = {#$totalPrice#}, totalPoint = {#$userinfo.point#}, totalBalance = {#$userinfo.money#}, pointRatio = {#$cfg_pointRatio#}, totalCoupon = {#$totalCoupon#};
+	var pointName = '{#$cfg_pointName#}';
+	var orderList = "{#getUrlPath service='member' type='user' template='order' module='shop'#}";
+	</script>
+{#include file="{#$HUONIAOROOT#}/templates/siteConfig/public_location.html"#}
+	{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+<script src="{#$templets_skin#}js/common.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+{#if $site_map == 'google'#}
+<script src="{#$HUONIAOROOT#}/templates/member/touch/js/markerwithlabel.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script src="{#$templets_skin#}js/confirm_map.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/confirm.js?v={#$cfg_staticVersion#}"></script>
+
+
+
+</body>
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$shop_description#}',
+		"title": '{#$shop_title#}',
+		"imgUrl": '{#$shop_logoUrl#}',
+		"link": '{#$shop_channelDomain#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+</html>

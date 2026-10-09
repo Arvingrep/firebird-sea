@@ -448,7 +448,7 @@ if ($action == "checkFtpConn") {
 //获取会员信息
 }elseif($action == "getMemberInfo"){
 	if(!empty($id)){
-		$userSql = $dsql->SetQuery("SELECT m.`username`, m.`nickname`, m.`company`, m.`realname`, m.`addr`, m.`money`, m.`bonus`, m.`promotion`, m.`point`, m.`email`, m.`emailCheck`, m.`phone`, m.`phoneCheck`, m.`qq`, m.`photo`, m.`sex`, m.`birthday`, m.`regtime`, m.`regip`, m.`state`, m.`cityid`, l.`name` as level FROM `#@__member` m LEFT JOIN `#@__member_level` l ON l.`id` = m.`level` WHERE m.`id` = ".$id);
+		$userSql = $dsql->SetQuery("SELECT m.`username`, m.`nickname`, m.`company`, m.`realname`, m.`addr`, m.`money`, m.`bonus`, m.`promotion`, m.`point`, m.`email`, m.`emailCheck`, m.`phone`, m.`phoneCheck`, m.`qq`, m.`photo`, m.`sex`, m.`birthday`, m.`regtime`, m.`regip`, m.`state`, l.`name` as level FROM `#@__member` m LEFT JOIN `#@__member_level` l ON l.`id` = m.`level` WHERE m.`id` = ".$id);
 		$userResult = $dsql->dsqlOper($userSql, "results");
 		if($userResult){
 			$addrname = $userResult[0]['addr'];
@@ -460,7 +460,6 @@ if ($action == "checkFtpConn") {
             $userResult[0]['realname'] = $userResult[0]['realname'] ? $userResult[0]['realname'] : '';
             $userResult[0]['phone'] = $userResult[0]['phone'] ? $userResult[0]['phone'] : '';
             $userResult[0]['email'] = $userResult[0]['email'] ? $userResult[0]['email'] : '';
-            $userResult[0]['cityname'] = getSiteCityName($userResult[0]['cityid']);
 			echo json_encode($userResult);
 		}
 	}
@@ -557,19 +556,7 @@ if ($action == "checkFtpConn") {
     $key = addslashes($_POST['key']);
     if (!empty($key)) {
         $where = getCityFilter('zj.`cityid`');
-        $userSql = $dsql->SetQuery("SELECT user.username, user.phone, user.nickname, zj.id FROM `#@__house_distributor_company_user` zj LEFT JOIN `#@__member` user ON user.id = zj.uid WHERE (user.username like '%$key%' OR user.nickname like '%$key%')".$where." LIMIT 0, 10");
-        $userResult = $dsql->dsqlOper($userSql, "results");
-        if ($userResult) {
-            echo json_encode($userResult);
-        }
-    }
-    die;
-//模糊匹配新房产经纪人
-} elseif ($action == "checkBrokerUser") {
-    $key = addslashes($_POST['key']);
-    if (!empty($key)) {
-        $where = getCityFilter('zj.`cityid`');
-        $userSql = $dsql->SetQuery("SELECT user.username, user.phone, user.nickname, zj.uid FROM `#@__house_distributor_company_user` zj LEFT JOIN `#@__member` user ON user.id = zj.uid WHERE (user.username like '%$key%' OR user.nickname like '%$key%')".$where." LIMIT 0, 10");
+        $userSql = $dsql->SetQuery("SELECT user.username, user.phone, user.nickname, zj.id FROM `#@__house_zjuser` zj LEFT JOIN `#@__member` user ON user.id = zj.userid WHERE (user.username like '%$key%' OR user.nickname like '%$key%')".$where." LIMIT 0, 10");
         $userResult = $dsql->dsqlOper($userSql, "results");
         if ($userResult) {
             echo json_encode($userResult);
@@ -582,7 +569,7 @@ if ($action == "checkFtpConn") {
     $key = addslashes($_POST['key']);
     if (!empty($key)) {
         $where = getCityFilter('zj.`cityid`');
-        $zjSql = $dsql->SetQuery("SELECT user.id FROM `#@__house_distributor_company_user` zj LEFT JOIN `#@__member` user ON user.id = zj.uid WHERE zj.status = 1 ".$where."");
+        $zjSql = $dsql->SetQuery("SELECT user.id FROM `#@__house_zjuser` zj LEFT JOIN `#@__member` user ON user.id = zj.userid WHERE zj.state = 1 ".$where."");
         $zjResult = $dsql->dsqlOper($zjSql, "results");
         $idArr = '0';
         if(!empty($zjResult)){
@@ -596,18 +583,12 @@ if ($action == "checkFtpConn") {
 	            $userSql = $dsql->SetQuery("SELECT username, phone, nickname, id FROM  `#@__member`  WHERE `state` = 1 and `id` not in ($idArr) and (username like '%$key%' OR nickname like '%$key%') LIMIT 0, 10");
 	            $userResult = $dsql->dsqlOper($userSql, "results");
 	            if ($userResult) {
-                    foreach ($userResult as $key=>$value) {
-                        $userResult[$key]['phone']=aesDecrypt($value['phone']);
-                    }
 	                echo json_encode($userResult);
 	            }
             }else{
             	$userSql = $dsql->SetQuery("SELECT username, phone, nickname, id FROM  `#@__member`  WHERE `state` = 1 and (username like '%$key%' OR nickname like '%$key%') LIMIT 0, 10");
 	            $userResult = $dsql->dsqlOper($userSql, "results");
 	            if ($userResult) {
-                    foreach ($userResult as $key=>$value) {
-                        $userResult[$key]['phone']=aesDecrypt($value['phone']);
-                    }
 	                echo json_encode($userResult);
 	            }
             }
@@ -615,9 +596,6 @@ if ($action == "checkFtpConn") {
         	$userSql = $dsql->SetQuery("SELECT username, phone, nickname, id FROM  `#@__member`  WHERE `state` = 1 and (username like '%$key%' OR nickname like '%$key%') LIMIT 0, 10");
             $userResult = $dsql->dsqlOper($userSql, "results");
             if ($userResult) {
-                foreach ($userResult as $key=>$value) {
-                    $userResult[$key]['phone']=aesDecrypt($value['phone']);
-                }
                 echo json_encode($userResult);
             }
         }
@@ -640,7 +618,7 @@ if ($action == "checkFtpConn") {
             $where = " AND zj.id != " . $id;
         }
 
-        $userSql = $dsql->SetQuery("SELECT user.username, user.phone, user.nickname, zj.id FROM `#@__house_distributor_company_user` zj LEFT JOIN `#@__member` user ON user.id = zj.uid WHERE user.username = '$key'" . $where);
+        $userSql = $dsql->SetQuery("SELECT user.username, user.phone, user.nickname, zj.id FROM `#@__house_zjuser` zj LEFT JOIN `#@__member` user ON user.id = zj.userid WHERE user.username = '$key'" . $where);
         $userResult = $dsql->dsqlOper($userSql, "results");
         if ($userResult) {
             echo 200;
@@ -666,7 +644,7 @@ if ($action == "checkFtpConn") {
             $where = " AND zj.id != " . $id;
         }
 
-        $userSql = $dsql->SetQuery("SELECT user.username, user.phone, user.nickname, zj.uid  FROM `#@__house_distributor_company` zj LEFT JOIN `#@__member` user ON user.id = zj.uid WHERE user.username = '$key'" . $where);
+        $userSql = $dsql->SetQuery("SELECT user.username, user.phone, user.nickname, zj.userid FROM `#@__house_zjcom` zj LEFT JOIN `#@__member` user ON user.id = zj.userid WHERE user.username = '$key'" . $where);
         $userResult = $dsql->dsqlOper($userSql, "results");
         if ($userResult) {
             echo 200;
@@ -681,7 +659,7 @@ if ($action == "checkFtpConn") {
     $key = addslashes($_POST['key']);
     if (!empty($key)) {
         $where = getCityFilter('`cityid`');
-        $commSql = $dsql->SetQuery("SELECT `id`, `name` as `title` FROM `#@__house_distributor_company` WHERE `name` like '%$key%'".$where." LIMIT 0, 10");
+        $commSql = $dsql->SetQuery("SELECT `id`, `title` FROM `#@__house_zjcom` WHERE `title` like '%$key%'".$where." LIMIT 0, 10");
         $commResult = $dsql->dsqlOper($commSql, "results");
         if ($commResult) {
             echo json_encode($commResult);
@@ -1825,6 +1803,11 @@ if ($action == "checkFtpConn") {
     if(!file_exists($wechatConfig)) return array("state" => 200, "info" => '请先设置微信开发者信息！');
     require($wechatConfig);
 
+    include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
+    $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
+    $token = $jssdk->getAccessToken();
+
+    if (!$token) die('{"state":"200","info":"Token获取失败！"}');
     if ((int)$addtype == 0) {
         /*设置所属行业*/
         $url = 'https://api.weixin.qq.com/cgi-bin/template/api_set_industry?access_token='.$token;
@@ -1873,21 +1856,19 @@ if ($action == "checkFtpConn") {
             }
             $template_title = $ret[0]['title'];
             $wechat_serialarr['template_id_short'] = $ret[0]['wechat_serial'];
-        }
-
-        //批量全部添加
-        else{
+            //批量全部添加
+        }else{
             $pageSize = empty($pageSize) ? 1 : $pageSize;
             $page     = empty($page) ? 1 : $page;
 
             $atpage = $pageSize*($page-1);
             $where = " LIMIT $atpage, $pageSize";
 
-            $sql = $dsql->SetQuery("SELECT `id`, `wechat_serial`, `wechat_rule` FROM `#@__site_notify` WHERE `wechat_serial` != '' AND `wechat_state` = 1 GROUP  BY `wechat_serial` LIMIT 0,25");
+            $sql = $dsql->SetQuery("SELECT `id`, `wechat_serial` FROM `#@__site_notify` WHERE `wechat_serial` != '' AND `wechat_state` = 1 GROUP  BY `wechat_serial` LIMIT 0,25");
             $totalCount = $dsql->dsqlOper($sql, "totalCount");
 
             //获取模板信息
-            $sql = $dsql->SetQuery("SELECT `id`, `title`, `wechat_serial`, `wechat_rule` FROM `#@__site_notify` WHERE `wechat_serial` != '' AND `wechat_state` = 1 GROUP  BY `wechat_serial` ORDER BY `id` ASC" . $where);
+            $sql = $dsql->SetQuery("SELECT `id`, `title`, `wechat_serial` FROM `#@__site_notify` WHERE `wechat_serial` != '' AND `wechat_state` = 1 GROUP  BY `wechat_serial` ORDER BY `id` ASC" . $where);
             $ret = $dsql->dsqlOper($sql, "results");
             if(!$ret){
                 die('{"state":"200","info":' . json_encode("消息通知未配置，请核实！") . '}');
@@ -1895,123 +1876,60 @@ if ($action == "checkFtpConn") {
 
             $template_title = $ret[0]['title'];
             $wechat_serialarr['template_id_short'] = $ret[0]['wechat_serial'];
-            $wechat_serialarr['keyword_name_list'] = $ret[0]['wechat_rule'];
         }
 
         if (!empty($wechat_serialarr)) {
-            
-            //获取token
-            include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
-            
-            $cityid = (int)$cityid;  //-1所有分站，0默认，>0指定分站
 
-            //默认配置
-            $wechatArr = array();
-            $defautWechatConfig = array(
-                'cityname' => '总站配置',
-                'token' => $cfg_wechatToken,
-                'appid' => $cfg_wechatAppid,
-                'appsecret' => $cfg_wechatAppsecret,
-                'name' => $cfg_wechatName,
-                'code' => $cfg_wechatCode,
-                'qr' => $cfg_wechatQr
-            );
+            $url = 'https://api.weixin.qq.com/cgi-bin/template/api_add_template?access_token='.$token;
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_HEADER, 0);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($wechat_serialarr));
+            curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT']);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            $output = curl_exec($ch);
+            curl_close($ch);
 
-            $wechatArr[0] = $defautWechatConfig;
-
-            //所有分站
-            if($cityid == -1){
-                global $cfg_siteCityAdvanced_wechat;
-                if($cfg_siteCityAdvanced_wechat){
-                    foreach($cfg_siteCityAdvanced_wechat as $key => $value){
-                        $wechatArr[$key] = $value;
-                    }
-                }
+            if (empty($output)) {
+                return '{"state": 200, "info": "请求失败，请稍候重试！"}';
             }
-            //指定分站
-            elseif($cityid > 0){
-                if(isset($cfg_siteCityAdvanced_wechat[$cityid])){
-                    unset($wechatArr[0]);
-                    $wechatArr[$cityid] = $cfg_siteCityAdvanced_wechat[$cityid];
-                }
-            }
-
-            //循环执行
-            foreach($wechatArr as $key => $value){
-
-                $cityname = $value['cityname'];
-
-                //获取token
-                $jssdk = new WechatJSSDK($value['appid'], $value['appsecret']);
-                $token = $jssdk->getAccessToken();
-
-                if (!$token){
-                    if($id){
-                        die('{"state":"200","info":' . json_encode("分站[' . $cityname . ']；Token获取失败！") . '}');
-                    }else{
-                        die('<h1>分站[' . $cityname . ']；Token获取失败！</h1>');
-                    }
-                }
-
-                //请求接口
-                $url = 'https://api.weixin.qq.com/cgi-bin/template/api_add_template?access_token='.$token;
-                $output = hn_curl($url, $wechat_serialarr);
-
-                if (empty($output)) {
-                    return '{"state": 200, "info": "分站[' . $cityname . ']；请求失败，请稍候重试！"}';
-                }
-                $result = json_decode($output, true);
-                if ($result['errmsg'] != 'ok') {
-                    if ($result['errcode'] == '45026') {
-                        $err = "分站[" . $cityname . "]；模板数量达到上限，请到微信公众平台模板库清理不用的模板后再导入！";
-                    } else {
-                        $err = '分站[' . $cityname . ']；标题[' . $template_title . ']；TemplateID[' . $wechat_serialarr['template_id_short'] . ']；Code[' . $result['errcode'] . ']；Message[' . $result['errmsg'] . ']';
-                    }
-
-                    if($id){
-                        die('{"state":"200","info":' . json_encode("添加失败，请重试！错误信息：" . $err) . '}');
-                    }else{
-                        die('<h1>添加失败！错误信息：'.$err.'，请'.$second.'秒后刷新重试！</h1>');
-                    }
+            $result = json_decode($output, true);
+            if ($result['errmsg'] != 'ok') {
+                if ($result['errcode'] == '45026') {
+                    $err = "模板数量达到上限，请到微信公众平台模板库清理不用的模板后再导入！";
                 } else {
-                    $code = $result['template_id'];
-
-                    //默认配置
-                    if($key == 0){
-                        $archives = $dsql->SetQuery("UPDATE `#@__site_notify` SET `wechat_tempid` = '" . $code . "' WHERE `wechat_serial` = '" . $wechat_serialarr['template_id_short']."'");
-                        $results  = $dsql->dsqlOper($archives, "update");
-                    }
-                    //分站配置
-                    else{
-                        $random_code = substr(md5(uniqid()), 0, 8);
-                        $sql = $dsql->SetQuery("SELECT `wechat_city_tempid` FROM `#@__site_notify` WHERE `wechat_serial` = '" . $wechat_serialarr['template_id_short']."' AND $random_code = $random_code");
-                        $ret = $dsql->dsqlOper($sql, "results");
-                        if($ret){
-                            foreach($ret as $key => $value){
-                                $wechat_city_tempid = $value['wechat_city_tempid'];
-                                $wechat_city_tempid = $wechat_city_tempid ? json_decode($wechat_city_tempid, true) : array();
-                                $wechat_city_tempid[$key] = $code;
-                                $wechat_city_tempid = json_encode($wechat_city_tempid, JSON_UNESCAPED_UNICODE);
-                                $archives = $dsql->SetQuery("UPDATE `#@__site_notify` SET `wechat_city_tempid` = '".$wechat_city_tempid."' WHERE `wechat_serial` = '" . $wechat_serialarr['template_id_short']."'");
-                                $results  = $dsql->dsqlOper($archives, "update");
-                            }
-                        }
-                    }
+                    $err = '标题[' . $template_title . ']；TemplateID[' . $wechat_serialarr['template_id_short'] . ']；Code[' . $result['errcode'] . ']；Message[' . $result['errmsg'] . ']';
                 }
+            } else {
+                $code = $result['template_id'];
+                $archives = $dsql->SetQuery("UPDATE `#@__site_notify` SET `wechat_tempid` = '" . $result['template_id'] . "' WHERE `wechat_serial` = '" . $wechat_serialarr['template_id_short']."'");
+                $results  = $dsql->dsqlOper($archives, "update");
             }
         }
 
+
         $second = 0.5;  //间隔时间（秒）
 
+        if($err){
+            if($id){
+                die('{"state":"200","info":' . json_encode("添加失败，请重试！错误信息：" . $err) . '}');
+            }else{
+                die('<h1>添加失败！错误信息：'.$err.'，请'.$second.'秒后刷新重试！</h1>');
+            }
+        }
+
         if($id){
-            die('{"state":"100","info":' . json_encode("导入成功！") . ',"code":"'.$code.'"}');
+            die('{"state":"100","info":' . json_encode("添加成功，模板正在审核中，请登录短信平台查看审核结果！") . ',"code":"'.$code.'"}');
         }else{
 
             if($page == $totalCount){
                 ShowMsg("{$totalCount}条模板全部导入成功，当前页面可以关掉了！", "javascript:;");
             }else{
                 $page++;
-                ShowMsg("共有{$totalCount}条模板需要添加，正在导入第".($page-1)."条，".$second."秒后开始导入下一条。" , "?action=addWxTemplate&addtype=1&cityid=".$cityid."&page=".$page, 0, $second*1000);
+                ShowMsg("共有{$totalCount}条模板需要添加，正在导入第".($page-1)."条，".$second."秒后开始导入下一条。" , "?action=addWxTemplate&addtype=1&page=".$page, 0, $second*1000);
             }
         }
 

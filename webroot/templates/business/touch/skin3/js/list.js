@@ -66,12 +66,6 @@ $(function() {
 			$t.addClass('on').siblings().removeClass('on');
 			box.show().siblings().hide();
 			//if (index == 0 && infoScroll == null) {infoScroll = chooseScroll("scroll-assort");}
-          	if(index == 0){
-              $('#scroll-assort').find('.on').click();
-              var end = $('#scroll-assort li.on').offset().top + $('#scroll-assort li.on').height() / 2 - $('.choose-stage-l').height() /2;
-              var start = $("#scroll-assort").scrollTop();
-              $('#scroll-assort').scrollTop(end + start);
-            }
 			if (index == 1 && areaScroll == null) {init.getArea();}
 			if (index == 2 && sortScroll == null) {sortScroll = chooseScroll("scroll-sort");}
 			if (index == 3 && moreScroll == null) {moreScroll = chooseScroll("scroll-more");}

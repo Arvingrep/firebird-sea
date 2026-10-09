@@ -513,8 +513,8 @@ if($action != ""){
 
             //删除超过时间的日志
             $_time = GetMkTime(time()) - $max_memberBehaviorLog_save_day * 86400;
-			$sql = $dsql->SetQuery("DELETE FROM `#@__member_log` WHERE `pubdate` < ".$_time);
-			$dsql->dsqlOper($sql, "update");
+            $sql = $dsql->SetQuery("DELETE FROM `#@__member_log_all` WHERE `pubdate` < ".$_time);
+            $dsql->dsqlOper($sql, "update");
 
             adminLog("设置用户行为日志保存天数", $max_memberBehaviorLog_save_day . '天');
         }
@@ -1031,7 +1031,7 @@ if(file_exists($tpl."/".$templates)){
 	if($cfg_map != 5) $cla .= " hide";
 	array_push($mapkeyhtml, '<dl id="map5" class="'.$cla.'">
       <dt><label for="mapkey_amap">天地图API密钥：</label></dt>
-      <dd><p><code>此地图解析精度最多到区级，无法精确到乡镇，如果使用了外卖、团购和商城的平台配送功能，请使用百度或者高德地图，否则将影响功能使用！</code></p><div class="input-prepend input-append"><span class="add-on">浏览器端 Key：</span><input style="width: 360px;" type="text" name="mapkey_tmap" id="mapkey_tmap" value="'.$cfg_map_tmap.'" /><div class="btn-group"><a href="https://cloudcenter.tianditu.gov.cn/center/development/myApp" class="btn" target="_blank">申请天地图密钥 <i class="icon-share-alt"></i></a></div></div><br /><div class="input-prepend input-append"><span class="add-on">服务器端 Key：</span><input style="width: 360px;" type="text" name="mapkey_tmap_server" id="mapkey_tmap_server" value="'.$cfg_map_tmap_server.'" /><div class="btn-group"><a href="https://cloudcenter.tianditu.gov.cn/center/development/myApp" class="btn" target="_blank">申请天地图密钥 <i class="icon-share-alt"></i></a></div></div></dd>
+      <dd><p><code>此地图解析精度最多到区级，无法精确到乡镇，如果使用了外卖、团购和商城的平台配送功能，请使用百度或者高德地图，否则将影响功能使用！</code></p><div class="input-prepend input-append"><span class="add-on">浏览器端 Key：</span><input style="width: 360px;" type="text" name="mapkey_tmap" id="mapkey_tmap" value="'.$cfg_map_tmap.'" /><div class="btn-group"><a href="https://console.tianditu.gov.cn/api/key" class="btn" target="_blank">申请天地图密钥 <i class="icon-share-alt"></i></a></div></div><br /><div class="input-prepend input-append"><span class="add-on">服务器端 Key：</span><input style="width: 360px;" type="text" name="mapkey_tmap_server" id="mapkey_tmap_server" value="'.$cfg_map_tmap_server.'" /><div class="btn-group"><a href="https://console.tianditu.gov.cn/api/key" class="btn" target="_blank">申请天地图密钥 <i class="icon-share-alt"></i></a></div></div></dd>
     </dl>');
 	$huoniaoTag->assign('mapkey', join("", $mapkeyhtml));
 

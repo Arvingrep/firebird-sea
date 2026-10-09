@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>{#$integral_title#}</title>
+<meta name="keywords" content="{#$integral_keywords#}" />
+<meta name="description" content="{#$integral_description#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common-s.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/confirm-order.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$integral_channelDomain#}';
+
+var criticalPoint = 1240, criticalClass = "w1200";
+var cookiePre = '{#$cfg_cookiePre#}';
+$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+var hideFileUrl = {#$cfg_hideUrl#};
+var pointName = '{#$cfg_pointName#}';
+var pointRatio = '{#$cfg_pointRatio#}';
+var maxCount = {#$detail_inventory#};
+var userPoint = {#$userinfo.point#};
+
+var convertUrl = '{#getUrlPath service="member" type="user" template="convert"#}';
+var payUrl = '/include/ajax.php?service=integral&action=pay&paytype=#paytype&ordernum=#ordernum';
+</script>
+</head>
+
+<body>
+{#include file='_header.html' pageCurr=0#}
+
+  <!-- 产品分类列表 s -->
+  <div class="categorywrap defaulthide mgl">
+   <div id="nav_category">
+    <div class="">
+     <ul class="category">
+      {#integral action="type" return=toptype#}
+      <li> <a href="{#getUrlPath service='integral' template='list' param="typeid={#$toptype.id#}"#}">{#$toptype.typename#}<i></i></a>
+       <div class="sub_category_box">
+        <dl class="sub_category">
+          {#integral action="type" type=$toptype.id return=subtype#}
+          <dd>
+           <a href="{#getUrlPath service='integral' template='list' param="typeid={#$subtype.id#}"#}">{#$subtype.typename#}</a>
+          </dd>
+          {#/integral#}
+        </dl>
+       </div>
+      </li>
+      {#/integral#}
+     </ul>
+    </div>
+   </div>
+  </div>
+  <!-- 产品分类列表 e -->
+  <!-- 头部用户账户积分信息 s -->
+  <div class="wrap top-user-info-2">
+    <ul>
+      <li class="l1">当前账户{#$cfg_pointName#}：<span class="f-red">{#$userinfo.point#}</span></li>
+      <li class="l2"></li>
+    </ul>
+  </div>
+  <!-- 头部用户账户积分信息 e -->
+  <!-- 购物车列表 s -->
+  <div class="wrap cart-list">
+    <ul class="head oh">
+      <li class="pic"><span>图片</span></li>
+      <li class="name"><span>礼品名称</span></li>
+      <li class="price"><span>单价</span></li>
+      <li class="num"><span>数量</span></li>
+      <li class="integral"><span>兑换</span></li>
+      <li class="do"><span>运费</span></li>
+    </ul>
+    <ul class="main oh">
+      <li data-id="{#$detail_id#}" data-price="{#$detail_price#}" data-point="{#$detail_point#}" data-freight="{#$detail_freight#}" data-inventory="{#$detail_inventory#}">
+        <div class="pic fl">
+          <a href="" target="_blank"><img src="{#changeFileSize url=$detail_litpic type="small"#}" alt="{#$detail_title#}"></a>
+        </div>
+        <div class="name fl">
+          <a href="{#$detail_url#}" target="_blank">{#$detail_title#}</a>
+        </div>
+        <div class="price fl">
+          <span>{#$detail_mprice#}{#echoCurrency type='short'#}</span>
+        </div>
+        <div class="num fl">
+          <span class="btn-box">
+            <span class="btn-dec cannot"><a href="javascript:void(0)"></a></span>
+            <input type="text" value="{#$count#}" class="buynum">
+            <span class="btn-add"><a href="javascript:void(0)"></a></span>
+          </span>
+        </div>
+        <div class="integral fl">
+          <span>{#$detail_price#}{#echoCurrency type='short'#} + {#$detail_point#}{#$cfg_pointName#}</span>
+        </div>
+        <div class="do fl">
+          <span class="freight">{#$detail_freight#}</span>
+        </div>
+      </li>
+    </ul>
+    <div class="btmdo">
+      {#*<a href="javascript:void(0)" class="reset"><i></i>清空购物车</a>*#}
+      <div class="tr-info">
+        <p class="p1">合计支付：<span class="f-red total_r">计算中...</span></p>
+        <ul class="p2">
+          <li class="l2" id="iten_c_li"><span id="integral_check">账户不足{#$cfg_pointName#}：</span><span class="f-red" id="differ_n">0</span></li>
+          <li class="l1">账户{#$cfg_pointName#}：<span class="f-red" id="have_n">{#$userinfo.point#}</span></li>
+        </ul>
+        <div class="addres">
+          <div class="dd d4">
+            <div class="type">收货地址：</div>
+            <div class="info section-address">
+              <div class="addresList">
+                {#$i = 1#}
+                {#member action="address"#}
+                <div id="addAddressNo_{#$i#}" class="address-item J_addressItem{#if $i == 1#} selected{#/if#}"  data-id="{#$row.id#}" data-name="{#$row.person#}" data-tel="{#if $row.mobile != "" && $row.tel != ""#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#$row.mobile#}{#/if#}" data-addr="{#$row.addrname#}" data-address="{#$row.address#}" data-code="{#$row.areaCode#}">
+                  <dl>
+                    <dt><span class="tag"></span><span class="uname">{#$row.person#}</span></dt>
+                    <dd class="uphone">{#if $row.mobile != "" && $row.tel != ""#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#/if#}</dd>
+                    <dd class="uaddres1">{#$row.addrname#}</dd>
+                    <dd class="uaddres2">{#$row.address#}</dd>
+                  </dl>
+                  <div class="actions actions1">
+                    <a href="javascript:void(0)" class="modify">修改</a>
+                  </div>
+                  <div class="actions actions2">
+                    <a href="javascript:void(0)" class="del">删除</a>
+                  </div>
+                  <div class="actions actions3">
+                    <a href="javascript:void(0)" class="setDefault">{#if $i == 1#}当前地址{#else#}使用此地址{#/if#}</a>
+                  </div>
+                </div>
+                {#$i = $i+1#}
+                {#/member#}
+                <div class="address-item address-item-new">
+                  <div class="addbtn">
+                    <span>+</span>
+                    <p>添加新地址</p>
+                  </div>
+                </div>
+              </div>
+              <!-- <span>请选择地址</span><a href="">[修改]</a> -->
+            </div>
+          </div>
+          {#*
+          <div class="dd d5">
+            <div class="type">配送时间：</div>
+            <div class="info">
+                <a href="javascript:void(0)" class="active">不限送货时间：周一至周日</a>
+                <a href="javascript:void(0)">工作日送货：<span>周一至周五</span></a>
+                <a href="javascript:void(0)">双休日、假日送货：<span>周六至周日</span></a>
+            </div>
+          </div>
+          *#}
+        </div>
+        <div class="part3Con">
+          <div class="payStyle">
+            <p class="pay-style"><i><em></em></i><a href="javascript:;">{#$cfg_pointName#}部分</a></p>
+            <div class="blist pwdcon">
+              <input type="password" class="paypwd_inp" placeholder="请输入支付密码">
+            </div>
+          </div>
+          <div class="payStyle">
+            <p class="pay-style"><i><em></em></i><a href="javascript:;">现金部分</a><span>支持微信支付、支付宝、银联支付等多种支付方式</span></p>
+            <div class="blist terrace clearfix">
+              {#siteConfig action="payment" return="payment"#}
+              <a href="javascript:;" class="bank-icon{#if $_bindex.payment == 1#} active{#/if#}" title="{#$payment.pay_name#}" data-type="{#$payment.pay_code#}"><span class="{#$payment.pay_code#}"></span><b></b></a>
+              {#/siteConfig#}
+            </div>
+          </div>
+        </div>
+        <p class="p3"><a href="javascript:;" class="submit">立即结算</a></p>
+      </div>
+    </div>
+    <form action="/include/ajax.php?service=integral&action=deal" class="fn-hide" id="dealForm">
+      <input type="hidden" name="id" value="{#$detail_id#}">
+      <input type="hidden" name="count" id="count" value="1">
+      <input type="hidden" name="address" id="address" value="">
+      <input type="hidden" name="paypwd" class="paypwd" value="">
+    </form>
+    <form action="/include/ajax.php?service=integral&action=pay" class="fn-hide" id="payForm" method="post">
+      <input type="hidden" name="ordernum" id="ordernum" value="">
+      <input type="hidden" name="paytype" id="paytype" value="">
+      <input type="hidden" name="paypwd" class="paypwd" value="">
+    </form>
+  </div>
+  <!-- 购物车列表 s -->
+  <!-- 相关礼品推荐 s -->
+  <div class="wrap interrela-recomm btm45">
+    <div class="title">相关礼品推荐</div>
+    <div class="box">
+      <ul class="product-list-bdr">
+        {#integral action="slist" pageSize=10 typeid=$detail_typeid return="list"#}
+        <li>
+        <div class="inner product-time-c3">
+          <div class="pic">
+            <a href="{#$list.url#}"><img src="{#$cfg_staticPath#}images/blank.gif" data-url="{#$list.litpic#}"></a>
+          </div>
+          <p class="name"><a href="{#$list.url#}">{#$list.title#}</a></p>
+          <p class="price">&yen;{#$list.price#}</p>
+          <p class="des">使用{#$cfg_pointName#}抵{#$list.point/$cfg_pointRatio#}</p>
+        </div>
+        <div class="inner-ab"></div>
+      </li>
+      {#/integral#}
+      </ul>
+    </div>
+  </div>
+  <!-- 相关礼品推荐 e -->
+
+  {#include file='_footer.html'#}
+
+  <!--  收货地址 s -->
+  <div class="address-edit-box">
+    <form action="" id="submitAddr">
+      <div class="box-main">
+        <div class="form-section">
+          <label class="input-label" for="user_name">姓名</label>
+          <input class="input-text J_addressInput" type="text" id="user_name" name="" placeholder="收货人姓名">
+        </div>
+
+        <div class="form-section">
+          <span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+          <label class="input-label phone-label" for="user_phone">手机号</label>
+          <input class="input-text J_addressInput" type="text" id="user_phone" name="user_phone" placeholder="11位手机号">
+          <input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+          <div class="areaCode_wrap areaCode_wrap2">
+            <ul>
+              
+            </ul>
+          </div>
+        </div>
+
+        <div class="form-section form-select-2 clearfix">
+          <div class="xm-select select-province">
+              <div class="dropdown">
+                  <label class="iconfont" for="J_province"></label>
+                  <select name="province" id="J_province" class="select_1">
+                    <option value="0">省份/自治区</option>
+                    {#siteConfig action="area" return="addr" son="0"#}
+                    <option value="{#$addr.id#}">{#$addr.typename#}</option>
+                    {#/siteConfig#}
+                  </select>
+              </div>
+          </div>
+          <div class="xm-select select-city">
+              <div class="dropdown">
+                  <label class="iconfont" for="J_city"></label>
+                  <select name="city" id="J_city" class="select_2">
+                    <option value="0">城市/地区</option>
+                  </select>
+              </div>
+          </div>
+        </div>
+        <div class="form-section clearfix">
+          <div class="xm-select select-county">
+              <div class="dropdown">
+                  <label class="iconfont" for="J_county"></label>
+                  <select name="county" id="J_county" class="select_3">
+                      <option value="0">区/县</option>
+                  </select>
+              </div>
+          </div>
+        </div>
+        <div class="form-section">
+            <label class="input-label" for="user_adress">详细地址</label>
+            <textarea class="input-text J_addressInput" type="text" id="user_adress" name="user_adress" placeholder="详细地址，路名或街道名称，门牌号"></textarea>
+        </div>
+      </div>
+      <!-- box-main end -->
+      <div class="form-confirm clearfix">
+        <a href="javascript:void(0);" class="btn btn-primary" id="J_save" >保存</a>
+        <a href="javascript:void(0);" class="btn btn-gray" id="J_cancel" >取消</a>
+      </div>
+    </form>
+  </div>
+  <div class="mask"></div>
+  <!-- 收货地址 弹出框 e -->
+  <script src="{#$cfg_staticPath#}js/ui/jquery.scroll.loading.js" type="text/javascript"></script>
+  <script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.SuperSlide.2.1.1.js"></script>
+  <script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+  <script type="text/javascript" src="{#$templets_skin#}js/common-s.js?v={#$cfg_staticVersion#}"></script>
+  <script type="text/javascript" src="{#$templets_skin#}js/confirm-order.js?v={#$cfg_staticVersion#}"></script>
+ </body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>请求列表</title>
+{#$cssFile#}
+<style type="text/css">
+.statistics label {display: inline-block;margin-right: 15px;cursor: text;line-height: 35px;}
+.con{ overflow: hidden;    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;}
+.sortToken,.sortResponse{text-decoration: none;}
+.sortToken:not(.curr) ,.sortResponse:not(.curr){color: #999;}
+.sortToken:hover.sortResponse:hover{color: #2672ec; text-decoration: none;}
+.sortToken i,.sortResponse i{display: inline-block; width: 18px; height: 20px; background: url(/static/images/ui/chosen-sprite.png) no-repeat -2px 3px; margin-left: 2px;}
+.bs-docs-example {position: relative; margin: 15px 20px; padding: 30px 19px 30px; *padding-top: 19px; background-color: #fff; border: 1px solid #ddd; -webkit-border-radius: 4px; -moz-border-radius: 4px; border-radius: 4px; margin-left: 50px;}
+/* .bs-docs-example:after {content: "请求列表"; position: absolute; top: -1px; left: -1px; padding: 3px 7px; font-size: 12px; font-weight: bold; background-color: #f5f5f5; border: 1px solid #ddd; color: #9da0a4; -webkit-border-radius: 4px 0 4px 0; -moz-border-radius: 4px 0 4px 0; border-radius: 4px 0 4px 0;} */
+.controls label {display: inline-block; margin: 5px 0 0;}
+.list .showReply.btn{font-size: 12px !important; padding: 8px !important;}
+body{padding: 10px; box-sizing: border-box; height: 100vh;}
+.answer_box{margin-bottom: 20px;}
+.answer_box h3{font-size: 16px; color:#444; font-weight: bold;}
+.showReply{cursor: pointer;}
+.showReply.con:hover{text-decoration: underline;}
+.pagination ul{vertical-align: middle;}
+.userinfoShow{overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+.list td{box-sizing: border-box;}
+</style>
+<script>
+    var now = "{#$smarty.now|date_format:'%Y-%m-%d'#}"
+    var modules = {
+      'job':"{#getModuleTitle name='job'#}",
+      'info':"{#getModuleTitle name='info'#}",
+    }
+</script>
+</head>
+
+<body>
+  <div class="btn-group config-nav">
+    <a type="button" href="index.php?adminRoute={#$adminRoute#}&id=1" class="btn " data-id="1">数据统计</a>
+    <button type="button" class="btn link active" data-url="count.php" >请求记录</button>
+    <a href="index.php?adminRoute={#$adminRoute#}&id=2" type="button" class="btn" data-id="2">配置选项</a>
+</div>
+  <div class="bs-docs-example form-horizontal " data-id="2">
+
+    <div class="search clearfix">
+      <label>搜索：
+      <div class="btn-group" id="ctype" data-id="">
+        <button class="btn dropdown-toggle" data-toggle="dropdown">模块<span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="">全部</a></li>
+          {#if in_array("info", $installModuleArr)#}<li><a href="javascript:;" data-id="info">{#getModuleTitle name='info'#}</a></li>{#/if#}
+          {#if in_array("job", $installModuleArr)#}<li><a href="javascript:;" data-id="job">{#getModuleTitle name='job'#}</a></li>{#/if#}
+        </ul>
+      </div>
+      </label>
+
+      <div class="btn-group" id="cplatform" data-id="">
+        <button class="btn dropdown-toggle" data-toggle="dropdown">AI平台<span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="-1">全部</a></li>
+          {#foreach from=$aiPlatformOptions key='key' item='item'#}
+          <li><a href="javascript:;" data-id="{#$key#}">{#$item#}</a></li>
+          {#/foreach#}
+        </ul>
+      </div>
+      <input class="input-small" type="search" id="keyword" placeholder="输入用户id">
+      &nbsp;&nbsp;请求日期&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期">&nbsp;&nbsp;到&nbsp;&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期">&nbsp;&nbsp;
+      <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+      <div class="f-right">
+        <div class="btn-group" id="pageBtn" data-id="20">
+          <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+          <ul class="dropdown-menu pull-right">
+            <li><a href="javascript:;" data-id="10">每页10条</a></li>
+            <li><a href="javascript:;" data-id="15">每页15条</a></li>
+            <li><a href="javascript:;" data-id="20">每页20条</a></li>
+            <li><a href="javascript:;" data-id="30">每页30条</a></li>
+            <li><a href="javascript:;" data-id="50">每页50条</a></li>
+            <li><a href="javascript:;" data-id="100">每页100条</a></li>
+          </ul>
+        </div>
+        <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+        <button class="btn dropdown-toggle disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+        <div class="btn-group" id="paginationBtn">
+          <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+          <ul class="dropdown-menu" style="left:auto; right:0;">
+            <li><a href="javascript:;" data-id="1">第1页</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <div class="filter clearfix">
+        <div class="f-left">
+          
+        </div>
+        
+      </div>
+    
+    <ul class="thead t100 clearfix">
+      <li class="row6 ">模块名</li>
+      <li class="row12 ">请求用户</li>
+      <li class="row16 left">问题关键字</li>
+      <li class="row10 ">AI平台</li>
+      <li class="row12 "><a href="javascript:;" class="sortToken sort" data-sort="1">花费tokens(次)<i></i></a></li>
+      <li class="row8">输出token</li>
+      <li class="row8 ">输入token</li>
+      <li class="row8"><a href="javascript:;" class="sortResponse sort" data-sort="2">用时(秒)<i></i></a></li>
+      <li class="row12 ">请求时间/请求IP端口</li>
+      <li class="row8">操作</li>
+    </ul>
+    
+    <div class="list common mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+    
+    <div id="pageInfo" class="pagination pagination-centered"></div>
+    
+    <div class="hide">
+      <span id="sKeyword"></span>
+      <span id="mtype"></span>
+      <span id="start"></span>
+      <span id="end"></span>
+    </div>
+  </div>
+
+<script>var adminRoute = "{#$adminRoute#}";</script>
+{#$jsFile#}
+<!-- <script type="text/javascript" src="tpl/js/count.js"> -->
+
+</script>
+</body>
+</html>

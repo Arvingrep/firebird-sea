@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<style>
+html {min-width: 1400px;}
+.o-wrap {padding:15px 15px 50px;}
+.o-item {margin:-10px 0 0 0; padding:5px 20px 10px; background:#f9f9f9;}
+.o-item p {margin:0;}
+.o-item table {width:100%; margin:0;}
+.o-item table td {vertical-align:middle;}
+.o-item table td img {width:50px; height:50px; object-fit: cover;}
+.o-item table td.p-total {color:#f00; font-size:14px;}
+.fn-hide {display: none;}
+.right-con {padding: 0 40px; box-sizing: border-box; -moz-box-sizing: border-box; -webkit-box-sizing: border-box; -ms-box-sizing: border-box; -o-box-sizing: border-box; width: 100%; background: #fff; border-left: 1px solid #eee;}
+ol, ul, li {list-style: none;}
+.right-con .right-title {font-size: 14px; font-weight: bold; padding-top: 20px; padding-bottom: 7px;}
+.right-con ul li {font-size: 14px; color: #666; margin-bottom: 15px;}
+
+.label.label-info.label-huodong-1 {background: #fda8c3!important; border-color: #ff97bb!important; color: #fff!important;}
+.label.label-info.label-huodong-2 {background: #84a0ff!important; border-color: #83a2ff!important; color: #fff!important;}
+.label.label-info.label-huodong-3 {background: #ff7762!important; border-color: #ff897c!important; color: #fff!important;}
+.label.label-info.label-huodong-4 {background: #c48aff!important; border-color: #bf85ff!important; color: #fff!important;}
+
+.information {display: flex; flex-flow: row wrap; font-size: 14px;}
+.information .order-1, .information .order-2, .information .order-3 {flex: 1;}
+.order-state {font-size: 18px; font-weight: 700;}
+
+.information .userinfo {margin-right: 10px;}
+.information .level {display: inline-block; font-size: 10px; height: 20px; line-height: 18px; border-radius: 15px; padding-left: 5px; padding-right: 7px; color: #fff; background-color: rgba(0, 0, 0, .7); vertical-align: text-bottom;}
+.information .level img{display: inline-block; width: 15px; height: 15px; object-fit: cover; margin-right: 3px; vertical-align: text-top;}
+
+.editform dt, .editform dt label, .editform dd.singel-line {line-height: 20px;}
+.cost-info {margin: 20px 0 50px; width: 100%;}
+.cost-info td {padding: 8px 0;}
+.cost-info code {margin-right: 10px;}
+.cost-info tr:hover td {background-color: #f5f5f5;}
+.cost-info td:first-child {text-align: right;}
+.cost-info td:last-child {width: 150px; text-align: right;}
+.fenxiao-info {margin: -30px 0 50px; text-align: right; width: 100%; line-height: 25px;}
+.fenxiao-info td:first-child {text-align: right; vertical-align: top;}
+.fenxiao-info td:last-child {width: 150px; text-align: right; white-space: nowrap;}
+.tPrice {font-size: 18px; color: #F7473E;}
+.changeOrder {margin-right: 10px;}
+</style>
+<script>
+var action = '{#$action#}', adminPath = "{#$adminPath#}";
+var productArr = '{#json_encode($product)#}';
+var orderNum = '{#$id#}';
+var goodpricearr = '{#$goodpricearr#}'
+var all_logistic = '{#$logistic#}'
+var changelogistic = '{#if $changetype#}{#$changelogistic#}{#/if#}'
+</script>
+</head>
+
+<body>
+
+{#if $paytypeold == 'delivery'#}
+<div class="alert alert-danger" style="margin:10px 20px 15px 20px!important;"><button type="button" class="close" data-dismiss="alert">×</button>注意：货到付款的订单，平台不会自动给商家结算，需要平台线下对账并结算给商家，该页面只记录结算金额，订单中涉及到的优惠金额、分站收入、分销佣金等都需要平台先行垫付！</div>
+{#/if#}
+
+<ul class="nav nav-tabs tt" id="myTab" style="margin: 20px 20px 0;">
+  <li class="active"><a data-toggle="tab" href="javascript:;" data-type="courierinfo">基本信息</a></li>
+  {#if $huodongtype == 3#}
+  <li class=""><a data-toggle="tab" href="javascript:;" data-type="bargaining">砍价记录</a></li>
+  {#/if#}
+  {#if $protype == 1 && $orderstate != 0#}
+  <li class=""><a data-toggle="tab" href="javascript:;" data-type="orderinfo">电子券明细</a></li>
+  {#/if#}
+  {#if $orderstate == 4 || $orderstate == 7 || ($orderstate == 6 && $retState == 1)#}
+  <li class=""><a data-toggle="tab" href="javascript:;" data-type="tuimoney">退款记录</a></li>
+  {#/if#}
+</ul>
+<div class="qswrap shopOrder">
+  <div class="item">
+  <form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+
+  <div class="information">
+    <div class="order-1">
+        <dl class="clearfix">
+            <dt>订单状态：</dt>
+            <dd class="singel-line order-state">
+              {#if $orderstate == 0#}
+              <span style="color: #F7473E;">未付款</span>
+              {#elseif $orderstate == 1 || $orderstate == 11#}
+              已付款，等待确认
+              {#elseif $orderstate == 3#}
+              <span style="color: #19be6b;">交易成功</span>
+              {#elseif $orderstate == 6#}
+                {#if $retState == 1#}
+                  {#if $expDate == 0#}
+                    <span class='text-error'>未发货，买家申请退款</span>
+                  {#else#}
+                    <span class='text-error'>已发货，买家申请退款</span>
+                  {#/if#}
+                {#elseif $shipping == 0#}
+                  订单已确认，{#if $songdate#}骑手已取货{#elseif $peidate#}骑手已接单{#else#}等待骑手接单{#/if#}
+                {#else#}
+                  已发货，等待买家收货
+                {#/if#}
+              {#elseif $orderstate == 7#}
+              <span style="color: #19be6b;">退款成功<small style="font-weight: 500; font-size: 12px;">（原路退回）</small></span>
+              {#elseif $orderstate == 10#}
+              <span style="color: #999;">关闭<small style="font-weight: 500; font-size: 12px;">（超时未支付或用户取消订单）</small></span>
+              {#/if#}
+            </dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>订单编号：</dt>
+            <dd class="singel-line">{#$ordernum#}</dd>
+          </dl>
+
+          {#if $huodongtype#}
+          <dl class="clearfix">
+            <dt>活动类型：</dt>
+            <dd class="singel-line">
+                <span class="label label-info label-huodong-{#$huodongtype#}">{#$huodongName#}</span>
+                {#if $huodongtype == 3#}
+                    {#if $bargainingInfo.state == 1#}<span class="label label-success" style="margin-left: 10px;">砍价成功</span>{#elseif $bargainingInfo.state == 2#}<span class="label label-danger" style="margin-left: 10px;">砍价失败</span>{#/if#}
+                {#/if#}
+                {#if $huodongtype == 4#}
+                &nbsp;&nbsp;拼团ID <code>{#$pinid#}</code>
+                <div style="margin-top: 10px;">
+                    状态 {#if $pinstate == 0#}<span class="label" style="margin-right: 20px;">待成团</span>{#else#}<span class="label label-success" style="margin-right: 20px;">已成团</span>{#/if#}
+                    身份 {#if $pintype == 0#}<span class="label">成员</span>{#else#}<span class="label label-info">团长</span>{#/if#}
+                </div>
+                {#/if#}
+            </dd>
+          </dl>
+          {#/if#}
+
+          <dl class="clearfix">
+            <dt>商品类型：</dt>
+            <dd class="singel-line">{#if $protype ==0#}实物{#else#}电子券{#/if#}</dd>
+          </dl>
+        
+          <dl class="clearfix">
+            <dt>下单会员：</dt>
+            <dd class="singel-line">
+                <a href="javascript:;" data-id="{#$userid#}" class="userinfo">{#$username#}</a>
+                {#if $userlevel#}
+                <span class="level">{#if $userlevel.icon#}<img src="{#$userlevel.icon#}" onerror="this.src='/static/images/rz_licenseState.png'" />{#/if#}{#$userlevel.name#}</span>
+                {#/if#}
+            </dd>
+          </dl>
+        
+          <dl class="clearfix">
+            <dt>店铺名称：</dt>
+            <dd class="singel-line"><a href="{#$storeUrl#}" target="_blank">{#$store#}</a><br />联系电话：{#$storeTel#}</dd>
+          </dl>
+          <dl class="clearfix">
+            <dt>店铺账号：</dt>
+            <dd class="singel-line"><a href="javascript:;" data-id="{#$storeUserid#}" class="userinfo">{#$storeUsername#}</a></dd>
+          </dl>
+          {#if $branchid && $protype == 0#}
+          <dl class="clearfix">
+            <dt>店铺分店：</dt>
+            <dd class="singel-line">
+                {#$branchStoreTitle#}
+                
+                {#if $orderstate == 1#}
+                <br />
+                <select id="brancheSelect" style="margin: 10px 0 0 0; min-width: 200px;">
+                    <option value="">变更分店</option>
+                    {#foreach from=$branchList item=branch#}
+                    <option value="{#$branch.id#}">{#$branch.title#}</option>
+                    {#/foreach#}
+                </select>
+                {#/if#}
+        
+            </dd>
+          </dl>
+          {#/if#}
+
+          <dl class="clearfix">
+            <dt>订单备注：</dt>
+            <dd class="singel-line">{#$admin_log|nl2br#}{#if $admin_log#}<br />{#/if#}<a href="javascript:;" class="adminLogEdit">编辑</a></dd>
+          </dl>
+    </div>
+    
+    <div class="order-2">
+        {#if $orderstate != 0 && $orderstate != 10#}
+        <dl class="clearfix">
+            <dt>付款方式：</dt>
+            <dd class="singel-line">{#$paytype#}</dd>
+        </dl>
+        {#/if#}
+
+        <dl class="clearfix">
+            <dt>下单时间：</dt>
+            <dd class="singel-line">{#$orderdate#}</dd>
+        </dl>
+
+        {#if $orderstate == 10 && $canceltime#}
+        <dl class="clearfix">
+            <dt>取消时间：</dt>
+            <dd class="singel-line">{#$canceltime#}</dd>
+        </dl>
+        {#/if#}
+        
+        {#if $paydate#}
+        <dl class="clearfix">
+            <dt>付款时间：</dt>
+            <dd class="singel-line">{#$paydate#}</dd>
+        </dl>
+        {#/if#}
+
+        {#if $confirmdate#}
+        <dl class="clearfix">
+            <dt>确认时间：</dt>
+            <dd class="singel-line">{#$confirmdate#}</dd>
+        </dl>
+        {#/if#}
+
+        {#if $expDate#}
+        <dl class="clearfix">
+            <dt>发货时间：</dt>
+            <dd class="singel-line">{#$expDate#}</dd>
+        </dl>
+        {#/if#}
+        
+        {#if $shipping == 2 && $songdatime#}
+        <dl class="clearfix">
+            <dt>送达时间：</dt>
+            <dd class="singel-line">{#$songdatime#}</dd>
+        </dl>
+        {#/if#}
+        
+        {#if $orderstate == 7#}
+        <dl class="clearfix">
+            <dt>退款时间：</dt>
+            <dd class="singel-line">{#$retOkdate#}</dd>
+        </dl>
+        {#/if#}
+        
+        {#if $okdate#}
+        <dl class="clearfix">
+            <dt>完成时间：</dt>
+            <dd class="singel-line">{#$okdate#}</dd>
+        </dl>
+        {#/if#}
+    </div>
+
+    <div class="order-3">
+        {#if $protype ==0#}
+        
+        {#if $peisongid || $shipping#}
+        <dl class="clearfix">
+            <dt>配送方式：</dt>
+            {#if $shipping == 0 && $peisongid#}
+            <dd class="singel-line">骑手配送</dd>
+            {#elseif $shipping == 1#}
+            <dd class="singel-line">普通快递</dd>
+            {#elseif $shipping == 2#}
+            <dd class="singel-line">商家配送</dd>
+            {#/if#}
+        </dl>
+        {#/if#}
+
+        <dl class="clearfix">
+            <dt>收货地址：</dt>
+            <dd class="singel-line">{#$address#}{#if $lng && $lat#}<img data-lng="{#$lat#}" data-lat="{#$lng#}" src="/static/images/admin/markditu.jpg" id="mark" style="cursor: pointer; margin-left: 10px; display: inline-block; vertical-align: sub; height: 20px;" title="查看地图位置">{#/if#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>收货姓名：</dt>
+            <dd class="singel-line">{#$people#}{#if $orderstate == 0 || $orderstate == 1 || $orderstate == 6#}&nbsp;&nbsp;<a href="javascript:;" class="editAddress">修改收货信息</a>{#/if#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>联系电话：</dt>
+            <dd class="singel-line">{#$contact#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>买家备注：</dt>
+            <dd class="singel-line">{#$note|default:"无"#}</dd>
+        </dl>
+
+        {#if $shipping == 1#}
+        <dl class="clearfix">
+            <dt>快递公司：</dt>
+            <dd class="singel-line">{#$expCompany#}{#if $orderstate == 6#}&nbsp;&nbsp;<a href="javascript:;" class="editExpress">修改物流信息</a>{#/if#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>快递单号：</dt>
+            <dd class="singel-line">{#$expNumber#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>物流跟踪：</dt>
+            <dd class="singel-line"><a href="https://www.baidu.com/s?wd={#$expNumber#}" target="_blank">点击查看</a></dd>
+        </dl>
+        {#/if#}
+
+        {#if $peisongid#}
+
+        <dl class="clearfix">
+            <dt>配送骑手：</dt>
+            <dd class="singel-line">{#$peisongname#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>骑手电话：</dt>
+            <dd class="singel-line">{#$peisongphone#}</dd>
+        </dl>
+        {#if $peidate#}
+        <dl class="clearfix">
+            <dt>接单时间：</dt>
+            <dd class="singel-line">{#$peidate#}</dd>
+        </dl>
+        {#/if#}
+        {#if $songdate#}
+        <dl class="clearfix">
+            <dt>取货时间：</dt>
+            <dd class="singel-line">{#$songdate#}</dd>
+        </dl>
+        {#/if#}
+        {#if $okdate#}
+        <dl class="clearfix">
+            <dt>完成时间：</dt>
+            <dd class="singel-line">{#$okdate#}</dd>
+        </dl>
+        {#/if#}
+
+        {#/if#}
+
+        {#/if#}
+    </div>
+  </div>
+  
+
+  <dl class="clearfix" style="margin-top: 50px; font-size: 14px;">
+    <dd>
+      <div class="o-item">
+        <table class="table">
+          <thead><tr><th width="50">商品</th><th>&nbsp;</th><th>单价</th><th>数量</th>{#if $changetype#}<th>改价</th>{#/if#}</tr></thead>
+          <tbody>
+            {#foreach from=$product item=pro#}
+            <tr>
+              <td><a href="{#$pro.proUrl#}" target="_blank"><img src="{#$pro.proImg#}" onerror="this.src='/static/images/good_default.png'" /></a></td>
+              <td><a href="{#$pro.proUrl#}" target="_blank">{#$pro.product#}</a><br /><small>{#$pro.specation|replace:"$$$":"、"#}</small></td>
+              <td>{#echoCurrency type='symbol'#}{#$pro.price#}</td>
+              <td>X {#$pro.count#}</td>
+              {#if $changetype#}
+              <td>{#echoCurrency type='symbol'#}{#$pro.changeprice#}</td>
+              {#/if#}
+            </tr>
+            {#/foreach#}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 费用明细 -->
+      <table class="cost-info">
+        <tr>
+            <td class="p-total">商品小计：</td>
+            <td>{#echoCurrency type='symbol'#}{#$danjia|string_format:'%.2f'#}</td>
+        </tr>
+        <tr>
+            <td class="p-total">运费：</td>
+            <td>{#echoCurrency type='symbol'#}{#$logistic|string_format:'%.2f'#}</td>
+        </tr>
+
+        {#if $changetype#}
+        <tr>
+            <td class="p-total">改价后总额：</td>
+            <td><span class="tPrice">{#echoCurrency type='symbol'#}{#$changeprice|string_format:'%.2f'#}</span></td>
+        </tr>
+        {#/if#}
+
+        <!-- <tr>
+            <td class="p-total">订单总额：</td>
+            <td>{#echoCurrency type='symbol'#}{#$orderprice#}</td>
+        </tr> -->
+
+        {#if $auth_shop_price > 0#}
+        <tr>
+            <td class="p-total">{#$auth_shopBody#}：</td>
+            <td>-{#echoCurrency type='symbol'#}{#$auth_shop_price|string_format:'%.2f'#}</td>
+        </tr>
+        {#/if#}
+
+        {#if $auth_logistic > 0#}
+        <tr>
+            <td class="p-total">{#$antu_peisongBody#}：</td>
+            <td>-{#echoCurrency type='symbol'#}{#$auth_logistic|string_format:'%.2f'#}</td>
+        </tr>
+        {#/if#}
+
+        {#if $point > 0#}
+        <tr>
+            <td class="p-total">{#$cfg_pointName#}支付：</td>
+            <td>-{#echoCurrency type='symbol'#}{#$point|string_format:'%.2f'#}</td></tr>
+        {#/if#}
+
+        {#if $quan > 0#}
+        <tr>
+            <td class="p-total"><code>{#if $quanbear#}平台承担{#else#}商家承担{#/if#}</code><code style="padding: 1px 4px; margin-right: 10px; display: inline-block; line-height: 16px; background: #F7FAFF; border: 1px solid #CED9ED; border-radius: 4px; color: #7D8FB3;">{#$quanbody#}</code>优惠券：</td>
+            <td>-{#echoCurrency type='symbol'#}{#$quan|string_format:'%.2f'#}</td></tr>
+        {#/if#}
+
+        <tr>
+            <td class="p-total">{#if $orderstate == 0#}<a href="javascript:;" class="changeOrder">修改价格</a>{#/if#}{#if $orderstate == 0 || $orderstate == 10#}实际应付{#else#}实际支付{#/if#}：</td>
+            <td>
+                <span class="tPrice">
+                    {#echoCurrency type='symbol'#}
+                    {#if $changetype#}
+                    {#($changeprice-$auth_shop_price-$auth_logistic-$quan-$point)|string_format:'%.2f'#}
+                    {#else#}
+                    {#($danjia-$auth_shop_price-$auth_logistic-$quan-$point+$logistic)|string_format:'%.2f'#}
+                    {#/if#}
+                </span>
+            </td>
+        </tr>
+        
+      </table>
+
+      <!-- 结算明细 -->
+      <table class="cost-info">
+        {#if $orderstate == 3#}
+        <tr>
+            <td class="p-total"><code>{#if $quan > 0 && !$quanbear#}(商品小计 - 优惠券){#else#}商品小计{#/if#} * {#100-$cfg_shopFee#}%{#if $protype == 0 && $shipping != 0#} + 运费{#/if#}{#if $fenxiao_source || ($bear == 2 && $fenxiaomonyeres)#} - 分销佣金{#/if#}</code>商家收入：</td>
+            <td>{#echoCurrency type='symbol'#}{#$sjprice|string_format:'%.2f'#}</td>
+        </tr>
+        {#/if#}
+
+        {#if $qsamount != 0#}
+        <tr>
+            <td class="p-total">骑手收入：</td>
+            <td>{#echoCurrency type='symbol'#}{#$qsamount|string_format:'%.2f'#}</td>
+        </tr>
+        {#/if#}
+
+        {#if $fenxiaomonyeres && $fenxiao_amount == 0#}
+        <tr>
+            <td class="p-total">{#if $bear !=0#}<code>{#if $bear == 1#}平台承担{#elseif $bear == 2#}商家承担{#/if#}</code>{#/if#}分销佣金：</td>
+            <td>{#echoCurrency type='symbol'#}{#$allfenxiao|string_format:'%.2f'#}</td>
+        </tr>
+        {#/if#}
+        
+        {#if $orderstate == 3#}
+        <tr>
+            <td class="p-total">{#$fenzhanName#}分站收入：</td>
+            <td>{#echoCurrency type='symbol'#}{#$fenzhan|string_format:'%.2f'|default:0#}</td>
+        </tr>
+        <tr>
+            <td class="p-total"><code>商品小计 + 运费{#if $quan > 0#} - 优惠券{#/if#} - 商家收入{#if $fenxiao_amount > 0 || ($bear == 1 && $fenxiaomonyeres)#} - 分销佣金{#/if#} - 分站收入</code>平台收入：</td>
+            <td>{#echoCurrency type='symbol'#}{#$pingtai|string_format:'%.2f'|default:0#}</td>
+        </tr>
+        {#/if#}
+      </table>
+
+      {#if $fenxiao_amount > 0#}
+      <!-- 分销明细 -->
+      <table class="cost-info">
+        <tr>
+            <td class="p-total"><code>{#if $fenxiao_source#}商家承担{#else#}平台承担{#/if#}</code>分销佣金：</td>
+            <td>{#echoCurrency type='symbol'#}{#$fenxiao_amount|string_format:'%.2f'#}</td>
+        </tr>
+        <tr>
+            <td class="p-total">实际分出：</td>
+            <td>{#echoCurrency type='symbol'#}{#$fenxiao_out|string_format:'%.2f'#}</td>
+        </tr>
+        {#if $fenxiao_precipitate > 0#}
+        <tr>
+            <td class="p-total">资金沉淀：</td>
+            <td>{#echoCurrency type='symbol'#}{#$fenxiao_precipitate|string_format:'%.2f'#}</td>
+        </tr>
+        {#/if#}
+      </table>
+      {#/if#}
+
+      {#if $fenxiaomonyeres#}
+      <table class="fenxiao-info">
+        <tr>
+            <td class="p-total">分销用户：</td>
+            <td>{#foreach from=$fenxiaomonyeres item=l#}<a href="javascript:;" class="userinfo" data-id="{#$l.uid#}">{#$l.nickname#}</a>&nbsp;&nbsp;{#echoCurrency type='symbol'#}{#$l.amount|string_format:'%.2f'#}<br />{#/foreach#}</td>
+        </tr>
+      </table>
+      {#/if#}
+
+    </dd>
+  </dl>
+
+   </form>
+ </div>
+
+ {#if $huodongtype == 3#}
+ <div class="item fn-hide">
+    <div class="right-con fn-right editform" style="padding-top: 20px;">
+
+        <dl class="clearfix">
+            <dt>砍价次数：</dt>
+            <dd class="singel-line">{#$bargainingInfo.kj_num#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>商品原价：</dt>
+            <dd class="singel-line">{#echoCurrency type='symbol'#}{#$bargainingInfo.gmoney#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>最低可砍至：</dt>
+            <dd class="singel-line">{#echoCurrency type='symbol'#}{#$bargainingInfo.gfinalmoney#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>当前金额：</dt>
+            <dd class="singel-line">{#echoCurrency type='symbol'#}{#$bargainingInfo.gnowmoney#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>开始时间：</dt>
+            <dd class="singel-line">{#$bargainingInfo.pubdate#}</dd>
+        </dl>
+        <dl class="clearfix">
+            <dt>结束时间：</dt>
+            <dd class="singel-line">{#$bargainingInfo.enddate#}</dd>
+        </dl>
+
+        <div class="o-item o-wrap" style="margin-top: 50px; font-size: 14px;">
+            <table class="table">
+              <thead><tr><th width="50">用户</th><th>&nbsp;</th><th>砍价金额</th><th>砍价时间</th></tr></thead>
+              <tbody>
+                {#foreach from=$bargainingList item=pro#}
+                <tr>
+                  <td><a href="javascript:;" data-id="{#$pro.uid#}" class="userinfo"><img src="{#$pro.photo#}" onerror="this.src='/static/images/noPhoto_100.jpg'" /></a></td>
+                  <td><a href="javascript:;" data-id="{#$pro.uid#}" class="userinfo">{#$pro.nickname#}</a></td>
+                  <td>-{#echoCurrency type='symbol'#}{#$pro.money#}</td>
+                  <td>{#$pro.pubdate#}</td>
+                </tr>
+                {#/foreach#}
+              </tbody>
+            </table>
+        </div>
+        
+    </div>
+ </div>
+ {#/if#}
+
+ 
+ {#if $protype == 1 && $orderstate != 0#}
+ <div class="item fn-hide">
+    <div class="right-con fn-right editform" style="padding-top: 20px;">
+
+        <div class="o-item o-wrap" style="margin-top: 50px; font-size: 14px;">
+            <table class="table">
+              <thead><tr><th>券号</th><th>生成时间</th><th>有效期</th><th>使用时间</th><th>是否退款</th></tr></thead>
+              <tbody>
+                {#foreach from=$quanList item=pro#}
+                <tr>
+                  <td>{#$pro.cardnum#}</td>
+                  <td>{#$pro.carddate#}</td>
+                  <td>{#$pro.expireddate#}</td>
+                  <td>{#$pro.usedate#}</td>
+                  <td>{#if $pro.ret_state#}<font color="#ff0000">已退款</font>{#else#}未退款{#/if#}</td>
+                </tr>
+                {#/foreach#}
+              </tbody>
+            </table>
+        </div>
+        
+    </div>
+ </div>
+ {#/if#}
+
+
+ <div class="item fn-hide">
+   <div class="right-con fn-right editform" style="padding-top: 20px;">
+
+    
+    {#if $orderstate == 7#}
+    <dl class="clearfix">
+        <dt>退款时间：</dt>
+        <dd class="singel-line">{#$retOkdate#}</dd>
+    </dl>
+    <dl class="clearfix">
+        <dt>退款方式：</dt>
+        <dd class="singel-line">原路退回</dd>
+    </dl>
+    <!-- <dl class="clearfix">
+        <dt>退款金额：</dt>
+        <dd class="singel-line">{#echoCurrency type='symbol'#}{#$tuimoney|default:0#}</dd>
+    </dl>
+    <dl class="clearfix">
+        <dt>退款{#$cfg_pointName#}：</dt>
+        <dd class="singel-line">{#$tuipoint#}</dd>
+    </dl> -->
+    {#if $refrundno#}
+    <dl class="clearfix">
+        <dt>退款流水号：</dt>
+        <dd class="singel-line">{#$refrundno#}</dd>
+    </dl>
+    {#/if#}
+    {#/if#}
+
+
+    {#if ($orderstate == 6 && $retState == 1) || $orderstate == 7#}
+    <div style="padding: 5px 0; background:#f5f5f5;">
+        <dl class="clearfix">
+        <dt>退款原因：</dt>
+        <dd class="singel-line">{#$retType#}</dd>
+        </dl>
+        <dl class="clearfix">
+        <dt>退款说明：</dt>
+        <dd class="singel-line">{#$retNote#}</dd>
+        </dl>
+        {#if $retPics|@count > 0#}
+        <dl class="clearfix">
+        <dt>退款凭证：</dt>
+        <dd class="singel-line">
+            {#foreach from=$retPics item=pics key=k#}
+            <a href="{#$pics.path#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics.val#}" style="width: 100px; height: 100px; object-fit: cover;"/></a>
+            {#/foreach#}
+        </dd>
+        </dl>
+        {#/if#}
+        <dl class="clearfix">
+        <dt>申请时间：</dt>
+        <dd class="singel-line">{#if $retDate#}{#$retDate#}{#/if#}</dd>
+        </dl>
+    </div>
+    {#/if#}
+
+    {#if $retSnote != ""#}
+    <div style="margin-top: 10px; padding: 5px 0; background:#f5f5f5;">
+        <dl class="clearfix">
+        <dt>卖家回复：</dt>
+        <dd class="singel-line">{#$retSnote#}</dd>
+        </dl>
+        {#if $retSpics|@count > 0#}
+        <dl class="clearfix">
+        <dt>回复凭证：</dt>
+        <dd class="singel-line">
+            {#foreach from=$retSpics item=pics key=k#}
+            <a href="{#$pics.path#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics.val#}" style="width: 100px; height: 100px; object-fit: cover;" /></a>
+            {#/foreach#}
+        </dd>
+        </dl>
+        {#/if#}
+        <dl class="clearfix">
+        <dt>回复时间：</dt>
+        <dd class="singel-line">{#$retSdate#}</dd>
+        </dl>
+    </div>
+    {#/if#}
+
+     {#foreach from=$ret_negotiate.refundinfo item=l#}
+     <h2 class="right-title">{#$l.typename#}</h2>{#*  配送信息 *#}
+     <ul>
+       <li>
+         <label style="float: left;">提交时间：</label>
+         <span>{#$l.datetime|date_format:"%Y-%m-%d %H:%M:%S"#}</span>
+       </li>
+       <li>
+         <label style="float: left;">退款类型：</label>
+         <span>{#if $l.type == 1#}退货退款{#else#}仅退款{#/if#}</span>
+       </li>
+       {#if $l.typestatus == 0#}
+       <li>
+         <label style="float: left;">退款金额：</label>
+         <span>{#echoCurrency type='symbol'#}{#$l.tuikuanmoney#}</span>
+       </li>
+       {#/if#}
+       <li>
+         <label style="float: left;">退款原因：</label>
+         <span>{#$l.refundinfo#}</span>
+       </li>
+       {#if $l.pics#}
+       <li>
+         <label style="float: left;">退款凭证：</label>
+         <span>
+             {#foreach from=$l.pics item=pics key=k#}
+             <a href="{#$cfg_attachment#}{#$pics#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics#}" style="width: 100px; height: 100px; object-fit: cover;"/></a>&nbsp;
+             {#/foreach#}
+         </span>
+       </li>
+       {#/if#}
+     </ul>
+     {#/foreach#}
+   </div>
+</div>
+
+
+
+<!-- 修改订单价格s -->
+{#if $orderstate == 0#}
+<div class="changeMask"></div>
+<div class="chpriceAlert">
+	<a href="javascript:;" class="chprice_close"></a>
+	<h3 class="chpriceTit">修改订单价格</h3>
+	<div class="chpriceTit2">
+		<strong class="ddMpr">订单原价</strong><em>：</em>
+		<p><strong>{#echoCurrency type='symbol'#}<span class="chYzj">{#$orderprice#}</span></strong></p>
+		<em class="chYf"></em>
+	</div>
+	<div class="chpriceWrap">
+		<div class="chpriceCon">
+			<table class="chprioh">
+				<colgroup>
+					<col style="width:40%;">
+					<col style="width:15%;">
+					<col style="width:12%;">
+					<!-- <col style="width:16%;"> -->
+					<col style="width:19%;">
+				</colgroup>
+				<tbody>
+					<tr>
+						<td>{#$langData['siteConfig'][16][25]#}</td>
+						<td>{#$langData['siteConfig'][19][323]#}</td>
+						<td>{#$langData['siteConfig'][19][324]#}</td>
+						<!-- <td>下单价</td> -->
+						<td>改价为</td>
+					</tr>
+
+				</tbody>
+			</table>
+			<table class="chpriTa">
+				<colgroup>
+					<col style="width:40%;">
+					<col style="width:15%;">
+					<col style="width:12%;">
+					<!-- <col style="width:16%;"> -->
+					<col style="width:19%;">
+				</colgroup>
+				<tbody class="goodWrap">
+
+				</tbody>
+			</table>
+
+		</div>
+		<div class="changeBot">
+			<div class="priceItem fn-clear">
+				<div class="changeTip"><i></i><span>修改商品总价将均摊至单件商品价格</span></div>
+				<b>商品总价(不含运费)：</b>
+				<div class="price zongjia" data-totalprice="{#$goodFee#}" data-currTotalprice="{#$toPayPrice#}">
+					<em>{#echoCurrency type='symbol'#}</em>
+					<input type="text" id="totalprice" value="">
+				</div>
+			</div>
+			<div class="priceItem fn-clear">
+				<div class="free" data-price="{#$logisticFee#}"><s></s>免运费</div>
+				<b class="b2">运费：</b>
+				<div class="price">
+			        <em>{#echoCurrency type='symbol'#}</em>
+			        <input type="text" id="logistic" value="">
+			    </div>
+			</div>
+		</div>
+		<div class="ddZj"><span>订单总价：</span><strong>{#echoCurrency type='symbol'#}<em id="priceAll">0.00</em></strong></div>
+	</div>
+	<a href="javascript:;" class="sureChange">确定修改</a>
+	<input type="hidden" id="fakeprice">
+    <input type="hidden" id="fakelogistic">
+</div>
+{#/if#}
+<!-- 修改订单价格e -->
+
+</div>
+
+<!-- 修改订单备注 -->
+<script id="adminLogForm" type="text/html">
+    <form action="" class="quick-editForm" name="editForm">
+        <input type="hidden" name="orderid" value="{#$id#}">
+        <input type="hidden" name="ordernum" value="{#$ordernum#}">
+      <dl class="clearfix">
+        <dd><textarea name="admin_log" class="input-xlarge" id="admin_log" style="width: 450px; height: 150px;">{#$admin_log#}</textarea></dd>
+      </dl>
+    </form>
+</script>
+
+<!-- 修改收货信息 -->
+<script id="editAddressForm" type="text/html">
+    <form action="" class="quick-editForm" name="editForm">
+        <input type="hidden" name="orderid" value="{#$id#}">
+        <input type="hidden" name="ordernum" value="{#$ordernum#}">
+      <dl class="clearfix">
+        <dt>收货地址：</dt>
+        <dd><textarea name="address" class="input-xlarge" id="address">{#$address#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>收货姓名：</dt>
+        <dd><input class="input-large" type="text" name="people" id="people" value="{#$people#}" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>联系电话：</dt>
+        <dd><input class="input-large" type="text" name="contact" id="contact" value="{#$contact#}" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>买家备注：</dt>
+        <dd><textarea name="note" class="input-xlarge" id="note">{#$note#}</textarea></dd>
+      </dl>
+    </form>
+</script>
+
+<!-- 修改物流信息 -->
+<script id="editExpressForm" type="text/html">
+    <form action="" class="quick-editForm" name="editForm">
+        <input type="hidden" name="orderid" value="{#$id#}">
+        <input type="hidden" name="ordernum" value="{#$ordernum#}">
+      <dl class="clearfix">
+        <dt>快递公司：</dt>
+        <dd>
+            <select id="exp_company" name="exp_company">
+                <option value="">请选择</option>
+                {#foreach from=$juhe_express_company item=exp key=jc#}
+                <option value="{#$jc#}" {#if $exp == $expCompany#}selected{#/if#}>{#$exp#}</option>
+                {#/foreach#}
+            </select>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>快递单号：</dt>
+        <dd><input class="input-large" type="text" name="exp_number" id="exp_number" value="{#$expNumber#}" /></dd>
+      </dl>
+    </form>
+</script>
+
+<script>
+  var ret_negotiatearr = '{#$ret_negotiate#}',staticPath = '{#$cfg_staticPath#}';templatePath = '{#$templets_skin#}';
+  var photo = '{#$photo#}';
+  var logo = '{#$logo#}';
+</script>
+{#$jsFile#}
+</body>
+</html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>{#$detail_content#}</title>
+		<meta name="keywords" content="{#$circle_keywords#}">
+		<meta name="description" content="{#$circle_description#}">
+		<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+		<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon">
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/svdetail_1.css?v={#$cfg_staticVersion#}" />
+		<link rel="stylesheet" href="{#$templets_skin#}css/new_svdetail.css?v={#$cfg_staticVersion#}" />
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+
+		<script>
+			var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', masterDomain = '{#$cfg_basehost#}',staticPath='{#$cfg_staticPath#}', member_center = '{#$member_userDomain#}' ;
+			var channelDomain = '{#$circle_channelDomain#}'
+			var templets_skin = '{#$templets_skin#}';
+			var mobanurl = "{#$detail_url#}",
+			    domainurl = '{#$cfg_basehost#}',
+			      title ='{#$detail_content|escape#}',
+			      desc = "{#$circle_description|strip#}",
+			      rcmd_url = "",
+			      img_url = "{#$detail_litpic#}";
+				  photo = "{#$detail_photo#}"
+				  zannum = "{#$detail_zan#}"   //需要获取
+				  zanhas = "{#$detail_is_zan#}"
+			var nowid = "{#$detail_id#}";
+			var dzuid = "{#$userinfo.userid#}"; //当前登录用户id
+			var fuid = "{#$uid#}";
+			var channelName = '{#$circle_channelName#}';//模块名
+			var userLink = "{#getUrlPath service='member' template='user' type='user'#}";
+			var obj = {
+		        current: -1,
+		        state: "0",
+		        memberid: 0,
+		        videoData: [
+		        {
+
+		          id: "{#$detail_id#}",
+		          thumbnail: "{#$detail_thumbnail#}",
+		          userid:"{#$detail_userid#}",
+		          videoadr:'{#$detail_videoadr#}',
+		          content: '{#$detail_content|escape#}',
+		          username: '{#$detail_nickname#}',
+				  photo:"{#$detail_photo#}",
+		          zan: '{#$detail_zan#}',
+				  isdz: '{#$detail_is_zan#}',
+				  isfollow:"{#$detail_isfollow#}",
+		          reward: '{#$detail_reward#}',
+		          click: '{#$detail_click#}',
+		          reply: '{#$detail_reply#}',
+		          picheight:"{#$detail_picheight#}",
+		          picwidth:"{#$detail_picwidth#}",
+		          url:'{#getUrlPath service="circle" template="blog_detail" id={#$detail_id#}#}',
+				  commodity:{#json_encode($detail_commodity)#},
+                  topictitle:'{#$detail_topictitle#}',
+				  topicurl:'{#$detail_topicurl#}',
+
+		        },
+		        ],
+		        oneData: {
+		          litpic: "",
+		          video: ''
+		        },
+		        twoData: {
+
+		          litpic: "",
+		          videourl: ''
+		        },
+		        threeData: {
+		          litpic: "",
+		          videourl: ''
+		        }
+		      }
+			  var placeholderText='{#$cfg_commentPlaceholder#}';
+              var rewardLimit = {#$circle_rewardLimit|default:100#};
+		</script>
+		<style type="text/css">
+			.appDwonload{display: none !important;}
+		</style>
+	</head>
+	<body style="background: #000">
+		<div class="header absolute transparent svdetail_top">
+			<div class="header-l"><a href="{#$circle_channelDomain#}" class="goBack"></a></div>
+				<div class="header-address">
+				<span>{#$langData['circle'][3][0]#}</span>   {#* 短视频详情 *#}
+			</div>
+			<!--视频发布的提示s-->
+			<div class="left_tip">{#$langData['circle'][3][1]#}</div> {#* 也想发视频？点这里试试 *#}
+			<!--视频发布的提示e-->
+			<div class="header-search">
+				<a href="javascript:;" class="dropnav"></a>
+			</div>
+		</div>
+		<video
+    	x5-video-player-type="h5-page" 
+		id="player"  
+		onclick="goPlay(event)" 
+		x5-video-can-play-with-audio="true" 
+		src="/include/attachment.php?f={#$detail_videoadr[0]#}" 
+		preload="auto" 
+		type="video/mp4"
+		webkit-playsinline="true"
+		playsinline="true" 
+		controlslist="nodownload" 
+		x5-video-player-fullscreen="true" 
+		style="width: 100%; height: 100%; background: rgb(0, 0, 0); object-fit: contain; position: absolute; display: none; z-index: 0;" 
+		poster="{#$detail_litpic#}" >
+      <h5>{#$langData['circle'][3][2]#}</h5>{#* 您的系统不支持Video标签 *#}
+    </video>
+    <input type="hidden" id="videoid" value="527">
+    <div class="swiper-container video_banner swiper-container-initialized swiper-container-vertical" id="shipin_banner_box">
+      <div class="swiper-wrapper" >
+        <div class="swiper-slide swiper-slide-prev">
+          <div class="posterImg" id="PrevEle"></div>
+        </div>
+        <div class="swiper-slide swiper-slide-active" >
+          <div class="btn-play-opacity" onclick="goPlay(event)"></div>
+          <div onclick="goPlay(event)" class="play_btn"></div>
+          <video
+          	id="my-video"
+          	x5-video-player-type="h5-page" 
+          	onclick="goPlay(event)"
+          	class="video_ele"
+          	poster="{#$detail_litpic#}"
+			x5-video-can-play-with-audio="true" 
+			src="/include/attachment.php?f={#$detail_videoadr[0]#}" 
+			preload="auto" 
+			type="video/mp4"
+			webkit-playsinline="true"
+			playsinline="true" 
+			controlslist="nodownload" 
+            style="object-fit:contain;"
+            >
+
+          </video>
+
+          <!--短视频信息s-->
+          <div class="fabuNeirong_container">
+            <div class="name_title ismember" data-href="/m/mdetails.html?t=0&amp;id=" data-id="0" data-url="/m/user/reg"> {#$detail_nickname#}</div>
+            <div class="content">{#$detail_content#}</div>
+            <div class="topic_title">
+				<a href="{#$detail_topicurl#}">{#$detail_topictitle#}</a>
+			</div>
+          </div>
+          <!--短视频信息e-->
+          <!--短视频进度条s-->
+          <div class="video_line">
+          	<div class="bofa_line"></div>
+          </div>
+          <!--短视频进度条e-->
+          <!--底部遮罩s-->
+          <div class="mask_bottom"></div>
+          <!--底部遮罩e-->
+
+
+          <!--短视频相关按钮s-->
+          <div class="right_group">
+          	<!--成功提示s-->
+          	<div class="tip_sucess"></div>
+          	<!--成功提示e-->
+          	<!--头像关注s-->
+          	<div class="head_box">
+          		<a href="{#if $detail_userid#}{#getUrlPath service='member' template='user' type='user' id=$detail_userid#}{#else#}javascript:;{#/if#}">
+          			<img src="{#if $detail_photo#}{#$detail_photo#}{#else#}{#$cfg_staticPath#}images/default_user.jpg{#/if#}" />
+          		</a>
+          		{#if $detail_isfollow == 1 || $detail_isfollow == 0#}
+          		<span class="care_btn {#if $detail_isfollow==1#} cared{#/if#}" data-id="{#$detail_userid #}">
+          			<s class="gz_1"></s>
+          			<s class="gz_2"></s>
+          		</span>
+          		{#/if#}
+          	</div>
+          	<!--头像关注e-->
+
+          	<!--点赞按钮s-->
+          	<div class="zan_box">
+          		<a href="javascript:;" data-id="{#$detail_id|default:0#}" data-admin="{#$detail_userid#}" class="up_num{#if $detail_is_zan != '0'#} active{#/if#}"><i></i></a>
+          		<span>{#if $detail_zan !="0"#}{#$detail_zan#}{else}{#$langData['circle'][3][3]#}{#/if#}</span>{#* 点赞 *#}
+          	</div>
+          	<!--点赞按钮e-->
+
+          	<!--评论数s-->
+          	<div class="comm_box">
+          		<a href="javascript:;" class="common_num"></a>
+          		<span>{#if $detail_reply != "0" && $detail_reply != ''#}{#$detail_reply#}{else}{#$langData['circle'][3][4]#}{#/if#}</span>{#* 评论 *#}
+          	</div>
+          	<!--评论数e-->
+          	<!--分享数s-->
+          	<div class="share_box">
+          		<a href="javascript:;" class="share_num HN_PublicShare"></a>
+          		<span>{#$langData['circle'][3][5]#}</span>{#* 分享 *#}
+          	</div>
+          	<!--分享数e-->
+			{#if 'reward'|in_array:$cfg_ucenterLinks && $circle_rewardSwitch == 0#}
+          	<!--打赏按钮s-->
+          	<div class="reward_box {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide {#/if#}">
+          		<a href="javascript:;" class="reward_num"></a>
+          		<span>{#$langData['circle'][3][6]#}</span>{#* 打赏 *#}
+          	</div>
+          	<!--打赏按钮e-->
+			{#/if#}
+
+
+          </div>
+          <!--短视频相关按钮e-->
+          <!--商品链接s-->
+
+			{#*<div class="link_btn pro_link">
+				<span>ins床品</span>等<em>3</em>件宝贝
+			</div>*#}
+
+		<!--商品链接e-->
+
+		<!--跳转链接s-->
+
+
+
+		<!--跳转链接e-->
+		<!--链接隐藏s-->
+		{#*<a href="#" class="link_btn link_hide">
+			<span>5分钟打动人心高情商沟通课</span>
+		</a>*#}
+		<!--链接隐藏e-->
+        </div>
+        <div class="swiper-slide swiper-slide-next" >
+          <div class="posterImg" id="NextEle">
+          </div>
+        </div>
+      </div>
+    </div>
+    <!--更多s-->
+    <div class="more_box">
+    	<div class="mask0"></div>
+    	<!--举报相关按钮-->
+		<div class="btn_group">
+			<a href="{#$circle_channelDomain#}" class="share_btn">
+				<span><img src="{#$templets_skin#}images/index_icon.png"></span>
+				<p>{#$langData['circle'][3][7]#}</p>    {#* 回首页 *#}
+			</a>
+			<a href="javascript:;" class="jubao_btn">
+				<span><img src="{#$templets_skin#}images/jubao.png"></span>
+				<p>{#$langData['circle'][3][8]#}</p>    {#* 举报 *#}
+			</a>
+			<a href="javascript:;" class="fabu_btn">
+				<span><img src="{#$templets_skin#}images/fabu_video.png"></span>
+				<p>{#$langData['circle'][3][9]#}</p>    {#* 发布 *#}
+			</a>
+		</div>
+    </div>
+	<!--更多e-->
+	<!--评论s-->
+	<div class="box_all">
+		<div class="mask_comm"></div>
+		<div class="commonlist_box">
+		<h2><em>0</em>{#$langData['circle'][3][10]#}  <i class="close_btn"></i></h2>  {#* 条评论 *#}
+		<ul class="comm_ul">
+
+		</ul>
+		<div class="reply_input">
+			<!--<input type="text" id="commt" data-type="commt"  maxlength="200" />-->
+			<textarea class="reply_txtarea" data-type="commt"  maxlength="200"  placeholder="{#$cfg_commentPlaceholder#}"></textarea>   {#* 说说你的看法 *#}
+			<button type="button" class="reply_btn">{#$langData['circle'][3][12]#}</button>    {#* 发送 *#}
+		</div>
+	</div>
+	</div>
+
+	<!--评论e-->
+	<!-- 打赏 s -->
+		<div class="shang-box">
+			<div class="shang-money">
+				<a href="javascript:;" class="close"></a>
+				<h2 class="shang_to">{#$langData['circle'][3][13]#}-<span>{#$userinfo.nickname#}</span></h2>   {#* 打赏给 *#}
+				<div class="shang-item">
+					<span class="shang-item-cash">{#echoCurrency type='symbol'#}<em>0.88</em></span>
+					<span class="inp">{#$langData['circle'][3][14]#}</span>   {#* 其他金额 *#}
+					<div class="shang-else">
+						<em>{#echoCurrency type='symbol'#}</em><input onkeyup="this.value=this.value.replace(/[^\d.]/g,'')" type="text" value="0.88">
+					</div>
+					<p class="error-tip"><span>{#$langData['circle'][3][15]#}{#$circle_rewardLimit#}{#echoCurrency type='short'#}</span></p>{#* 打赏最多不超过 *#}
+				</div>
+				<div class="shang-btn">
+					<a href="javascript:;">{#$langData['circle'][3][16]#}</a>{#* 打赏给 *#}
+				</div>
+			<!--	<p class="tip-p">打赏最多不超过2000{#echoCurrency type='short'#}</p>-->
+			</div>
+		</div>
+	<!-- 打赏 e -->
+	<div class="mask"></div>
+
+    <!-- 遮罩 -->
+    <div class="mask_pro"> </div>
+	<!--商品列表s-->
+	<div class="prolist_box">
+		<h2><em>0</em>{#$langData['circle'][3][17]#}  <i class="close_btn"></i></h2>{#* 个相关链接 *#}
+		<ul class="pro_ul">
+			<li class="pro_li fn-clear">
+				<a href="#" class="fn-clear">
+					<div class="left_proimg"><img src="{#$templets_skin#}upfile/pro.png" /></div>
+					<div class="right_proinfo">
+						<h3 class="pro_title">OPPO FIND X 曲面全景屏双潜望摄像头闪充</h3>
+						<p class="pro_price">{#echoCurrency type='symbol'#}4900<em>.00</em></p>
+					</div>
+				</a>
+			</li>
+			<li class="pro_li fn-clear">
+				<a href="#" class="fn-clear">
+					<div class="left_proimg"><img src="{#$templets_skin#}upfile/pro.png" /></div>
+					<div class="right_proinfo">
+						<h3 class="pro_title">OPPO FIND X 曲面全景屏双潜望摄像头闪充</h3>
+						<p class="pro_price">{#echoCurrency type='symbol'#}4900<em>.00</em></p>
+					</div>
+				</a>
+			</li>
+			<li class="pro_li fn-clear">
+				<a href="#" class="fn-clear">
+					<div class="left_proimg"><img src="{#$templets_skin#}upfile/pro.png" /></div>
+					<div class="right_proinfo">
+						<h3 class="pro_title">OPPO FIND X 曲面全景屏双潜望摄像头闪充</h3>
+						<p class="pro_price">{#echoCurrency type='symbol'#}4900<em>.00</em></p>
+					</div>
+				</a>
+			</li>
+			<li class="pro_li fn-clear">
+				<a href="#" class="fn-clear">
+					<div class="left_proimg"><img src="{#$templets_skin#}upfile/pro.png" /></div>
+					<div class="right_proinfo">
+						<h3 class="pro_title">OPPO FIND X 曲面全景屏双潜望摄像头闪充</h3>
+						<p class="pro_price">{#echoCurrency type='symbol'#}4900<em>.00</em></p>
+					</div>
+				</a>
+			</li>
+			<li class="pro_li fn-clear">
+				<a href="#" class="fn-clear">
+					<div class="left_proimg"><img src="{#$templets_skin#}upfile/pro.png" /></div>
+					<div class="right_proinfo">
+						<h3 class="pro_title">OPPO FIND X 曲面全景屏双潜望摄像头闪充</h3>
+						<p class="pro_price">{#echoCurrency type='symbol'#}4900<em>.00</em></p>
+					</div>
+				</a>
+			</li>
+		</ul>
+	</div>
+	<!--商品列表e-->
+
+	<!--举报s-->
+	<div class="jubao_box">
+		<div class="jubao">
+			<i class="close_btn"></i>
+			<div class="jubao_detail">
+				<h4>{#$langData['circle'][0][34]#}：</h4>   {#* 举报<em></em>的发布 *#}
+				<h2 class="jubao_title"></h2>
+				<form class="content_box">
+					<div class="jubap_type">
+						<input type="text" readonly="" placeholder="请选择类型" />
+						<!--选项-->
+						<div class="chosebox">
+							<ul class="chose_ul">
+								<li>{#$langData['circle'][0][36]#}</li>   {#* 垃圾广告 *#}
+								<li>{#$langData['circle'][0][37]#}</li>   {#* 色情淫秽 *#}
+								<li>{#$langData['circle'][0][38]#}</li>   {#* 政治反动 *#}
+								<li>{#$langData['circle'][0][39]#}</li>   {#* 钓鱼诈骗 *#}
+								<li>{#$langData['circle'][0][40]#}</li>   {#* 网络敲诈 *#}
+								<li>{#$langData['circle'][0][41]#}</li>   {#* 内容侵权 *#}
+								<li>{#$langData['circle'][0][42]#}</li>       {#* 其他 *#}
+							</ul>
+						</div>
+
+					</div>
+					<div class="contact"><input placeholder="{#$langData['circle'][0][43]#}" type="tel"></div>    {#* 请填写联系方式 *#}
+					<dl class="jubao_content">
+						<dt><em>0</em>/100</dt>
+						<dd class="con">
+							<textarea placeholder="{#$langData['circle'][0][44]#}"></textarea>    {#* 请输入简明扼要的备注说明，以便工作人员更好的审核(选填) *#}
+						</dd>
+					</dl>
+					<button type="button" class="sub">{#$langData['circle'][0][73]#}</button>   {#* 提交 *#}
+				</form>
+			</div>
+		</div>
+	</div>
+	<!--举报e-->
+	<!--举报提示消息s-->
+	<div class="JuError"></div>
+	<div class="JuMask"></div>
+	<!--举报提示消息e-->
+
+	{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+	</body>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/inobounce.min.js?v={#$cfg_staticVersion#}"></script>
+	<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+	<script type="text/javascript" src="{#$templets_skin#}js/svdetail_1.js?v={#$cfg_staticVersion#}"></script>
+
+	<script>
+
+		var wxconfig = {
+			"appId": '{#$wxjssdk_appId#}',
+			"timestamp": '{#$wxjssdk_timestamp#}',
+			"nonceStr": '{#$wxjssdk_nonceStr#}',
+			"signature": '{#$wxjssdk_signature#}',
+			"description": '{#$circle_description|strip#}',
+			"title": '{#$detail_content|escape#}',
+			"imgUrl": '{#$detail_thumbnail#}',
+			"link": '{#getUrlPath service="circle" template="blog_detail" id={#$detail_id#}#}',
+		};
+
+		document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+		JubaoConfig = {
+				"module" : 'circle',
+				"action" : 'detail',
+				"id" : '{#$detail_id#}'
+			};
+	</script>
+	<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+
+
+
+
+</html>

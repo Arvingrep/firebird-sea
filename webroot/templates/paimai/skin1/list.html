@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+  <title>{#if $seo_title != ""#}{#$seo_title#}{#else#}商品列表{#/if#}-{#$paimai_title#}</title>
+  <meta name="keywords" content="{#$paimai_keywords#}"/>
+  <meta name="description" content="{#$paimai_description#}"/>
+  <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico?v={#$cfg_staticVersion#}" type="image/x-icon"/>
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public_header.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/list.css?v={#$cfg_staticVersion#}" media="all" />
+    <script src="{#$cfg_staticPath#}js/core/jquery-1.9.0.min.js"></script>
+    <script src="{#$cfg_staticPath#}js/vue/vue.js"></script>
+    <script>
+        var typeid = '{#$typeid#}'
+    </script>
+</head>
+<body class="w1200">
+    {#include file="public_top.html" page_curr="list"#} 
+    <div id="GoodsList"  class="wrap">
+        <div class="result__crumb">
+            <a href="{#$paimai_channelDomain#}" target="_blank">拍卖首页</a>
+            <span class="result__crumb-data">(共<em data-v-14f49f9d="">{{totalCount}}</em>件拍品)</span>
+        </div>
+        <div class="filters">
+            <div class="filters__row">
+              <span class="filters__label">拍品来源：</span>
+              <div class="filters__content">
+                <span :class="[{'is-checked': searchForm.store == ''} ,'el-check-tag']" @click="searchForm.store = '';chanageSearchForm('store','')">不限</span>
+                <span :class="['el-check-tag',{'is-checked': store.id == searchForm.store}]" v-for="store in storeList" @click="chanageSearchForm('store',store.id)">{{store.company}}</span>
+              </div>
+            </div>
+            <div class="filters__row">
+              <span class="filters__label">分类：</span>
+              <div class="filters__content">
+                <span :class="[{'is-checked': searchForm.typeid == ''} ,'el-check-tag']" @click="searchForm.typeid = '';chanageSearchForm('typeid','')">不限</span>
+                <span :class="['el-check-tag',{'is-checked': item.id == searchForm.typeid}]" v-for="item in tabList" @click="chanageSearchForm('typeid',item.id)">{{item.typename}}</span>
+                
+              </div>
+            </div>
+            <div class="filters__row">
+              <span class="filters__label">拍品状态：</span>
+              <div class="filters__content">
+                  <!-- , {"is-checked": item.value === searchForm.arcrank }   @change="handleChangeStatus($event,item.value)" -->
+                <span v-for="(item,index) in goodStatusList" :class="['el-check-tag',{'is-checked': item.value === searchForm.timetype }]" @click="chanageSearchForm('timetype',item.value)"  :data-val="item.value" >{{item.label}}</span>
+              </div>
+            </div>
+            <div class="filters__row">
+              <span class="filters__label">综合排序：</span>
+              <div class="filters__content">
+                <div class="el-radio-group">
+                    <label class="el-radio-button is-active el-radio-button--small" @click="chanageSearchForm('orderby','')">
+                        <input class="el-radio-button__original-radio" type="radio" checked value="默认排序" name="orderby">
+                        <span class="el-radio-button__inner">默认排序</span>
+                    </label>
+                    <label class="el-radio-button el-radio-button--small downBtn" data-up="1" data-down="2" >
+                        <input class="el-radio-button__original-radio" type="radio"  value="价格" name="orderby" >
+                        <span class="el-radio-button__inner" @click="onclick()">价格</span>
+                    </label>
+                    <label class="el-radio-button el-radio-button--small downBtn" data-up="3" data-down="4" >
+                        <input class="el-radio-button__original-radio" type="radio" value="出价次数" name="orderby">
+                        <span class="el-radio-button__inner" @click="onclick()">出价次数</span>
+                    </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="wrap proCon">
+            
+            <div class="el-tabs__content">
+                <div class="el-tab-pane"  > 
+                     <div class="conbox_1" v-if="goodsList.length > 0">
+                        <div class="item J-item-li " v-for="item in goodsList" :key="item.id">
+                            <a target="_blank" :href="item.url" :title="item.title" class="J-card J-card--end">
+                              <div class="J-card_header">
+                                <img class="J-card_img loaded"
+                                     :src="item.litpic">
+                                <div class="J-card_timer">
+                                  <p class="J-card_timercontent">  {{item.djs}} </p>
+                                </div>
+                              </div>
+                              <div class="J-card_title">
+                                <h3 style="-webkit-box-orient: vertical">
+                                  {{item.title}}
+                                </h3>
+                              </div>
+                              <div class="J-card_footer">
+                                <div class="J-card_unit">{#echoCurrency type='symbol'#}</div>
+                                <div class="J-card_price">{{item.cur_mon_start}}</div>
+                                <div class="J-card_number">{{item.pai_count}}次出价</div>
+                              </div>
+                            </a>
+                          </div>
+                          
+                     </div> 
+                     <div class="noData" v-else>
+                        <div class="noData-text" v-if="finished" >
+                            暂无数据
+                        </div>
+                        <div class="noData-text" v-else >
+                            数据加载中
+                        </div>
+                     </div>
+                </div>
+                <div class="paginationBox" v-if="totalPage > 1">
+                    <div  class="el-pagination is-background">
+                        <button type="button" class="btn-prev is-first" :disabled="page == 2" @click="getPageData(page - 1,1)"><i class="el-icon"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M609.408 149.376 277.76 489.6a32 32 0 0 0 0 44.672l331.648 340.352a29.12 29.12 0 0 0 41.728 0 30.592 30.592 0 0 0 0-42.752L339.264 511.936l311.872-319.872a30.592 30.592 0 0 0 0-42.688 29.12 29.12 0 0 0-41.728 0z"></path></svg></i></button>
+                        <ul class="el-pager">
+                            <li v-for="key of totalPage" :key="key" :class="['number',{'is-active': (key + 1) == page}]" :aria-current="key == page" :tabindex="key" @click="getPageData(key)"> {{key}} </li>
+                        </ul>
+                        <button type="button" class="btn-next is-last" aria-disabled="false" :disabled="page > totalPage" @click="getPageData(page)"><i class="el-icon"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M340.864 149.312a30.592 30.592 0 0 0 0 42.752L652.736 512 340.864 831.872a30.592 30.592 0 0 0 0 42.752 29.12 29.12 0 0 0 41.728 0L714.24 534.336a32 32 0 0 0 0-44.672L382.592 149.376a29.12 29.12 0 0 0-41.728 0z"></path></svg></i></button>
+                    </div>   
+                </div>
+            </div>
+        </div> 
+    </div>
+    {#include file="foot.html"#} 
+    <script src="{#$templets_skin#}js/list.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

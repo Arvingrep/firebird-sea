@@ -1,4 +1,4 @@
-var pageVue = new Vue({
+var page = new Vue({
   el:"#page",
   data:{
     navList:navList,  //左侧导航

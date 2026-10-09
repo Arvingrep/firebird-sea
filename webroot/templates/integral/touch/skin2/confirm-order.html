@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1,minimum-scale=1.0,maximum-scale=1.0, user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>确认订单-{#$integral_title#}</title>
+<meta name="keywords" content="{#$integral_keywords#}" />
+<meta name="description" content="{#$integral_description#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/confirm-order.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
+<script>
+var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$integral_channelDomain#}', cfg_staticPath = staticPath = '{#$cfg_staticPath#}';
+var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+var payUrl = '{#getUrlPath service='integral' template='pay' param='ordernum=#ordernum'#}';
+var pointName = '{#$cfg_pointName#}';
+</script>
+</head>
+
+<body>
+<div class="container" id="p1">
+	<!-- nav -->
+	{#$pageTitle = "提交订单"#}
+	{#include file="../../../siteConfig/touch_top.html"#}
+
+	<!-- 选择地址 s -->
+	<div class="address">
+		<a href="javascript:;" class="t">
+			<div class="address-box">
+	      		{#$address = 0#}
+				{#member action="address"#}
+				{#if $_bindex.row == 1#}
+				{#$address = $row.id#}
+				<div class="address-info">
+					<span class="name">{#$row.person#}</span>
+					<span class="tel">{#if $row.mobile != "" && $row.tel != ""#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#$row.mobile#}{#/if#}</span>
+					<span class="address-txt">{#$row.address#}</span>
+				</div>
+				{#/if#}
+				{#/member#}
+				{#if $address == 0#}
+				<div class="address-info empty">请填写收货人信息</div>
+				{#/if#}
+	      		<i class="icon-right"></i>
+	    	</div>
+		</a>
+	</div>
+	<!-- 选择地址 e -->
+
+	<div class="cart-list">
+	  	<div class="shop-list">
+			<a href="">
+				<div class="shop-info fn-clear">
+					<div class="shop-info-img"><img src="{#$detail_litpic#}" alt="{#$detail_title#}"></div>
+					<div class="shop-info-txt">
+						<h3>{#$detail_title#}</h3>
+						<div class="shop-info-price">￥{#$detail_price#}+{#$cfg_pointName#}{#$detail_point#}</div>
+					</div>
+				</div>
+			</a>
+	    	<p class="btns"><span>数量&nbsp;<em>{#$count#}</em></span><span>兑换现金&nbsp;<em>{#echoCurrency type='symbol'#}{#$detail_price*$count#}</em></span><span>兑换{#$cfg_pointName#}&nbsp;<em>{#$detail_point*$count#}</em></span><span>邮费&nbsp;<em>{#echoCurrency type='symbol'#}{#$detail_freight#}</em></span><!-- <span class="del"></span> --></p>
+		</div>
+	</div>
+
+	<a href="javascript:;" class="submit">提交订单</a>
+
+	<form action="/include/ajax.php?service=integral&action=deal" class="hide" id="dealForm">
+		<input type="hidden" name="id" value="{#$id#}">
+		<input type="hidden" name="count" value="{#$count#}">
+		<input type="hidden" name="address" id="address" value="{#$address#}">
+	</form>
+
+</div>
+
+<!-- 选择收货地址 -->
+<div id="p2" class="hide">
+	<div class="header">
+		<div class="l_btn">
+			<a href="javascript:;" class="goback1"><img src="{#$templets_skin#}images/left.png" alt="">返回</a>
+		</div>
+		<div class="title"><h2>选择收货地址</h2></div>
+		<div class="r_btn">
+			<a href="javascript:;" class="addAddress">添加</a>
+		</div>
+	</div>
+
+	{#if $address == 0#}
+	<div class="null">
+		<p>你还没有添加收货地址，快来添加收货地址吧~</p>
+		<a href="javascript:;" class="add_address addAddress">添加收货地址</a>
+	</div>
+	<div class="have">
+		<div class="addresslist"></div>
+	</div>
+	{#else#}
+	<div class="have">
+		<div class="addresslist">
+			{#member action="address"#}
+			<div class="item">
+        <a href="javascript:;" data-id="{#$row.id#}" data-name="{#$row.person#}" data-tel="{#if $row.mobile != "" && $row.tel != ""#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#$row.mobile#}{#/if#}" data-addr="{#$row.addrname#}&nbsp;&nbsp;{#$row.address#}" class="a_set_addr">
+        	<p><span>{#$row.person#}</span><span>电话：{#if $row.mobile != "" && $row.tel != ""#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#$row.mobile#}{#/if#}</span></p>
+        	<p>{#$row.addrname#}&nbsp;&nbsp;{#$row.address#}</p>
+        	<div class="btn_address"><span>选择该收货地址</span></div>
+        </a>
+      </div>
+			{#/member#}
+		</div>
+	</div>
+	{#/if#}
+</div>
+
+<!-- 新增收货地址 -->
+<div id="p3" class="hide">
+	<div class="header">
+		<div class="l_btn">
+			<a href="javascript:;" class="goback1"><img src="{#$templets_skin#}images/left.png" alt="">返回</a>
+		</div>
+		<div class="title"><h2>新增收货地址</h2></div>
+	</div>
+
+	<div class="addaddress">
+		<form action="">
+			<ul class="edit">
+				<li>
+					<label for="">收货人：</label>
+					<span><input type="text" id="person"></span>
+				</li>
+				<li class="fn-clear">
+					<label for="">{#$langData['siteConfig'][47][86]#}：</label>  {#* 国籍地区 *#}						
+					<p class="areacode_span"><em class="code_label">+{#$internationalPhoneSection[0]['code']#}</em></p>
+					<input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+				</li>
+				<li>
+					<label for="">手机号码：</label>
+					<span><input type="text" id="mobile"></span>
+				</li>
+				<li>
+					<label for="">省市区：</label>
+					<span id="addrlist">
+						<select id="addrid" name="addrid[]">
+							<option value="0">-请选择-</option>
+							{#siteConfig action="area" return="addr" son="0"#}
+							<option value="{#$addr.id#}">{#$addr.typename#}</option>
+							{#/siteConfig#}
+						</select>
+					</span>
+				</li>
+				<li>
+					<label for="">详细地址：</label>
+					<span><input type="text" id="addr"></span>
+				</li>
+			</ul>
+			<div class="edit_ft">
+				<a href="javascript:;" id="submit">保存</a>
+			</div>
+		</form>
+	</div>
+</div>
+<!-- 区号弹出层 s -->
+  <div class="layer_code">
+    {#* 国籍/地区  *#}
+    <div class="layer_search"><p>{#$langData['siteConfig'][19][285]#}</p><em class="layer_close"></em></div> 
+    <div class="layer_list" id="layer_list">
+      <ul>
+      </ul>
+    </div>
+  </div>
+<!-- 区号弹出层 e -->
+<div class="mask-code" id="maskReg"></div>
+<script>
+	var totalAmount = {#$detail_price*$count + $detail_freight#};
+	var totalPoint= {#$detail_point*$count#};
+	var userPoint = {#if $userinfo#}{#$userinfo['point']#}{#else#}0{#/if#};
+
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$integral_description#}',
+		"title": '{#$integral_title#}',
+		"imgUrl": '{#$integral_logoUrl#}',
+		"link": '{#$integral_channelDomain#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$templets_skin#}js/confirm-order.js?v={#$cfg_staticVersion#}" charset="utf-8"></script>
+</body>
+</html>

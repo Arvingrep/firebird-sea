@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#$langData['siteConfig'][19][451]#}</title> {#*   商品管理   *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage-goods.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var sid = "{#$sid#}"
+		</script>
+	</head>
+	<body>
+		<div id="page" v-cloak>
+			<!-- 头部 -->
+			<div class="top_box">
+				<div class="headbox">
+					<a href="/wmsj/shop/store-detail.php?sid={#$sid#}&currentPageOpen=1"  class="back_btn"></a>
+					<div class="htitle">{#$langData['siteConfig'][19][451]#}</div>    {#*   商品管理   *#}
+					
+				</div>
+				<div class="tab_box" v-show="!changeSort" >
+					<ul v-cloak>
+						<li class="on_chose" @click="changetab" data-curr="all">{#$langData['waimai'][11][123]#}<em>{{totalCount0}}</em></li>
+						<li @click="changetab" data-curr="stock">{#$langData['waimai'][7][90]#}<em>{{totalCount1}}</em></li>   {#*   已售罄   *#}
+						<li @click="changetab" data-curr="status">{#$langData['waimai'][11][124]#}<em>{{totalCount2}}</em></li>   {#*   已下架   *#}
+					</ul>
+					<b></b>
+				</div>
+				<div class="tab_box" v-show="changeSort"><h2>{#$langData['waimai'][11][125]#}<em> {{totalCount}} </em>{#$langData['waimai'][11][126]#}</h2></div>{#*   共有  件商品 *#}
+			</div>
+			<div class="content_box">
+				<div class="menu_box">
+					<ul v-cloak>
+						<li :class="{'fenlei_now':index==0}" v-for="(menu,index) in menuList" :data-id="menu.id"  @click="scrollTo">{{menu.title}}</li>
+						<li v-if="!menuIdList.includes(foodList[foodList.length - 1] && foodList[foodList.length - 1].typeid)" data-id="other" @click="scrollTo">其他</li>
+					</ul>
+				</div>
+				<div class="list_box"  v-cloak >
+					<dl class="fenlei_dl" v-for="(menu,index) in menuList" :data-id="menu.id" >
+						<dt v-show=" menu_list(menu.id) &&  menu_list(menu.id).length">{{menu.title}}</dt>
+						<dd class="ddlist" v-for="(food,findex) in menu_list(menu.id)" v-if="menu.id==food.typeid" :data-id="food.id" >
+							<div :class="['fimg',{'nostock':(food.stock=='0' && food.stockvalid=='1')||food.status=='0'}]">
+								<img :src="food.pics_path" alt="" onerror="this.src='{#$templets_skin#}images/food.png'">
+								<span v-if="food.stock=='0'&& food.stockvalid=='1'">{#$langData['waimai'][7][90]#}</span>{#*   已售罄   *#}
+								<span v-if="food.status=='0'">{#$langData['waimai'][11][124]#}</span>{#*   已下架   *#}
+								<em v-if="food.status=='0' && changeSort" class="shangjia_tip"> {#$langData['waimai'][11][127]#} </em>{#*   上架后会在<br/>当前位置 *#}
+							</div>
+							<div class="fdetail">
+								<h2><span v-if="food.label!=''" class="label">{{food.label}}</span> {{food.title}}</h2>
+								<p><span>{#$langData['waimai'][7][5]#}{{food.countall}}</span>&nbsp;&nbsp;&nbsp;&nbsp;<span v-if="food.stockvalid=='1'">{#$langData['waimai'][7][145]#}{{food.stock}}</span></p>{#* 月销  库存 *#}
+								<div class="price_show">
+									<span class="nprice"><em>{#echoCurrency type='symbol'#}</em>{{food.price}}</span><s class="oprice" v-if="food.formerprice && food.formerprice!='0.00'">{#echoCurrency type='symbol'#}{{food.formerprice}}</s><span class="limit" v-if="food.is_day_limitfood!='0'">{#$langData['waimai'][11][129]#}{{food.is_day_limitfood}}{{food.unit}}</span></div>
+								{#* 限购 *#}	
+							</div>
+							<div class="btns_group" v-if="!changeSort">
+								<button type="button" class="xiajia btn" v-if="food.status=='1' && (curr=='all'|| curr=='status')" :data-status="food.status" @click="xiajia(food.id)">{#$langData['waimai'][11][130]#}</button>{#* 下架 *#}	
+								<button type="button" class="xiajia btn" :data-status="food.status" v-else-if="food.status=='0' && (curr=='all'|| curr=='status')"  @click="xiajia(food.id)">{#$langData['waimai'][11][131]#}</button>{#* 上架 *#}	
+								<div class="xiajia  btn" :data-status="food.status" v-if="curr=='stock'" @click="change_kucun">
+									<span class="txt">{#$langData['waimai'][11][132]#}</span>{#* 加库存 *#}
+									<div class="btn_shangjia"><input type="text" placeholder="输入数量" oninput = "value=value.replace(/[^\d]/g,'')"><a href="javascript:;" @click.stop="add_kucun(food.id)">{#$langData['waimai'][11][131]#}</a></div>
+								</div>
+								<a :href="'add-goods.php?sid={#$sid#}&id='+food.id" class="edit btn">{#$langData['waimai'][11][133]#}</a>{#* 编辑 *#}
+							</div>
+							<div class="btns_group" v-if="changeSort">
+								<button type="button" class="xiajia btn sort_up" @click="sortChange" data-type="up">{#$langData['waimai'][11][110]#}</button>{#* 上移 *#}
+								<button type="button" class="xiajia btn sort_down" @click="sortChange" data-type="down">{#$langData['waimai'][11][111]#}</button>{#* 下移 *#}
+								
+							</div>
+						</dd>
+						
+						
+					</dl>
+					<dl v-if="!menuIdList.includes(foodList[foodList.length - 1] && foodList[foodList.length - 1].typeid)" class="fenlei_dl" data-id="other" >
+						<dt>其他</dt>
+						<dd  class="ddlist"  v-for="(food,findex) in noTypeList()">
+							<div :class="['fimg',{'nostock':(food.stock=='0' && food.stockvalid=='1')||food.status=='0'}]">
+								<img :src="food.pics_path" alt="" onerror="this.src='{#$templets_skin#}images/food.png'">
+								<span v-if="food.stock=='0'&& food.stockvalid=='1'">{#$langData['waimai'][7][90]#}</span>{#*   已售罄   *#}
+								<span v-if="food.status=='0'">{#$langData['waimai'][11][124]#}</span>{#*   已下架   *#}
+								<em v-if="food.status=='0' && changeSort" class="shangjia_tip"> {#$langData['waimai'][11][127]#} </em>{#*   上架后会在<br/>当前位置 *#}
+							</div>
+							<div class="fdetail">
+								<h2><span v-if="food.label!=''" class="label">{{food.label}}</span> {{food.title}}</h2>
+								<p><span>{#$langData['waimai'][11][128]#}{{food.countall}}</span>&nbsp;&nbsp;&nbsp;&nbsp;<span v-if="food.stockvalid=='1'">{#$langData['waimai'][7][145]#}{{food.stock}}</span></p>{#* 月销  库存 *#}
+								<div class="price_show">
+									<span class="nprice"><em>{#echoCurrency type='symbol'#}</em>{{food.price}}</span><s class="oprice" v-if="food.formerprice && food.formerprice!='0.00'">{#echoCurrency type='symbol'#}{{food.formerprice}}</s><span class="limit" v-if="food.is_day_limitfood!='0'">{#$langData['waimai'][11][129]#}{{food.is_day_limitfood}}{{food.unit}}</span></div>
+								{#* 限购 *#}	
+							</div>
+							<div class="btns_group" v-if="!changeSort">
+								<button type="button" class="xiajia btn" v-if="food.status=='1' && (curr=='all'|| curr=='status')" :data-status="food.status" @click="xiajia(food.id)">{#$langData['waimai'][11][130]#}</button>{#* 下架 *#}	
+								<button type="button" class="xiajia btn" :data-status="food.status" v-else-if="food.status=='0' && (curr=='all'|| curr=='status')"  @click="xiajia(food.id)">{#$langData['waimai'][11][131]#}</button>{#* 上架 *#}	
+								<div class="xiajia  btn" :data-status="food.status" v-if="curr=='stock'" @click="change_kucun">
+									<span class="txt">{#$langData['waimai'][11][132]#}</span>{#* 加库存 *#}
+									<div class="btn_shangjia"><input type="text" placeholder="输入数量" oninput = "value=value.replace(/[^\d]/g,'')"><a href="javascript:;" @click.stop="add_kucun(food.id)">{#$langData['waimai'][11][131]#}</a></div>
+								</div>
+								<a :href="'add-goods.php?sid={#$sid#}&id='+food.id" class="edit btn">{#$langData['waimai'][11][133]#}</a>{#* 编辑 *#}
+							</div>
+							<div class="btns_group" v-if="changeSort">
+								<button type="button" class="xiajia btn sort_up" @click="sortChange" data-type="up">{#$langData['waimai'][11][110]#}</button>{#* 上移 *#}
+								<button type="button" class="xiajia btn sort_down" @click="sortChange" data-type="down">{#$langData['waimai'][11][111]#}</button>{#* 下移 *#}
+								
+							</div>
+						</dd>
+					</dl>
+					<div class="loadtip">{{loadTxt}}</div>
+				</div>
+				
+			</div>
+			<!-- 加载中 -->
+			<div v-cloak class="loading_icon" v-if="LOADING"></div>
+			<!-- 底部 -->
+			<div class="bottom_box" v-if="curr=='all'" v-cloak>
+				<ul v-if="!changeSort">
+					<li><a href="goods-type.php?sid={#$sid#}"><img src="{#$templets_skin#}images/fl.png" />{#$langData['waimai'][11][134]#}</a></li>{#* 分类管理 *#}
+					<li><a href="javascript:;" @click="changeSort = !changeSort"><img src="{#$templets_skin#}images/px.png" />{#$langData['waimai'][11][135]#}</a></li>{#* 商品排序 *#}
+					<li><a href="add-goods.php?sid={#$sid#}"><img src="{#$templets_skin#}images/xj.png" />{#$langData['waimai'][6][38]#}</a></li>{#* 新建商品 *#}
+				</ul>
+				<a v-else href="javascript:;" class="save_sort" @click="saveSort">{#$langData['waimai'][2][52]#}</a>{#* 保存 *#}
+			</div>
+		</div>
+	</body>
+	<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/manage-goods.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

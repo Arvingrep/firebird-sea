@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no,viewport-fit=cover" />
+<meta name="format-detection" content="telephone=no">
+<title>{#$detail_title#}团购|图片|价格|菜单</title>
+<meta name="apptitle" content="团购详情">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/tdetail.css?v={#$cfg_staticVersion#}">
+<script src="{#$cfg_staticPath#}js/ui/html2canvas.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-2.1.1.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$dating_channelDomain#}', staticPath = '{#$cfg_staticPath#}',templets_skin = '{#$templets_skin#}';
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var cookiePre = '{#$cfg_cookiePre#}';
+
+	var detailTitle = '{#$detail_title#}';
+	var detailPrice = '{#$detail_price#}';
+	var maxCount    = '{#$detail_limit#}';
+	var detailThumb = '{#$detail_litpic#}';
+	var detailUrl   = '{#getUrlPath service="tuan" template="detail" id=$detail_id#}';
+	var date        = [{#$smarty.now#}, {#$detail_startdate#}, {#$detail_enddate#}];
+	var detailID    = '{#$detail_id#}';
+
+    var pageData = {
+        title: '{#$detail_store['company']#}',
+        address: "{#$detail_store['addrname'][0]#} {#$detail_store['addrname'][1]#} {#$detail_store['address']#}",
+        lat: '',
+        lng: '',
+        lnglat: '{#$detail_store['lnglat']#}',
+        mapType: '{#$site_map#}',
+        cityName: '{#$siteCityInfo['name']#}',
+        mapKey: '{#$site_map_key#}'
+    };
+
+    var JubaoConfig = {
+		"module" : 'tuan',
+		"action" : 'detail',
+		"id" : '{#$detail_id#}'
+	};
+
+    var imconfig = {
+		'mod':'tuan',
+		'chatid':"{#$detail_store['member']['userid']#}",
+		'title': '{#$detail_title#}',
+		"price": '{#echoCurrency type='symbol'#}{#$detail_price#}',
+		"imgUrl": '{#$detail_litpic#}',
+		"link": '{#getUrlPath service="tuan" template="detail" id=$detail_id#}',
+	};
+	var touch_poster = 1;  //是否有海报按钮
+</script>
+</head>
+
+<body>
+
+{#include file="../../../siteConfig/touch_top.html" pageTitle="团购详情"#}
+{#include file="../../../siteConfig/public_touch_poster.html" posterModule='tuanDetail'#}
+{#include file="../../../siteConfig/touch_poster_3.7.html" posterType="tuanModule"#}
+<!-- 视频 s-->
+<div class="topMain">
+  <div class="swiper-container">
+    <i class="vClose"></i>
+    <div class="swiper-wrapper">
+      {#if !empty($detail_video)#}
+      <div class="swiper-slide video-box">
+          <video width="100%" height="100%" preload="meta" x5-video-player-type="h5" x5-playsinline playsinline webkit-playsinline  src="{#$detail_video#}" id="video" poster="{#$detail_litpic|default: '{#$templets_skin#}upfile/usBanner.png'#}"></video>
+          <div class="video-btn">
+              <div class="play-box video-icon-box" id="vbplay">
+                  <i class="play-icon video-icon"></i>
+              </div>
+              <div class="load-box video-icon-box" style="display: none;">
+                  <i class="load-icon video-icon"></i>
+              </div>
+              <div class="reload-box video-icon-box" style="display: none;">
+                  <i class="reload-icon"></i>
+                  <p>重新播放</p>
+              </div>
+              <div class="error-box video-icon-box" style="display: none;">
+                  <p class="err-info">视频出错了，请检查网络状况</p>
+                  <div class="reload-box">
+                      <i class="reload-icon"></i>
+                      <p>重新加载</p>
+                  </div>
+              </div>
+          </div>
+          <div id="video-control" style="display: none;">
+          <div class="btn-control">
+            <div id="play" class="play"> </div>
+          </div>
+          <div id="time" class="time"> 00:00 </div>
+          <div id="progress"> <span id="bar"></span>
+            <div id="control"> </div>
+          </div>
+          <div class="btn-control">
+            <div id="sound" class="soundon"> </div>
+          </div>
+          <div id="full" class="full"> </div>
+        </div>
+      </div>
+      {#/if#}
+      {#foreach from=$detail_pics item=val#}
+      <div class="swiper-slide">
+        <img src="{#$val.path#}" alt="">
+      </div>
+      {#/foreach#}
+    </div>
+    <div class="swiper-pagination"></div>
+  </div>
+</div>
+<!-- 视频 e-->
+{#if $detail_secKill == 1#}
+<!-- 倒计时 -->
+<div class="count_down fn-clear">
+  <span class="present_price">{#echoCurrency type='symbol'#}<em>{#$detail_price#}</em></span>
+  <span class="original_price">{#echoCurrency type='symbol'#}{#$detail_market#}</span>
+  <div class="daojishi"><!--距结束<span>02</span>:<span>10</span>:<span>58</span>--></div>
+</div>
+{#/if#}
+
+<div class="main_txt">
+  <div class="title">
+    <h2>{#$detail_title#}</h2>
+    <p>{#$detail_flag#}</p>
+
+    <div class="price fn-clear"><span class="zhehoujia">{#echoCurrency type='symbol'#}<em>{#$detail_price#}</em></span><span class="yuanjia">门市价：{#echoCurrency type='symbol'#}{#$detail_market#}</span><div class="daojishi fn-right"></div></div>
+  </div>
+  <div class="service fn-clear">
+    {#if $detail_is_tuikuan==0#}
+    <span class="service_01">随时退</span>
+    <span class="service_02">过期自动退</span>
+    {#else#}
+    <span class="service_05">一经售出，概不退换</span>
+    {#/if#}
+    <span class="service_03">已售{#$detail_sale#}</span>
+
+    {#if $detail_collect == 1#}
+    <span class="service_04 cang_active">已收藏</span>
+    {#else#}
+    <span class="service_04 cang">收藏</span>
+    {#/if#}
+  </div>
+  {#if $detail_istop == 1#}
+  <i></i>
+  {#/if#}
+  <!-- 分销用户独享s -->
+  {#if $cfg_fenxiaoFee_tuan#}
+  <div class="fenxiao_share">
+    <span>分享赚</span>邀请好友下单，可赚<em>{#echoCurrency type="symbol"#}{#round($cfg_fenxiaoFee_tuan * $detail_price,2)#}</em>
+  </div>
+  {#else if $cfg_fenxiaoFee_inttuan#}
+  <div class="fenxiao_share">
+    <span>分享赚</span>邀请好友下单，可赚<em>{#echoCurrency type="symbol"#}{#$cfg_fenxiaoFee_inttuan#}</em>
+  </div>
+  {#/if#}
+  <!-- 分销用户独享e -->
+</div>
+<!-- 优惠()s -->
+<div class="yhBox">
+  <!-- 会员优惠 -->
+  {#if $userinfo && $userinfo.level && $userinfo.privilege && $userinfo.privilege['tuan']&& $userinfo.privilege['tuan'] != 10#}
+  <div class="vipyouhui">
+    <div class="vipIcon"><span>{#$userinfo.levelName#}</span></div> {#$userinfo.levelName#}{#$userinfo.privilege['tuan']#}折，预计可省{#echoCurrency type="symbol"#}{#(10 - $userinfo.privilege['shop']) / 10 * $detail_price #}
+  </div>
+  {#/if#}
+  <!-- 积分抵扣 -->
+  {#if $cfg_returnPoint_tuan#}
+  <div class="point"><span>{#$cfg_pointName#}</span>购买可得{#intval($cfg_returnPoint_tuan * $detail_price)#}{#$cfg_pointName#}</div>
+  {#/if#}
+</div>
+<!-- 优惠e -->
+{#if $detail_tips#}
+<!-- 重要通知 -->
+<div class="business_info">
+  <div class="info_title">重要通知</div>
+  <div class="info_bus" style="font-size: .3rem;">
+	{#$detail_tips#}
+  </div>
+</div>
+{#/if#}
+
+<!-- 商家信息 -->
+<div class="business_info">
+  <div class="info_title">商家信息</div>
+  <div class="info_bus">
+    <h2><a href="{#getUrlPath service='tuan' template='store' id=$detail_store['id']#}">{#$detail_store['company']#}</a></h2>
+    <p><a class="appMapBtn" href="javascript:;">{#$detail_store['addrname'][0]#} {#$detail_store['addrname'][1]#} {#$detail_store['address']#}</a></p>
+    <div class="phone"><a href="tel:{#$detail_store['tel']#}">{#$detail_store['tel']#}</a><a href="tel:{#$detail_store['phone']#}">{#$detail_store['phone']#}</a></div>
+    <a class="map_bus" href="{#getUrlPath service='tuan' template='store' id=$detail_store['id']#}"></a>
+  </div>
+</div>
+
+{#if $detail_pin == 1 && $detail_secKill!=1#}
+<!-- 拼团人数列表 -->
+<div class="people">
+  <div class="info_title">{#$totalCount#}人在拼单</div>
+  <div class="people_list">
+    <div class="swiper-container">
+      <div class="swiper-wrapper">
+          {#tuan action="pinList" return="list" tid=$detail_id pageSize=20#}
+          <div class="swiper-slide time_each">
+            <div class="fn-clear info_list">
+                <div class="list_img"><img src="{#$list.photo|default:'/static/images/default_user.jpg'#}"></div>
+                <div class="list_name">{#$list.name#}</div>
+                <a href="javascript:;">去拼单</a>
+                <div class="list_time"><p>还差<em>{#$list.rest#}人</em>拼成</p><p class="time_show" data-time="{#$list.enddate#}" data-now="{#$list.now#}">剩余{#$list.time#}</p></div>
+            </div>
+          </div>
+          {#/tuan#}
+      </div>
+    </div>
+  </div>
+</div>
+{#/if#}
+
+<div class="detail_list">
+  <nav class="nav-wrap " id="nav-wrap">
+    <ul class="fn-clear">
+        <li class="active">
+            <a href="javascript:;">
+                <span>团购内容</span>
+            </a>
+        </li>
+        <li>
+            <a href="javascript:;">
+                <span>团购须知</span>
+            </a>
+        </li>
+        <li>
+            <a href="javascript:;">
+                <span>网友点评</span>
+            </a>
+        </li>
+    </ul>
+  </nav>
+</div>
+<div class="tuan_container">
+  <div class="tuan_content common_tuan">
+    {#if $detail_package && $detail_package|@count neq 0#}
+    {#if $detail_packtype == 1#}
+    <ul>
+      <li class="fn-clear"><span class="tuan_content_name">{#$detail_package[0]#}</span><span class="tuan_content_price">{#echoCurrency type='symbol'#}{#$detail_package[1]#}</span><span class="tuan_content_time">{#$detail_package[2]#}</span></li>
+    </ul>
+     {#elseif $detail_packtype == 2#}
+    <ul>
+      {#foreach from=$detail_package item=package#}
+    <li class="tc_name"><em>•</em>{#$package['title']#}</li>
+      {#foreach from=$package['tr'] key=key item=tr#}
+      <li class="fn-clear"><span class="tuan_content_name">{#$tr[0]#}</span><span class="tuan_content_price"><em>{#echoCurrency type='symbol'#}</em>{#$tr[1]#}</span>{#if $tr[2]#}<span class="tuan_content_time">{#$tr[2]#}</span>{#/if#}</li>
+      {#/foreach#}
+      {#/foreach#}
+    </ul>
+    {#*
+    <p class="tuan_content_zongjia fn-clear"><span>总价值<em>{#$detail_market#}</em></span></p>
+    <p class="tuan_content_tuanjia fn-clear"><span>团购价<em>{#$detail_price#}</em></span></p>
+    *#}
+    {#/if#}
+    {#/if#}
+  </div>
+  <div class="common_tuan">
+    <div class="tuan_notes ">
+      <div class="info_title">购买须知</div>
+      <div class="tuan_notes_list">
+        {#if $detail_notice|@count neq 0#}
+        {#foreach from=$detail_notice item=notice#}
+        <dl>
+            <dt>{#$notice.title#}</dt>
+            <dd><p class="listitem">{#$notice.note#}</p></dd>
+        </dl>
+        {#/foreach#}
+      {#/if#}
+      </div>
+    </div>
+
+    <!-- 图文详情 -->
+    <div class="uknow" id="bodyDetail">
+        <div class="uknow-tit">
+            <span>图文详情</span>
+        </div>
+        <div class="uknow-con">
+            <div id="tuanDetail">{#if $detail_mbody#}{#$detail_mbody#}{#else#}{#$detail_body#}{#/if#}</div>
+        </div>
+    </div>
+    <!-- 图文详情 end-->
+  </div>
+  <div class="tuan_comment commentBox common_tuan">
+    <div class="info_comment">用户评论 ({#$detail_totalCommon#})</div>
+    <div>
+      <ul class="commentlist">
+        {#member action='getComment' return='common' type='tuan-order' son='1' aid={#$detail_id#} orderby='hot' pageSize='3'#}
+        {#if is_array($common.user)#}
+        {#$nickname = $common.user.nickname#}
+        {#$photo = $common.user.photo|default: '/static/images/noPhoto_40.jpg'#}
+        {#else#}
+        {#$nickname = {#$langData['info'][2][33]#}#}
+        {#$photo = '/static/images/noPhoto_40.jpg'#}
+        {#/if#}
+        <li class="fn-clear">
+          <div class="left">
+            <a href="javascript:;"><img src="{#$photo#}" alt=""></a>
+          </div>
+          <div class="right">
+            <p class="name">{#$nickname#} <span>{#date("Y.m.d",$common.dtime)#}</span></p>
+            <p class="content">{#$common.content#}</p>
+          </div>
+          <!--<ul class="children">
+            <li class="fn-clear">
+              <div class="left">
+                <a href="javascript:;"><img src="http://qmr.215000.com/templates/siteConfig/touch/skin5/upfile/uphead02.png" alt=""></a>
+              </div>
+              <div class="right">
+                <p class="name">pink <span>2018.6.4</span></p>
+                <p class="content">回复<span>pink</span>:感谢您的光顾！欢迎下次再来，优惠多多</p>
+              </div>
+            </li>
+            <li class="fn-clear">
+              <div class="left">
+                <a href="javascript:;"><img src="http://qmr.215000.com/templates/siteConfig/touch/skin5/upfile/uphead02.png" alt=""></a>
+              </div>
+              <div class="right">
+                <p class="name">pink <span>2018.6.4</span></p>
+                <p class="content">回复<span>pink</span>:感谢您的光顾！欢迎下次再来，优惠多多</p>
+              </div>
+            </li>
+          </ul>-->
+        </li>
+         {#/member#}
+      </ul>
+    </div>
+    <div class="genduo"><a href="{#getUrlPath service='tuan' template='review' id={#$detail_id#}#}">查看全部评价</a></div>
+  </div>
+</div>
+<div class="tuan_other">
+  <div class="info_comment">其他团购</div>
+  <div class="info">
+    <ul>
+    	{#tuan action="tlist" return="list" store=$detail_sid pageSize=3#}
+    	{#if $list.id != $detail_id#}
+      <li class="fn-clear">
+        <a href="{#$list.url#}">
+        <div class="s_img"><img src="{#$list.litpic#}"></div>
+        <div class="s_title">
+          <div class="bus_txt fn-clear"><span class="bus_txt_title">{#$list.title#}</span></div>
+          <div class="tuangou_people">{#$list.sale#}人已团</div>
+          <div class="addr tuangou_price fn-clear"><span class="discounted">{#echoCurrency type='symbol'#}<em>{#$list.price#}</em></span><span class="or_price">{#echoCurrency type='symbol'#}{#$list.market#}</span><div class="aa">去抢购</div></div>
+        </div>
+        </a>
+      </li>
+      {#/if#}
+      {#/tuan#}
+    </ul>
+  </div>
+</div>
+{#if $detail_pin == 1 && $detail_secKill!=1#}
+<div class="tuan_bottom fn-clear pintuan">
+	<!--聊天按钮s-->
+	<a href="javascript:;" class="chat_to-Link" data-type="detail">
+		<img src="{#$templets_skin#}images/msg_to.png" />
+		<p>聊天</p>
+	</a>
+	<!--聊天按钮e-->
+	<div class="btn_group fn-clear">
+	  {#if $detail_limit <= 0#}
+		<div class="btn_01 grey"><a style="color: #fff;" href="javaScript:;"><span>{#echoCurrency type='symbol'#}<em class="btn_price">{#$detail_price#}</em><em>已售完</em></span></a></div>
+	  <div class="btn_02"><a style="color:#fff;" href="javaScript:;"><span>{#echoCurrency type='symbol'#}<em class="btn_price">{#$detail_pinprice#}</em><em>拼团结束</em></span></a></div>
+	  {#elseif time()>$detail_enddate#}
+		<div class="btn_01"><a style="color: #fff;" href="javaScript:;"><span>{#echoCurrency type='symbol'#}<em class="btn_price">{#$detail_price#}</em><em>已结束</em></span></a></div>
+	    <div class="btn_02"><a style="color:#fff;" href="javaScript:;"><span>{#echoCurrency type='symbol'#}<em class="btn_price">{#$detail_pinprice#}</em><em>拼团结束</em></span></a></div>
+	  {#elseif $detail_startdate>time()#}
+		<div class="btn_01"><a style="color: #fff;" href="javaScript:;"><span>{#echoCurrency type='symbol'#}<em class="btn_price">{#$detail_price#}</em><em>即将开始</em></span></a></div>
+	    <div class="btn_02"><a style="color:#fff;" href="javaScript:;"><span>{#echoCurrency type='symbol'#}<em class="btn_price">{#$detail_pinprice#}</em><em>即将开始</em></span></a></div>
+	  {#else#}
+		<div class="btn_01"><a style="color: #fff;" href="{#getUrlPath service="tuan" template="buy" id={#$detail_id#} count="1"#}"><span>{#echoCurrency type='symbol'#}<em class="btn_price">{#$detail_price#}</em><em>单独购买</em></span></a></div>
+	    <div class="btn_02"><a style="color:#fff;" href="{#getUrlPath service="tuan" template="buy" id={#$detail_id#} count="1" param="type=pin"#}"><span>{#echoCurrency type='symbol'#}<em class="btn_price">{#$detail_pinprice#}</em><em>我要开团</em></span></a></div>
+	  {#/if#}
+
+	  <div class="btn_03"><p>距离结束仅剩</p><p>14:25:49</p></div>
+	  <div class="btn_04">邀请好友一起拼单</div>
+	</div>
+</div>
+{#else#}
+<div class="tuan_bottom commontuan">
+  <div class="price fn-clear"><span class="zhehoujia">{#echoCurrency type='symbol'#}<em>{#$detail_price#}</em></span><span class="yuanjia">门市价：{#echoCurrency type='symbol'#}{#$detail_market#}</span>
+  {#if $detail_limit <= 0#}
+  <a href="javaScript:;" class="grey">已售完</a>
+  {#elseif time()>$detail_enddate#}
+  <a href="javaScript:;"  class="grey">已结束</a>
+  {#elseif $detail_startdate>time()#}
+  <a href="javaScript:;">即将开始</a>
+  {#else#}
+  <a href="{#getUrlPath service="tuan" template="buy" id={#$detail_id#} count="1"#}">立即抢购</a>
+  {#/if#}</div>
+</div>
+{#/if#}
+
+<!-- 拼单列表弹框 -->
+<div class="pd_list">
+  <div class="bgCover"></div>
+  <div class="modal-main">
+    <div class="pd_txt">正在拼单</div>
+    <div class="pd_title_list pd_title_txt">
+       <ul >
+        {#tuan action="pinList" return="list" tid=$detail_id pageSize=20#}
+        <li class="fn-clear time_each">
+          <div class="list_img"><img src="{#$list.photo|default:'/static/images/default_user.jpg'#}"></div>
+          <div class="list_time"><p>{#$list.name#}</p><p class="time_show" data-time="{#$list.enddate#}" data-now="{#$list.now#}">剩余{#$list.time#}</p></div>
+          <a href="{#$list.url#}">去拼单</a>
+        </li>
+        {#/tuan#}
+      </ul>
+    </div>
+    <i class="close"></i>
+  </div>
+</div>
+
+<!-- 图片放大 -->
+{#include file="../../../siteConfig/bigimg_1.2.html"#}
+
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$detail_subtitle#}',
+		"title": '{#$detail_title#}',
+		"imgUrl": '{#$detail_litpic#}',
+		"link": '{#getUrlPath service="tuan" template="detail" id=$detail_id#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+
+<script type="text/javascript"  src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+
+<script src="{#$cfg_staticPath#}js/publicOpenMap.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/nav.js"></script>
+{#if $detail_pin == 1 && $detail_secKill!=1#}
+<script src="{#$templets_skin#}js/jquery.smartScroll.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+<script src="{#$templets_skin#}js/tdetail.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

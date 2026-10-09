@@ -292,18 +292,6 @@ class business {
 			$storeArr = array();
 			$businessStore = $businessStore ? unserialize($businessStore) : array();
 			if($businessStore){
-
-                global $cfg_basedomain;
-                global $reqUri;
-                $dirDomain = $cfg_basedomain . $reqUri;
-                $param = array("service"  => "member");
-                $busiDomain = getUrlPath($param);     //商家会员域名
-                $ischeck_busi = explode($busiDomain, $dirDomain);
-
-                $param = array("service"  => "member", "type" => "user");
-                $userDomain = getUrlPath($param);     //个人会员域名
-                $ischeck_user = explode($userDomain, $dirDomain);
-
 				foreach ($businessStore as $key => $value) {
 
 					$sql = $dsql->SetQuery("SELECT `wx`, `bd`, `qm`, `dy`, `app`, `pc`, `h5`, `android`, `ios`, `harmony` FROM `#@__site_module` WHERE `name` = '$key'");
@@ -314,8 +302,6 @@ class business {
 
 						//模块开关
 						if(
-                            HUONIAOADMIN || 
-                            (count($ischeck_busi) > 1 || count($ischeck_user) > 1) || 
 							(!isMobile() && $_ret['pc']) ||
 				  		    (
 				  			  isMobile() && (
@@ -729,11 +715,12 @@ class business {
         }
 
 
-		$archives = $dsql->SetQuery("SELECT l.`id`,$select_maidan l.`uid`, l.`isbid`, l.`title`, l.`logo`, l.`typeid`, l.`addrid`, l.`address`, l.`lng`, l.`lat`, l.`wechatname`, l.`wechatcode`, l.`wechatqr`, l.`tel`, l.`qq`,l.`landmark`, l.`email`, l.`pics`, l.`license`, l.`opentime`, l.`openweek`, l.`opentimes`, l.`amount`, l.`parking`, l.`authattr`, l.`pubdate`, l.`type`, l.`qj_file`, l.`video`, l.`banner`,".$select." (SELECT COUNT(`id`)  FROM `#@__public_comment` c WHERE c.`aid` = l.`id` AND c.`type` = 'business' AND `ischeck` = 1) AS popularity, (SELECT avg(`sco1`) FROM `#@__public_comment` c WHERE c.`aid` = l.`id` AND c.`type` = 'business' AND `ischeck` = 1 AND `pid` = 0) AS praise FROM `#@__business_list` l WHERE l.`state` = 1 AND (l.`expired` = 0 || l.`expired` > ".$now.")".$where);
+		$archives = $dsql->SetQuery("SELECT l.`id`,$select_maidan l.`uid`, l.`isbid`, l.`title`, l.`logo`, l.`typeid`, l.`addrid`, l.`address`, l.`lng`, l.`lat`, l.`wechatname`, l.`wechatcode`, l.`wechatqr`, l.`tel`, l.`qq`,l.`landmark`, l.`email`, l.`pics`, l.`license`, l.`opentime`, l.`openweek`, l.`opentimes`, l.`amount`, l.`parking`, l.`authattr`, l.`pubdate`, l.`type`, l.`qj_file`, l.`video`, l.`banner`,".$select." (SELECT COUNT(`id`)  FROM `#@__public_comment_all` c WHERE c.`aid` = l.`id` AND c.`type` = 'business' AND `ischeck` = 1) AS popularity, (SELECT avg(`sco1`) FROM `#@__public_comment_all` c WHERE c.`aid` = l.`id` AND c.`type` = 'business' AND `ischeck` = 1 AND `pid` = 0) AS praise FROM `#@__business_list` l WHERE l.`state` = 1 AND (l.`expired` = 0 || l.`expired` > ".$now.")".$where);
 		$archives_count = $dsql->SetQuery("SELECT count(`id`) FROM `#@__business_list` l WHERE l.`state` = 1 AND (l.`expired` = 0 || l.`expired` > ".$now.")".$where);
 
 		//总条数
-		$totalCount = (int)$dsql->getOne($archives_count);
+		$totalResults = $dsql->dsqlOper($archives_count, "results", "NUM");
+		$totalCount = (int)$totalResults[0][0];
 
 		//总分页数
 		$totalPage = ceil($totalCount/$pageSize);
@@ -964,7 +951,7 @@ class business {
 
 
                 //综合评分
-				$sql = $dsql->SetQuery("SELECT avg(`rating`) r, count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `aid` = ".$val['id']." AND `pid` = 0 AND `type` = 'business'");
+				$sql = $dsql->SetQuery("SELECT avg(`rating`) r, count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `aid` = ".$val['id']." AND `pid` = 0 AND `type` = 'business'");
 				$res = $dsql->dsqlOper($sql, "results");
 				$rating = $res[0]['r'];		//总评分
 				$list[$i]['rating']  = number_format($rating, 1);
@@ -997,10 +984,10 @@ class business {
 
 
 				//点评
-				$sql = $dsql->SetQuery("SELECT avg(`sco1`) r, count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `pid` = 0");
-				$res  = $dsql->dsqlOper($sql, "results");
-				$comment = $res[0]['c'];    //点评数量
-				$sco1  = $res[0]['r'];    //总评分
+				$sql                    = $dsql->SetQuery("SELECT avg(`sco1`) r, count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `pid` = 0");
+				$res                    = $dsql->dsqlOper($sql, "results");
+				$comment                = $res[0]['c'];    //点评数量
+				$sco1                   = $res[0]['r'];    //总评分
 				$list[$i]['comment'] = $comment;
 				$list[$i]['sco1']    = number_format($sco1, 1);
 
@@ -1009,20 +996,21 @@ class business {
                     $list[$i]['rating'] = $list[$i]['sco1'];
                 }
 
-				$sql = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 1 AND `pid` = 0");
-				$list[$i]['sco1_1'] = (int)$dsql->getOne($sql);
-				
-				$sql = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 2 AND `pid` = 0");
-				$list[$i]['sco1_2'] = (int)$dsql->getOne($sql);
-				
-				$sql = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 3 AND `pid` = 0");
-				$list[$i]['sco1_3'] = (int)$dsql->getOne($sql);
-				
-				$sql = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 4 AND `pid` = 0");
-				$list[$i]['sco1_4'] = (int)$dsql->getOne($sql);
-
-				$sql  = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 5 AND `pid` = 0");
-				$list[$i]['sco1_5'] = (int)$dsql->getOne($sql);
+				$sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 1 AND `pid` = 0");
+				$res                    = $dsql->dsqlOper($sql, "results");
+				$list[$i]['sco1_1'] = (int)$res[0]['c'];
+				$sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 2 AND `pid` = 0");
+				$res                    = $dsql->dsqlOper($sql, "results");
+				$list[$i]['sco1_2'] = (int)$res[0]['c'];
+				$sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 3 AND `pid` = 0");
+				$res                    = $dsql->dsqlOper($sql, "results");
+				$list[$i]['sco1_3'] = (int)$res[0]['c'];
+				$sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 4 AND `pid` = 0");
+				$res                    = $dsql->dsqlOper($sql, "results");
+				$list[$i]['sco1_4'] = (int)$res[0]['c'];
+				$sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $val['id'] . " AND `sco1` = 5 AND `pid` = 0");
+				$res                    = $dsql->dsqlOper($sql, "results");
+				$list[$i]['sco1_5'] = (int)$res[0]['c'];
 
 				$i ++;
 			}
@@ -1351,20 +1339,36 @@ class business {
             }
             $storeDetail["auth"] = $auth;
 
-			//点评
-			$sql = $dsql->SetQuery("SELECT avg(`sco1`) r, count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `pid` = 0");
-			$res = $dsql->dsqlOper($sql, "results");
-			$comment = $res[0]['c'];    //点评数量
-			$sco1 = $res[0]['r'];    //总评分
+            //点评
+			$sql                    = $dsql->SetQuery("SELECT avg(`sco1`) r, count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `pid` = 0");
+			$res                    = $dsql->dsqlOper($sql, "results");
+			$comment                = $res[0]['c'];    //点评数量
+			$sco1                   = $res[0]['r'];    //总评分
 			$storeDetail['comment'] = $comment;
-			$storeDetail['sco1'] = number_format($sco1, 1);
+			$storeDetail['sco1']    = number_format($sco1, 1);
 
 			$storeDetail['intro'] = $results[0]['body'];
 
-			// 带图
-			$sql = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `pics` != '' AND `pid` = 0");
+			// $sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `sco1` = 1 AND `pid` = 0");
+			// $res                    = $dsql->dsqlOper($sql, "results");
+			// $storeDetail['sco1_1'] = $res[0]['c'];
+			// $sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `sco1` = 2 AND `pid` = 0");
+			// $res                    = $dsql->dsqlOper($sql, "results");
+			// $storeDetail['sco1_2'] = $res[0]['c'];
+			// $sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `sco1` = 3 AND `pid` = 0");
+			// $res                    = $dsql->dsqlOper($sql, "results");
+			// $storeDetail['sco1_3'] = $res[0]['c'];
+			// $sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `sco1` = 4 AND `pid` = 0");
+			// $res                    = $dsql->dsqlOper($sql, "results");
+			// $storeDetail['sco1_4'] = $res[0]['c'];
+			// $sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `sco1` = 5 AND `pid` = 0");
+			// $res                    = $dsql->dsqlOper($sql, "results");
+			// $storeDetail['sco1_5'] = $res[0]['c'];
 
-			$storeDetail['comment_pic'] = $dsql->getOne($sql);
+			// 带图
+			$sql                    = $dsql->SetQuery("SELECT count(`id`) c FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'business' AND `aid` = " . $id . " AND `pics` != '' AND `pid` = 0");
+			$res                    = $dsql->dsqlOper($sql, "results");
+			$storeDetail['comment_pic'] = $res[0]['c'];
 
             // 自定义导航
             $custom_nav = array();
@@ -7651,19 +7655,6 @@ class business {
 				include HUONIAOINC . "/config/business.inc.php";
 				$fenXiao = (int)$custommaidanFenXiao;
 
-				require_once(HUONIAOINC.'/config/fenxiaoConfig.inc.php');
-				$fenxiaoBinding = (int)$cfg_fenxiaoBinding;
-
-				$pass = false;
-				if ($fenxiaoBinding == 1) {
-					//分销商查询
-					$sql = $dsql->SetQuery("SELECT `id` FROM `#@__member_fenxiao_user` where `uid` = '$sjuid' AND `state`=1");
-					$fxuid = $dsql->getOne($sql);
-					$pass = $fxuid ? true : false;
-				} else {
-					$pass = true;
-				}
-
                 // 分销只针对登录用户
 				if($fenXiao && $uid > 0){
 
@@ -7691,13 +7682,8 @@ class business {
 
                     //如果下单人没有推荐人，则绑定下单为的推荐人为商家，并且不对此单进行分销，因为商家自己推荐的，不需要再出分销佣金
 					if(empty($from_uidres[0]['from_uid']) && $sj_uidres[0]['from_uid'] != $uid){
-
-						$nowTime = GetMkTime(time());//当前时间，绑定的时候保存绑定时间
-
-						if($pass){
-							$sql = $dsql->SetQuery("UPDATE `#@__member` SET `from_uid` = '$sjuid', `from_bindtime` = '$nowTime' WHERE `id` = $uid");
-							$dsql->dsqlOper($sql, "results");
-						}
+						$sql = $dsql->SetQuery("UPDATE `#@__member` SET `from_uid` = '$sjuid' WHERE `id` = $uid");
+						$dsql->dsqlOper($sql, "results");
 
                         $fenxiaoFee = 0;
                         $cfg_fenxiaoState = 0;
@@ -8970,8 +8956,8 @@ class business {
 					$userid_f = "userid";
 					break;
 				case "house" :
-					$tab = "house_distributor_company";
-					$userid_f = "uid";
+					$tab = "house_zjcom";
+					$userid_f = "userid";
 					break;
 				case "waimai" :
 					$tab = "waimai_shop";

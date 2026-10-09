@@ -18,10 +18,9 @@ $(function(){
       var r = location.search.substr(1).match(reg);
       if (r!=null) return (r[2]); return null;
   }
-    // var urlSearch = location.search;
-    // var string = urlSearch.split("=")[1]; //分割取出typeid
-    // var typeidPram = getParameter("typeid"); //通过getParameter获取
-    var typeidPram = typeid;
+    var urlSearch = location.search;
+    var string = urlSearch.split("=")[1]; //分割取出typeid
+    var typeidPram = getParameter("typeid"); //通过getParameter获取
    $(".albumsnav span ").each(function(){
     var t = $(this), id = t.find('a').attr("data-id");
     if(typeidPram == id){
@@ -43,9 +42,9 @@ $(function(){
               type: 'get',
               dataType: 'json',
               success: function(data){
-                $('#picobj .loading').remove();
                 var totalCount = 0;
                 if(data && data.state == 100){
+                   $('#picobj .loading').remove();
                   var list = data.info.list, html = [];
                   for(var i = 0; i < list.length; i++){
                   	html.push('<figure itemprop="associatedMedia" itemscope="" itemtype="" class="swiper-slide">')

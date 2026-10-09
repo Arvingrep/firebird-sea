@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>商城活动设置</title>
+{#$cssFile#}
+<script>
+  var huodongopt = '{#json_encode($huodongopt)#}';
+  var huodongnames = '{#json_encode($huodongnames)#}';
+  var huodongopen = '{#json_encode($huodongopen)#}';
+  var huodongshopopen = '{#json_encode($huodongshopopen)#}';
+  var huodongygtime = '{#$huodongygtime#}';
+  var shopbargainingnomoneyCheckNum = '{#json_encode($shopbargainingnomoneyCheckNum)#}'
+  var shopbargainingnomoneyNames = '{#json_encode($shopbargainingnomoneyNames)#}'
+  var shopbargainingnomoneyChecked = {#$shopbargainingnomoneyChecked|default:0#}
+  var selfbargainCheckNum = '{#json_encode($selfbargainCheckNum)#}'
+  var selfbargainNames = '{#json_encode($selfbargainNames)#}'
+  var selfbargainChecked = {#$selfbargainChecked|default:0#}
+  var bargaintime = '{#$bargaintime#}'
+  var helpbargain = '{#$helpbargain#}'
+  var shopKanjiaGuize = '{#$shopKanjiaGuize#}' 
+  var levelList = '{#json_encode($levelList)#}'
+</script>
+</head>
+
+<body>
+  <div id="page" class="pageBox">
+    <div class="page_header">
+      <div class="tabBox">
+        <ul>
+          <li v-for="item in tabsList" :class="['li_' + item.id,{'currOn':currObj.id == item.id}]" @click="currObj = item">
+            <img :src="'/static/images/admin/shop/huodong_'+item.id+'.png'"/>
+            <span v-if="!item.saveOpen">未开启</span>
+          </li>
+        </ul>
+      </div>
+      <a href="shop/huodongProductList.php" data-id="huodongProductListphp" data-title="活动管理" @click.prevent="addPage"> 管理活动商品></a>
+    </div>
+    <div class="pageCon">
+      <form class="editform" id="editform">
+        <template  v-for="item in tabsList">
+          <div class="pintuan" v-show="currObj.id == item.id" >
+            <div class="title">
+              <h4>{{item.name}}</h4>
+              <p v-if="item.id  == 4">商家制定商品的拼团价、拼团人数等；买家自己开团或参与他人拼团，限定时间内人满即购买成功</p>
+              <p v-if="item.id  == 2">商家制定活动商品的秒杀价、秒杀时间、数量等；用户在规则内进行低价秒杀</p>
+              <p v-if="item.id  == 3">商家制定商品底价及需砍价规则等；用户可参与活动邀请好友帮助砍价</p>
+              <p v-if="item.id  == 1">平台制定抢购时间场次；商家制定商品抢购价、数量、参与场次等；用户在活动时间内进行抢购</p>
+            </div>
+            <div class="formCon">
+              <dl class="fn-clear clearfix">
+                <dt><label>活动开关：</label></dt>
+                <dd class="radio">
+                  <label for="" v-for="(num,ind) in 2" @click="switchClick">
+                    <input type="radio" @change="changeSwicth(item.id,num)"  :name="'switch_' + item.id" :checked="(item.open && num == 1) || (!item.open && num == 2)" :value="item.open">{{num == 1 ? '开启' : '关闭'}}
+                  </label>
+                </dd>
+              </dl>
+              <dl class="fn-clear clearfix" v-if="item.id == 2 || item.id == 1">
+                <dt><label>活动预告时限：</label></dt>
+                <dd class="radio">
+                  <input class="input-mini" type="number" name="huodongygtime" id="huodongygtime" min="0" v-model="huodongygtime"> 小时
+                  <span class="input-tips" style="display:inline-block;"><s></s>距活动开始前几小时内，商品详情显示活动倒计时</span>
+                </dd>
+              </dl>
+              <template v-if="item.id == 3">
+                <dl class="fn-clear clearfix">
+                  <dt><label>未到底价：</label></dt>
+                  <dd class="radio">
+                    {#html_radios name="shopbargainingnomoney" values=$shopbargainingnomoneyCheckNum checked=$shopbargainingnomoneyChecked output=$shopbargainingnomoneyNames separator="&nbsp;&nbsp;"#}
+                  </dd>
+                </dl>
+                <dl class="clearfix">
+                  <dt><label>自己砍价：</label></dt>
+                  <dd class="radio">
+                    {#html_radios name="selfbargain" values=$selfbargainCheckNum checked=$selfbargainChecked output=$selfbargainNames separator="&nbsp;&nbsp;"#}
+                  </dd>
+                </dl>
+                <dl class="clearfix">
+                  <dt><label>砍价时限：</label></dt>
+                  <dd class="radio">
+                    <input class="input-mini" type="number" name="bargaintime" id="bargaintime" min="0" value="{#$bargaintime#}" /> 小时
+                    <span class="input-tips" style="display:inline-block;"><s></s>买家发起砍价后，最多可以在几个小时内让别人砍价，超过设置的时间，将不可以再继续砍价。</span>
+                  </dd>
+                </dl>
+                <dl class="clearfix">
+                  <dt><label>帮砍次数：</label></dt>
+                  <dd class="radio">
+                    <input class="input-mini" type="number" name="helpbargain" id="helpbargain" min="0" value="{#$helpbargain#}" /> 每天
+                    <span class="input-tips" style="display:inline-block;"><s></s>用户每天最多可以帮别人砍价的次数。</span>
+                  </dd>
+                </dl>
+                <dl class="clearfix">
+                  <dt>砍价规则：</dt>
+                  <dd>
+                    <script id="body" name="shopKanjiaGuize" type="text/plain" style="width:85%;height:500px">{#$shopKanjiaGuize#}</script>
+                  </dd>
+                </dl>
+                <input v-for="id in huodongopen" type="hidden" name="huodongopen[]" :value="id">
+                <input type="hidden" id="token" name="token" value="{#$token#}">
+              </template>
+            </div>
+          </div>
+        </template>
+        
+      </form>
+      <!-- 场次设置 -->
+      <div v-if="currObj.id == 1" class="levelListBox">
+        <h5>活动场次设置</h5>
+        <ul class="thead clearfix" style="margin:10px 10px 0;">
+          <li class="row30 left">&nbsp;&nbsp;&nbsp;&nbsp;名 称</li>
+          <li class="row50 left">时 间</li>
+          <li class="row10 left">名 额</li>
+          <li class="row10 center">操 作</li>
+        </ul>
+        
+        <form class="list mb50" id="list">
+          <input type="hidden" id="token" value="{#$token#}" />
+          <ul class="root">
+            <li class="clearfix tr" v-for="(item,ind) in levelList ">
+              <div class="row30 left">&nbsp;&nbsp;&nbsp;&nbsp;<input type="text" :id="'hname' + ind" :data-id="item.id" v-model="item.name" /></div>
+              <div class="row50 left">
+                <input class="chooseTime" :id="`start_time${ind}`" type="text" v-model="item.ktime" :name="`start_time${ind}`" />至
+                <input class="chooseTime" :id="`stop_time${ind}`" type="text" v-model="item.etime" :name="`end_time${ind}`" />
+                <div class="errorMessage" id="Config_shop_start_time_em_" style="display:none"></div>
+                <div class="errorMessage" id="Config_shop_stop_time_em_" style="display:none"></div>
+                </div>
+              <div class="row10 left"><input type="text" class="semdinput" v-model="item.number"></div>
+              <div class="row10 center"><a href="javascript:;" class="del" title="删除" @click="delLevelList(item.id,ind)">编辑删除</a></div>
+            </li>
+            
+        
+          </ul>
+          <div class="tr clearfix">
+            <div class="row80 left">&nbsp;&nbsp;<a href="javascript:;" class="add-type" style="display:inline-block;" id="addNew" @click="addLevelList">新增限购场次</a></div>
+          </div>
+        </form>
+      </div>
+      <div class="btnbox">
+        <input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" @click="saveInfo">
+      </div>
+    </div>
+  </div>
+<script>
+  var adminPath = "{#$adminPath#}", modelType = action = "{#$action#}";
+</script>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>搜索结果</title>
+<meta name="keywords" content="{#$house_keywords#}" />
+<meta name="description" content="{#$house_description#}" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/search_list.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$house_channelDomain#}',templets_skin = '{#$templets_skin#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}';
+	var stypeid='{#$stypeid#}',keywords = '{#$keywords#}';
+</script>
+</head>
+
+<body class="w1200">
+{#include file="../../siteConfig/top1.html"#}
+
+{#$pageCurr = "school"#}
+{#include file="top.html"#}
+<div class="bgBanner">
+	<div class="wrap">
+		<h2>学区房查询</h2>
+		<div class="search_box fn-clear">
+			<form class="form_search" action="{#getUrlPath service='house'  template='search_list'#}">
+				<span class="chose_type" data-type="{#$stypeid#}">{#if $stypeid == 1#}查小区{#else#}查学校{#/if#}</span>
+				<input id="keywords" name="keywords" type="text" placeholder="输入小区名称查询"  value="{#$keywords#}"/>
+				<input id="searchtype" type="hidden" name="stypeid" value="{#$stypeid#}" />
+				<button class="submitSe"><i></i></button>
+			</form>
+			<div class="search_result">热搜：<p></p></div>
+
+			<ul class="chose_box">
+				<li data-type="1">查小区</li>
+				<li data-type="2">查学校</li>
+			</ul>
+		</div>
+	</div>
+
+</div>
+<div class="wrap">
+	{#if $stypeid == 1#}
+	{#house action="getCommunity" pageSize="1" page={#$page#} stypeid={#$stypeid#} keywords={#$keywords#}#}
+	<p class="resNum">共找到<strong>{#$pageInfo.totalCount#}</strong>个符合要求的小区</p>
+	{#/house#}
+	{#else#}
+	{#house action=getSchool pageSize=1 stypeid={#$stypeid#} addrid={#$addrid#} business={#$business#}  schoolnature={#$schoolnature#} schooltype={#$schooltype#} keywords={#$keywords#} return=list#}
+	<p class="resNum">共找到<strong>{#$pageInfo.totalCount#}</strong>个符合要求的学校</p>
+	{#/house#}
+	{#/if#}
+</div>
+<!-- 筛选 s-->
+<div class="filter_box wrap speFilter">
+    <div class="filter">
+        <!-- 区域 s-->
+		<dl class="fn-clear" id="addr">
+			<dt>区域</dt>
+			<dd class="chooseClass" data-chose="quyu">
+				<a href="{#getUrlPath service='house' template='search_list' param="addrid=0&business=0&schoolnature={#$schoolnature#}&schooltype={#$schooltype#}&keywords={#$keywords#}"#}" data-id="0" {#if $addrid == 0#} {#$addridName='不限'#} class="curr" {#/if#}>不限</a>      {#* 不限 *#}
+				{#house action="addr" return="addr" son="once"#}
+				{#if $addr.id == $addrid#}
+				{#$addridName = $addr.typename#}
+				{#/if#}
+				<a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addr.id#}&business=0&schoolnature={#$schoolnature#}&schooltype={#$schooltype#}&keywords={#$keywords#}"#}" data-id="{#$addr.id#}" {#if $addrid == $addr.id#} class="curr"{#/if#}>{#$addr.typename#}{#if $addr.lower#}{#/if#}</a>
+				{#/house#}
+
+				{#if $addrid!=0#}
+				<div class="subnav fn-clear" style="clear: both;">
+					<div id="addr{#$addrid#}" class="chooseClass" data-chose="quyu_sub">
+						<a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business=0&schoolnature={#$schoolnature#}&schooltype={#$schooltype#}&keywords={#$keywords#}"#}" data-id="{#$addrid#}" {#if $business == 0#} {#$businessName = '不限'#} class="curr" {#/if#}>不限</a>
+						{#house action="addr" return="addr2" type=$addrid#}
+						{#if $addr2.id == $business#}
+						{#$businessName = $addr2.typename#}
+						{#/if#}
+						<a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business={#$addr2.id#}&schoolnature={#$schoolnature#}&schooltype={#$schooltype#}&keywords={#$keywords#}"#}" data-id="{#$addr2.id#}" {#if $business==$addr2.id#} class="curr" {#/if#} >{#$addr2.typename#}</a>
+						{#/house#}
+					</div>
+				</div>
+				{#/if#}
+
+			</dd>
+		</dl>
+		<!-- 区域 e-->
+        <!-- 性质 s-->
+        <dl class="fn-clear">
+            <dt>性质</dt>
+            <dd class="chooseClass" data-chose="school" id="schoolChoose">
+                <a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business={#$business#}&schoolnature=&schooltype={#$schooltype#}&keywords={#$keywords#}"#}" {#if $schoolnature == ''#} {#$schoolnatureName = '不限'#} class="curr" {#/if#}>不限</a>
+                <a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business={#$business#}&schoolnature=0&schooltype={#$schooltype#}&keywords={#$keywords#}"#}" data-id="0" {#if $schoolnature == '0'#} {#$schoolnatureName = '公办'#} class="curr" {#/if#}>公办</a>
+                <a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business={#$business#}&schoolnature=1&schooltype={#$schooltype#}&keywords={#$keywords#}"#}" data-id="1" {#if $schoolnature == '1'#} {#$schoolnatureName = '私办'#} class="curr" {#/if#}>私办</a>
+                <a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business={#$business#}&schoolnature=2&schooltype={#$schooltype#}&keywords={#$keywords#}"#}" data-id="2" {#if $schoolnature == '2'#} {#$schoolnatureName = '合办'#} class="curr" {#/if#}>合办</a>
+
+            </dd>
+        </dl>
+        <!-- 性质 e-->
+        <!-- 类型 s-->
+        <dl class="fn-clear">
+            <dt>类型</dt>
+            <dd class="chooseClass" data-chose="study" id="studyChoose">
+                <a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business={#$business#}&schoolnature={#$schoolnature#}&schooltype=&keywords={#$keywords#}"#}" {#if $schooltype == ''#} {#$schooltypeName = '不限'#} class="curr" {#/if#}>不限</a>
+                {#house action="item" return="type" type='107'#}
+                 <a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business={#$business#}&schoolnature={#$schoolnature#}&schooltype={#$type.id#}&keywords={#$keywords#}"#}" data-id="{#$type.id#}" {#if $schooltype == $type.id#} {#$schooltypeName=$type.typename#} class="curr" {#/if#}>{#$type.typename#}</a>
+                {#/house#}
+            </dd>
+        </dl>
+        <!-- 类型 e-->
+    </div>
+	{#if $keywords != "" || $addrid !=0  || $business !=0 || $schoolnature != '' ||$keywords!='' || $schooltype!=0#}
+	<div class="deletebox">
+		<dl class="fi-state fn-clear" style="display: block;">
+			<dt>已选条件</dt>
+			<dd class="fn-clear">
+				{#if $keywords#}
+				<a href="{#getUrlPath service='house' template='search_list' param="addrid={#$addrid#}&business={#$business#}&schoolnature={#$schoolnature#}&schooltype={#$schooltype#}"#}"><span>{#$keywords#}</span><i class="idel"></i></a>
+				{#/if#}
+
+				{#if $addrid#}
+				<a href="{#getUrlPath service='house' template='search_list' param="addrid=&business=$business&schoolnature=$schoolnature&schooltype=$schooltype&keywords=$keywords"#}"><span>{#$addridName#}</span><i class="idel"></i></a>
+				{#/if#}
+
+				{#if $business#}
+				<a href="{#getUrlPath service='house' template='search_list' param="addrid=$addrid&business=&schoolnature=$schoolnature&schooltype=$schooltype&keywords=$keywords"#}"><span>{#$businessName#}</span><i class="idel"></i></a>
+				{#/if#}
+
+				{#if $schooltype#}
+				<a href="{#getUrlPath service='house' template='search_list' param="addrid=&business=$business&schoolnature=$schoolnature&schooltype=&keywords=$keywords"#}"><span>{#$schooltypeName#}</span><i class="idel"></i></a>
+				{#/if#}
+
+				{#if $schoolnature != ''#}
+				<a href="{#getUrlPath service='house' template='search_list' param="addrid=&business=$business&schoolnature=&schooltype=$schooltype&keywords=$keywords"#}"><span>{#$schoolnatureName#}</span><i class="idel"></i></a>
+				{#/if#}
+
+			</dd>
+			<a class="btn_clear" href="{#getUrlPath service='house' template='search_list' param="addrid=&business=&schoolnature=&schooltype=&keywords="#}">清空条件</a>
+		</dl>
+	</div>
+	{#/if#}
+</div>
+<!-- 筛选 e-->
+<div class="wrap fn-clear list_wrap">
+	<div class="list fn-left">
+		<ul>
+			{#if $stypeid == 1#}
+				{#house action="getCommunity" pageSize="10" page={#$page#} stypeid={#$stypeid#} keywords={#$keywords#} #}
+				<li class="comuLi"><a href="{#getUrlPath service='house' template='slist' param="sid={#$row.id#}&sname={#$row.title#}"#}" class="fn-clear">
+					<div class="left_b fn-left">
+						<h2 class="tit">{#$row.title#}</h2>
+						<p class="addr"><i></i>{#$row.addrName#}</p>
+					</div>
+					<div class="right_b fn-right">
+						<strong>{#$row.schoolcount#}</strong>所学校
+					</div>
+				</a></li>
+				{#/house#}
+
+			{#else#}
+				{#house action=getSchool pageSize=10 page={#$page#}  addrid={#$addrid#} business={#$business#}  schoolnature={#$schoolnature#} schooltype={#$schooltype#} keywords={#$keywords#} return=list#}
+          		
+				<li class="scLi"><a href="{#getUrlPath service='house'  template='school_detail' param="id={#$list.id#}"#}">
+					<div class="left_img"><img src="{#if $list.logo#}{#$list.logo#}{#else#}{#$cfg_staticPath#}/images/404.jpg{#/if#}" alt="" onerror="javascript:this.src='{#$cfg_staticPath#}images/404.jpg';"></div>
+					<div class="rightSc">
+						<h3>{#$list.title#}</h3>
+						<p class="tag">
+							<span class="nature">{#$list.schoolnaturename#}</span>
+							{#foreach from=$list.typearr item='type'#}
+							<span class="slevel-{#if $type.typename == '幼儿园'#}1{#elseif $type.typename == '小学'#}2{#else#}3{#/if#}">{#$type.typename#}</span>
+							{#/foreach#}
+
+						</p>
+						<p class="addr"><i></i>{#$list.addrName#}</p>
+						<p class="fire"><i></i>{#$list.click#}</p>
+					</div>
+				</a></li>
+				{#/house#}
+          
+			{#/if#}
+			{#if $pageInfo.totalCount == 0#}
+          	<li class="empty failed scLi"><img src="{#$templets_skin#}images/icon_faild.png"><span>没有找到符合条件的结果</span></li>
+            {#/if#}
+
+		</ul>
+        {#getPageList service='house' template='search_list' pageType='dynamic' param="keywords=$keywords&stypeid=$stypeid&page=#page#"#}
+	</div>
+	<div class="seeCon fn-right">
+		<h3 class="nearSee">最近浏览的学校<i></i></h3>
+		<ul>
+
+		</ul>
+	</div>
+</div>
+
+{#include file="footer.html"#}
+
+<script type="text/javascript" src="{#$templets_skin#}js/school.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/search_list.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

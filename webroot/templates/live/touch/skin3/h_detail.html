@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>{#$livedetail_title#}</title>
+<meta name="keywords" content="{#$live_keywords#}">
+<meta name="description" content="{#$live_description#}">
+<meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="{#$templets_skin#}css/livedetail.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" href="//g.alicdn.com/de/prismplayer/2.13.2/skins/default/aliplayer-min.css">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" charset="utf-8" src="//g.alicdn.com/de/prismplayer/2.13.2/aliplayer-min.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script>jQuery.noConflict()</script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script>
+    var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$live_channelDomain#}', staticPath = '{#$cfg_staticPath#}',templets_skin = '{#$templets_skin#}', cfg_attachment = '{#$cfg_attachment#}';
+    var hideFileUrl = '{#$cfg_hideUrl#}';
+    var cookiePre = '{#$cfg_cookiePre#}';
+    var id = '{#$livedetail_id#}', luser_id = '{#$userid#}', room = '{#$livedetail_id#}';
+    var medial = {#json_encode($livedetail_media)#};
+    var live_user = '{#$livedetail_user#}';
+    var modelType = "live";
+    var source = {#if $livedetail_state==2#}'{#$detail_mp4url#}'{#else#}'{#$detail_url#}'{#/if#};
+	var media = {#json_encode($livedetail_media)#};
+	var upflag = 1;
+	var livedetail_state = {#$livedetail_state#};
+	var poster = '{#$livedetail_litpic#}';
+</script>
+</head>
+    <body>
+        {#include file="../../../siteConfig/touch_top.html" pageTitle="{#$livedetail_title#}"#}
+
+        <div class="player-area">
+            <div class="video_big ">
+                {#if $livedetail_state==1#}
+                <span class="live_state living"><i></i><em>{#$livedetail_click#}人正在观看</em>{#if $onLineNums#}{#/if#}</span>
+                {#else if $livedetail_state==2#}
+               		 {#if $detail_mp4url != '' #}
+               		 <span class="live_state live_after"><i>精彩回放</i><em>{#$livedetail_click#}人浏览</em></span>
+               		 {#else#}
+               		 <span class="live_state live_after"><i>回放制作中</i></span>
+               		 {#/if#}
+                {#else#}
+                <span class="live_state live_before"><i>预告</i><em>{#$livedetail_start_time#}开播</em></span>
+                {#/if#}
+                 {#if $livedetail_state==1||$livedetail_state==2#}
+                 <!--<div class="poster_img">
+                 	<p>正在初始化~~</p>
+                 	<img src="{#$livedetail_litpic#}"/>
+                 </div>-->
+                <div class="prism-player" id="player-con" data-type="{#$livedetail_state#}" data-src="{#if $livedetail_state==2#}{#$detail_mp4url#}{#else#}{#$detail_url#}{#/if#}" data-poster="{#$livedetail_litpic#}">
+                    <div class="video-btn">
+                        <div class="play-box video-icon-box" id="vbplay">
+                            <i class="play-icon video-icon"></i>
+                        </div>
+                        <div class="load-box video-icon-box" style="display: none;">
+                            <i class="load-icon video-icon"></i>
+                        </div>
+                        <div class="reload-box video-icon-box" style="display: none;">
+                            <i class="reload-icon"></i>
+                            <p>重新播放</p> {#*  重新播放   *#}
+                        </div>
+                        <div class="error-box video-icon-box" style="display: none;">
+                            <p class="err-info">视频出错了，请检查网络状况</p>{#*  视频出错了，请检查网络状况   *#}
+                            <div class="reload-box">
+                                <i class="reload-icon"></i>
+                                <p>重新加载</p>{#*  重新加载   *#}
+                            </div>
+                        </div>
+                    </div>
+                    <!--图片-->
+                    <div class="poster_img"><img src="{#$livedetail_litpic#}"/></div>
+                    <!--我的控制条-->
+                    <div id="video-control" style="display: none;">
+                        <div class="btn-control">
+                            <div id="play" class="play"> </div>
+                        </div>
+                        <div id="time" class="time"> 00:00 </div>
+                        <div id="progress"> <span id="bar"></span>
+                            <div id="control"> </div>
+                        </div>
+                        <div class="btn-control">
+                            <div id="sound" class="soundon"> </div>
+                        </div>
+                        <div id="full" class="full"> </div>
+                    </div>
+                </div>
+            	{#else#}
+            	<div class="pre_poster" >
+            		<img src="{#$livedetail_litpic#}" />
+            	</div>
+            	{#/if#}
+            </div>
+
+            <div class="vinfo_box">
+                <div class="v_right">
+                </div>
+                <div class="v_left">
+                    <h2>{#$livedetail_title#}</h2>
+                    <p class="v_info"><em class="living">直播</em> 观看人次:{#$livedetail_click#}</p>
+                </div>
+            </div>
+            <div class="advbox swiper-container">
+                <div class="swiper-wrapper">
+                    {#{#myad title="$livedetail_adv" type='slide'#}|replace:'slideshow-item':'swiper-slide'#}
+                </div>
+            </div>
+            <div class="tab_box">
+            	<ul>
+					{#foreach from=$livedetail_menu item='menu' key='k'#}
+					<li data-id="{#$menu.sys#}" class="{#if $k==0#}on_chose{#/if#}"><a href="{#$menu.url|default:'javascript:;'#}">{#$menu.name#}</a></li>
+					{#/foreach#}
+				</ul>
+				{#if $livedetail_user != $userid#}
+				{#if $userid && $livedetail_isMfollow#}
+			    <span data-id="{#$fid#}" class="active">已关注</span>
+			    {#else#}
+			    <span data-id="{#$fid#}">关注</span>
+				{#/if#}
+				{#/if#}
+            </div>
+        </div>
+        <div class="con_box">
+			<!-- 介绍 -->
+		    <div class="jieshao con_li" data-id='0'>
+				<a href="{#$cfg_basehost#}/user/{#$livedetail_user#}#live">
+					<div class="jieshao_info fn-clear">
+						<div class="info_img"><img src="{#$livedetail_photo#}"></div>
+						<div class="info_text">
+							<p>{#$livedetail_nickname#}</p>
+							<!--<p>直击峰会现场</p>-->
+						</div>
+						<i></i>
+					</div>
+				</a>
+				<div class="introduce">
+					<div class="introduce_txt">直播介绍</div>
+					<div class="introduce_title">
+						{#$livedetail_note#}
+					</div>
+				</div>
+			</div>
+			<!-- 介绍 e-->
+			<!-- 图文 -->
+        	<ul class="con_li ulbox tuwen" data-id='1'>
+                {#live action=imgTextList return=list chatid=$livedetail_id pageSize=100#}
+        		 <li class="libox big_img">
+                    <div class="info fn-clear">
+                        <div class="art_info">
+                            <span class="art_head"><img src="{#changeFileSize url="{#$list.photo#}" type="small"#}" /></span>
+                            <div class="art_name">
+                                <h2>{#$list.nickname#}</h2>
+                                <p>{#$list.pubdate|date_format:'%H:%M'#}</p>
+                            </div>
+                        </div>
+                        <!--<div class="img_info">04-24 13:00</div>-->
+                    </div>
+                    <a href="javascript:;" class="fn-clear">
+                        <h2>{#$list.text#}</h2>
+                        <div class="img_box">
+                            {#foreach from=$list.img item=val#}
+                            <span class="thumb"><img src="{#$val#}"/></span>
+                            {#/foreach#}
+                        </div>
+                    </a>
+                </li>
+                {#/live#}
+                {#if $pageInfo.totalCount == 0#}
+                <div class="empty">抱歉！ 暂无直播图文</div>
+                {#/if#}
+        	</ul>
+       		<!-- 互动 -->
+		    <div class="hudong con_li" data-id='2'>
+		        <div class="interact main_info" id="main_info">
+		        </div>
+		        <div class="fixed_icon">
+		            <!--<div class="fi_01"><a href="javaScript:;"><img src="{#$templets_skin#}images/ic_05.png"></a></div>-->
+                    {#if 'reward'|in_array:$cfg_ucenterLinks && $live_rewardSwitch == 0#}
+		            <div class="fi_02 "><a href="{#getUrlPath service=live action=sharePage live_id=$livedetail_id#}"><img src="{#$templets_skin#}images/ic_06.png"></a></div>
+		            <div class="fi_03 {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide {#/if#}"><a href="javascript:;"><img src="{#$templets_skin#}images/ic_07.png"></a></div>
+                    {#else#}
+		            <div class="fi_02 " style="bottom: 2.44rem;"><a href="{#getUrlPath service=live action=sharePage live_id=$livedetail_id#}"><img src="{#$templets_skin#}images/ic_06.png"></a></div>
+                    {#/if#}
+		            <div class="fi_04{#if $livedetail_iszan#} active{#/if#}"><img src="{#$templets_skin#}images/ic_08.png"><p>{#$livedetail_zanCount#}</p></div>
+		        </div>
+		        <div class="search_bar fn-clear">
+		            <span class="biaoqin"></span>
+		            <!-- <input type="text" id="search_keyword" class="txt_search" value="" autocomplete="off" placeholder="请输入您要搜索的企业关键词"> -->
+		            <span class="search_keyword">{#$cfg_commentPlaceholder#}</span>
+		            <span class="liwu  {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide {#/if#}"></span>
+		            <span class="jia"></span>
+		        </div>
+		    </div>
+		    <!-- 互动 e-->
+			<!-- 商品s -->
+			<div class="con_li pro_box" style="display: none;" data-id='3'>
+				<ul class="pro_ul">
+					 {#live action='product' aid={#$livedetail_id#} return='pro' pageSize='50' zero='1'  orderby='asc'#}
+					<li class="fn-clear">
+						<a href="{#$pro.url#}" class="pro fn-clear">
+							<div class="left_img"><i style="font-style:normal;">{#$pro.px#}</i><img src="/include/attachment.php?f={#$pro.pic#}" /></div>
+							<div class="right_info">
+								<h3>{#$pro.title#}</h3>
+								{#$p = explode(".",$pro.price)#}
+								<p class="price_show">{#echoCurrency type='symbol'#}<em>{#$p[0]#}</em>.{#$p[1]#}</p>
+								<button type="button" class="buy_btn">去购买</button>
+							</div>
+						</a>
+					</li>
+					{#/live#}
+					
+				</ul>
+				{#if $pageInfo.totalCount == 0#}
+				<div class="empty">{#$langData['live'][3][46]#}</div>
+				
+				{#/if#}
+				<!-- <p class="loading">加载中~</p> -->
+			</div>
+			<!-- 商品e -->
+			 <!-- 邀请榜 -->
+		    <div class="yaoqinbang con_li" style="display: none;"  data-id='4' >
+		        <div class="yqb">
+		            <div class="switch_list">
+		                <p>
+		                    <span class="active" data-id="1">邀请榜</span><span data-id="2">打赏榜</span>
+		                </p>
+		            </div>
+		            <div class="request_list yaoqingbang" style="display: block">
+		                <ul>
+		                    {#$a=0#}
+		                    {#live action=getShareList return=list liveid=$livedetail_id#}
+		                    <input type="hidden" value="{#$a++#}">
+		                    <li class="fn-clear">
+		                        <span class="ranking {#if $a < 4#}ranking_0{#$a#}{#/if#}"></span>
+		                        <div class="ranking_info fn-clear">
+		                            <div class="user_img"><img src="{#$list['user']['photo']#}"></div>
+		                            <p class="user_name">{#$list['user']['username']#}</p>
+		                            <p class="user_data">邀请<em>{#$list['scount']#}</em>人</p>
+		                        </div>
+		                    </li>
+		                    {#/live#}
+		                    {#$a=null#}
+		                </ul>
+		            </div>
+
+		            <div class="request_list dashangbang" style="display: none">
+		                <ul>
+		                    {#$a=0#}
+		                    {#live action=getRewardList return=list liveid=$livedetail_id#}
+		                    <input type="hidden" value="{#$a++#}">
+		                    <li class="fn-clear">
+		                        <span class="ranking {#if $a < 4#}ranking_0{#$a#}{#/if#}"></span>
+		                        <div class="ranking_info fn-clear">
+		                            <div class="user_img"><img src="{#$list['user']['photo']#}"></div>
+		                            <p class="user_name">{#$list['user']['username']#}</p>
+		                            <p class="user_data">共打赏<em>{#$list['sumamount']#}</em>{#echoCurrency type='short'#}</p>
+		                        </div>
+		                    </li>
+		                    {#/live#}
+		                    {#$a=null#}
+		                </ul>
+		            </div>
+		        </div>
+		        <a class="btn_request" href="{#getUrlPath service=live action=sharePage live_id=$livedetail_id#}">我要邀请</a>
+		    </div>
+
+		    <!-- 合作 -->
+		    <!-- <div class="hezuo con_li" style="display: none;">
+		        <div class="no_hz">
+		            <img src="{#$templets_skin#}images/img.png">
+		            <p>TA还没有上传合作信息哦</p>
+		        </div>
+		    </div> -->
+        </div>
+
+        <!-- qq表情 -->
+        <div class="emotion-box">
+            
+        </div>
+
+        <!-- 加--红包、照片 -->
+		<div class="mask_01"></div>
+		<div class="Multi_function fn-clear">
+		    <div class="red_envelopes  {#if $cfg_iosVirtualPaymentState#}iosVirtualPaymentHide {#/if#}"><a href="{#getUrlPath service=live action=redPacket live_id=$livedetail_id cid=$detail_chatRoomIds#}"><img src="{#$templets_skin#}images/ioc_02.png"></a><p>红包</p></div>
+		    <div class="photograph"><img src="{#$templets_skin#}images/ioc_01.png"><p>图片</p><div class="photograph1"></div></div>
+		</div>
+
+		<div class="disk_01"></div>
+
+
+        <!-- 点击领取红包弹出层 -->
+		<div class="disk_02"></div>
+		<div class="hb_img">
+		    <img class="hb_bg" src="{#$templets_skin#}images/hongbao_01.png">
+		    <div class="hb_portrait"><img src="{#$livedetail_userphoto#}"></div>
+		    <p class="hb_txt">{#$livedetail_username#}</p>
+		    <p class="hb_title">发了一个红包</p>
+		    <p class="hb_slogan">恭喜发财，大吉大利</p>
+		    <div class="hb_qiang" data-id="" data-state=""><img src="{#$templets_skin#}images/hongbao_02.png"></div>
+		    <a class="hb_receive" href="javaScript:;" style="display: none">查看领取详情>></a>
+		    <i class="sign_out"></i>
+		</div>
+
+		<div class="disk_03"></div>
+		<div class="hongbao_list">
+		    <div class="list_top">
+		        <img class="huodong_bg" src="{#$templets_skin#}images/h_01.png">
+		        <div class="hb_portrait"><img src=""></div>
+		        <p class="hb_txt"></p>
+		        <p class="hb_slogan">恭喜发财，大吉大利</p>
+		        <p class="hb_m"><em class="hb_m_number">99.99</em><em>{#echoCurrency type='short'#}</em></p>
+		        <a class="put_forward" href="{#getUrlPath service=member type=user template=withdraw#}">提现</a>
+		        <i class="hd_sign_out"></i>
+		    </div>
+		    <div class="list_bottom">
+		        <p class="bg_botton_txt">已领取<em class="h_yilingqu">1</em>/<em class="h_zonggong">5</em>个，共<em class="ylq_yuan">5</em>/<em class="zg_yuan">5</em>{#echoCurrency type='short'#}</p>
+		        <ul class="list_qianghongbao">
+
+		        </ul>
+		    </div>
+		</div>
+
+		<div class="protips"></div>
+
+		<!--输入框-->
+		<div class="ios-input-box">
+		    <div class="ios-input-con">
+		        <p class="reply_title">发表评论</p>
+		        <!-- <textarea placeholder="请输入评论内容" class="ios-comment-area"></textarea> -->
+		        <div class="txt" id="content">
+		            <!--<font class="txt-gray">帖子内容</font>-->
+
+		            <div class="textarea placeholder" contenteditable="true" id="content_text">
+		            </div>
+		        </div>
+		        <div class="btn-group">
+		            <div class="ios-input-close">取消</div>
+		            <div class="ios-input-submit">发送</div>
+		        </div>
+		    </div>
+		</div>
+
+		<!-- 打赏弹窗 -->
+		<div class="disk_04"></div>
+		<div class="dashang">
+		    <div class="hong_d"></div>
+		    <div class="hong_top">
+		        <img class="hong_bg" src="{#$templets_skin#}images/h_02.png">
+		        <p class="hong_txt">红包打赏给</p>
+		        <div class="hong_portrait"><img src="{#$livedetail_litpic#}"></div>
+		        <p class="hong_name">{#$livedetail_nickname#}</p>
+		        <p class="hong_title">打赏榜上有名，赏金额会送给主播</p>
+		        <i class="hong_sign_out"></i>
+		    </div>
+		    <div class="hong_bottom">
+		        <div class="hong_bg_l">
+		            <ul class="fn-clear">
+                        {#foreach from=$live_rewardOption key=ind item=ds#}
+                        {#if $ind < 6#}
+		                <li>{#$ds#}{#echoCurrency type='short'#}</li>
+                        {#/if#}
+                        {#/foreach#}
+		            </ul>
+		            <p class="other_money">其他金额</p>
+		        </div>
+		    </div>
+		</div>
+
+		<div class="mask"></div>
+		<div class="layui-m-anim-scale" id="c-gift">
+		    <ul class="mlbn-present fn-clear">
+		        {#live action=getGift return=gift#}
+		        <li data-id="{#$gift['id']#}">
+		            <a href="javaScript:;">
+		                <span><img src="{#$gift['gift_litpic']#}"></span>
+		                <p class="mlbn-present-zan-name">{#$gift['gift_name']#}</p>
+		                <p class="mlbn-present-zan-money">{#$gift['gift_price']#}{#echoCurrency type='short'#}</p>
+		            </a>
+		        </li>
+		        {#/live#}
+		    </ul>
+		    <ul class="d-flex fn-clear" id="fs-gift-number">
+		        <li class="f-12rem s_title">数量</li>
+		        <li class="clearfix fsl-shuliang">
+		            <span class="fsl-shuliang-reduce">－</span>
+		            <input type="text" class="fsl-shuliang-number" id="fs-gift-amount" value="1" onkeyup="this.value=this.value.replace(/[^\d.]/g,'')">
+		            <span class="fsl-shuliang-plus">＋</span>
+		        </li>
+		        <li class="flex f-12rem fsl-present-price">合计：<var id="fs-gift-total">2.00</var>{#echoCurrency type='short'#}</li>
+		        <li class="fsl-fasong-bt">
+		            <a id="fs-gift-send" class="enable publicpaybtn">赠送</a>
+		        </li>
+		    </ul>
+		</div>
+		<div class="disk_05"></div>
+		<div class="gengduo">
+		    <p class="gengduo_txt">其他金额</p>
+		    <div class="gengduo_n"><input type="text" name="other_money" placeholder="可填写0.1――999" onkeyup="this.value=this.value.replace(/[^\d.]/g,'')">{#echoCurrency type='short'#}</div>
+		    <div class="gengduo_btn fn-clear"><p class="gengduo_btn_01">取消</p><p class="gengduo_btn_02 publicpaybtn">确定</p></div>
+		</div>
+
+
+<!--付费和邀请码s-->
+<div class="pay_page">
+	<!--顶部返回-->
+	<a href="{#$live_channelDomain#}" class="go_back">返回</a>
+	<div class="bottom_page">
+		<h2>{#if $liveType eq 1#}邀请码{#else#}付费观看{#/if#}</h2>
+		<div class="bottom_block">
+			<div class="bg_top"></div>
+			<!--<img class="bg_top" src="{#$templets_skin#}images/bg_img.png" />-->
+			<!--付费-->
+			<div class="pay_box">
+				<p>当前直播需要付费才能继续观看哦~</p>
+				<h3><em>{#echoCurrency type='symbol'#}</em>{#$livemoney#}</h3>
+				<a href="javascript:;" class="go_pay publicpaybtn">立即支付</a>
+			</div>
+			<div class="invide_code">
+            <form id="pForm" action="{#$check_pass_url#}" method="post">
+				<p>当前直播需要邀请码才能继续观看哦~</p>
+				<input class="code_in" type="text" name="password" placeholder="输入邀请码" />
+                <a href="javascript:;" class="go_sure">确认</a>
+            </form>
+			</div>
+
+		</div>
+	</div>
+</div>
+<!--付费e-->
+
+	{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+<!--大图查看s-->
+
+<link rel='stylesheet' href='{#$cfg_staticPath#}css/ui/photoswipe.css?v={#$cfg_staticVersion#}'>
+<link rel='stylesheet' href='{#$cfg_staticPath#}css/ui/photoswipe-default-skin.css?v={#$cfg_staticVersion#}'>
+<script src='{#$cfg_staticPath#}js/ui/photoswipe.min.js?v={#$cfg_staticVersion#}'></script>
+<script src='{#$cfg_staticPath#}js/ui/photoswipe-ui-default.min.js?v={#$cfg_staticVersion#}'></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/imglook.js?v={#$cfg_staticVersion#}" ></script>
+<script src="{#$templets_skin#}js/jquery.bigImage_1.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>		
+<!--大图查看e-->
+<script>
+    var username='{#$livedetail_username#}';
+    var userphoto='{#$livedetail_userphoto#}';
+    var appKey = "{#$livedetail_appKey#}";
+    var token  = "{#$livedetail_token#}";
+    var config = {
+        protobuf : "{#$cfg_staticPath#}js/rong/protobuf-2.2.8.min.js"
+    };
+    var count = 0;// 拉取最近聊天最多 50 条。
+    var chatRoomId = "{#$detail_chatRoomId#}"; // 聊天室 Id。{#$detail_url#}
+    var live_user_n = '{#$livedetail_nickname#}';
+	var amount = '{#$livemoney#}';
+
+	var showTipCookie = $.cookie(cookiePre + "_showTip");
+	var showTip = 0;
+  
+	{#if $liveUserAuth eq 1#}
+		{#if $livedetail_state == 2 && $detail_mp4url == ''#}
+			var showTip = 1;//视频回放正在制作中
+		{#else#}
+		    var showTip = 4;
+		{#/if#}
+		// $.cookie(cookiePre + "_showTip", '2', {expires: 1, path: '/'});
+	{#else#}
+		{#if $liveType eq 1#}
+			var showTip = 2;//加密
+			//加密
+            $(".pay_page").show();
+            $(".invide_code").show();
+			$(".pay_box").hide();
+			/*---新增---*/
+			$('#player-con').remove();
+			$('.video_big').append('<div class="poster_show"><img src="'+poster+'"></div>');
+		{#else#}
+			var showTip = 3;//付费
+			//付费
+            $(".pay_page").show();
+            $(".pay_box").show();
+			$(".invide_code").hide();
+			// $.cookie(cookiePre + "_showTip", '1', {expires: 1, path: '/'});
+			/*----新增----*/
+			$('#player-con').remove();
+			$('.video_big').append('<div class="poster_show"><img src="'+poster+'"></div>');
+		{#/if#}
+	{#/if#}
+</script>
+<script>
+    var wxconfig = {
+        "appId": '{#$wxjssdk_appId#}',
+        "timestamp": '{#$wxjssdk_timestamp#}',
+        "nonceStr": '{#$wxjssdk_nonceStr#}',
+        "signature": '{#$wxjssdk_signature#}',
+        "description": '{#$livedetail_note|strip_tags|default:$live_description#}',
+        "title": '{#$livedetail_title#}',
+        "imgUrl": '{#$livedetail_litpic#}',
+        "link": '{#getUrlPath service="live"  template="h_detail" id={#$livedetail_id#}#}',
+    };
+    document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$cfg_staticPath#}js/webuploader/webuploader.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.scroll.loading.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/upload.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/chatroom.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/live_detail.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

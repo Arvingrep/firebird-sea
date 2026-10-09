@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+	modelType = "travel", adminPath = "{#$adminPath#}",
+	basehost = '{#$basehost#}', subdomain = '{#$subdomain#}', mapCity = "{#$cfg_mapCity#}";
+var cityid = {#$cityid#}, cityList = {#$cityList#},addr = {#$addrid#};
+var imglist = {"imgpics": {#$pics#}};
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="user">对应会员：</label></dt>
+    <dd style="position:static;">
+      <input class="input-medium" type="text" name="user" id="user" value="{#$username#}" autocomplete="off" />
+      <input type="hidden" name="userid" id="userid" value="{#$userid#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>此会员可以管理店铺信息</span>
+      <div id="userList" class="popup_key"></div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>选择频道：</dt>
+    <dd class="checkbox">
+      {#html_checkboxes name='bind_module' values=$bind_module_val output=$bind_module_name selected=$bind_module separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="title">店铺名称：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="title" id="title" data-regex=".{2,60}" maxlength="60" value="{#$title#}" />
+      <span class="input-tips"><s></s>请输入店铺名称。</span>
+    </dd>
+  </dl>
+  
+  <dl class="clearfix">
+    <dt><label for="addrid">所属地区：</label></dt>
+    <dd>
+			<div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id="{#$addrid#}">{#if $addrid != ""#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}</div>
+			<input type="hidden" name="addrid" id="addrid" value="{#$addrid#}" />
+		<input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+      <span class="input-tips"><s></s>请选择所属地区</span>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="address">详细地址：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" maxlength="60" data-regex=".{2,60}" />
+      <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+      <span class="input-tips"><s></s>请输入详细地址，2-60位</span>
+      <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="tel">联系电话：</label></dt>
+    <dd><input type="text" class="input-large" id="tel" name="tel" data-regex=".{2,60}" value="{#$tel#}" /><span class="input-tips"><s></s>请输入联系电话</span></dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="contact">联系人：</label></dt>
+    <dd><input type="text" class="input-large" id="contact" name="contact" data-regex=".{1,30}" value="{#$contact#}" /><span class="input-tips"><s></s>请输入联系人</span></dd>
+  </dl>
+
+  <dl class="clearfix lxs {#if empty($bind)#}hide{#/if#}">
+    <dt><label for="license">许可证号：</label></dt>
+    <dd><input type="text" class="input-large" id="license" name="license" data-regex=".{1,60}" value="{#$license#}" /><span class="input-tips"><s></s>请输入许可证号</span></dd>
+  </dl>
+
+<!--  <dl class="clearfix lxs {#if empty($bind)#}hide{#/if#}">-->
+<!--    <dt><label for="servicetime">服务时间：</label></dt>-->
+<!--    <dd><input type="text" class="input-large" id="servicetime" name="servicetime" data-regex=".{1,100}" value="{#$servicetime#}" /><span class="input-tips"><s></s>请输入服务时间</span></dd>-->
+<!--  </dl>-->
+
+    <dl class="clearfix">
+        <dt>服务时间：</dt>
+        <dd class="checkbox">
+            {#html_checkboxes name='date' values=$date_val output=$date_name selected=$date separator="&nbsp;&nbsp;"#}
+        </dd>
+    </dl>
+
+  <dl class="clearfix">
+    <dt>店铺图集：</dt>
+		<dd class="listImgBox hide">
+			<div class="list-holder">
+				<ul id="listSection4" class="clearfix listSection piece"></ul>
+				<input type="hidden" name="pics" value='{#$pics#}' class="imglist-hidden">
+			</div>
+			<div class="btn-section clearfix">
+				<div class="uploadinp filePicker" id="filePicker4" data-type="album" data-count="{#$storeatlasMax#}" data-size="{#$atlasSize#}" data-imglist="imgpics"><div id="flasHolder"></div><span>添加图片</span></div>
+				<div class="upload-tip">
+					<p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+				</div>
+			</div>
+		</dd>
+  </dl>
+
+  <dl class="clearfix" id="type0">
+    <dt>上传视频：</dt>
+    <dd>
+		<input name="video" type="hidden" id="video" value="{#$video#}" />
+		<div class="spic{#if $video == ""#} hide{#/if#}">
+			<div class="sholder" id="videoPreview">
+				 <a href="/include/videoPreview.php?f=" data-id="{#$video#}">预览视频</a>
+			</div>
+			<a href="javascript:;" class="reupload">重新上传</a>
+		</div>
+		<iframe src ="/include/upfile.inc.php?mod=travel&type=video&obj=video&filetype=video" style="width:100%; height:25px;{#if $video != ""#} display: none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt>详细介绍：</dt>
+    <dd><script id="note" name="note" type="text/plain" style="width:85%;height:500px">{#$note#}</script></dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="click">浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+      <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+      <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+    </dd>
+  </dl>
+  
+  <dl class="clearfix">
+    <dt><label for="state">显示状态：</label></dt>
+    <dd class="radio">
+      {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix{#if $state != 2#} hide{#/if#}" id="refuseObj">
+    <dt>拒审原因：</dt>
+    <dd>
+        <textarea class="input-xxlarge" rows="2" name="refuse" id="refuse" data-regex=".{0,250}">{#$refuse#}</textarea>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+      <dt><label for="flag">认证状态：</label></dt>
+      <dd class="radio">
+        {#html_radios name="flag" values=$flagopt checked=$flag output=$flagnames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

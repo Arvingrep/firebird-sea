@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<link rel="stylesheet" href="{#$templets_skin#}css/uni.1a42107e.css?v={#$cfg_staticVersion#}">
+
+		<meta charset="UTF-8" />
+		<meta name="viewport"
+			content="width=device-width,initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no,viewport-fit=cover, viewport-fit=cover" />
+		<title>{#$info_title#}</title>
+		<meta name="apptitle" content="{#$info_channelName#}">
+		<meta property="og:title" content="" />
+		<meta property="og:description" content="" />
+		<meta property="og:image" content="{#$shareAdvancedUrl#}" />
+		<link rel="canonical" href="">
+		<script type="module" crossorigin src="{#$templets_skin#}js/index-6ef16ca3.js?v={#$cfg_staticVersion#}"></script>
+		<link rel="stylesheet" href="{#$templets_skin#}css/index-caa5ea7e.css?v={#$cfg_staticVersion#}">
+	</head>
+	<body>
+		<div id="app"></div>
+		<script type="text/javascript" src="{#$cfg_staticPath#}/js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}">
+		</script>
+		<script src="//res2.wx.qq.com/open/js/jweixin-1.6.0.js?v={#$cfg_staticVersion#}"></script>
+		<script src="https://lf3-cdn-tos.bytegoofy.com/goofy/developer/jssdk/jssdk-1.2.1.js?v={#$cfg_staticVersion#}">
+		</script>
+		<script>
+			var templateTitle = '{#$info_title#}';
+			var channelDomain = "{#$info_channelDomain#}";
+			var moldName = channelDomain.split('/').reverse()[0].split('?')[0]; //当前模块使用的目录名字，路由守卫用
+			var cfg_staticVersion = "{#$cfg_staticVersion#}";
+			var masterDomains = '{#$cfg_basehost#}';
+			var service = '{#$service#}';
+			var templateSkin = '{#$templets_skin|replace:$cfg_basehost:""#}'
+			var cityUrl = '{#$cfg_basehost#}/changecity.html?currentPageOpen=1';
+			var pathname = channelDomain.replace(masterDomains, '');
+			// 此处不同的模块调用不同的数据
+			var wxconfig = {
+				appId: '{#$wxjssdk_appId#}',
+				timestamp: '{#$wxjssdk_timestamp#}',
+				nonceStr: '{#$wxjssdk_nonceStr#}',
+				signature: '{#$wxjssdk_signature#}',
+				imgUrl: '{#$cfg_weblogo#}',
+				"description": '{#$info_description#}',
+				"title": '{#$info_title#}',
+				"link": '{#$info_channelDomain#}',
+			};
+			var pageData = {
+				mapType: '{#$site_map#}',
+				mapKey: '{#$site_map_key#}'
+			}; //地图跳转用
+			// 避免与 uni-app 内置 wx 全局对象冲突
+			window.jWeixin = window.wx;
+			delete window.wx;
+			window.touTiao = window.tt;
+			delete window.tt;
+			//微信分享
+			var wxBoolean = Boolean(navigator.userAgent.toLowerCase().match(/micromessenger/))
+			if (wxBoolean) {
+				jWeixin.config({
+					debug: false,
+					appId: wxconfig.appId,
+					timestamp: wxconfig.timestamp,
+					nonceStr: wxconfig.nonceStr,
+					signature: wxconfig.signature,
+					jsApiList: ['onMenuShareTimeline', 'onMenuShareAppMessage', 'onMenuShareQQ',
+						'onMenuShareWeibo', 'updateAppMessageShareData', 'updateTimelineShareData',
+						'onMenuShareQZone', 'openLocation', 'scanQRCode', 'chooseImage', 'previewImage',
+						'uploadImage', 'downloadImage', 'getLocation'
+					],
+					openTagList: ['wx-open-launch-app',
+						'wx-open-launch-weapp'
+					] // 可选，需要使用的开放标签列表，例如['wx-open-launch-app']
+				});
+			};
+			var loginUserId = '{#$userinfo.userid#}'; //用户id 
+			var appBoolean = Boolean(navigator.userAgent.toLowerCase().match(/huoniao/)); //app判断
+			var Android = Boolean(navigator.userAgent.toLowerCase().match(/android/)); //安卓判断
+			var cityInfo = JSON.parse($.cookie('HN_siteCityInfo')) || {}; // 地址信息
+			if (cityInfo != {}) { //城市切换提示用
+				localStorage.setItem('cityInfo', JSON.stringify({
+					type: "object",
+					data: cityInfo
+				}));
+			}
+			var url = location.search;
+			var params = new URLSearchParams(url.slice(1));
+			// 地图相关
+			var site_map = '{#$site_map#}'; //地图类型
+			var site_map_key = '{#$site_map_key#}'; //地图key
+			//注册客户端webview
+			function setupWebViewJavascriptBridge(callback) {
+				if (window.WebViewJavascriptBridge) {
+					return callback(WebViewJavascriptBridge);
+				} else {
+					document.addEventListener("WebViewJavascriptBridgeReady", function() {
+						return callback(WebViewJavascriptBridge);
+					}, false);
+				}
+
+				var _device = navigator.userAgent.toLowerCase();
+				if (_device.indexOf('huoniao') > -1) {
+					if (window.WVJBCallbacks) {
+						return window.WVJBCallbacks.push(callback);
+					}
+					window.WVJBCallbacks = [callback];
+					var WVJBIframe = document.createElement("iframe");
+					WVJBIframe.style.display = "none";
+					WVJBIframe.src = "wvjbscheme://__BRIDGE_LOADED__";
+
+					document.documentElement.appendChild(WVJBIframe);
+					setTimeout(function() {
+						document.documentElement.removeChild(WVJBIframe)
+					}, 0);
+				}
+			}
+		</script>
+		{#if $site_map == "amap"#}
+		{#$amap_jscode#} {#* 高德地图安全密钥 *#}
+		{#/if#}
+		<script type="text/javascript" src="{#$site_map_apiFile#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}/js/publicLocation.js?v={#$cfg_staticVersion#}">
+		</script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}/js/publicOpenMap.js?v={#$cfg_staticVersion#}">
+		</script>
+
+	</body>
+</html>

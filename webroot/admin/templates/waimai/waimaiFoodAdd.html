@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>商品列表</title>
+{#$cssFile#}
+<script>
+var action = "{#$action#}", adminPath = "{#$adminPath#}";
+var modelType = "waimai";
+var imglist = {
+    "pic": {#$pics#}
+}
+var sid = {#$sid#};
+</script>
+<style>
+label {display: inline-block;}
+.tab-content {overflow: visible;}
+input, textarea, .uneditable-input {width: auto;}
+input[type="radio"], input[type="checkbox"] {margin: 0 3px 0 0;}
+
+label{vertical-align:middle;font-weight:normal;font-size:14px;display:inline-block;margin-bottom:5px;}
+label input{border-radius:0!important;color:#858585;background-color:#fff;border:1px solid #d5d5d5;padding:5px 4px;line-height:1.2; font-size:14px;font-family:inherit;-webkit-box-shadow:none!important;box-shadow:none!important;-webkit-transition-duration:.1s; transition-duration:.1s;background-image:none;margin:0;-webkit-appearance:textfield; }
+.form-submit-btn{padding-left:100px;height:60px;margin-top:30px;}
+.aa{display:none;}
+.priceblock{width:100%;height:50px;background:#f5f5f5;line-height:50px;border:1px solid #eeeeee;margin:10px auto;}
+.deletefield,.addsonfield,.sondeletefield{width:50px;height:50px;float:right;background:#eeeeee;color:#FF0000;font-weight:bold;line-height:50px;text-align:center;cursor:pointer;}
+.addsonfield{width:100px;border-right:1px solid #ffffff;color:blue;}
+.natureblock{border:1px solid #eeeeee;padding:0px;margin:10px;}
+.natureblock .fieldblock{width:100%;margin:0 auto;height:50px;background:#f5f5f5;line-height:50px;}
+.sonfieldblock{width:90%;margin:5px auto;height:40px;background:#cccccc;line-height:40px;}
+.sonfieldblock .sondeletefield{height:40px;line-height:40px;}
+.priceAdd{ margin-right: 10px;}
+.priceAdd span{ color: #999;}
+.priceAdd  input{width: 80px; margin-right: 4px;}
+
+.food_img{width: 40px; height: 40px; margin-right: 10px; position: relative; display: inline-block; vertical-align: middle; background-color: #fff; transform: translateY(-1px); background: #cccccc url(/static/images/add_icon.png) no-repeat center center/20px; border-right: solid 10px #fff;}
+.food_img img{width: 100%; display: block; height: 100%; object-fit: cover; background-color: #f5f5f5;}
+.food_img .fileInp{position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; display: block; z-index: 1;}
+</style>
+</head>
+
+
+<div class="main-content">
+
+  <div class="page-content">
+    <!-- /section:settings.box -->
+    <div class="page-content-area">
+
+      <div class="row">
+        <div class="col-sm-11">
+          <form enctype="multipart/form-data" class="form-horizontal" id="food-form" action="?sid={#$sid#}&id={#$id#}" method="post">
+            <div class="tabbable">
+              <ul class="nav nav-tabs tt" id="myTab">
+                <li class="active"><a data-toggle="tab" href="#">基本信息</a></li>
+                <li><a data-toggle="tab" href="#">商品属性</a></li>
+                <li><a data-toggle="tab" href="#">商品限购设置</a></li>
+                <li><a data-toggle="tab" href="#">商品图片</a></li>
+              </ul>
+              <div class="tab-content">
+                <!-- 基本信息start -->
+                <div id="infocontent" class="tab-pane active tt_1">
+                  <div class="row">
+                    <div class="col-sm-12">
+                      <div class="form-group">
+                        <label class="col-sm-1"><label for="Food_tag">编号</label></label>
+                        <input class="col-sm-1" size="10" maxlength="10" name="sort" id="Food_tag" type="text" value="{#$sort|string_format:"%d"#}">（决定展示顺序，编号越大越靠前）</div>
+                      <div class="form-group">
+                        <label class="col-sm-1"><label for="Food_name">商品名称</label></label>
+                        <input class="col-sm-3" size="30" maxlength="30" name="title" id="Food_name" type="text" value="{#$title#}"></div>
+                      <div class="form-group">
+                        <label class="col-sm-1"><label for="Food_price">价格</label></label>
+                        <input class="col-sm-1" name="price" id="Food_price" type="text" value="{#$price#}"></div>
+                      {#if $mtype !=3#}
+                      <div class="form-group{#if $cfg_fenxiaoState != 1#} hide{#/if#}">
+                        <label class="col-sm-1"><label for="Food_price">分销佣金</label></label>
+                        <input class="col-sm-1" type="text" name="fx_reward" id="fx_reward" value="{#$fx_reward#}" min="0" maxlength="6" data-regex="0|\d*\.?\d+">&nbsp;&nbsp;数字类型或者百分数（相对实际支付商品价格）<br>&nbsp;&nbsp;如 20、10%。留空则按照默认佣金额度计算</div>
+                      {#/if#}
+                      <div class="form-group">
+                        <label class="col-sm-1" for="Food_type_id">商品分类</label>
+                        <select name="typeid" id="Food_type_id">
+                            {#foreach from=$typelist item=type#}
+                            <option value="{#$type.id#}"{#if $typeid == $type.id#} selected{#/if#}>{#$type.title#}</option>
+                            {#/foreach#}
+                        </select>
+                        <span id="secondtypehtml"></span>
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1"><label for="Food_unit">商品单位</label></label>
+                        <input class="col-sm-1" size="20" maxlength="4" placeholder="如个、斤、份" name="unit" id="Food_unit" type="text" value="{#$unit#}"></div>
+                      <div class="form-group">
+                        <label class="col-sm-1"><label for="Food_label">标签</label></label>
+                        <input class="col-sm-1" size="20" maxlength="4" placeholder="如特价、促销、招牌" name="label" id="Food_label" type="text" value="{#$label#}"></div>
+                      <div class="form-group">
+                          <label class="col-sm-1">优惠推荐</label>
+                          <div class="checkbox">
+                            <label style="margin-left: -10px;">
+                              <input id="ytConfig_saleRec" type="hidden" value="0" name="Config[saleRec]">
+                              <input class="ace" name="saleRec" id="Config_saleRec" value="1" type="checkbox"{#if $saleRec#} checked{#/if#}>
+                              <span class="lbl"><label for="Config_saleRec" style="margin-left: -13px; margin-top: -3px;">启用</label></span>
+                            </label>
+                            <label>勾选后务必启用库存！</label>
+                          </div>
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1" for="Food_is_dabao">是否开启打包费</label>
+                        <select name="is_dabao" id="Food_is_dabao">
+                          <option value="0"{#if !$is_dabao#} selected{#/if#}>关闭</option>
+                          <option value="1"{#if $is_dabao#} selected{#/if#}>开启</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1"><label for="Food_dabao_money">打包费金额</label></label>
+                        <input class="col-sm-1" name="dabao_money" id="Food_dabao_money" type="text" value="{#$dabao_money|string_format:"%.2f"#}">
+                      </div>
+                      <div class="form-group">
+                        <div class="checkbox">
+                          <label>
+                            <input id="ytConfig_is_discount" type="hidden" value="0" name="Config[is_discount]">
+                            <input class="ace" name="is_discount" id="Config_is_discount" value="1" type="checkbox"{#if $is_discount#} checked{#/if#}>
+                            <span class="lbl"><label for="Config_is_discount">启用商品打折</label></span>
+                          </label>
+                        </div>
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1" for="Config_discount_value">商品折扣值</label>
+                        <input class="col-sm-1" name="discount_value" id="Config_discount_value" type="text" value="{#if $discount_value#}{#$discount_value#}{#else#}10.0{#/if#}">
+                        <span class="help-button" data-rel="popover" data-trigger="hover" data-placement="right" data-content="如8折输入8，88折输入8.8" title="" data-original-title="会员折扣填写说明">
+                          <span class="ace-icon fa fa-info bigger-120"></span>
+                        </span>
+                      </div>
+
+                      <div class="form-group">
+                        <label class="col-sm-1" for="Food_status">商品状态</label>
+                        <select name="status" id="Food_status">
+                          <option value="1"{#if $status || $status == ""#} selected{#/if#}>正常</option>
+                          <option value="0"{#if !$status && $status != ""#} selected{#/if#}>停售</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1" for="Food_stockvalid">启用库存</label>
+                        <select name="stockvalid" id="Food_stockvalid">
+                          <option value="1"{#if $stockvalid#} selected{#/if#}>启用</option>
+                          <option value="0"{#if !$stockvalid#} selected{#/if#}>关闭</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1"><label for="Food_stock">库存量</label></label>
+                        <input class="col-sm-1" size="10" maxlength="10" name="stock" id="Food_stock" type="text" value="{#$stock|string_format:"%d"#}">
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1"><label for="Food_formerprice">原价</label></label>
+                        <input class="col-sm-1" name="formerprice" id="Food_formerprice" type="text" value="{#$formerprice|string_format:"%.2f"#}">
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1" for="Food_descript">商品简介</label>
+                        <textarea class="col-sm-3" size="200" maxlength="200" name="descript" id="Food_descript">{#$descript#}</textarea>
+                      </div>
+                      <div class="form-group">
+                        <label class="col-sm-1" for="content">描述</label>
+                        <div class="col-sm-8" style="padding-left: 0;">
+                            <script id="body" name="body" type="text/plain" style="width:100%;height:500px">{#$body#}</script>
+                        </div>
+                      </div>
+                      <div id="inputimglist" style="display:none"></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- 基本信息end -->
+                <!-- 自定义属性start -->
+                <div id="nature" class="tab-pane tt_1">
+                  <div class="alert alert-block alert-success">
+                    商品的最终价格是基本信息中商品的基础价格与选择的各属性价格总和，如果不希望某个属性值带上价格，可以将它的属性价格设为0，
+                    <br>
+                    <span style="color:red;">商品属性可灵活运用于各场景，比如套餐、大杯小杯、冷饮热饮、辣或不辣等等，顾客选择的属性信息将在打印机、短信、邮件、管理后台等各种订单提醒方式中展示。</span>
+                    <button type="button" class="close" data-dismiss="alert">
+                      <i class="ace-icon fa fa-times"></i>
+                    </button>
+                  </div>
+                  <div class="form-group">
+                    <label class="col-sm-2" for="Food_is_nature">是否开启商品属性</label>
+                    <select name="is_nature" id="Food_is_nature">
+                      <option value="1"{#if $is_nature#} selected{#/if#}>开启</option>
+                      <option value="0"{#if !$is_nature#} selected{#/if#}>关闭</option>
+                    </select>
+                  </div>
+                  <div class="widget-box" style="width:100%;margin-left:0px;padding:0px;">
+                    <div class="widget-header">
+                      <h5>商品属性</h5></div>
+                    <div class="widget-body shuxing" style="padding:20px;" id="natureblocklist">
+                      <button class="btn btn-success" type="button" id="addpricenature">添加商品属性</button>
+
+                      {#if $id#}
+                      {#$index = 100#}
+                      {#foreach from=$nature item=n#}
+                      <div class="natureblock fatherblock">
+                          <div class="fieldblock">
+                              <label>属性名: <input type="text" name="nature[{#$index#}][name]" value="{#$n.name#}" style="width:80px;padding:0 5px;"></label>
+                              <label>属性值最多可选数
+                                <select name="nature[{#$index#}][maxchoose]" class="maxchoose" style="width:80px;">
+                                  {#for $val=1 to 100#}
+                                  <option value="{#$val#}"{#if $val == $n.maxchoose#} selected="selected"{#/if#}>{#$val#}</option>
+                                  {#/for#}
+                                </select>
+                              </label>
+                              <div class="deletefield" style="" title="删除商品属性"> 删除 </div>
+                              <div class="addsonfield" title="增加属性值" onclick="addsonnaturepriceblock(this,{#$index#});"> 增加属性值 </div>
+                          </div>
+                          {#foreach from=$n.data item=p#}
+                          <div class="sonfieldblock fatherblock">
+                              <div class="food_img" title="上传图片">
+                                
+                                <img src="{#$p.pic#}" class="{#if !$p.pic#}hide{#/if#}" alt="">
+                                
+                                <input type="file" accept="images/*" class="fileInp">
+                                <input type="hidden" value="{#$p.pic#}" name="nature[{#$index#}][pic][]" class="pic">
+                              </div>
+                              <label>属性值: <input type="text" value="{#$p.value#}" name="nature[{#$index#}][value][]"></label>
+                              <label class="priceAdd">价格: <span>加<input type="text" value="{#$p.price#}" name="nature[{#$index#}][price][]" class="price">元</span></label>
+                              <!-- <label>价格: <input type="text" value="{#$p.price|string_format:"%d"#}" name="nature[{#$index#}][price][]" class="price"></label> -->
+                              <label>是否开启:
+                                <select name="nature[{#$index#}][is_open][]" style="width:60px;">
+                                  <option value="0"{#if $p.is_open == 0#} selected="selected"{#/if#}>开启</option>
+                                  <option value="1"{#if $p.is_open == 1#} selected="selected"{#/if#}>关闭</option>
+                                </select>
+                              </label>
+                              <div class="sondeletefield">删除</div>
+                          </div>
+                          {#/foreach#}
+                      </div>
+                      {#$index = $index + 1#}
+                      {#/foreach#}
+                      {#/if#}
+
+                    </div>
+                    <div style="clear:both;"></div>
+                  </div>
+                </div>
+                <!-- 自定义属性 end-->
+                <!-- 限购设置 start -->
+                <div id="limitfood" class="tab-pane tt_1">
+                  <div class="widget-box" style="width:100%;margin-left:0px;padding:0px;">
+                    <div class="widget-header"><h5>每天限购</h5></div><br>
+                    <div class="form-group" style="margin-left:5px;">
+                      <label class="col-sm-1" for="Food_is_day_limitfood">是否开启商品每天限购</label>
+                      <select name="is_day_limitfood" id="Food_is_day_limitfood">
+                        <option value="0"{#if !$is_day_limitfood#} selected{#/if#}>不开启</option>
+                        <option value="1"{#if $is_day_limitfood#} selected{#/if#}>开启</option>
+                      </select>
+                    </div>
+                    <div class="form-group" style="margin-left:5px;">
+                      <label class="col-sm-1"><label for="Food_day_foodnum">每人每天限购数量</label></label>
+                      <input class="col-sm-1" size="5" maxlength="5" placeholder="每天限购的商品数量" style="width:50px;" name="day_foodnum" id="Food_day_foodnum" type="text" value="{#if $day_foodnum#}{#$day_foodnum#}{#else#}1{#/if#}">
+                    </div>
+                  </div>
+                  <div class="widget-box" style="width:100%;margin-left:0px;padding:0px;">
+                    <div class="widget-header"><h5>限购活动</h5></div><br>
+                    <div class="row">
+                      <div class="form-group" style="margin-left:5px;">
+                        <label class="col-sm-1" for="Food_is_limitfood">是否开启限购活动</label>
+                        <select name="is_limitfood" id="Food_is_limitfood">
+                          <option value="0"{#if !$is_limitfood#} selected{#/if#}>不开启</option>
+                          <option value="1"{#if $is_limitfood#} selected{#/if#}>开启</option>
+                        </select>
+                      </div>
+                      <div class="form-group" style="margin-left:5px;">
+                        <label class="col-sm-1"><label for="Food_foodnum">每人限购数量</label></label>
+                        <input class="col-sm-1" size="5" maxlength="5" placeholder="每人限购的商品数量" style="width:50px;" name="foodnum" id="Food_foodnum" type="text" value="{#if $foodnum#}{#$foodnum#}{#else#}1{#/if#}">
+                      </div>
+                      <div class="widget-box" style="width:90%;margin-left:20px;padding:0px;">
+                        <div class="widget-header"><h5>限制日期范围</h5></div>
+                        <div class="widget-body" style="padding:20px;">开始日期:
+                          <input id="StatisticsForm_beginDate" type="text" name="start_time" value="{#$start_time#}">
+                          <br><br>结束日期:
+                          <input id="StatisticsForm_endDate" type="text" name="stop_time" value="{#$stop_time#}">
+                          <br><br>
+                        </div>
+                      </div>
+                      <div class="widget-box" style="width:90%;margin-left:20px;padding:0px;">
+                        <div class="widget-header"><h5>限制时间段</h5></div>
+                        <div class="widget-body" style="padding:20px;">
+                          <div style="margin:10px;width:400px;float:left;">(1)
+                            <input id="delivertime_0_start" class="chooseTime" type="text" value="{#if $limit_time[0][0]#}{#$limit_time[0][0]#}{#else#}00:00{#/if#}" name="limit_time[0][start]" >至
+                            <input id="delivertime_0_stop" class="chooseTime" type="text" value="{#if $limit_time[0][1]#}{#$limit_time[0][1]#}{#else#}00:00{#/if#}" name="limit_time[0][stop]" >
+                          </div>
+                          <div style="margin:10px;width:400px;float:left;">(2)
+                            <input id="delivertime_1_start" class="chooseTime" type="text" value="{#if $limit_time[1][0]#}{#$limit_time[1][0]#}{#else#}00:00{#/if#}" name="limit_time[1][start]" >至
+                            <input id="delivertime_1_stop" class="chooseTime" type="text" value="{#if $limit_time[1][1]#}{#$limit_time[1][1]#}{#else#}00:00{#/if#}" name="limit_time[1][stop]" >
+                          </div>
+                          <div style="margin:10px;width:400px;float:left;">(3)
+                            <input id="delivertime_2_start" class="chooseTime" type="text" value="{#if $limit_time[2][0]#}{#$limit_time[2][0]#}{#else#}00:00{#/if#}" name="limit_time[2][start]" >至
+                            <input id="delivertime_2_stop" class="chooseTime" type="text" value="{#if $limit_time[2][1]#}{#$limit_time[2][1]#}{#else#}00:00{#/if#}" name="limit_time[2][stop]" >
+                          </div>
+                          <div style="margin:10px;width:400px;float:left;">(4)
+                            <input id="delivertime_3_start" class="chooseTime" type="text" value="{#if $limit_time[3][0]#}{#$limit_time[3][0]#}{#else#}00:00{#/if#}" name="limit_time[3][start]" >至
+                            <input id="delivertime_3_stop" class="chooseTime" type="text" value="{#if $limit_time[3][1]#}{#$limit_time[3][1]#}{#else#}00:00{#/if#}" name="limit_time[3][stop]" >
+                          </div>
+                          <div style="margin:10px;width:400px;float:left;">(5)
+                            <input id="delivertime_4_start" class="chooseTime" type="text" value="{#if $limit_time[4][0]#}{#$limit_time[4][0]#}{#else#}00:00{#/if#}" name="limit_time[4][start]" >至
+                            <input id="delivertime_4_stop" class="chooseTime" type="text" value="{#if $limit_time[4][1]#}{#$limit_time[4][1]#}{#else#}00:00{#/if#}" name="limit_time[4][stop]" >
+                          </div>
+                          <div style="margin:10px;width:400px;float:left;">(6)
+                            <input id="delivertime_5_start" class="chooseTime" type="text" value="{#if $limit_time[5][0]#}{#$limit_time[5][0]#}{#else#}00:00{#/if#}" name="limit_time[5][start]" >至
+                            <input id="delivertime_5_stop" class="chooseTime" type="text" value="{#if $limit_time[5][1]#}{#$limit_time[5][1]#}{#else#}00:00{#/if#}" name="limit_time[5][stop]" >
+                          </div>
+                          <div style="clear:both;"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="imgcontent" class="tab-pane tt_1">
+
+                    <div class="alert alert-block alert-success">支持jpg、jpeg、gif、png格式的图片&nbsp;&nbsp;单张最大1M，最多上传10张，为了达到最佳效果，建议上传宽度为600像素的图片</div>
+
+                    <div class="listImgBox">
+              			<div class="list-holder">
+              				<ul id="listSection" class="clearfix listSection piece"></ul>
+              				<input type="hidden" name="pics" value='[]' class="imglist-hidden">
+              			</div>
+              			<div class="btn-section clearfix">
+              				<div class="uploadinp filePicker" id="filePicker" data-type="album" data-count="10" data-size="1024" data-imglist="pic"><div id="flasHolder"></div><span>添加图片</span></div>
+              				<div class="upload-tip">
+              					<p><a href="javascript:;" class="deleteAllAtlas" style="display:none;">删除所有</a>&nbsp;&nbsp;<span class="fileerror"></span></p>
+              				</div>
+              			</div>
+                    </div>
+
+				</div>
+
+              </div>
+            </div>
+
+            <div class="clearfix form-actions">
+              <button id="submitBtn" class="btn btn-info" type="submit" style="margin-left:200px;" onclick="return checkFrom(this.form)"><i class="ace-icon fa fa-check bigger-110"></i>保存</button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+
+{#$editorFile#}
+{#$jsFile#}

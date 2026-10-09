@@ -5411,7 +5411,7 @@ var page = new Vue({
                         break;
                     case 'qiandao': //右侧按钮图标
 
-                        if(ind || !isNaN(ind)){
+                        if(ind !== ''){
                             that[ind].qiandao.icon = m.turl
                         }else {
                             that.memberCompFormData.qiandaoBtn.icon = m.turl
@@ -6807,10 +6807,12 @@ var page = new Vue({
         // 改变链接弹窗显示
         changeLink(str){
             const that = this;
+
             // linkList:linkListBox,  //常用链接
             // currEditLinkStr:'', //当前编辑
             // keywords:'', //关键字
             // searchList: linkListBox,  //常用链接
+
             let currLink = ''
             let jsonArr = str.split('.');
             var obj = that;

@@ -133,8 +133,7 @@ function getList(is){
 							var name = nickname, tel = phone;
 							if(property.length > 1){
 								name = property[0]['姓名'];
-								tel = property[2]['手机'];
-                                tel = tel == undefined ? property[1]['手机'] : tel;
+								tel = property[1]['手机'];
 							}
 
 							var info = [];

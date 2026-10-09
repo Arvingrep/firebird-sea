@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<style>
+    .input-append.open{position: relative}
+</style>
+<script>
+    var masterDomain = '{#$cfg_basehost#}';
+    var tid = {#$tid#}, action = 'info', modelType = 'info', cfg_term = "pc", adminPath = "{#$adminPath#}";
+    var service = 'info';
+</script>
+</head>
+
+<body>
+<div class="search clearfix" style="margin-top: 10px;">
+    <label>自定义<strong>【{#$title#}】</strong>高级设置{#if $useParentConfig#}<font style="color: red; font-size: 12px; margin-left: 20px;">目前继承的上级配置</font>{#/if#}</label>
+    <button type="button" class="btn btn-danger" id="reset" style="float: right;">恢复默认配置</button>
+</div>
+<form action="" method="post" name="editform" id="editform" class="editform infoEdit" style="padding-top: 0;">
+  <input type="hidden" name="dopost" id="dopost" value="edit" />
+  <input type="hidden" name="tid" id="tid" value="{#$tid#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+
+  <div class="thead" style="margin-top: 10px!important;">&nbsp;&nbsp;视频图集</div>
+
+  <dl class="clearfix">
+    <dt><label>视频上传：</label></dt>
+    <dd class="radio">
+      {#html_radios name="videoSwitch" values=$videoSwitchOpt checked=$videoSwitch output=$videoSwitchNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label>图集上传数量：</label></dt>
+    <dd class="radio">
+      {#html_radios name="picSwitch" values=$picSwitchOpt checked=$picSwitch output=$picSwitchNames separator="&nbsp;&nbsp;"#}
+      <span class="input-tips" style="display:inline-block;"><s style="top: 2px;"></s>默认为{#$default_atlasMax#}张</span>
+    </dd>
+  </dl>
+
+  <div id="picObj" class="{#if !$picSwitch#}hide{#/if#}">
+    <dl class="clearfix">
+        <dt><label for="atlasMax">&nbsp;</label></dt>
+        <dd class="radio">
+        <input class="input-mini" type="number" name="atlasMax" id="atlasMax" min="0" value="{#$atlasMax#}" /> 张
+        <p style="padding-left: 0; font-size: 12px; padding-top: 10px; color: #999;">数量为0时，页面将不显示上传按钮。</p>
+        </dd>
+    </dl>
+  </div>
+
+  <div class="thead" style="margin-top: 10px!important;">&nbsp;&nbsp;费用相关</div>
+
+  <dl class="clearfix">
+    <dt><label>用户激励：</label></dt>
+    <dd class="radio">
+      {#html_radios name="excitationSwitch" values=$excitationSwitchOpt checked=$excitationSwitch output=$excitationSwitchNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><strong style="font-size: 16px;">延长有效期&nbsp;&nbsp;</strong></dt>
+    <dd>&nbsp;</dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label>有效期开关：</label></dt>
+    <dd class="radio">
+      {#html_radios name="validSwitch" values=$validSwitchOpt checked=$validSwitch output=$validSwitchNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>有效期配置：</label></dt>
+    <dd class="radio">
+      {#html_radios name="validConfig" values=$validConfigOpt checked=$validConfig output=$validConfigNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+
+  <div id="validObj" class="{#if !$validConfig#}hide{#/if#}">
+    <dl class="clearfix">
+        <dt>&nbsp;</dt>
+        <dd>
+        <div class="priceWrap">
+            <table class="table table-hover table-bordered table-striped refreshSmartTable">
+            <thead>
+            <tr>
+                <th>时长</th>
+                <th>价格</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {#if $validRule#}
+            {#foreach from=$validRule item=refresh#}
+            <tr>
+                <td>
+                <div class="input-append validA">
+                    <input class="input-small day" name="validRule[day][]" value="{#$refresh.day#}" type="number">
+                    <input class="dayText" name="validRule[daytext][]" value="{#$refresh.daytext|default:2#}" type="hidden">
+                    <button type="button" class="btn dropdown-toggle " data-toggle="dropdown" data-id="{#$refresh.daytext|default:2#}">{#if $refresh.daytext== 1#}年{#elseif $refresh.daytext== 3#}天{#else#}月{#/if#}<span class="caret"></span></button>
+                    <ul class="dropdown-menu">
+                    <li><a href="javascript:;" data-id="1">年</a></li>
+                    <li><a href="javascript:;" data-id="2">月</a></li>
+                    <li><a href="javascript:;" data-id="3">天</a></li>
+                    </ul>
+                </div>
+                </td>
+
+                <td>
+                <div class="input-append">
+                    <input class="input-small price" step="0.01" name="validRule[price][]" value="{#$refresh.price#}" type="number">
+                    <span class="add-on">元</span>
+                </div>
+
+                </td>
+                <td><a href="javascript:;" class="del" title="删除"><i class="icon-trash"></i></a></td>
+            </tr>
+            {#/foreach#}
+            {#else#}
+            <tr>
+                <td>
+                <div class="input-append validA">
+                    <input class="input-small day" id="validRuleday" name="validRule[day][]" value="" type="number">
+                    <input class="dayText" name="validRule[daytext][]" value="{#$refresh.daytext|default: 2#}" type="hidden">
+                    <button type="button" class="btn dropdown-toggle " data-toggle="dropdown" data-id="2">月<span class="caret"></span></button>
+                    <ul class="dropdown-menu">
+                    <li><a href="javascript:;" data-id="1">年</a></li>
+                    <li><a href="javascript:;" data-id="2">月</a></li>
+                    <li><a href="javascript:;" data-id="3">天</a></li>
+                    </ul>
+                </div>
+                </td>
+                <td>
+                <div class="input-append">
+                    <input class="input-small price" step="0.01" name="validRule[price][]" value="" type="number">
+                    <span class="add-on">元</span>
+                </div>
+                </td>
+                <td><a href="javascript:;" class="del" title="删除"><i class="icon-trash"></i></a></td>
+            </tr>
+            {#/if#}
+            </tbody>
+            <tbody>
+            <tr>
+                <td colspan="7">
+                <button type="button" class="btn btn-small addPrice1" data-type="valid">增加一行</button>&nbsp;&nbsp;&nbsp;&nbsp;
+                </td>
+            </tr>
+            </tbody>
+            </table>
+        </div>
+        </dd>
+    </dl>
+  </div>
+
+  <dl class="clearfix">
+    <dt><strong style="font-size: 16px;">刷新配置&nbsp;&nbsp;</strong></dt>
+    <dd>&nbsp;</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>刷新开关：</label></dt>
+    <dd class="radio">
+      {#html_radios name="refreshSwitch" values=$refreshSwitchOpt checked=$refreshSwitch output=$refreshSwitchNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>刷新配置：</label></dt>
+    <dd class="radio">
+      {#html_radios name="refreshConfig" values=$refreshConfigOpt checked=$refreshConfig output=$refreshConfigNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+
+  <div id="refreshObj" class="{#if !$refreshConfig#}hide{#/if#}">
+    <dl class="clearfix">
+        <dt><label for="refreshNormalPrice">普通刷新：</label></dt>
+        <dd>
+        <div class="input-append">
+            <input class="input-mini refreshNormalPrice" type="number" id="refreshNormalPrice" name="refreshNormalPrice" value="{#$refreshNormalPrice#}">
+            <span class="add-on">元/次</span>
+        </div>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label>智能刷新：</label></dt>
+        <dd>
+        <h5 class="stit" style="margin-top: 0;"><span class="label label-info">折扣、单价、优惠的值按照普通刷新一次的价格计算</span></h5>
+        <div class="priceWrap">
+            <table class="table table-hover table-bordered table-striped refreshSmartTable">
+            <thead>
+                <tr>
+                <th>次数</th>
+                <th>时长</th>
+                <th>价格</th>
+                <th>折扣</th>
+                <th>单价</th>
+                <th>优惠</th>
+                <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {#if $refreshSmart#}
+                {#foreach from=$refreshSmart item=refresh#}
+                <tr>
+                <td>
+                    <div class="input-append">
+                    <input class="span1 times" name="refreshSmart[times][]" value="{#$refresh.times#}" type="number">
+                    <span class="add-on">次</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="span1 day" name="refreshSmart[day][]" value="{#$refresh.day#}" type="number">
+                    <span class="add-on">天</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="refreshSmart[price][]" value="{#$refresh.price#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td class="discount">无</td>
+                <td class="unit">0元</td>
+                <td class="offer">0元</td>
+                <td><a href="javascript:;" class="del" title="删除"><i class="icon-trash"></i></a></td>
+                </tr>
+                {#/foreach#}
+                {#else#}
+                <tr>
+                <td>
+                    <div class="input-append">
+                    <input class="span1 times" name="refreshSmart[times][]" value="" type="number">
+                    <span class="add-on">次</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="span1 day" name="refreshSmart[day][]" value="" type="number">
+                    <span class="add-on">天</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="refreshSmart[price][]" value="" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td class="discount">无</td>
+                <td class="unit">0元</td>
+                <td class="offer">0元</td>
+                <td><a href="javascript:;" class="del" title="删除"><i class="icon-trash"></i></a></td>
+                </tr>
+                {#/if#}
+            </tbody>
+            <tbody>
+                <tr>
+                <td colspan="7">
+                    <button type="button" class="btn btn-small addPrice" data-type="refresh">增加一行</button>&nbsp;&nbsp;&nbsp;&nbsp;
+                </td>
+                </tr>
+            </tbody>
+            </table>
+        </div>
+        </dd>
+    </dl>
+  </div>
+
+  <dl class="clearfix">
+    <dt><strong style="font-size: 16px;">置顶配置&nbsp;&nbsp;</strong></dt>
+    <dd>&nbsp;</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>置顶开关：</label></dt>
+    <dd class="radio">
+      {#html_radios name="topSwitch" values=$topSwitchOpt checked=$topSwitch output=$topSwitchNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>置顶配置：</label></dt>
+    <dd class="radio">
+      {#html_radios name="topConfig" values=$topConfigOpt checked=$topConfig output=$topConfigNames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+
+  <div id="topObj" class="{#if !$topConfig#}hide{#/if#}">
+    <dl class="clearfix">
+        <dt><label>普通置顶：</label></dt>
+        <dd>
+        <h5 class="stit" style="margin-top: 0;"><span class="label label-info">折扣、优惠的值按照第一条的价格计算</span></h5>
+        <div class="priceWrap">
+            <table class="table table-hover table-bordered table-striped topNormalTable">
+            <thead>
+                <tr>
+                <th>时长</th>
+                <th>价格</th>
+                <th>折扣</th>
+                <th>优惠</th>
+                <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {#if $topNormal#}
+                {#foreach from=$topNormal item=top#}
+                <tr>
+                <td>
+                    <div class="input-append">
+                    <input class="span1 day" name="topNormal[day][]" value="{#$top.day#}" type="number">
+                    <span class="add-on">天</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topNormal[price][]" value="{#$top.price#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td class="discount">无</td>
+                <td class="offer">0元</td>
+                <td><a href="javascript:;" class="del" title="删除"><i class="icon-trash"></i></a></td>
+                </tr>
+                {#/foreach#}
+                {#else#}
+                <tr>
+                <td>
+                    <div class="input-append">
+                    <input class="span1 day" name="topNormal[day][]" value="" type="number">
+                    <span class="add-on">天</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topNormal[price][]" value="" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td class="discount">无</td>
+                <td class="offer">0元</td>
+                <td><a href="javascript:;" class="del" title="删除"><i class="icon-trash"></i></a></td>
+                </tr>
+                {#/if#}
+            </tbody>
+            <tbody>
+                <tr>
+                <td colspan="5">
+                    <button type="button" class="btn btn-small addPrice" data-type="topNormal">增加一行</button>&nbsp;&nbsp;&nbsp;&nbsp;
+                </td>
+                </tr>
+            </tbody>
+            </table>
+        </div>
+        </dd>
+    </dl>
+    <dl class="clearfix">
+        <dt><label>计划置顶：</label></dt>
+        <dd>
+        <div class="priceWrap">
+            <table class="table table-hover table-bordered table-striped">
+            <thead>
+                <tr>
+                <th>时长</th>
+                <th>周一</th>
+                <th>周二</th>
+                <th>周三</th>
+                <th>周四</th>
+                <th>周五</th>
+                <th>周六</th>
+                <th>周日</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                <td>全天</td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topPlan[all][]" value="{#$topPlan[0]['all']#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topPlan[all][]" value="{#$topPlan[1]['all']#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topPlan[all][]" value="{#$topPlan[2]['all']#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topPlan[all][]" value="{#$topPlan[3]['all']#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topPlan[all][]" value="{#$topPlan[4]['all']#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topPlan[all][]" value="{#$topPlan[5]['all']#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-append">
+                    <input class="input-small price" step="0.01" name="topPlan[all][]" value="{#$topPlan[6]['all']#}" type="number">
+                    <span class="add-on">元</span>
+                    </div>
+                </td>
+                </tr>
+                <tr>
+                    <td>早8点-晚8点</td>
+                    <td>
+                    <div class="input-append">
+                        <input class="input-small price" step="0.01" name="topPlan[day][]" value="{#$topPlan[0]['day']#}" type="number">
+                        <span class="add-on">元</span>
+                    </div>
+                    </td>
+                    <td>
+                    <div class="input-append">
+                        <input class="input-small price" step="0.01" name="topPlan[day][]" value="{#$topPlan[1]['day']#}" type="number">
+                        <span class="add-on">元</span>
+                    </div>
+                    </td>
+                    <td>
+                    <div class="input-append">
+                        <input class="input-small price" step="0.01" name="topPlan[day][]" value="{#$topPlan[2]['day']#}" type="number">
+                        <span class="add-on">元</span>
+                    </div>
+                    </td>
+                    <td>
+                    <div class="input-append">
+                        <input class="input-small price" step="0.01" name="topPlan[day][]" value="{#$topPlan[3]['day']#}" type="number">
+                        <span class="add-on">元</span>
+                    </div>
+                    </td>
+                    <td>
+                    <div class="input-append">
+                        <input class="input-small price" step="0.01" name="topPlan[day][]" value="{#$topPlan[4]['day']#}" type="number">
+                        <span class="add-on">元</span>
+                    </div>
+                    </td>
+                    <td>
+                    <div class="input-append">
+                        <input class="input-small price" step="0.01" name="topPlan[day][]" value="{#$topPlan[5]['day']#}" type="number">
+                        <span class="add-on">元</span>
+                    </div>
+                    </td>
+                    <td>
+                    <div class="input-append">
+                        <input class="input-small price" step="0.01" name="topPlan[day][]" value="{#$topPlan[6]['day']#}" type="number">
+                        <span class="add-on">元</span>
+                    </div>
+                    </td>
+                </tr>
+            </tbody>
+            </table>
+        </div>
+        </dd>
+    </dl>
+  </div>
+
+  <div class="thead" style="margin-top: 10px!important;">&nbsp;&nbsp;声明协议</div>
+  
+  <dl class="clearfix">
+    <dt><label for="fabuTips" class="sl">发布声明：</label></dt>
+    <dd>
+      <textarea class="input-xxlarge" name="fabuTips" id="fabuTips">{#$fabuTips#}</textarea>
+      <div style="font-size: 12px; padding-top: 10px;">如：发布前请阅读并遵守《平台发布须知》，禁止发布医疗 药品、金融、网络兼职等虚假诈骗信息</div>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="sysTips" class="sl">系统备注：</label></dt>
+    <dd>
+      <textarea class="input-xxlarge" name="sysTips" id="sysTips">{#$sysTips#}</textarea>
+      <div style="font-size: 12px; padding-top: 10px;">显示在发布页的信息有效期上方</div>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label class="sl">发布协议：</label></dt>
+    <dd>
+        <script id="protocol" name="protocol" type="text/plain" style="width:85%;height:500px">{#$protocol#}</script>
+    </dd>
+  </dl>
+  
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+</form>
+
+<script type="text/templates" id="refresh">
+<tr>
+    <td>
+    <div class="input-append">
+        <input class="span1 times" name="refreshSmart[times][]" value="" type="number">
+        <span class="add-on">次</span>
+    </div>
+    </td>
+    <td>
+    <div class="input-append">
+        <input class="span1 day" name="refreshSmart[day][]" value="" type="number">
+        <span class="add-on">天</span>
+    </div>
+    </td>
+    <td>
+    <div class="input-append">
+        <input class="input-small price" step="0.01" name="refreshSmart[price][]" value="" type="number">
+        <span class="add-on">元</span>
+    </div>
+    </td>
+    <td class="discount">无</td>
+    <td class="unit">0元</td>
+    <td class="offer">0元</td>
+    <td><a href="javascript:;" class="del" title="删除"><i class="icon-trash"></i></a></td>
+</tr>
+</script>
+
+<script type="text/templates" id="topNormal">
+<tr>
+    <td>
+    <div class="input-append">
+        <input class="span1 day" name="topNormal[day][]" value="" type="number">
+        <span class="add-on">天</span>
+    </div>
+    </td>
+    <td>
+    <div class="input-append">
+        <input class="input-small price" step="0.01" name="topNormal[price][]" value="" type="number">
+        <span class="add-on">元</span>
+    </div>
+    </td>
+    <td class="discount">无</td>
+    <td class="offer">0元</td>
+    <td><a href="javascript:;" class="del" title="删除"><i class="icon-trash"></i></a></td>
+</tr>
+</script>
+
+{#$editorFile_adminInfo#}
+{#$jsFile#}
+</body>
+</html>

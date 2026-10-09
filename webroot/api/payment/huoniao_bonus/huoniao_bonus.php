@@ -12,9 +12,6 @@ if (isset($set_modules) && $set_modules == TRUE) {
     /* 名称 */
     $payment[$i]['pay_name'] = "消费金";
 
-	/* 所属公司 */
-    $payment[$i]['title'] = "酷曼软件";
-
     /* 版本号 */
     $payment[$i]['version'] = '1.0.0';
 
@@ -79,7 +76,7 @@ class huoniao_bonus
         if ($app && !isApp() && !isWxMiniprogram()) return false;
 
         // 查询该笔订单有没有支付成功
-        $ordersql = $dsql->SetQuery("SELECT `id`, `body` FROM `#@__pay_log` WHERE `ordernum` = '" . $order["order_sn"] . "' AND `state` = 1");
+        $ordersql = $dsql->SetQuery("SELECT `id` FROM `#@__pay_log` WHERE `ordernum` = '" . $order["order_sn"] . "' AND `state` = 1");
         $orderres = $dsql->dsqlOper($ordersql, "results");
         if ($orderres) {
             die("This order has already been paid, please do not pay again");
@@ -88,9 +85,8 @@ class huoniao_bonus
         $order_amount = sprintf("%.2f", $order['order_amount']);
 
         //查询购买人id
-        $useridsql = $dsql->SetQuery("SELECT `uid`,`ordertype`,`amount`,`body` FROM `#@__pay_log` WHERE `ordernum` = '" . $order["order_sn"] . "' ");
+        $useridsql = $dsql->SetQuery("SELECT `uid`,`ordertype`,`amount` FROM `#@__pay_log` WHERE `ordernum` = '" . $order["order_sn"] . "' ");
         $user = $dsql->dsqlOper($useridsql, "results");
-        $order_body = $user[0]['body'];
         if ($order['service'] == 'business'){
             $BeginDate                  = date('Y-m-01', strtotime(date("Y-m-d")));//本月第一天
             $overDate                   = date('Y-m-d', strtotime("$BeginDate +1 month -1 day"));//本月最后一天
@@ -136,7 +132,7 @@ class huoniao_bonus
         $user = $userLogin->getMemberInfo($userid);
         $userbonus = $user['bonus'];            //账户消费金
         $subject = $order['subject'];
-        $info = $subject . ':' . $order["order_sn"] . ($order['order_sn'] != $order_body && strstr($order_body, ',') ? '，合并订单：' . $order_body : '');
+        $info = $subject . ':' . $order["order_sn"];
         global  $siteCityInfo;
         $cityid  = $siteCityInfo['cityid'];   //调取当前的分站id
         if (!$cityid){

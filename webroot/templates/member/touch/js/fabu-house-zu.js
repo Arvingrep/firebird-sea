@@ -1,35 +1,5 @@
 $(function(){
-	$.ajax({
-		url: `/include/ajax.php?service=house&action=route&route=consumer/myData`,
-		type: "POST",
-		dataType: "json",
-		success: function (data) {
-			if(data?.state == 100){
-				let info = data.info;
-				let url ='';
-				if(info.role.isStoreManage||info.role.isBroker||info.role.isOnlyBroker){ //经纪人
-					if(navigator.userAgent.toLowerCase().match(/micromessenger/)){ //微信小程序
-						wx.miniProgram.redirectTo({url:`/pages/packages/house/broker/fabu_house_zu/fabu_house_zu`})
-					}else{
-						location.href=`${houseDomain}/broker/fabu_house_zu?${app_platform?'appFullScreen=1':''}`;
-					}
-				}else{ //个人
-					if(navigator.userAgent.toLowerCase().match(/micromessenger/)){ //微信小程序
-						wx.miniProgram.redirectTo({url:`/pages/packages/house/member/publish/publish?type=1`})
-					}else{
-						location.href=`${houseDomain}/member/publish?type=1${app_platform?'&appFullScreen=1':''}`;
-					}
-				}
-				
-			}else{
-				alert(data.info);
-			}
-		},
-		error: function(){ 
-			alert('身份信息获取失败！')
-		}
-	});
-	return false
+
 	//选择框
 	$('.checkbox[data-type="type"] dd').bind('click',function(){
 		$(this).addClass('on').siblings('dd').removeClass('on');

@@ -295,8 +295,9 @@ if($action == 'getData'){
 
                 $list[$key]['desc'] = cn_substrR(strip_tags($val['body']), 100);
 
-                $archives = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment` WHERE `ischeck` = 1 AND `type` = 'info-detail' AND `aid` = " . $val['id'] . " AND `pid` = 0");
-                $list[$key]['common'] = $dsql->getOne($archives);
+                $archives = $dsql->SetQuery("SELECT count(`id`) total FROM `#@__public_comment_all` WHERE `ischeck` = 1 AND `type` = 'info-detail' AND `aid` = " . $val['id'] . " AND `pid` = 0");
+                $res                  = $dsql->dsqlOper($archives, "results");
+                $list[$key]['common'] = $res[0]['total'];
 
                 //会员信息
                 $member = array(
@@ -581,11 +582,11 @@ if($action == 'getData'){
 
 
                 //评论数量
-                $sql    = $dsql->SetQuery("SELECT count(c.`id`) FROM `#@__public_comment` c LEFT JOIN `#@__shop_order` o ON o.`id` = c.`oid` WHERE o.`orderstate` = 3 AND c.`ischeck` = 1 AND c.`type` = 'shop-order' AND o.`store` = '" . $val['store'] . "' AND c.`pid` = 0");
-                $rcount = $dsql->getOne($sql);
+                $sql    = $dsql->SetQuery("SELECT c.`id` FROM `#@__public_comment_all` c LEFT JOIN `#@__shop_order` o ON o.`id` = c.`oid` WHERE o.`orderstate` = 3 AND c.`ischeck` = 1 AND c.`type` = 'shop-order' AND o.`store` = '" . $val['store'] . "' AND c.`pid` = 0");
+                $rcount = $dsql->dsqlOper($sql, "totalCount");
                 //好评率
-                $sql     = $dsql->SetQuery("SELECT count(c.`id`) hpcount ,avg(c.`sco1`) s1, avg(c.`sco2`) s2, avg(c.`sco3`) s3 FROM `#@__public_comment` c LEFT JOIN `#@__shop_order` o ON o.`id` = c.`oid` WHERE o.`orderstate` = 3 AND c.`ischeck` = 1 AND c.`rating` = 1 AND c.`type` = 'shop-order' AND o.`store` = '" . $val['store'] . "' AND c.`pid` = 0");
-                $res = $dsql->dsqlOper($sql, "results");
+                $sql     = $dsql->SetQuery("SELECT count(c.`id`) hpcount ,avg(c.`sco1`) s1, avg(c.`sco2`) s2, avg(c.`sco3`) s3 FROM `#@__public_comment_all` c LEFT JOIN `#@__shop_order` o ON o.`id` = c.`oid` WHERE o.`orderstate` = 3 AND c.`ischeck` = 1 AND c.`rating` = 1 AND c.`type` = 'shop-order' AND o.`store` = '" . $val['store'] . "' AND c.`pid` = 0");
+                $res    = $dsql->dsqlOper($sql, "results");
 
                 $score1  = $res[0]['s1'];  //分项1
                 $score2  = $res[0]['s2'];  //分项2

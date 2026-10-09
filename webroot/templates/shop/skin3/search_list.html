@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>{#if $stype || $ctype == 3#}推荐商家{#else if $typeid#}{#$typename#}{#else#}商城列表{#/if#}</title>
+<meta name="keywords" content="{#$shop_keywords#}"/>
+<meta name="description" content="{#$shop_description#}"/>
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico?v={#$cfg_staticVersion#}" type="image/x-icon"/>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all"/>
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all"/>
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/search_list.css?v={#$cfg_staticVersion#}" media="all"/>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$shop_channelDomain#}',staticPath = '{#$cfg_staticPath#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}';
+	var detailUrl    = "{#getUrlPath  service='shop' template='detail' id='%id%'#}";
+	var stdetailurl    = "{#getUrlPath  service='shop' template='store-detail' id='%id%'#}";
+	var slistUrl = "{#getUrlPath  service='shop' template='search_list'#}";
+	var cityid = "{#$siteCityInfo['cityid']#}";
+	var hottuan		 = "{#$hottuan#}";
+	var typeid = '{#$typeid#}';
+	var parentid = '{#$parentid#}';
+	var keywords = '{#$keywords#}';
+	var pagetype = '{#$pagetype#}'
+	var stype = '{#$stype#}'; // 推荐商家
+	var currType = '{#$ctype|string_format:"%d"#}'; //当前选中
+</script>
+</head>
+<body>
+{#$pageCurr = 'search_list'#}
+{#include file="top.html"#}
+<div class="wrap mainWrap">
+	<div class="topFilter">
+		<div class="seTab {#if $stype == 'shop'#}fn-hide{#/if#}">
+			<ul class="fn-clear">
+				
+                {#foreach from=$shop_pageTypeConfig name=foo item=pageTypeConfig#}
+                    {#if $pageTypeConfig.show == 1#}
+                    <li class="{#if $ctype == $pageTypeConfig.id || (!$ctype && $smarty.foreach.foo.index == 0)#}curr{#/if#}" data-id="{#$pageTypeConfig.id#}"><a href="{#getUrlPath  service='shop' template='search_list'#}?ctype={#$pageTypeConfig.id#}&typeid={#$typeid#}&keywords={#$keywords#}">{#$pageTypeConfig.title#}</a></li>
+                    {#/if#}
+                {#/foreach#}
+
+                {#*
+				<li class="{#if $ctype != 2 &&  $ctype != 3 && $pagetype != 2 || $ctype == 1#}curr{#/if#} {#if $pagetype == 2#}fn-hide{#/if#}"><a href="{#getUrlPath  service='shop' template='search_list'#}?ctype=1&typeid={#$typeid#}">到店优惠</a></li>
+				<li class="{#if $pagetype == 2 && $ctype != 1  && $ctype != 3 || $ctype == 2#}curr{#/if#} {#if $pagetype == 1#}fn-hide{#/if#}"><a href="{#getUrlPath  service='shop' template='search_list'#}?ctype=2&typeid={#$typeid#}">送到家</a></li>
+				<li class="{#if $ctype == 3#}curr{#/if#}"><a href="{#getUrlPath  service='shop' template='search_list'#}?ctype=3&typeid={#if $parentid#}{#$parentid#}{#else#}{#$typeid#}{#/if#}">商家</a></li>
+                *#}
+			</ul>
+		</div>
+		<div class="seResult">全部结果&nbsp;&nbsp;>&nbsp;&nbsp;<div class="typeArr">{#if $typeid#}<span>{#$typename#}<s></s></span>{#/if#}</div><strong class="keywords">{#if $keywords#}"{#$keywords#}"{#/if#}</strong>共<span class="result">0</span>个<em class="stype">{#if $stype == 'shop' || $ctype == 3#}商家{#else#}商品{#/if#}</em></div>
+	</div>
+	<div class="select">
+		<div class="tab brand {#if $ctype != 2 || ($pagetype == 2 && $ctype == 3)  #}fn-hide{#/if#}">
+			<a href="javascript:;" class="seeMore">更多<i></i></a>
+			<span class="left">品牌</span>
+			<div class="downFilter fn-clear" style="height: 100px;">
+
+			</div>
+		</div>
+
+		<div class="tab daodianType">
+			<a href="javascript:;" class="seeMore">更多<i></i></a>
+			<span class="left">分类</span>
+			<div class="downFilter" data-pi="{#$parentid#}">
+				<p>
+					<a class="{#if !$typeid#}on{#/if#}" href="{#if $ctype == 3#}{#getUrlPath  service='shop' template='search_list' param="ctype=3&typeid=0&keywords={#$keywords#}"#}{#else#}{#getUrlPath  service='shop' template='search_list' param="ctype={#$ctype#}&typeid=0&keywords={#$keywords#}"#}{#/if#}" data-id="0">{#$langData['siteConfig'][22][96]#}</a>
+					{#$count = 0#}
+					{#if $ctype == 3#}
+					<!-- 商家 -->
+					{#shop action="type" return="type" type=$parentid#}
+					<a href="{#getUrlPath  service='shop' template='search_list' param="ctype=3&typeid={#$type.id#}&keywords={#$keywords#}"#}" class="{#if $type.id == $typeid#}on{#/if#}" data-id="{#$type.id#}">{#$type.typename#}</a>
+					{#/shop#}
+					{#else#}
+					<!-- 到店 -->
+					{#shop action="type" return="type" type=$typeid#}
+					<a href="{#getUrlPath  service='shop' template='search_list' param="ctype={#$ctype#}&typeid={#$type.id#}&keywords={#$keywords#}"#}" data-id="{#$type.id#}">{#$type.typename#}</a>
+					{#if $type#}
+					{#$count = $count + 1#}
+					{#/if#}
+					{#/shop#}
+					{#if $count == 0#}
+					{#shop action="type" return="type" type=$parentid#}
+					<a href="{#getUrlPath  service='shop' template='search_list' param="ctype={#$ctype#}&typeid={#$type.id#}&keywords={#$keywords#}"#}" class="{#if $type.id == $typeid#}on{#/if#}" data-id="{#$type.id#}">{#$type.typename#}</a>
+					{#/shop#}
+					{#/if#}
+					{#/if#}
+				</p>
+				
+				
+			</div>
+		</div>
+		<div class="tab comAddr daodianAddr" data-id="">
+			<a href="javascript:;" class="seeMore">更多<i></i></a>
+			<span class="left">地区</span>
+			<div class="downFilter">
+				<p>
+					<a class="on" href="javascript:;" data-id="0" data-lower="0">{#$langData['siteConfig'][22][96]#}</a>
+					{#shop action="addr" type=$siteCityInfo['cityid'] return='addr' #}
+					<a href="javascript:;" data-id="{#$addr.id#}" data-lower="{#$addr.lower#}">{#$addr.typename#}</a>
+					{#/shop#}
+				</p>
+			</div>
+		</div>
+		
+		<div class="tab adrsubTab">
+			<span class="left"></span>
+			<div class="downFilter"><p></p></div>
+		</div>
+		
+		<div class="tab yingye fn-hide" data-id="">
+			<a href="javascript:;" class="seeMore">更多<i></i></a>
+			<span class="left">营业时间</span>
+			<div class="downFilter">
+				<p>
+					<a class="on" href="javascript:;" data-id="">全部</a>
+					<a href="javascript:;" data-id="3">0-6时</a>
+					<a href="javascript:;" data-id="4">6-12时</a>
+					<a href="javascript:;" data-id="5">12-18时</a>
+					<a href="javascript:;" data-id="6">18-24时</a>
+					
+					<a href="javascript:;" data-id="2">24小时营业</a>
+
+				</p>
+			</div>
+		</div>
+		
+	</div>
+	<div class="resultWrap fn-clear">
+		<div class="resultList">
+			<div class="filterTab fn-clear">
+				<ul class="shaiX fn-clear orderby">
+					<li class="curr" data-id=""><a href="javascript:;" >综合</a></li>
+					<li data-id="1"><a href="javascript:;">销量</a></li>
+					<li class="priceFilter" data-id="3"><a href="javascript:;">价格<i></i><s></s></a></li>
+				</ul>
+				<div class="inpbox inp_price">
+	                <input type="input" class="p1" id="priceLow" placeholder="{#echoCurrency type='symbol'#}" maxlength="6" value="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');"><em>-</em>
+	                <input type="input" class="p2" id="priceTop" placeholder="{#echoCurrency type='symbol'#}" maxlength="6" value="" onkeyup="this.value=this.value.replace(/[^0-9]/g,'');">
+	            </div>
+	            <div class="filterPage">
+	            	<a href="javascript:;" class="recPa disabled"></a>
+	            	<span class="currPa">1</span><span class="pline">/</span><span class="allP">1</span>
+	            	<a href="javascript:;" class="addPa"></a>
+	            </div>
+	            <div class="otherFilter show" data-sx="0" data-param="discount">
+	            	<a href="javascript:;" data-id="2"><s></s><span>特价活动</span></a>
+	            	<a href="javascript:;" data-id="3"><s></s><span>新店</span></a>
+	            	<a href="javascript:;" data-id="1"><s></s><span>随时退</span></a>
+	            </div>
+	            <div class="otherFilter" data-sx="1">
+	            	<a href="javascript:;" data-id="1" class="tcg"><s></s><span>同城配送</span></a>
+	            	<a href="javascript:;" data-id="4"><s></s><span>货到付款</span></a>
+	            	<a href="javascript:;" data-id="5"><s></s><span>特价活动</span></a>
+	            </div>
+	            <div class="otherFilter " data-sx="2">
+	            	<a href="javascript:;" class="sameCity"><s></s><span>同城商家</span></a>
+	            	<a href="javascript:;" class="oping"><s></s><span>营业中</span></a>
+	            </div>
+	            
+			</div>
+			<div class="goodList">
+		        <ul class="fn-clear">
+					
+		        </ul>
+		        
+		        <div class="loading">加载中~</div>
+		        
+		    </div>
+		    <div class="sepagination fn-clear"></div>
+
+			<div class="emptyData">
+			  	<img src="{#$templets_skin#}images/noresult.png" alt="">
+			  	<h2>非常抱歉</h2> 
+			  	<p>没有找到相关宝贝，换个关键词试试吧~</p>
+			</div>
+		</div>
+
+        {#if $ctype != 3#}
+		<div class="reRight">
+			<h1 class="reTit">猜你喜欢</h1>
+			<div class="likeList">
+				<ul>
+					{#shop action="slist" rec="1" page=1 pageSize=3 return=list#}
+					<li><a href="{#$list.url#}">
+						<div class="likeImg"><img src="{#changeFileSize url=$list['litpic'] width='450' height='440'#}" alt=""onerror="javascript:this.src='{#$cfg_staticPath#}images/noPhoto_100.jpg';this.onerror=this.src='{#$cfg_staticPath#}images/good_default.png';"></div>
+						<div class="likeInfo">
+							<h2>{#$list.title#}</h2>
+							<p><span>{#echoCurrency type='symbol'#}</span><strong>{#if $list.huodongarr#}{#$list.huodongprice#}{#else#}{#$list.price#}{#/if#}</strong></p>
+						</div>
+						
+					</a></li>
+					{#/shop#}
+				</ul>
+			</div>
+		</div>
+        {#/if#}
+	</div>
+	
+	
+
+</div>
+
+{#include file="bottom.html"#}
+<script>
+    var totalCount = {#$pageInfo.totalCount|string_format:"%d"#};
+    var priceUrl ="{#getUrlPath service='shop' template='search_list' param="addrid=$addrid&business=$business&typeid=$typeid&ctypeid=$ctypeid&price=pricePlaceholder&keywords=$keywords"#}";
+</script>
+<script type="text/javascript" src="{#$templets_skin#}js/search_list.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+	modelType = "pension", adminPath = "{#$adminPath#}",
+	basehost = '{#$basehost#}', subdomain = '{#$subdomain#}', mapCity = "{#$cfg_mapCity#}";
+var cityid = {#$cityid#}, cityList = {#$cityList#},addr = {#$addrid#};
+</script>
+</head>
+<body>
+
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+      <dl class="clearfix">
+        <dt><label for="user">对应会员：</label></dt>
+        <dd style="position:static;">
+          <input class="input-medium" type="text" name="user" id="user" value="{#$username#}" autocomplete="off" />
+          <input type="hidden" name="userid" id="userid" value="{#$userid#}" />
+          <span class="input-tips" style="display:inline-block;"><s></s>此会员可以管理老人信息</span>
+          <div id="userList" class="popup_key"></div>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="elderlyname">老人姓名：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="elderlyname" id="elderlyname" data-regex=".{2,60}" maxlength="60" value="{#$elderlyname#}" />
+          <span class="input-tips"><s></s>请输入老人姓名。</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="sex">性别：</label></dt>
+        <dd class="radio">
+          {#html_radios name="sex" values=$sexopt checked=$sex output=$sexnames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="switch">开关：</label></dt>
+        <dd class="radio">
+          {#html_radios name="switch" values=$switchopt checked=$switch output=$switchnames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="age">年龄：</label></dt>
+        <dd><span><input class="input-mini" type="number" name="age" min="0" id="age" value="{#$age#}" /></span></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt>上传图片：</dt>
+        <dd class="thumb clearfix listImgBox">
+          <div class="uploadinp filePicker thumbtn{#if $photo != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+          {#if $photo != ""#}
+          <ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$photo#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$photo#}" data-val="{#$photo#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+          {#else#}
+          <ul id="listSection1" class="listSection thumblist clearfix"></ul>
+          {#/if#}
+          <input type="hidden" name="photo" value="{#$photo#}" class="imglist-hidden" id="photo">
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="accommodation">期望入住形式：</label></dt>
+        <dd class="radio">
+          {#html_radios name="accommodation" values=$accommodationopt checked=$accommodation output=$accommodationnames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="addrid">期望养老地域：</label></dt>
+        <dd>
+          <div class="cityName addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id="{#$addrid#}">{#if $addrid != ""#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}</div>
+          <input type="hidden" name="addrid" id="addrid" value="{#$addrid#}" />
+        <input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+          <span class="input-tips"><s></s>请选择所属地区</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="address">详细地址：</label></dt>
+        <dd>
+          <input class="input-xlarge" type="text" name="address" id="address" value="{#$address#}" maxlength="60" data-regex=".{2,60}" />
+          <img src="{#$adminPath#}../static/images/admin/markditu.jpg" id="mark" style="cursor:pointer;" title="标注地图位置" />
+          <span class="input-tips"><s></s>请输入详细地址，2-60位</span>
+          <input type="hidden" name="lnglat" id="lnglat" value="{#$lnglat#}" />
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="rzminprice">入住费用预算低价：</label></dt>
+        <dd>
+          <div class="input-prepend input-append">
+            <input class="input-mini" type="text" name="rzminprice" id="rzmaxprice" value="{#$rzminprice#}">
+            <span class="add-on">万{#echoCurrency type="short"#}</span>
+          </div>
+          <label for="rzmaxprice" class="ml30">高价：</label>
+          <div class="input-prepend input-append">
+            <input class="input-mini" type="text" name="rzmaxprice" id="rzmaxprice" value="{#$rzmaxprice#}">
+            <span class="add-on">万{#echoCurrency type="short"#}</span>
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="monthminprice">月费用预算低价：</label></dt>
+        <dd>
+          <div class="input-prepend input-append">
+            <input class="input-mini" type="text" name="monthminprice" id="monthminprice" value="{#$monthminprice#}">
+            <span class="add-on">{#echoCurrency type="short"#}</span>
+          </div>
+          <label for="monthmaxprice" class="ml30">高价：</label>
+          <div class="input-prepend input-append">
+            <input class="input-mini" type="text" name="monthmaxprice" id="monthmaxprice" value="{#$monthmaxprice#}">
+            <span class="add-on">{#echoCurrency type="short"#}</span>
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="people">联系人：</label></dt>
+        <dd><input class="input-large" type="text" name="people" id="people" value="{#$people#}" /></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="relationship">亲属关系：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="relationship" id="relationship" value="{#$relationship#}" />
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="tel">联系电话：</label></dt>
+        <dd><input type="text" class="input-large" id="tel" name="tel" data-regex=".{2,60}" value="{#$tel#}" /><span class="input-tips"><s></s>请输入联系电话</span></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="wx">微信：</label></dt>
+        <dd><input type="text" class="input-large" id="wx" name="wx" data-regex=".{2,60}" value="{#$wx#}" /><span class="input-tips"><s></s>请输入微信</span></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="email">邮箱：</label></dt>
+        <dd><input type="text" class="input-large" id="email" name="email" data-regex=".{2,60}" value="{#$email#}" /><span class="input-tips"><s></s>请输入邮箱</span></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="targetcare">照护对象：</label></dt>
+        <dd>
+          <span id="proList">
+            {#html_radios name="targetcare" values=$targetcareval checked=$targetcare output=$targetcarelist separator="&nbsp;&nbsp;"#}
+          </span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="catid">期望养老形式：</label></dt>
+        <dd>
+          <span id="proList">
+              {#html_radios name="catid" values=$catidval checked=$catid output=$catidlist separator="&nbsp;&nbsp;"#}
+          </span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="level">期望养老级别：</label></dt>
+        <dd><textarea id="level" name="level" rows="4" class="input-xxlarge">{#$level#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="personalsituation">个人情况：</label></dt>
+        <dd><textarea id="personalsituation" name="personalsituation" rows="4" class="input-xxlarge">{#$personalsituation#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="situation">疾病情况：</label></dt>
+        <dd><textarea id="situation" name="situation" rows="4" class="input-xxlarge">{#$situation#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="desc">需求说明：</label></dt>
+        <dd><textarea id="desc" name="desc" rows="4" class="input-xxlarge">{#$desc#}</textarea></dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="click">浏览次数：</label></dt>
+        <dd>
+          <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+          <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+          <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="state">显示状态：</label></dt>
+        <dd class="radio">
+          {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix formbtn">
+        <dt>&nbsp;</dt>
+        <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+      </dl>
+
+</form>
+
+{#$jsFile#}
+</body>
+</html>

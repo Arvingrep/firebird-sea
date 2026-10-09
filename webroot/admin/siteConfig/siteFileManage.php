@@ -25,8 +25,7 @@ if($action != "" || $dopost != ""){
         $pagestep = $pagestep == "" ? 10 : $pagestep;
         $page     = $page == "" ? 1 : $page;
 
-        // $where = " AND l.`path` != ''";
-        $where = "";
+        $where = " AND l.`path` != ''";
 
         if($module){
             $where .= " AND l.`path` like '/".$module."%'";
@@ -73,17 +72,13 @@ if($action != "" || $dopost != ""){
             $where .= " ORDER BY l.`id` DESC";
         }
 
-        if($action == 'getTotalSize'){
-            $archives = $dsql->SetQuery("SELECT sum(`filesize`) totalSize FROM `#@__attachment` l WHERE 1 = 1".$where);
-            $totalSize = (int)$dsql->getOne($archives);
-            $totalSize = $totalSize ? sizeformat($totalSize) : 0;
-            echo '{"state": 100, "info": "'.$totalSize.'"}';die;
-        }else{
-            $archives = $dsql->SetQuery("SELECT count(*) totalCount FROM `#@__attachment` l WHERE 1 = 1".$where);
-        }
+        $archives = $dsql->SetQuery("SELECT count(*) totalCount, sum(`filesize`) totalSize FROM `#@__attachment` l WHERE 1 = 1".$where);
 
         //总条数
-        $totalCount = (int)$dsql->getOne($archives);
+        $totalRes = $dsql->dsqlOper($archives, "results");
+        $totalCount = (int)$totalRes[0]['totalCount'];
+        $totalSize = (int)$totalRes[0]['totalSize'];
+        $totalSize = $totalSize ? sizeformat($totalSize) : 0;
 
         //总分页数
         $totalPage = ceil($totalCount/$pagestep);

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#$langData['waimai'][1][78]#}</title> {#*   营业信息    *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/business-info.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var status = {#$status#}; //店铺状态
+			var ordervalid = {#$ordervalid#};  //外卖下单
+			var shopid = '{#$sid#}';
+			var cityid ="{#$cityid#}",site_map = '{#$site_map#}';
+			var wmOrder = {#$wmstorestatus#};  //外卖点单
+			var ordervalid = {#$ordervalid#}; //外卖下单
+			var selftake = {#$selftake#};  //到店自取
+			var instorestatus = {#$instorestatus#}; //店内点餐
+			var weeks = '{#$weeks#}';
+			var preOrder = {#$reservestatus|default:0#}; //提前下单
+		</script>
+	</head>
+	<body>
+		<div id="page" >
+			<div class="bodyCon" >
+				<!-- 头部 s-->
+				<div class="top_box">
+					<div class="headbox">
+						<a href="javascript:;" onclick="javascript:history.go(-1);" class="back_btn goBack"></a>
+						<div class="htitle">{#$langData['waimai'][1][78]#}</div>    {#*   营业信息   *#}
+						
+					</div>
+				</div>
+				<!-- 头部 e-->
+				<form class="shop_detail" id="submitForm">
+					<div class="detail_box">
+						<div class="inpbox toggle_li">
+							<label for="shopname">{#$langData['waimai'][1][38]#}</label> {#*  店铺状态 *#}
+							<span :class="['switch',{'active':status==1}]" @click="status = !status"></span>
+							<input type="hidden" name="status" id="status" :value="status==1?1:0">
+						</div>
+						<div class="inpbox normal" v-show="status!=1">
+							<label for="">{#$langData['waimai'][11][93]#} </label>{#*  关闭提示信息： *#}
+							<input type="text" name="closeorder" value="{#$closeinfo|default:$langData['waimai'][11][99]#}">
+						</div>
+						<div class="inpbox select_inp" v-show="status==1">
+							<label>{#$langData['waimai'][7][99]#}</label> {#*  营业时间 *#}
+							<input type="text" readonly="readonly" placeholder="{#$langData['waimai'][11][94]#}" name="weeks" id="weeks_show" value="{#$weeklist#}" @click="shopTypeShow"/>  {#*  请选择星期 *#}
+						</div>
+						<div class="date_chose" v-show="status==1">
+							<div class="date_box inpbox">
+								<label for="date">{#$langData['waimai'][1][187]#}</label>{#* 时间段 *#}
+								<span class="add_btn" style="{#if $timeCount==6#}display: none;{#/if#}" @click="timeChose">{#$langData['waimai'][11][95]#}</span>
+								<input type="hidden" name="stime" id="stime" class="mbsc-comp">
+								<input type="hidden" name="etime" id="etime" class="mbsc-comp">
+							</div>
+                            <p style="color: #ADAEB3; font-size: .22rem; font-weight: normal; padding: .1rem 0;">如果涉及跨天营业，请分开设置时间段，如：晚上8点营业到第二天凌晨3点，分别设置营业时间段1：20:00至23:59，营业时间段2：00:00至02:59</p>
+							<div class="time_list">
+								{#$timeCount = 0#}
+								{#if   $start_time1!= $end_time1#}
+								{#$timeCount = $timeCount+1#}
+								<span class="chose_inp">{#$start_time1#}-{#$end_time1#}
+									<em class="del_time"></em>
+									<input type="hidden" name="start_time{#$timeCount#}"  value="{#$start_time1#}" />
+									<input type="hidden" name="end_time{#$timeCount#}"  value="{#$end_time1#}" />
+								</span>
+								{#/if#}
+								{#if  $start_time2!= $end_time2#}
+								{#$timeCount = $timeCount+1#}
+								<span class="chose_inp">{#$start_time2#}-{#$end_time2#}
+									<em class="del_time"></em>
+									<input type="hidden" name="start_time{#$timeCount#}"  value="{#$start_time2#}" />
+									<input type="hidden" name="end_time{#$timeCount#}"  value="{#$end_time2#}" />
+								</span>
+								{#/if#}
+								{#if $start_time3!= $end_time3#}
+								{#$timeCount = $timeCount+1#}
+								<span class="chose_inp">{#$start_time3#}-{#$end_time3#}
+									<em class="del_time"></em>
+									<input type="hidden" name="start_time{#$timeCount#}"  value="{#$start_time3#}" />
+									<input type="hidden" name="end_time{#$timeCount#}"  value="{#$end_time3#}" />
+								</span>
+								{#/if#}
+								
+							</div>
+						</div>
+					</div>
+					<dl class="module_box">
+						<dt>{#$langData['waimai'][11][96]#}</dt>{#*  外卖设置 *#}
+						<dd class="detail_box">
+							<div class="inpbox more_h">
+								<div class="left_label">
+									<label for="">{#$langData['waimai'][11][97]#}</label>{#*  外卖点餐 *#}
+									<p>{#$langData['waimai'][11][98]#}</p>{#*  关闭后店铺外卖功能全部停用 *#}
+								</div>
+								<span :class="['switch',{'active':wmOrder}]" @click="wmOrder = !wmOrder"></span>
+								<input type="hidden" name="wmstorestatus" id="wmOrder" :value="wmOrder?1:0">
+							</div>
+							<div class="inpbox normal" v-show="!wmOrder">
+								<label for="">{#$langData['waimai'][11][93]#} </label>{#*  关闭提示信息： *#}
+								<input type="text" name="closeorder" value="{#$closeorder|default:$langData['waimai'][11][99]#}">{#*  本店已休息 *#}
+							</div>
+						</dd>
+						<dd :class="['detail_box',{'grey':!wmOrder}]">
+							<!-- 外卖下单 -->
+							<div class="inpbox more_h">
+								<div class="left_label">
+									<label for="">{#$langData['waimai'][11][100]#}</label>  {#*  外卖下单 *#}
+									<p>{#$langData['waimai'][11][101]#}</p>  {#*  关闭后顾客可查看店铺和商品，不可下单 *#}
+								</div>
+								<span :class="['switch',{'active':ordervalid&&wmOrder}]" @click="ordervalid = !ordervalid"></span>
+								<input type="hidden" name="ordervalid" id="ordervalid" :value="ordervalid?1:0">
+							</div>
+							<div class="inpbox normal" v-show="!ordervalid">
+								<label for="">{#$langData['waimai'][11][93]#} </label>{#*  关闭提示信息： *#}
+								<input type="text" name="closeorder" value="{#$closeorder|default:$langData['waimai'][11][99]#}">{#*  本店已休息 *#}
+							</div>
+							
+							
+						</dd>
+						<!-- 到店自取 -->
+						<dd  :class="['detail_box',{'grey':!wmOrder}]">
+							<div class="inpbox more_h">
+								<div class="left_label">
+									<label for="">{#$langData['waimai'][11][102]#}</label>   {#*  到店自取 *#}
+									<p>{#$langData['waimai'][11][103]#}</p>   {#*  买家通过外卖下单可选，不收取配送费 *#}
+								</div>
+								<span :class="['switch',{'active':selftake&&wmOrder}]" @click="selftake = !selftake"></span>
+								<input type="hidden" name="selftake" id="selftake" :value="selftake?1:0">
+							</div>
+							
+						</dd>
+
+						<!-- 支持预定 -->
+						<dd  :class="['detail_box',{'grey':!wmOrder}]">
+							<div class="inpbox more_h">
+								<div class="left_label">
+									<label for="">支持预定</label>   {#*  支持预定 *#}
+									<p>开启预定后，店铺休息状态顾客可下预订单</p>   {#*  开启预定后，店铺休息状态顾客可下预订单 *#}
+								</div>
+								<span :class="['switch',{'active':preOrder&&wmOrder}]" @click="preOrder = !preOrder"></span>
+								<input type="hidden" name="reservestatus" id="preOrder" :value="preOrder?1:0">
+							</div>
+							
+						</dd>
+					</dl>
+					
+					<!-- 店内点餐 -->
+					<dl class="module_box">
+						<dt>{#$langData['waimai'][11][104]#}</dt>   {#*  店内点餐 *#}
+						<dd class="detail_box">
+							<div class="inpbox more_h">
+								<label for="">{#$langData['waimai'][11][104]#}</label>   {#*  店内点餐 *#}
+								<span :class="['switch',{'active':instorestatus}]" @click="instorestatus = !instorestatus"></span>
+								<input type="hidden" name="instorestatus" id="instorestatus" :value="instorestatus?1:0">
+							</div>
+							<div class="inpbox normal" v-show="!instorestatus">
+								<label for="">{#$langData['waimai'][11][93]#} </label>{#*  关闭提示信息： *#}
+								<input type="text" readonly="readonly" value="{#$langData['waimai'][11][105]#} "> {#*  本店暂不支持扫码点单 *#}
+							</div>
+						</dd>
+					</dl>
+					<button type="button" class="save_btn" data-type="business-info" @click="dataSubmit()">{#$langData['waimai'][2][52]#}</button>{#*  保存 *#}
+				</form>
+				
+			</div>
+			<div class="loading_icon" v-if="LOADING"></div>
+			
+			<div class="mask_scroll"  @click="cancelChose"></div>
+			<div class="scroll_box">
+				<div class="scroll_head">
+					<a href="javascript:;" class="cancel_btn" @click="cancelChose()">{#$langData['waimai'][2][43]#}</a>  {#*  取消  *#}
+					<div class="htitle">选择星期</div>
+					<a href="javascript:;" class="sure_btn" @click="sureChose()">{#$langData['waimai'][3][33]#}</a>  {#*  确定  *#}
+				</div>
+				<div class="select_box">
+					<ul class="fn-clear">
+						<li v-for="txt in weektxt" :data-id="txt.id" :class="[{'chosed chose_before':arrIn(txt.id)>-1}]" @click="select">{{txt.txt}}</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		
+	</body>
+	<script src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/business-info.js?v={#$cfg_staticVersion#}"></script>
+</html>

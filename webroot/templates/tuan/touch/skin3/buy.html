@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>提交订单</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="format-detection" content="telephone=no">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/gm-d.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$tuan_channelDomain#}', cfg_staticPath = '{#$cfg_staticPath#}';
+	var cookiePre = '{#$cfg_cookiePre#}', cookieDomain = '{#$cfg_cookieDomain#}', id = {#$detail_id#}, tuantype = {#$detail_tuantype#};
+	var price = {#$detail_price#}, max = {#$detail_maxCount#};
+	var limit_msg = '{#$detail_limit_msg#}';
+	var type  = '{#$type#}', pinprice = {#$detail_pinprice#}, pinid ='{#$pinid#}', voucher ='{#$voucher#}';
+	{#if $detail_tuantype == 2#}
+	var freight = {#$detail_freight#}, freeshi = {#$detail_freeshi#};
+	{#/if#}
+
+	// 积分抵扣
+	var hasPoint = '{#$userinfo.point#}';
+		jifen_ =  {#if $cfg_offset_tuan#}{#$cfg_offset_tuan#}{#else#}0{#/if#};
+	var pointRatio = {#$cfg_pointRatio#};
+
+	var usermoney = '{#$useinfo.money#}';
+</script>
+<style type="text/css">
+	.shareTo{display: block; min-width: 1.5rem; height: 1rem; text-align: center; line-height: 1rem; color: #fff; font-size: .3rem; background: #e30c26;}
+
+</style>
+</head>
+
+<body>
+<!-- 头部 -->
+{#$pageTitle = "提交订单"#}
+{#include file="../../../siteConfig/touch_top.html"#}
+<!-- 头部 end-->
+
+<form action="/include/ajax.php?service=tuan&action=deal" method="post" id="orderForm">
+	<input type="hidden" id="if_jifen" name="usePinput" value="1">
+
+	<!-- 内容 -->
+	<div class="order-info">
+		<div class="order-name">
+			<div class="name-l">{#$detail_title#}</div>
+			<div class="name-r">{#echoCurrency type='symbol'#}<em>{#if $detail_pin && $type == "pin"#}{#$detail_pinprice#}{#else#}{#$detail_price#}{#/if#}</em></div>
+		</div>
+		<div class="order-num">
+			<div class="name-l">数量</div>
+			<div class="name-r">
+				<span class="num-rec">－</span>
+				<input type="tel" name="" value="{#$count#}" placeholder="" class="num-account" onkeyup="value=value.replace(/[^\d]/g,'')" onbeforepaste="clipboardData.setData('text',clipboardData.getData('text').replace(/[^\d]/g,''))">
+				<span class="num-add">＋</span>
+			</div>
+		</div>
+		{#if $detail_tuantype == 2 && $detail_freight > 0#}
+		<div class="order-fare">
+			<div class="name-l">运费</div>
+			<div class="name-r">{#if $count > $detail_freeshi#}免运费{#else#}{#echoCurrency type='symbol'#}<em>{#$detail_freight#}</em>{#/if#}</div>
+		</div>
+		{#/if#}
+		<div class="order-price">
+			<div class="name-l">总计</div>
+			<div class="name-r">{#echoCurrency type='symbol'#}<em>{#$totalAmount#}</em></div>
+		</div>
+	</div>
+	<!-- 内容 end-->
+
+	{#if $userinfo && $userinfo.phoneEncrypt != ""#}
+	<!-- 登录之后新绑定手机 -->
+	<div class="band band-logined">
+		<div class="band-tit">
+			<div class="name-l">您绑定的手机号码</div>
+		</div>
+		<div class="band-change">
+			<div class="name-l">{#$userinfo.phoneEncrypt#}</div>
+			<div class="name-r"><a href="{#getUrlPath service='member' type='user' template='security'#}">绑定新号码＞</a></div>
+		</div>
+	</div>
+	<!-- 登录之后新绑定手机 end-->
+	{#else#}
+	<!-- 登录前绑定手机号 -->
+	<div class="band">
+		<a href="{#getUrlPath service='member' type='user' template='security'#}">绑定新手机号＞</a>
+	</div>
+	<!-- 登录前绑定手机号 end-->
+	{#/if#}
+
+
+	{#if $detail_tuantype == 2 && $userinfo#}
+	<!-- 有收货地址 -->
+	<div class="order-address">
+		<div class="address-tit">选择收货地址</div>
+		<div class="address-change">
+			{#$has = 0#}
+			{#member action="address"#}
+			{#$has = 1#}
+			{#if $_bindex.row == 1#}
+			<input type="hidden" name="addressid" id="addressid" value="{#$row.id#}" />
+			<a href="javascript:;" class="chooseAddress fn-clear">
+				<div class="name-l">
+					<p><span>{#$row.person#}</span><span>{#if $row.mobile != ""#}{#$row.mobile#}{#/if#}
+					{#if $row.mobile != "" && $row.tel != ""#}/ {#$row.tel#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#/if#}</span></p>
+					<p>{#$row.addrname#} {#$row.address#}</p>
+				</div>
+				<div class="name-r">＞</div>
+				<div class="clear"></div>
+			</a>
+			{#/if#}
+			{#/member#}
+			{#if $has == 0#}
+			<input type="hidden" name="addressid" id="addressid" value="" />
+			<a href="javascript:;" class="chooseAddress fn-clear">
+				<div class="name-l">你还没有收货地址，去添加＞</div>
+			</a>
+			{#/if#}
+		</div>
+	</div>
+	<!-- 有收货地址 end-->
+
+	<div class="order-day">
+		<div class="day-tit">送货时间</div>
+		<div class="day-change">
+			<a href="javascript:;">
+				<div class="name-l">
+					<select name="deliveryType" id="deliveryType">
+						<option value="1">只工作日送货</option>
+						<option value="2">只双休日、假日送货</option>
+						<option value="3">白天没人，其它时间送货</option>
+						<option value="4">工作日、双休日与假日均可送货</option>
+					</select>
+				</div>
+				<div class="day-r">重新选择＞</div>
+				<div class="clear"></div>
+			</a>
+		</div>
+	</div>
+
+	<!-- 配送说明 -->
+	<div class="remark">
+		<input placeholder="配送特殊说明，配送公司会尽量调节" id="comment" />
+	</div>
+	<!-- 配送说明 end-->
+
+	<!-- 选择收货地址 s -->
+
+	<!-- 选择收货地址 e -->
+
+	{#/if#}
+
+	{#if $userinfo.point > 0 && $cfg_offset_tuan > 0#}
+  <div class="integral" data-dikou="{#$cfg_offset_tuan#}" >
+  	<p class="left">可用<span class="jifen">0</span>{#$cfg_pointName#}抵扣<span class="jian">0</span>{#echoCurrency type="short"#}</p>
+		<span class="gou hasgou"></span>
+  </div>
+	{#/if#}
+
+
+
+	<!-- <div class="submit">
+		<a href="javascript:;" id="submit">提交订单</a>
+	</div> -->
+	<div class="bottomFixed">
+		<div style="font-size: .28rem;display: flex; align-items: center; justify-content: space-between; float: revert; padding-left: .2rem; width: 100%;">
+			<div class="left_price" data-price="{#$detail_price#}">实付款：<span>{#echoCurrency type="symbol"#}<b class="amount">{#$detail_price#}</b></span></div>
+			{#if $peerpayState && !$peerpay#}<a href="javascript:;" class="shareTo" data-paytype="1">找人付</a>{#/if#}
+		</div>
+
+		<a href="javascript:;" id="submit" data-paytype="0" class="publicpaybtn">提交订单</a>
+	</div>
+</form>
+
+{#include file="{#$HUONIAOROOT#}/templates/member/touch/public-pay-pop.html"#}
+
+{#* 引入收货地址 *#}
+{#if $detail_tuantype == 2 && $userinfo#}
+<script type="text/javascript">
+	var addrAction = 'area';
+</script>
+<link rel="stylesheet" href="{#$cfg_basehost#}/templates/member/touch/css/sel-address.css?v={#$cfg_staticVersion#}" />
+<script type="text/javascript" src="{#$cfg_basehost#}/templates/member/touch/js/sel-address.js?v={#$cfg_staticVersion#}"></script>
+{#/if#}
+
+<!-- <script src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script> -->
+<script src="{#$templets_skin#}js/gm-kuaidi.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

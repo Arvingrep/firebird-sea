@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",  //缩略图配置
+  modelType = "education", adminPath = "{#$adminPath#}", mapCity = "{#$cfg_mapCity#}";
+  var typeListArr = {#$typeListArr#};
+</script>
+<style>
+.dropdown-menu {
+    max-height: 350px!important;
+    overflow-y: auto;
+}
+
+.priceWrap .table {width: auto;}
+.priceWrap .table th {min-width: 105px; height: 30px; text-align: center; line-height: 30px;}
+.priceWrap .table td {text-align: center; height: 34px; line-height: 31px;}
+.priceWrap .level {font-size: 18px;}
+.priceWrap .input-append, .input-prepend {margin-bottom: 0;}
+.priceWrap .del {display: inline-block; vertical-align: middle;}
+.priceWrap .input-append select {margin: -5px -6px 0 -6px; border-radius: 0;}
+</style>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <dl class="clearfix">
+    <dt><label for="user">对应会员：</label></dt>
+    <dd style="position:static;">
+      <input class="input-medium" type="text" name="user" id="user" value="{#$username#}" autocomplete="off" />
+      <input type="hidden" name="userid" id="userid" value="{#$userid#}" />
+      <span class="input-tips"><s></s>请输入网站对应会员名</span>
+      <div id="userList" class="popup_key"></div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="username">姓名：</label></dt>
+    <dd>
+      <input class="input-xlarge" type="text" name="username" id="username" value="{#$tutorname#}" data-regex=".{1,60}"/>
+      <span class="input-tips"><s></s>请输入1-30姓名</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="sex">性别：</label></dt>
+    <dd class="radio">
+      <label><input type="radio" name="sex" value="1" {#if $sex == 1#} checked{#/if#}>男</label>&nbsp;&nbsp;
+      <label><input type="radio" name="sex" value="0" {#if $sex == 0#} checked{#/if#}>女</label>&nbsp;&nbsp;
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="addrid">所属地区：</label></dt>
+    <dd>
+			<div class="cityName addrBtn addridBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$addrid split=' '#}" data-id="{#$addrid#}">{#if $addrid != ""#}{#getPublicParentInfo tab='site_area' id=$addrid type='typename' split='/'#}{#else#}请选择{#/if#}</div>
+			<input type="hidden" name="addrid" id="addrid" value="{#$addrid#}" />
+		<input type="hidden" name="cityid" id="cityid" value={#$cityid#}>
+      <span class="input-tips"><s></s>请选择所属地区</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>上传头像：</dt>
+		<dd class="thumb clearfix listImgBox">
+			<div class="uploadinp filePicker thumbtn{#if $photo != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+			{#if $photo != ""#}
+			<ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$photo#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$photo#}" data-val="{#$photo#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+			{#else#}
+			<ul id="listSection1" class="listSection thumblist clearfix"></ul>
+			{#/if#}
+			<input type="hidden" name="photo" value="{#$photo#}" class="imglist-hidden" id="photo">
+		</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>家教类别：</dt>
+    <dd style="overflow:visible;">
+      <div class="btn-group" id="typeBtn" style="margin-left:10px;">
+        <button class="btn dropdown-toggle" type="button" data-toggle="dropdown">{#$catname#}<span class="caret"></span></button>
+      </div>
+      <input type="hidden" name="catid" id="catid" value="{#$catid#}" />
+      <span class="input-tips"><s></s>请选择家教类别</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="university">毕业院校：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="university" id="university" value="{#$university#}" data-regex=".{1,60}"/>
+      <span class="input-tips"><s></s>请输入毕业院校</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="education">学历：</label></dt>
+    <dd>
+      <span id="educationalList">
+        <select name="education" id="education" class="input-large">
+          {#html_options options=$educationalList selected=$education#}
+        </select>
+      </span>
+      <span class="input-tips"><s></s>请选择学历</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="teachingage">教龄：</label></dt>
+    <dd>
+      <span id="teachingageList">
+        <select name="teachingage" id="teachingage" class="input-large">
+          {#html_options options=$teachingageList selected=$teachingage#}
+        </select>
+      </span>
+      <span class="input-tips"><s></s>请选择教龄</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="subjects">教学科目：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="subjects" id="subjects" value="{#$subjects#}" />
+      <span class="input-tips"><s></s>请填写教学科目，多个科目之间用“,”隔开</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>身份证正面照片：</dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $idcardFront != ""#} hide{#/if#}" id="filePicker2" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $idcardFront != ""#}
+      <ul id="listSection2" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_2_1"><a href='{#$cfg_attachment#}{#$idcardFront#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$idcardFront#}" data-val="{#$idcardFront#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection2" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="idcardFront" value="{#$idcardFront#}" class="imglist-hidden" id="idcardFront">
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>身份证反面照片：</dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $idcardBack != ""#} hide{#/if#}" id="filePicker3" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $idcardBack != ""#}
+      <ul id="listSection3" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_3_1"><a href='{#$cfg_attachment#}{#$idcardBack#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$idcardBack#}" data-val="{#$idcardBack#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection3" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="idcardBack" value="{#$idcardBack#}" class="imglist-hidden" id="idcardBack">
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="certifyState">实名认证：</label></dt>
+    <dd class="radio">
+      {#html_radios name="certifyState" values=$certifyStateopt checked=$certifyState output=$certifyStatenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>学位证：</dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $degree != ""#} hide{#/if#}" id="filePicker4" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $degree != ""#}
+      <ul id="listSection4" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_4_1"><a href='{#$cfg_attachment#}{#$degree#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$degree#}" data-val="{#$degree#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection4" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="degree" value="{#$degree#}" class="imglist-hidden" id="degree">
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="degreestate">学位证认证：</label></dt>
+    <dd class="radio">
+      {#html_radios name="degreestate" values=$degreestateopt checked=$degreestate output=$degreestatenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>毕业证：</dt>
+    <dd class="thumb clearfix listImgBox">
+      <div class="uploadinp filePicker thumbtn{#if $diploma != ""#} hide{#/if#}" id="filePicker5" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+      {#if $diploma != ""#}
+      <ul id="listSection5" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_5_1"><a href='{#$cfg_attachment#}{#$diploma#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$diploma#}" data-val="{#$diploma#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+      {#else#}
+      <ul id="listSection5" class="listSection thumblist clearfix"></ul>
+      {#/if#}
+      <input type="hidden" name="diploma" value="{#$diploma#}" class="imglist-hidden" id="diploma">
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="diplomastate">毕业证认证：</label></dt>
+    <dd class="radio">
+      {#html_radios name="diplomastate" values=$diplomastateopt checked=$diplomastate output=$diplomastatenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <div class="thead">&nbsp;&nbsp;授课设置</div>
+  <dl class="clearfix">
+    <dt><label for="price">价格：</label></dt>
+    <dd>
+      <div class="input-prepend input-append" style="margin-bottom:0">
+        <input class="input-mini" id="price" name="price" type="number" data-regex="0|\d*\.?\d+" value="{#$price#}">
+        <span class="add-on">{#echoCurrency type="short"#}</span>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="typeid">授课方式：</label></dt>
+    <dd class="radio">
+      {#html_radios name="typeid" values=$typeidopt checked=$typeid output=$typeidnames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix {#if $typeid==1#}hide{#/if#}" id="type0">
+    <dt><label for="areaaddrid">授课区域：</label></dt>
+    <dd>
+			<div class="cityName addrBtn areaaddrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$areaaddrid split=' '#}" data-id="{#$areaaddrid#}">{#if $areaaddrid != "" && $areaaddrid != 0#}{#getPublicParentInfo tab='site_area' id=$areaaddrid type='typename' split='/'#}{#else#}请选择{#/if#}</div>
+			<input type="hidden" name="areaaddrid" id="areaaddrid" value="{#$areaaddrid#}" />
+		  <input type="hidden" name="areacityid" id="areacityid" value={#$areacityid#}>
+      <span class="input-tips"><s></s>请选择所属地区</span>
+    </dd>
+  </dl>
+  <dl class="clearfix {#if $typeid==0#}hide{#/if#}" id="type1">
+    <dt><label for="area">授课地址：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="area" id="area" value="{#$area#}" data-regex=".{1,60}"/>
+      <span class="input-tips"><s></s>请输入地址</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="tel">联系方式：</label></dt>
+    <dd>
+      <input class="input-large" type="text" name="tel" id="tel" value="{#$tel#}" data-regex=".{1,60}"/>
+      <span class="input-tips"><s></s>请输入联系方式</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="teachingtime">授课时间：</label></dt>
+    <dd>
+      <div class="priceWrap">
+        <table class="table table-hover table-bordered table-striped">
+          <thead>
+            <tr>
+              <th>周一</th>
+              <th>周二</th>
+              <th>周三</th>
+              <th>周四</th>
+              <th>周五</th>
+              <th>周六</th>
+              <th>周日</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="input-append">
+                  <label><input type="checkbox" name="teachingtime[1][1]" value="1" {#if $teachingtime[1][1] == 1#} checked{#/if#}/>&nbsp;上午</label>
+                </div>
+              </td>
+              <td>
+                <div class="input-append">
+                    <label><input type="checkbox" name="teachingtime[2][1]" value="1" {#if $teachingtime[2][1] == 1#} checked{#/if#}/>&nbsp;上午</label>
+                </div>
+              </td>
+              <td>
+                <div class="input-append">
+                    <label><input type="checkbox" name="teachingtime[3][1]" value="1" {#if $teachingtime[3][1] == 1#} checked{#/if#}/>&nbsp;上午</label>
+                </div>
+              </td>
+              <td>
+                <div class="input-append">
+                    <label><input type="checkbox" name="teachingtime[4][1]" value="1" {#if $teachingtime[4][1] == 1#} checked{#/if#}/>&nbsp;上午</label>
+                </div>
+              </td>
+              <td>
+                <div class="input-append">
+                    <label><input type="checkbox" name="teachingtime[5][1]" value="1" {#if $teachingtime[5][1] == 1#} checked{#/if#}/>&nbsp;上午</label>
+                </div>
+              </td>
+              <td>
+                <div class="input-append">
+                    <label><input type="checkbox" name="teachingtime[6][1]" value="1" {#if $teachingtime[6][1] == 1#} checked{#/if#}/>&nbsp;上午</label>
+                </div>
+              </td>
+              <td>
+                <div class="input-append">
+                    <label><input type="checkbox" name="teachingtime[7][1]" value="1" {#if $teachingtime[7][1] == 1#} checked{#/if#}/>&nbsp;上午</label>
+                </div>
+              </td>
+            </tr>
+              <tr>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[1][2]" value="2" {#if $teachingtime[1][2] == 2#} checked{#/if#}/>&nbsp;下午</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[2][2]" value="2" {#if $teachingtime[2][2] == 2#} checked{#/if#}/>&nbsp;下午</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[3][2]" value="2" {#if $teachingtime[3][2] == 2#} checked{#/if#}/>&nbsp;下午</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[4][2]" value="2" {#if $teachingtime[4][2] == 2#} checked{#/if#}/>&nbsp;下午</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[5][2]" value="2" {#if $teachingtime[5][2] == 2#} checked{#/if#}/>&nbsp;下午</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[6][2]" value="2" {#if $teachingtime[6][2] == 2#} checked{#/if#}/>&nbsp;下午</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[7][2]" value="2" {#if $teachingtime[7][2] == 2#} checked{#/if#}/>&nbsp;下午</label>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[1][3]" value="3" {#if $teachingtime[1][3] == 3#} checked{#/if#}/>&nbsp;晚上</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[2][3]" value="3" {#if $teachingtime[2][3] == 3#} checked{#/if#}/>&nbsp;晚上</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[3][3]" value="3" {#if $teachingtime[3][3] == 3#} checked{#/if#}/>&nbsp;晚上</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[4][3]" value="3" {#if $teachingtime[4][3] == 3#} checked{#/if#}/>&nbsp;晚上</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[5][3]" value="3" {#if $teachingtime[5][3] == 3#} checked{#/if#}/>&nbsp;晚上</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[6][3]" value="3" {#if $teachingtime[6][3] == 3#} checked{#/if#}/>&nbsp;晚上</label>
+                  </div>
+                </td>
+                <td>
+                  <div class="input-append">
+                      <label><input type="checkbox" name="teachingtime[7][3]" value="3" {#if $teachingtime[7][3] == 3#} checked{#/if#}/>&nbsp;晚上</label>
+                  </div>
+                </td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="note">教师简介：</label></dt>
+    <dd><textarea class="input-xxlarge" name="note" id="note" rows="8">{#$note#}</textarea></dd>
+  </dl>
+  <dl class="clearfix">
+      <dt><label>是否推荐：</label></dt>
+      <dd class="radio">
+        <label><input type="checkbox" name="rec" value="1"{#if $rec == 1#} checked{#/if#} />推荐</label>
+      </dd>
+    </dl>
+  <dl class="clearfix">
+    <dt><label for="click">浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini" type="number" name="click" min="0" id="click" value="{#$click#}" /></span>
+      <label class="ml30" for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+      <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="state">显示状态：</label></dt>
+    <dd class="radio">
+      {#html_radios name="state" values=$stateopt checked=$state output=$statenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

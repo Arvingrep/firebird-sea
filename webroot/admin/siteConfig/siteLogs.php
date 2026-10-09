@@ -74,48 +74,24 @@ if($dopost == "delLogs"){
 	}
 
 	if($keywords != ""){
-		$keywords = trim($keywords);
-		$stype = trim($stype);
-		if ($stype == "name") {
-			$where .= " AND `name` like '$keywords%'";
-		} else if ($stype == "note") {
-			$where .= " AND `note` like '%$keywords%'";
-		} else if ($stype == "ip") {
-			$where .= " AND `ip` like '$keywords%'";
-		}
+		$where .= " AND (`name` like '%$keywords%' OR `note` like '%$keywords%' OR `ip` like '%$keywords%')";
 	}
 
-	$where .= " order by `pubdate` desc";
+	$where .= " order by `id` desc";
 
-	$archives = $dsql->SetQuery("SELECT count(1) FROM `#@__".$db."` WHERE 1 = 1". $where);
+	$archives = $dsql->SetQuery("SELECT `id` FROM `#@__".$db."` WHERE 1 = 1");
 
 	//总条数
-	$totalCount = (int)$dsql->getOne($archives);
-
+	$totalCount = $dsql->dsqlOper($archives.$where, "totalCount");
 	//总分页数
 	$totalPage = ceil($totalCount/$pagestep);
 
-	$atpage = $pagestep * ($page - 1);
-
-	$idWhere = "";
-    $maxLimit = 10000;
-    $limit = " LIMIT $atpage, $pagestep";
-
-	if ($atpage > $maxLimit) {
-		$sql = $dsql->SetQuery("SELECT `id` FROM `#@__" . $db . "` WHERE 1 = 1" . $where . $limit);
-		$ids = $dsql->getArr($sql);
-
-		if (count($ids) > 0) {
-			$idWhere = " AND `id` IN(" . join(',', $ids) . ")";
-		} else {
-			$idWhere = " AND 1=2";
-		}
-		$limit = "";
-	}
-	$archives = $dsql->SetQuery("SELECT `id`, `admin`, `name`, `note`, `ip`, `pubdate` FROM `#@__" . $db . "` WHERE 1 = 1" . $idWhere . $where . $limit);
+	$atpage = $pagestep*($page-1);
+	$where .= " LIMIT $atpage, $pagestep";
+	$archives = $dsql->SetQuery("SELECT `id`, `admin`, `name`, `note`, `ip`, `pubdate` FROM `#@__".$db."` WHERE 1 = 1".$where);
 	$results = $dsql->dsqlOper($archives, "results");
 
-	if(is_array($results) && count($results) > 0){
+	if(count($results) > 0){
 		$list = array();
 		foreach ($results as $key=>$value) {
 			$list[$key]["id"] = $value["id"];

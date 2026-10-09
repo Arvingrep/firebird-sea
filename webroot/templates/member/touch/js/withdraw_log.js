@@ -26,9 +26,6 @@ new Vue({
 	methods: {
 		// 跳转到详情页
 		toWithdrawDetail(url) {
-			if(from){
-				url += url.includes('?') ? '&' : '?' + 'from=' + from
-			}
 			location.href = url;
 		},
 		// 格式化金额
@@ -95,7 +92,7 @@ new Vue({
 				const nextPage = this.currentPage + 1;
 				// 发送网络请求，获取下一页数据
 				axios.get(
-					`/include/ajax.php?service=member&action=withdraw_log&from=${from}&page=${this.currentPage}&pageSize=${this.pageInfo.pageSize}`
+					`/include/ajax.php?service=member&action=withdraw_log&page=${this.currentPage}&pageSize=${this.pageInfo.pageSize}`
 					)
 					.then(response => {
 						if (response.data.state == 100) { 

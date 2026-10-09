@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>管理商城订单</title>
+{#$cssFile#}
+<style type="text/css">
+  html {min-width: 1400px;}
+  .statistics {display: inline-block;}
+  .statistics label {display: inline-block; margin-right: 15px; cursor: text; line-height: 35px;}
+  .search .input-append, .search .input-prepend {margin-bottom: 0;}
+  .search .add-on.sel {padding: 0!important; height: 33px;}
+  .search .add-on.sel select {border: 0; background: transparent; width: 90px; height: 32px;}
+  .search .input-prepend input {border-radius: 0!important;}
+
+  .thead {border-bottom: 1px solid #cfe0f7; background: #E8F1FE;}
+  .thead .oh {width: 100%;}
+  .thead td {padding: 0 10px;}
+  #table table {border: 1px solid #ebeef5; margin: 10px 0 15px;}
+  #table table:hover {border-color: #ccc;}
+  #table th {font-weight: 500; background-color: #f5f5f5; padding: 5px 10px;}
+  #table .selected th {background-color: #f2f7ff;}
+  #table td {text-align: left; background: #fff!important; height: auto; padding: 15px 10px; border-left: 1px solid #ebeef5; border-top: 1px solid #ebeef5; border-bottom: 0;}
+  #table tr td:first-child {border-left: 0;}
+  #table td p {margin-bottom: 0;}
+  #table tr:hover td {background: #fff!important;}
+  #table thead .check {margin-right: 15px;}
+  #table thead .text {display: inline-block; margin-left: 15px;}
+  #table thead .oper-td {text-align: right;}
+  #table thead .oper-td a {margin-left: 15px; display: inline-block;}
+  .list td .audit {color: #19be6b;}
+
+  .pro-info {display: flex;}
+  .pro-image {flex-shrink: 0; width: 76px;}
+  .pro-txt {flex: 1;}
+  .pro-title {line-height: 1.4em; display: table-cell;}
+  .pro-spection {font-size: 12px; line-height: 1.2em; margin-top: 5px;}
+
+  .label.label-info.label-huodong-1 {background: #fda8c3!important; border-color: #ff97bb!important; color: #fff!important;}
+  .label.label-info.label-huodong-2 {background: #84a0ff!important; border-color: #83a2ff!important; color: #fff!important;}
+  .label.label-info.label-huodong-3 {background: #ff7762!important; border-color: #ff897c!important; color: #fff!important;}
+  .label.label-info.label-huodong-4 {background: #c48aff!important; border-color: #bf85ff!important; color: #fff!important;}
+
+  .list .userinfo {margin-right: 10px;}
+  .list .level {display: inline-block; font-size: 10px; height: 20px; line-height: 18px; border-radius: 15px; padding-left: 5px; padding-right: 7px; color: #fff; background-color: rgba(0, 0, 0, .7); vertical-align: text-bottom;}
+  .list .level img{display: inline-block; width: 15px; height: 15px; object-fit: cover; margin-right: 3px; vertical-align: text-top;}
+</style>
+</head>
+
+<body>
+<div class="search">
+  <label>搜索：</label>
+  <div class="choseCity"><input type="hidden" id="cityList" name="cityList" placeholder="请选择城市分站" value=""></div>
+  <div class="btn-group" id="shoptypeBtn" data-id="">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">商品类型<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li><a href="javascript:;" data-id="">所有类型</a></li>
+      <li><a href="javascript:;" data-id="1">实物商品</a></li>
+      <li><a href="javascript:;" data-id="2">电子券</a></li>
+    </ul>
+  </div>
+  <div class="btn-group" id="paymentBtn">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">支付方式<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li><a href="javascript:;" data-id="" data-nolist="true">所有方式</a></li>
+      {#foreach $paymentList as $k => $v#}
+      <li><a href="javascript:;" data-id="{#$k#}" data-nolist="true">{#$v#}</a></li>
+      {#/foreach#}
+    </ul>
+  </div>
+  <div class="btn-group" id="huodongBtn">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">活动订单<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li><a href="javascript:;" data-id="">全部订单</a></li>
+      <li><a href="javascript:;" data-id="0">普通订单</a></li>
+      <li><a href="javascript:;" data-id="1">准点抢购</a></li>
+      <li><a href="javascript:;" data-id="2">特价秒杀</a></li>
+      <li><a href="javascript:;" data-id="3">砍价-全部</a></li>
+      <!-- <li><a href="javascript:;" data-id="3-0">砍价-砍价中</a></li> -->
+      <li><a href="javascript:;" data-id="3-1">砍价-成功</a></li>
+      <li><a href="javascript:;" data-id="3-2">砍价-失败</a></li>
+      <!-- <li><a href="javascript:;" data-id="3-3">砍价-已购买</a></li> -->
+      <li><a href="javascript:;" data-id="4">拼团-全部</a></li>
+      <li><a href="javascript:;" data-id="4-0">拼团-待成团</a></li>
+      <li><a href="javascript:;" data-id="4-1">拼团-已成团</a></li>
+    </ul>
+  </div>
+  <div class="btn-group" id="shippingBtn" data-id="">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">配送方式<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li><a href="javascript:;" data-id="">全部方式</a></li>
+      <li><a href="javascript:;" data-id="0">骑手配送</a></li>
+      <li><a href="javascript:;" data-id="1">快递配送</a></li>
+      <li><a href="javascript:;" data-id="2">商家自配</a></li>
+    </ul>
+  </div>
+
+  <div class="input-prepend input-append">
+    <span class="add-on sel">
+        <select id="timetypeBtn">
+            <option value="1">下单时间</option>
+            <option value="2">付款时间</option>
+            <option value="3">发货时间</option>
+            <option value="4">申请退款</option>
+            <option value="5">退款时间</option>
+        </select>
+    </span>
+    <input class="input-small" type="text" id="stime" placeholder="开始日期" value="" autocomplete="off">
+    <span class="add-on">到</span>
+    <input class="input-small" type="text" id="etime" placeholder="结束日期" value="" autocomplete="off">
+  </div>
+
+  <div class="input-prepend input-append">
+    <span class="add-on sel">
+        <select id="searchtypeBtn">
+            <option value="1">订单号</option>
+            <option value="2">用户ID</option>
+            <option value="3">收货人</option>
+            <option value="4">收货电话</option>
+            <option value="5">收货地址</option>
+            <option value="6">商品ID</option>
+            <option value="7">商品名称</option>
+            <option value="8">店铺ID</option>
+            <option value="9">店铺名称</option>
+            <option value="10">拼团ID</option>
+        </select>
+    </span>
+    <input class="input-large" type="search" id="keyword" placeholder="请输入要搜索的关键字" value="">
+  </div>
+
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="selectBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="1">全选</a></li>
+        <li><a href="javascript:;" data-id="0">不选</a></li>
+      </ul>
+    </div>
+    <button class="btn" data-toggle="dropdown" id="delBtn">删除</button>
+    <div class="btn-group" id="stateBtn" {#if $notice == 11#} data-id="11"{#elseif $notice#} data-id="1"{#/if#}>
+      {#if $notice == 11#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">异常订单(<span class="state11"></span>)<span class="caret"></span></button>
+      {#elseif $notice == 12#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">平台配送异常订单(<span class="state12"></span>)<span class="caret"></span></button>
+      {#elseif $notice == 63#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">配送中-平台配送(<span class="state63"></span>)<span class="caret"></span></button>
+      {#elseif $notice == 64#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">待配送-平台配送(<span class="state64"></span>)<span class="caret"></span></button>
+      {#elseif $notice == 66#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">已完成-平台配送(<span class="state66"></span>)<span class="caret"></span></button>
+      {#elseif $notice#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">已付款(<span class="state1"></span>)<span class="caret"></span></button>
+      {#else#}
+      <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="totalCount"></span>)<span class="caret"></span></button>
+      {#/if#}
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>
+        <!-- <li><a href="javascript:;" data-id="0">未付款(<span class="state0"></span>)</a></li>
+        <li><a href="javascript:;" data-id="1">已付款(<span class="state1"></span>)</a></li>
+        <li><a href="javascript:;" data-id="3">交易成功(<span class="state3"></span>)</a></li>
+        <li><a href="javascript:;" data-id="4">退款中(<span class="state4"></span>)</a></li>
+        <li><a href="javascript:;" data-id="6">已发货(<span class="state6"></span>)</a></li>
+        <li><a href="javascript:;" data-id="7">退款成功(<span class="state7"></span>)</a></li>
+        <li><a href="javascript:;" data-id="10">关闭(<span class="state10"></span>)</a></li> -->
+        <li><a href="javascript:;" data-id="0">未付款(<span class="state0"></span>)</a></li>
+        <li><a href="javascript:;" data-id="1">已付款(<span class="state1"></span>)</a></li>
+        <li><a href="javascript:;" data-id="6,0">已发货(<span class="state60"></span>)</a></li>
+        <li><a href="javascript:;" data-id="4">退款中(<span class="state4"></span>)</a></li>
+        <li><a href="javascript:;" data-id="7">退款成功(<span class="state7"></span>)</a></li>
+        <li><a href="javascript:;" data-id="3">交易成功(<span class="state3"></span>)</a></li>
+        <li><a href="javascript:;" data-id="10">关闭(<span class="state10"></span>)</a></li>
+        <li title="{#$abnormalOrderTitle#}"><a href="javascript:;" data-id="11">异常订单(<span class="state11"></span>)</a></li>
+        {#if !$shopCourierState#}
+        <li class="divider"></li>
+        <li><a href="javascript:;" data-id="6,4">待配送-平台配送(<span class="state64"></span>)</a></li>
+        <li><a href="javascript:;" data-id="6,2">已接单-平台配送(<span class="state62"></span>)</a></li>
+        <li><a href="javascript:;" data-id="6,3">配送中-平台配送(<span class="state63"></span>)</a></li>
+        <li><a href="javascript:;" data-id="6,5">已接单+配送中-平台配送(<span class="state65"></span>)</a></li>
+        <li><a href="javascript:;" data-id="6,6">已完成-平台配送(<span class="state66"></span>)</a></li>
+        <li><a href="javascript:;" data-id="6,1">配送中-商家配送(<span class="state61"></span>)</a></li>
+        <li title="{#$platformAbnormalOrderTitle#}"><a href="javascript:;" data-id="12">平台配送异常订单(<span class="state12"></span>)</a></li>
+        {#/if#}
+      </ul>
+    </div>
+
+    {#if !$shopCourierState#}
+    <span id="courierSelect" class="hide">
+        <select class="chosen-select" name="courier_id" id="courier_id">
+            <option value="0">选择骑手</option>
+            {#foreach from=$courier item=c#}
+            <option value="{#$c.id#}">{#$c.cityname#}-{#$c.name#}</option>
+            {#/foreach#}
+        </select>
+        <button class="btn" id="setCourier">设置配送员</button>
+        <button class="btn btn-link" id="courierLocation">查看配送员位置</button>
+    </span>
+    {#/if#}
+<!--     <div class="statistics">
+      <label style="margin-left:20px;">总金额：<span class="totalMoney"></span></label>
+      <label>商品总额：<span class="shopTotalPrice"></span></label>
+      <label>运费总额：<span class="peisongTotalPrice"></span></label>
+    </div> -->
+  </div>
+  <div class="f-right">
+    <a href="shopOrder.php?dopost=getList&do=export" class="btn btn-link" style="margin-left: 10px;" id="export">导出订单数据</a>
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- <ul class="thead t100 clearfix">
+  <li class="row3">&nbsp;</li>
+  <li class="row14 left">会员/订单号</li>
+  <li class="row20 left">商家</li>
+  <li class="row8 left">订单金额</li>
+  {#if !$shopCourierState#}
+  <li class="row15 left">支付方式/下单时间</li>
+  {#else#}
+  <li class="row30 left">支付方式/下单时间</li>
+  {#/if#}
+  <li class="row15 left">状态</li>
+  {#if !$shopCourierState#}
+  <li class="row15 left">骑手/状态</li>
+  {#/if#}
+  <li class="row10 left">&nbsp;&nbsp;操作</li>
+</ul> -->
+
+<div class="thead">
+    <table class="oh">
+		<colgroup>
+			<col style="width:3%;">
+			<col style="width:28%;">
+			<col style="width:8%;">
+			<col style="width:19%;">
+			<col style="width:15%;">
+			<col style="width:15%;">
+			<col style="width:12%;">
+		</colgroup>
+		<tbody>
+			<tr>
+				<td></td>
+				<td>商品</td>
+				<td>单价/数量</td>
+				<td>买家</td>
+				<td>实付款</td>
+				<td>配送</td>
+				<td>状态</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+
+<div class="list mt124" id="list" data-totalpage="1" data-atpage="1">
+    <div id="table"></div>
+    <div id="loading" class="loading hide"></div>
+</div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword">{#$keywords#}</span>
+  <span id="start"></span>
+  <span id="end"></span>
+  <span id="shoptype"></span>
+  <span id="payment"></span>
+  <span id="huodong"></span>
+  <span id="shipping"></span>
+  <span id="timetype"></span>
+  <span id="searchtype"></span>
+</div>
+
+<script id="quickEdit" type="text/html">
+  <form action="" class="quick-editForm" name="editForm">
+    <dl class="clearfix">
+      <dt>用户退货方式：</dt>
+      <dd id="store"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>申请退款时间：</dt>
+      <dd id="user"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>协商历史：</dt>
+      <dd id="negotiate"></dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>是否退款：</dt>
+      <dd>
+        <select id="isCheck" name="isCheck" class="input-medium">
+          <option value="0">等待审核</option>
+          <option value="1" selected="selected">是</option>
+          <option value="2">否</option>
+        </select>&nbsp;&nbsp;&nbsp;
+      </dd>
+    </dl>
+  </form>
+</script>
+
+<script>
+  var adminPath = "{#$adminPath#}", shopCourierState = {#$shopCourierState#}, cityList = {#$cityList#}, cfg_pointName = '{#$cfg_pointName#}';
+</script>
+{#$jsFile#}
+</body>
+</html>

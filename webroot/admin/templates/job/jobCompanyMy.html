@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>我的客户</title>
+{#$cssFile#}
+<style>
+    .tag {display: inline-block; margin-right: 3px; color: #fff; padding: 0 4px; border-radius: 4px; font-size: 12px; border: 1px solid;}
+    .tag-default {color: #333; background-color: #fff;}
+    .list td.state .tooltip {text-indent: 0;}
+    .btns_group{display: grid; grid-template-columns: repeat(3,1fr);  border-radius: 4px; width: 320px; height: 36px; box-sizing: border-box; margin-left: 20px; margin-top: 20px; overflow: hidden;}
+    .btns_group .btn{display: flex; align-items: center; justify-content: center; border: solid 1px #DCDFE6; border-radius: 0 !important;}
+    .btns_group .btn:first-of-type{border-radius: 4px 0 0 4px !important; border-right: none !important;}
+    .btns_group .btn:last-of-type{border-radius: 0 4px 4px 0 !important; border-left: none !important;}
+    .btns_group .btn.active{background-color: #409EFF !important; color: #fff;}
+    .labManage{background-color: #EBF3FF; border-color:#EBF3FF ; color: #3377FF; display: inline-flex;width: 84px; height: 36px; align-items: center; justify-content: center; vertical-align: middle; border-radius: 4px; margin-right: 8px; cursor: pointer;}
+    .flex_row{display: flex; align-items: center; justify-content: center;}
+    .flex_row .flex_l{display: flex; margin-right: 18px; }
+    .flex_row .flex_l a{margin: 0 6px; cursor: pointer;}
+</style>
+</head>
+
+<body>
+  <div class="btns_group">
+    <a href="jobCompanyGH.php" class="add-page btn  GH" data-id="jobCompanyGHphp" data-title="公海客户">公海客户<span></span></a>
+    <a href="jobCompanyFollow.php" class="add-page btn Follow" data-id="jobCompanyFollowphp" data-title="跟进记录">跟进记录<span></span></a>
+    <a href="javascript:;" class="btn active My"data-title="我的客户">我的客户<span></span></a>
+  </div>
+<div class="alert alert-success" style="margin:10px 20px 0 20px;"><button type="button" class="close" data-dismiss="alert">×</button>此页面用于展示被自己领取的客户，可以在该页面进行跟进、释放客户，查看领取、跟进记录，以及修改企业信息。</div>
+<div class="search">
+  搜索：
+  <div class="choseCity"><input type="hidden" id="cityid" name="cityid" placeholder="请选择城市分站" value=""></div>&nbsp;
+  <!--<div class="btn-group" id="addrBtn" data-id="">-->
+    <!--<button class="btn dropdown-toggle" data-toggle="dropdown">全部地区<span class="caret"></span></button>-->
+  <!--</div>-->
+  <div class="btn-group" id="comboBtn">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">企业套餐<span class="caret"></span></button>
+  <ul class="dropdown-menu">
+    <li><a href="javascript:;" data-id=""  data-nolist="true">企业套餐</a></li>
+    <li><a href="javascript:;" data-id="-1"  data-nolist="true">未开通套餐</a></li>
+    <li class="divider"></li>
+    {#foreach $comboList as $comboId => $comboTitle#}
+    <li><a href="javascript:;" data-id="{#$comboId#}" data-nolist="true">{#$comboTitle#}</a></li>
+    {#/foreach#}
+    <li class="divider"></li>
+    <li><a href="javascript:;" data-id="-2"  data-nolist="true">一天内到期</a></li>
+    <li><a href="javascript:;" data-id="-3"  data-nolist="true">三天内到期</a></li>
+    <li><a href="javascript:;" data-id="-4"  data-nolist="true">一周内到期</a></li>
+    <li><a href="javascript:;" data-id="-5"  data-nolist="true">一月内到期</a></li>
+  </ul>
+  </div>
+  <div class="btn-group" id="certBtn">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">认证状态<span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li><a href="javascript:;" data-id="" data-nolist="true">认证状态</a></li>
+      <li><a href="javascript:;" data-id="1" data-nolist="true">已认证</a></li>
+      <li><a href="javascript:;" data-id="0" data-nolist="true">待认证</a></li>
+    </ul>
+  </div>
+  入驻时间&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期" autocomplete="off">&nbsp;到&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期" autocomplete="off">
+  <span>
+    <select style="width: auto; border-right: 0; border-radius: 4px 0 0 4px; border-color: #dcdfe6;" name="searchType" id="searchType">
+      <option value="cname">公司名</option>
+      <option value="uname">用户名</option>
+    </select><input class="input-large" type="search" id="keyword" placeholder="请输入要搜索的关键字" style="border-radius: 0 4px 4px 0!important;">
+  </span>
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+  
+</div>
+
+<script id="propertyForm" type="text/html">
+  <form action="" class="quick-editForm job_propertyForm" name="editForm">
+    <dl class="clearfix">
+      <dd class="clearfix">
+        {#foreach $tagList as $tagItemId => $tagItemVal#}
+        <label class="property_label"><input type="checkbox" name="flags" value="{#$tagItemVal['id']#}" /><span style="background-color:{#$tagItemVal['color']#};">{#$tagItemVal['typename']#}</span></label>
+        {#/foreach#}
+      </dd>
+    </dl>
+  </form>
+</script>
+
+
+<script id="fillLogForm" type="text/html">
+  <form action="" class="quick-editForm" name="editForm">
+    <dl class="clearfix">
+      <dt>跟进类型：</dt>
+      <dd class="clearfix">
+        <select id="logTagSelect">
+          <option selected disabled value="0">请选择</option>
+          <option value="1">当面拜访</option>
+          <option value="2">电话拜访</option>
+          <option value="3">网络拜访</option>
+          <option value="4">其他</option>
+        </select>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>跟进时间：</dt>
+      <dd class="clearfix">
+        <input id="fillTime" type="datetime-local"/>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>跟进内容：</dt>
+      <dd class="clearfix">
+        <textarea id="fillContent" rows="10"></textarea>
+      </dd>
+    </dl>
+  </form>
+</script>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="selectBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="1">全选</a></li>
+        <li><a href="javascript:;" data-id="0">不选</a></li>
+      </ul>
+    </div>
+    <div class="btn-group" id="stateBtn"{#if $notice && !$mingan#} data-id="0"{#/if#}{#if $mingan#} data-id="3"{#/if#}>
+        {#if $notice && !$mingan#}
+        <button class="btn dropdown-toggle" data-toggle="dropdown">待审核(<span class="totalGray"></span>)<span class="caret"></span></button>
+        {#elseif $mingan#}
+        <button class="btn dropdown-toggle" data-toggle="dropdown">修改敏感信息(<span class="totalChange"></span>)<span class="caret"></span></button>
+        {#else#}
+        <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="totalCount"></span>)<span class="caret"></span></button>
+        {#/if#}
+        <ul class="dropdown-menu">
+          <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>
+          <li><a href="javascript:;" data-id="0">待审核(<span class="totalGray"></span>)</a></li>
+          <li><a href="javascript:;" data-id="1">已审核(<span class="totalAudit"></span>)</a></li>
+          <li><a href="javascript:;" data-id="2">拒绝审核(<span class="totalRefuse"></span>)</a></li>
+          <li><a href="javascript:;" data-id="3">修改敏感信息(<span class="totalChange"></span>)</a></li>
+        </ul>
+    </div>
+    <div class="btn-group" id="tagBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">查看标签<span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="">查看标签</a></li>
+        {#foreach $tagList as $tagItemId => $tagItemVal#}
+        <li><a href="javascript:;" data-id="{#$tagItemVal['id']#}" {#if $tagItemVal['color']#}style="background-color: {#$tagItemVal['color']#}; color: #fff;"{#/if#}>{#$tagItemVal['typename']#}</a></li>
+        {#/foreach#}
+      </ul>
+     
+    </div>
+    <button class="btn" data-toggle="dropdown" id="delBtn">释放</button>
+    <button class="btn hide" data-toggle="dropdown" id="addTag">添加标签</button>
+    <button class="btn hide" data-toggle="dropdown" id="delTag">删除标签</button>
+    <div class="btn-group hide" id="batchAudit"></div>
+    <a href="javascript:;" class="btn btn-warning" id="export">导出数据</a>
+    <span class="tongji" style="margin: 0 10px;">共<span class="totalCount">0</span>个客户</span>
+  </div>
+  <div class="f-right">
+    <div class="labManage" id="labManage">标签管理</div>
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row3">&nbsp;</li>
+  <li class="row23 left">公司信息</li>
+  <li class="row15 left">联系人/电话/用户</li>
+  <li class="row9 left">职位/进行中</li>
+  <li class="row14 left">套餐/有效期</li>
+  <li class="row14 left">入驻时间/认证状态</li>
+  <li class="row10">审核状态</li>
+  <li class="row12">操作</li>
+</ul>
+
+<div class="list mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="sAddr"></span>
+</div>
+
+<script>
+  var adminList = {#$adminList#},addrListArr = {#$addrListArr#}, adminPath = "{#$adminPath#}",cityList = {#json_encode($cityArr)#};
+</script>
+{#$jsFile#}
+</body>
+</html>

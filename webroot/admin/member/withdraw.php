@@ -96,17 +96,6 @@ if($dopost == "getList"){
 		$where .= " AND `tdate` <= ". GetMkTime($end." 23:59:59");
 	}
 
-	//来源筛选，-1全部 0普通提现 1商家提现
-	// $source = (int)$source;
-	// if ($source != -1) {
-
-	// 	if ($source == 0) {
-	// 		$where .= " AND `source` != 3";
-	// 	} elseif ($source == 1) {
-	// 		$where .= " AND `source` = 3";
-	// 	}
-	// }
-
 	$archives = $dsql->SetQuery("SELECT `id` FROM `#@__".$action."` WHERE 1 = 1".$where);
 
 	//总条数
@@ -121,10 +110,6 @@ if($dopost == "getList"){
 	$state2 = $dsql->dsqlOper($archives." AND `state` = 2", "totalCount");
 	//微信打款中
 	$state3 = $dsql->dsqlOper($archives." AND `state` = 3", "totalCount");
-	//撤销中
-	$state4 = $dsql->dsqlOper($archives." AND `state` = 4", "totalCount");
-	//确认中
-	$state6 = $dsql->dsqlOper($archives." AND `state` = 6", "totalCount");
 
 	if($state != ""){
 		$where .= " AND `state` = " . $state;
@@ -137,10 +122,6 @@ if($dopost == "getList"){
 			$totalPage = ceil($state2/$pagestep);
 		}elseif($state == 3){
 			$totalPage = ceil($state3/$pagestep);
-        }elseif($state == 4){
-			$totalPage = ceil($state4/$pagestep);
-        }elseif($state == 6){
-			$totalPage = ceil($state6/$pagestep);
         }
 	}
 
@@ -232,19 +213,19 @@ if($dopost == "getList"){
 
 		if(count($list) > 0){
 		    if ($do != 'export'){
-                echo '{"state": 100, "info": '.json_encode("获取成功").', "pageInfo": {"totalPage": '.$totalPage.', "totalCount": '.$totalCount.', "state0": '.$state0.', "state1": '.$state1.', "state2": '.$state2.', "state3": '.$state3.', "state4": '.$state4.', "state6": '.$state6.'},"totalShouxu": '.$totalShouxu.',"totalAmount": '.$totalAmount.',"totalPrice": '.$totalPrice.', "list": '.json_encode($list).'}';
+                echo '{"state": 100, "info": '.json_encode("获取成功").', "pageInfo": {"totalPage": '.$totalPage.', "totalCount": '.$totalCount.', "state0": '.$state0.', "state1": '.$state1.', "state2": '.$state2.', "state3": '.$state3.'},"totalShouxu": '.$totalShouxu.',"totalAmount": '.$totalAmount.',"totalPrice": '.$totalPrice.', "list": '.json_encode($list).'}';
             }
 
 		}else{
 		    if ($do != "export"){
-                echo '{"state": 101, "info": '.json_encode("暂无相关信息").', "pageInfo": {"totalPage": '.$totalPage.', "totalCount": '.$totalCount.', "state0": '.$state0.', "state1": '.$state1.', "state2": '.$state2.', "state3": '.$state3.', "state4": '.$state4.', "state6": '.$state6.'},"totalShouxu": '.$totalShouxu.',"totalAmount": '.$totalAmount.', "totalPrice": '.$totalPrice.'}';
+                echo '{"state": 101, "info": '.json_encode("暂无相关信息").', "pageInfo": {"totalPage": '.$totalPage.', "totalCount": '.$totalCount.', "state0": '.$state0.', "state1": '.$state1.', "state2": '.$state2.', "state3": '.$state3.'},"totalShouxu": '.$totalShouxu.',"totalAmount": '.$totalAmount.', "totalPrice": '.$totalPrice.'}';
             }
 
 		}
 
 	}else{
 	    if ($do !="export"){
-            echo '{"state": 101, "info": '.json_encode("暂无相关信息").', "pageInfo": {"totalPage": '.$totalPage.', "totalCount": '.$totalCount.', "state0": '.$state0.', "state1": '.$state1.', "state2": '.$state2.', "state3": '.$state3.', "state4": '.$state4.', "state6": '.$state6.'},"totalShouxu": '.$totalShouxu.', "totalAmount": '.$totalAmount.', "totalPrice": '.$totalPrice.'}';
+            echo '{"state": 101, "info": '.json_encode("暂无相关信息").', "pageInfo": {"totalPage": '.$totalPage.', "totalCount": '.$totalCount.', "state0": '.$state0.', "state1": '.$state1.', "state2": '.$state2.', "state3": '.$state3.'},"totalShouxu": '.$totalShouxu.', "totalAmount": '.$totalAmount.', "totalPrice": '.$totalPrice.'}';
         }
 
 	}
@@ -294,12 +275,7 @@ if($dopost == "getList"){
                 $data['state'] = '成功';
             }elseif($data['state'] == 2){
                 $data['state'] = '失败';
-            }elseif($data['state'] == 3){
-                $data['state'] = '打款中';
-            }elseif($data['state'] == 4){
-                $data['state'] = '撤销中';
-            }elseif($data['state'] == 6){
-                $data['state'] = '确认打款中';
+
             }
             $arr = array();
             array_push($arr, iconv('utf-8', 'gb2312//IGNORE', $data['type']));
@@ -360,245 +336,6 @@ if($dopost == "getList"){
 	}
 	die;
 
-/*//发起转账
-}elseif($dopost == "apply"){
-
-	if ($id == null) {
-		echo '{"state": 200, "info": "转账id不能为空！"}';
-		die();
-	}
-
-	//查询转账单信息
-	$sql = $dsql->SetQuery("SELECT `uid`,`bank`,`state`,`auditstate`,`ordernum`,`amount` FROM `#@__".$action."` WHERE `id` = ".$id);
-	$ret = $dsql->dsqlOper($sql, "results");
-	if ($ret == null || !is_array($ret)) {
-		echo '{"state": 200, "info": "没有对应的转账信息！"}';
-		die();
-	}
-	$withdrawInfo = $ret[0];
-
-	//判断支付方式是微信支付，且状态是否正确
-	if ($withdrawInfo['bank'] != 'weixin') {
-		echo '{"state": 200, "info": "支付方式错误！"}';
-		die();
-	}
-	if ($withdrawInfo['auditstate'] != 1 || !in_array($withdrawInfo['state'], array(0,3,6))) {
-		echo '{"state": 200, "info": "当前状态不允许发起转账申请！"}';
-		die();
-	}
-
-	$sql = $dsql->SetQuery("SELECT `wechat_openid`,`wechat_mini_openid`,`realname` FROM `#@__member` WHERE `id` = ".$withdrawInfo['uid']);
-	$ret = $dsql->dsqlOper($sql, "results");
-	if ($ret == null || !is_array($ret)) {
-		echo '{"state": 200, "info": "没有对应的用户信息！"}';
-		die();
-	}
-	$userInfo = $ret[0];
-
-	//如果已经有订单号了，就不重新生成了
-	$ordernum = $withdrawInfo['ordernum'];
-	if ($ordernum == null) {
-		$ordernum = create_ordernum();
-	}
-
-	$orderInfo = array(
-		'ordernum' => $ordernum,
-		'openid' => $userInfo['wechat_openid'],
-		'wechat_mini_openid' => $userInfo['wechat_mini_openid'],
-		'name' => $userInfo['realname'],
-		'amount' => (float)$withdrawInfo['amount'],
-		'wid' => $id,
-	);
-
-	//发起转账请求
-	include_once HUONIAOROOT."/api/payment/wxpay/wxpayTransfers.php";
-	$wxpayTransfers = new wxpayTransfers();
-	$return = $wxpayTransfers->transfers($orderInfo,false);
-
-	$error = 0;
-	if($return['state'] != 100) {
-
-		//加载支付方式操作函数
-		loadPlug("payment");
-		$payment = get_payment("wxpay");
-		//如果网页支付配置的账号失败了，使用APP支付配置的账号重试
-		if($payment['APP_APPID']){
-			include_once HUONIAOROOT."/api/payment/wxpay/wxpayTransfers.php";
-			$wxpayTransfers = new wxpayTransfers();
-			$return = $wxpayTransfers->transfers($orderInfo, true);
-			if($return['state'] != 100) {
-				$error = 1;
-			}
-		}else{
-			$error = 1;
-		}
-
-	}
-	
-	if ($error == 0) {
-		adminLog("发起转账申请", $id);
-		echo json_encode($return);
-	} else {
-		//echo '{"state": 200, "info": '.json_encode("操作失败！请稍后再试。").'}';
-		echo json_encode($return);
-	}
-
-	die();
-
-//查询转账单
-}elseif($dopost == "search"){
-
-	if ($id == null) {
-		echo '{"state": 200, "info": "转账id不能为空！"}';
-		die();
-	}
-
-	//查询转账单信息
-	$sql = $dsql->SetQuery("SELECT `bank`,`state`,`auditstate`,`ordernum` FROM `#@__".$action."` WHERE `id` = ".$id);
-	$ret = $dsql->dsqlOper($sql, "results");
-	if ($ret == null || !is_array($ret)) {
-		echo '{"state": 200, "info": "没有对应的转账信息！"}';
-		die();
-	}
-	$withdrawInfo = $ret[0];
-
-	//判断支付方式是微信支付，且状态是否正确
-	if ($withdrawInfo['bank'] != 'weixin') {
-		echo '{"state": 200, "info": "支付方式错误！"}';
-		die();
-	}
-	if ($withdrawInfo['ordernum'] == null) {
-		echo '{"state": 200, "info": "没有对应的转账信息！"}';
-		die();
-	}
-	if ($withdrawInfo['auditstate'] != 1) {
-		echo '{"state": 200, "info": "转账单没有通过审核！"}';
-		die();
-	}
-
-	//发起查询请求
-	include_once HUONIAOROOT."/api/payment/wxpay/wxpayTransfers.php";
-	$wxpayTransfers = new wxpayTransfers();
-	$return = $wxpayTransfers->v4_queryPaying($id,false);
-
-	$error = 0;
-	if($return['state'] != 100) {
-
-		//加载支付方式操作函数
-		loadPlug("payment");
-		$payment = get_payment("wxpay");
-		//如果网页支付配置的账号失败了，使用APP支付配置的账号重试
-		if($payment['APP_APPID']){
-			include_once HUONIAOROOT."/api/payment/wxpay/wxpayTransfers.php";
-			$wxpayTransfers = new wxpayTransfers();
-			$return = $wxpayTransfers->v4_queryPaying($id, true);
-			if($return['state'] != 100) {
-				$error = 1;
-			}
-		}else{
-			$error = 1;
-		}
-
-	}
-	
-	if ($error == 0) {
-		echo json_encode($return);
-	} else {
-		//echo '{"state": 200, "info": '.json_encode("查询失败！请稍后再试。").'}';
-		echo json_encode($return);
-	}
-
-	die();*/
-
-//撤销转账
-}elseif($dopost == "revoke"){
-
-	if ($id == null) {
-		echo '{"state": 200, "info": "转账id不能为空！"}';
-		die();
-	}
-
-	if ($note == null) {
-		echo '{"state": 200, "info": "撤销原因不能为空！"}';
-		die();
-	}
-
-	//查询转账单信息
-	$sql = $dsql->SetQuery("SELECT `bank`,`state`,`auditstate`,`ordernum`,`usertype`,`source` FROM `#@__member_withdraw` WHERE `id` = ".$id);
-	$ret = $dsql->dsqlOper($sql, "results");
-	if ($ret == null || !is_array($ret)) {
-		echo '{"state": 200, "info": "没有对应的转账信息！"}';
-		die();
-	}
-	$withdrawInfo = $ret[0];
-
-	//判断支付方式是微信支付，且状态是否正确
-	if ($withdrawInfo['bank'] != 'weixin') {
-		echo '{"state": 200, "info": "支付方式错误！"}';
-		die();
-	}
-	if ($withdrawInfo['ordernum'] == null) {
-		echo '{"state": 200, "info": "没有对应的转账信息！"}';
-		die();
-	}
-	if ($withdrawInfo['auditstate'] != 1 || !in_array($withdrawInfo['state'], array(3,4,6))) {
-		echo '{"state": 200, "info": "当前状态不允许发起撤销转账申请！"}';
-		die();
-	}
-
-	$ordernum = $withdrawInfo['ordernum'];
-
-	$orderInfo = array(
-		'wid' => $id,
-		'ordernum' => $ordernum,
-		'usertype' => $withdrawInfo['usertype'],
-		'source' => $withdrawInfo['source'],
-		'note' => $note,
-	);
-
-	//发起撤销转账请求
-	include_once HUONIAOROOT."/api/payment/wxpay/wxpayTransfers.php";
-	$wxpayTransfers = new wxpayTransfers();
-	$return = $wxpayTransfers->v4_revoke($orderInfo,false);
-
-	$error = 0;
-	if($return['state'] != 100) {
-
-		$error = 1;
-
-		//如果返回值带有不重复字段noretry，则直接打印结果
-		if (isset($return['noretry']) && $return['noretry'] == 1) {
-			$error = 1;
-		} else {
-
-			//加载支付方式操作函数
-			loadPlug("payment");
-			$payment = get_payment("wxpay");
-			//如果网页支付配置的账号失败了，使用APP支付配置的账号重试
-			if($payment['APP_APPID']){
-				include_once HUONIAOROOT."/api/payment/wxpay/wxpayTransfers.php";
-				$wxpayTransfers = new wxpayTransfers();
-				$return = $wxpayTransfers->v4_revoke($orderInfo, true);
-				if($return['state'] != 100) {
-					$error = 1;
-				}
-			}else{
-				$error = 1;
-			}
-
-		}
-
-	}
-	
-	if ($error == 0) {
-		adminLog("发起撤销转账申请", $id);
-		echo json_encode($return);
-	} else {
-		//echo '{"state": 200, "info": '.json_encode("操作失败！请稍后再试。").'}';
-		echo json_encode($return);
-	}
-
-	die();
 }
 
 //验证模板文件

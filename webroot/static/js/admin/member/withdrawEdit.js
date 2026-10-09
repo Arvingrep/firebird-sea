@@ -32,23 +32,6 @@ $(function () {
 	});
 
 
-	$("#cancelBtn").bind("click",function () {
-		$.dialog.prompt('您确定要取消打款吗？请填写取消原因', function(note){
-			huoniao.showTip("loading", "正在操作，请稍候...");
-			huoniao.operaJson("./withdraw.php?dopost=revoke", "note="+note+"&id="+id, function(data){
-				if(data.state == 100){
-					huoniao.showTip("success", data.info, "auto");
-					setTimeout(function() {
-						location.reload();
-					}, 500);
-				}else{
-					$.dialog.alert(data.info);
-				    huoniao.hideTip();
-				}
-			});
-		})
-	})
-
 	//提交表单
 	$("#btnSubmit").bind("click", function(event){
 		event.preventDefault();

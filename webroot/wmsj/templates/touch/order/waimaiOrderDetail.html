@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#$langData['siteConfig'][19][313]#}</title> {#*   订单详情   *#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/waimaiOrderDetail.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var state = '{#$state#}';
+			var orderid = '{#$id#}';
+			var state = '{#$state#}';
+			var orderid = '{#$id#}';
+			var lng = '{#$lng#}';
+			var lat = '{#$lat#}';
+			var user = '{#$username#}';
+			var userAddress = '{#$address#}';
+			var peisong = '{#$peisong#}';
+			var peisonglat = '{#$peisonglng#}';
+			var peisonglng = '{#$peisonglat#}';
+			var juliuser = '{#$juliuser#}';
+			var merchant_deliver = '{#$merchant_deliver#}';
+			var tel = '{#$tel#}';
+			var slat = '{#$coordX#}';
+			var slng = '{#$coordY#}';
+			var receivingdate = '{#$receivingdate#}'
+		</script>
+	</head>
+	<body>
+		<div id="page">
+			<!-- 头部 s-->
+			<div class="top_box">
+				<div class="headbox">
+					<a href="javascript:;" onclick="javascript:history.go(-1);" class="back_btn goBack"></a>
+					<div class="htitle">{#$langData['siteConfig'][19][313]#}</div>    {#*   订单详情   *#}
+					{#if $state!=1 && $state!=7#}<a href="javascript:;"  class="oprint" @click="printOrder()">{#$langData['waimai'][1][225]#}</a>{#/if#}  {#*  打印订单  *#}
+				</div>
+			</div>
+			<!-- 头部 e-->
+			<div class="order_head">
+				{#if $state==1#}
+				<div class="order_state">
+					<h3>{#$langData['waimai'][11][32]#}</h3>    {#*  订单已完成  *#}
+					<p>{#$langData['waimai'][10][81]#}</p>    {#*  准时送达  *#}
+				</div>
+				<p class="ordernum">{#$langData['waimai'][1][206]#} <span>{#$shopname|cat:$ordernumstore#}</span></p>  {#*  订单编号  *#}
+				{#else#}
+
+				<div class="order_num">
+					{#$num = '-'|explode:$ordernumstore#}
+					{#if $ordertype!='1'#}<h3>#<span>{#$num[1]#}</span></h3>
+					{#else#}
+					<h3>{#$langData['waimai'][0][30]#}<span>{#$desk#}</span></h3>{#*  订单编号  *#}
+					{#/if#}
+					{#if $reservesongdate#}
+					<p>预计<span>{#($reservesongdate )|date_format:'%m-%d %H:%M'#}</span>送达</p>
+					{#else#}
+					<p>{#$langData['waimai'][11][33]|replace:"1":($delivery_time - $paydiff)#}</p>{#* <span>1分钟内 </span> 送达 *#}
+					{#/if#}
+				</div>
+				{#if $reservesongdate || $note || $preset#}
+				<div class="txt" >
+
+					{#if $reservesongdate#}
+					<p style="color:#f00; ">此单为预订订单 预定时间为{#($reservesongdate )|date_format:'%m-%d %H:%M'#}</p>
+					{#/if#}
+                    {#if $preset#}
+                    {#foreach from=$preset item=p#}
+                    <p class="remarks" style="min-height: auto; padding-bottom: 0; margin-top: 0;">{#$p.title#}：<span style="font-size: .26rem;">{#$p.value#}</span></p>
+                    {#/foreach#}
+                    {#/if#}
+					{#if $note#}
+					<p class="remarks">{#$langData['waimai'][1][211]#}：<span>{#$note#}</span></p>{#*  备注  *#}
+					{#/if#}
+				</div>
+				{#/if#}
+				{#/if#}
+			</div>
+			<div class="orderDetailBox">
+				<!-- 订单商品信息 -->
+				<div class="pro_detail odetailBox">
+					<!-- 商品列表s -->
+					<dl class="pro_table">
+						{#$allCount=0#}
+						{#$allMoney=0#}
+						{#* 商品规格 数量 小计 *#}
+						<dt><span class="guige">{#$langData['waimai'][11][34]#}</span><span class="num">{#$langData['waimai'][11][35]#}</span><span class="amount">{#$langData['waimai'][7][36]#}</span></dt>
+						 {#foreach from=$food item=f#}
+						<dd>
+							<div class="pro_info">
+								<div class="pro_img"><img src="{#$f.picpath#}" alt="" onerror="javascript:this.src='{#$templets_skin#}images/food.png'"></div>
+								<div class="pro_name">
+									<h3>{#$f.title#}</h3>
+									<p>{#$f.ntitle#}</p>
+								</div>
+							</div>
+							<div class="pro_num {#if $f.count>1#}more{#/if#}">x{#$f.count#}</div>
+							<div class="pro_amount">{#echoCurrency type='symbol'#}<em>{#$f.price * $f.count#}</em></div>
+							{#$allCount=$allCount+$f.count#}
+							{#$allMoney=$allMoney + $f.price * $f.count#}
+						</dd>
+						{#/foreach#}
+					</dl>
+
+					<!-- 商品价格统计s -->
+					<dl class="fee_table" >
+						<dt>
+							<div class="left_tit">{#$langData['waimai'][11][36]#}</div>   {#* 原价统计 *#}
+							<span class="p_count">{#$langData['waimai'][11][37]|replace:"1":$allCount#}</span>  {#* 共<b>1</b>件 *#}
+<!--							<span class="p_all">{#echoCurrency type='symbol'#}<em>{#$ptYouhui+$busYouhui+$amount#}</em></span>-->
+							<span class="p_all">{#echoCurrency type='symbol'#}<em>{#$allMoney#}</em></span>
+						</dt>
+						<dd class="red youhui" @click="hui_show = !hui_show">
+							<span class="left_tit">{#$langData['waimai'][7][85]#}</span>   {#* 优惠 *#}
+							<span class="right_det">{#echoCurrency type='symbol'#}<em>{#$ptYouhui+$busYouhui#}</em> </span>
+						</dd>
+						 {#foreach from=$priceinfo item=p#}
+						 {#if $p.type != "youhui" && $p.type != "quan" && $p.type != "manjian" && $p.type != "shoudan" &&strpos($p.type, "uth_") === false#}
+						 <dd>
+						 	<span class="left_tit">{#$p.body#}</span>
+						 	<span class="right_det">{#echoCurrency type='symbol'#}<em>{#$p.amount#}</em> </span>
+						 </dd>
+						 {#/if#}
+						 {#/foreach#}
+						<dd>
+							<span class="left_tit">平台提价收益结算</span>
+							<span class="right_det">{#echoCurrency type='symbol'#}<em>{#$ptprofit#}</em> </span>
+						</dd>
+
+						<!-- 准时宝 -->
+						 {#if $zsbprice!= '0'#}
+						 <dd>
+							 <span class="left_tit">{#$langData['waimai'][8][87]#}</span>{#* 准时宝 *#}
+							 <span class="right_det">{#echoCurrency type='symbol'#}<em>{#$zsbprice#}</em></span>
+						 </dd>
+						 {#/if#}
+						 <dd>
+							 <span class="left_tit">{#$langData['waimai'][11][38]#}</span>  {#*  顾客实付 *#}
+							 <span class="right_det">{#echoCurrency type='symbol'#}<em>{#$amount#}</em></span>
+						 </dd>
+					</dl>
+
+					<!-- 平台和商家 -->
+					<dl class="fee_table">
+						<dt></dt>
+						<dd class="red">
+							<span class="left_tit">{#$langData['waimai'][9][12]#}</span>   {#*  平台服务费  *#}
+							<span class="right_det {#if $ptyd_show<0#}jia{#/if#}">{#echoCurrency type='symbol'#}<em>{#if $ptyd_show<0#}{#$ptyd*-1#}{#else#}{#$ptyd_show#}{#/if#}</em></span>
+						</dd>
+						{#if $additional > 0#}
+						<dd class="red">
+							<span class="left_tit">{#$additional_name#}</span>
+							<span class="right_det">{#echoCurrency type='symbol'#}<em>{#$additional#}</em></span>
+						</dd>
+						{#/if#}
+						<dd class="business">
+							<span class="left_tit">{#$langData['waimai'][9][13]#}</span>   {#*  商家收入估算  *#}
+							<span class="right_det">{#echoCurrency type='symbol'#}<em>{#$business#}</em></span>
+						</dd>
+					</dl>
+				</div>
+
+				<!-- 顾客信息 -->
+				{#if $ordertype!=1#}
+				<div class="custom_detail ">
+					<h5>{#$langData['waimai'][11][39]#}</h5>    {#*  顾客信息  *#}
+					<div class="customer_info">
+						<div class="customer_detail">
+							<div class="customer_left">
+								<h3>{#$username#}<span>{#$langData['waimai'][11][13]#}{#substr($tel,7)#}</span></h3>
+								{#if $address#}<p class="address" style="word-break: break-all;">{#$address#}</p>{#/if#}
+								{#if $ordertype!='1' && $merchant_deliver#}
+								{#if $juliuser && $lng && $lng!='null' && $lat && $lat!='null'#}<p class="juli" @click="tomap()">{#$juliuser#}</p>{#/if#}
+								{#else#}
+								{#if $juliuser#}<p class="juli">{#$juliuser#}</p>{#/if#}
+								{#/if#}
+								
+							</div>
+							<div class="custom_dright" data-type="{#$ordertype#}">
+								{#if $ordertype!='1' && $merchant_deliver && $lng && $lng!='null' && $lat && $lat!='null'#}
+								<a href="javascript:;" class="map_icon"  @click="tomap()"></a>
+								{#/if#}
+								<a class="customer_right tel" href="tel:{#$tel#}"></a >
+							</div>
+
+						</div>
+						<div class="customer_tab">
+							{#if $selftime != 0#}<p style="font-size: .28rem; color: #962EAB; font-weight: bold;">顾客自取时间  {#$selftime|date_format:'%Y-%m-%d %H:%M'#}</p>{#/if#}
+							{#if $collect#}
+							<span>{#$langData['waimai'][11][14]#}</span>   {#*  收藏门店  *#}
+							{#/if#}
+							{#if $first#}
+							<span>{#$langData['waimai'][11][15]#}</span>   {#*  门店新客  *#}
+							{#/if#}
+							{#if $level#}
+							<span>{#$level#}</span>
+							{#/if#}
+						</div>
+					</div>
+				</div>
+				{#/if#}
+
+				<!-- 配送信息 -->
+
+				{#if $merchant_deliver#}
+				<div class="peisong_detail">
+					<h5>{#$langData['waimai'][7][124]#}</h5>   {#*  配送信息  *#}
+					<dl class="peisong_info">
+						<dt class="qishou_info">
+							<div class="left_info">
+								{#$langData['waimai'][11][40]#} 
+							</div>
+						</dt>
+						{#if $peidate#}
+						<dd>
+							{#if $peidate#}{#$peidate|date_format:"%H:%M:%S"#} {#$langData['waimai'][7][114]#}{#/if#}{#* 骑手已接单 *#}
+						</dd>
+						{#/if#}
+						{#if $songdate#}
+						<dd>
+							{#$songdate|date_format:"%H:%M:%S"#} {#$langData['waimai'][11][41]#} {#* 骑手已取餐 *#}
+						</dd>
+						{#/if#}
+						{#if $okdate#}
+						<dd>{#$songdate|date_format:"%H:%M:%S"#} {#$langData['waimai'][11][42]#}</dd>  {#* 已送达 *#}
+						{#/if#}
+					</dl>
+				</div>
+				{#elseif $state==4||$state==5#}
+				<div class="peisong_detail">
+					<h5>{#$langData['waimai'][11][43]#}</h5>{#*  骑手信息  *#}
+					<dl class="peisong_info">
+						<dt class="qishou_info">
+							<div class="left_info">
+								{#$peisong#} <span style="display: none;">{#$delivery_service#}</span>
+							</div>
+							<div class="right_info">
+								<a href="javascript:;" class="map_icon" @click="tomap(peisonglng,peisonglat,peisong)" ></a>
+								<a class="tel" href="tel:{#$peisongphone#}"></a>
+							</div>
+						</dt>
+						{#if $peidate#}
+						<dd>
+							{#if $peidate#}{#$peidate|date_format:"%H:%M:%S"#} {#$langData['waimai'][7][114]#}{#/if#}{#* 骑手已接单 *#}
+							<span class="chaoshi_tip fn-hide">【{#$langData['waimai'][11][44]#}】</span>
+						</dd>
+						{#/if#}
+						{#if $songdate#}
+						<dd>
+							{#$songdate|date_format:"%H:%M:%S"#} {#$langData['waimai'][11][41]#}{#* 骑手取餐 *#}
+						</dd>
+						{#/if#}
+						{#if $okdate#}
+						<dd>{#$songdate|date_format:"%H:%M:%S"#} {#$langData['waimai'][11][42]#}</dd>{#* 已送达 *#}
+						{#/if#}
+					</dl>
+				</div>
+				{#/if#}
+
+				<!-- 订单状态 -->
+				<div class="orderState ostateBox" {#if $ordertype==1#}style="margin-top:.2rem;"{#/if#}>
+					<dl class="ostateList">
+						<dt>{#$langData['siteConfig'][19][319]#}</dt>{#*  订单信息  *#}
+						<dd>
+							<span class="left_tit">{#$langData['siteConfig'][19][308]#}</span>{#*  订单号  *#}
+							<span class="right_info">{#$shopname|cat:$ordernumstore#}</span>
+						</dd>
+						<dd>
+							<span class="left_tit">{#$langData['siteConfig'][19][309]#}</span>{#*  下单时间  *#}
+							<span class="right_info">{#if $pubdate#}{#$pubdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</span>
+						</dd>
+						<dd>
+							<span class="left_tit">{#$langData['siteConfig'][19][53]#}</span>{#*  付款时间  *#}
+							<span class="right_info">{#if $paydate > 0#}{#$paydate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</span>
+						</dd>
+						{#if $reservesongdate#}
+						<dd>
+							<span class="left_tit">预订时间</span>{#*  预订时间  *#}
+							<span class="right_info">{#($reservesongdate)|date_format:'%m-%d %H:%M'#}</span>
+						</dd>
+						{#/if#}
+						<dd>
+							<span class="left_tit">{#$langData['siteConfig'][19][52]#}</span>{#*  付款方式  *#}
+							<span class="right_info">{#$paytype#}</span>
+						</dd>
+						<dd>
+							<span class="left_tit">{#$langData['waimai'][11][45]#}</span>{#*  商家接单时间  *#}
+							<span class="right_info">{#if $confirmdate#}{#$confirmdate|date_format:"%Y-%m-%d %H:%M:%S"#}{#/if#}</span>
+						</dd>
+
+						{#if $peidate#}
+						<dd>
+							<span class="left_tit">{#$langData['waimai'][11][46]#}</span>{#*  骑手接单时间  *#}
+							<span class="right_info">{#$peidate|date_format:"%Y-%m-%d %H:%M:%S"#}</span>
+						</dd>
+						{#/if#}
+						{#if $songdate#}
+						<dd>
+							<span class="left_tit">{#$langData['siteConfig'][17][27]#}</span>{#*  配送时间  *#}
+							<span class="right_info">{#$songdate|date_format:"%Y-%m-%d %H:%M:%S"#}</span>
+						</dd>
+						{#/if#}
+
+						{#if $desk && $ordertype==1#}
+						 <dd>
+						 	<span class="left_tit">{#$langData['waimai'][0][30]#}</span>{#*  桌号  *#}
+						 	<span class="right_info rcolor">{#$desk#}</span>
+						 </dd>
+						 {#/if#}
+
+						 {#if $okdate#}
+						  <dd>
+						  	<span class="left_tit">{#$langData['waimai'][1][227]#}</span>{#*  完成速度  *#}
+						  	<span class="right_info">{#ceil(($okdate-$pubdate)/60)#}</span>
+						  </dd>
+						 {#/if#}
+
+						 {#if $okdate#}
+						 <dd>
+						 	<span class="left_tit">{#$langData['waimai'][1][226]#}</span>{#*  完成时间  *#}
+						 	<span class="right_info">{#$okdate|date_format:"%Y-%m-%d %H:%M:%S"#}</span>
+						 </dd>
+						 {#/if#}
+						 <dd>
+						 	<span class="left_tit">{#$langData['siteConfig'][16][50]#}</span>{#* 订单状态  *#}
+						 	<span class="right_info rcolor">
+								{#if $state == 0#}
+								{#$langData['siteConfig'][9][22]#}
+								{#elseif $state == 1#}
+								{#$langData['siteConfig'][6][3]#}
+								{#elseif $state == 2#}
+								{#$langData['siteConfig'][9][11]#}
+								{#elseif $state == 3#}
+								  {#if $merchant_deliver#}{#$langData['waimai'][5][5]#}{#else#}{#$langData['siteConfig'][9][46]#}{#/if#}
+								{#elseif $state == 4#}
+								{#$langData['waimai'][7][114]#}
+								{#elseif $state == 5#}
+								{#$langData['siteConfig'][16][115]#}
+								{#elseif $state == 6#}
+								{#$langData['siteConfig'][6][112]#}
+								{#elseif $state == 7#}
+								{#$langData['siteConfig'][9][47]#}
+								{#/if#}
+							</span>
+						 </dd>
+
+					</dl>
+
+					{#if $state == 2 || $state == 3 || $state == 4#}
+					<div class="btns_group merchant_deliver_{#$merchant_deliver#} {#if $merchant_deliver==0 && $mealtime>0 && $state==3#}big_btn{#/if#}" data-state="{#$desk#}" {#if $state == 2 && $reservesongdate#}style="padding-top:.5rem;"{#/if#}>
+						{#if $state == 2 && $reservesongdate && $receivingdate#}<span   class="preOrder_tip">{{receivingdate}}可接单</span>{#/if#}
+						{#if $state == 2#}
+						<a href="javascript:;" class="fail" data-type="cancel" @click="cancel_order = !cancel_order">取消单</a>
+						{#/if#}
+						
+						{#if  $state != 2#}
+						{#if $mealtime > 0#}
+						{#if $merchant_deliver#} {#* 商家配送的订单，商家才可以确认成功 *#}
+						<a href="javascript:;" class="complete" @click="opOrder" data-type="songda">{#$langData['siteConfig'][6][108]#}</a> {#* 确认成功 *#}
+						{#/if#}
+						{#else#}
+                        {#if $desk && $ordertype==1#}
+						<a href="javascript:;" class="complete" @click="opOrder" data-type="songda">{#$langData['waimai'][11][19]#}</a> {#* 确认已出餐 *#}
+                        {#else#}
+						<a href="javascript:;" class="complete" @click="opOrder" data-type="mealtime">{#$langData['waimai'][11][19]#}</a> {#* 确认已出餐 *#}
+                        {#/if#}
+						{#/if#}
+						{#/if#}
+						{#if $state == 2#}<a href="javascript:;" class="success" data-type="jiedan"  @click="opOrder">{#$langData['waimai'][10][90]#}</a>{#/if#} {#* 接单 *#}
+					</div>
+					{#/if#}
+				</div>
+			</div>
+
+			<div :class="['mask_youhui',{'show':hui_show}] " @click="hui_show = !hui_show"></div>
+			<div :class="['youhui_box',{'tobottom':hui_show}]">
+				<div class="yh_head">{#$langData['waimai'][11][47]#} <span>-{#echoCurrency type='symbol'#}<em>{#$ptYouhui+$busYouhui#}</em> </span></div>   {#* 总计优惠 *#}
+				<dl class="yh_detail">
+					<dt>{#$langData['waimai'][11][48]#}</dt>{#* 优惠详情 *#}
+					{#foreach from=$priceinfo item=p#}
+					{#if $p.type=='youhui' || $p.type=='quan' || $p.type=='manjian' ||$p.type=='shoudan'#}
+					<dd>
+						<span class="left_tit">
+						{#if $p.type=='youhui'#}{#* 首单优惠 *#}
+						<b class="zhe">{#$langData['waimai'][2][91]#}</b>   {#* 折 *#}
+						{#else if $p.type=='manjian'#}{#* 满减优惠 *#}
+						<b class="man">{#$langData['waimai'][11][49]#}</b>   {#* 满 *#}
+						{#else if $p.type=='shoudan'#}{#* 首单优惠 *#}
+						<b class="shou">{#$langData['waimai'][2][92]#}</b>   {#* 首 *#}
+						{#else if $p.type=='pingtai'#}{#* 平台优惠 *#}
+						<b class="ptai">{#echoCurrency type="symbol"#}</b>
+						{#else if $p.type=='fan'#} {#* 返券 *#}
+						<b class="quan">{#$langData['waimai'][11][50]#}</b>   {#* 返 *#}
+						{#/if#}
+						{#$p.body#}
+						</span>
+						<span class="right_det">-{#echoCurrency type='symbol'#}<em>{#$p.amount|replace:'-':''#}</em> </span>
+					</dd>
+					{#/if#}
+					{#/foreach#}
+				</dl>
+				<dl class="yh_count">
+					<dt>{#$langData['waimai'][11][51]#}</dt>   {#* 优惠平台 *#}
+					<dd>
+						<span class="left_tit">{#$langData['waimai'][9][9]#}</span>  {#* 平台优惠 *#}
+						<span class="right_det">{#echoCurrency type='symbol'#}<em>{#$ptYouhui#}</em></span>
+					</dd>
+					<dd>
+						<span class="left_tit">{#$langData['waimai'][9][10]#}</span>   {#* 商家优惠 *#}
+						<span class="right_det">{#echoCurrency type='symbol'#}<em>{#$busYouhui#}</em></span>
+					</dd>
+				</dl>
+			</div>
+			<template>
+				<div class="pop_mask" v-show="cancel_order"></div>
+				<div class="pop_box" v-show="cancel_order">
+					<textarea rows="" cols="" id="note" placeholder="{#$langData['waimai'][11][2]#}"></textarea>  {#*  请输入取消订单原因（如商品售空、店铺打烊等） *#}
+					<button type="button" class="sure_btn" data-type="cancel" data-id="{#$id#}" @click.stop="opOrder">{#$langData['waimai'][11][3]#}</button>  {#*  取消订单  *#}
+					<button type="button" class="cancel_btn" @click="cancel_order = !cancel_order">{#$langData['waimai'][11][52]#}</button>
+				</div>
+			</template>
+		</div>
+		<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/waimaiOrderDetail.js?v={#$cfg_staticVersion#}"></script>
+	</body>
+</html>

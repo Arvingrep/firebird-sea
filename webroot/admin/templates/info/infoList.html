@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>管理信息</title>
+{#$cssFile#}
+  <script>  var masterDomain = '{#$cfg_basehost#}'
+  var userTotalBalance = {#$userinfo.money|string_format:'%.2f'#};
+  var service = 'info';
+  var currentYear = 2021, currentMonth = 11, currentDay = 16;
+  </script>
+</head>
+<style>
+  .list td, .thead {font-size: 14px;}
+  .list td .lj {width: 95%; display: inline-block;}
+  .list td.state {text-indent: 0; padding-right: 5px;}
+  .list td .modify {color: #2672ec;}
+  .list td .topping {color: #2672ec;}
+  .list td .refresh {color: #2672ec;}
+  .list td .huanyuan {color: #51a351;}
+  .list td .delete {color: #f00;}
+
+  /*置顶刷新浮动窗*/
+  .refreshTopMask{background: #000; opacity: .4; filter:Alpha(opacity=40); position: fixed; top: 0; bottom: 0; left: 0; right: 0; z-index: 1001; display: none;}
+  .refreshTopPopup{position: fixed; left: 50%; top: 40%; z-index: 1002; background: #fff; width: 660px; margin-left: -330px; margin-top: -320px; border-radius: 5px; overflow: hidden; -webkit-animation: popup .3s ease-out; -moz-animation: popup .3s ease-out; animation: popup .3s ease-out; display: none;}
+  .rtHeader {height: 50px; line-height: 50px; background: -webkit-gradient(linear, 0 0, 0 100%, from(#ff7800), to(#ffb800)); background: -webkit-linear-gradient(left, #ff7800, #ffb800); background: -moz-linear-gradient(left, #ff7800, #ffb800); background: -o-linear-gradient(left, #ff7800, #ffb800); background: -ms-linear-gradient(left, #ff7800, #ffb800); background: linear-gradient(left, #ff7800, #ffb800); filter: progid:DXImageTransform.Microsoft.gradient(GradientType = 1, startColorstr = #ff7800, endColorstr = #ffb800);}
+  .rtHeader h5 {float: left; color: #fff; font-size: 18px; color: #fff; margin-left: 30px;}
+  .rtHeader .rtClose {float: right; width: 50px; height: 50px; text-align: center; color: #fff; font-size: 45px; line-height: 45px; margin-right: 10px;}
+
+  .rtBody {padding: 30px; background: #fff;}
+  .rtTab {height: 36px; border-bottom: 1px solid #ffb772;}
+  .rtTab ul {margin-left: 0;}
+  .rtTab li {float: left; padding: 0 25px; height: 36px; line-height: 36px; cursor: pointer; font-size: 16px; border: 1px solid transparent; border-bottom: 0; margin-bottom: -1px; list-style: none;}
+  .rtTab li.curr {background: #ffecd7; border: 1px solid #ffb772; border-bottom: 0;}
+
+  .rtCon {padding: 10px 0;}
+  /*日历签到列表*/
+  .topCalendarBg {display: none; position: fixed; z-index: 8888; left: 0; top: 0; right: 0; bottom: 0; background: #000; filter: alpha(opacity=40); opacity: .4;}
+  .topCalendar {display: none; position: fixed; z-index: 9999; left: 50%; top: 50%; width: 600px; height:566px; margin: -290px 0 0 -283px; background: #fff; border-radius: 4px; overflow: hidden;}
+  .sign_succ_calendar_title {text-align:center;height:50px;line-height:50px; background: -webkit-gradient(linear, 0 0, 0 100%, from(#ff7800), to(#ffb800)); background: -webkit-linear-gradient(left, #ff7800, #ffb800); background: -moz-linear-gradient(left, #ff7800, #ffb800); background: -o-linear-gradient(left, #ff7800, #ffb800); background: -ms-linear-gradient(left, #ff7800, #ffb800); background: linear-gradient(left, #ff7800, #ffb800); filter: progid:DXImageTransform.Microsoft.gradient(GradientType = 1, startColorstr = #ff7800, endColorstr = #ffb800); color: #fff;}
+  .calendar_month_span {display:inline-block;font-size:16px;letter-spacing:2px;font-weight:bold; margin: 0 10px; vertical-align: middle;}
+  .calendar_month_next {display:inline-block;cursor:pointer; text-align: center; font-size: 20px; vertical-align: middle;}
+  .calendar_month_prev {display:inline-block;cursor:pointer; text-align: center; font-size: 20px; vertical-align: middle; margin-left: 40px;}
+  .calendar_close {float: right; width: 30px; height: 30px; background: url('../images/topCalendarClose.png'); cursor: pointer; margin: 10px 10px 0 0;}
+
+
+  /* 普通刷新 */
+  .normalTips {font-size: 14px; line-height: 1.5em;}
+  .normalTips strong {color: #f60;}
+  .normalTips em {color: #f00; font-weight: 700; padding: 0 3px;}
+
+  /* 免费刷新 */
+  .freeRefresh .oper {text-align: center; font-size: 16px; padding-bottom: 30px;}
+  .freeRefresh .refreshNow, .freeRefresh .refreshConfirm {border-radius: 4px; background-color: rgb(255, 120, 0); box-shadow: 0px 3px 10px 0px rgba(255, 120, 0, 0.6); padding: 0 35px; height: 45px; border: 0; outline: 0; cursor: pointer; font-size: 18px; color: #fff; margin: 60px auto 25px;}
+  .freeRefresh .refreshNow:disabled, .freeRefresh .refreshConfirm:disabled {background-color: rgb(169, 169, 169); box-shadow: 0px 3px 10px 0px rgba(197, 197, 197, 0.6);}
+  .freeRefresh .refreshConfirm {margin-top: 20px;}
+  .freeRefresh .oper p {color: #a0a0a0;}
+  .freeRefresh .icon-success {position: relative; border-radius: 50%; background-color: rgb(32, 221, 108); box-shadow: 0px 3px 8px 0px rgba(32, 221, 108, 0.42); width: 80px; height: 80px; text-align: center; display: block; margin: 60px auto 20px;}
+  .freeRefresh .icon-success s {position: absolute; left: 50%; top: 50%; width: 41px; height: 27px; margin: -13px 0 0 -20px; background: url('/templates/member/images/refreshTop_success.png');}
+  .freeRefresh .oper .sc p {line-height: 1.8em;}
+
+  /* 普通收费刷新 */
+  .normalRefresh {font-size: 18px; padding: 15px 0 0; color: #f60; font-weight: 700;}
+
+  /* 智能刷新 */
+  .rtSmart {font-size: 16px; max-height: 200px; overflow-y: auto; margin-left: 0;}
+  .rtSmart li {position: relative; line-height: 35px; padding-left: 40px; cursor: pointer;}
+  .rtSmart li:hover {background: #f5f5f5;}
+  .rtSmart li .radio {position: absolute; border: 1px solid #ccc; width: 20px !important; height: 20px!important; border-radius: 50%; left: 10px; top: 9px;padding-left: 0px;min-heigh:inherit !important; box-sizing: border-box;}
+  .rtSmart li .radio s {position: absolute; width: 8px; height: 8px; border-radius: 50%; top: 4px; left: 4px;}
+  .rtSmart li.checked .radio {border-color: #ff7800; width: 16px; height: 16px; border-width: 2px;}
+  .rtSmart li.checked .radio s {background: #ff7800;}
+  .rtSmart li span {float: left;}
+  .rtSmart li span strong {color: #f00;}
+  .rtSmart li .sm-tit {width: 30%;}
+  .rtSmart li .sm-pri {width: 45%;}
+  .rtSmart li .sm-off {width: 25%;}
+  .rtSmart li .sm-tit em {color: #a0a0a0;}
+  .rtSmart li .sm-pri em {color: #f00;}
+
+  /* 置顶 */
+  .rtTopping {font-size: 14px;}
+  .rtTopping dl {margin-bottom: 15px;}
+  .rtTopping dt {float: left; width: 80px; font-weight: 700;}
+  .rtTopping dd {position: relative; overflow: hidden;}
+  .rtTopping .topType label {float: left; margin-right: 15px; cursor: pointer;}
+  .rtTopping .topType em {width: 20px; height: 20px; display: inline-block; margin-right: 5px; border-radius: 50%; border: 1px solid #c0c0c0; text-align: center; line-height: 20px}
+  .rtTopping .topType .checked em {border-color: #ff3e54; background-color: #ff3e54;}
+  .rtTopping .topType em img {width: 15px; height: 10px; display: inline-block; vertical-align: middle; margin-top: -3px;}
+
+  /* 置顶时长 */
+  .rtTopping .topDays {max-height: 200px; overflow-y: auto;}
+  .rtTopping .topDays li {position: relative; float: left; margin: 0 5px 10px 0; border: 1px solid #dcdcdc; width: 118px; height: 90px; border-radius: 4px; overflow: hidden; text-align: center; cursor: pointer;}
+  .rtTopping .topDays li:hover {border-color: #ff3e54;}
+  .rtTopping .topDays li.checked {width: 116px; height: 88px; border: 2px solid #ff3e54;}
+  .rtTopping .topDays li sup {position: absolute; left: 0; top: 0; font-size: 12px; color: #fff; background: #ff4261; line-height: 22px; padding: 0 5px;}
+  .rtTopping .topDays li p {padding-top: 25px; font-size: 16px;}
+  .rtTopping .topDays li strong {color: #ff3e54; font-size: 20px;}
+  .rtTopping .topDays li em {position: absolute; right: 0; bottom: -20px; z-index: 1; width: 0; height: 0; border: 20px solid transparent;}
+  .rtTopping .topDays li img {position: absolute; right: 1px; bottom: 4px; width: 9px; z-index: 2;}
+  .rtTopping .topDays li.checked em {border-right-color: #ff3e54;}
+  .rtTopping .topDays li.checked sup {top: -1px; left: -1px;}
+  .rtTopping .topDays li.checked p {padding-top: 24px;}
+
+  /* 置顶日期 */
+  .rtTopping .rtDate {float: left; position: relative; height: 38px; line-height: 38px; border: 1px solid #e5e5e5; border-radius: 4px; padding: 0 35px 0 0; cursor: pointer;}
+  .rtTopping .rtDate input {width: 90px; height: 38px; border: 0; outline: 0; padding-left: 12px; cursor: pointer !important;}
+  .rtTopping .rtDate em {position: absolute; right: 12px; top: 50%; width: 0; height: 0; margin-top: -2.5px; border: 5px solid transparent; border-top-color: #b0b0b0;}
+  .rtTopping .rtSplit {float: left; margin: 0 10px; width: 12px; height: 1px; background: #5c5c5c; overflow: hidden; margin-top: 20px;}
+
+  /* 置顶时段 */
+  .rtTopping .rtPlanList {width: 100%; border-left: 1px solid #e5e5e5; border-top: 1px solid #e5e5e5; font-size: 14px;}
+  .rtTopping .rtPlanList th, .rtTopping .rtPlanList td {border-right: 1px solid #e5e5e5; border-bottom: 1px solid #e5e5e5; text-align: center; height: 40px;}
+  .rtTopping .rtPlanList td em {display: block; height: 40px; cursor: pointer;}
+  .rtTopping .rtPlanList td:hover em {background-color: #f5f5f5;}
+  .rtTopping .rtPlanList td.curr em {background: url('/templates/member/images/radio_check_red.png') no-repeat center center;}
+
+  /* 使用余额 */
+  .rtBody .fabu_dl{margin-bottom: 10px; font-size: 16px;}
+  .rtBody .fabu_dl dt{float: left; padding-left: 25px; width: 427px;}
+  .rtBody .fabu_dl dd{float: left;}
+  .rtBody .yue-btn{position: relative; cursor: pointer;}
+  .rtBody .yue-btn .radio{position: absolute; width: 17px; height: 17px; left: 0; top: 3px; border-radius: 4px; background-color: rgb(255, 0, 69);}
+  .rtBody .yue-btn .radio s{display: none; position: absolute; width: 15px; height: 10px; top: 3px; left: 1px; background: url('/templates/member/images/refreshTop_checked.png');}
+  .rtBody .yue-btn.active .radio s{display: block;}
+  .rtBody .pay-total {color: #f00; font-weight: 700; font-size: 18px;}
+
+  /* 支付方式 */
+  .rtPayObj {margin-top: 10px;}
+  .rtBody .payTab {height: 40px; border-bottom: 1px solid #e0e0e0; background: #f9f9f9;}
+  .rtBody .payTab li {position: relative; float: left; padding: 0 25px; height: 39px; line-height: 39px; border-right: 1px solid #e0e0e0; border: 1px solid #e0e0e0; border-top: 2px solid #e0e0e0; border-bottom: 0; text-align: center; font-size: 16px; color: #666; margin-right: -1px; cursor: pointer;}
+  .rtBody .payTab li.curr {border-top-color: #ff7800; background: #fff;}
+  .rtBody .qrpay, .rtBody .payway {border: 1px solid #e0e0e0; border-top: 0;}
+  .rtBody .qrpay {padding: 30px 20px; text-align: center;}
+  .rtBody .qrpay dt {position: relative; width: 150px; height: 150px; padding: 10px; border: 1px solid #d8d8d8; margin: 0 auto;}
+  .rtBody .qrpay dt .pay_top, .rtBody .qrpay dt .pay_bottom {position: absolute; width: 15px; height: 16px;}
+  .rtBody .qrpay dt .pay_top {left: -3px; top: -3px;}
+  .rtBody .qrpay dt .pay_bottom {right: -3px; bottom: -3px;}
+  .rtBody .qrpay dt img {width: 100%; height: 100%; display: block;}
+  .rtBody .qrpay dd {font-size: 14px; line-height: 30px; text-align: center; margin-top: 15px;}
+  .rtBody .qrpay dd img {width: 30px; height: 30px; display: inline-block; vertical-align: middle; margin-right: 5px;}
+
+  .rtBody .payway{padding: 30px 18px 20px; font-size: 16px;}
+  .rtBody .payway li{text-align: center; float: left; border: 1px solid #e7e7e7; width: 173px; line-height: 30px; padding: 10px 0; margin: 0 12px 14px 0; border-radius: 4px; cursor: pointer;}
+  .rtBody .payway li.active{border-color: #0ab7f9; background: url('/templates/member/images/selected.png') right top no-repeat; }
+  .rtBody .payway li a:hover{text-decoration: none; color: #333;}
+  .rtBody .payway li a img{height: 44px; vertical-align: middle; margin-right: 5px;}
+
+  .rtBody .paySubmit{display: block; width: 175px; border-radius: 4px; background-color: rgb(255, 120, 0); box-shadow: 0px 3px 10px 0px rgba(255, 120, 0, 0.6); height: 45px; line-height: 45px; text-align: center; font-size: 18px; color: #fff; margin: 20px auto 0;}
+
+  /*日历签到列表*/
+  .topCalendarBg {display: none; position: fixed; z-index: 8888; left: 0; top: 0; right: 0; bottom: 0; background: #000; filter: alpha(opacity=40); opacity: .4;}
+  .topCalendar {display: none; position: fixed; z-index: 9999; left: 50%; top: 50%; width: 600px; height:566px; margin: -290px 0 0 -283px; background: #fff; border-radius: 4px; overflow: hidden;}
+  .sign_succ_calendar_title {text-align:center;height:50px;line-height:50px; background: -webkit-gradient(linear, 0 0, 0 100%, from(#ff7800), to(#ffb800)); background: -webkit-linear-gradient(left, #ff7800, #ffb800); background: -moz-linear-gradient(left, #ff7800, #ffb800); background: -o-linear-gradient(left, #ff7800, #ffb800); background: -ms-linear-gradient(left, #ff7800, #ffb800); background: linear-gradient(left, #ff7800, #ffb800); filter: progid:DXImageTransform.Microsoft.gradient(GradientType = 1, startColorstr = #ff7800, endColorstr = #ffb800); color: #fff;}
+  .calendar_month_span {display:inline-block;font-size:16px;letter-spacing:2px;font-weight:bold; margin: 0 10px; vertical-align: middle;}
+  .calendar_month_next {display:inline-block;cursor:pointer; text-align: center; font-size: 20px; vertical-align: middle;}
+  .calendar_month_prev {display:inline-block;cursor:pointer; text-align: center; font-size: 20px; vertical-align: middle; margin-left: 40px;}
+  .calendar_close {float: right; width: 30px; height: 30px; background: url('../images/topCalendarClose.png'); cursor: pointer; margin: 10px 10px 0 0;}
+
+  .sign table {border-collapse:collapse;border-spacing:0;width:100%;}
+  .sign th,.sign td {width:30px;height:40px;text-align:center;line-height:40px;border:1px solid #eeeeee;}
+  .sign th {font-size:16px; background: #f8f8f8;}
+  .sign td {color:#404040;vertical-align:middle;}
+  .sign .WeekDay td {height:70px;text-align:left;font-size:20px;vertical-align:top;padding-top:8px;position:relative;text-align: center;}
+  .sign .WeekDay td.empty,.sign .WeekDay td.on {cursor:default;}
+  .sign .WeekDay td.empty:hover,.sign .WeekDay td.on:hover {background:none;}
+  .sign .WeekDay td i {position:absolute;right:15px;top:32px;width:8px;height:8px;border-radius:8px;background:#f25b11;display:none;}
+  .sign .WeekDay td span {position:absolute;left:0;right:0;bottom:0px;color:#adadad;font-size:16px;text-align:center;text-indent:0;}
+  .sign .WeekDay td p {position:absolute;left:0;right:0;bottom:0px;color:#adadad;font-size:16px;width:120px;text-align:center;text-indent:0;display:none;background:#ccc;color:#fff;height:36px;line-height:36px;}
+  .sign .WeekDay td.isTop0 {background: #d7d7d7;}
+  .sign .WeekDay td.today {background: #f5bb0c; color: #fff;}
+  .sign .WeekDay td.today span {color: #fff;}
+
+
+  /*房产经纪人相关*/
+  .refreshTopPopup.check_zjuser .price_average,
+  .refreshTopPopup.check_zjuser .price_average *,
+  .refreshTopPopup.check_zjuser .sm-pri,
+  .refreshTopPopup.check_zjuser .sm-pri *,
+  .refreshTopPopup.check_zjuser .sm-off,
+  .refreshTopPopup.check_zjuser .sm-off *,
+  .refreshTopPopup.check_zjuser .rtTopping .topNormal li strong,
+  .refreshTopPopup.check_zjuser .rtTopping .topNormal li strong *
+  {text-decoration: line-through;color:#ccc;}
+  .refreshTopPopup.check_zjuser .zjuser_tj {display: block !important;}
+  .zjuser_info {display: none;margin:20px 0 0;font-size:14px;text-align: center;color: #a0a0a0;}
+  .refreshTopPopup.check_zjuser .zjuser_info {display: block;}
+  .hide_impt {display: none !important;}
+
+
+  /* 20211126 修改 */
+  .rtClose{text-decoration: none !important;}
+</style>
+<body>
+<div class="search">
+  <label>搜索：<input class="input-large" type="search" id="keyword" placeholder="请输入要搜索的关键字"></label>
+  发布日期&nbsp;&nbsp;<input class="input-small" type="text" id="stime" placeholder="开始日期" autocomplete="off">&nbsp;到&nbsp;<input class="input-small" type="text" id="etime" placeholder="结束日期" autocomplete="off">
+  <div class="btn-group" id="typeBtn" data-id="">
+    <button class="btn dropdown-toggle" data-toggle="dropdown">全部分类<span class="caret"></span></button>
+  </div>
+  <!-- <select class="chosen-select" id="cityList" style="width: auto;"></select> -->
+  <div class="choseCity"><input type="hidden" id="cityList" name="cityList" placeholder="请选择城市分站" value=""></div>
+  <button type="button" class="btn btn-success" id="searchBtn">立即搜索</button>
+<!--  <button class="btn btn-danger" id="delAllGray" style="margin-left:20px;">一键删除待审核</button>-->
+</div>
+
+<div class="filter clearfix">
+  <div class="f-left">
+    <div class="btn-group" id="selectBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown"><span class="check"></span><span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="1">全选</a></li>
+        <li><a href="javascript:;" data-id="0">不选</a></li>
+      </ul>
+    </div>
+    <button class="btn" data-toggle="dropdown" id="delBtn">删除</button>
+    <button class="btn" data-toggle="dropdown" id="revertBtn">还原</button>
+    <button class="btn" data-toggle="dropdown" id="fullyDelBtn">彻底删除</button>
+    <button class="btn" data-toggle="dropdown" id="refreshBtn">更新时间</button>
+    {#if $recycle != 1#}
+    <div class="btn-group" id="stateBtn"{#if $notice#} data-id="0"{#/if#}>
+		{#if $notice#}
+        <button class="btn dropdown-toggle" data-toggle="dropdown">待审核(<span class="totalGray"></span>)<span class="caret"></span></button>
+        {#else#}
+        <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息(<span class="totalCount"></span>)<span class="caret"></span></button>
+        {#/if#}
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="">全部信息(<span class="totalCount"></span>)</a></li>
+        <li><a href="javascript:;" data-id="0">待审核(<span class="totalGray"></span>)</a></li>
+        <li><a href="javascript:;" data-id="1">已审核(<span class="totalAudit"></span>)</a></li>
+        <li><a href="javascript:;" data-id="2">拒绝审核(<span class="totalRefuse"></span>)</a></li>
+        <li><a href="javascript:;" data-id="3">取消显示(<span class="totalNoshow"></span>)</a></li>
+        <li><a href="javascript:;" data-id="4">已过期(<span class="totalValid"></span>)</a></li>
+      </ul>
+    </div>
+  {#/if#}
+    <div class="btn-group hide" id="batchAudit">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">批量审核<span class="caret"></span></button>
+      <ul class="dropdown-menu">
+        <li><a href="javascript:;" data-id="待审核">待审核</a></li>
+        <li><a href="javascript:;" data-id="已审核">已审核</a></li>
+        <li><a href="javascript:;" data-id="拒绝审核">拒绝审核</a></li>
+        <li><a href="javascript:;" data-id="取消显示">取消显示</a></li>
+      </ul>
+    </div>
+<!-- <a href="javascript:;" class="btn" id="grayObj">待审核(<span class="totalGray">0</span>)</a> -->
+  <button style="display: none;" class="btn" data-toggle="dropdown" id="recycleBtn"{#if $recycle == 1#} data-id="1"{#/if#}>回收站</button>
+
+  {#if $recycle != 1#}
+  <div class="btn-group" id="stateBtnn" {#if $notice#} data-id="0"{#/if#}>
+  <button class="btn dropdown-toggle" data-toggle="dropdown">全部信息<span class="caret"></span></button>
+  <ul class="dropdown-menu">
+    <li><a href="javascript:;" data-id="">全部信息</a></li>
+    <li><a href="javascript:;" data-id="1">置顶(<span class="totalBid"></span>)条</a></li>
+    <li><a href="javascript:;" data-id="2">刷新(<span class="totalRefresh"></span>)条</a></li>
+    <li><a href="javascript:;" data-id="3">阅读红包(<span class="totalReadInfo"></span>)条&nbsp;总额(<span class="totalReadPrice"></span>)元&nbsp;剩余(<span class="totalsurRead"></span>)元</a></li>
+    <li><a href="javascript:;" data-id="4">分享红包(<span class="totalShareInfo"></span>)条&nbsp;总额(<span class="totalSharePrice"></span>)元&nbsp;剩余(<span class="totalsurShare"></span>)元</a></li>
+  </ul>
+</div>
+  <a href="infoAdd.php" class="btn btn-primary" id="addNew">发布信息</a>
+  {#/if#}
+  </div>
+  <div class="f-right">
+    <div class="btn-group" id="pageBtn" data-id="20">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">每页20条<span class="caret"></span></button>
+      <ul class="dropdown-menu pull-right">
+        <li><a href="javascript:;" data-id="10">每页10条</a></li>
+        <li><a href="javascript:;" data-id="15">每页15条</a></li>
+        <li><a href="javascript:;" data-id="20">每页20条</a></li>
+        <li><a href="javascript:;" data-id="30">每页30条</a></li>
+        <li><a href="javascript:;" data-id="50">每页50条</a></li>
+        <li><a href="javascript:;" data-id="100">每页100条</a></li>
+      </ul>
+    </div>
+    <button class="btn disabled" data-toggle="dropdown" id="prevBtn">上一页</button>
+    <button class="btn disabled" data-toggle="dropdown" id="nextBtn">下一页</button>
+    <div class="btn-group" id="paginationBtn">
+      <button class="btn dropdown-toggle" data-toggle="dropdown">1/1页<span class="caret"></span></button>
+      <ul class="dropdown-menu" style="left:auto; right:0;">
+        <li><a href="javascript:;" data-id="1">第1页</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<ul class="thead t100 clearfix">
+  <li class="row3">&nbsp;</li>
+  <li class="row25 left">标题</li>
+  <li class="row12 left">分类</li>
+  <li class="row12 left">分站</li>
+  <li class="row14 left">发布人</li>
+  <li class="row10 left">发布时间</li>
+  <li class="row12">审核状态</li>
+  <li class="row12">操作</li>
+</ul>
+
+<form action="" method="post" name="editform"  style="display: none" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="edit" />
+  <input type="hidden" name="id" id="id" value="" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <input type="hidden" name="config" id="config" value=''>
+  <input type="hidden" name="isbid" id="isbid" value=''>
+  <input type="hidden" name="bid_type" id="bid_type" value=''>
+  <input type="hidden" name="refreConfig" id="refreConfig" value='0'>
+  <input type="hidden" name="type" id="type" value=''>
+  <input type="hidden" name="refreshSmart" id="refreshSmart" value=''>
+</form>
+
+<div class="list mt124" id="list" data-totalpage="1" data-atpage="1"><table><tbody></tbody></table><div id="loading" class="loading hide"></div></div>
+
+<div id="pageInfo" class="pagination pagination-centered"></div>
+
+<div class="hide">
+  <span id="sKeyword"></span>
+  <span id="sType"></span>
+  <span id="start"></span>
+  <span id="end"></span>
+</div>
+<div class="refreshTopMask"></div>
+
+<div class="refreshTopPopup">
+  <div class="rtHeader fn-clear">
+    <h5></h5>
+    <a href="javascript:;" class="rtClose">&times;</a>
+  </div>
+  <div class="rtBody">
+
+    <!-- 刷新 s -->
+    <div class="rtRefresh fn-hide">
+      <div class="rtTab">
+        <ul class="fn-clear">
+          <li data-type="smart">{#$langData['siteConfig'][32][28]#}</li>{#* 智能刷新 *#}
+        </ul>
+      </div>
+      <div class="rtCon">
+        <!-- 智能刷新 -->
+        <div class="rtItem fn-hide">
+          <ul class="rtSmart"></ul>
+        </div>
+
+        <!--          &lt;!&ndash; 普通刷新 &ndash;&gt;-->
+        <!--          <div class="rtItem">-->
+        <!--            <div class="normalTips">{#$langData['siteConfig'][32][30]#}<em class="smartUnit">0.0</em>元</span></div>{#* 信息刷新后，排名靠前，时间显示最新，获取更多浏览机会！<br /><strong>智能刷新</strong>效果翻倍，<span class="price_average">每次仅需 *#}-->
+
+        <!--            &lt;!&ndash; 免费刷新 &ndash;&gt;-->
+        <!--          <div class="freeRefresh">-->
+        <!--            <div class="oper">-->
+        <!--              <div class="ny">-->
+        <!--                <button type="button" class="refreshNow">{#$langData['siteConfig'][32][31]#}</button>{#* 立即刷新 *#}-->
+        <!--                <p>{#$langData['siteConfig'][32][32]#}</p>-->
+        <!--                {#* 本次刷新<font color="#ff6600">免费</font>，您还有<em class="refreshFreeSurplus">0</em>次免费刷新的机会。 *#}-->
+        <!--              </div>-->
+        <!--              <div class="sc fn-hide">-->
+        <!--                <span class="icon-success"><s></s></span>-->
+        <!--                <div><strong>{#$langData['siteConfig'][32][33]#}</strong></div>{#* 刷新成功 *#}-->
+        <!--                <p>{#$langData['siteConfig'][32][34]#}</p>{#* 您的信息曝光量将大增！ *#}-->
+        <!--                <button type="button" class="refreshConfirm">{#$langData['siteConfig'][6][1]#}</button>{#* 确定 *#}-->
+        <!--              </div>-->
+        <!--            </div>-->
+        <!--          </div>-->
+
+        <!--            &lt;!&ndash; 普通收费刷新 &ndash;&gt;-->
+        <!--          <div class="normalRefresh fn-hide">-->
+        <!--            <p>{#$langData['siteConfig'][32][35]#}</p>{#* 提示：您的免费刷新次数已用完，不再享有免费刷新。 *#}-->
+        <!--          </div>-->
+        <!--          </div>-->
+
+      </div>
+    </div>
+    <!-- 刷新 e -->
+
+    <!-- 置顶 s -->
+    <div class="rtTopping fn-hide">
+
+      <dl class="fn-clear">
+        <dt>{#$langData['siteConfig'][32][37]#}</dt>{#* 置顶方式 *#}
+        <dd class="topType fn-clear">
+          <!--            <label class="checked"><em><img src="{#$cfg_basehost#}/templates/member/images/refreshTop_checked.png" /></em>{#$langData['siteConfig'][32][38]#}</label>{#* 立即置顶 *#}-->
+          <label><em><img src="{#$cfg_basehost#}/templates/member/images/refreshTop_checked.png" /></em>{#$langData['siteConfig'][32][39]#}</label>{#* 计划置顶 *#}
+        </dd>
+      </dl>
+      <div class="topPlan " style="display: block !important;">
+        <dl class="fn-clear">
+          <dt>{#$langData['siteConfig'][32][41]#}</dt>{#* 置顶日期 *#}
+          <dd>
+            <div class="rtDate" id="topPlanBegan">
+              <input id="topPlanBeganObj" readonly value="{#$smarty.now|date_format:'%Y-%m-%d'#}" />
+              <em></em>
+            </div>
+            <span class="rtSplit"></span>
+            <div class="rtDate" id="topPlanEnd">
+              <input id="topPlanEndObj" readonly value="{#$addWeekDate|date_format:'%Y-%m-%d'#}">
+              <em></em>
+            </div>
+          </dd>
+        </dl>
+        <dl class="fn-clear">
+          <dt>{#$langData['siteConfig'][32][42]#}</dt>{#* 置顶时段 *#}
+          <dd>
+            <table class="rtPlanList">
+              <thead>
+              <tr>
+                <th>{#$langData['siteConfig'][19][384]#}</th>{#* 时间 *#}
+                <th>{#$langData['siteConfig'][14][4]#}</th>{#* 星期一 *#}
+                <th>{#$langData['siteConfig'][14][5]#}</th>{#* 星期二 *#}
+                <th>{#$langData['siteConfig'][14][6]#}</th>{#* 星期三 *#}
+                <th>{#$langData['siteConfig'][14][7]#}</th>{#* 星期四 *#}
+                <th>{#$langData['siteConfig'][14][8]#}</th>{#* 星期五 *#}
+                <th>{#$langData['siteConfig'][14][9]#}</th>{#* 星期六 *#}
+                <th>{#$langData['siteConfig'][14][10]#}</th>{#* 星期日 *#}
+              </tr>
+              </thead>
+              <tbody>
+              <tr>
+                <td>{#$langData['siteConfig'][14][11]#}</td>{#* 全天 *#}
+                <td class="curr" data-week="1" data-type="all"><em></em></td>
+                <td class="curr" data-week="2" data-type="all"><em></em></td>
+                <td class="curr" data-week="3" data-type="all"><em></em></td>
+                <td class="curr" data-week="4" data-type="all"><em></em></td>
+                <td class="curr" data-week="5" data-type="all"><em></em></td>
+                <td class="curr" data-week="6" data-type="all"><em></em></td>
+                <td class="curr" data-week="0" data-type="all"><em></em></td>
+              </tr>
+              <tr>
+                <td>{#$langData['siteConfig'][14][12]#}</td>{#* 早8点-晚8点 *#}
+                <td data-week="1" data-type="day"><em></em></td>
+                <td data-week="2" data-type="day"><em></em></td>
+                <td data-week="3" data-type="day"><em></em></td>
+                <td data-week="4" data-type="day"><em></em></td>
+                <td data-week="5" data-type="day"><em></em></td>
+                <td data-week="6" data-type="day"><em></em></td>
+                <td data-week="0" data-type="day"><em></em></td>
+              </tr>
+              <tr>
+                <td>{#$langData['siteConfig'][32][43]#}</td>{#* 不置顶 *#}
+                <td><em></em></td>
+                <td><em></em></td>
+                <td><em></em></td>
+                <td><em></em></td>
+                <td><em></em></td>
+                <td><em></em></td>
+                <td><em></em></td>
+              </tr>
+              </tbody>
+            </table>
+          </dd>
+        </dl>
+      </div>
+    </div>
+    <!-- 置顶 e -->
+
+    <!-- 支付 s -->
+    <div class="rtPayObj">
+      <!-- {#if $userinfo.money > 0#}
+      <dl class="fabu_dl fn-clear yue">
+        <dt class="yue-btn active"><i class="radio"><s></s></i>{#$langData['siteConfig'][19][386]#} <em class="gray">({#echoCurrency type='symbol'#}{#$userinfo.money#})</em></dt>
+        <dd>-{#echoCurrency type='symbol'#} <em class="reduce-yue">0.00</em></dd>
+      </dl>
+      {#/if#} -->
+      <!--        <dl class="fabu_dl fn-clear">-->
+      <!--          <dt>{#$langData['siteConfig'][32][44]#}</dt>{#* 应付金额 *#}-->
+      <!--          <dd>&nbsp;{#echoCurrency type='symbol'#} <em class="pay-total">0.00</em></dd>-->
+      <!--        </dl>-->
+
+
+      <a href="javascript:;" class="paySubmit publicpaybtn" >确定</a>{#* 支付 *#}
+    </div>
+
+  </div>
+</div>
+
+<div class="topCalendar"></div>
+<div class="topCalendarBg"></div>
+
+<script>
+  var typeListArr = {#$typeListArr#}, cityList = {#$cityList#}, adminPath = "{#$adminPath#}";
+</script>
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/ui/calendar/WdatePicker.js"></script>
+{#$jsFile#}
+</body>
+</html>

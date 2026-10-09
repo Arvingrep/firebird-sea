@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{#$pageTitle = "团购详情"#}
+{#if $detail_hourly==1#}
+{#$pageTitle = "秒杀详情"#}
+{#/if#}
+<meta charset="{#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no,viewport-fit=cover" />
+<title>{#$detail_title#}团购|图片|价格|菜单</title>
+<meta name="apptitle" content="{#$pageTitle#}">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/swiper.min.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}1">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$dating_channelDomain#}', staticPath = '{#$cfg_staticPath#}',templets_skin = '{#$templets_skin#}';
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var cookiePre = '{#$cfg_cookiePre#}';
+
+	var detailTitle = '{#$detail_title#}';
+	var detailPrice = '{#$detail_price#}';
+	var maxCount    = '{#$detail_limit#}';
+	var detailThumb = '{#$detail_litpic#}';
+	var detailUrl   = '{#getUrlPath service="tuan" template="detail" id=$detail_id#}';
+	var date        = [{#$smarty.now#}, {#$detail_startdate#}, {#$detail_enddate#}];
+  var pageData = {
+    title: '{#$detail_store['member']['company']#}',
+    address: '{#$detail_store['address']#}',
+    lng:'',
+    lat:'',
+    lnglat: '{#$detail_store['lnglat']#}',
+    mapType: '{#$site_map#}',
+    cityName: '{#$siteCityInfo['name']#}',
+    mapKey: '{#$site_map_key#}'
+  };
+</script>
+</head>
+
+<body>
+{#include file="../../../siteConfig/touch_top.html"#}
+
+<!-- 视频 s-->
+<div class="topMain">
+  <div class="swiper-container">
+    <i class="vClose"></i>
+    <div class="swiper-wrapper">
+    	{#if !empty($detail_video)#}
+      <div class="swiper-slide video-box">
+          <video width="100%" height="100%" preload="meta" x5-video-player-type="h5" x5-playsinline playsinline webkit-playsinline  src="{#$detail_video#}" id="video" poster="{#$detail_litpic|default: '{#$templets_skin#}upfile/usBanner.png'#}"></video>
+          <div class="video-btn">
+              <div class="play-box video-icon-box" id="vbplay">
+                  <i class="play-icon video-icon"></i>
+              </div>
+              <div class="load-box video-icon-box" style="display: none;">
+                  <i class="load-icon video-icon"></i>
+              </div>
+              <div class="reload-box video-icon-box" style="display: none;">
+                  <i class="reload-icon"></i>
+                  <p>重新播放</p>
+              </div>
+              <div class="error-box video-icon-box" style="display: none;">
+                  <p class="err-info">视频出错了，请检查网络状况</p>
+                  <div class="reload-box">
+                      <i class="reload-icon"></i>
+                      <p>重新加载</p>
+                  </div>
+              </div>
+          </div>
+          <div id="video-control" style="display: none;">
+          <div class="btn-control">
+            <div id="play" class="play"> </div>
+          </div>
+          <div id="time" class="time"> 00:00 </div>
+          <div id="progress"> <span id="bar"></span>
+            <div id="control"> </div>
+          </div>
+          <div class="btn-control">
+            <div id="sound" class="soundon"> </div>
+          </div>
+          <div id="full" class="full"> </div>
+        </div>
+      </div>
+      {#/if#}
+      {#foreach from=$detail_pics item=val#}
+      <div class="swiper-slide">
+        <img src="{#$val.path#}" alt="">
+      </div>
+      {#/foreach#}
+    </div>
+    <div class="swiper-pagination"></div>
+  </div>
+</div>
+<!-- 视频 e-->
+
+<!-- 倒计时 -->
+<div class="count_down fn-clear">
+  <span class="present_price">{#echoCurrency type='symbol'#}<em>{#$detail_price#}</em></span>
+  <span class="original_price">{#echoCurrency type='symbol'#}{#$detail_market#}</span>
+  <div class="daojishi"><!--距结束<span>02</span>:<span>10</span>:<span>58</span>--></div>
+</div>
+
+
+<div class="main_txt">
+  <div class="title">
+    <h2>{#$detail_title#}</h2>
+    <p>{#$detail_flag#}</p>
+    <div class="price fn-clear"><span class="zhehoujia">{#echoCurrency type='symbol'#}<em>{#$detail_price#}</em></span><span class="yuanjia">门市价：{#echoCurrency type='symbol'#}{#$detail_market#}</span></div>
+  </div>
+  <div class="service fn-clear">
+    <span class="service_01">随时退</span>
+    <span class="service_02">过期自动退</span>
+    <span class="service_03">已售{#$detail_sale#}</span>
+    {#if $detail_collect == 1#}
+    <span class="service_04 cang_active">已收藏</span>
+    {#else#}
+    <span class="service_04 cang">收藏</span>
+    {#/if#}
+  </div>
+</div>
+
+<!-- 商家信息 -->
+<div class="business_info">
+  <div class="info_title">商家信息</div>
+  <div class="info_bus">
+    <h2>{#$detail_store['member']['company']#}</h2>
+    <p>{#$detail_store['addrname'][0]#} {#$detail_store['addrname'][1]#} {#$detail_store['address']#}</p>
+    <div class="phone"><a href="tel:{#$detail_store['tel']#}">{#$detail_store['tel']#}</a><a href="tel:{#$detail_store['phone']#}">{#$detail_store['phone']#}</a></div>
+    <a class="map_bus appMapBtn" href="javascript:;"></a>
+  </div>
+</div>
+
+<div class="detail_list">
+  <nav class="nav-wrap " id="nav-wrap">
+    <ul class="fn-clear">
+        <li class="active">
+            <a href="javascript:;">
+                <span>团购内容</span>
+            </a>
+        </li>
+        <li>
+            <a href="javascript:;">
+                <span>团购须知</span>
+            </a>
+        </li>
+        <li>
+            <a href="javascript:;">
+                <span>网友点评</span>
+            </a>
+        </li>
+    </ul>
+  </nav>
+</div>
+<div class="tuan_container">
+  <div class="tuan_content common_tuan">
+    <p class="tuan_content_title">以下内容每人每天限一次</p>
+    {#if $detail_package|@count neq 0#}
+    {#if $detail_packtype == 1#}
+    <ul>
+      <li class="fn-clear"><span class="tuan_content_name">{#$detail_package[0]#}</span><span class="tuan_content_price">{#$detail_package[1]#}</span><span class="tuan_content_time">{#$detail_package[2]#}</span></li>
+    </ul>
+    {#elseif $detail_packtype == 2#}
+    <ul>
+      {#foreach from=$detail_package item=package#}
+      {#foreach from=$package['tr'] key=key item=tr#}
+      <li class="fn-clear"><span class="tuan_content_name">{#$tr[0]#}</span><span class="tuan_content_price">{#$tr[1]#}</span><span class="tuan_content_time">{#$tr[2]#}</span></li>
+      {#/foreach#}
+      {#/foreach#}
+    </ul>
+    <p class="tuan_content_zongjia fn-clear"><span>总价值<em>{#$detail_market#}</em></span></p>
+    <p class="tuan_content_tuanjia fn-clear"><span>团购价<em>{#$detail_price#}</em></span></p>
+    {#/if#}
+    {#/if#}
+  </div>
+  <div class="common_tuan">
+    <div class="tuan_notes">
+      <div class="info_title">购买须知</div>
+      <div class="tuan_notes_list">
+        {#if $detail_notice|@count neq 0#}
+        {#foreach from=$detail_notice item=notice#}
+        <dl>
+            <dt>{#$notice.title#}</dt>
+            <dd><p class="listitem">{#$notice.note#}</p></dd>
+        </dl>
+        {#/foreach#}
+      {#/if#}
+      </div>
+    </div>
+
+
+    <!-- 查看图文详情 -->
+    <div class="pic-con"><a href="javascript:;" id="showDetail">查看图文详情 ></a></div>
+    <!-- 查看图文详情 end-->
+
+    <!-- 图文详情 -->
+    <div class="uknow fn-hide" id="bodyDetail">
+        <div class="uknow-tit">
+            <span>图文详情</span>
+        </div>
+        <div class="uknow-con">
+            <textarea id="tuanDetail">{#$detail_body#}</textarea>
+        </div>
+    </div>
+    <!-- 图文详情 end-->
+  </div>
+  <div class="tuan_comment commentBox common_tuan">
+    <div class="info_comment">用户评论 ({#$detail_totalCommon#})</div>
+    <div>
+      <ul class="commentlist">
+        {#tuan action="common" return="list" id=$detail_id  pageSize=3#}
+        <li class="fn-clear">
+          <div class="left">
+            <a href="javascript:;"><img src="{#$list.user.photo#}" alt=""></a>
+          </div>
+          <div class="right">
+            <p class="name">{#$list.user.nickname#} <span>{#date("Y.m.d",$list.dtime)#}</span></p>
+            <p class="content">{#$list.content#}</p>
+          </div>
+          <!--<ul class="children">
+            <li class="fn-clear">
+              <div class="left">
+                <a href="javascript:;"><img src="http://qmr.215000.com/templates/siteConfig/touch/skin5/upfile/uphead02.png" alt=""></a>
+              </div>
+              <div class="right">
+                <p class="name">pink <span>2018.6.4</span></p>
+                <p class="content">回复<span>pink</span>:感谢您的光顾！欢迎下次再来，优惠多多</p>
+              </div>
+            </li>
+            <li class="fn-clear">
+              <div class="left">
+                <a href="javascript:;"><img src="http://qmr.215000.com/templates/siteConfig/touch/skin5/upfile/uphead02.png" alt=""></a>
+              </div>
+              <div class="right">
+                <p class="name">pink <span>2018.6.4</span></p>
+                <p class="content">回复<span>pink</span>:感谢您的光顾！欢迎下次再来，优惠多多</p>
+              </div>
+            </li>
+          </ul>-->
+        </li>
+        {#/tuan#}
+      </ul>
+    </div>
+    <div class="genduo"><a href="{#getUrlPath service='tuan' template='review' id={#$detail_id#}#}">查看全部评价</a></div>
+  </div>
+
+</div>
+
+
+
+
+<div class="tuan_other">
+  <div class="info_comment">其他团购</div>
+  <div class="info">
+    <ul>
+      {#tuan action="tlist" return="list" store=$detail_sid pageSize=3#}
+      {#if $list.id != $detail_id#}
+      <li class="fn-clear">
+      	<a href="{#$list.url#}">
+        <div class="s_img"><img src="{#$list.litpic#}"></div>
+        <div class="s_title">
+          <div class="bus_txt fn-clear"><span class="bus_txt_title">{#$list.title#}</span></div>
+          <div class="tuangou_people">{#$list.sale#}人已团</div>
+          <div class="addr tuangou_price fn-clear"><span class="discounted">{#echoCurrency type='symbol'#}<em>{#$list.price#}</em></span><span class="or_price">{#echoCurrency type='symbol'#}{#$list.market#}</span><div class="aa">去抢购</div></div>
+        </div>
+        </a>
+      </li>
+      {#/if#}
+      {#/tuan#}
+    </ul>
+  </div>
+</div>
+
+<div class="tuan_bottom">
+  <div class="price fn-clear"><span class="zhehoujia">{#echoCurrency type='symbol'#}<em>{#$detail_price#}</em></span><span class="yuanjia">门市价：{#echoCurrency type='symbol'#}{#$detail_market#}</span>
+  {#if $detail_limit <= 0#}
+  	<a href="javaScript:;"  class="grey">已售完</a>
+  {#elseif time()>$detail_enddate#}
+  	<a href="javaScript:;"  class="grey">已结束</a>
+  {#elseif $detail_startdate>time()#}
+  	<a href="javaScript:;">即将开始</a>
+  {#else#}
+  	<a href="{#getUrlPath service="tuan" template="buy" id={#$detail_id#} count="1"#}">立即抢购</a>
+  {#/if#}
+ </div>
+</div>
+
+<script type="text/javascript">
+	var detailID    = '{#$detail_id#}';
+
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$detail_subtitle#}',
+		"title": '{#$detail_title#}',
+		"imgUrl": '{#$detail_litpic#}',
+		"link": '{#getUrlPath service="tuan" template="tdetail" id=$detail_id#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$cfg_staticPath#}js/publicOpenMap.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/swiper.min.js" type="text/javascript"></script>
+<script src="{#$templets_skin#}js/nav.js"></script>
+<script src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

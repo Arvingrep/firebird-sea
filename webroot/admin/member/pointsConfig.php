@@ -140,7 +140,7 @@ if(!empty($_POST)){
 
 //配置参数
 require_once(HUONIAOINC.'/config/pointsConfig.inc.php');
-require_once(HUONIAOINC.'/config/fenxiaoConfig.inc.php');
+
 //验证模板文件
 if(file_exists($tpl."/".$templates)){
 
@@ -158,9 +158,6 @@ if(file_exists($tpl."/".$templates)){
 		'admin/member/pointsConfig.js'
 	);
 	$huoniaoTag->assign('jsFile', includeFile('js', $jsFile));
-
-    //分销商-推荐人范围限制
-    $huoniaoTag->assign('fenxiaoBindingChecked', (int)$cfg_fenxiaoBinding);
 
 	//签到状态
 	$huoniaoTag->assign('pointState', array('0', '1'));

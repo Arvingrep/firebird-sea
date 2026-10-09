@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>商品列表</title>
+{#$cssFile#}
+<script>
+var action = "{#$action#}", adminPath = "{#$adminPath#}", sid = {#$sid#};
+var shopname = '{#$shopname#}';
+</script>
+<style>
+.stockStatusSwitch, .foodStatusSwitch{ display:none; }
+#foodList .priceInput, #foodList .nameInput, #foodList .tagInput, #foodList .unitInput, #foodList .labelInput, #foodList .pointInput, #foodList .stockInput{ font-size:12px; color:black; display:none; width:100%; }
+#foodList pre{ white-space:pre-wrap; }
+.btn-group+.btn, .btn-group>.btn{ border-width:5px; }
+.pagination {display: block; text-align: right;}
+.pagination div {margin: 0;}
+.pagination .page_info {display: inline-block; line-height: 35px; margin-left: 15px;}
+.pagination ul>li.page_current span {background: #e8e8e8;}
+
+#import {overflow: hidden;}
+#Filedata {position: absolute; left: 0; top: 0; right: 0; bottom: 0; opacity: 0; filter: alpha(opacity=0); cursor: pointer;}
+td.fastedit {position: relative;}
+td.fastedit:hover {background-color: #82af6f !important;}
+</style>
+</head>
+
+<div class="main-content">
+
+  <div class="page-content">
+    <!-- /section:settings.box -->
+    <div class="page-content-area">
+        <form action="?" method="get">
+            <div class="">
+                <div class="col-xs-12">
+                {#if $isdel == 0#}
+                <span style="float: left; margin-right: 20px;">
+                    <select name="typeid" id="typeid">
+                    <option value="0">全部分类</option>
+                    {#foreach from=$typelist item=type#}
+                    <option value="{#$type.id#}"{#if $typeid == $type.id#} selected{#/if#}>{#$type.title#}</option>
+                    {#/foreach#}
+                    </select>
+                </span>
+                <a class="btn btn-success" href="waimaiFoodAdd.php?sid={#$sid#}" id="addFood" style="color:#fff">新建商品</a>
+                <button type="button" class="btn btn-danger" id="deleteSelect">批量删除商品</button>
+                <div class="btn btn-warning" id="priceIncrease"><span>一键提价</span></div>
+                <div class="btn btn-primary" id="import"><span>导入商品</span><input type="file" accept=".xls" id="Filedata" name="Filedata"></div>
+                <a href="/include/data/waimaiImportTemp.xls?v=2" download style="margin-left: 10px;">下载导入模板</a>
+                <button type="button" class="btn btn-white btn-warning btn-bold mybtn bigger-150" style="float:right;vertical-align: middle;margin-right:80px;" id="recycle" data-href="waimaiFoodList.php?sid={#$sid#}&del=1">
+                    <i class="ace-icon fa fa-trash-o bigger-120 orange"></i>商品回收站
+                </button>
+                {#/if#}
+                <!-- 111111111111111111111111111 -->
+                <div id="foodList" class="grid-view">
+                    <input type="hidden" name="sid" value="{#$sid#}" />
+                    <input type="hidden" name="del" value="{#$isdel#}">
+                    <button type="submit" style="display: none;"></button>
+                    <table class="table table-striped table-bordered table-hover">
+                    <thead>
+                        <tr>
+                        <th class="checkbox-column" id="foodList_c0"><input type="checkbox" value="1" name="foodList_c0_all" id="foodList_c0_all"></th>
+                        <th id="foodList_c1">商品名称</th>
+                        <th id="foodList_c2">编号</th>
+                        <th id="foodList_c3">商品单位</th>
+                        <th id="foodList_c4">价格&nbsp;&nbsp;<a href="javascript:;" class="reviewPrice" data-id="{#$reviewPrice#}">{#if $reviewPrice#}全部{#else#}审核中{#/if#}</a><input type="hidden" name="reviewPrice" value="{#$reviewPrice#}" id="reviewPrice" /></th>
+                        <th id="foodList_c5">商品分类</th>
+                        <th id="foodList_c7">标签</th>
+                        <th id="foodList_c8">销售量</th>
+                        <th id="foodList_c9">库存状态</th>
+                        <th id="foodList_c10">库存量</th>
+                        <th id="foodList_c11">是否限购</th>
+                        <th id="foodList_c12">商品状态</th>
+                        <th id="foodList_c13">自定义属性</th>
+                        <th id="foodList_c14">优惠推荐</th>
+                        <th id="foodList_c15">操作</th>
+                        </tr>
+                        <tr class="filters">
+                        <td>&nbsp;</td>
+                        <td><input name="title" type="text" maxlength="30" value="{#$title#}"></td>
+                        <td><input name="sort" type="text" maxlength="10" value="{#if $sort#}{#$sort#}{#/if#}"></td>
+                        <td><input name="unit" type="text" maxlength="6" value="{#$unit#}"></td>
+                        <td><input name="price" type="text" value="{#$price#}"></td>
+                        <td><input name="typename" type="text" value="{#$typename#}"></td>
+                        <td><input name="label" type="text" maxlength="4" value="{#$label#}"></td>
+                        <td><input name="saleCount" type="text" maxlength="10" value="{#if $saleCount#}{#$saleCount#}{#/if#}"></td>
+                        <td>&nbsp;</td>
+                        <td><input name="stock" type="text" value="{#if $stock#}{#$stock#}{#/if#}"></td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {#foreach from=$list item=l#}
+                        <tr data-id="{#$l.id#}">
+                        <td width="20"><input value="{#$l.id#}" id="foodList_c0_0" type="checkbox" name="selectorderlist[]"></td>
+                        <td  class="fastedit title" data-val="{#$l.title#}" contenteditable="true">{#$l.title#}</td>
+                        <td width="50" class="fastedit sort" data-val="{#$l.sort#}" contenteditable="true">{#$l.sort#}</td>
+                        <td width="60" class="fastedit unit" data-val="{#$l.unit#}" contenteditable="true">{#$l.unit#}</td>
+                        <td width="100" class="fastedit price" data-val="{#$l.price#}"{#if $l.review_price == 0#} contenteditable="true"{#/if#}>
+                            {#$l.price#}
+                            {#if $l.review_price > 0#}
+                            <br /><span style="color: #ff0000;">新价格：<strong>{#$l.review_price#}</strong></span>
+                            <br /><a href="javascript:;" class="newprice" data-id="1">通过</a>&nbsp;&nbsp;&nbsp;&nbsp;<a href="javascript:;" class="newprice" data-id="0">拒绝</a>
+                            {#/if#}
+                        </td>
+                        <td width="120">{#$l.typename#}</td>
+                        <td width="100">{#$l.label#}</td>
+                        <td width="50">{#$l.sale#}</td>
+                        <td width="60">
+                            <label class="stockStatusSwitch" style="display: inline-block;">
+                            <input name="switch-field-1" class="ace ace-switch ace-switch-6" type="checkbox" data-id="{#$l.id#}"{#if $l.stockvalid#} checked{#/if#}>
+                            <span class="lbl"></span>
+                            </label>
+                        </td>
+                        <td width="60">{#$l.stock#}</td>
+                        <td width="60">{#if $l.is_day_limitfood#}是{#else#}否{#/if#}</td>
+                        <td width="60">
+                            <label class="foodStatusSwitch" style="display: inline-block;">
+                            <input name="switch-field-1" class="ace ace-switch ace-switch-6" type="checkbox" data-id="{#$l.id#}"{#if $l.status#} checked{#/if#}>
+                            <span class="lbl"></span>
+                            </label>
+                        </td>
+                        <td width="70">
+                            <label class="natureStatusSwitch">
+                            <input name="switch-field-1" class="ace ace-switch ace-switch-6" type="checkbox" data-id="{#$l.id#}"{#if $l.is_nature#} checked{#/if#}>
+                            <span class="lbl"></span>
+                            </label>
+                        </td>
+                        <td width="60">
+                            <label class="saleStateSwitch">
+                            <input name="switch-field-1" class="ace ace-switch ace-switch-6" type="checkbox" data-id="{#$l.id#}"{#if $l.saleRec#} checked{#/if#}>
+                            <span class="lbl"></span>
+                            </label>
+                        </td>
+                        <td nowrap="nowrap" class="center">
+                            {#if $isdel#}
+                            <a class="label label-sm label-success recycleback" data-id="{#$l.id#}" style="line-height:18px;">恢复</a>
+                            <a class="label label-sm label-warning destory" data-id="{#$l.id#}" style="line-height:18px;">删除</a>
+                            {#else#}
+                            <a href="waimaiFoodAdd.php?sid={#$sid#}&id={#$l.id#}" title="修改" class="green" style="padding-right:8px;"><i class="ace-icon fa fa-pencil bigger-130"></i></a>&nbsp;&nbsp;&nbsp;&nbsp;
+                            <a title="删除" class="red del" style="padding-right:8px;cursor:pointer;" data-id="{#$l.id#}"><i class="ace-icon fa fa-trash-o bigger-130"></i></a>
+                            {#/if#}
+                        </td>
+                        </tr>
+                        {#/foreach#}
+                        {#if $list|@count == 0#}
+                        <tr>
+                        <td colspan="15" style="height: 200px; line-height: 200px; text-align: center;">没有找到数据.</td>
+                        </tr>
+                        {#/if#}
+                    </tbody>
+                    </table>
+
+                    {#$pagelist#}
+
+                </div>
+                </div>
+            </div>
+        </form>
+    </div>
+  </div>
+
+
+
+{#$jsFile#}

@@ -90,21 +90,6 @@ function _response_multiNews($object, $newsContent){
 // </xml>';
 
 
-//如果传了cityid，说明是分站绑定的独立公众号的情况，需要获取分站信息
-$_updateCityid = "";
-$cityid = (int)$cityid;
-if($cityid){
-    $wechatCityAdvancedConfig = getWechatCityAdvancedConfig('', $cityid);
-    if($wechatCityAdvancedConfig){
-        $cfg_wechatAppid = $wechatCityAdvancedConfig['appid'];
-        $cfg_wechatAppsecret = $wechatCityAdvancedConfig['appsecret'];
-        $cfg_wechatToken = $wechatCityAdvancedConfig['token'];
-
-        $_updateCityid = " AND `cityid` = '$cityid'";
-    }
-}
-
-
 define("APPID", $cfg_wechatAppid);
 define("APPSECRET", $cfg_wechatAppsecret);
 define("TOKEN", $cfg_wechatToken);
@@ -166,19 +151,17 @@ class wechat{
 			$RX_TYPE = trim($postObj->MsgType);
 	        $FromUserName = $postObj->FromUserName;
 
-            if($postObj->Event != "unsubscribe"){
-                switch($RX_TYPE){
-                    case "text":
-                        $resultStr = $this->handleText($postObj);
-                        break;
-                    case "event":
-                        $resultStr = $this->handleEvent($postObj);
-                        break;
-                    default:
-                        $resultStr = "Unknow msg type: ".$RX_TYPE;
-                        break;
-                }
-            }
+			switch($RX_TYPE){
+				case "text":
+					$resultStr = $this->handleText($postObj);
+					break;
+				case "event":
+					$resultStr = $this->handleEvent($postObj);
+					break;
+				default:
+					$resultStr = "Unknow msg type: ".$RX_TYPE;
+					break;
+			}
 
 	        //微信传图首次记录
 	        if($RX_TYPE == "event" && (strstr($postObj->EventKey, '微信传图_') || strstr($postObj->EventKey, '海报_') || strstr($postObj->EventKey, 'bind_') || strstr($postObj->EventKey, 'idclub') ) ){
@@ -209,7 +192,6 @@ class wechat{
 			      if(!file_exists($wechatConfig)) return;
 			      require($wechatConfig);
 
-                  global $cfg_wechatAppid, $cfg_wechatAppsecret;
 			      include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
 			      $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
 			      $weixinAccessToken = $jssdk->getAccessToken();
@@ -263,8 +245,6 @@ class wechat{
 				  $uid = str_replace('qrscene_bind_', '', $postObj->EventKey);
 				  $uid = (int)$uid;
 				  $this->bindSiteMember($postObj->FromUserName, $uid);
-
-
 
                   //关注回复
                   if($postObj->MsgType == 'event' && $postObj->Event == 'subscribe'){
@@ -359,26 +339,18 @@ class wechat{
 	        //取消关注
 	        if($RX_TYPE == "event" && $postObj->Event == "unsubscribe"){
 	            $openid = $postObj->FromUserName;
-
-                global $cityid;
-                //如果是独立公众号的分站
-                if ($cityid) {
-                    //更新对应分站的关注状态
-                    $sql = $dsql->SetQuery("UPDATE `#@__member_wechat_subscribe` SET `subscribe` = 0 WHERE `cityid` = ".$cityid." AND `openid` = '".$openid."'");
-	                $dsql->dsqlOper($sql, "update");
-                } else {
-                    //如果是主站，就更新主站的关注状态
-                    $sql = $dsql->SetQuery("UPDATE `#@__member` SET `wechat_subscribe` = 0 WHERE `wechat_openid` = '$openid'");
-                    $dsql->dsqlOper($sql, "update");
-                    //如果取消关注则删除微信关注临时表的数据
-                    $openidsql = $dsql->SetQuery("SELECT `wechat_conn` FROM `#@__member` WHERE `wechat_openid` = '$openid' AND (`mtype` = 1 OR `mtype` = 2) ");
-                    $openidres = $dsql->dsqlOper($openidsql, "results");
-                    $openKey = $openidres[0]['wechat_conn'];
-                    if (!empty($openKey)){
-                        $archives = $dsql->SetQuery("DELETE FROM `#@__site_wxid` WHERE `wxkey` = '$openKey'");
-                        $dsql->dsqlOper($archives, "update");
-                    }
+	            $sql = $dsql->SetQuery("UPDATE `#@__member` SET `wechat_subscribe` = 0 WHERE `wechat_openid` = '$openid'");
+	            $dsql->dsqlOper($sql, "update");
+                //如果取消关注则删除微信关注临时表的数据
+                $openidsql = $dsql->SetQuery("SELECT `wechat_conn` FROM `#@__member` WHERE `wechat_openid` = '$openid' AND (`mtype` = 1 OR `mtype` = 2) ");
+                $openidres = $dsql->dsqlOper($openidsql, "results");
+                $openKey = $openidres[0]['wechat_conn'];
+                if (!empty($openKey)){
+                    $archives = $dsql->SetQuery("DELETE FROM `#@__site_wxid` WHERE `wxkey` = '$openKey'");
+                     $dsql->dsqlOper($archives, "update");
                 }
+
+
 
             }
 
@@ -411,11 +383,8 @@ class wechat{
             case "subscribe":
                 $contentStr = $this->getAutoreply("subscribe", $object);
                 break;
-            case "trade_manage_order_settlement": //小程序订单确认收货通知
-                $contentStr = $this->confirmDeliveryNotify($object);
-                break;
             default:
-                $contentStr = $this->getAutoreply($object->EventKey, $object);
+                $contentStr = $this->getAutoreply($object->EventKey);
                 break;
         }
         $resultStr = $this->_response($object, $contentStr);
@@ -432,7 +401,6 @@ class wechat{
       if(!file_exists($wechatConfig)) return;
       require($wechatConfig);
 
-      global $cfg_wechatAppid, $cfg_wechatAppsecret;
       include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
       $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
       $weixinAccessToken = $jssdk->getAccessToken();
@@ -575,36 +543,20 @@ class wechat{
     //根据关键字获取系统响应内容
     public function getAutoreply($key, $postObj = array()){
 
-        global $cityid;
         global $cfg_secureAccess;
         global $cfg_basehost;
         global $cfg_wechatSubscribeType;
         global $cfg_wechatSubscribe;
         global $cfg_wechatSubscribeMedia;
-        global $cfg_wechat_cityAdvanced;
         global $cfg_autoReplyWithSiteSearchState;
-        global $cfg_autoReplyWithSiteSearchModule;
-        global $cfg_autoReplyWithSiteSearchTitle;
-        global $cfg_autoReplyWithSiteSearchDescption;
 
         $cfg_autoReplyWithSiteSearchState = (int)$cfg_autoReplyWithSiteSearchState;  //关联网站搜索服务  0开启 1关闭
-
-        //分站自定义
-        if(isset($cfg_wechat_cityAdvanced[$cityid])){
-            $cfg_wechatSubscribeType = (int)$cfg_wechat_cityAdvanced[$cityid]['subscribeType'];
-            $cfg_wechatSubscribe = $cfg_wechat_cityAdvanced[$cityid]['subscribe'];
-            $cfg_wechatSubscribeMedia = $cfg_wechat_cityAdvanced[$cityid]['subscribeMedia'];
-            $cfg_autoReplyWithSiteSearchState = (int)$cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchState'];
-            $cfg_autoReplyWithSiteSearchModule = $cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchModule'];
-            $cfg_autoReplyWithSiteSearchTitle = $cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchTitle'];
-            $cfg_autoReplyWithSiteSearchDescption = $cfg_wechat_cityAdvanced[$cityid]['autoReplyWithSiteSearchDescption'];
-        }
 
         //关注回复
         if($key == "subscribe"){
 
             //自定义
-            if($cfg_wechatSubscribeType == 1){                
+            if($cfg_wechatSubscribeType == 1){
 
                 $cfg_wechatSubscribeArr = json_decode(stripslashes($cfg_wechatSubscribe), true);
 
@@ -612,7 +564,6 @@ class wechat{
                 if(strstr($cfg_wechatSubscribe, '$subscribeCount')){
 
                     $subscribeCount = 1;
-                    global $cfg_wechatAppid, $cfg_wechatAppsecret;
                     include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
                     $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
                     $token = $jssdk->getAccessToken();
@@ -638,7 +589,6 @@ class wechat{
                 //判断是否为数组
                 elseif(is_array($cfg_wechatSubscribeArr)){
                     
-                    global $cfg_wechatAppid, $cfg_wechatAppsecret;
                     include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
                     $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
                     $weixinAccessToken = $jssdk->getAccessToken();
@@ -703,8 +653,7 @@ class wechat{
 
             //匹配关键字
             global $dsql;
-            global $cityid;
-            $sql = $dsql->SetQuery("SELECT `type`, `body`, `media` FROM `#@__site_wechat_autoreply` WHERE `cityid` = '$cityid' AND `title` like '%$key%' LIMIT 1");
+            $sql = $dsql->SetQuery("SELECT `type`, `body`, `media` FROM `#@__site_wechat_autoreply` WHERE `title` like '%$key%' LIMIT 1");
             $ret = $dsql->dsqlOper($sql, "results");
             if($ret){
                 $type  = $ret[0]['type'];
@@ -719,7 +668,6 @@ class wechat{
                     //判断是否为数组
                     if(is_array($bodyArr)){
                         
-                        global $cfg_wechatAppid, $cfg_wechatAppsecret;
                         include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
                         $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
                         $weixinAccessToken = $jssdk->getAccessToken();
@@ -728,33 +676,19 @@ class wechat{
                         $description = $bodyArr['description'];
                         $link = $bodyArr['link'];
                         $image = $bodyArr['image'];
-                        $media_id = isset($bodyArr['media_id']) ? $bodyArr['media_id'] : '';  //如果有此值，就用图片消息
                         
-                        //图片消息
-                        if($media_id){
-                            $data = '{
-                                "touser":"'.$postObj->FromUserName.'",
-                                "msgtype":"image",
-                                "image":{
-                                    "media_id": "'.$media_id.'"
-                                }
-                            }';
-                        }
-                        //图文消息
-                        else{
-                            $data = '{
-                                "touser":"'.$postObj->FromUserName.'",
-                                "msgtype":"news",
-                                "news":{
-                                    "articles": [{
-                                        "title": "'.$title.'",
-                                        "description": "'.$description.'",
-                                        "url": "'.$link.'",
-                                        "picurl": "'.$image.'"
-                                    }]
-                                }
-                            }';
-                        }
+                        $data = '{
+                            "touser":"'.$postObj->FromUserName.'",
+                            "msgtype":"news",
+                            "news":{
+                                "articles": [{
+                                    "title": "'.$title.'",
+                                    "description": "'.$description.'",
+                                    "url": "'.$link.'",
+                                    "picurl": "'.$image.'"
+                                }]
+                            }
+                        }';
     
                         $curl = curl_init();
                         curl_setopt($curl, CURLOPT_URL, "https://api.weixin.qq.com/cgi-bin/message/custom/send?access_token=".$weixinAccessToken);
@@ -765,11 +699,6 @@ class wechat{
                         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
                         $result = json_decode(curl_exec($curl), true);
                         curl_close($curl);
-
-                        // require_once dirname(__FILE__)."/../payment/log.php";
-                        // $_weixin= new CLogFileHandler(HUONIAOROOT . '/log/weixin/'.date('Y-m-d').'.log', true);
-                        // $_weixin->DEBUG(json_encode($result, JSON_UNESCAPED_UNICODE));
-                        
                         if($result['errcode'] == 0){
                             echo '';die;
                         }
@@ -794,6 +723,9 @@ class wechat{
             //站内搜索
             elseif(!$cfg_autoReplyWithSiteSearchState){
 
+                global $cfg_autoReplyWithSiteSearchModule;
+                global $cfg_autoReplyWithSiteSearchTitle;
+                global $cfg_autoReplyWithSiteSearchDescption;
                 global $esConfig;
 
                 $cfg_autoReplyWithSiteSearchTitle = $cfg_autoReplyWithSiteSearchTitle ? $cfg_autoReplyWithSiteSearchTitle : '查看与[$keyword]相关的内容';
@@ -964,7 +896,6 @@ class wechat{
                     
                 }
 
-                global $cfg_wechatAppid, $cfg_wechatAppsecret;
                 include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
                 $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
                 $weixinAccessToken = $jssdk->getAccessToken();
@@ -1031,7 +962,6 @@ class wechat{
       if(!file_exists($wechatConfig)) return;
       require($wechatConfig);
 
-      global $cfg_wechatAppid, $cfg_wechatAppsecret;
       include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
       $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
       $weixinAccessToken = $jssdk->getAccessToken();
@@ -1095,7 +1025,6 @@ class wechat{
       if(!file_exists($wechatConfig)) return;
       require($wechatConfig);
 
-      global $cfg_wechatAppid, $cfg_wechatAppsecret;
       include_once(HUONIAOROOT."/include/class/WechatJSSDK.class.php");
       $jssdk = new WechatJSSDK($cfg_wechatAppid, $cfg_wechatAppsecret);
       $weixinAccessToken = $jssdk->getAccessToken();
@@ -1130,64 +1059,15 @@ class wechat{
                 $key      = $user_info['unionid'];
                 $key      = $key ? $key : $user_info['openid'];
 
-                global $cityid;
-                //如果是独立公众号的分站
-                if ($cityid) {
-                    $where = "`cityid` = ".$cityid." AND `openid` = '".$user_info['openid']."'";
-                    $nowTime = GetMkTime(time());
-
-                    //先查询对应分站是否已经有记录了，有记录就更新，没有就新增
-                    $sql = $dsql->SetQuery("SELECT `id` FROM `#@__member_wechat_subscribe` WHERE ".$where);
-                    $ret = $dsql->dsqlOper($sql, "results");
-                    if ($ret != null && is_array($ret)) {
-                        $sql = $dsql->SetQuery("UPDATE `#@__member_wechat_subscribe` SET `subscribe` = 1,`subscribe_time` = ".$nowTime." WHERE `id` = ".$ret[0]['id']);
-                        $dsql->dsqlOper($sql, "update");
-
-                        return;
-                    } else {
-                        //如果有传入有效的uid，则插入新的分站关注记录
-                        $userid = (int)$uid;
-                        if ($userid > 0) {
-                            $sql = $dsql->SetQuery("INSERT INTO `#@__member_wechat_subscribe` (`cityid`,`userid`,`openid`,`subscribe`,`subscribe_time`) VALUES (".$cityid.",".$userid.",'".$user_info['openid']."',1,".$nowTime.")");
-                            $dsql->dsqlOper($sql, 'update');
-
-                            return;
-                        }
-                    }
-
-                    return;
-                } else {
-                    //如果是主站
-                    $sql = $dsql->SetQuery("SELECT `id` FROM `#@__member` WHERE `wechat_conn` = '$key' OR `wechat_openid` = '$key'");
-                    $ret = $dsql->dsqlOper($sql, "results");
-                    if($ret){
-
-                        //更新用户信息
-                        $sql = $dsql->SetQuery("UPDATE `#@__member` SET `wechat_subscribe` = 1 WHERE `wechat_conn` = '$key' OR `wechat_openid` = '$key'");
-
-                    }else{
-
-                        $openidsql = $dsql->SetQuery("SELECT `wxkey` FROM `#@__site_wxid` WHERE `wxkey` = '$key' ");
-                        $openidres = $dsql->dsqlOper($openidsql, 'results');
-                        if (!empty($openidres)){
-                            // $sql = $dsql->SetQuery("UPDATE `#@__member` SET `wxkey` = '$key' WHERE `wxkey` = '$key'");
-                            // $dsql->dsqlOper($sql, 'update');
-                        }else{
-                            $sql = $dsql->SetQuery("INSERT INTO `#@__site_wxid` (`wxkey`) VALUES ('$key')");            //存取key方便用于更新关注公众号字段
-                            $dsql->dsqlOper($sql, 'update');
-                        }
-
-                    }
-                }
-
                 //查询现有用户是否存在，如果已经存在，更新关注状态
-                /*$sql = $dsql->SetQuery("SELECT `id` FROM `#@__member` WHERE `wechat_conn` = '$key' OR `wechat_openid` = '$key'");
+                $sql = $dsql->SetQuery("SELECT `id` FROM `#@__member` WHERE `wechat_conn` = '$key' OR `wechat_openid` = '$key'");
                 $ret = $dsql->dsqlOper($sql, "results");
                 if($ret){
 
                     //更新用户信息
-                    $sql = $dsql->SetQuery("UPDATE `#@__member` SET `wechat_subscribe` = 1 ".$_updateCityid." WHERE `wechat_conn` = '$key' OR `wechat_openid` = '$key'");
-
+                    $sql = $dsql->SetQuery("UPDATE `#@__member` SET `wechat_subscribe` = 1 WHERE `wechat_conn` = '$key' OR `wechat_openid` = '$key'");
+                    $dsql->dsqlOper($sql, "update");
+                    
                 }else{
 
                     $openidsql = $dsql->SetQuery("SELECT `wxkey` FROM `#@__site_wxid` WHERE `wxkey` = '$key' ");
@@ -1200,9 +1080,7 @@ class wechat{
                         $dsql->dsqlOper($sql, 'update');
                     }
 
-                }*/
-
-
+                }
                 // $key      = $openid;
                 $nickname = trim($user_info['nickname']);
                 $photo    = trim($user_info['headimgurl']);
@@ -1232,42 +1110,5 @@ class wechat{
 
     }
 
-    //确认收货后通知
-    public function confirmDeliveryNotify($obj)
-    {
-        if(isset($obj->confirm_receive_method) && in_array($obj->confirm_receive_method, array('1', '2'))){ //属于确认收货消息
-            global $dsql;
-            $transactionId = $obj->transaction_id; //微信交易单号
-            $sql = $dsql->SetQuery("SELECT `ordertype`, `body` FROM `#@__pay_log` WHERE `transaction_id` = '$transactionId' AND `paytype` IN ('wxpay', 'allinpay_wxpay') AND `state` = 1"); //已支付的微信订单
-            $payLog = $dsql->getArr($sql);
-            if ($payLog) {
-                if ($payLog['ordertype'] == 'shop') { //在线商城 确认收货逻辑
-                    $ordernums = $payLog['body'] ? explode(',', $payLog['body']) : array();
-                    if ($ordernums) {
-                        $valArr = array();
-                        foreach ($ordernums as $val) {
-                            $valArr[] = "'$val'";
-                        }
-                        $whereVal = join(',', $valArr);
-                        $sql = $dsql->SetQuery("SELECT `id`, `ordernum`, `userid`, `orderstate`, `shipping` FROM `#@__shop_order` WHERE `ordernum` in ($whereVal) AND `orderstate`=6"); //需要确认收货的订单
-                        $shopOrders = $dsql->dsqlOper($sql, 'results');
-                        if ($shopOrders) {
-                            foreach ($shopOrders as $order) {
-                                //商城确认收货流程
-                                global $autoReceiptUserID;
-                                $autoReceiptUserID = $order['userid'];
-                                $moduleHandler = new handlers("shop", "receipt");
-                                $ret = $moduleHandler->getHandle(array('id' => $order['id']));
-                                $note = sprintf("微信支付交易单号: %s, 订单号：%s, 用户id: %d, 商城确认收货接口返回值：%s", $transactionId, $order['ordernum'], $order['userid'], json_encode($ret));
-                                adminLog('收到微信小程序确认收货通知', $note, 'shop');
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return "";
-    }
 
 }

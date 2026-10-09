@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var action = '{#$action#}', adminPath = "{#$adminPath#}";
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <dl class="clearfix">
+    <dt>订单编号：</dt>
+    <dd class="singel-line">{#$ordernum#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>订单时间：</dt>
+    <dd class="singel-line">{#$orderdate#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>订单状态：</dt>
+    <dd class="singel-line">
+      {#if $orderstate == 0#}
+      <span class="muted">未付款</span>
+      {#elseif $orderstate == 1#}
+      已付款
+      {#elseif $orderstate == 2#}
+      <span class='text-error'>已过期</span>
+      {#elseif $orderstate == 3#}
+      <span class='text-info'>交易成功</span>
+      {#elseif $orderstate == 6#}
+        {#if $retState == 1#}
+          {#if $expDate == 0#}
+            未发货，买家申请退款
+          {#else#}
+            已发货，买家申请退款
+          {#/if#}
+        {#else#}
+          已发货，等待买家收货
+        {#/if#}
+      {#elseif $orderstate == 7#}
+      <span class='text-error'>退款成功</span>
+      {#/if#}
+    </dd>
+  </dl>
+  
+  {#if $orderstate == 7#}
+  <dl class="clearfix">
+    <dt>退款时间：</dt>
+    <dd class="singel-line">{#$retOkdate#}</dd>
+  </dl>
+  {#/if#}
+  
+
+  {#if ($orderstate == 6 && $retState == 1) || $orderstate == 7#}
+  <div style="padding: 5px 0; background:#f5f5f5;">
+    <dl class="clearfix">
+      <dt>退款原因：</dt>
+      <dd class="singel-line">{#$retType#}</dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>退款说明：</dt>
+      <dd class="singel-line">{#$retNote#}</dd>
+    </dl>
+    {#if $retPics|@count > 0#}
+    <dl class="clearfix">
+      <dt>退款凭证：</dt>
+      <dd class="singel-line">
+        {#foreach from=$retPics item=pics key=k#}
+        <a href="{#$pics.path#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics.val#}&type=small" /></a>
+        {#/foreach#}
+      </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt>申请时间：</dt>
+      <dd class="singel-line">{#$retDate#}</dd>
+    </dl>
+  </div>
+  {#/if#}
+
+
+  {#if $retSnote != ""#}
+  <div style="margin-top: 10px; padding: 5px 0; background:#f5f5f5;">
+    <dl class="clearfix">
+      <dt>卖家回复：</dt>
+      <dd class="singel-line">{#$retSnote#}</dd>
+    </dl>
+    {#if $retSpics|@count > 0#}
+    <dl class="clearfix">
+      <dt>回复凭证：</dt>
+      <dd class="singel-line">
+        {#foreach from=$retSpics item=pics key=k#}
+        <a href="{#$pics.path#}" target="_blank"><img src="{#$cfg_attachment#}{#$pics.val#}&type=small" /></a>
+        {#/foreach#}
+      </dd>
+    </dl>
+    {#/if#}
+    <dl class="clearfix">
+      <dt>回复时间：</dt>
+      <dd class="singel-line">{#$retSdate#}</dd>
+    </dl>
+  </div>
+  {#/if#}
+
+
+
+  <dl class="clearfix">
+    <dt>下单会员：</dt>
+    <dd class="singel-line"><a href="javascript:;" data-id="{#$userid#}" class="userinfo">{#$username#}</a></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>团购商品：</dt>
+    <dd class="singel-line"><a href="{#$prourl#}" target="_blank">{#$proname#}</a></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>订单总额：</dt>
+    {#if $freeshiMoney != 0#}
+    <dd class="singel-line"><small>单价：</small>&yen;{#$orderprice#} × <small>数量：</small>{#$procount#} + <small>运费：</small>{#$freeshiMoney#} = <strong>&yen;{#$totalAmount#}</strong></dd>
+    {#else#}
+    <dd class="singel-line"><small>单价：</small>&yen;{#$orderprice#} × <small>数量：</small>{#$procount#} = <strong>&yen;{#$totalAmount#}</strong></dd>
+    {#/if#}
+  </dl>
+
+  {#if $orderstate != 0#}
+  <dl class="clearfix">
+    <dt>付款方式：</dt>
+    <dd class="singel-line">{#$paytype#}<br />积分：<strong>{#$point#}</strong>&nbsp;&nbsp;余额：<strong>{#$balance#}</strong>&nbsp;&nbsp;另外支付：<strong>{#$payprice#}</strong></dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>付款时间：</dt>
+    <dd class="singel-line">{#$paydate#}</dd>
+  </dl>
+  {#/if#}
+  
+  {#if $tuantype == 0 and $orderstate != 0#}
+  <dl class="clearfix">
+    <dt>团购券：</dt>
+    <dd class="singel-line">
+      <table style="width:400px;">
+        <thead>
+          <tr align="left">
+            <th>券号</th>
+            <th>过期时间</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#section name=n loop=$cardnum#}
+          <tr>
+            <td>{#$cardnum[n][0]#}</td>
+            <td>{#$cardnum[n][2]#}</td>
+            <td>{#$cardnum[n][1]#}</td>
+          </tr>
+          {#/section#}
+        </tbody>
+      </table>
+    </dd>
+  </dl>
+  {#/if#}
+  
+  {#if $tuantype == 1 and $orderstate != 0#}
+  <dl class="clearfix">
+    <dt>充值卡：</dt>
+    <dd class="singel-line">
+      <table style="width:500px;">
+        <thead>
+          <tr align="left">
+            <th>卡号</th>
+            <th>面值</th>
+            <th>过期时间</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#section name=n loop=$cardnum#}
+          <tr>
+            <td>{#$cardnum[n][0]#}</td>
+            <td>&yen;{#$cardnum[n][3]#}</td>
+            <td>{#$cardnum[n][2]#}</td>
+            <td>{#$cardnum[n][1]#}</td>
+          </tr>
+          {#/section#}
+        </tbody>
+      </table>
+    </dd>
+  </dl>
+  {#/if#}
+  
+  {#if $tuantype == 2#}
+  <dl class="clearfix">
+    <dt>街道地址：</dt>
+    <dd class="radio">
+      <input class="input-xxlarge" type="text" name="useraddr" id="useraddr" value="{#$useraddr#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>收货人姓名：</dt>
+    <dd class="radio">
+      <input class="input-medium" type="text" name="username" id="username" value="{#$people#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>联系电话：</dt>
+    <dd class="radio">
+      <input class="input-xlarge" type="text" name="usercontact" id="usercontact" value="{#$usercontact#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>送货时间：</dt>
+    <dd class="radio">
+      <select name="deliveryType" id="deliveryType" class="input-xlarge">
+        {#html_options options=$deliveryTypeList selected=$deliveryType#}
+      </select>
+    </dd>
+  </dl>  
+  <dl class="clearfix">
+    <dt>备注：</dt>
+    <dd class="radio">
+      <textarea class="input-xxlarge" type="text" name="usernote" id="usernote">{#$usernote#}</textarea>
+    </dd>
+  </dl>
+  
+  {#if $expDate != 0#}
+  <dl class="clearfix">
+    <dt>快递公司：</dt>
+    <dd class="singel-line">{#$expCompany#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>快递单号：</dt>
+    <dd class="singel-line">{#$expNumber#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>发货时间：</dt>
+    <dd class="singel-line">{#$expDate#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>物流跟踪：</dt>
+    <dd class="singel-line"><a href="https://www.baidu.com/s?wd={#$expCompany#} {#$expNumber#}" target="_blank">点击查看</a></dd>
+  </dl>
+  {#/if#}
+
+  {#if $orderstate == 0 && $expDate == 0#}
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+  {#/if#}
+  {#/if#}
+</form>
+
+{#$jsFile#}
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <meta charset="UTF-8">
+    <title>{#$article_title#}</title>
+    <meta name="keywords" content="{#$article_keywords#}" />
+    <meta name="description" content="{#$article_description#}" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/video.css?v={#$cfg_staticVersion#}" media="all" />
+
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+    <script type="text/javascript" >
+        var masterDomain = '{#$cfg_basehost#}';
+        var staticPath = '{#$cfg_staticPath#}';
+        var mold = '{#$mold#}';
+        var typeid = {#$list_id|default:0#};
+        var searchPage = '{#getUrlPath service='article' template='search' param='keywords='#}';
+    </script>
+</head>
+<body class="w1200">
+<!--头部 s-->
+{#include file="_top.html" pageCurr=$pageCurr#}
+<!--头部 e-->
+<div class="contain">
+    <div class="wrap">
+
+        <div class="containtwo">
+
+            <!--列表式-->
+            <div class="con fn-clear pta show">
+
+                <ul class="fudong-nav">
+                    <div class="hd"><h2>这些圈子都在看</h2></div>
+                    {#$n = 0#}
+                    {#article action='type' mold="$mold" return='type'#}
+                    <li {#if $typeid == $row.id || $parentid == $row.id#}class="active item"{#/if#}>
+                        <a href="{#$type.url#}">{#$type.typename#}</a>
+                        <div class="secondnac-box">
+                            <ul class="second-nav">
+                                {#article action='type' mold="$mold" type={#$type.id#} return='type1'#}
+                                <li class="on_nav">
+                                    <a href="{#$type1.url#}" title="{#$type1.typename#}"> {#$type1.typename#}</a>
+                                </li>
+                                {#/article#}
+                            </ul>
+                        </div>
+                    </li>
+                    {#$n = $n + 1#}
+                    {#/article#}       
+                </ul>
+                <!--左侧浮动导航e-->
+                {#if $n > 10#}
+                {#$minh = 66 + 57 * 10#}
+                {#else#}
+                {#$minh = 66 + 57 * $n#}
+                {#/if#}
+                {#if $minh < 300#}
+                {#$minh = 300#}
+                {#/if#}
+
+                <!--中间部分-->
+                <div class="content fl" style="min-height:{#$minh#}px;" id="content">
+                    {#article action='alist' mold="$mold" typeid=$list_id flag="h" pageSize=1 return='list'#}
+                    <div class="video-module">
+                        <div class="wrapper">
+                            <a href="{#$list.url#}" target="_blank">
+                                <img src="{#if $list.litpic#}{#$list.litpic#}{#else#}/static/images/blank.gif{#/if#}" alt="{#$list.title|strip_tags#}">
+                                <div class="play-box"><span class="play-btn"></span><div class="bg"></div></div>
+                            </a>
+                        </div>
+                        <div class="info">
+                            <p class="title">{#$list.title#}</p>
+                            <div class="items fn-clear">
+                                {#if $list.writer#}
+                                {#if $list.media#}
+                                <div class="fn-left"><a href="{#$list.media.url#}" class="author">{#$list.writer#}</a></div>
+                                {#else#}
+                                <div class="fn-left"><span class="author">{#$list.writer#}</span></div>
+                                {#/if#}
+                                {#/if#}
+                                <span class="publish">{#$list.pubdate|date_format:'%Y-%m-%d %H:%M:%S'#}</span>
+                                <div class="fn-right">
+                                    <a href="javascript:;" class="sharebtn newBtn_share t listBtnShare" data-title="{#$list.title|strip_tags#}" data-url="{#$list.url#}" data-pic="{#$list.litpic#}">分享</a>
+                                    <span class="count">{#if $list.click >= 10000#}{#$list.click / 10000#}万{#else#}{#$list.click#}{#/if#}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {#/article#}
+
+                    <div class="arithmetic-list">
+                        <div class="hd">
+                            <h2 class="title">享看懂你 <span class="sub-title">你的专属视频</span></h2>
+                        </div>
+                        <div class="bd">
+                            <ul class="video-list " id="vdlist"></ul>
+
+                            <div style="font-size:14px;color:#bfbfbf;text-align:center;line-height:168px;" class="loa">加载中...</div>
+                            <!-- <div class="loadmore">为您推荐了10条视频</div> -->
+                        </div>
+                    </div>
+
+                </div>
+                <div class="sidebar fr">
+                    <div class="hd fn-clear"><h2 class="fl">相关推荐</h2>   </div>
+                    <ul class="video-list">
+                        {#article action='alist' mold=$mold typeid=$list_id flag="r" pageSize=6 return='list'#}
+                        <li><a href="{#$list.url#}" target="_blank">
+                            <div class="inner">
+                                <div class="pic">
+                                    <img src="{#if $list.litpic#}{#$list.litpic#}{#else#}/static/images/blank.gif{#/if#}" alt="{#$list.title|strip_tags#}">
+                                    {#if $list.videotime_#}<span class="duration">{#$list.videotime_#}</span>{#/if#}
+                                </div>
+                                <div class="info">
+                                    <p class="title">{#$list.title#}</p>
+                                    <span class="author">{#$list.writer#}</span>
+                                    <span class="count">{#if $list.click >= 10000#}{#$list.click / 10000#}万{#else#}{#$list.click#}{#/if#}</span>
+                                </div>
+                            </div>
+                        </a></li>
+                        {#/article#}
+                    </ul>
+                    <div class="more"><a href="{#getUrlPath service='article' template='video'#}">查看更多</a></div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<!--底部 s-->
+{#include file='../../siteConfig/public_foot_v3.html' module='article' theme='gray'#}
+<!--底部 e-->
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/video.js?v={#$cfg_staticVersion#}"></script>
+
+</body>
+</html>

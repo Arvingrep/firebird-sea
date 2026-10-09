@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html>
+<head>
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<title>{#if $hottuan == 1#}热门团购{#else if $typeid#}分类列表{#else if $stype=='shop'#}推荐商家{#else#}搜索结果{#/if#}</title>
+<meta name="apptitle" content="{#if $hottuan == 1#}热门团购{#else if $typeid#}分类列表{#else if $stype=='shop'#}推荐商家{#else#}搜索结果{#/if#}">
+<meta name="keywords" content="{#$shop_keywords#}"/>
+<meta name="description" content="{#$shop_description#}"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1">
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}"/>
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+<link rel="stylesheet" href="{#$templets_skin#}css/search_list.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script>
+	var masterDomain = '{#$cfg_basehost#}',staticPath = '{#$cfg_staticPath#}', templets_skin = '{#$templets_skin#}';
+	var hideFileUrl  = {#$cfg_hideUrl#};
+	var cookiePre    = '{#$cfg_cookiePre#}';
+	var liveUrl      = '{#getUrlPath service='shop'  template='live'#}';
+	var cityid       = "{#$siteCityInfo['cityid']#}";
+	var detailUrl    = "{#getUrlPath  service='shop' template='detail' id='%id%'#}";
+	var stdetailurl    = "{#getUrlPath  service='shop' template='store-detail' id='%id%'#}";
+	var hottuan		 = "{#$hottuan#}";
+	var nowkeywords		 = "{#$keywords#}";
+	var from		 = "{#$from#}";
+	var typeid		 = "{#$typeid#}";
+	var typename	 = "{#$typename#}";
+	var parentid	 = "{#$parentid#}";
+	var stype = '{#$stype#}';
+	var pagetype = '{#$pagetype#}'
+	var pid = '{#$pid#}'
+</script>
+</head>
+</head>
+<body class="{#if $stype=='shop'#}recStore{#/if#}">
+{#if $hottuan == 1#}{#$pageTitle = "热门团购"#}{#else if $typeid#}{#$pageTitle = "{#$typename#}"#}{#else if $stype=='shop'#}{#$pageTitle = "推荐商家"#}{#else if $keywords#}{#$pageTitle = "搜索结果"#}{#else#}{#$pageTitle = "分类列表"#}{#/if#}
+{#include file="../../../siteConfig/touch_top.html" headTheme="fixed" #}
+<!--搜索框s-->
+<div class="search_box fn-clear">
+	<form class="form_search" action="">
+		<input id="keywords" name="keywords" type="text" placeholder="输入搜索关键词" enterkeyhint="search" autocomplete="off" value="" />
+		{#if $stype#}
+		<input type="hidden" name="stype" value="{#$stype#}">
+		{#/if#}
+		<i class="cancelSear"></i>
+	</form>
+</div>
+<div class="filterWrap">
+	<div class="filterTop">
+		<div class="headbox {#if $stype=='shop'#}fn-hide{#/if#}">
+			<ul>
+
+                {#foreach from=$shop_pageTypeConfig name=foo item=pageTypeConfig#}
+                    {#if $pageTypeConfig.show == 1#}
+                    <li class="{#if $pagetype == $pageTypeConfig.id || (!$pagetype && $stype != 'shop' && $smarty.foreach.foo.index == 0) || ($stype == 'shop' && $pageTypeConfig.id == 3)#}curr{#/if#}" data-id="{#$pageTypeConfig.id#}"><a href="javascript:;">{#$pageTypeConfig.title#}</a></li>
+                    {#/if#}
+                {#/foreach#}
+
+                {#*
+				<li class="{#if $stype != 'shop' || $pagetype != 2#}curr{#/if#} {#if $pagetype == 2#}fn-hide{#/if#}"><a href="javascript:;">到店优惠</a></li>
+				{#if $pagetype != 1#}
+				<li class="{#if $stype != 'shop' && $pagetype==2#}curr{#/if#}"><a href="javascript:;">送到家</a></li>
+                {#/if#}
+				{#if $hottuan != 1#}
+				<li class="{#if $stype == 'shop'#}curr{#/if#}"><a href="javascript:;">商家</a></li>
+				{#/if#}
+                *#}
+
+				<s></s>
+			</ul>
+		</div>
+		<div class="filterBox">
+			{#if $stype!='shop'#}
+            {#foreach from=$shop_pageTypeConfig name=foo item=pageTypeConfig#}
+            {#if $pageTypeConfig.show == 1 && $pageTypeConfig.id == 1#}
+			<div data-id="{#$pageTypeConfig.id#}" class="daodfilter comfilter {#if $pagetype == 1 || (!$pagetype && $smarty.foreach.foo.index == 0) #}comshow{#/if#}">
+				<div class="comdiv">
+					<a href="javascript:;" class="quyu" data-id=""><span>区域</span><s></s></a>
+					<a href="javascript:;" class="orderby" data-id=""><span>综合排序</span><s></s></a>
+					<a href="javascript:;" class="fenlei" data-id="{#$typeid#}"><span>{#$typename|default:"分类"#}</span><s></s></a>
+				</div>
+				<div class="shaixuan" data-id="">筛选 <span class="sx_num"></span><s></s></div>
+			</div>	
+            {#/if#}
+            {#if $pageTypeConfig.show == 1 && $pageTypeConfig.id == 2#}
+			<div data-id="{#$pageTypeConfig.id#}" class="tcfilter comfilter {#if $pagetype == 2 || (!$pagetype && $smarty.foreach.foo.index == 0) #}comshow{#/if#}">
+				<div class="comdiv">
+					<a href="javascript:;" class="tcg special" data-id=""><i></i><span>同城购</span></a>
+					<a href="javascript:;" class="orderby" data-id=""><span>综合排序</span><s></s></a>
+					<a href="javascript:;" class="fenlei" data-id="{#$typeid#}"><span>{#$typename|default:"分类"#}</span><s></s></a>
+				</div>
+				<div class="shaixuan" data-id="">筛选 <span class="sx_num"></span><s></s></div>
+			</div>	
+            {#/if#}
+            {#if $pageTypeConfig.show == 1 && $pageTypeConfig.id == 3#}
+            <div data-id="{#$pageTypeConfig.id#}" class="busfilter comfilter {#if $stype=='shop' || $pagetype == 3#}comshow{#/if#}">
+				<div class="comdiv">
+					<a href="javascript:;" class="quyu busquyu" data-id=""><span>区域</span><s></s></a>
+					<a href="javascript:;" class="orderby" data-id=""><span>综合排序</span><s></s></a>
+					<a href="javascript:;" class="fenlei" data-id="{#$typeid#}"><span>{#$typename|default:"分类"#}</span><s></s></a>
+					<a href="javascript:;" class="yingye special" data-id=""><span>营业中</span></a>
+					{#if $pagetype != 2#}
+					<a href="javascript:;" class="istuan special" data-id=""><span>团购</span></a>
+					{#/if#}
+				</div>
+				<div class="shaixuan" data-id="">筛选 <span class="sx_num"></span><s></s></div>
+			</div>
+            {#/if#}
+            {#/foreach#}
+			{#else#}
+			<div data-id="{#$pageTypeConfig.id#}" class="busfilter comfilter {#if $stype=='shop' || $pagetype == 3#}comshow{#/if#}">
+				<div class="comdiv">
+					<a href="javascript:;" class="quyu busquyu" data-id=""><span>区域</span><s></s></a>
+					<a href="javascript:;" class="orderby" data-id=""><span>综合排序</span><s></s></a>
+					<a href="javascript:;" class="fenlei" data-id="{#$typeid#}"><span>{#$typename|default:"分类"#}</span><s></s></a>
+					<a href="javascript:;" class="yingye special" data-id=""><span>营业中</span></a>
+					{#if $pagetype != 2#}
+					<a href="javascript:;" class="istuan special" data-id=""><span>团购</span></a>
+					{#/if#}
+				</div>
+				<div class="shaixuan" data-id="">筛选 <span class="sx_num"></span><s></s></div>
+			</div>
+			{#/if#}			
+		</div>
+	</div>
+	<div class="filterBot">
+		<!-- 区域 共用 s-->
+		<div class="filerAlert quyuAlert">
+			<div class="chooseLeft">
+				<ul>
+<!--					<li><a href="javascript:;" data-id="" data-lower="0">全苏州</a></li>-->
+					<li><a href="javascript:;" data-id="" data-lower="0">附近</a></li>
+<!--					<li><a href="javascript:;" data-id="" data-lower="0">热门商圈</a></li>-->
+					{#shop action="addr" type=$siteCityInfo['cityid'] return='addr'#}
+					<li><a href="javascript:;" data-id="{#$addr.id#}" data-lower="1">{#$addr.typename#}</a></li>
+					{#/shop#}
+				</ul>
+			</div>
+			<div class="chooseRight">
+				<ul></ul>
+			</div>
+		</div>
+		<!-- 区域 共用 e-->
+		<!-- 分类 共用 s-->
+		<!--  -->
+		<div class="filerAlert fenleiAlert {#if $pid || $typeid#}active{#/if#}" >
+			<div class="chooseLeft">
+				<ul>
+
+					<li><a href="javascript:;" data-id="" data-lower="0">不限分类</a></li>
+					{#if $pid && $pid != $parentid#}
+					{#shop action="type" return='type' type=$pid#}
+					<li class="{#if $type.id == $typeid || $parentid == $type.id#}curr{#/if#}" ><a href="javascript:;" data-id="{#$type.id#}" data-lower="{#if $type.lower#}{#$type.lower#}{#else#}0{#/if#}">{#$type.typename#}</a></li>
+					{#/shop#}
+					{#else#}
+					{#shop action="type" return='type'#}
+					<li class="{#if $type.id == $typeid || $parentid == $type.id#}curr{#/if#}" ><a href="javascript:;" data-id="{#$type.id#}" data-lower="{#if $type.lower#}{#$type.lower#}{#else#}0{#/if#}">{#$type.typename#}</a></li>
+					{#/shop#}
+					{#/if#}
+					
+				</ul>
+			</div>
+			<div class="chooseRight">
+				<ul>
+					
+					{#if $pid#}
+					<li><a href="javascript:;" data-id="{#$pid#}" data-lower="0">不限分类</a></li>
+					{#if $parentid != $pid#}
+					{#shop action="type" return='type' type=$parentid#}
+					<li class="{#if $type.id == $typeid || $parentid == $type.id#}curr{#/if#}" ><a href="javascript:;" data-id="{#$type.id#}" data-lower="{#if $type.lower#}{#$type.lower#}{#else#}0{#/if#}">{#$type.typename#}</a></li>
+					{#/shop#}
+					{#else#}
+					{#shop action="type" return='type' type=$parentid#}
+					<li class="{#if $type.id == $typeid || $parentid == $type.id#}curr{#/if#}" ><a href="javascript:;" data-id="{#$type.id#}" data-lower="{#if $type.lower#}{#$type.lower#}{#else#}0{#/if#}">{#$type.typename#}</a></li>
+					{#/shop#}
+					{#/if#}
+					{#else if $typeid#}
+					{#shop action="type" return='type' type=$typeid#}
+					<li class="{#if $type.id == $typeid || $parentid == $type.id#}curr{#/if#}" ><a href="javascript:;" data-id="{#$type.id#}" data-lower="{#if $type.lower#}{#$type.lower#}{#else#}0{#/if#}">{#$type.typename#}</a></li>
+					{#/shop#}
+					{#/if#}
+
+				</ul>
+			</div>
+
+			<div class="lowerBox">
+				<div class="lower_mask"></div>
+				<div class="lower_con ">
+					<ul></ul>
+				</div>
+			</div>
+		</div>
+		<!-- 分类 共用 e-->
+		<!-- 到店优惠 排序 s-->
+		<div class="filerAlert pxAlert" data-type="daodian">
+			<ul>
+				<li><a href="javascript:;" data-id="">综合排序<s></s></a></li>
+				<li><a href="javascript:;" data-id="11">距离最近<s></s></a></li>
+				<li><a href="javascript:;" data-id="12">好评优先<s></s></a></li>
+				<li><a href="javascript:;" data-id="3">低价优先<s></s></a></li>
+				<li><a href="javascript:;" data-id="4">高价优先<s></s></a></li>
+			</ul>
+		</div>
+		<!-- 到店优惠 排序 e-->
+	
+		<!-- 到店优惠 筛选 s-->
+		<div class="sxAlert" data-type="daodian">
+			<div class="sxTop">
+				<dl class="bidl comdl" data-chose="discount">
+					<dt>服务/折扣</dt>
+					<dd>
+						<a href="javascript:;" data-id="1">随时退</a>
+						<a href="javascript:;" data-id="2">活动促销</a>
+						<a href="javascript:;" data-id="3">新店</a>
+					</dd>
+				</dl>
+				{#if count($tagarr) > 0 && $tagarr[0] != ''#}
+				<dl class="smdl comdl" data-chose="feature">
+					<dt>环境/特色</dt>
+					<dd>
+						{#foreach from=$tagarr item=tag#}
+						<a href="javascript:;" data-id="{#$tag#}">{#$tag#}</a>
+						{#/foreach#}
+					</dd>
+				</dl>
+				{#/if#}
+				<dl>
+					<dt>价格区间</dt>
+					<dd>
+						<div class="price-box">
+							<input type="text" id="min_price" placeholder="最低价" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+							 <em class="line">-</em>
+							 <input type="text" id="high_price" placeholder="最高价" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+						</div>
+					</dd>
+				</dl>
+			</div>
+			<div class="sxBot">
+				<ul class="fn-clear">
+					<li class="fn-left"><a href="javascript:;" class="reset">重置</a></li>
+					<li class="fn-right"><a href="javascript:;" class="sure">确定<span class="sxNum"></span></a></li>
+				</ul>
+			</div>
+			
+		</div>
+		<!-- 到店优惠 筛选 e-->
+
+		<!-- 送到家 排序 s-->
+		<div class="filerAlert pxAlert" data-type="tohome">
+			<ul>
+				<li><a href="javascript:;" data-id="">综合排序<s></s></a></li>
+				<li><a href="javascript:;" data-id="1">按销量<s></s></a></li>
+				<li><a href="javascript:;" data-id="3">价格升序<s></s></a></li>
+				<li><a href="javascript:;" data-id="4">价格降序<s></s></a></li>
+			</ul>
+		</div>
+		<!-- 送到家 排序 e-->
+		<!-- 送到家 筛选 s-->
+		<div class="sxAlert" data-type="tohome">
+			<div class="sxTop">
+				<dl class="smdl comdl" data-chose="discount">
+					<dt>服务/折扣</dt>
+					<dd>
+<!--						<a href="javascript:;" data-id="">免运费</a>-->
+						<a href="javascript:;" data-id="4">货到付款</a>
+						<a href="javascript:;" data-id="5">特价</a>
+						<a href="javascript:;" data-id="3">新店</a>
+					</dd>
+				</dl>
+				<dl>
+					<dt>价格区间</dt>
+					<dd>
+						<div class="price-box">
+							<input type="text" id="min_price" placeholder="最低价" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+							 <em class="line">-</em>
+							 <input type="text" id="high_price" placeholder="最高价" onkeyup="value=value.replace(/^\D*(\d*(?:\.\d{0,2})?).*$/g, '$1')">
+						</div>
+					</dd>
+				</dl>
+				<dl class="smdl brand comdl" data-chose="brand" id="pinpaihtml">
+					<dt class="moreInfo">品牌<s></s></dt>
+					<dd>
+						<!-- <a href="javascript:;" data-id="">{#$brand.title#}</a> -->
+					</dd>
+				</dl>
+			</div>
+			<div class="sxBot">
+				<ul class="fn-clear">
+					<li class="fn-left"><a href="javascript:;" class="reset">重置</a></li>
+					<li class="fn-right"><a href="javascript:;" class="sure">确定<span class="sxNum"></span></a></li>
+				</ul>
+			</div>
+			
+		</div>
+		<!-- 送到家 筛选 e-->
+
+		<!-- 商家 排序 s-->
+		<div class="filerAlert pxAlert" data-type="business">
+			<ul>   
+				<li><a href="javascript:;" data-id="">综合排序<s></s></a></li>
+				<li><a href="javascript:;" data-id="3">距离最近<s></s></a></li>
+				<li><a href="javascript:;" data-id="8">好评优先<s></s></a></li>
+				<li><a href="javascript:;" data-id="7">销量优先<s></s></a></li>
+			</ul>
+		</div>
+		<!-- 商家 排序 e-->
+
+		<!-- 商家 筛选 s-->
+		<div class="sxAlert " data-type="business">
+			<div class="sxTop">
+				<dl class="bidl comdl" data-chose="opentime">
+					<dt>营业时间</dt>
+					<dd>
+						<a href="javascript:;" data-id="1">营业中</a>
+						<a href="javascript:;" data-id="2">24小时营业</a>
+						<span class="choseTime">选择时间</span>
+						<a href="javascript:;" data-id="3" class="ttime">0-6时</a>
+						<a href="javascript:;" data-id="4" class="ttime">6-12时</a>
+						<a href="javascript:;" data-id="5" class="ttime spe">12-18时</a>
+						<a href="javascript:;" data-id="6" class="ttime last">18-24时</a>
+
+					</dd>
+				</dl>
+				<dl class="smdl comdl" data-chose="discount">
+					<dt>服务/折扣</dt>
+					<dd>
+						<a href="javascript:;" data-id="1">货到付款</a>
+						<a href="javascript:;" data-id="2">团购</a>
+<!--						<a href="javascript:;" data-id="3">随时退</a>-->
+						<a href="javascript:;" data-id="4">新店</a>
+						<a href="javascript:;" data-id="5">同城配送</a>
+<!--						<a href="javascript:;" data-id="6">店内促销</a>-->
+						<a href="javascript:;" data-id="7">认证商家</a>
+					</dd>
+				</dl>
+
+			</div>
+			<div class="sxBot">
+				<ul class="fn-clear">
+					<li class="fn-left"><a href="javascript:;" class="reset">重置</a></li>
+					<li class="fn-right"><a href="javascript:;" class="sure">确定 <span class="sxNum"></span></a></li>
+				</ul>
+			</div>
+			
+		</div>
+		<!-- 商家 筛选 e-->
+
+
+	</div>
+	
+</div>
+<div class="search_page">
+	<div class="swiper-container" id="tabs-container">
+      	<div class="swiper-wrapper">
+      		{#if $stype!='shop'#}
+
+            {#foreach from=$shop_pageTypeConfig name=foo item=pageTypeConfig#}
+            {#if $pageTypeConfig.show == 1 && $pageTypeConfig.id == 1#}
+	        <div class="swiper-slide ">
+				<div class="swiperBox">
+					<div class="localList comList">
+						<div class="fn-clear localDiv">
+							<ul class="fn-left list_ul1">
+							</ul>
+							<ul class="fn-right list_ul2">
+							</ul>
+						</div>
+						<div class="loading">加载中</div>
+					</div>
+				</div>
+				<div class="emptyData">
+					<img src="{#$templets_skin#}images/search/noresult.png" alt="">
+					<h2>非常抱歉</h2> 
+					<p>没有找到相关宝贝{#if $keywords != ''#}，换个关键词试试吧~{#/if#}</p>
+				</div>
+					<!-- 精选推荐 -->
+				<div class="command-list">
+					<div class="command-list-tit">
+						<h2></h2>
+						<span><i></i>{#$langData['shop'][0][8]#}</span>
+					</div>
+					<div class="command-list-con col2 fn-clear">
+						<ul class="goodlist fn-clear fn-left">
+							
+						</ul>
+						<ul class="goodlist fn-clear fn-left">
+							<!-- <li class="tuanPro">
+								<a href="javascript:;" class="proLink">
+									<div class="pro_img"><img src="" alt=""></div>
+									<div class="pro_info">
+										<h4>榴芒一刻旗舰店</h4>
+										<p class="sale_info"><span>已售3104</span><em>|</em><span>2.5km</span></p>
+										<p class="pro_price"><span class="symbol">￥</span><span class="num">95<em>.00</em></span></p>
+									</div>
+								</a>
+							</li> -->
+						</ul>
+						<div class="loading">{#$langData['siteConfig'][20][184]#}</div>
+					</div>
+				</div>
+				<!-- 精选推荐 end-->
+	        </div>
+	        {#/if#}
+	        {#if $pageTypeConfig.show == 1 && $pageTypeConfig.id == 2#}
+	        <div class="swiper-slide">
+				<div class="swiperBox">
+					<div class="choiceList comList">
+						<div class="fn-clear choiceDiv">
+							<ul class="fn-left list_ul1">
+								
+							</ul>
+							<ul class="fn-right list_ul2">
+							</ul>
+						</div>
+						<div class="loading">加载中</div>
+					</div>
+				</div>
+	        	
+				<div class="emptyData">
+					<img src="{#$templets_skin#}images/search/noresult.png" alt="">
+					<h2>非常抱歉</h2> 
+					<p>没有找到相关宝贝{#if $keywords != ''#}，换个关键词试试吧~{#/if#}</p>
+				</div>
+					<!-- 精选推荐 -->
+				<div class="command-list">
+					<div class="command-list-tit">
+						<h2></h2>
+						<span><i></i>{#$langData['shop'][0][8]#}</span>
+					</div>
+					<div class="command-list-con col2 fn-clear">
+						<ul class="goodlist fn-clear fn-left">
+							<!-- <li class="shopPro">
+								<a href="javascript:;" class="proLink">
+									<div class="pro_img"><img src="" alt=""></div>
+									<div class="pro_info">
+										<h4>榴芒一刻旗舰店</h4>
+										<div class="pro_price">
+											<div class="price"><span class="symbol">￥</span><span class="num">95<em>.00</em></span></div>
+											<span class="sale">3104件已售</span>
+										</div>
+										<p class="sale_lab"><span>同城送</span><span>包邮</span></p>
+									</div>
+								</a>
+							</li> -->
+						</ul>
+						<ul class="goodlist fn-clear fn-left">
+							
+						</ul>
+						<div class="loading">{#$langData['siteConfig'][20][184]#}</div>
+					</div>
+				</div>
+				<!-- 精选推荐 end-->
+	        </div>
+	        {#/if#}
+	        {#if $pageTypeConfig.show == 1 && $pageTypeConfig.id == 3#}
+            <div class="swiper-slide storeSlide">
+				<div class="swiperBox">
+					<div class="sameCity"><a href="javascript:;"><i></i>筛选同城商家</a></div>
+					<div class="storeList comList">
+						<div>
+							<ul>
+								
+							</ul>
+						</div>
+						<div class="loading">加载中</div>
+					</div>
+				</div>
+				<div class="emptyData">
+					<img src="{#$templets_skin#}images/search/noresult.png" alt="">
+					<h2>非常抱歉</h2> 
+					<p>没有找到相关商家{#if $keywords != ''#}，换个关键词试试吧~{#/if#}</p>
+				</div>
+					<!-- 精选推荐 -->
+				<div class="command-list">
+					<div class="command-list-tit">
+						<h2></h2>
+						<span><i></i>{#$langData['shop'][0][8]#}</span>
+					</div>
+					<div class="command-list-con">
+						<ul class="goodlist fn-clear">
+							<!-- <li class="store">
+								<a href="javascript:;" class="storeLink">
+									<div class="store_logo"><img src="" alt=""></div>
+									<div class="store_info">
+										<h4>榴芒一刻旗舰店</h4>
+										<p class="store_star"><span class="star">4.5</span><span class="xiadan">最近有100人下单</span></p>
+										<p class="store_label"><span>休闲零食</span><span>江苏 南京</span></p>
+									</div>
+								</a>
+							</li> -->
+						</ul>
+						<div class="loading">{#$langData['siteConfig'][20][184]#}</div>
+					</div>
+				</div>
+				<!-- 精选推荐 end-->
+	        </div>
+            {#/if#}
+            {#/foreach#}
+	        {#else#}
+	        <div class="swiper-slide storeSlide">
+				<div class="swiperBox">
+					<div class="sameCity"><a href="javascript:;"><i></i>筛选同城商家</a></div>
+					<div class="storeList comList">
+						<div>
+							<ul>
+								
+							</ul>
+						</div>
+						<div class="loading">加载中</div>
+					</div>
+				</div>
+				<div class="emptyData">
+					<img src="{#$templets_skin#}images/search/noresult.png" alt="">
+					<h2>非常抱歉</h2> 
+					<p>没有找到相关商家{#if $keywords != ''#}，换个关键词试试吧~{#/if#}</p>
+				</div>
+					<!-- 精选推荐 -->
+				<div class="command-list">
+					<div class="command-list-tit">
+						<h2></h2>
+						<span><i></i>{#$langData['shop'][0][8]#}</span>
+					</div>
+					<div class="command-list-con">
+						<ul class="goodlist fn-clear">
+							<!-- <li class="store">
+								<a href="javascript:;" class="storeLink">
+									<div class="store_logo"><img src="" alt=""></div>
+									<div class="store_info">
+										<h4>榴芒一刻旗舰店</h4>
+										<p class="store_star"><span class="star">4.5</span><span class="xiadan">最近有100人下单</span></p>
+										<p class="store_label"><span>休闲零食</span><span>江苏 南京</span></p>
+									</div>
+								</a>
+							</li> -->
+						</ul>
+						<div class="loading">{#$langData['siteConfig'][20][184]#}</div>
+					</div>
+				</div>
+				<!-- 精选推荐 end-->
+	        </div>
+	        {#/if#}
+      </div>
+  	</div>
+  
+</div>
+<!--搜索框s-->
+<div class="mask"></div>
+<input type="hidden" id="sxval">
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$shop_description#}',
+		"title": '{#$shop_title#}',
+		"imgUrl": '{#$shop_logoUrl#}',
+		"link": '{#$shop_channelDomain#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+{#include file="../../../siteConfig/public_location.html"#}
+<script type='text/javascript' src='{#$cfg_basehost#}/include/json.php?action=lang'></script>
+<script src="{#$templets_skin#}js/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}" type="text/javascript"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/search_list.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

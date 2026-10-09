@@ -69,7 +69,7 @@ function getList(is){
 	$(".pagination").hide();
 
 	$.ajax({
-		url: masterDomain+"/include/ajax.php?service=house&action=route&route=consumer/myEntrustList&state="+state+"&page="+atpage+"&pageSize="+pageSize,
+		url: masterDomain+"/include/ajax.php?service=house&action=myEntrust&state="+state+"&page="+atpage+"&pageSize="+pageSize,
 		type: "GET",
 		dataType: "jsonp",
 		success: function (data) {

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$langData['travel'][7][2]#}</title>{#* 订单填写 *#}
+    <meta name="keywords" content="{#$travel_keywords#}" />
+    <meta name="description" content="{#$travel_description#}" />
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/calendar.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/ticket-order.css?v={#$cfg_staticVersion#}" media="all" />
+    {#if $type ==2 && $detail_typeid ==1#}
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/group-order.css?v={#$cfg_staticVersion#}" media="all" />
+    {#/if#}
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$travel_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', templets_skin = '{#$templets_skin#}', type = '{#$type#}', price = '{#$price#}',typeid = '{#$detail_typeid#}',daytype='{#$detail_missiontype#}',totalBalance = '{#$userinfo.money#}';
+        var deTitle = '{#$title#}';
+        var specialtimejson = '{#$specialtimejson#}';
+        //先判断 是天天发团还是自选发团
+        var st = (daytype==1)?1:0;
+        var chosetimeArr = '';
+        if(st ==1 ){
+        	chosetimeArr = {#if $detail_missiontime#}'{#$detail_missiontime#}'{#else#}''{#/if#};
+        }
+
+
+        // 积分抵扣
+        var hasPoint = '{#$userinfo.point#}';
+        jifen_ =  '{#$cfg_offset_travel#}';
+        var pointRatio = {#$cfg_pointRatio#};
+    </script>
+
+</head>
+
+<body class="w1200">
+{#if $type==2#}
+    {#if $detail_typeid == 0#}
+    {#$pageCurr = "daytravel"#}
+    {#else#}
+    {#$pageCurr = "grouptravel"#}
+    {#/if#}
+{#else#}
+{#$pageCurr = "ticket"#}
+{#/if#}
+<!-- 导航 s-->
+{#include file="_top.html"#}
+
+<!-- 导航 e-->
+<div class="main_wrap">
+    <div class="wrap crumbs">
+        {#* 您当前所在： 首页*#}
+        <div class="cont">
+            {#$langData['travel'][14][0]#}
+            <a href="{#$travel_channelDomain#}">{#$langData['siteConfig'][0][0]#}</a>
+            <span>></span>
+            {#if $type==2#}
+                {#if $detail_typeid == 0#}
+                <a href="javascript:;" class="green_a">{#$langData['travel'][12][60]#}</a>{#* 一日游 *#}
+                {#else#}
+                <a href="javascript:;" class="green_a">{#$langData['travel'][12][61]#}</a>{#* 跟团游 *#}
+                {#/if#}
+            {#else#}
+            <a href="javascript:;" class="green_a">{#$langData['travel'][1][0]#}</a>{#* 景点门票 *#}
+            {#/if#}
+        </div>
+    </div>
+    <div class="wrap order-progress">
+        <ul class="fn-clear">
+            <li class="has-go white"><em>1</em>选择景点</li>
+            <li class="now-go white secd_li"><em>2</em>填写订单</li>
+            <li class="no-go grey third_li"><em>3</em>在线支付</li>
+            <li class="no-go grey four_li"><em>4</em>支付成功</li>
+        </ul>
+    </div>
+    <div class="fn-clear wrap main_con">
+        <div class="order_left ticketItemWrap">
+            <div class="left_con">
+                <div class="order_top orderInfo">
+                    <i class="leftIcon"></i><h2>预订信息</h2>
+                </div>
+                <div class="order_con">
+                    {#if $type == 1#}
+                    <h3 class="orderTitle">{#$detail_title#}<i class="more-icon"></i></h3>
+                    <div class="buy_note">
+                        {#$detail_note|nl2br#}
+                        <span class="hide_con">收起</span>
+                    </div>
+                    {#else#}
+                    <h3 class="orderTitle">{#$detail_title#}</h3>
+                    {#/if#}
+                    <dl class="start-time">
+                        {#if $type == 1#}
+                        <dt>日&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;期：</dt>
+                        {#else#}
+                        <dt>出行时间：</dt>
+                        {#/if#}
+                        <dd><input class="chooseDateInput" name="chooseDateInput_1" id="chooseDateInput_1" readonly="readonly" placeholder="请选择日期"><i class="time-icon"></i>
+                            <div id="single-pick"></div>
+                        </dd>
+                    </dl>
+                    <dl class="start-people">
+                        {#if $type == 1#}
+                        <dt>数&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;量：</dt>
+                        {#else#}
+                        <dt>{#$langData['travel'][3][16]#}：</dt>{#*  出游人数 *#}
+                        {#/if#}
+                        <dd class="num_people">
+                            <div class="adult fn-clear">
+
+                                <div class="_right">
+                                    <a href="javascript:;" class="jian"></a>
+                                    <span>1</span>
+                                    <a href="javascript:;" class="add"></a>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+                </div>
+                <div class="order_top orPeople">
+                    <i class="leftIcon"></i><h2>{#$langData['travel'][3][17]#}</em></h2>{#*  预订人信息<em>仅需填写1位实际出行的游客信息   *#}
+                </div>
+                <div class="peo_con">
+                    <input type="hidden" value="{#$id#}" id="proid" name="proid">
+                    <dl>
+                        <dt><label for="contact"><em class="star">*</em>姓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;名：</label></dt>
+                        <dd><input type="text" placeholder="请输入姓名" id="contact" name="contact"></dd>
+                    </dl>
+                    <dl class="peo_tel">
+                        <dt><label for="tel"><em class="star">*</em>手机号码：</label></dt>
+                        <dd>
+                            <div class="inpbdr fn-clear">
+                                <span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+                                <input type="text" placeholder="请输入手机号码" id="tel" name="tel">
+                                <!--国际区号弹窗-->
+                                <div class="areaCode_wrap areaCode_wrap2">
+                                    <ul>
+
+                                    </ul>
+                                </div>
+                                <input type="hidden" name="areaCode" id="areaCode" value="{#$internationalPhoneSection[0]['code']#}">
+                            </div>
+                            <span class="tip_span">用于接收确认短信</span>
+                        </dd>
+                    </dl>
+                    <dl class="peo_id">
+                        <dt><label for="person_id"><em class="star">*</em>身份证号：</label></dt>
+                        <dd><input type="text" placeholder="请输入身份证号" id="person_id" name="person_id"><span class="tip_span">用于景点入园凭证</span></dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="submit_btn">
+                <a href="javascript:;" class="submit_a publicpaybtn">{#$langData['travel'][8][41]#}</a>{#*  提交订单   *#}
+            </div>
+        </div>
+        <!-- 列表右 s-->
+
+        <!-- 结算信息 s-->
+        <div class="settlement">
+            <h2>结算信息</h2>
+            <div class="tour_fare">
+                <div class="tour_top">
+                    <span>出游团费</span><span class="detail_all fn-right">{#echoCurrency type='symbol'#}<em>0</em></span>
+                </div>
+                <div class="tour_bot">
+                <p>{#$title#} {#echoCurrency type='symbol'#}<em class="peoUnit">{#$price#}</em> x <span class="peoNum">1</span></p>
+                </div>
+            </div>
+            <!-- 优惠信息 -->
+            {#if $userinfo.point > 0 && $cfg_offset_travel > 0#}
+            <dl class="youhui integral">
+              <dt>本单优惠</dt>
+              <dd class="fn-clear">
+                <div class="ltxt"><span class="gou hasgou"></span>使用<span class="jifen">0</span>积分抵扣<span class="jifen_jian">0</span>元</div>
+                <div class="rtxt amount_jian">-{#echoCurrency type="symbol"#}<span>0</span></div>
+              </dd>
+            </dl>
+            {#/if#}
+            <div class="priceAll">
+                <span>总价</span><span class="price_all fn-right">{#echoCurrency type='symbol'#}<em>{#$totalAmount#}</em></span>
+            </div>
+        </div>
+        <!-- 结算信息 e-->
+
+        <!-- 列表右 e-->
+    </div>
+</div>
+{#include file="{#$HUONIAOROOT#}/templates/member/public-pay-pop.html"#}
+
+{#include file="../../siteConfig/public_foot_v3.html" module='siteConfig' theme='gray'#}
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.scroll.loading.js"></script>
+<script charset="UTF-8" src="{#$cfg_staticPath#}js/ui/jquery.SuperSlide.2.1.1.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<!-- 公共头部搜索+收藏js -->
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/calendar.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/confirm-order.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/ticket-order.js?v={#$cfg_staticVersion#}"></script>
+
+
+</body>
+</html>

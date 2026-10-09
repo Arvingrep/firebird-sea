@@ -109,32 +109,6 @@ $(function(){
 				}
 			}
 
-			//导出数据
-			, export: function () {
-				$("#sKeyword").html($("#keyword").val());
-				$("#sstype").html($("#stype").val());
-				$("#mmodule").html($("#cmodule").attr("data-id"));
-				$("#mtype").html($("#ctype").attr("data-id"));
-				$("#start").html($("#stime").val());
-				$("#end").html($("#etime").val());
-
-				var sKeyword = encodeURIComponent($("#sKeyword").html()),
-					stype = $("#searchType").val(),
-					start = $("#start").html(),
-					end = $("#end").html(),
-					mmodule = $("#mmodule").html(),
-					mtype = $("#mtype").html(),
-					state = $("#stateBtn").attr("data-id") ? $("#stateBtn").attr("data-id") : ""
-
-				huoniao.showTip("loading", "正在导出，请耐心稍候...");
-				let url = './memberBehaviorLog.php?do=export&stype=' + stype + '&sKeyword=' + sKeyword + '&start=' + start + '&end=' + end + '&state=' + state + '&mtype=' + mtype + '&module=' + mmodule;
-				window.location.href = url;
-					
-				setTimeout(function () {
-					huoniao.hideTip();
-				}, 5000);
-			}
-
 		};
 
 	//开始、结束时间
@@ -146,7 +120,6 @@ $(function(){
 	//搜索
 	$("#searchBtn").bind("click", function(){
 		$("#sKeyword").html($("#keyword").val());
-		$("#sstype").html($("#stype").val());
 		$("#mmodule").html($("#cmodule").attr("data-id"));
 		$("#mtype").html($("#ctype").attr("data-id"));
 		$("#start").html($("#stime").val());
@@ -355,17 +328,24 @@ $(function(){
 	});
 
 	$("#export").click(function(e){
-		let totalCount = $(".totalCount").html();
-		totalCount = Number(totalCount);
-		if (totalCount > 100000) {
-			$.dialog.confirm('当前' + totalCount + '条数据，您确定要导出吗？', function () {
-				init.export();
-			});
-		} else {
-			if (totalCount != 0) {
-				init.export();
-			}
-		}
+        var t = $(this), 
+            sKeyword = encodeURIComponent($("#sKeyword").html()),
+            start    = $("#start").html(),
+            end      = $("#end").html(),
+            mmodule  = $("#mmodule").html(),
+            mtype    = $("#mtype").html(),
+            state    = $("#stateBtn").attr("data-id") ? $("#stateBtn").attr("data-id") : ""
+
+        huoniao.showTip("loading", "正在导出，请耐心稍候...");
+        var url = '?do=export&sKeyword='+sKeyword+'&start='+start+'&end='+end+'&state='+state+'&mtype = '+mtype+'&module = '+mmodule;
+        console.log(url);
+
+        t.attr('href', url);
+
+        setTimeout(function(){
+            huoniao.hideTip();
+        }, 5000);
+
 	})
 
 
@@ -407,7 +387,6 @@ function getList(){
 	$("#selectBtn a:eq(1)").click();
 	$("#loading").html("加载中，请稍候...").show();
 	var sKeyword = encodeURIComponent($("#sKeyword").html()),
-		stype    = $("#searchType").val(),
 		start    = $("#start").html(),
 		end      = $("#end").html(),
 		mmodule  = $("#mmodule").html(),
@@ -418,7 +397,6 @@ function getList(){
 		page     = $("#list").attr("data-atpage") ? $("#list").attr("data-atpage") : "1";
 
 	var data = [];
-		data.push("stype="+stype);
 		data.push("sKeyword="+sKeyword);
 		data.push("start="+start);
 		data.push("end="+end);
@@ -431,11 +409,10 @@ function getList(){
 
 	huoniao.operaJson("memberBehaviorLog.php?dopost=getList", data.join("&"), function(val){
 		var obj = $("#list"), list = [], i = 0, memberBehaviorLog = val.memberBehaviorLog;
-		
+		obj.attr("data-totalpage", val.pageInfo.totalPage);
+		$(".totalCount").html(val.pageInfo.totalCount);
 
 		if(val.state == "100"){
-			obj.attr("data-totalpage", val.pageInfo.totalPage);
-			$(".totalCount").html(val.pageInfo.totalCount);
 			huoniao.hideTip();
 
 			for(i; i < memberBehaviorLog.length; i++){

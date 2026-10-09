@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html class="grey">
+	<head>
+		<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>{#if $id#}{#$langData['waimai'][5][14]#}{#else#}{#$langData['waimai'][5][13]#}{#/if#}</title> {#*   编辑商品   新增商品*#}
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/mobiscroll.javascript.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/manage-goods.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/ui/swiper.min_4.2.2.css?v={#$cfg_staticVersion#}">
+		<script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+		<script src="{#$templets_skin#}js/vue.min.js?v={#$cfg_staticVersion#}"></script>
+		<script>
+			var id = "{#$id#}";
+			var sid = "{#$sid#}";
+			var typeid = '{#$typeid#}';
+			var modelType = 'waimai';
+			var thumbSize = {#$thumbSize#}, thumbType = '{#$thumbType#}', atlasSize = {#$atlasSize*1024#}, atlasType = '{#$atlasType#}', atlasMax = 10;
+			var is_nature = '{#$is_nature#}';  //是否开启属性值
+			var propData = '{#$nature|@json_encode#}';
+		</script>
+	</head>
+	<body>
+		<div id="page">
+			<!-- 头部 -->
+			<div class="top_box">
+				<div class="headbox">
+					<a href="/wmsj/shop/manage-goods.php?sid={#$sid#}&currentPageOpen=1"  class="back_btn"></a>
+					<div class="htitle">{#if $id#}{#$langData['waimai'][5][14]#}{#else#}{#$langData['waimai'][5][13]#}{#/if#}</div>    {#*   编辑商品  新增商品   *#}
+					<a href="javascript:;" class="btn_save" @click="saveData()">{#$langData['waimai'][2][52]#}</a>  {#* 保存 *#}
+				</div>
+			</div>
+			<!-- form表单 -->
+			<form action="" id="formSumbmit">
+				<dl class="imgBox catybox fn-clear">
+					<dt>{#$langData['waimai'][11][53]#}</dt> {#* 商品图片 *#}
+					 {#foreach from=$picsList key=k item=i#}
+					<dd class="litpic" data-index="{#$k#}" id="WU_FILE_0_{#$k#}" ><div class="del_btn" @click="delimg"></div><img  src="{#changeFileSize url="{#$i.path#}" type='small'#}" data-val="{#$i.pathSource#}" data-url="{#changeFileSize url="{#$i.path#}" type='small'#}"@click="imgShow = !imgShow,imgshow({#$k#})"></dd>
+					{#/foreach#}
+					<dd class="upbtn"><div id="filePicker">{#$langData['waimai'][11][54]#}</p></div></dd>{#* 上传图片<p>(最多10张)</p> *#}
+					<input type="hidden" name="pics" id="pro_banner">
+				</dl>
+
+				<!-- 分割线 -->
+				<ul class="catybox">
+					<li>
+						<label for="title">{#$langData['siteConfig'][19][486]#}</label>		{#* 商品名称 *#}
+						<input type="text" placeholder="{#$langData['waimai'][11][55]#}" name="title" value="{#$title#}" >{#* 请输入商品名称 *#}
+					</li>
+					<!-- <li class="fn-hide">
+						<label for="sort">{#$langData['waimai'][5][15]#}</label>
+						<input type="text" placeholder="0" name="sort" value="{#$sort|string_format:'%d'#}">
+					</li> -->
+					<li class="select_inp">
+						<label for="sort">{#$langData['waimai'][1][44]#}</label>{#* 商品分类 *#}
+						<input type="text" readonly="readonly" placeholder="{#$langData['waimai'][1][239]#}" name="typename"  id="typename">{#* 请选择 *#}
+						<input type="hidden" readonly="readonly" placeholder="{#$langData['waimai'][1][239]#}" name="typeid" id="typeid" value="{#$typeid#}" >{#* 请选择 *#}
+					</li>
+					<li>
+						<label for="title">{#$langData['waimai'][11][56]#}</label>{#* 商品标签 *#}
+						<input type="text" placeholder="{#$langData['waimai'][11][57]#}" name="label" value="{#$label#}">{#* 例如特惠、限量（2字） *#}
+					</li>
+				</ul>
+
+				<!-- 分割线 -->
+				<ul  class="catybox">
+					<input type="hidden" name="status" value="{#$status|default:1#}">
+					<li>
+						<label for="price_r">{#$langData['waimai'][11][58]#}</label>{#* 售价 *#}
+						<input type="text" placeholder="{#$langData['waimai'][11][59]#}" name="price_r" value="{#if $price#}{#echoCurrency type='symbol'#}{#$price#}{#/if#}" @input="onInput()"> {#* 请输入售价 *#}
+						<input type="hidden" name="price" value="{#$price#}" />
+					</li>
+                    {#if $review_price > 0#}
+                    <li>
+						<label for="price_r">审核中的价格</label>
+						<input type="text" readonly style="color: #ff0000; font-weight: 700;" value="{#echoCurrency type='symbol'#}{#$review_price#}">
+					</li>
+                    {#/if#}
+					<li>
+						<label for="formerprice_r">{#$langData['waimai'][5][23]#}</label>{#* 原价 *#}
+						<input type="text" placeholder="{#$langData['waimai'][5][24]#}" name="formerprice_r" value="{#if $formerprice#}{#echoCurrency type='symbol'#}{#$formerprice|string_format:'%.2f'#}{#/if#}" @input="onInput()">{#* 请输入原价 *#}
+						<input type="hidden" name="formerprice" value="{#$formerprice#}" />
+					</li>
+					<li>
+						<label for="unit">{#$langData['waimai'][11][60]#}</label>{#* 单位 *#}
+						<input type="text" placeholder="{#$langData['waimai'][11][61]#}" name="unit" value="{#$unit#}">
+					</li>
+					<!-- <li>
+						<input type="hidden" name="is_dabao" id="is_dabao" value="{#if $dabao_money && $dabao_money > 0#}1{#else#}0{#/if#}">	
+						<label for="dabao_money_r">{#$langData['waimai'][7][31]#}</label>{#* 打包费 *#}
+						<input type="text" placeholder="{#$langData['waimai'][11][62]#}" name="dabao_money_r" value="{#if $dabao_money#}{#echoCurrency type='symbol'#}{#$dabao_money|string_format:'%.2f'#}{#/if#}" @input="onInput()"> {#* 不收取则留空 *#}
+						<input type="hidden" name="dabao_money" value="{#$dabao_money|string_format:'%.2f'#}">
+					</li> -->
+				</ul>
+
+                
+				<!-- 分割线 -->
+				<ul  class="catybox">
+					<li class="toggle_li">
+						<label for="is_dabao">开启打包费状态</label>
+						<span class="switch {#if $is_dabao==1 || $is_dabao==''#}active{#/if#}" data-type="is_dabao"  data-val="{#$is_dabao#}" @click="switchTrggle"></span>
+						<input type="hidden" name="is_dabao" value="{#$is_dabao|default:1#}">
+					</li>
+					<li >
+						<label for="dabao_money">{#$langData['waimai'][7][31]#}</label>{#* 库存量 *#}
+						<input type="number" name="dabao_money" placeholder="{#$langData['waimai'][11][62]#}" value="{#$dabao_money|string_format:'%.2f'#}">{#* 不收取则留空 *#}
+					</li>
+				</ul>
+
+				<!-- 分割线 -->
+				<ul  class="catybox">
+					<li class="toggle_li">
+						<label for="stockvalid">{#$langData['waimai'][11][63]#}</label>{#* 开启库存状态 *#}
+						<span class="switch {#if $stockvalid==1 || $stockvalid==''#}active{#/if#}" data-type="stockvalid"  data-val="{#$stockvalid#}" @click="switchTrggle"></span>
+						<input type="hidden" name="stockvalid" value="{#$stockvalid|default:1#}">
+					</li>
+					<li >
+						<label for="stock">{#$langData['waimai'][1][58]#}</label>{#* 库存量 *#}
+						<input type="number" name="stock" placeholder="{#$langData['waimai'][11][64]#}" value="{#$stock#}">{#* 请输入库存量 *#}
+					</li>
+				</ul>
+
+				<!-- 分割线 -->
+				<ul  class="catybox">
+					<li class="toggle_li">
+						<label for="is_day_limitfood">{#$langData['waimai'][11][65]#}</label>{#* 开启每日限购 *#}
+						<span class="switch {#if $is_day_limitfood#}active{#/if#}" data-type="is_day_limitfood" data-val="{#$is_day_limitfood#}" @click="switchTrggle"></span>
+						<input type="hidden" name="is_day_limitfood" value="{#$is_day_limitfood|default:0#}">
+					</li>
+					<li >
+						<label for="stock">{#$langData['waimai'][11][66]#}</label>{#* 每日限购数量 *#}
+						<input type="number" name="day_foodnum" placeholder="{#$langData['waimai'][11][67]#}" value="{#$day_foodnum#}">{#* 请输入每日限购数量 *#}
+					</li>
+				</ul>
+
+				<!-- 分割线 -->
+				<ul  class="catybox">
+					<li class="toggle_li">
+						<label for="is_limitfood">{#$langData['waimai'][11][68]#}</label>{#* 开启限购活动 *#}
+						<span class="switch {#if $is_limitfood#}active{#/if#}" data-type="is_limitfood" data-val="{#$is_limitfood#}" @click="switchTrggle"></span>
+						<input type="hidden" name="is_limitfood" value="{#$is_limitfood|default:0#}">
+					</li>
+					<li >
+						<label for="foodnum">{#$langData['waimai'][6][32]#}</label>{#* 每人限购数量 *#}
+						<input type="number" name="foodnum" placeholder="请输入限购数量" value="{#$foodnum#}">
+					</li>
+					<!-- {#$limit_time|@print_r#} -->
+					<li class="date_chose">
+						<div class="date_box select_inp">
+							<label for="date">{#$langData['waimai'][11][69]#}</label>{#* 日期范围 *#}
+							<input type="text" name="dateChose" placeholder="{#$langData['waimai'][1][239]#}" id="date_show" @click="dataChose" readonly="readonly" value="{#if $start_time#}{#$start_time#} {#$langData['waimai'][11][70]#} {#$stop_time#}{#/if#}">
+							<input type="hidden" name="start_time" placeholder="{#$langData['waimai'][1][239]#}" id="sdate" class="mbsc-comp" value="{#$start_time#}">
+							<input type="hidden" name="stop_time" placeholder="{#$langData['waimai'][1][239]#}" id="edate" class="mbsc-comp" value="{#$stop_time#}">
+						</div>
+						<div class="time_list">
+							{#$timeCount = 0#}
+							{#foreach from=$limit_time  item=time #}
+							{#if $time[0]!=$time[1]#}
+							<span class="chose_inp">{#$time[0]#}-{#$time[1]#}
+								<em class="del_time"></em>
+								<input type="hidden" name="limit_time[{#$timeCount#}][start]"  value="{#$time[0]#}" />
+								<input type="hidden" name="limit_time[{#$timeCount#}][stop]"  value="{#$time[1]#}" />
+							</span>
+							{#$timeCount = $timeCount + 1#}
+							{#/if#}
+							{#/foreach#}
+							<span class="add_btn" style="{#if $timeCount==6#}display: none;{#/if#}" @click="timeChose">{#$langData['waimai'][11][71]#}</span>  {#* 添加时间段 *#}
+
+							<input type="hidden" name="stime" id="stime" class="mbsc-comp">
+							<input type="hidden" name="etime" id="etime" class="mbsc-comp">
+
+						</div>
+					</li>
+				</ul>
+				<dl class="catybox descr_box">
+					<dt>{#$langData['waimai'][11][72]#}</dt>{#* 商品描述 *#}
+					<dd>
+						<!-- <textarea name="body" placeholder="{#$langData['waimai'][11][73]#}" >{#$body#}</textarea>{#* 请输入商品描述 *#} -->
+						 <div class="textarea" contenteditable="true" placeholder="{#$langData['waimai'][11][73]#}">{#$body#}</div>
+					</dd>
+				</dl>
+
+				<div class="propBox">
+					<!-- 增加商品属性s -->
+					<ul class="catybox">
+						<li class="toggle_li">
+							<label for="is_nature">开启商品属性</label>{#* 开启商品属性 *#}
+						<!-- 	<span class="switch {#if $is_nature == 1 || $is_nature ==''#}active{#/if#}" data-type="is_nature"  data-val="{#$is_nature#}" @click="switchTrggle"></span> -->
+							<span :class="['switch', {'active':is_nature == 1}]" data-type="is_nature"  data-val="{#$is_nature#}" @click="is_nature = !is_nature"></span>
+							<input type="hidden" name="is_nature" :value="is_nature?1:0">
+						</li>
+					</ul>
+					<div class="propList" v-show="is_nature" style="display: none;">
+						<dl class="catybox" v-for="(prop,index) in propData" :data-index="index">
+							<dt>
+								<div class="left_box">
+									<a href="javascript:;" class="delProp" @click="delDl"></a>
+									<input type="text" :name="'nature['+(index+100*1)+'][name]'" data-prop="name" v-on:input="valChange" class="propinp" placeholder="请输入属性名" :value="prop.name">{#* 请输入属性名 *#}
+								</div>
+								<div class="right_box" @click="changeMax">
+									最多可选属性
+									<input type="tel" maxlength="2" :name="'nature['+(index+100*1)+'][maxchoose]'" data-prop="maxchoose"  v-on:input="valChange" class="maxchoose" placeholder="最大可选值" :value="prop.maxchoose">{#* 最大可选值 *#}
+								</div>
+							</dt>
+							<dd class="prop_value" v-for="(pvalue,k) in prop.data" :data-index="k">
+								<div class="inpArr">
+									<div class="picbox">
+										<img :src="pvalue.pic" v-if="pvalue.pic" alt=""></img>
+										<input type="file" accept="image/*" class="fileInp" @change="fileChange(pvalue,$event)">
+										<input type="hidden" :name="'nature['+(index+100*1)+'][pic][]'" data-prop="pic" :value="pvalue.pic">
+									</div>
+									<div class="inpbox">
+										<label for="">属性值</label>
+										<input type="text" :name="'nature['+(index+100*1)+'][value][]'" data-prop="value" v-on:input="valChange" placeholder="输入属性值" :value="pvalue.value">
+									</div>
+									<div class="inpbox">
+										<label for="">价格</label>
+										<input type="text" :name="'nature['+(index+100*1)+'][price][]'" data-prop="price" v-on:input="valChange" class="prop_price"  placeholder="输入增加的金额" onkeyup="value=value.replace(/[^\-?\d.]/g,'')" :value="pvalue.price">
+									</div>
+								</div>
+								<a href="javascript:;" class="del" @click="delpopValue"></a>
+							</dd>
+							<dd class="add_btn" @click="addppValue">添加属性值</dd>
+						</dl>
+					</div>
+
+					<a href="javascript:;" v-show="is_nature" style="display: none;" class="addProp" @click="addPro">新增商品属性</a>
+				</div>
+
+			</form>
+			{#if $id#}<button type="button" class="del_pro" @click="showConfirm">{#$langData['waimai'][11][74]#}</button>{#/if#}{#* 删除此商品 *#}
+		<div class="loading_icon" v-show="LOADING"></div>
+		<!-- 图片预览 -->
+		<template>
+			<div class="swiper-box" v-show="imgShow">
+				<div class="headbox">
+					<a href="javascript:;"  class="back_btn" @click="imgShow = !imgShow"></a>
+					<div class="htitle">{#$langData['waimai'][11][75]#}</div>    {#*   图片预览   *#}
+					<a href="javascript:;" class="del_img" @click="show_delimg()"></a>
+				</div>
+				<div class="swiper-container">
+					<div class="swiper-wrapper">
+						{#foreach from=$picsList key=k item=i#}
+						<div class="swiper-slide" data-index="{#$k#}">
+							<img src="{#$i.path#}" alt="">
+						</div>
+						{#/foreach#}
+					</div>
+					<div class="pagenation"></div>
+				</div>
+				<a href="javascript:;" class="set_btn" @click="setMain()">{#$langData['waimai'][11][76]#}</a>{#*   设为主图   *#}
+			</div>
+		</template>
+
+		<!-- 伪按钮 -->
+		<div class="abox"><a href="javascript:;" class="change_value"></a></div>
+
+
+
+		<!-- 删除弹窗 s-->
+		<div class="delMask" @click="hideConfirm"></div>
+		<div class="delAlert">
+			<div class="delAlertCon">
+				<div>
+					<h2 class="delTile">确定删除信息？</h2>
+					<p>一经删除不可恢复</p>
+				</div>
+				<ul class="fn-clear">
+					<li class="firLi"><a href="javascript:;" class="cancelDel" @click="hideConfirm">取消</a>
+					<li><a href="javascript:;" class="sureDel" @click="del_pro">确认</a>
+				</ul>
+			</div>
+		</div>
+		<!-- 删除弹窗 e-->
+		</div>
+
+	</body>
+
+
+	<script src="{#$templets_skin#}js/mobiscroll.custom-3.0.0-beta4.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_basehost#}/include/lang/{#$langList.currCode#}.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/zepto.deferred.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_staticPath#}js/webuploader/webuploader.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/axios.min.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$cfg_staticPath#}js/ui/swiper.min_4.2.2.js?v={#$cfg_staticVersion#}"></script>
+	<script src="{#$templets_skin#}js/add-goods.js?v={#$cfg_staticVersion#}"></script>
+
+</html>

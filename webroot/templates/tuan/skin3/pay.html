@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>支付-{#$tuan_channelName#}</title>
+<meta name="keywords" content="{#$tuan_keywords#}" />
+<meta name="description" content="{#$tuan_description#}" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/pay.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$tuan_channelDomain#}', cfg_staticPath = '{#$cfg_staticPath#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var totalAmount = {#$totalAmount#}, totalPoint = {#$userinfo.point#}, totalBalance = {#$userinfo.money#}, pointRatio = {#$cfg_pointRatio#};
+	var pointName = '{#$cfg_pointName#}', ordernum = '{#$ordernum#}', cookieDomain = '{#$cfg_cookieDomain#}';
+</script>
+</head>
+
+<body>
+{#include file="../../siteConfig/top.html"#}
+
+<div class="wrap fn-clear btop">
+	<h1 class="logo"><a href="{#$tuan_channelDomain#}" title="{#$tuan_channelName#}"><img src="{#$tuan_logoUrl#}" alt="{#$tuan_channelName#}" /></a></h1>
+	<ul class="process p2">
+		<li><strong>1</strong>确认订单</li>
+		<li class="curr"><strong>2</strong>选择支付方式</li>
+		<li><strong>3</strong>购买成功</li>
+	</ul>
+</div>
+
+<div class="wrap">
+	<form action="/include/ajax.php?service=tuan&action=pay" method="post" target="_blank" id="payform">
+		<input type="hidden" name="ordernum" id="ordernum" value="{#$ordernum#}" />
+		<input type="hidden" name="paytype" id="paytype" value="" />
+		<dl class="details">
+			<dt><strong>您购买的商品信息如下：</strong><a href="{#$editDetailUrl#}">修改订单</a></dt>
+			<dd>
+				{#foreach from=$orderArr key=k item=order#}
+				<div class="ditem">
+					<div class="name">{#if $orderArr|@count > 1#}商品{#$k+1#}：{#/if#}<a href="{#$order.url#}" target="_blank" title="{#$order.title#}">{#$order.title#}</a></div>
+					<div class="count">{#$order.count#}份</div>
+					{#if $k == 0#}<div class="price">应付金额：<strong>{#echoCurrency type='symbol'#}{#$totalAmount#}</strong></div>{#/if#}
+				</div>
+				{#/foreach#}
+			</dd>
+		</dl>
+
+		<div class="pay-bank">
+			<div class="tab">
+				<a href="javascript:;" class="current"><span>平台支付</span><em>（微信/支付宝/等）</em></a>
+			</div>
+			<div class="con">
+				<div class="blist terrace fn-clear" style="display: block;">
+					{#$alipay = 0#}
+				   {#siteConfig action="payment"#}
+				   {#if $row.pay_code == 'alipay'#}
+				   {#$alipay = 1#}
+				   {#/if#}
+					<a href="javascript:;" class="bank-icon{#if $_bindex.row == 1#} active{#/if#}" title="{#$row.pay_name#}" data-type="{#$row.pay_code#}"><span class="{#$row.pay_code#}"></span><b></b></a>
+					{#/siteConfig#}
+
+					{#if $peerpayState#}
+					<a href="{#getUrlPath service="member" type="user" template="daipay" param="module={#$service#}&ordernum={#$ordernum#}"#}" class="bank-icon" title="朋友代付" data-type="peerpay"><span class="peerpay"></span><b></b></a>
+					{#/if#}
+				</div>
+			</div>
+		</div>
+
+		{#if $userinfo.point > 0#}
+		<!-- <div class="use-account fn-clear">
+			<div class="account-summary">
+				<label><input id="usePinput" name="usePinput" type="checkbox" value="1" />使用{#$cfg_pointName#}抵扣</label>
+				<span class="use-input">使用：<input type="text" id="usePcount" name="point" onkeyup="value=value.replace(/\D+/ig,'')" />个</span>
+				<span class="discharge">-{#echoCurrency type='symbol'#}<em id="disMoney">0</em></span>
+				<div class="use-tip">您有 {#$userinfo.point#} 个{#$cfg_pointName#}，此单最多可用 <em id="cusePoint">0</em> 个</div>
+			</div>
+		</div> -->
+		{#/if#}
+
+		{#if $userinfo.money > 0#}
+		<div class="use-account fn-clear">
+			<div class="account-summary">
+				<label><input id="useBalance" name="useBalance" type="checkbox" value="1" />使用余额支付</label>
+				<span class="use-input">使用：<input type="text" autocomplete="new-password" id="useBcount" name="balance" onkeyup="value=value.replace(/[^0-9.]/ig,'')" />{#echoCurrency type='short'#}</span>
+				<span class="discharge">-{#echoCurrency type='symbol'#}<em id="balMoney">0</em></span>
+				<div class="use-tip">账户余额 {#$userinfo.money#} {#echoCurrency type='short'#}，此单最多可用 <em id="cuseBalance">0</em> {#echoCurrency type='short'#}</div>
+				<div class="use-tip paypwd"><label><span>支付密码：</span><input autocomplete="new-password" type="password" id="paypwd" name="paypwd" /></label></div>
+			</div>
+		</div>
+		{#/if#}
+
+		<div class="money-details">
+			<p class="pri"><span>还需支付：</span><em>{#echoCurrency type='symbol'#}</em><strong id="totalPayMoney">{#$totalAmount#}</strong></p>
+		</div>
+		<div class="buy-botton">
+			<button type="button" class="subtn" id="tj">立即支付</button>
+			<a href="{#$editDetailUrl#}"><< 返回修改订单</a>
+		</div>
+	</form>
+</div>
+
+<div class="pay-pop" id="feedback">
+	<a href="javascript:;" class="pop-close"></a>
+	<div class="pop-border"></div>
+	<div class="pop-main">
+		<div class="pop-title">在新打开的页面上完成付款！</div>
+		<div class="pop-con">
+			<p><i class="icon01"></i><span>如已经支付成功，请点击</span><a class="red" href="{#getUrlPath service='member' type='user' template='order' module='tuan'#}">已完成付款</a></p>
+			<p><i class="icon02"></i><span>如付款遇到问题，您可以</span><a class="gray" href="javascript:;">重新支付</a><em>或</em><a class="gray" href="javascript:;">选择其他支付方式</a></p>
+			<div class="question"><a href="#" target="_blank">支付常见问题</a><span>|</span>客服电话：{#$tuan_hotline#}</div>
+		</div>
+	</div>
+</div>
+
+{#include file="footer.html"#}
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/pay.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>

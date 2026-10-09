@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}",
+    atlasSize = {#$atlasSize#}, atlasType = '{#$atlasType#}', atlasMax = 0;
+var imglist = {"list1": {#$imglist#}}, action = '{#$action#}', modelType = '{#$action#}',
+	cfg_term = "pc", adminPath = "{#$adminPath#}";
+</script>
+<style>
+html, body {height: auto;}
+.thead {margin: 20px 10px;}
+</style>
+</head>
+
+<body>
+<div class="left-nav" id="left-nav">
+  <ul>
+    <li class="current"><a href="javascript:;">基本信息</a></li>
+    <li><a href="javascript:;">团购参数</a></li>
+    <li><a href="javascript:;">购买须知</a></li>
+    <li><a href="javascript:;">团购内容</a></li>
+    <li><a href="javascript:;">拼团参数</a></li>
+    </li>
+  </ul>
+</div>
+
+<form action="" method="post" name="editform" id="editform" class="editform" style="margin-left: 100px;">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <div class="thead" style="margin-top: 0;">&nbsp;&nbsp;基本信息</div>
+  <dl class="clearfix">
+    <dt><label for="store">商家名称：</label></dt>
+    <dd style="position:static;">
+      <input class="input-xlarge" type="text" name="store" id="store" placeholder="请输入商家名称关键字" value="{#$store#}" />
+      <input type="hidden" name="sid" id="sid" value="{#$sid#}">
+      <span class="input-tips"><s></s>请从列表中选择商家</span>
+      <div id="storeList" class="popup_key" style="display: none;"></div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="title">团购标题：</label></dt>
+    <dd>
+      <input class="input-xxlarge" type="text" name="title" id="title" placeholder="60个字以内" data-regex=".{1,60}" maxlength="60" value="{#$title#}" />
+      <span class="input-tips"><s></s>请输入标题，1-60个汉字</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="subtitle">团购副标题：</label></dt>
+    <dd>
+      <textarea class="input-xxlarge" name="subtitle" id="subtitle" placeholder="100个字以内" data-regex=".{5,100}" maxlength="100">{#$subtitle#}</textarea>
+      <span class="input-tips"><s></s>请输入副标题，5-100个汉字</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>缩略图：</dt>
+    <dd class="thumb clearfix listImgBox">
+			<div class="uploadinp filePicker thumbtn{#if $litpic != ""#} hide{#/if#}" id="filePicker1" data-type="thumb"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+			{#if $litpic != ""#}
+			<ul id="listSection1" class="listSection thumblist clearfix" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$litpic#}' target="_blank" title=""><img src="{#$cfg_attachment#}{#$litpic#}" data-val="{#$litpic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+			{#else#}
+			<ul id="listSection1" class="listSection thumblist clearfix"></ul>
+			{#/if#}
+			<input type="hidden" name="litpic" value="{#$litpic#}" class="imglist-hidden" id="litpic">
+		</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>图集：</dt>
+    <dd class="listImgBox hide">
+			<div class="list-holder">
+				<ul id="listSection2" class="clearfix listSection piece"></ul>
+				<input type="hidden" name="imglist" value='{#$imglist#}' class="imglist-hidden">
+			</div>
+			<div class="btn-section clearfix">
+				<div class="uploadinp filePicker" id="filePicker2" data-type="album" data-count="999" data-size="{#$atlasSize#}" data-imglist="list1"><div id="flasHolder"></div><span>添加图片</span></div>
+				<div class="upload-tip">
+					<p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+				</div>
+			</div>
+		</dd>
+  </dl>
+
+  <dl class="clearfix" id="type0">
+    <dt>上传视频：</dt>
+    <dd>
+		<input name="video" type="hidden" id="video" value="{#$video#}" />
+		<div class="spic{#if $video == ""#} hide{#/if#}">
+			<div class="sholder" id="videoPreview">
+				 <a href="/include/videoPreview.php?f=" data-id="{#$video#}">预览视频</a>
+			</div>
+			<a href="javascript:;" class="reupload">重新上传</a>
+		</div>
+		<iframe src ="/include/upfile.inc.php?mod=tuan&type=video&obj=video&filetype=video" style="width:100%; height:25px;{#if $video != ""#} display: none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt>团购时间：</dt>
+    <dd>
+      <div class="input-prepend input-append" style="margin-bottom:0">
+        <span class="add-on">从</span>
+        <input class="input-medium" id="startdate" name="startdate" type="text" value="{#$startdate#}" />
+        <span class="add-on">到</span>
+        <input class="input-medium" id="enddate" name="enddate" type="text" value="{#$enddate#}" />
+      </div>
+      <label style="display:inline-block; margin:0 0 10px 15px; vertical-align:middle;"><input type="checkbox" name="hourly" id="hourly" value="1"{#if $hourly == 1#} checked{#/if#} />整点团</label>
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dt><label for="minnum">最低团购数量：</label></dt>
+    <dd>
+      <input class="input-mini" type="number" min="0" name="minnum" data-regex="[0-9]\d*" id="minnum" value="1" />
+      <span class="input-tips" style="display:inline-block;"><s></s>只有达到最低团购数量，团购才成功，如果没达到此数，则团购无效</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="maxnum">最高团购数量：</label></dt>
+    <dd>
+      <input class="input-mini" type="number" min="0" name="maxnum" data-regex="[1-9]\d*" id="maxnum" value="{#$maxnum#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>如果购买量达到此值，则显示已卖完，团购结束</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="limit">购买限制：</label></dt>
+    <dd>
+      <div class="input-prepend input-append" style="margin-bottom:0">
+        <span class="add-on">每天：</span>
+        <input class="input-mini" name="limit_day" min="0" type="number" data-regex="0|\d*\.?\d+" value="{#$limit_day#}">
+        <span class="add-on">件</span>
+      </div>
+      <span class="input-tips" style="display:inline-block;"><s></s>每个用户每天限购</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="limit"></label></dt>
+    <dd>
+      <div class="input-prepend input-append" style="margin-bottom:0">
+        <span class="add-on">时间：</span>
+        <input class="input-medium chooseDateTime" name="limit_start" type="text" data-regex="0|\d*\.?\d+" value="{#$limit_start#}" autocomplete="off">
+        <span class="add-on">到</span>
+        <input class="input-medium chooseDateTime" name="limit_end" type="text" data-regex="0|\d*\.?\d+" value="{#$limit_end#}" autocomplete="off">
+        <span class="add-on">限购</span>
+        <input class="input-mini" type="number" min="0" name="limit" data-regex="[1-9]\d*" id="limit" value="{#$limit#}" />
+        <span class="add-on">件</span>
+        <span class="input-tips" style="display:inline-block;"><s></s>每个用户时间段内限购</span>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="defbuynum">默认已购买数量：</label></dt>
+    <dd>
+      <input class="input-mini" type="number" min="0" name="defbuynum" data-regex="[0-9]\d*" id="defbuynum" value="{#$defbuynum#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>
+        {#if $dopost == "edit"#}
+        <span class="text-error">（实际购买：<strong>{#$buynum#}</strong>份）</span>
+        {#/if#}
+        前台显示的已团购数量是此数字和真正购买数量之和</span>
+    </dd>
+  </dl>
+  <dl class="clearfix{#if $cfg_fenxiaoState != 1#} hide{#/if#}">
+    <dt><label>分销佣金：</label></dt>
+    <dd>
+      <div class="input-prepend input-append">
+        <input class="input-mini" type="text" name="fx_reward" id="fx_reward" value="{#$fx_reward#}" min="0" maxlength="6" >
+        <span class="add-on">{#echoCurrency type="short"#}</span>
+        <span class="input-tips" style="display:inline-block;"><s></s>数字类型或者百分数（相对实际支付商品价格），如 20、10%。留空则按照默认佣金额度计算</span>
+      </div>
+    </dd>
+  </dl>
+  <div class="thead">&nbsp;&nbsp;团购参数</div>
+  <dl class="clearfix">
+    <dt>团购价格：</dt>
+    <dd>
+      <div class="input-prepend input-append" style="margin-bottom:0">
+        <span class="add-on">市场价：</span>
+        <input class="input-mini" id="market" name="market" type="text" data-regex="0|\d*\.?\d+" value="{#$market#}" />
+        <span class="add-on">{#echoCurrency type="short"#}</span>
+      </div>&nbsp;&nbsp;
+      <div class="input-prepend input-append" style="margin-bottom:0">
+        <span class="add-on">团购价：</span>
+        <input class="input-mini" id="price" name="price" type="text" data-regex="0|\d*\.?\d+" value="{#$price#}" />
+        <span class="add-on">{#echoCurrency type="short"#}</span>
+      </div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>团购类别：</dt>
+    <dd class="radio">
+      {#html_radios name="tuantype" values=$tuantype checked=$tuantypechecked output=$tuantypenames separator="&nbsp;&nbsp;"#}
+    </dd>
+  </dl>
+  {#if $tuantypechecked == 0 or $tuantypechecked == 1#}
+  <div id="tuantype0">
+  {#else#}
+  <div id="tuantype0" class="hide">
+  {#/if#}
+    <dl class="clearfix">
+      <dt>过期类型：</dt>
+      <dd class="radio">
+        {#html_radios name="expire_type" values=$expire_values checked=$expire_check output=$expire_names separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix" id="expire_type_static">
+      <dt><label for="expireddate">过期时间：</label></dt>
+      <dd>
+        <input class="input-medium" id="expireddate" name="expireddate" type="text" value="{#$expireddate#}" autocomplete="off" />
+        <!--<span class="input-tips" style="display:inline-block"><s></s>不限制可不填，否则超过此日期会显示已过期</span>-->
+      </dd>
+    </dl>
+    <dl class="clearfix hide" id="expire_type_limit">
+      <dt>过期时间：</dt>
+      <dd>
+        <input type="number" min="0" class="input-mini" id="expire_limit" name="expire_limit" value="{#$expire_limit#}"/>天
+      </dd>
+    </dl>
+  </div>
+  {#if $tuantypechecked == 1#}
+  <div id="tuantype1">
+  {#else#}
+  <div id="tuantype1" class="hide">
+  {#/if#}
+    <dl class="clearfix">
+      <dt><label for="amount">充值卡金额：</label></dt>
+      <dd>
+        <div class="input-prepend input-append" style="margin-bottom:0">
+          <input class="input-mini" id="amount" name="amount" type="text" data-regex="[0-9]\d*" value="{#$amount#}" />
+          <span class="add-on">{#echoCurrency type="short"#}</span>
+        </div>
+      </dd>
+    </dl>
+  </div>
+  {#if $tuantypechecked == 2#}
+  <div id="tuantype2">
+  {#else#}
+  <div id="tuantype2" class="hide">
+  {#/if#}
+    <dl class="clearfix">
+      <dt>快递运费：</dt>
+      <dd>
+        <div class="input-prepend input-append" style="margin-bottom:0">
+          <span class="add-on">运费</span>
+          <input class="input-mini" id="freight" name="freight" type="text" data-regex="\d*\.?\d+" value="{#$freight#}" />
+          <span class="add-on">{#echoCurrency type="short"#}</span>
+        </div>&nbsp;&nbsp;
+        <div class="input-prepend input-append" style="margin-bottom:0">
+          <span class="add-on">超过</span>
+          <input class="input-mini" id="freeshi" name="freeshi" type="text" data-regex="[0-9]\d*" value="{#$freeshi#}" />
+          <span class="add-on">件免运费</span>
+        </div>
+      </dd>
+    </dl>
+  </div>
+  <div id="itemList">{#$itemList#}</div>
+  <dl class="clearfix">
+    <dt>自定义属性：</dt>
+    <dd class="radio">{#html_checkboxes name='flags' values=$flag output=$flagList selected=$flags separator="&nbsp;&nbsp;"#}</dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="valid">团购状态：</label></dt>
+    <dd class="radio">
+      <select name="arcrank" id="arcrank" class="input-medium">
+        {#html_options options=$arcrankList selected=$arcrank#}
+      </select>&nbsp;&nbsp;&nbsp;&nbsp;
+      <label for="weight">排序：</label><input class="input-mini" type="number" name="weight" id="weight" min="0" data-regex="[0-9]\d*" value="{#$weight#}" />
+      <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>其它设置：</label></dt>
+    <dd class="radio">
+      <label><input type="checkbox" name="rec" value="1"{#if $rec == 1#} checked{#/if#} />推荐</label>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>是否置顶：</label></dt>
+    <dd class="radio">
+      <label><input type="checkbox" name="istop" value="1"{#if $istop == 1#} checked{#/if#} />置顶</label>
+    </dd>
+  </dl>
+    <dl class="clearfix">
+      <dt>是否支持退款：</dt>
+      <dd class="radio">
+        {#html_radios name="is_tuikuan" values=$is_tuikuan checked=$is_tuikuanchecked output=$is_tuikuannames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+  <div class="thead">&nbsp;&nbsp;购买须知</div>
+  <dl class="clearfix">
+    <dt><label for="tips">重要通知：</label></dt>
+    <dd>
+      <textarea class="input-xxlarge" rows="3" name="tips" id="tips">{#$tips#}</textarea>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>购买须知：</label></dt>
+    <dd id="notice" class="notice">
+      {#if $dopost == "edit"#}
+      {#if $notice|@count neq 0#}
+      {#foreach from=$notice key=id item=n#}
+      <dl>
+        <dt><input type="text" class="dt" value="{#$n.title#}" /></dt>
+        <dd><textarea class="dd">{#$n.note#}</textarea></dd>
+        <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span title="添加" class="add"><i class="icon-plus"></i></span>
+      </dl>
+      {#/foreach#}
+      {#else#}
+      <a href="javascript:;" class="btn btn-small addNotice">新增一项</a>
+      {#/if#}
+      {#else#}
+      <dl>
+        <dt><input type="text" class="dt" value="使用时间" /></dt>
+        <dd><textarea class="dd"></textarea></dd>
+        <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span title="添加" class="add"><i class="icon-plus"></i></span>
+      </dl>
+      <dl>
+        <dt><input type="text" class="dt" value="预约提醒" /></dt>
+        <dd><textarea class="dd"></textarea></dd>
+        <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span title="添加" class="add"><i class="icon-plus"></i></span>
+      </dl>
+      <dl>
+        <dt><input type="text" class="dt" value="限购限用提醒" /></dt>
+        <dd><textarea class="dd"></textarea></dd>
+        <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span title="添加" class="add"><i class="icon-plus"></i></span>
+      </dl>
+      <dl>
+        <dt><input type="text" class="dt" value="温馨提示" /></dt>
+        <dd><textarea class="dd"></textarea></dd>
+        <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span title="添加" class="add"><i class="icon-plus"></i></span>
+      </dl>
+      <dl>
+        <dt><input type="text" class="dt" value="商家服务" /></dt>
+        <dd><textarea class="dd"></textarea></dd>
+        <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span title="添加" class="add"><i class="icon-plus"></i></span>
+      </dl>
+      <a href="javascript:;" class="btn btn-small addNotice">新增一项</a>
+      {#/if#}
+    </dd>
+  </dl>
+  <div class="thead">&nbsp;&nbsp;团购内容</div>
+  <dl class="clearfix">
+    <dt><label>套餐类型：</label></dt>
+    <dd class="radio">
+      <label><input type="radio" name="packtype" value="1"{#if $packtype == 1#} checked{#/if#} />代金券</label>&nbsp;&nbsp;
+      <label><input type="radio" name="packtype" value="2"{#if $packtype == 2#} checked{#/if#} />套餐</label>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label>套餐内容：</label></dt>
+    <dd class="taocon">
+
+      {#if $packtype == 1#}
+      <div class="singel">
+        <table>
+          <thead>
+            <tr>
+              <th width="50%" align="left">内容</th>
+              <th width="15%">单价</th>
+              <th width="18%">数量/规格</th>
+              <th width="17%">小计</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="text" class="s1" value="{#$package[0]#}" /></td>
+              <td><input type="text" class="s2" value="{#$package[1]#}" /></td>
+              <td><input type="text" class="s3" value="{#$package[2]#}" /></td>
+              <td><input type="text" class="s4" value="{#$package[3]#}" /></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {#elseif $packtype == 2#}
+      <div class="many">
+        {#if $package|@count neq 0#}
+        {#foreach from=$package item=pack#}
+        <table class="tab">
+          <tr>
+            <td class="mtit"><input type="text" value="{#$pack.title#}" /></td>
+            <td class="items">
+              <table>
+                <thead>
+                  <tr>
+                    <th width="38%"align="left"><a href="javascript:;" class="remove" title="删除"><i class="icon-remove"></i></a>名称</th>
+                    <th width="15%">单价</th>
+                    <th width="15%">数量/规格</th>
+                    <th width="15%">小计</th>
+                    <th width="17%">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#foreach from=$pack.tr item=tr#}
+                  <tr>
+                    <td><input type="text" class="tit" value="{#$tr[0]#}" /></td>
+                    <td><input type="text" class="pric" value="{#$tr[1]#}" /></td>
+                    <td><input type="text" class="coun" value="{#$tr[2]#}" /></td>
+                    <td><input type="text" class="tot" value="{#$tr[3]#}" /></td>
+                    <td>
+                      <span class="move" title="移动"><i class="icon-move"></i></span><span class="del" title="删除"><i class="icon-remove"></i></span><span class="add" title="添加"><i class="icon-plus"></i></span>
+                    </td>
+                  </tr>
+                  {#/foreach#}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </table>
+        {#/foreach#}
+        {#/if#}
+        <a href="javascript:;" class="btn btn-small addTao">新增套餐内容</a>
+      </div>
+      {#/if#}
+
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt>团购详情：</dt>
+    <dd>
+      <ul class="nav nav-tabs" style="margin-bottom:5px;">
+        <li class="active"><a href="#pc">电脑端</a></li>
+        <li><a href="#mobile">移动端</a></li>
+      </ul>
+      <div id="pc">
+      	<script id="body" name="body" type="text/plain" style="width:85%;height:500px">{#$body#}</script>
+      </div>
+      <div id="mobile" class="hide">
+      	<script id="mbody" name="mbody" type="text/plain" style="width:960px;height:500px">{#$mbody#}</script>
+      </div>
+    </dd>
+  </dl>
+  <div class="thead">&nbsp;&nbsp;拼团参数</div>
+  <dl class="clearfix">
+    <dt><label>是否支持拼团：</label></dt>
+    <dd class="radio">
+      <label><input type="checkbox" name="pin" value="1"{#if $pin == 1#} checked{#/if#} />支持</label>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="pinprice">拼团价格：</label></dt>
+    <dd>
+      <input class="input-mini" type="text" min="0" name="pinprice" data-regex="0|\d*\.?\d+" id="pinprice" value="{#$pinprice#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>拼团价格</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="pinpeople">拼团人数：</label></dt>
+    <dd>
+      <input class="input-mini" type="number" min="2" name="pinpeople" data-regex="[1-9]\d*" id="pinpeople" value="{#$pinpeople#}" />
+      <span class="input-tips" style="display:inline-block;"><s></s>拼团人数</span>
+    </dd>
+  </dl>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+</form>
+
+{#$editorFile#}
+{#$jsFile#}
+</body>
+</html>

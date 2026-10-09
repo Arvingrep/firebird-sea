@@ -278,39 +278,9 @@ class siteConfig {
             $cityid = getCityId();
         }
 
-        $isWxMiniprogram = $platform == 'wx_miniprogram' ? 1 : isWxMiniprogram();
-        $isBaiDuMiniprogram = $platform == 'bd_miniprogram' ? 1 : isBaiDuMiniprogram();
-        $isQqMiniprogram = $platform == 'qm_miniprogram' ? 1 : isQqMiniprogram();
-        $isByteMiniprogram = $platform == 'dy_miniprogram' ? 1 : isByteMiniprogram();
-
-        if(isAndroidApp()){
-            $platform = 'android';
-        }elseif(isIosApp()){
-            $platform = 'ios';
-        }elseif(isHarmonyApp()){
-            $platform = 'harmony';
-        }elseif($isWxMiniprogram){
-            $platform = 'wx_miniprogram';
-        }elseif($isBaiDuMiniprogram){
-            $platform = 'bd_miniprogram';
-        }elseif($isQqMiniprogram){
-            $platform = 'qm_miniprogram';
-        }elseif($isByteMiniprogram){
-            $platform = 'dy_miniprogram';
-        }elseif(isMobile()){
-            $platform = 'h5';
-        }else{
-            $platform = 'pc';
-        }
-
         $md5SiteModuleKey = "siteModule_" . $platform . '_' . $type . '_' . $cityid . '_' . $page;
         if(isset($_G[$md5SiteModuleKey])){
             return $_G[$md5SiteModuleKey];
-        }
-
-        $module_cache = cache_read($md5SiteModuleKey . '.php', 'siteModule/'.$cityid);
-        if($module_cache){
-            return $module_cache;
         }
 
         //获取分站设置
@@ -321,11 +291,12 @@ class siteConfig {
             if ($ret) {
                 $cityConfig = unserialize($ret[0]['config']);
             }
-
-            //根据职位所在分站，获取分站相关信息，用于生成链接时使用
-            global $siteCityInfo;
-            $siteCityInfo = cityInfoById($cityid);
         }
+
+        $isWxMiniprogram = $platform == 'wx_miniprogram' ? 1 : isWxMiniprogram();
+        $isBaiDuMiniprogram = $platform == 'bd_miniprogram' ? 1 : isBaiDuMiniprogram();
+        $isQqMiniprogram = $platform == 'qm_miniprogram' ? 1 : isQqMiniprogram();
+        $isByteMiniprogram = $platform == 'dy_miniprogram' ? 1 : isByteMiniprogram();
 
 
         $moduleArr = array();
@@ -390,10 +361,10 @@ class siteConfig {
                         }
 
                         //引入配置文件
-                        // $serviceInc = $config_path.$sName.".inc.php";
-                        // if(file_exists($serviceInc)){
-                        //     require($serviceInc);
-                        // }
+                        $serviceInc = $config_path.$sName.".inc.php";
+                        if(file_exists($serviceInc)){
+                            require($serviceInc);
+                        }
 
                         //重置自定义配置
                         $subDomain = $customSubDomain;
@@ -402,13 +373,12 @@ class siteConfig {
 
                         //获取功能模块配置参数
                         if($sName) {
-                            // $configHandels = new handlers($sName, "config");
-                            // $moduleConfig = $configHandels->getHandle();
-                            $moduleConfig = getModuleConfig($sName);
+                            $configHandels = new handlers($sName, "config");
+                            $moduleConfig = $configHandels->getHandle();
                         }
 
-                        if((is_array($moduleConfig) && !$moduleConfig['channelSwitch']) || $value['type'] == 1){
-                            // $moduleConfig  = $moduleConfig['info'];
+                        if((is_array($moduleConfig) && $moduleConfig['state'] == 100) || $value['type'] == 1){
+                            $moduleConfig  = $moduleConfig['info'];
 
                             //识别商家
                             if($value['type'] == 1 && $value['link'] == '{#$business_channelDomain#}' && !strstr($value['link'], '.html')){
@@ -480,9 +450,6 @@ class siteConfig {
         }
 
         $_G[$md5SiteModuleKey] = $moduleArr;
-
-        cache_write($md5SiteModuleKey . '.php', $moduleArr, 'siteModule/'.$cityid, 1);
-
         return $moduleArr;
     }
 
@@ -988,25 +955,10 @@ class siteConfig {
             }
         }
 
-        $archives = $dsql->SetQuery("SELECT `id`, `pay_code`, `pay_name`, `pay_desc`, `pay_config` FROM `#@__site_payment` WHERE `state` = 1 ORDER BY `weight`, `id` DESC");
+        $archives = $dsql->SetQuery("SELECT `id`, `pay_code`, `pay_name`, `pay_desc` FROM `#@__site_payment` WHERE `state` = 1 ORDER BY `weight`, `id` DESC");
         $results = $dsql->dsqlOper($archives, "results");
         if($results){
             foreach ($results as $key => $val){
-
-                //获取paytype，提供给前端判断是否需要原生支付，主要用于微信和支付宝
-                $pay_config = array();
-                $config_list = unserialize($val['pay_config']);
-                foreach ($config_list AS $config){
-                    $pay_config[$config['name']] = $config['value'];
-                }
-
-                $val['paytype'] = $pay_config['paytype'];
-
-                //微信和支付宝默认为当前pay_code
-                if(!$val['paytype'] && ($val['pay_code'] == 'wxpay' || $val['pay_code'] == 'alipay')){
-                    $val['paytype'] = $val['pay_code'];
-                }
-
 
                 $icon = '/api/payment/'.$val['pay_code'].'/images/'.$val['pay_code'].'.png';
                 if(!file_exists(HUONIAOROOT . $icon)){
@@ -1032,7 +984,7 @@ class siteConfig {
                     array_push($list, $val);
                 }elseif($isByteMiniprogram && $val['pay_code'] == 'bytemini'){
                     array_push($list, $val);
-                }elseif($isWxMiniprogram && ($val['pay_code'] == 'wxpay' || $val['pay_code'] == 'rfbp_icbc' || $val['pay_code'] == 'yabandpay_wxpay'|| $val['pay_code'] == 'fomopay_wxpay' || $val['pay_code'] == 'fomopay_paynow' || $pay_config['paytype'] == 'wxpay')){
+                }elseif($isWxMiniprogram && ($val['pay_code'] == 'wxpay' || $val['pay_code'] == 'rfbp_icbc' || $val['pay_code'] == 'yabandpay_wxpay'|| $val['pay_code'] == 'fomopay_wxpay' || $val['pay_code'] == 'fomopay_paynow')){
                     array_push($list, $val);
                 }elseif ($val['pay_code'] == 'huoniao_bonus' ){
 
@@ -3085,7 +3037,6 @@ class siteConfig {
                     global $domainNoCity;
                     $domainNoCity = 1;
 
-                    $_platform = $platform;
                     $platform = $platform == 'android' || $platform == 'ios' || $platform == 'harmony' ? 'app' : $platform;
 
                     //资讯
@@ -3187,28 +3138,27 @@ class siteConfig {
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon1.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon1.png?v=" . $cfg_staticVersion,
                                 "url" => getUrlPath(array('service' => $module, 'param' => ($platform == 'app' ? 'appIndex=1&appTitle' : ''))),
-                                'miniPath' => '/pages/packages/house/client/index/index',
                                 "fabu" => 0,    "message" => 0, "code" => !isIOSApp() ? 'house' : ''
                             ),
                             1 => array(
                                 "name" => '地图找房',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon2.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon2.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array('service' => $module, 'template' => 'mapLoupan', 'param' => ($platform == 'app' ? 'appTitle' : ''))),
+                                "url" => getUrlPath(array('service' => $module, 'template' => 'map', 'action' => 'loupan', 'param' => ($platform == 'app' ? 'appIndex=1&appTitle' : ''))),
                                 "fabu" => 0,    "message" => 0, "code" => ''
                             ),
                             2 => array(
                                 "name" => '发布',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon3.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon3.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array("service" => "member", "type" => "user", "template" => "house", 'param' => ($platform == 'app' ? 'appTitle' : ''))) . '#fabu',
+                                "url" => getUrlPath(array("service" => "member", "type" => "user", "template" => "house", 'param' => ($platform == 'app' ? 'appIndex=1&appTitle' : ''))) . '#fabu',
                                 "fabu" => 1,    "message" => 0, "code" => ''
                             ),
                             3 => array(
                                 "name" => '消息',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon4.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon4.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array("service" => "member", "type" => "user", "template" => "message", 'param' => 'module=house' . ($platform == 'app' ? '&appFullScreen' : ''))),
+                                "url" => getUrlPath(array("service" => "member", "type" => "user", "template" => "message", 'param' => ($platform == 'app' ? 'appIndex=1&appFullScreen' : ''))),
                                 "miniPath" => "/pages/member/message/index?module=" . $module,
                                 "fabu" => 0,    "message" => 1, "code" => ''
                             ),
@@ -3216,8 +3166,7 @@ class siteConfig {
                                 "name" => '我的',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon5.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon5.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array("service" => "house")) . '/member/index' . ($platform == 'app' ? '?appFullScreen' : ''),
-                                'miniPath' => '/pages/packages/house/member/index/index',
+                                "url" => getUrlPath(array("service" => "member", "type" => "user", "template" => "index_house", 'param' => ($platform == 'app' ? 'appIndex=1&appFullScreen' : ''))),
                                 "fabu" => 0,    "message" => 0, "code" => ''
                             )
                         );
@@ -3268,7 +3217,7 @@ class siteConfig {
                                 "name" => '首页',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon1.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon1.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array('service' => $module, 'param' => ($platform == 'app' ? 'appIndex=1&appTitle=1' : ''))),
+                                "url" => getUrlPath(array('service' => $module, 'param' => ($platform == 'app' ? 'appIndex=1&appFullScreen=1' : ''))),
                                 "miniPath" => "/pages/packages/zhaopin/index/index",
                                 "fabu" => 0,    "message" => 0, "code" => !isIOSApp() ? 'zhaopin' : ''
                             ),
@@ -3276,7 +3225,7 @@ class siteConfig {
                                 "name" => '职位',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon2.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon2.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array('service' => $module, 'template' => 'job-list', 'param' => ($platform == 'app' ? 'appTitle=1' : ''))),
+                                "url" => getUrlPath(array('service' => $module, 'template' => 'job-list')),
                                 "miniPath" => "/pages/packages/zhaopin/qzJobList/qzJobList",
                                 "fabu" => 0,    "message" => 0, "code" => ''
                             ),
@@ -3284,7 +3233,7 @@ class siteConfig {
                                 "name" => '公司',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon3.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon3.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array('service' => $module, 'template' => 'company-list', 'param' => ($platform == 'app' ? 'appTitle=1' : ''))),
+                                "url" => getUrlPath(array('service' => $module, 'template' => 'company-list')),
                                 "miniPath" => "/pages/packages/zhaopin/companyList/companyList",
                                 "fabu" => 0,    "message" => 0, "code" => ''
                             ),
@@ -3300,7 +3249,7 @@ class siteConfig {
                                 "name" => '我的',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon5.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon5.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array('service' => $module, 'template' => 'u_center', 'param' => ($platform == 'app' ? ($_platform == 'ios' ? 'appTitle=1' : 'appFullScreen=1') : ''))),
+                                "url" => getUrlPath(array('service' => $module, 'template' => 'u_center')),
                                 "miniPath" => "/pages/packages/zhaopin_center/zp_center/index/index",
                                 "fabu" => 0,    "message" => 0, "code" => ''
                             )
@@ -4177,7 +4126,7 @@ class siteConfig {
                                 "name" => '推荐',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon2.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon2.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array("service" => $module, "template" => "list", 'param' => ($platform == 'app' ? '' : ''))),
+                                "url" => getUrlPath(array("service" => $module, "template" => "list", 'param' => ($platform == 'app' ? 'appTitle=1' : ''))),
                                 "miniPath" => "/pages/packages/task/list/list",
                                 "fabu" => 0,    "message" => 0, "code" => ''
                             ),
@@ -4200,7 +4149,7 @@ class siteConfig {
                                 "name" => '我的',
                                 "icon_h" => $tplDir."images/touchHomePageFooter/2.0/".$module."/ficon5.png?v=" . $cfg_staticVersion,
                                 "icon" => $tplDir."images/touchHomePageFooter/2.0/".$module."/aficon5.png?v=" . $cfg_staticVersion,
-                                "url" => getUrlPath(array("service" => $module, "template" => "my", 'param' => ($platform == 'app' ? '' : ''))),
+                                "url" => getUrlPath(array("service" => $module, "template" => "my", 'param' => ($platform == 'app' ? 'appTitle=1' : ''))),
                                 "miniPath" => "/pages/packages/task/my/my",
                                 "fabu" => 0,    "message" => 0, "code" => ''
                             )
@@ -5387,7 +5336,7 @@ class siteConfig {
                     );
 
                     //查询当前会员是否为中介
-                    $sql = $dsql->SetQuery("SELECT `id`, `meal` FROM `#@__house_distributor_company_user` WHERE `uid` = $uid");
+                    $sql = $dsql->SetQuery("SELECT `id`, `meal` FROM `#@__house_zjuser` WHERE `userid` = $uid");
                     $ret = $dsql->dsqlOper($sql, "results");
                     if($ret){
 
@@ -6174,7 +6123,7 @@ class siteConfig {
         //判断是否经纪人
         $check_zjuser = false;
         if($module == "house"){
-            $sql = $dsql->SetQuery("SELECT `id`, `meal` FROM `#@__house_distributor_company_user` WHERE `uid` = $userid");
+            $sql = $dsql->SetQuery("SELECT `id`, `meal` FROM `#@__house_zjuser` WHERE `userid` = $userid");
             $ret = $dsql->dsqlOper($sql, "results");
             if($ret){
                 $zjuid = $ret[0]['id'];
@@ -6571,12 +6520,7 @@ class siteConfig {
         $field  = '';
         $stitle = ",`title`";
         if($module == 'house'){
-            //兼容新房产房源数据 
-            if (in_array($act, array('sale', 'zu'))) {
-                $tab = $module . '_property_listing';
-            } else {
-                $tab = $module . '_' . $act;
-            }
+            $tab = $module . '_' . $act;
             $field = ",`cityid`";
         }elseif($module == 'job'){
             $tab = $module . '_resume';
@@ -6760,9 +6704,7 @@ class siteConfig {
                 }
 
                 if($module == 'house'){
-                    //兼容处理新房源字段
-                    $upField = (in_array($act, array('sale', 'zu'))) ? 'publish_time' : 'pubdate';
-                    $sql = $dsql->SetQuery("UPDATE `#@__" . $tab . "` SET `$upField` = '$time' WHERE `id` = $aid");
+                    $sql = $dsql->SetQuery("UPDATE `#@__".$tab."` SET `pubdate` = '$time' WHERE `id` = $aid");
                     $ret = $dsql->dsqlOper($sql, "update");
                 }
 
@@ -6805,10 +6747,7 @@ class siteConfig {
                 }
 
                 if($module == 'house'){
-                    //兼容新版房产逻辑
-                    $upField = (in_array($act, array('sale', 'zu'))) ? 'publish_time' : 'pubdate';
-
-                    $sql = $dsql->SetQuery("UPDATE `#@__".$tab."` SET `refreshSmart` = 1, `refreshCount` = '$sr_times', `refreshTimes` = '$sr_day', `refreshPrice` = '$sr_price', `refreshBegan` = '$time', `refreshNext` = '$nextRefreshTime', `refreshSurplus` = '$refreshSurplus', `$upField` = '$time' WHERE `id` = $aid");
+                    $sql = $dsql->SetQuery("UPDATE `#@__".$tab."` SET `refreshSmart` = 1, `refreshCount` = '$sr_times', `refreshTimes` = '$sr_day', `refreshPrice` = '$sr_price', `refreshBegan` = '$time', `refreshNext` = '$nextRefreshTime', `refreshSurplus` = '$refreshSurplus', `pubdate` = '$time' WHERE `id` = $aid");
                     $ret = $dsql->dsqlOper($sql, "update");
                 }
 
@@ -7831,27 +7770,6 @@ class siteConfig {
         global $cfg_server_wx;
         global $cfg_server_wxQr;
 
-        $_check_cityid = (int)$_GET['cityid'] ?? '';
-        if(!$_check_cityid){
-            global $siteCityInfo;
-            $_check_cityid = (int)$siteCityInfo['cityid'] ?? '';
-        }
-
-        if($_check_cityid){
-            $_wechatConfig = getWechatCityAdvancedConfig('', $_check_cityid);
-            $_wxminiConfig = getMiniProgramCityAdvancedConfig('', $_check_cityid);
-
-            if($_wechatConfig){
-                $cfg_wechatName = $_wechatConfig['name'];
-                $cfg_wechatQr = $_wechatConfig['qr'];
-            }
-            if($_wxminiConfig){
-                $cfg_miniProgramName = $_wxminiConfig['name'];
-                $cfg_miniProgramQr = $_wxminiConfig['qr'];
-            }
-
-        }
-
         return array(
             'basehost' => $cfg_secureAccess . $cfg_basehost,
             'weixin' => array(
@@ -8027,11 +7945,11 @@ class siteConfig {
             $delfrom = $ret[0]['delfrom'];
             $delto = $ret[0]['delto'];
 
-            // if($state){
+            if($state){
 
                 //如果已经是好友，但是申请人将对方删除了，此时直接更新状态，不需要再申请
                 if($fid_ == $userid && $delfrom){
-                    $sql = $dsql->SetQuery("UPDATE `#@__member_friend` SET `state` = 1, `date` = '$time', `delfrom` = 0 WHERE `id` = " . $id);
+                    $sql = $dsql->SetQuery("UPDATE `#@__member_friend` SET `delfrom` = 0 WHERE `id` = " . $id);
                     $dsql->dsqlOper($sql, "update");
 
                     //发送消息
@@ -8051,7 +7969,7 @@ class siteConfig {
 
                 //如果已经是好友，但是申请人将对方删除了，此时直接更新状态，不需要再申请
                 if($tid_ == $userid && $delto){
-                    $sql = $dsql->SetQuery("UPDATE `#@__member_friend` SET `state` = 1, `date` = '$time', `delto` = 0 WHERE `id` = " . $id);
+                    $sql = $dsql->SetQuery("UPDATE `#@__member_friend` SET `delto` = 0 WHERE `id` = " . $id);
                     $dsql->dsqlOper($sql, "update");
 
                     //发送消息
@@ -8071,17 +7989,15 @@ class siteConfig {
 
                 //如果已经是好友，并且双方都没有删除
                 if(!$delfrom && !$delto){
-                    $sql = $dsql->SetQuery("UPDATE `#@__member_friend` SET `state` = 1 WHERE `id` = " . $id);
-                    $dsql->dsqlOper($sql, "update");
                     return array("state" => 200, "info" => "你们已经是好友了！");
                 }
-            // }else{
-            //     //更新状态
-            //     $sql = $dsql->SetQuery("UPDATE `#@__member_friend` SET `state` = 0, `delto` = 1, `date` = '$time' WHERE `id` = " . $id);
-            //     $dsql->dsqlOper($sql, "update");
-            // }
+            }else{
+                //更新状态
+                $sql = $dsql->SetQuery("UPDATE `#@__member_friend` SET `state` = 1, `delto` = 1, `date` = '$time' WHERE `id` = " . $id);
+                $dsql->dsqlOper($sql, "update");
+            }
         }else{
-            $sql = $dsql->SetQuery("INSERT INTO `#@__member_friend` (`fid`, `tid`, `state`, `date`, `delfrom`, `delto`, `temp`, `tempdelfrom`, `tempdelto`) VALUES ('$userid', '$tid', 0, '$time', 0, 1, 1, 0, 0)");
+            $sql = $dsql->SetQuery("INSERT INTO `#@__member_friend` (`fid`, `tid`, `state`, `date`, `delfrom`, `delto`, `temp`, `tempdelfrom`, `tempdelto`) VALUES ('$userid', '$tid', 1, '$time', 0, 1, 1, 0, 0)");
             $dsql->dsqlOper($sql, "update");
         }
 
@@ -8662,7 +8578,7 @@ class siteConfig {
         $sql = $dsql->SetQuery("SELECT `id` FROM `#@__member_friend` WHERE (`fid` = $fid AND `tid` = $tid) OR (`fid` = $tid AND `tid` = $fid)");
         $ret = $dsql->dsqlOper($sql, "results");
         if(!$ret){
-            $sql = $dsql->SetQuery("INSERT INTO `#@__member_friend` (`fid`, `tid`, `state`, `date`, `delfrom`, `delto`, `temp`, `tempdelfrom`, `tempdelto`) VALUES ('$fid', '$tid', 0, 0, 0, 1, 1, 0, 0)");
+            $sql = $dsql->SetQuery("INSERT INTO `#@__member_friend` (`fid`, `tid`, `state`, `date`, `delfrom`, `delto`, `temp`, `tempdelfrom`, `tempdelto`) VALUES ('$fid', '$tid', 0, 0, 0, 0, 1, 0, 0)");
             $dsql->dsqlOper($sql, "update");
         }
 
@@ -9325,10 +9241,10 @@ class siteConfig {
             $disresult = 0;
             $feiresult = 0;
             if ($value['moduletype'] == 'shop'){
-                $sql    = $dsql->SetQuery("SELECT count(c.`id`) FROM `#@__public_comment` c LEFT JOIN `#@__shop_order` o ON o.`id` = c.`oid` WHERE o.`orderstate` = 3 AND c.`ischeck` = 1 AND c.`type` = 'shop-order' AND o.`store` = '".$value['id']."' AND c.`pid` = 0");
-                $rcount = (int)$dsql->getOne($sql);
+                $sql    = $dsql->SetQuery("SELECT c.`id` FROM `#@__public_comment_all` c LEFT JOIN `#@__shop_order` o ON o.`id` = c.`oid` WHERE o.`orderstate` = 3 AND c.`ischeck` = 1 AND c.`type` = 'shop-order' AND o.`store` = '$id' AND c.`pid` = 0");
+                $rcount = $dsql->dsqlOper($sql, "totalCount");
 
-                $sql = $dsql->SetQuery("SELECT count(c.`id`) hpcount ,avg(c.`sco1`) s1, avg(c.`sco2`) s2, avg(c.`sco3`) s3 FROM `#@__public_comment` c LEFT JOIN `#@__shop_order` o ON o.`id` = c.`oid` WHERE o.`orderstate` = 3 AND c.`ischeck` = 1 AND c.`rating` = 1 AND c.`type` = 'shop-order' AND o.`store` = '".$value['id']."'  AND c.`pid` = 0");
+                $sql     = $dsql->SetQuery("SELECT count(c.`id`) hpcount ,avg(c.`sco1`) s1, avg(c.`sco2`) s2, avg(c.`sco3`) s3 FROM `#@__public_comment_all` c LEFT JOIN `#@__shop_order` o ON o.`id` = c.`oid` WHERE o.`orderstate` = 3 AND c.`ischeck` = 1 AND c.`rating` = 1 AND c.`type` = 'shop-order' AND o.`store` = '".$value['id']."'  AND c.`pid` = 0");
                 $res    = $dsql->dsqlOper($sql, "results");
                 $score1  = $res[0]['s1'];  //分项1
                 $hpcount = $res[0]['hpcount'];
@@ -9423,12 +9339,6 @@ class siteConfig {
         $time        = time();
         $expired     = $time + 2592000;  //过期时间（30天后）
 		$from        = $this->param['from'];  //来源
-        $cityid      = (int)$this->param['cityid'];  //分站ID
-
-        if(!$cityid){
-            global $siteCityInfo;
-            $cityid = (int)$siteCityInfo['cityid'] ?? '';
-        }
 
         if($link == 'undefined'){
             $param = array(
@@ -9553,7 +9463,7 @@ class siteConfig {
 
         //先验证是否存在，并且没有过期
         $has = false;
-        $sql = $dsql->SetQuery("SELECT `id`, `qr`, `expired`, `ticket` FROM `#@__site_wxposter` WHERE `cityid` = '$cityid' AND `module` = '$module' AND `type` = '$type' AND `aid` = '$aid' AND `link` = '$link'");
+        $sql = $dsql->SetQuery("SELECT `id`, `qr`, `expired`, `ticket` FROM `#@__site_wxposter` WHERE `module` = '$module' AND `type` = '$type' AND `aid` = '$aid' AND `link` = '$link'");
         $ret = $dsql->dsqlOper($sql, "results");
         if($ret){
             $has = true;
@@ -9620,7 +9530,7 @@ class siteConfig {
 
                 //新创建
             }else{
-                $sql = $dsql->SetQuery("INSERT INTO `#@__site_wxposter` (`cityid`, `rand`, `module`, `type`, `aid`, `title`, `description`, `imgUrl`, `link`, `qr`, `expired`, `ticket`) VALUES ('$cityid', '$rand', '$module', '$type', '$aid', '$title', '$description', '$imgUrl', '$link', '$qr', '$expired', '$ticket')");
+                $sql = $dsql->SetQuery("INSERT INTO `#@__site_wxposter` (`rand`, `module`, `type`, `aid`, `title`, `description`, `imgUrl`, `link`, `qr`, `expired`, `ticket`) VALUES ('$rand', '$module', '$type', '$aid', '$title', '$description', '$imgUrl', '$link', '$qr', '$expired', '$ticket')");
                 $ret = $dsql->dsqlOper($sql, "update");
             }
 

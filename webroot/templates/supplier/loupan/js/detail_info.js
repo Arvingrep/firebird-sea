@@ -7,11 +7,11 @@ function getEditor(id){
 
 getEditor("note");
 
-var pageVue = new Vue({
+var page = new Vue({
 	el:'#page',
 	data:{
 		navList:navList,
-		currid:currid,
+		currid:2,
 		hoverid:'',
 		buildtypelist:buildtypenames,  //建筑类型
 		buildtype:[],

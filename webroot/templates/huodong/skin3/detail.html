@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>{#$detail_title#} - {#$detail_typename[1]#} - {#$detail_typename[0]#} - {#$huodong_title#}</title>
+		<meta name="keywords" content="{#$detail_typename[0]#},{#$detail_typename[1]#},{#$huodong_keywords#}" />
+		<meta name="description" content="{#$huodong_description#}" />
+		<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" href="{#$templets_skin#}css/pub_top.css?v={#$cfg_staticVersion#}">
+		<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/detail.css?v={#$cfg_staticVersion#}">
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+		<script type="text/javascript">
+			var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$huodong_channelDomain#}', id = {#$detail_id#}, feetype = {#$detail_feetype#}, cookiePre = '{#$cfg_cookiePre#}', staticPath = '{#$cfg_staticPath#}', hideFileUrl = {#$cfg_hideUrl#};
+			var imconfig = {
+				'mod':'huodong',
+				'chatid':"{#$detail_uid#}",
+				'title': '{#$detail_title#}',
+				"price": '{#if $detail_feetype == 0#}免费{#else#}<em>{#echoCurrency type='symbol'#}</em>{#$detail_minprice#}{#/if#}',
+				"imgUrl": '{#changeFileSize url={#$detail_litpic#} type='small'#}',
+				"link": '{#getUrlPath service="huodong" template="detail" id=$detail_id#}',
+
+			}
+			var member_userDomain = '{#$member_userDomain#}';
+			var site_map = "{#$site_map#}";
+			var  hdData = {
+				id: '{#$detail_id#}',
+				title: '{#$detail_title#}',
+				address: '{#$detail_address#}',
+				lat: '{#$detail_lat#}',
+				lng: '{#$detail_lng#}',
+                cityName: '{#$siteCityInfo.name#}',
+				url: '{#$huodong_channelDomain#}/detail-{#$detail_id#}.html',
+				mapType: '{#$site_map#}',
+			    mapKey: '{#$site_map_key#}',
+                mapServerKey: '{#$site_map_server_key#}'
+			};
+			var pageDetail = hdData;
+            var pageData = hdData;
+		</script>
+	</head>
+	<body>
+		{#$channel = 'huodong'#}
+		<div class="top_nav">
+			<ul>
+				{#if $detail_feeList && count($detail_feeList)>0#}
+				<li class="on">{#$langData['huodong'][2][4]#}</li>   {#*  活动票种  *#}
+				{#/if#}
+				<li {#if $detail_feeList && count($detail_feeList)==0#}class="on"{#/if#}>{#$langData['huodong'][0][29]#}</li>   {#*  活动详情  *#}
+				<li>{#$langData['huodong'][2][5]#}</li>   {#*  活动成员  *#}
+				<li>{#$langData['huodong'][0][41]#}</li>   {#*  活动评论  *#}
+			</ul>
+		</div>
+		{#$hotline = $huodong_hotline#}
+		{#include file="../../siteConfig/top1.html"#}
+		{#include file="header_search.html"#}
+		<div class="mainbox">
+			<!-- 活动信息展示 -->
+			<div class="hd_info fn-clear">
+				<div class="left_img"><img src="{#$detail_litpic#}"></div>
+				<div class="right_info">
+					<h2>{#$detail_title#}</h2>
+					<div class="hd_detail">
+						<p class="time"><i></i>{#$detail_began|date_format:"%Y-%m-%d %H:%M"#} ~ {#$detail_end|date_format:"%Y-%m-%d %H:%M"#}</p>
+						<p class="deadline {#if !$detail_baoming#}ended{#/if#}"><i></i>{#*  报名截止时间   报名已截止 *#}
+						{#if !$detail_baoming#}
+						{#$langData['huodong'][2][6]#} {#$detail_baomingend|date_format:"%Y-%m-%d %H:%M"#}
+						{#else#}
+						{#$langData['huodong'][2][6]#} {#$detail_end|date_format:"%Y-%m-%d %H:%M"#}
+						{#/if#}
+						</p>
+						<p class="addr"><i></i>{#if $detail_addrname#}{#$detail_addrname[$detail_addrname|@count-2]#} {#$detail_addrname[$detail_addrname|@count-1]#} {#/if#}{#$detail_address#}</p>
+						<p class="tel"><i></i>主办方电话：{#$detail_contact#}</p>
+						<p>
+							<span class="bm_num"><i></i><em>{#$detail_reg#}</em>{#$langData['huodong'][2][3]#}</span>   {#*  人已报名 *#}
+							{#if $detail_feetype == 0#}
+							<em class="line"> | </em>
+							<span class="bm_limit"><i></i>{#$langData['huodong'][2][32]|replace:"1":$detail_max#}</span>   {#*限额<em>1</em> 人报名 *#}
+							{#/if#}
+						</p>
+					</div>
+					{#if $now < $detail_end#}
+						{#if $detail_isbaoming#}
+                            {#if $detail_sign == 1#}
+							<div class="baoming isbaoming"><a href="javascript:;">您已报名</a></div>
+                            {#else#}
+							<div class="baoming cancel"><a href="javascript:;" class="cancel">{#$langData['huodong'][0][49]#}</a></div>     {#*  取消报名 *#}
+                            {#/if#}
+						{#else#}
+							{#if $detail_surplus > 0#}
+								{#if $detail_feetype#}
+									<div class="baoming"><a href="javascript:;">{#$langData['huodong'][1][13]#}</a></div>     {#*  报名 *#}
+								{#else#}
+									{#if $detail_max <= $detail_reg#}
+									<div class="baomingend" title="{#$langData['huodong'][1][0]#}"><a href="javascript:;">{#$langData['huodong'][1][0]#}</a></div>     {#*  名额已用完 *#}
+									{#else#}
+									<div class="baoming"><a href="javascript:;">{#$langData['huodong'][1][13]#}</a></div>     {#*  报名 *#}
+									{#/if#}
+								{#/if#}
+							{#else#}
+								<div class="baomingend" title="{#$langData['huodong'][1][1]#}"><a href="javascript:;">{#$langData['huodong'][1][1]#}</a></div>  {#*  报名已截止 *#}
+							{#/if#}
+						{#/if#}
+					{#else#}
+						<div class="baomingend"><a href="javascript:;">{#$langData['huodong'][1][2]#}</a></div>    {#*  活动已结束 *#}
+					{#/if#}
+
+					<div class="btns_group">
+						<a href="javascript:;" class="chat chat_to-Link" data-type="detail"><i></i><em>{#$langData['huodong'][2][7]#}</em></a>   {#*  在线咨询 *#}
+						{#if $detail_collect == "has"#}
+						<a href="javascript:;" class="shou shoued"><i></i><em>{#$langData['huodong'][0][47]#}</em></a>   {#*  已收藏 *#}
+						{#else#}
+						<a href="javascript:;" class="shou"><i></i><em>{#$langData['huodong'][0][31]#}</em></a>   {#*  收藏 *#}
+						{#/if#}
+
+					</div>
+				</div>
+			</div>
+
+			<!-- 左右两部分 -->
+			<div class="wrapbox fn-clear">
+				<div class="left_con">
+					<!-- 活动票种 -->
+					{#if $detail_feeList && count($detail_feeList)>0#}
+					<div class="ticketBox scrollbox">
+						<h4>{#$langData['huodong'][2][4]#}</h4>    {#*  活动票种 *#}
+						<ul class="fn-clear">
+
+							{#foreach from=$detail_feeList item=fee#}
+							<li data-id="{#$fee.id#}" class="{#if ($fee.max == $fee.reg && $fee.max > 0) || ($now > $detail_end)#}nochose{#/if#}">
+								<i></i>
+								<div class="ticket_info fn-clear">
+									<div class="tprice"><em>{#$fee.price#}</em>{#$langData['huodong'][0][6]#}</div>    {#*  起 *#}
+									{#if $fee.max#}
+									<div class="tnum">{#$langData['huodong'][1][12]|replace:" 0 ":($fee.max - $fee.reg)|replace:" 1 ":$fee.max#}</div>{#*  剩余<em> 0 / 1 </em>张 *#}
+									{#else#}
+									<div class="tnum">{#$langData['huodong'][2][8]#}</div>    {#*  不限量 *#}
+									{#/if#}
+								</div>
+								<p>{#$fee.title#}</p>
+							</li>
+							{#/foreach#}
+						</ul>
+					</div>
+					{#/if#}
+
+					<!-- 活动详情 -->
+					<div class="detail_box scrollbox">
+						<h4>{#$langData['huodong'][0][29]#}</h4>    {#*  活动详情 *#}
+						<div class="detail">
+							{#$detail_body#}
+						</div>
+					</div>
+
+
+					<!-- 活动成员 -->
+					<div class="reg_box scrollbox">
+						<h4>{#$langData['huodong'][2][5]#}</h4>    {#*  活动成员 *#}
+						{#if $detail_reg#}
+						<div class="ulbox">
+							<ul class="fn-clear">
+								<!-- {#huodong action='regList' hid={#$detail_id#}#}
+								<li class="li_reg">
+									<a href="{#getUrlPath service='member' template='user' id={#$row.uid#}#}">
+										<div class="head_img"><img src="{#if $row.photo#}{#$row.photo#}{#else#}{#$cfg_staticPath|cat:'images/noPhoto_100.jpg'#}{#/if#}"></div>
+										<h5>{#$row.nickname|default:$langData['huodong'][0][42]#}</h5>  {#*  匿名 *#}
+										<p>{#$row.date|date_format:'%Y-%m-%d'#}</p>
+									</a>
+								</li>
+								{#/huodong#} -->
+							</ul>
+						</div>
+						{#if $detail_reg>6#}
+						<a href="javascript:; " class="more_btn">{#$langData['huodong'][2][9]#}</a>    {#*  展开 *#}
+						{#/if#}
+						{#else#}
+						<p>{#$langData['huodong'][0][43]#}</p>  {#*  还没有人报名哦~ *#}
+						{#/if#}
+					</div>
+					<!-- 活动评论 -->
+					<div class="commt_box scrollbox">
+						<h4>{#$langData['huodong'][0][41]#}</h4>   {#* 活动评论 *#}
+						<div class="commtbox">
+							<textarea rows="" cols="" placeholder="{#$langData['huodong'][2][10]#}"></textarea>   {#*  对活动有疑问？有看法？在这里评论~ *#}
+							<div class="cbtn_box fn-clear">
+								{#if $userinfo#}
+								<div class="loginUser fn-clear">
+									<div class="h_img"><img src="{#if $userinfo.photo#}{#$userinfo.photo#}{#else#}{#$cfg_staticPath|cat:'images/noPhoto_100.jpg'#}{#/if#}"  onerror="this.src='/static/images/noPhoto_60.jpg'" alt=""></div>
+									<div class="nickname">{#$userinfo.nickname#}</div>
+									<a href="{#$cfg_basehost#}/logout.html" class="unlogin">{#$langData['huodong'][2][11]#}</a>  {#* 安全退出 *#}
+								</div>
+								<a href="javascript:;" class="commt_btn onbtn">{#$langData['huodong'][2][12]#}</a>   {#* 评论 *#}
+								{#else#}
+								<a href="{#$cfg_basehost#}/login.html" class="login_btn">{#$langData['huodong'][2][13]#}</a>     {#* 登录 *#}
+								{#/if#}
+							</div>
+
+						</div>
+
+					</div>
+
+					<!-- 评论列表 -->
+					<div class="commtlist_box">
+						<h4>{#$langData['huodong'][2][14]#}（<em>{#$detail_reply#}</em>）</h4>  {#* 最新评论 *#}
+						<ul class="commt_ul">
+							{#*
+							<li class="commt_li">
+								 <div class="left_img"></div>
+								 <div class="right_txt">
+									 <div class="btns_box">
+										 <h3 class="c_nick">我是昵称</h3>
+										 <div class="btn_group">
+											<a href="javascript:;" class="reply_btn"><i></i><em>回复</em></a>
+											<a href="javascript:;" class="zan_btn"><i></i><em>1500</em></a>
+										 </div>
+									 </div>
+									 <div class="commt_con">我是发布内容</div>
+									 <p class="pubdate">昨天</p>
+									 <div class="reply_list">
+										 <ul class="reply_ul">
+											 <li class="reply_li">
+												  <div class="left_img"></div>
+												  <div class="right_txt">
+													  <div class="btns_box">
+														 <h3 class="c_nick">我是昵称</h3>
+														 <div class="btn_group">
+															<a href="javascript:;" class="reply_btn"><i></i><em>回复</em></a>
+															<a href="javascript:;" class="zan_btn"><i></i><em>1500</em></a>
+														 </div>
+													  </div>
+													  <div class="commt_con">我是发布内容</div>
+													  <p class="pubdate">昨天</p>
+													  <div class="reply_box">
+															 <input type="text" placeholder="回复" >
+															 <button type="button" class="re_btn">回复</button>
+													  </div>
+												  </div>
+											 </li>
+											 <li class="reply_li">
+												 <div class="left_img"></div>
+												 <div class="right_txt">
+												  <div class="btns_box">
+													 <h3 class="c_nick">我是昵称</h3>
+													 <div class="btn_group">
+														<a href="javascript:;" class="reply_btn"><i></i><em>回复</em></a>
+														<a href="javascript:;" class="zan_btn"><i></i><em>1500</em></a>
+													 </div>
+												  </div>
+												  <div class="commt_con">我是发布内容</div>
+												  <p class="pubdate">昨天</p>
+												 </div>
+											 </li>
+										 </ul>
+									 </div>
+									 <div class="reply_box">
+										 <input type="text" placeholder="回复" >
+										 <button type="button" class="re_btn">回复</button>
+									 </div>
+								 </div>
+							</li>
+							*#}
+						</ul>
+					</div>
+
+					<!-- 相似活动 -->
+					<div class="hd_box">
+						<h4>{#$langData['huodong'][2][15]#}</h4>  {#*  相似活动  *#}
+						<ul class="list">
+							{#huodong action='hlist' typeid={#$detail_typeid#} page=1 pageSize='3'#}
+							<li class="fn-clear">
+								<a href="{#$row.url#}" class="hdimg">
+									<img src="{#$row.litpic#}" alt="{#$row.title#}">
+								</a>
+								<div class="rinfo">
+									<a href="{#$row.url#}"><h1>{#$row.title#}</h1></a>
+									<div class="hd_detail">
+										<p><span class="bm_num"><i></i><em>{#$row.reg#}{#$langData['huodong'][2][3]#}</em></span> <em class="fenge">|</em> <span class="r_num"><i></i><em>{#$row.click#}</em></span></p>{#*  人已报名  *#}
+										<p><span class="hd_time"><i></i><em>{#$row.began|date_format:"%Y-%m-%d %H:%M"#}</em></span></p>
+										<p><span class="hd_addr"><i></i><em>{#if $row.addrname#}{#$row.addrname[$row.addrname|@count-2]#} {#$row.addrname[$row.addrname|@count-1]#}{#/if#}</em></span></p>
+									</div>
+									<div class="user_info fn-clear">
+										<a class="u_head" href="{#getUrlPath service='huodong' template='business' id={#$row.uid#}#}"><img src="{#$row.userphoto#}" alt=""></a>
+										<p class="u_nick">{#$row.username#} </p>
+									</div>
+									<a class="btn_baoming" href="{#$row.url#}">立即报名</a>
+								</div>
+								<div class="price_box">
+									<span class="price_show {#if $row.feetype=='0'#}free{#/if#}">{#if $row.feetype=='0'#}{#$langData['huodong'][0][5]#}{#else#}{#echoCurrency type='symbol'#}<em>{#$row.mprice#}</em>{#$langData['huodong'][0][6]#}{#/if#}</span>  {#*  免费 起  *#}
+									<em class="code_btn"></em>
+								</div>
+								<div class="code_box">
+									<div class="code_img">
+										<img src="{#$cfg_basehost#}/include/qrcode.php?data={#$row.url#}" alt="" />
+									</div>
+									<i class="arr"></i>
+								</div>
+							</li>
+							{#/huodong#}
+						</ul>
+					</div>
+				</div>
+				<div class="right_con">
+					<!-- 活动地点 -->
+					<div class="map_box">
+						<h4>{#$langData['huodong'][2][16]#}</h4>   {#*  活动地点  *#}
+						<div class="map_show map_box">
+							 <a href="javascript:;" class="appMapBtn" target="_blank"><img class="appMapImg" src="/static/images/blank.gif" alt=""></a>
+						</div>
+					</div>
+
+
+					<!-- 主办方 -->
+					<div class="organzer_box">
+						<h4>{#$langData['huodong'][2][31]#}</h4>   {#*  主办方  *#}
+						<div class="organzer">
+							<div class="or_info">
+								<div class="head_img">
+									<a href="{#$detail_user['memberurl']#}" target="_blank">
+										<img src="{#$detail_user['photo']#}" onerror="this.src='/static/images/noPhoto_60.jpg'">
+									</a>
+								</div>
+								<h3 class="nickname">{#$detail_user['username']#}</h3>
+								<div class="count_data fn-clear">
+									<div class="left_count">
+										<h5>{#$detail_user['huodongCount']#}</h5>
+										<p>{#$langData['huodong'][1][23]#}</p>    {#*  发布活动  *#}
+										<i ></i>
+									</div>
+									<div class="right_count">
+										<h5>{#$detail_user['regCount']#}</h5>
+										<p>{#$langData['huodong'][1][34]#}</p>    {#*  参与人数  *#}
+									</div>
+								</div>
+
+								<a href="javascript:;" class="care_btn {#if $isfollow == 1#} cared {#/if#}" data-uid="{#$detail_uid#}"><i></i><em>{#if $isfollow==1#}{#$langData['siteConfig'][19][845]#}{#else#}{#$langData['siteConfig'][19][846]#}{#/if#}</em></a>
+
+							</div>
+							<div class="hd_list">
+								<h4>{#$langData['huodong'][2][18]#}</h4>    {#*  他的活动  *#}
+								<ul>
+									{#huodong action='hlist' return='list' uid={#$detail_uid#} pageSize="10"#}
+									<li>
+										<a href="{#$list.url#}">
+											<p>• {#$list.began|date_format:"%Y-%m-%d %H:%M:%S"#}</p>
+											<h3>{#$list.title#}</h3>
+										</a>
+									</li>
+									{#/huodong#}
+								</ul>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		{#*
+		<!-- 地图弹窗 -->
+		<div class="mask"></div>
+		<div class="map-popup fn-hide">
+		    <div class="close"><img src="{#$templets_skin#}images/popup-close.png" alt=""></div>
+		    <p class="name">{#$detail_title#}</p>
+		    <p class="location">{#$detail_address#}</p>
+		    <div id="allmap"></div>
+		</div>
+		*#}
+		<div class="mask_pop"></div>
+		<div class="pop_box">
+			<h1>{#$langData['huodong'][1][3]#}   <i class="close_pop"></i></h1>   {#*  填写报名信息  *#}
+			<div class="form_box">
+				<form action="" id="form">
+					<div class="box_in">
+						<dl data-id="{#$langData['huodong'][1][4]#}" data-type="text" data-required="1">
+							<dt>{#$langData['huodong'][1][4]#}</dt>
+							<dd><input type="text" placeholder="{#$langData['huodong'][1][5]#}" {#if $userinfo#}value="{#$userinfo.nickname#}"{#/if#}></dd>
+						</dl>{#*  姓名 ==== 请输入姓名  *#}
+						<dl class="phone_dl" data-id="{#$langData['huodong'][1][6]#}" data-type="text" data-required="1">
+							<dt>{#$langData['huodong'][1][6]#}</dt>
+							<dd>
+								<span class="areacode" data-val="{#$internationalPhoneSection[0]['code']#}">+<em>{#$internationalPhoneSection[0]['code']#}</em> <i class="arr_d"></i></span>
+								<input type="text" placeholder="{#$langData['huodong'][1][7]#}" {#if $userinfo#}value="{#$userinfo.phone#}"{#/if#}>
+								{#*  手机 ==== 请输入手机号  *#}
+
+							</dd>
+						</dl>
+
+						{#foreach from=$detail_property item=p key=k#}
+						<dl class="fn-clear" data-id="{#$p.title#}" data-type="{#$p.type#}" data-required="{#$p.required#}">
+							<dt>{#$p.title#}{#if $p.required == 0#} ({#$langData['huodong'][1][8]#}){#/if#}</dt>
+							<dd>
+								{#if $p.type == 'text'#}
+								<input type="text" placeholder="{#$langData['huodong'][1][9]#}{#$p.title#}" />   {#* 请输入 *#}
+								{#elseif $p.type == 'text_long'#}
+								<textarea maxlength="200" placeholder="{#$langData['huodong'][1][9]#}{#$p.title#}"></textarea>   {#* 请输入 *#}
+								{#elseif $p.type == 'single_vote'#}
+								<input type="hidden" name="single{#$k#}" value="" />
+								{#foreach from=$p.val item=i#}
+								<label class="single_chose" data-val="{#$i#}">
+									<i></i><em>{#$i#}</em>
+								</label>
+								{#/foreach#}
+								{#elseif $p.type == 'multi_vote'#}
+								<input type="hidden" name="multi{#$k#}" value="" />
+								{#foreach from=$p.val item=i#}
+								<label class="multi_chose"  data-val="{#$i#}">
+									<i></i><em>{#$i#}</em>
+								</label>
+								{#/foreach#}
+								{#/if#}
+							</dd>
+						</dl>
+						{#/foreach#}
+
+					</div>
+					<div class="arealist">
+						<ul>
+							{#siteConfig action='internationalPhoneSection' return="item"#}
+							<li data-cn="{#$item.name#}" data-code="{#$item.code#}"><span>{#$item.name#}<span><em class="fn-right">{#$item.code#}</em></li>
+							{#/siteConfig#}
+						</ul>
+					</div>
+					<a href="javascript:;" class="sure_btn">{#$langData['huodong'][0][28]#}</a>  {#* 确认 *#}
+				</form>
+			</div>
+
+		</div>
+		{#include file="{#$HUONIAOROOT#}/templates/member/public-pay-pop.html"#}
+		<!-- <script type="text/javascript" src="{#$site_map_apiFile#}"></script> -->
+		<!-- <script type="text/javascript" src="{#$templets_skin#}js/map-detail-{#$site_map#}.js?v={#$cfg_staticVersion#}"></script> -->
+		{#include file="_footer.html"#}
+        <script type="text/javascript" src="{#$cfg_staticPath#}js/publicOpenMap.js?v={#$cfg_staticVersion#}"></script>
+		<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/noscroll.js"></script>
+		<script type="text/javascript" src="{#$templets_skin#}js/detail.js?v={#$cfg_staticVersion#}"></script>
+	</body>
+</html>

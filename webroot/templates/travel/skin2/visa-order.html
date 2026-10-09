@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+    <meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+    <title>{#$langData['travel'][7][2]#}</title>{#* 订单填写 *#}
+    <meta name="keywords" content="{#$travel_keywords#}" />
+    <meta name="description" content="{#$travel_description#}" />
+    <link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/common.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/calendar.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/daterangepicker.css?v={#$cfg_staticVersion#}" media="all" />
+    <link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/visa-order.css?v={#$cfg_staticVersion#}" media="all" />
+    <script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
+    <script type="text/javascript">
+        var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$travel_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+        var hideFileUrl = {#$cfg_hideUrl#}, cookiePre = '{#$cfg_cookiePre#}', templets_skin = '{#$templets_skin#}', types = '{#$type#}',type = '{#$type#}', price = '{#$detail_price#}', earliestdate = '{#$detail_earliestdates#}',totalBalance = '{#$userinfo.money#}';
+        var map_city = '{#$cfg_mapCity#}', site_map = "{#$site_map#}";
+
+        // 积分抵扣
+        var hasPoint = '{#$userinfo.point#}';
+        jifen_ =  '{#$cfg_offset_travel#}';
+        var pointRatio = {#$cfg_pointRatio#};
+    </script>
+
+</head>
+
+<body class="w1200">
+{#$pageCurr = "visaindex"#}
+<!-- 导航 s-->
+{#include file="_top.html"#}
+
+<!-- 导航 e-->
+<div class="main_wrap">
+    <div class="wrap crumbs">
+        {#* 您当前所在： 首页 签证*#}
+        <div class="cont">
+            {#$langData['travel'][14][0]#}
+            <a href="{#$travel_channelDomain#}">{#$langData['siteConfig'][0][0]#}</a>
+            <span>></span>
+            <a href="javascript:;" class="green_a">{#$langData['travel'][12][66]#}</a>{#* 签证 *#}
+        </div>
+    </div>
+    <div class="wrap order-progress">
+        <ul class="fn-clear">
+            <li class="has-go white"><em>1</em>选择景点</li>
+            <li class="now-go white secd_li"><em>2</em>填写订单</li>
+            <li class="no-go grey third_li"><em>3</em>在线支付</li>
+            <li class="no-go grey four_li"><em>4</em>支付成功</li>
+        </ul>
+    </div>
+    <div class="fn-clear wrap main_con">
+        <div class="order_left ticketItemWrap">
+            <div class="left_con">
+                <div class="order_top orderInfo">
+                    <i class="leftIcon"></i><h2>申请信息</h2>
+                </div>
+                <div class="order_con">
+                    {#if $type == 1#}
+                    <h3 class="orderTitle">{#$detail_title#}<i class="more-icon"></i></h3>
+                    <div class="buy_note">
+                        {#$detail_note|nl2br#}
+                        <span class="hide_con">收起</span>
+                    </div>
+                    {#else#}
+                    <h3 class="orderTitle">{#$detail_title#}</h3>
+                    {#/if#}
+                    <dl class="start-time">
+                        <dt><label for="startTime">出行时间：</label></dt>
+                        <dd><input class="startTime" name="startTime" id="startTime" readonly="readonly" placeholder="请选择日期"><i class="time-icon"></i><span class="tip-span tjTip">{#$langData['travel'][14][45]#}{#* 最晚需要在<i></i>前收齐您的材料，请合理安排时间邮寄 *#}</span>
+                            <div id="single-pick"></div>
+                        </dd>
+                    </dl>
+                    <dl class="start-people">
+                        <dt>{#$langData['travel'][14][44]#}：</dt>{#*  申请人数： *#}
+                        <dd class="num_people">
+                            <div class="adult fn-clear">
+
+                                <div class="_right">
+                                    <a href="javascript:;" class="jian"></a>
+                                    <span>1</span>
+                                    <a href="javascript:;" class="add"></a>
+                                </div>
+                            </div>
+                        </dd>
+                    </dl>
+                </div>
+                <div class="order_top orPeople">
+                    <i class="leftIcon"></i><h2>联系人信息<em>请准确填写订单联系人信息</em></h2>
+                </div>
+                <div class="peo_con">
+                    <input type="hidden" value="{#$id#}" id="proid" name="proid">
+                    <dl>
+                        <dt><label for="contact"><em class="star">*</em>姓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;名：</label></dt>
+                        <dd><input type="text" placeholder="请输入姓名" id="contact" name="contact"></dd>
+                    </dl>
+                    <dl class="peo_tel">
+                        <dt><label for="tel"><em class="star">*</em>手机号码：</label></dt>
+                        <dd>
+                            <div class="inpbdr fn-clear">
+                                <span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+                                <input type="text" placeholder="请输入手机号码" id="tel" name="tel">
+                                <!--国际区号弹窗-->
+                                <div class="areaCode_wrap areaCode_wrap2">
+                                    <ul>
+
+                                    </ul>
+                                </div>
+                                <input type="hidden" name="areaCode" id="contact-areaCode" value="{#$internationalPhoneSection[0]['code']#}" class="commCode">
+                            </div>
+                            <span class="tip_span">用于接收确认短信</span>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt><label for="email"><em class="star">*</em>邮&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;箱：</label></dt>
+                        <dd><input type="text" placeholder="请输入您的邮箱" id="email" name="email"></dd>
+                    </dl>
+                </div>
+                <div class="order_top orPeople">
+                    <i class="leftIcon"></i><h2>申请人信息<em>为了您能顺利出行，请准确填写以下信息</em></h2>
+                </div>
+                <div class="apply_content">
+                    <div class="apply">
+                        <h2 class="apply-h2">申请人1</h2>
+                        <div class="apply_con peo_con">
+                            <dl class="apply_man">
+                                <dt><label for="offer_name1"><em class="star">*</em>姓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 名：</label></dt>
+                                <dd><input type="text" placeholder="请输入订单联系人姓名" id="offer_name1" name="offer_name1" class="offer_name"></dd>
+                            </dl>
+                            <dl class="apply_type">
+                                <dt><label for="customerType1"><em class="star">*</em>{#$langData['travel'][8][53]#}：</label></dt>{#*  客户类型   *#}
+                                <dd class="selectCus">
+                                    <select name="customerType1" id="customerType1" class="offer_type">
+                                        <option value={#$langData['travel'][8][50]#}>{#$langData['travel'][8][50]#}</option> {#*  请选择客户类型   *#}
+                                        <option value="1">{#$langData['travel'][8][54]#}</option> {#*  在职人员   *#}
+                                        <option value="2">{#$langData['travel'][8][55]#}</option> {#*  自由职业者   *#}
+                                        <option value="3">{#$langData['travel'][8][56]#}</option> {#*  退休人员   *#}
+                                        <option value="4">{#$langData['travel'][8][57]#}</option> {#*  在校学生   *#}
+                                        <option value="5">{#$langData['travel'][8][58]#}</option> {#*  学龄前儿童   *#}
+                                    </select>
+                                </dd>
+                            </dl>
+                            <dl class="birth">
+                                <dt><label for="birthday1"><em class="star">*</em>{#$langData['travel'][8][52]#}：</label></dt>{#*  出生日期   *#}
+                                <dd>
+                                    <input class="birthday" name="birthday" id="birthday1" readonly="readonly" placeholder="请选择出生日期"><i class="time-icon birth-icon"></i>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="order_top material">
+                    <i class="leftIcon"></i><h2>材料回寄信息<em>配送费按照实际快递费收取</em></h2>
+                </div>
+                <div class="part1Con fn-clear">
+                    {#member action="address"#}
+                    <dl{#if $_bindex.row == 1#} class="on"{#/if#} data-id="{#$row.id#}" data-name="{#$row.person#}" data-mobile="{#$row.mobile#}" data-tel="{#$row.tel#}" data-addr="{#$row.addrname#}" data-address="{#$row.address#}" data-lng="{#$row.lng#}" data-lat="{#$row.lat#}" data-code="{#$row.areaCode#}">
+                        <dt>
+                            <i></i><p class="name">
+                                <span>{#$row.person#}</span>  <span class="addr_tel">{#if $row.mobile != "" && $row.tel != ""#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#elseif $row.mobile == "" && $row.tel != ""#}{#$row.tel#}{#else#}{#if $row.areaCode != '' && $row.areaCode != '86'#}+{#$row.areaCode#} {#/if#}{#$row.mobile#}{#/if#}</span></p>
+                            <p class="address"><span>{#$row.addrname|replace:" ":"</span><span>"#}</span></p>
+                            <p class="detail">{#$row.address#}</p>
+                        </dt>
+                        <dd><a class="setAddress" href="javascript:;">{#if $_bindex.row == 1#}{#$langData['shop'][5][14]#}{#else#}{#$langData['shop'][5][15]#}{#/if#}</a><a class="revise" href="javascript:;">{#$langData['siteConfig'][6][6]#}</a><a class="delete" href="javascript:;">{#$langData['siteConfig'][6][8]#}</a></dd>{#*  默认地址 --- 编辑 --- 删除   *#}
+                    </dl>
+                    {#/member#}
+                    <div class="fn-left add"><a href="javascript:;"><span></span><p>{#$langData['shop'][5][16]#}</p></a></div>
+                </div>
+                <!--其他说明s-->
+                <div class="other_text">
+                    <h2>其他要求</h2>
+                    <textarea id="note" placeholder="{#$langData['travel'][8][35]#}" maxlength="100" onchange="this.value=this.value.substring(0,100)"  onkeydown="this.value=this.value.substring(0,100)" onkeyup="this.value=this.value.substring(0,100)"></textarea>{#*  如您有其他特殊要求，请在这里填写(100个字以内)   *#}
+                </div>
+                <!--其他说明e-->
+
+            </div>
+
+            <div class="submit_btn">
+                <a href="javascript:;" class="submit_a publicpaybtn">{#$langData['travel'][8][41]#}</a>{#*  提交订单   *#}
+                <section class="notice">
+                    <span>{#$langData['travel'][8][36]#}<em>{#$langData['travel'][8][37]#}</em>{#$langData['travel'][8][40]#}<em>{#$langData['travel'][8][38]#}</em>{#$langData['travel'][8][39]#}</span>
+                    {#*  请确保您已阅读并接受--免责声明--预定须知--,提交订单后将有客服专员联系您确认预订信息。  *#}
+                </section>
+            </div>
+
+        </div>
+        <!-- 列表右 s-->
+
+        <!-- 结算信息 s-->
+        <div class="settlement">
+            <h2>结算信息</h2>
+            <div class="tour_fare">
+                <div class="tour_top">
+                    <span>{#$detail_typename#}</span><span class="detail_all fn-right">{#echoCurrency type='symbol'#}<em>0</em></span>
+                </div>
+                <div class="tour_bot">
+
+                <p>{#$detail_countryname#} {#echoCurrency type='symbol'#}<em class="peoUnit">{#$detail_price#}</em> x <span class="peoNum">1</span></p>
+
+                </div>
+            </div>
+            <!-- 优惠信息 -->
+            {#if $userinfo.point > 0 && $cfg_offset_travel > 0#}
+            <dl class="youhui integral">
+              <dt>本单优惠</dt>
+              <dd class="fn-clear">
+                <div class="ltxt"><span class="gou hasgou"></span>使用<span class="jifen">0</span>积分抵扣<span class="jifen_jian">0</span>元</div>
+                <div class="rtxt amount_jian">-{#echoCurrency type="symbol"#}<span>0</span></div>
+              </dd>
+            </dl>
+            {#/if#}
+            <div class="priceAll">
+                <span>总价</span><span class="price_all fn-right">{#echoCurrency type='symbol'#}<em>{#$totalAmount#}</em></span>
+            </div>
+        </div>
+        <!-- 结算信息 e-->
+
+        <!-- 列表右 e-->
+    </div>
+</div>
+<!--弹出层-->
+<div id="bg"></div>
+<div class="popup">
+    <div class="popCon">
+        <div class="tip"><span class="left">{#$langData['siteConfig'][6][96]#}</span><i class="right"></i></div>
+        <ul>
+            <li class="address">
+                <dl class="fn-clear">
+                    <dt><font>*</font>{#$langData['siteConfig'][19][34]#}：</dt>
+                    <dd>
+                        <span id="addrlist">
+                            <select id="addrid" name="addrid[]">
+                                <option value="0">{#$langData['siteConfig'][23][118]#}</option>{#siteConfig action="area" return="addr" son="0"#}
+                                <option value="{#$addr.id#}">{#$addr.typename#}</option>
+                                {#/siteConfig#}
+                            </select>
+                        </span>
+                        <span class="input-tips"><s></s>{#$langData['siteConfig'][23][118]#}</span>
+                    </dd>
+                </dl>
+            </li>
+            <li class="detail">
+                <dl>
+                    <dt><font>*</font>{#$langData['siteConfig'][19][35]#}：</dt>
+                    <dd><input id="address" type="text" value="" /><img src="{#$cfg_staticPath#}images/admin/markditu.jpg" id="mark" title="{#$langData['siteConfig'][6][92]#}"><span class="input-tips"><s></s>{#$langData['shop'][5][30]#}</span></dd>
+                    <input type="hidden" id="lnglat" name="lnglat" />
+                </dl>
+            </li>
+            <li class="name">
+                <dl class="fn-clear">
+                    <dt><font>*</font>{#$langData['siteConfig'][19][33]#}：</dt>
+                    <dd><input id="person" type="text" value="" /><span class="input-tips"><s></s>{#$langData['shop'][5][31]#}</span></dd>
+                </dl>
+            </li>
+            <li class="phone">
+                <dl class="fn-clear">
+                    <dt>{#$langData['siteConfig'][3][6]#}：</dt>
+                    <dd>
+
+                        <div class="inpbdr">
+                            <span class="areaCode"><i>+{#$internationalPhoneSection[0]['code']#}</i><s></s></span>
+                            <input id="mobile" type="text" value="" />
+                            <!--国际区号弹窗-->
+                            <div class="areaCode_wrap areaCode_wrap2">
+                                <ul>
+
+                                </ul>
+                            </div>
+                            <input type="hidden" name="areaCode" id="address-areaCode" value="{#$internationalPhoneSection[0]['code']#}" class="commCode">
+                        </div>
+                        <span class="input-tips" style="display: inline-block;"><s></s>{#$langData['siteConfig'][20][581]#}</span>
+                    </dd>
+                </dl>
+            </li>
+            <li class="tel">
+                <dl class="fn-clear">
+                    <dt>{#$langData['siteConfig'][19][351]#}：</dt>
+                    <dd><input id="tel" type="text" value="" /><span class="input-tips"><s></s>{#$langData['siteConfig'][20][581]#}</span></dd>
+                </dl>
+            </li>
+            <li>
+                <dl>
+                    <dt></dt>
+                    <dd class="confirm"><a href="javascript:;" id="submit">{#$langData['shop'][5][32]#}</a></dd>
+                </dl>
+            </li>
+        </ul>
+    </div>
+</div>
+{#include file="{#$HUONIAOROOT#}/templates/member/public-pay-pop.html"#}
+{#include file="../../siteConfig/public_foot_v3.html" module='siteConfig' theme='gray'#}
+
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.scroll.loading.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/ui/jquery.dialog-4.2.0.js"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/common.js?v={#$cfg_staticVersion#}"></script>
+<!-- 公共头部搜索+收藏js -->
+<script type="text/javascript" src="{#$templets_skin#}js/public.js?v={#$cfg_staticVersion#}"></script>
+<!-- 出行时间 s-->
+<script type="text/javascript" src="{#$templets_skin#}js/calendar.js?v={#$cfg_staticVersion#}"></script>
+<!-- 出生日期 -->
+<script charset="UTF-8" src="{#$templets_skin#}js/moment.min.js?v={#$cfg_staticVersion#}"></script>
+<script charset="UTF-8" src="{#$templets_skin#}js/daterangepicker.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/confirm-order.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$templets_skin#}js/visa-order.js?v={#$cfg_staticVersion#}"></script>
+
+
+</body>
+</html>

@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$pagetitle#}</title>
+{#$cssFile#}
+  <style>
+    /*置顶刷新浮动窗*/
+    .refreshTopMask{background: #000; opacity: .4; filter:Alpha(opacity=40); position: fixed; top: 0; bottom: 0; left: 0; right: 0; z-index: 1001; display: none;}
+    .refreshTopPopup{position: fixed; left: 50%; top: 50%; z-index: 1002; background: #fff; width: 660px; margin-left: -330px; margin-top: -320px; border-radius: 5px; overflow: hidden; -webkit-animation: popup .3s ease-out; -moz-animation: popup .3s ease-out; animation: popup .3s ease-out; display: none;}
+    .rtHeader {height: 50px; line-height: 50px; background: -webkit-gradient(linear, 0 0, 0 100%, from(#ff7800), to(#ffb800)); background: -webkit-linear-gradient(left, #ff7800, #ffb800); background: -moz-linear-gradient(left, #ff7800, #ffb800); background: -o-linear-gradient(left, #ff7800, #ffb800); background: -ms-linear-gradient(left, #ff7800, #ffb800); background: linear-gradient(left, #ff7800, #ffb800); filter: progid:DXImageTransform.Microsoft.gradient(GradientType = 1, startColorstr = #ff7800, endColorstr = #ffb800);}
+    .rtHeader h5 {float: left; color: #fff; font-size: 18px; color: #fff; margin-left: 30px;}
+    .rtHeader .rtClose {float: right; width: 50px; height: 50px; text-align: center; color: #fff; font-size: 45px; line-height: 45px; margin-right: 10px;}
+
+    .rtBody {padding: 30px; background: #fff;}
+    .rtTab {height: 36px; border-bottom: 1px solid #ffb772;}
+    .rtTab li {float: left; padding: 0 25px; height: 36px; line-height: 36px; cursor: pointer; font-size: 16px; border: 1px solid transparent; border-bottom: 0; margin-bottom: -1px;}
+    .rtTab li.curr {background: #ffecd7; border: 1px solid #ffb772; border-bottom: 0;}
+
+    .rtCon {padding: 10px 0;}
+
+    /* 普通刷新 */
+    .normalTips {font-size: 14px; line-height: 1.5em;}
+    .normalTips strong {color: #f60;}
+    .normalTips em {color: #f00; font-weight: 700; padding: 0 3px;}
+
+    /* 免费刷新 */
+    .freeRefresh .oper {text-align: center; font-size: 16px; padding-bottom: 30px;}
+    .freeRefresh .refreshNow, .freeRefresh .refreshConfirm {border-radius: 4px; background-color: rgb(255, 120, 0); box-shadow: 0px 3px 10px 0px rgba(255, 120, 0, 0.6); padding: 0 35px; height: 45px; border: 0; outline: 0; cursor: pointer; font-size: 18px; color: #fff; margin: 60px auto 25px;}
+    .freeRefresh .refreshNow:disabled, .freeRefresh .refreshConfirm:disabled {background-color: rgb(169, 169, 169); box-shadow: 0px 3px 10px 0px rgba(197, 197, 197, 0.6);}
+    .freeRefresh .refreshConfirm {margin-top: 20px;}
+    .freeRefresh .oper p {color: #a0a0a0;}
+    .freeRefresh .icon-success {position: relative; border-radius: 50%; background-color: rgb(32, 221, 108); box-shadow: 0px 3px 8px 0px rgba(32, 221, 108, 0.42); width: 80px; height: 80px; text-align: center; display: block; margin: 60px auto 20px;}
+    .freeRefresh .icon-success s {position: absolute; left: 50%; top: 50%; width: 41px; height: 27px; margin: -13px 0 0 -20px; background: url('/templates/member/images/refreshTop_success.png');}
+    .freeRefresh .oper .sc p {line-height: 1.8em;}
+
+    /* 普通收费刷新 */
+    .normalRefresh {font-size: 18px; padding: 15px 0 0; color: #f60; font-weight: 700;}
+
+    /* 智能刷新 */
+    .rtSmart {font-size: 16px; max-height: 140px; overflow-y: auto;}
+    .rtSmart li {position: relative; line-height: 35px; padding-left: 40px; cursor: pointer;}
+    .rtSmart li:hover {background: #f5f5f5;}
+    .rtSmart li .radio {position: absolute; border: 1px solid #ccc; width: 17px; height: 17px !important; border-radius: 50%; left: 10px; top: 9px;padding-left: 0px;min-heigh:inherit !important;}
+    .rtSmart li .radio s {position: absolute; width: 8px; height: 8px; border-radius: 50%; top: 4px; left: 4px;}
+    .rtSmart li.checked .radio {border-color: #ff7800; width: 16px; height: 16px; border-width: 2px;}
+    .rtSmart li.checked .radio s {background: #ff7800;}
+    .rtSmart li span {float: left;}
+    .rtSmart li span strong {color: #f00;}
+    .rtSmart li .sm-tit {width: 30%;}
+    .rtSmart li .sm-pri {width: 45%;}
+    .rtSmart li .sm-off {width: 25%;}
+    .rtSmart li .sm-tit em {color: #a0a0a0;}
+    .rtSmart li .sm-pri em {color: #f00;}
+
+    /* 置顶 */
+    .rtTopping {font-size: 14px;}
+    .rtTopping dl {margin-bottom: 15px;}
+    .rtTopping dt {float: left; width: 80px; font-weight: 700;}
+    .rtTopping dd {position: relative; overflow: hidden;}
+    .rtTopping .topType label {float: left; margin-right: 15px; cursor: pointer;}
+    .rtTopping .topType em {width: 20px; height: 20px; display: inline-block; margin-right: 5px; border-radius: 50%; border: 1px solid #c0c0c0; text-align: center; line-height: 20px}
+    .rtTopping .topType .checked em {border-color: #ff3e54; background-color: #ff3e54;}
+    .rtTopping .topType em img {width: 15px; height: 10px; display: inline-block; vertical-align: middle; margin-top: -3px;}
+
+    /* 置顶时长 */
+    .rtTopping .topDays {max-height: 200px; overflow-y: auto;}
+    .rtTopping .topDays li {position: relative; float: left; margin: 0 5px 10px 0; border: 1px solid #dcdcdc; width: 118px; height: 90px; border-radius: 4px; overflow: hidden; text-align: center; cursor: pointer;}
+    .rtTopping .topDays li:hover {border-color: #ff3e54;}
+    .rtTopping .topDays li.checked {width: 116px; height: 88px; border: 2px solid #ff3e54;}
+    .rtTopping .topDays li sup {position: absolute; left: 0; top: 0; font-size: 12px; color: #fff; background: #ff4261; line-height: 22px; padding: 0 5px;}
+    .rtTopping .topDays li p {padding-top: 25px; font-size: 16px;}
+    .rtTopping .topDays li strong {color: #ff3e54; font-size: 20px;}
+    .rtTopping .topDays li em {position: absolute; right: 0; bottom: -20px; z-index: 1; width: 0; height: 0; border: 20px solid transparent;}
+    .rtTopping .topDays li img {position: absolute; right: 1px; bottom: 4px; width: 9px; z-index: 2;}
+    .rtTopping .topDays li.checked em {border-right-color: #ff3e54;}
+    .rtTopping .topDays li.checked sup {top: -1px; left: -1px;}
+    .rtTopping .topDays li.checked p {padding-top: 24px;}
+
+    /* 置顶日期 */
+    .rtTopping .rtDate {float: left; position: relative; height: 38px; line-height: 38px; border: 1px solid #e5e5e5; border-radius: 4px; padding: 0 35px 0 0; cursor: pointer;}
+    .rtTopping .rtDate input {width: 90px; height: 38px; border: 0; outline: 0; padding-left: 12px;}
+    .rtTopping .rtDate em {position: absolute; right: 12px; top: 50%; width: 0; height: 0; margin-top: -2.5px; border: 5px solid transparent; border-top-color: #b0b0b0;}
+    .rtTopping .rtSplit {float: left; margin: 0 10px; width: 12px; height: 1px; background: #5c5c5c; overflow: hidden; margin-top: 20px;}
+
+    /* 置顶时段 */
+    .rtTopping .rtPlanList {width: 100%; border-left: 1px solid #e5e5e5; border-top: 1px solid #e5e5e5; font-size: 14px;}
+    .rtTopping .rtPlanList th, .rtTopping .rtPlanList td {border-right: 1px solid #e5e5e5; border-bottom: 1px solid #e5e5e5; text-align: center; height: 40px;}
+    .rtTopping .rtPlanList td em {display: block; height: 40px; cursor: pointer;}
+    .rtTopping .rtPlanList td:hover em {background-color: #f5f5f5;}
+    .rtTopping .rtPlanList td.curr em {background: url('/templates/member/images/radio_check_red.png') no-repeat center center;}
+
+    /* 使用余额 */
+    .rtBody .fabu_dl{margin-bottom: 10px; font-size: 16px;}
+    .rtBody .fabu_dl dt{float: left; padding-left: 25px; width: 427px;}
+    .rtBody .fabu_dl dd{float: left;}
+    .rtBody .yue-btn{position: relative; cursor: pointer;}
+    .rtBody .yue-btn .radio{position: absolute; width: 17px; height: 17px; left: 0; top: 3px; border-radius: 4px; background-color: rgb(255, 0, 69);}
+    .rtBody .yue-btn .radio s{display: none; position: absolute; width: 15px; height: 10px; top: 3px; left: 1px; background: url('/templates/member/images/refreshTop_checked.png');}
+    .rtBody .yue-btn.active .radio s{display: block;}
+    .rtBody .pay-total {color: #f00; font-weight: 700; font-size: 18px;}
+
+    /* 支付方式 */
+    .rtPayObj {margin-top: 10px;}
+    .rtBody .payTab {height: 40px; border-bottom: 1px solid #e0e0e0; background: #f9f9f9;}
+    .rtBody .payTab li {position: relative; float: left; padding: 0 25px; height: 39px; line-height: 39px; border-right: 1px solid #e0e0e0; border: 1px solid #e0e0e0; border-top: 2px solid #e0e0e0; border-bottom: 0; text-align: center; font-size: 16px; color: #666; margin-right: -1px; cursor: pointer;}
+    .rtBody .payTab li.curr {border-top-color: #ff7800; background: #fff;}
+    .rtBody .qrpay, .rtBody .payway {border: 1px solid #e0e0e0; border-top: 0;}
+    .rtBody .qrpay {padding: 30px 20px; text-align: center;}
+    .rtBody .qrpay dt {position: relative; width: 150px; height: 150px; padding: 10px; border: 1px solid #d8d8d8; margin: 0 auto;}
+    .rtBody .qrpay dt .pay_top, .rtBody .qrpay dt .pay_bottom {position: absolute; width: 15px; height: 16px;}
+    .rtBody .qrpay dt .pay_top {left: -3px; top: -3px;}
+    .rtBody .qrpay dt .pay_bottom {right: -3px; bottom: -3px;}
+    .rtBody .qrpay dt img {width: 100%; height: 100%; display: block;}
+    .rtBody .qrpay dd {font-size: 14px; line-height: 30px; text-align: center; margin-top: 15px;}
+    .rtBody .qrpay dd img {width: 30px; height: 30px; display: inline-block; vertical-align: middle; margin-right: 5px;}
+
+    .rtBody .payway{padding: 30px 18px 20px; font-size: 16px;}
+    .rtBody .payway li{text-align: center; float: left; border: 1px solid #e7e7e7; width: 173px; line-height: 30px; padding: 10px 0; margin: 0 12px 14px 0; border-radius: 4px; cursor: pointer;}
+    .rtBody .payway li.active{border-color: #0ab7f9; background: url('/templates/member/images/selected.png') right top no-repeat; }
+    .rtBody .payway li a:hover{text-decoration: none; color: #333;}
+    .rtBody .payway li a img{height: 44px; vertical-align: middle; margin-right: 5px;}
+
+    .rtBody .paySubmit{display: block; width: 175px; border-radius: 4px; background-color: rgb(255, 120, 0); box-shadow: 0px 3px 10px 0px rgba(255, 120, 0, 0.6); height: 45px; line-height: 45px; text-align: center; font-size: 18px; color: #fff; margin: 20px auto 0;}
+
+    /*日历签到列表*/
+    .topCalendarBg {display: none; position: fixed; z-index: 8888; left: 0; top: 0; right: 0; bottom: 0; background: #000; filter: alpha(opacity=40); opacity: .4;}
+    .topCalendar {display: none; position: fixed; z-index: 9999; left: 50%; top: 50%; width: 600px; height:566px; margin: -290px 0 0 -283px; background: #fff; border-radius: 4px; overflow: hidden;}
+    .sign_succ_calendar_title {text-align:center;height:50px;line-height:50px; background: -webkit-gradient(linear, 0 0, 0 100%, from(#ff7800), to(#ffb800)); background: -webkit-linear-gradient(left, #ff7800, #ffb800); background: -moz-linear-gradient(left, #ff7800, #ffb800); background: -o-linear-gradient(left, #ff7800, #ffb800); background: -ms-linear-gradient(left, #ff7800, #ffb800); background: linear-gradient(left, #ff7800, #ffb800); filter: progid:DXImageTransform.Microsoft.gradient(GradientType = 1, startColorstr = #ff7800, endColorstr = #ffb800); color: #fff;}
+    .calendar_month_span {display:inline-block;font-size:16px;letter-spacing:2px;font-weight:bold; margin: 0 10px; vertical-align: middle;}
+    .calendar_month_next {display:inline-block;cursor:pointer; text-align: center; font-size: 20px; vertical-align: middle;}
+    .calendar_month_prev {display:inline-block;cursor:pointer; text-align: center; font-size: 20px; vertical-align: middle; margin-left: 40px;}
+    .calendar_close {float: right; width: 30px; height: 30px; background: url('../images/topCalendarClose.png'); cursor: pointer; margin: 10px 10px 0 0;}
+
+    .sign table {border-collapse:collapse;border-spacing:0;width:100%;}
+    .sign th,.sign td {width:30px;height:40px;text-align:center;line-height:40px;border:1px solid #eeeeee;}
+    .sign th {font-size:16px; background: #f8f8f8;}
+    .sign td {color:#404040;vertical-align:middle;}
+    .sign .WeekDay td {height:70px;text-align:left;font-size:20px;vertical-align:top;padding-top:8px;position:relative;text-align: center;}
+    .sign .WeekDay td.empty,.sign .WeekDay td.on {cursor:default;}
+    .sign .WeekDay td.empty:hover,.sign .WeekDay td.on:hover {background:none;}
+    .sign .WeekDay td i {position:absolute;right:15px;top:32px;width:8px;height:8px;border-radius:8px;background:#f25b11;display:none;}
+    .sign .WeekDay td span {position:absolute;left:0;right:0;bottom:0px;color:#adadad;font-size:16px;text-align:center;text-indent:0;}
+    .sign .WeekDay td p {position:absolute;left:0;right:0;bottom:0px;color:#adadad;font-size:16px;width:120px;text-align:center;text-indent:0;display:none;background:#ccc;color:#fff;height:36px;line-height:36px;}
+    .sign .WeekDay td.isTop0 {background: #d7d7d7;}
+    .sign .WeekDay td.today {background: #f5bb0c; color: #fff;}
+    .sign .WeekDay td.today span {color: #fff;}
+
+
+    /*房产经纪人相关*/
+    .refreshTopPopup.check_zjuser .price_average,
+    .refreshTopPopup.check_zjuser .price_average *,
+    .refreshTopPopup.check_zjuser .sm-pri,
+    .refreshTopPopup.check_zjuser .sm-pri *,
+    .refreshTopPopup.check_zjuser .sm-off,
+    .refreshTopPopup.check_zjuser .sm-off *,
+    .refreshTopPopup.check_zjuser .rtTopping .topNormal li strong,
+    .refreshTopPopup.check_zjuser .rtTopping .topNormal li strong *
+    {text-decoration: line-through;color:#ccc;}
+    .refreshTopPopup.check_zjuser .zjuser_tj {display: block !important;}
+    .zjuser_info {display: none;margin:20px 0 0;font-size:14px;text-align: center;color: #a0a0a0;}
+    .refreshTopPopup.check_zjuser .zjuser_info {display: block;}
+    .hide_impt {display: none !important;}
+
+
+    /* 类型选择 */
+  .typeMask{position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.4); z-index: 1000; display: none;}
+  .typePop{position: fixed; left: 0; right: 0 ;bottom: 0; top: 0; margin: auto; background: #fff; width: 942px; height: 640px; border: 1px solid #E0E0E0; box-shadow: 0px 5px 20px 0px rgba(0, 0, 0, 0.05); border-radius: 8px;  z-index: 1000; animation:popup .3s;  display: none;}
+  .typePop .popTit{height: 70px; line-height: 70px; border-bottom: solid 1px #EDEDED; position: relative; text-align: center; font-size: 18px; font-weight: bold; color: #333; margin: 0}
+  .typePop .popTit a{display: block; width: 20px; height: 20px; background: url(/static/images/close_2.png) no-repeat center/cover; position: absolute; top: 14px; right: 14px;}
+  .typePop .popCon{overflow: auto; max-height: 570px}
+  .typePop .popCon .catagoryBox{padding-bottom: 16px;}
+.editform  .catagoryBox{padding:  0 30px;}
+.editform  .catagoryBox dt{font-size: 18px; color: #333; font-weight: bold; padding-top: 36px; float: none; width: auto; text-align: left;}
+.editform  .catagoryBox dt  s{display: inline-block; width: 4px; height: 16px; background: #FF6600; margin-right: 6px; vertical-align: middle; margin-bottom: 2px;}
+.editform  .catagoryBox dd {margin-top: 10px; margin-left: 0}
+.editform  .catagoryBox dd a{display: block; float: left; width: 100px; height: 36px; border-radius: 4px; background: #FAFAFA; box-sizing: border-box; border: solid 1px #EDEDED; font-size: 14px; color: #4D4D4D; text-align: center; line-height: 34px; margin-right: 12px; margin-bottom: 12px; text-decoration: none;}
+.editform  .catagoryBox dd a.on_chose{background: #FFF6F0; color: #F76300; border: solid 1px #FFB27F;}
+#editform.infoEdit .inpBox input{box-shadow: none; }
+.editform dd{margin-left: 166px; padding:0;}
+.editform dd.tabArrs{margin-top: 20px; }
+.editform dd.tabArrs span{display: block; width: 100px; height: 36px; border: solid 1px #EDEDED; text-align: center; color: #333; line-height: 34px; border-radius: 4px; background: #F7F7F7; font-size: 14px; margin-right: 10px; margin-bottom: 10px; float: left; cursor:pointer;}
+.editform dd.tabArrs span.on_chose{color: #F76300; border: solid 1px #FFB27F; background: #FFF6F0; }
+
+.customizeBox{background: #FAFAFA; min-height: 100px; margin-bottom: 50px; border: 1px solid #F5F5F5; border-radius: 4px; padding: 20px 0; display: none;}
+.customizeBox dl{margin-bottom: 14px;}
+.customizeBox .cTitle dt{font-size: 18px; color: #333; font-weight: bold;}
+.customizeBox .cTitle dd{font-size: 14px; color: #A6A6A6; line-height: 38px;}
+.customizeBox .inpBox {background: #FCFCFC;}
+.customizeBox .inpBox input{padding-left: 10px; background: none;}
+.customizeBox .cContent dt{color: #333;}
+.customizeBox .cContent .radioBox ul{overflow: hidden; margin: 0}
+.customizeBox .cContent .radioBox li{float: left; font-size: 14px; color: #333; margin-right: 30px; position: relative; cursor: pointer; line-height: 36px; }
+.customizeBox .cContent .radioBox input{margin: 0}
+.customizeBox .cContent .radioBox input[type="radio"]{width: 100%; height: 100%; position: absolute; left: 0; right: 0; top: 0; bottom: 0; opacity: 0; cursor: pointer; }
+.customizeBox .cContent .radioBox li span{vertical-align: middle; display: inline-block;}
+.customizeBox .cContent .radioBox li s{display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: solid 1px #D9D9D9; box-sizing: border-box; background: #fff; vertical-align: middle; margin-right: 6px;  position: relative;}
+.customizeBox .cContent .radioBox li.on_chose s{border: solid 1px #56AC0B}
+.customizeBox .cContent .radioBox li.on_chose s i{display: block; width: 10px; height: 10px;  background: #56AC0B;  border-radius: 50%; position: absolute; left: 0; top: 0; bottom: 0; top: 0; margin: auto; right: 0;}
+.editform .customizeBox .cContent .AllcheckBox input[type="checkbox"]{border: 1px solid #d3cfc8 ; }
+.customizeBox .checkbox{padding-left:  0;}
+.editform .customizeBox .cContent .AllcheckBox label,.editform .radio label {font-size: 14px; line-height: 34px; margin-right: 12px; }
+.editform .radio label{line-height: 30px !important;}
+.editform .customizeBox .cContent .AllcheckBox input[type="checkbox"]:checked,.editform .radio  input[type="checkbox"]:checked{border: 2px solid #56ac0b; background: #56ac0b; color: #fff;}
+
+.editform .customizeBox .cContent .AllcheckBox input[type="checkbox"]:focus,.editform .radio  input[type="checkbox"]:focus{outline: none;}
+.editform .customizeBox .cContent .AllcheckBox input[type="checkbox"]:hover,.editform .radio  input[type="checkbox"]:hover{border: 2px solid #56ac0b; -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,0.2); -moz-box-shadow: inset 0 1px 1px rgba(0,0,0,0.2); box-shadow: inset 0 1px 1px rgba(0,0,0,0.2);}
+.floatDiv{float: left; margin-right: 6px;}
+.editform .clearfix>dd{padding:0;}
+.editform .clearfix{margin-bottom: 14px}
+.upTip{font-size: 14px; color:#A6A6A6; }
+.wxUploadObj1 .uploadinp{width: 140px; height: 140px; background: #FAFAFA; box-sizing: border-box; padding-top: 35px; border-radius: 4px; border: 1px solid #E5E5E5; position: relative;}
+.wxUploadObj1 .uploadinp span{position: static !important; margin: auto; display: block; text-align: center; color: #333;}
+.wxUploadObj1 .uploadinp label,.wxUploadObj1 .uploadinp input[type="file"]{width: 100%; height: 100%; position: absolute; left: 0; top: 0;}
+.wxUploadObj1 #flasHolder{width: 40px; height: 40px; margin: auto; background: url(/static/images/add_icon.png)}
+.listImgBox{padding-top: 10px;}
+.pubitem{width: 140px; height: 140px; position: relative; float: left;}
+.pubitem .li-rm{position: absolute; right: 0; bottom: 0; width: 28px; height: 28px; background: url(/static/images/del_btn.png) no-repeat center/cover;}
+.pubitem .li-thumb{width: 140px; height: 140px; }
+.pubitem .li-thumb img{width: 100%; height: 100%; object-fit: cover;}
+.listSection .pubitem:first-child .setMain{display: none !important; }
+.listSection .pubitem:first-child .mainImg{display: block !important; }
+.pubitem .setMain,.pubitem .mainImg{font-size: 12px; color: #fff; position: absolute; left: 0; bottom: 0; line-height: 28px; border-radius: 0 8px 0 4px; background: rgba(0,0,0,.7) ; padding: 0 6px; display: none; cursor: pointer;}
+.pubitem:hover .setMain{display: block;}
+.submit{width: 260px; height: 52px; background: #85C336; border: 1px solid #76AE30; border-radius: 4px;}
+
+.pubitem{float: left; margin-right: 10px; }
+.pubitem img,.pubitem video{display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 6px;}
+.detaiAddrBox{position: relative; float:left; }
+#mark.pFixed{position: absolute; right: 10px; top: 0}
+#addrPosi{width:100%;}
+.topping,.refresh{line-height: 40px;}
+.editform dl{margin-bottom: 12px;}
+  </style>
+<script>
+var item = '{#json_encode($item)#}'
+  var masterDomain = '{#$cfg_basehost#}'
+  var userTotalBalance = {#$userinfo.money|string_format:'%.2f'#};
+var atlasSize = {#$atlasSize#}, atlasType = "{#$atlasType#}", atlasMax = 20;  //图集配置
+var imglist = {"list1": {#$imglist#},},
+	typeid = {#$typeid#}, addr = '{#$addr#}', typeListArr = {#$typeListArr#}, addrListArr = {#$addrListArr#}, action = '{#$action#}', modelType = '{#$action#}',
+	cfg_term = "pc", adminPath = "{#$adminPath#}";
+var service = 'info';
+var fArr = '{#json_encode($characteristicservice)#}'
+var server_video_url = '/include/upload.inc.php?mod=info&filetype=video&type=video&utype=video';
+var server_image_url = '/include/upload.inc.php?mod=info&filetype=image&type=atlas';
+
+</script>
+</head>
+
+<body>
+<form action="" method="post" name="editform" id="editform" class="editform infoEdit">
+  <input type="hidden" name="dopost" id="dopost" value="{#$dopost#}" />
+  <input type="hidden" name="id" id="id" value="{#$id#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+
+  <!-- 分类选择 s -->
+  <div class="typeMask"></div>
+  <div class="typePop">
+  	<h2 class="popTit">{#$langData['info'][4][74]#} <a href="javascript:;" class="close_pop"></a></h2>{#* 选择发布分类 *#}
+  	<div class="popCon">
+  		<div class="catagoryBox">
+  		</div>
+  	</div>
+  </div>
+  <!-- 分类选择 e -->
+
+  <dl class="clearfix">
+    <dt><label for="typeid">信息分类：</label></dt>
+    <dd>
+      <span id="typeList">
+        <!-- <select name="typeid" id="typeid" class="input-large"></select> -->
+        <div class="inpBox selectType floatDiv typeParBox {#if $typeParId == ''#}fn-hide{#/if#}" data-id="{#$typeParId#}">
+					<input type="text" name="typepar" value="{#$typePar#}" readonly placeholder="{#$langData['info'][4][79]#}" id="typePar" class="inpBox selectType floatDiv typeParBox {#if $typeParId == ''#}fn-hide{#/if#}" data-id="{#$typeParId#}" ><input type="hidden" name="typeparid" id="typeparid" value="{#$typeParId#}"><s class="arr"></s>  {#* 请选择 *#}
+				</div>
+        <div class="inpBox selectType floatDiv">
+					<input type="text" name="typename" value="{#$typename#}" readonly placeholder="{#$langData['info'][4][79]#}" id="typename" ><input type="hidden" name="typeid" id="typeid" value="{#if $typeid#}{#$typeid#}{#else#}{#$typeid#}{#/if#}"><s class="arr"></s> {#* 请选择 *#}
+				</div>
+      </span>
+      <span class="input-tips"><s></s>请选择信息分类</span>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="user">对应会员：</label></dt>
+    <dd style="position:static;">
+      <input class="input-medium inpBox floatDiv" type="text" name="user" id="user" value="{#$username#}" autocomplete="off" />
+      <input type="hidden" name="userid" id="userid" value="{#$userid#}" />
+      <span class="input-tips"><s></s>请输入网站对应会员名</span>
+      <div id="userList" class="popup_key"></div>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="person">电话：</label></dt>
+    <dd>
+<!--      <input class="input-medium inpBox" type="text" name="person" id="person" value="{#$person#}" />-->
+      <label for="tel">
+        <!--		  <select name="areaCode" id="areaCode">-->
+        <!--              <option value="">区号</option>-->
+        <!--              {#foreach from=$internationalPhoneCode item=p#}-->
+        <!--              <option value="{#$p.code#}"{#if $areaCode == $p.code#} selected{#/if#}>{#$p.name#}&nbsp;&nbsp;+{#$p.code#}</option>-->
+        <!--              {#/foreach#}-->
+        <!--          </select>-->
+        <input class="input-medium inpBox" type="text" name="tel" id="tel" value="{#$tel#}" />
+      </label>
+<!--      <label for="qq">QQ/MSN：-->
+<!--        <input class="input-medium inpBox" type="text" name="qq" id="qq" value="{#$qq#}" />-->
+<!--      </label>-->
+    </dd>
+  </dl>
+  <!-- <dl class="clearfix">
+    <dt><label for="addr">所属地区：</label></dt>
+    <dd id="selAddr">
+      <div class="sel-group" data-title="{#$langData['siteConfig'][20][68]#}">{#* 请选择所在区域 *#}
+				<div class="city-title addrBtn" data-field="addrid" data-ids="{#getPublicParentInfo tab='site_area' id=$detail_addrid split=' '#}" data-id="{#$detail_addrid#}">{#if $detail_address != ""#}{#getPublicParentInfo tab='site_area' id=$detail_addrid type='typename' split='/'#}{#else#}{#if $detail_city#}{#$detail_city#}{#else#}{#$langData['siteConfig'][7][2]#}{#/if#}{#/if#}</div>{#* 请选择*#}
+			</div>
+			<div class="inpBox detaiAddr"><input type="text" placeholder="{#$langData['info'][4][85]#}" name="address" id="addr" style="width:100%;" value="{#$detail_address#}"></div>{#* 可添加详细位置  *#}
+			<input type="hidden" id="lnglat" name="lnglat" value="{#$detail_lng#},{#$detail_lat#}">
+			<input type="hidden" name="addr" id="addidArr" value="{#$detail_addrid#}" />
+      <input type="hidden" name="cityid" id="cityid" value="{#$detail_cityid|default:$siteCityInfo['cityid']#}" />
+
+			<div class="posiBox" id="mark"><s></s>{#$langData['info'][4][83]#}</div>{#* 可添加定位 *#}
+			<span class="input-tips"></span>
+    </dd>
+  </dl> -->
+  <dl class="fn-clear" data-required="1">
+    <dt>{#$langData['siteConfig'][19][27]#}：</dt>{#* 所在区域 *#}
+    <dd id="selAddr" data-id="{#$cityid#}">
+      <div class="sel-group" data-title="{#$langData['siteConfig'][20][68]#}">{#* 请选择所在区域 *#}
+				<div class="city-title addrBtn" data-field="addrid" data-ids="{#if $addr#}{#getPublicParentInfo tab='site_area' id=$addr split=' '#}{#else#}{#$cityid#}{#/if#}" data-id="{#if $addr#}{#$addr#}{#else#}{#$cityid#}{#/if#}">{#if $addr != ""#}{#getPublicParentInfo tab='site_area' id=$addr type='typename' split='/'#}{#else#}{#if $cityid#}{#$city#}{#else#}{#$langData['siteConfig'][7][2]#}{#/if#}{#/if#}</div>{#* 请选择*#}
+			</div>
+      <div class="detaiAddrBox ">
+        <div class="inpBox detaiAddr {#if !$address#}fn-hide{#/if#}" ><input type="text" name="address" id="addrPosi" value="{#$address#}"></div>
+      <div class="posiBox {#if $address#}pFixed{#/if#}" id="mark"><s></s><span>{#if $address#}查看定位{#else#}{#$langData['info'][4][83]#}{#/if#}</span></div>{#* 可添加定位 *#}
+      </div>{#* 可添加详细位置  *#}
+      <input type="hidden" id="lnglat" name="lnglat" value="{#$lng#},{#$lat#}">
+      <input type="hidden" name="addr" id="addr" value="{#$addr#}" />
+      <input type="hidden" name="cityid" id="cityid" value="{#$cityid|default:$siteCityInfo['cityid']#}" />
+      <!-- 定位 -->
+
+      <span class="tip-inline"></span>
+    </dd>
+  </dl>
+  <!-- <div id="itemList" class="hide" style="background:#f5f5f5; padding:5px 0;">{#$itemList#}
+
+  </div> -->
+  <dl class="clearfix">
+    <dt>信息说明：</dt>
+    <dd>
+      <!-- <ul class="nav nav-tabs" style="margin-bottom:5px;">
+        <li class="active"><a href="#pc">电脑端</a></li>
+        <li><a href="#mobile">移动端</a></li>
+      </ul> -->
+      <div id="pc">
+      	<script id="body" name="body" type="text/plain" style="width:85%;height:500px">{#$title#}</script>
+      </div>
+      <!-- <div id="mobile" class="hide">
+      	<script id="mbody" name="mbody" type="text/plain" style="width:960px;height:500px">{#$title#}</script>
+      </div> -->
+    </dd>
+
+  </dl>
+  {#$feature = 2#}
+  <dl class="clearfix">
+    <dt></dt>
+    <dd class="tabArrs"></dd>
+    <input type="hidden" name="feature" id="feature" value="">
+    {#foreach from=$characteristicservice item="v"#}
+    <input type="hidden" name="characteristicservice[]"  value="{#$v#}">
+    {#/foreach#}
+  </dl>
+  <!-- 自定义内容 s -->
+		<div class="customizeBox">
+			<dl class="cTitle">{#$langData['info'][4][84]#}</dl>{#*  <dt>完善信息</dt><dd><span>选填，完善信息可提高吸引力哦</span></dd>  *#}
+  			<div class="cContent">
+        </div>
+      </dl>
+   </div>
+ <!-- 自定义内容 e -->
+ <dl class="fn-clear">
+   <dt>{#$langData['siteConfig'][6][78]#}：</dt>{#* 上传照片 *#}
+   <dd class="listImgBox">
+     <input type="hidden" name="imglist" value='{#$imglist#}' class="imglist-hidden">
+     <div id="listSection1" class="listSection filePickerBox">
+       <div class="btn-section fn-clear">
+         <div class="wxUploadObj1 fn-clear">
+           <div class="uploadinp " data-main="1" data-right="1" id="filePicker1"  data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>上传图片</span></div>{#* 图片/视频 *#}
+         </div>
+       </div>
+     </div>
+
+   </dd>
+ </dl>
+ <dl class="fn-clear">
+   <dt>上传视频：</dt>{#* 上传视频 *#}
+   <dd class="listImgBox">
+     <input name="video" type="hidden" id="video" value="{#$video#}" />
+     <input name="videoPoster" type="hidden" id="videoPoster" value="{#$videoPoster#}" />
+     <div id="listSection2" class="listSection filePickerBox">
+       {#if $video#}
+       <div id="WU_VIDEO_FILE_0" class="pubitem videoItem">
+         <a href="/include/attachment.php?f={#$video#}" target="_blank" title="" class="enlarge"><video data-val="{#$video#}" data-url="{#$video#}" src="/include/attachment.php?f={#$video#}" poster="/include/attachment.php?f={#$videoPoster#}"></video></a><a class="li-rm" href="javascript:;"></a></div>
+       {#/if#}
+       <div class="btn-section fn-clear" style="{#if $video#}display:none;{#/if#}">
+         <div class="wxUploadObj1 fn-clear">
+           <div class="uploadinp " data-main="1" data-right="1" id="filePicker2"  data-count="{#$atlasMax#}" data-size="{#$atlasSize#}" data-imglist=""><div id="flasHolder"></div><span>上传视频</span></div>{#* 图片/视频 *#}
+         </div>
+       </div>
+     </div>
+
+   </dd>
+ </dl>
+
+  <dl class="clearfix">
+    <dt><label for="click">浏览次数：</label></dt>
+    <dd>
+      <span><input class="input-mini inpBox" type="number" name="click" min="0" id="click" data-regex="[1-9]\d*" value="{#$click#}" /></span>
+      <label class="ml30" for="weight">排序：</label><input class="input-mini inpBox" type="number" name="weight" id="weight" min="0" data-regex="[1-9]\d*" value="{#$weight#}" />
+      <span class="input-tips"><s></s>必填，排序越大，越排在前面</span>
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dt><label for="valid">有效期：</label></dt>
+    <dd class="radio">
+      <input type="text" class="input-medium  inpBox" id="valid" name="valid" value="{#$valid#}" />
+      <label for="arcrank">信息状态：
+        <select name="arcrank" id="arcrank" class="input-medium  inpBox">
+          {#html_options options=$arcrankList selected=$arcrank#}
+        </select>
+      </label>
+    </dd>
+  </dl>
+
+  <dl id="reviewObj" class="clearfix hide">
+    <dt><label for="certifyInfo">拒审原因：</label></dt>
+    <dd>
+      <textarea name="review" id="review" class="input-xxlarge" data-regex=".*" rows="2">{#$review#}</textarea>
+      <span class="input-tips"><s></s>请输入拒审原因。</span>
+    </dd>
+  </dl>
+
+
+
+  {#if $dopost == 'edit'#}
+  <!-- <dl class="clearfix">
+    <dt><label for="top">置顶：</label></dt>
+    <dd class="radio"> -->
+<!--      <input type="text" class="input-medium" id="bid_start" name="bid_start" value="{#$bid_start#}" />- -->
+<!--      <input type="text" class="input-medium" id="bid_end" name="bid_end" value="{#$bid_end#}" />-->
+<!--      <input type="hidden" id="isbid" name="isbid" value="{#$isbid#}">-->
+      <!-- <a href="javascript:;" class="topping"><s></s>置顶</a>
+    </dd>
+  </dl>
+
+  <dl class="clearfix">
+    <dt><label for="rtBody">刷新：</label></dt>
+    <dd class="radio">
+      <a href="javascript:;" class="refresh"><s></s>刷新</a>
+    </dd>
+  </dl> -->
+  {#/if#}
+  <!-- <dl class="clearfix">
+    <dt>上传图片：</dt>
+		<dd class="listImgBox hide">
+			<div class="list-holder">
+				<ul id="listSection2" class="clearfix listSection"></ul>
+				<input type="hidden" name="imglist" value='{#$imglist#}' class="imglist-hidden">
+			</div>
+			<div class="btn-section clearfix">
+				<div class="uploadinp filePicker" id="filePicker2" data-type="desc" data-count="999" data-size="{#$atlasSize#}" data-imglist="list1"><div id="flasHolder"></div><span>添加图片</span></div>
+				<div class="upload-tip">
+					<p><a href="javascript:;" class="hide deleteAllAtlas">删除所有</a>&nbsp;&nbsp;{#$atlasType|replace:"*.":""|replace:";":"、"#}&nbsp;&nbsp;单张最大{#$atlasSize/1024#}M<span class="fileerror"></span></p>
+				</div>
+			</div>
+		</dd>
+  </dl> -->
+
+  <!-- <dl class="clearfix">
+    <dd>
+      <input class="input-xxlarge" type="hidden" name="config" id="config" data-regex=".{1,60}" maxlength="60" value="" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dd>
+      <input class="input-xxlarge" type="hidden" name="isbid" id="isbid" data-regex=".{1,60}" maxlength="60" value="{#$isbid#}" />
+    </dd>
+  </dl>
+  <dl class="clearfix">
+    <dd>
+      <input class="input-xxlarge" type="hidden" name="bid_type" id="bid_type" data-regex=".{1,60}" maxlength="60" value="" />
+    </dd>
+  </dl> -->
+
+  <dl class="clearfix hide">
+    <dd>
+      <input class="input-xxlarge" type="hidden" name="refreConfig" id="refreConfig" data-regex=".{1,60}" maxlength="60" value="" />
+    </dd>
+  </dl>
+  <dl class="clearfix hide">
+    <dd>
+      <input class="input-xxlarge" type="hidden" name="refreshSmart" id="refreshSmart" data-regex=".{1,60}" maxlength="60" value="" />
+    </dd>
+  </dl>
+  <!-- <dl class="clearfix" id="type0">
+    <dt>上传视频：</dt>
+    <dd>
+		<input name="video" type="hidden" id="video" value="{#$video#}" />
+		<div class="spic{#if $video == ""#} hide{#/if#}">
+			<div class="sholder" id="videoPreview">
+				 <a href="/include/videoPreview.php?f=" data-id="{#$video#}">预览视频</a>
+			</div>
+			<a href="javascript:;" class="reupload">重新上传</a>
+		</div>
+		<iframe src ="/include/upfile.inc.php?mod={#$action#}&type=video&obj=video&filetype=video" style="width:100%; height:25px;{#if $video != ""#} display: none;{#/if#}" scrolling="no" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+    </dd>
+  </dl> -->
+
+  <dl class="clearfix">
+    <dt><label>其它设置：</label></dt>
+    <dd class="radio">
+      <label><input type="checkbox" name="rec" value="1"{#if $rec == 1#} checked{#/if#} />推荐</label>
+      <label><input type="checkbox" name="fire" value="1"{#if $fire == 1#} checked{#/if#} />火急</label>
+      <!-- <label><input type="checkbox" name="is_vipguanggao" value="1"{#if $is_vipguanggao == 1#} checked{#/if#} />vip广告去除</label> -->
+      <!-- <label><input type="checkbox" name="top" value="1"{#if $top == 1#} checked{#/if#} />置顶</label> -->
+    </dd>
+  </dl>
+  <!-- <dl class="clearfix">
+
+    <dt><label for="characteristicservice">特色：</label></dt>
+    <dd class="radio">
+      {#html_checkboxes name='characteristicservice' values=$charactersval output=$characterslist selected=$characteristicservice separator="&nbsp;&nbsp;"#}
+      <span class="input-tips"><s></s>请选择特色</span>
+    </dd>
+  </dl> -->
+
+  {#if $hasSetjili == 1#}
+  <dl class="clearfix">
+    <dt>用户激励：</dt>
+    <dd class="singel-line">
+      <p>阅读红包：{#$memberCount#}个【{#$CounthongbaoPrice#}元】&nbsp;&nbsp;&nbsp;&nbsp; 剩余：{#$hongbaoCount#}个【{#$hongbaoPrice#}元】 口令：【{#$kouling#}】红包方式：【{#$hongbaoMode#}】</p>
+      {#foreach from=$lingqu item=v key=k #}
+      <p style="text-indent: 2em;"><small>领取人：<a href="javascript:;" class="userinfo" data-id="{#$v.uid#}">{#$v.nickname#}</a> &nbsp; 一共领取：{#$v.price#}元</small></p>
+      {#/foreach#}
+      <hr>
+      <p>分享红包：一共【{#$Countreward#}次】,每次【{#$rewardPrice#}元】&nbsp;&nbsp;&nbsp;     剩余：【{#$rewardCount#}次】 【{#$rewardCountPrice#}元】 </p>
+    </dd>
+  </dl>
+  {#/if#}
+  {#if $isbid == '1' #}
+  {#if $bid_plan #}
+  <dl class="clearfix">
+  <dt>计划置顶：</dt>
+  <dd class="singel-line">
+    {#foreach from=$bid_plan item=v key=k#}
+    {#$v.date#} {#$v.week#} {#if $v.type =='all'#}全天 {#else#}早8-晚8{#/if#} </p>
+    {#/foreach#}
+  </dd>
+  </dl>
+  {#else#}
+  <dl class="clearfix">
+    <dt>已开通置顶：</dt>
+    <dd class="singel-line">{#$bid_end#} 结束</dd>
+  </dl>
+  {#/if#}
+  {#/if#}
+  {#if $refreshSmart#}
+  <dl class="clearfix">
+    <dt>刷新：</dt>
+    <dd class="singel-line">
+      {#$refreshNext#} 已刷新{#$refreshCount-$refreshSurplus#},剩余{#$refreshSurplus#}
+    </dd>
+  </dl>
+  {#/if#}
+  <div class="refreshTopMask"></div>
+
+  <div class="refreshTopPopup">
+    <div class="rtHeader fn-clear">
+      <h5></h5>
+      <a href="javascript:;" class="rtClose">&times;</a>
+    </div>
+    <div class="rtBody">
+
+      <!-- 刷新 s -->
+      <div class="rtRefresh fn-hide">
+        <div class="rtTab">
+          <ul class="fn-clear">
+            <li data-type="smart">{#$langData['siteConfig'][32][28]#}</li>{#* 智能刷新 *#}
+          </ul>
+        </div>
+        <div class="rtCon">
+          <!-- 智能刷新 -->
+          <div class="rtItem fn-hide">
+            <ul class="rtSmart"></ul>
+          </div>
+
+<!--          &lt;!&ndash; 普通刷新 &ndash;&gt;-->
+<!--          <div class="rtItem">-->
+<!--            <div class="normalTips">{#$langData['siteConfig'][32][30]#}<em class="smartUnit">0.0</em>元</span></div>{#* 信息刷新后，排名靠前，时间显示最新，获取更多浏览机会！<br /><strong>智能刷新</strong>效果翻倍，<span class="price_average">每次仅需 *#}-->
+
+<!--            &lt;!&ndash; 免费刷新 &ndash;&gt;-->
+<!--          <div class="freeRefresh">-->
+<!--            <div class="oper">-->
+<!--              <div class="ny">-->
+<!--                <button type="button" class="refreshNow">{#$langData['siteConfig'][32][31]#}</button>{#* 立即刷新 *#}-->
+<!--                <p>{#$langData['siteConfig'][32][32]#}</p>-->
+<!--                {#* 本次刷新<font color="#ff6600">免费</font>，您还有<em class="refreshFreeSurplus">0</em>次免费刷新的机会。 *#}-->
+<!--              </div>-->
+<!--              <div class="sc fn-hide">-->
+<!--                <span class="icon-success"><s></s></span>-->
+<!--                <div><strong>{#$langData['siteConfig'][32][33]#}</strong></div>{#* 刷新成功 *#}-->
+<!--                <p>{#$langData['siteConfig'][32][34]#}</p>{#* 您的信息曝光量将大增！ *#}-->
+<!--                <button type="button" class="refreshConfirm">{#$langData['siteConfig'][6][1]#}</button>{#* 确定 *#}-->
+<!--              </div>-->
+<!--            </div>-->
+<!--          </div>-->
+
+<!--            &lt;!&ndash; 普通收费刷新 &ndash;&gt;-->
+<!--          <div class="normalRefresh fn-hide">-->
+<!--            <p>{#$langData['siteConfig'][32][35]#}</p>{#* 提示：您的免费刷新次数已用完，不再享有免费刷新。 *#}-->
+<!--          </div>-->
+<!--          </div>-->
+
+        </div>
+      </div>
+      <!-- 刷新 e -->
+
+      <!-- 置顶 s -->
+      <div class="rtTopping fn-hide">
+
+        <dl class="fn-clear">
+          <dt>{#$langData['siteConfig'][32][37]#}</dt>{#* 置顶方式 *#}
+          <dd class="topType fn-clear">
+<!--            <label class="checked"><em><img src="{#$cfg_basehost#}/templates/member/images/refreshTop_checked.png" /></em>{#$langData['siteConfig'][32][38]#}</label>{#* 立即置顶 *#}-->
+            <label><em><img src="{#$cfg_basehost#}/templates/member/images/refreshTop_checked.png" /></em>{#$langData['siteConfig'][32][39]#}</label>{#* 计划置顶 *#}
+          </dd>
+        </dl>
+        <div class="topPlan " style="display: block !important;">
+          <dl class="fn-clear">
+            <dt>{#$langData['siteConfig'][32][41]#}</dt>{#* 置顶日期 *#}
+            <dd>
+              <div class="rtDate" id="topPlanBegan">
+                <input id="topPlanBeganObj" readonly value="{#$smarty.now|date_format:'%Y-%m-%d'#}" />
+                <em></em>
+              </div>
+              <span class="rtSplit"></span>
+              <div class="rtDate" id="topPlanEnd">
+                <input id="topPlanEndObj" readonly value="{#$addWeekDate|date_format:'%Y-%m-%d'#}">
+                <em></em>
+              </div>
+            </dd>
+          </dl>
+          <dl class="fn-clear">
+            <dt>{#$langData['siteConfig'][32][42]#}</dt>{#* 置顶时段 *#}
+            <dd>
+              <table class="rtPlanList">
+                <thead>
+                <tr>
+                  <th>{#$langData['siteConfig'][19][384]#}</th>{#* 时间 *#}
+                  <th>{#$langData['siteConfig'][14][4]#}</th>{#* 星期一 *#}
+                  <th>{#$langData['siteConfig'][14][5]#}</th>{#* 星期二 *#}
+                  <th>{#$langData['siteConfig'][14][6]#}</th>{#* 星期三 *#}
+                  <th>{#$langData['siteConfig'][14][7]#}</th>{#* 星期四 *#}
+                  <th>{#$langData['siteConfig'][14][8]#}</th>{#* 星期五 *#}
+                  <th>{#$langData['siteConfig'][14][9]#}</th>{#* 星期六 *#}
+                  <th>{#$langData['siteConfig'][14][10]#}</th>{#* 星期日 *#}
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                  <td>{#$langData['siteConfig'][14][11]#}</td>{#* 全天 *#}
+                  <td class="curr" data-week="1" data-type="all"><em></em></td>
+                  <td class="curr" data-week="2" data-type="all"><em></em></td>
+                  <td class="curr" data-week="3" data-type="all"><em></em></td>
+                  <td class="curr" data-week="4" data-type="all"><em></em></td>
+                  <td class="curr" data-week="5" data-type="all"><em></em></td>
+                  <td class="curr" data-week="6" data-type="all"><em></em></td>
+                  <td class="curr" data-week="0" data-type="all"><em></em></td>
+                </tr>
+                <tr>
+                  <td>{#$langData['siteConfig'][14][12]#}</td>{#* 早8点-晚8点 *#}
+                  <td data-week="1" data-type="day"><em></em></td>
+                  <td data-week="2" data-type="day"><em></em></td>
+                  <td data-week="3" data-type="day"><em></em></td>
+                  <td data-week="4" data-type="day"><em></em></td>
+                  <td data-week="5" data-type="day"><em></em></td>
+                  <td data-week="6" data-type="day"><em></em></td>
+                  <td data-week="0" data-type="day"><em></em></td>
+                </tr>
+                <tr>
+                  <td>{#$langData['siteConfig'][32][43]#}</td>{#* 不置顶 *#}
+                  <td><em></em></td>
+                  <td><em></em></td>
+                  <td><em></em></td>
+                  <td><em></em></td>
+                  <td><em></em></td>
+                  <td><em></em></td>
+                  <td><em></em></td>
+                </tr>
+                </tbody>
+              </table>
+            </dd>
+          </dl>
+        </div>
+      </div>
+      <!-- 置顶 e -->
+
+      <!-- 支付 s -->
+      <div class="rtPayObj">
+        <!-- {#if $userinfo.money > 0#}
+        <dl class="fabu_dl fn-clear yue">
+          <dt class="yue-btn active"><i class="radio"><s></s></i>{#$langData['siteConfig'][19][386]#} <em class="gray">({#echoCurrency type='symbol'#}{#$userinfo.money#})</em></dt>
+          <dd>-{#echoCurrency type='symbol'#} <em class="reduce-yue">0.00</em></dd>
+        </dl>
+        {#/if#} -->
+<!--        <dl class="fabu_dl fn-clear">-->
+<!--          <dt>{#$langData['siteConfig'][32][44]#}</dt>{#* 应付金额 *#}-->
+<!--          <dd>&nbsp;{#echoCurrency type='symbol'#} <em class="pay-total">0.00</em></dd>-->
+<!--        </dl>-->
+
+
+        <a href="javascript:;" class="paySubmit publicpaybtn" >确定</a>{#* 支付 *#}
+      </div>
+
+    </div>
+  </div>
+
+  <div class="topCalendar"></div>
+  <div class="topCalendarBg"></div>
+
+  <!--  <dl class="clearfix">-->
+<!--    <dt>分享红包剩余：</dt>-->
+<!--    <dd class="singel-line">{#$orderdate#}</dd>-->
+<!--  </dl>-->
+<!--  <dl class="clearfix">-->
+<!--    <dt>领取人：</dt>-->
+<!--    <dd class="singel-line">{#$orderdate#}</dd>-->
+<!--  </dl>-->
+<!--  <dl class="clearfix">-->
+<!--  <dt>抢红包剩余：</dt>-->
+<!--  <dd class="singel-line">{#$orderdate#}</dd>-->
+<!--</dl>-->
+<!--  <dl class="clearfix">-->
+<!--  <dt>阅读红包剩余：</dt>-->
+<!--  <dd class="singel-line">{#$orderdate#}</dd>-->
+<!--</dl>-->
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><button class="btn btn-large btn-success" type="submit" name="button" id="btnSubmit">确认提交</button></dd>
+  </dl>
+</form>
+
+{#$editorFile_adminInfo#}
+{#$jsFile#}
+<script type="text/javascript" src="{#$cfg_basehost#}/static/js/ui/calendar/WdatePicker.js"></script>
+</body>
+</html>

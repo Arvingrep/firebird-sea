@@ -61,7 +61,6 @@ if(empty($action)){
 			$in = isset($installArr) ? count($installArr) : 0;
 
             $installArr[$in]['pay_id'] = $pay_list[$code]['id'];
-            $installArr[$in]['title'] = $pay_list[$code]['title'] ? $pay_list[$code]['title'] : $pay_list[$code]['pay_name'];
             $installArr[$in]['pay_name'] = $pay_list[$code]['pay_name'];
             $installArr[$in]['version']  = $payment[$i]['version'];
             $installArr[$in]['pay_desc'] = $pay_list[$code]['pay_desc'];
@@ -74,7 +73,6 @@ if(empty($action)){
 			$un = isset($uninstallArr) ? count($uninstallArr) : 0;
 
 			$uninstallArr[$un]['pay_code'] = $payment[$i]['pay_code'];
-            $uninstallArr[$un]['title'] = $payment[$i]['title'] ? $payment[$i]['title'] : $payment[$i]['pay_name'];
             $uninstallArr[$un]['pay_name'] = $payment[$i]['pay_name'];
             $uninstallArr[$un]['version']  = $payment[$i]['version'];
             $uninstallArr[$un]['pay_desc'] = $payment[$i]['pay_desc'];
@@ -103,11 +101,6 @@ if(empty($action)){
 			exit();
 		}
 
-		if(empty($title)){
-			echo '{"state": 200, "info": "请输入所属公司名称！"}';
-			exit();
-		}
-
 		if(empty($pay_config)){
 			echo '{"state": 200, "info": "请输入帐号信息！"}';
 			exit();
@@ -117,11 +110,11 @@ if(empty($action)){
 		$pay_config = serialize(json_decode($_POST['pay_config'], true));
 
 		//保存到主表
-		$archives = $dsql->SetQuery("INSERT INTO `#@__".$tab."` (`pay_code`, `title`, `pay_name`, `pay_desc`, `pay_config`, `state`, `pubdate`) VALUES ('$code', '$title', '$pay_name', '$pay_desc', '$pay_config', '$state', '".GetMkTime(time())."')");
+		$archives = $dsql->SetQuery("INSERT INTO `#@__".$tab."` (`pay_code`, `pay_name`, `pay_desc`, `pay_config`, `state`, `pubdate`) VALUES ('$code', '$pay_name', '$pay_desc', '$pay_config', '$state', '".GetMkTime(time())."')");
 		$return = $dsql->dsqlOper($archives, "update");
 
 		if($return == "ok"){
-			adminLog("安装支付方式", $pay_name . '(' . $title . ')');
+			adminLog("安装支付方式", $pay_name);
 
 			updateAppConfig();  //更新APP配置文件
 
@@ -147,7 +140,7 @@ if(empty($action)){
 		$paydir = @opendir($payPath);
 		$set_modules = true;
 		$payment = array();
-		$pay_name = $title = $pay_desc = $config = $f = "";
+		$pay_name = $pay_desc = $config = $f = "";
 
 		while(false !== ($subdir = @readdir($paydir))){
 			if(is_dir($payPath.$subdir) && $subdir != ".." && $subdir != "."){
@@ -164,7 +157,6 @@ if(empty($action)){
 		for($i = 0; $i < count($payment); $i++){
 			if($code == $payment[$i]['pay_code']){
 				$f = "y";
-				$title = $payment[$i]['title'];
 				$pay_name = $payment[$i]['pay_name'];
             	$pay_desc = $payment[$i]['pay_desc'];
             	$config   = $payment[$i]['config'];
@@ -174,7 +166,6 @@ if(empty($action)){
 		if($f != ""){
 			$huoniaoTag->assign('action', $action);
 			$huoniaoTag->assign('code', $code);
-			$huoniaoTag->assign('title', $title);
 			$huoniaoTag->assign('pay_name', $pay_name);
 			$huoniaoTag->assign('pay_desc', $pay_desc);
 
@@ -243,11 +234,6 @@ if(empty($action)){
 			exit();
 		}
 
-		if(empty($title)){
-			echo '{"state": 200, "info": "请输入所属公司标题！"}';
-			exit();
-		}
-
 		if(empty($pay_config)){
 			echo '{"state": 200, "info": "请输入帐号信息！"}';
 			exit();
@@ -266,11 +252,11 @@ if(empty($action)){
 		$pay_config = serialize(json_decode($_POST['pay_config'], true));
 
 		//保存到主表
-		$archives = $dsql->SetQuery("UPDATE `#@__".$tab."` SET `title` = '$title', `pay_name` = '$pay_name', `pay_desc` = '$pay_desc', `pay_config` = '$pay_config', `state` = '$state' WHERE `id` = ". $id);
+		$archives = $dsql->SetQuery("UPDATE `#@__".$tab."` SET `pay_name` = '$pay_name', `pay_desc` = '$pay_desc', `pay_config` = '$pay_config', `state` = '$state' WHERE `id` = ". $id);
 		$return = $dsql->dsqlOper($archives, "update");
 
 		if($return == "ok"){
-			adminLog("修改支付方式", $pay_name . "(" . $title . ")");
+			adminLog("修改支付方式", $pay_name);
 
 			updateAppConfig();  //更新APP配置文件
 
@@ -294,7 +280,7 @@ if(empty($action)){
 	$paydir = @opendir($payPath);
 	$set_modules = true;
 	$payment = array();
-	$pay_name = $title = $pay_desc = $config = $f = "";
+	$pay_name = $pay_desc = $config = $f = "";
 
 	while(false !== ($subdir = @readdir($paydir))){
 		if(is_dir($payPath.$subdir) && $subdir != ".." && $subdir != "."){
@@ -320,7 +306,6 @@ if(empty($action)){
 	if($f != ""){
 		$huoniaoTag->assign('action', $action);
 		$huoniaoTag->assign('id', $id);
-		$huoniaoTag->assign('title', $payData[0]['title'] ? $payData[0]['title'] : $payData[0]['pay_name']);
 		$huoniaoTag->assign('pay_name', $payData[0]['pay_name']);
 		$huoniaoTag->assign('pay_desc', $payData[0]['pay_desc']);
 		$huoniaoTag->assign('pay_code', $payData[0]['pay_code']);

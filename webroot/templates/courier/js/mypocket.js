@@ -154,6 +154,7 @@ var page = new Vue({
     onPageVisibility(functions) {
         var _t = {};
         var ishide = false;
+
         var onShowCall = function () {
             if(ishide){
                 location.reload();
@@ -215,7 +216,7 @@ var page = new Vue({
               that.wechatSureGet(data.info); //微信端
             }else if(device.toLowerCase().includes('huoniao_android')){ //安卓端
                 setupWebViewJavascriptBridge(function(bridge) {
-                  bridge.callHandler('wxConfirmReceipt', {'mchId': data.info.mchid,'appId': data.info.appid,'package': encodeURIComponent(data.info.package_info),}, function(res){
+                  bridge.callHandler('wxConfirmReceipt', {'mchId': data.info.mchid,'appId': data.info.appid,'package': data.info.package_info,}, function(res){
                     console.log('安卓端提现,需判断是否成功');
                     setTimeout(() => {
                       location.reload();

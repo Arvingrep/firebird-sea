@@ -36,7 +36,6 @@ $(function(){
 			action       = $("#action").val(),
 			id           = $("#id").val(),
 			code         = $("#code").val(),
-			title        = $("#title"),
 			pay_name     = $("#pay_name"),
 			pay_desc     = $("#pay_desc").val(),
 			state        = $("input[name='state']:checked").val();
@@ -60,7 +59,6 @@ $(function(){
 		var form = [];
 		form.push("id="+id);
 		form.push("code="+code);
-		form.push("title="+title.val());
 		form.push("pay_name="+pay_name.val());
 		form.push("pay_desc="+pay_desc);
 		form.push("pay_config="+'['+pay_config.join(",")+']');

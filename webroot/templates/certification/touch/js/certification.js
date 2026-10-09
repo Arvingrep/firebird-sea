@@ -421,12 +421,9 @@ $(function () {
 				$("#idcardFimg").attr('data-url',response.url).show();
 				$("#idcardFront").val(response.url);
 			}
-            else{
-                showErrAlert(response.state);
-            }
 		},
 		showErr: function(info){
-			showErrAlert(info);
+			showMsg(info);
 		}
 	});
 
@@ -454,12 +451,9 @@ $(function () {
 				$("#idcardBimg").attr('data-url',response.url).show();
 				$("#idcardBack").val(response.url);
 			}
-            else{
-                showErrAlert(response.state);
-            }
 		},
 		showErr: function(info){
-			showErrAlert(info);
+			showMsg(info);
 		}
 	});
 
@@ -487,12 +481,9 @@ $(function () {
 				$("#licenseCimg").attr('data-url',response.url).show();
 				$("#licenseCom").val(response.url);
 			}
-            else{
-                showErrAlert(response.state);
-            }
 		},
 		showErr: function(info){
-			showErrAlert(info);
+			showMsg(info);
 		}
 	});
 

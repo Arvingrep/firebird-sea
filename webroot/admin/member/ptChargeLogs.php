@@ -46,18 +46,7 @@ if($dopost == "getList" || $do == "export"){
 
 	//关键词
 	if(!empty($sKeyword)){
-        $sKeyword = trim($sKeyword);
-		$isId = false;
-		if(substr($sKeyword, 0, 1) == '#'){
-			$id = substr($sKeyword, 1);
-			if(is_numeric($id)){
-				$isId = true;
-				$where .= " AND `uid` = $id";
-			}
-		}
-		if(!$isId){
-            $where .= " AND (`body` like '%$sKeyword%' OR `ordernum` = '$sKeyword' OR `uid` = '$sKeyword' OR `transaction_id` = '$sKeyword')";
-        }
+		$where .= " AND (`body` like '%$sKeyword%' OR `ordernum` = '$sKeyword' OR `uid` = '$sKeyword' OR `transaction_id` = '$sKeyword')";
 	}
 
 	if($start != ""){

@@ -23,11 +23,9 @@ function member($params, $content = "", &$smarty = array(), &$repeat = array())
     global $langData;
     global $installModuleArr;
     global $cfg_cancellation_state;         //注销账户开关
-
-    $userid = $userLogin->getMemberID();
-    
     if (in_array('shop', $installModuleArr)) {
         include HUONIAOINC . "/config/shop.inc.php";
+        $userid = $userLogin->getMemberID();
         $sql = $dsql->SetQuery("SELECT `shoptype` FROM `#@__shop_store` WHERE `userid` = " . $userid);
         $res = $dsql->dsqlOper($sql, "results");
         if ($res) {
@@ -62,40 +60,11 @@ function member($params, $content = "", &$smarty = array(), &$repeat = array())
     //用户个人模块信息
     $memberModule = $userLogin->getMemberModule();
 
-    //商家入驻配置信息
-    global $cfg_BusinessJoinConfig;
-    $cfg_BusinessJoinConfig = getBusinessJoinConfig();
-    $huoniaoTag->assign('businessConfig', $cfg_BusinessJoinConfig);
-
     //企业用户套餐信息
     $memberPackage = $userLogin->getMemberPackage();
+    
     if($memberPackage == 'No data!'){
         $memberPackage = array();
-    }
-
-    //签到信息
-    global $cfg_qiandao_state;
-    if($cfg_qiandao_state && $userid > 0){
-        //统计登录会员总签到天数
-        $totalQiandao = 0;
-        $sql = $dsql->SetQuery("SELECT `id`, `date` FROM `#@__member_qiandao` WHERE `uid` = $userid ORDER BY `date` DESC");
-        $ret = $dsql->dsqlOper($sql, "results");
-        if($ret){
-            $totalQiandao = count($ret);
-        }
-        $huoniaoTag->assign("totalQiandao", $totalQiandao);
-
-        //判断是否已经签到
-        $todayQiandao = 0;
-        if($ret){
-            $lastQiandao = GetMkTime(date("Y-m-d", $ret[0]['date']));
-            $today = GetMkTime(date("Y-m-d", time()));
-
-            if($lastQiandao == $today){
-                $todayQiandao = 1;
-            }
-        }
-        $huoniaoTag->assign("todayQiandao", $todayQiandao);
     }
 
     //合并
@@ -196,7 +165,7 @@ function member($params, $content = "", &$smarty = array(), &$repeat = array())
         //      $sid = $value['sid'];
         //      if($key == "shop" || $key == "tuan" || $key == "waimai"){
         //          $type == $key."_store";
-        // $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment` WHERE `type` = '$type' AND `aid` = $sid AND DATE_FORMAT(FROM_UNIXTIME(`dtime`), '%Y-%m-%d') = curdate()");
+        // $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `type` = '$type' AND `aid` = $sid AND DATE_FORMAT(FROM_UNIXTIME(`dtime`), '%Y-%m-%d') = curdate()");
         //      }
         //  }
         //  if($sql){
@@ -207,8 +176,8 @@ function member($params, $content = "", &$smarty = array(), &$repeat = array())
         $todayk = strtotime(date('Y-m-d'));
         //当天结束
         $todaye = strtotime(date('Y-m-d 23:59:59'));
-        $sql = $dsql->SetQuery("SELECT count(`id`) FROM `#@__public_comment` WHERE `type` = 'business' AND `aid` = $website AND `dtime` >$todayk AND `dtime` < $todaye");
-        $totalComment += (int)$dsql->getOne($sql);
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__public_comment_all` WHERE `type` = 'business' AND `aid` = $website AND `dtime` >$todayk AND `dtime` < $todaye");
+        $totalComment += (int)$dsql->dsqlOper($sql, "totalCount");
 
         $huoniaoTag->assign('totalComment', $totalComment);
     }
@@ -1395,7 +1364,7 @@ eot;
 
             //保存到主表
             $useragent = $_SERVER['HTTP_USER_AGENT'];
-            $_ip = $ip . ($_SERVER['REMOTE_PORT'] ? ':' . $_SERVER['REMOTE_PORT'] : '');
+            $_ip = $ip . ':' . $_SERVER['REMOTE_PORT'];
             $archives = $dsql->SetQuery("INSERT INTO `#@__member_login` (`userid`, `logintime`, `loginip`, `ipaddr`, `platform`, `useragent`) VALUES ('$userid', '" . GetMkTime(time()) . "', '$_ip', '$ipaddr', '$loginPlatform', '$useragent')");
             $dsql->dsqlOper($archives, "update");
 
@@ -2889,7 +2858,7 @@ eot;
         $userid = $userLogin->getMemberID();
         $jjr = 0;
 
-        $sql = $dsql->SetQuery("SELECT * FROM `#@__house_distributor_company_user` WHERE `uid` = $userid");
+        $sql = $dsql->SetQuery("SELECT * FROM `#@__house_zjuser` WHERE `userid` = $userid");
         $ret = $dsql->dsqlOper($sql, "results");
         if ($ret) {
             $jjr = 1;
@@ -2911,7 +2880,7 @@ eot;
         $huoniaoTag->assign("jjr", $jjr);
 
         $zjcom = 0;
-        $sql = $dsql->SetQuery("SELECT * FROM `#@__house_distributor_company` WHERE `uid` = $userid");
+        $sql = $dsql->SetQuery("SELECT * FROM `#@__house_zjcom` WHERE `userid` = $userid");
         $ret = $dsql->dsqlOper($sql, "results");
         if ($ret) {
             $zjcom = 1;
@@ -2931,7 +2900,7 @@ eot;
         //判断是否企业会员中心
         $ischeck = explode($busiDomain, $dirDomain);
 
-        if(isMobile() && (($action == 'manage' && $module != 'live' && $module != 'tuan' && $type != 'branch') || ($action == 'order' && $module != 'business' && count($ischeck) <= 1)) && file_exists($newManageFile)){
+        if(isMobile() && (($action == 'manage' && $module != 'live' && $module != 'tuan') || ($action == 'order' && $module != 'business' && count($ischeck) <= 1)) && file_exists($newManageFile)){
             $module = $module ? $module : '';
             $huoniaoTag->assign("module", $module);
 
@@ -3085,15 +3054,6 @@ eot;
         if ($module == 'sfcar') {
             include(HUONIAOROOT . "/include/config/sfcar.inc.php");
             $huoniaoTag->assign('insertselect', $customInsertselect);
-
-            $_sNameConfig = getModuleConfig('sfcar');
-            if(is_array($_sNameConfig)){
-                $sConfigName = array_keys($_sNameConfig);
-                foreach ($sConfigName as $config) {
-                    $huoniaoTag->assign('sfcar_'.$config, $_sNameConfig[$config]);
-                }
-            }
-
         }
         if ($module == "renovation") {
 
@@ -3162,7 +3122,7 @@ eot;
             die;
         }
         //发布前验证实名认证
-        if ($action == 'fabu' || $action == 'fabu_worker_seek' || $action == 'fabu_post_seek' || $action == 'fabu_job_seek') {
+        if ($action == 'fabu') {
             //实名认证
             $f_url = urlencode($cfg_secureAccess . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
 
@@ -3184,7 +3144,7 @@ eot;
             global $cfg_periodicCheckPhoneCycle;
             $periodicCheckPhone = (int)$cfg_periodicCheckPhone;
             $periodicCheckPhoneCycle = (int)$cfg_periodicCheckPhoneCycle * 86400;  //天
-            if ($cfg_memberBindPhone && $periodicCheckPhoneCycle && (!$userinfo['phone'] || !$userinfo['phoneCheck'] || ($periodicCheckPhone && $userinfo['phoneBindTime'] && time() - $userinfo['phoneBindTime'] > $periodicCheckPhoneCycle))) {
+            if ($cfg_memberBindPhone && (!$userinfo['phone'] || !$userinfo['phoneCheck'] || ($periodicCheckPhone && $userinfo['phoneBindTime'] && time() - $userinfo['phoneBindTime'] > $periodicCheckPhoneCycle))) {
                 $param = array(
                     'service' => 'siteConfig',
                     'template' => 'certification'
@@ -3328,7 +3288,7 @@ eot;
                 $zjusercom      = 0;
                 //判断是否经纪人
                 if ($do != "edit") {
-                    $sql = $dsql->SetQuery("SELECT `id`, `meal` FROM `#@__house_distributor_company_user` WHERE `uid` = $userid");
+                    $sql = $dsql->SetQuery("SELECT `id`, `meal` FROM `#@__house_zjuser` WHERE `userid` = $userid");
                     $ret = $dsql->dsqlOper($sql, "results");
                     if ($ret) {
 
@@ -3870,7 +3830,7 @@ eot;
                         $huoniaoTag->assign('visa_type', $visa_type);
                     }
                     $customAtlasMax = $custom_travelvisa_atlasMax ? $custom_travelvisa_atlasMax : 9;
-                } elseif ($type == "agency" || $type == "around") { //周边游
+                } elseif ($type == "agency") { //周边游
                     $customAtlasMax = $custom_travelagency_atlasMax ? $custom_travelagency_atlasMax : 9;
                     //景区分类
                     $travelHandlers = new handlers($module, "star_type");
@@ -4431,7 +4391,7 @@ eot;
 
             $comid = 0;
             $userid = $userLogin->getMemberID();
-             $sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company` WHERE `uid` = $userid");
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjcom` WHERE `userid` = $userid");
             $ret = $dsql->dsqlOper($sql, "results");
             if ($ret) {
                 $comid = $ret[0]['id'];
@@ -4801,7 +4761,7 @@ eot;
 
             if ($module == "house") {
                 $zjcom = 0;
-                $sql = $dsql->SetQuery("SELECT * FROM `#@__house_distributor_company` WHERE `uid` = $userid");
+                $sql = $dsql->SetQuery("SELECT * FROM `#@__house_zjcom` WHERE `userid` = $userid");
                 $ret = $dsql->dsqlOper($sql, "results");
                 if ($ret) {
                     $zjcom = 1;
@@ -5237,7 +5197,7 @@ eot;
         $house_comid = 0;
         global $installModuleArr;
         if (in_array("house", $installModuleArr)) {
-             $sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company` WHERE `uid` = $userid");
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjcom` WHERE `userid` = $userid");
             $ret = $dsql->dsqlOper($sql, "results");
             if ($ret) {
                 $house_comid = $ret[0]['id'];
@@ -6196,15 +6156,11 @@ eot;
         global $userLogin;
         global $cfg_thumbType;
         global $cfg_atlasType;
-
         $userid = $userLogin->getMemberID();
         if ($userid == -1) {
             $furl = urlencode($cfg_secureAccess . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
             header("location:" . $cfg_secureAccess . $cfg_basehost . "/login.html?furl=" . $furl);
         } else {
-
-            include_once(HUONIAOROOT . "/include/config/wechatConfig.inc.php");
-            $huoniaoTag->assign('cfg_miniProgramShippingManage', (int)$cfg_miniProgramShippingManage);
 
             $huoniaoTag->assign('peerpay', (int)$peerpay);
 
@@ -6461,7 +6417,7 @@ eot;
                         }
                     } elseif ($module == 'homemaking') {
                         if ($detailConfig['orderstate'] == 11 || $detailConfig['orderstate'] == 12) {
-                            $sql = $dsql->SetQuery("SELECT * FROM `#@__public_comment` WHERE `oid` = '$id' AND `type` = 'homemaking-order' ");
+                            $sql = $dsql->SetQuery("SELECT * FROM `#@__public_comment_all` WHERE `oid` = '$id' AND `type` = 'homemaking-order' ");
                             $ret = $dsql->dsqlOper($sql, 'results');
                             $huoniaoTag->assign('product', $detailConfig['product']);
                             $huoniaoTag->assign('ret', $ret[0]);
@@ -6811,51 +6767,6 @@ eot;
             $url = getUrlPath($param);
             die('<meta charset="UTF-8"><script type="text/javascript">alert("系统未开启VIP会员功能！");top.location="'.$url.'";</script>');
         }
-
-        //会员等级费用及特权
-        $dqtime = time();
-        $sql = $dsql->SetQuery("SELECT * FROM `#@__member_level` ORDER BY `id` ASC");
-        $results = $dsql->dsqlOper($sql, "results");
-        $memberlevelList = array();
-        if($results && is_array($results) && $uid!= -1){
-            foreach ($results as $key => $value) {
-                // $costArr      = empty($value['cost']) ? array() : unserialize($value['cost']);
-                $privilegeArr = empty($value['privilege']) ? array() : unserialize($value['privilege']);
-                $discountArr  = empty($value['discount']) ? array() : unserialize($value['discount']);
-                $memberlevelList[$key]['id']   = $value['id'];
-                $memberlevelList[$key]['name'] = $value['name'];
-                $memberlevelList[$key]['price']= $value['price'];
-                $memberlevelList[$key]['icon'] = $value['icon'] ? getAttachemntFile($value['icon']) : $value['icon'];
-                $memberlevelList[$key]['mintime']   = $value['mintime'];
-                // $memberlevelList[$key]['cost'] = $costArr;
-                if($privilegeArr['quan']){
-                    foreach ($privilegeArr['quan'] as $a => &$b) {
-                        if(in_array('waimai', $installModuleArr)){
-                            $sql = $dsql->SetQuery("SELECT `money`,`name` FROM `#@__waimai_quan` WHERE `id` = ".$b['qid']);
-                            $ret = $dsql->dsqlOper($sql, "results");
-                            $b['money'] = $ret['0']['money'];
-                            $b['name'] = $ret['0']['name'];
-
-                            $quansql = $dsql->SetQuery("SELECT count(`id`) quannum FROM `#@__waimai_quanlist` WHERE `userid` = $uid AND `state` = 0 AND `deadline`> $dqtime AND `qid` =".$b['qid']." AND `formtype`=" .$value['id']);
-                            $userquannum = $dsql->getOne($quansql);
-                            $b['userquannum'] = $userquannum;
-                            $memberlevelList[$key]['userquannumall']  +=$qret[0]['quannum'];
-                        }
-                    }
-                }
-                $memberlevelList[$key]['privilege'] = $privilegeArr;
-                $memberlevelList[$key]['discount']  = $discountArr ? $discountArr : array(
-                    array('month' => 1, 'discount' => 0),
-                    array('month' => 3, 'discount' => 0),
-                    array('month' => 6, 'discount' => 0),
-                    array('month' => 12, 'discount' => 0),
-                    array('month' => 24, 'discount' => 0),
-                    array('month' => 36, 'discount' => 0)
-                ); //充值优惠
-            }
-        }
-
-        $huoniaoTag->assign('memberlevelList', $memberlevelList);
 
         //信息
         $memberLevelAuth    = getMemberLevelAuth($userinfo['level']);
@@ -7676,7 +7587,7 @@ eot;
 
             //房产经济人
             if (in_array("house", $installModuleArr)) {
-                $housesql  = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_company_user` WHERE `uid` = $id AND `status` = 1");
+                $housesql  = $dsql->SetQuery("SELECT `id` FROM `#@__house_zjuser` WHERE `userid` = $id AND `state` = 1");
                 $houseres  = $dsql->dsqlOper($housesql, "results");
                 if ($houseres) {
                     $param = array(
@@ -8273,7 +8184,7 @@ eot;
             }
         } elseif ($ser == "house") {
             $showMap = 0;
-            $sql = $dsql->SetQuery("SELECT `addr`, `cityid`, `address` FROM `#@__house_distributor_company` WHERE `uid` = $uid");
+            $sql = $dsql->SetQuery("SELECT `addr`, `cityid`, `address` FROM `#@__house_zjcom` WHERE `userid` = $uid");
             $ret = $dsql->dsqlOper($sql, "results");
             if ($ret) {
                 $addrid = $ret[0]['addr'];
@@ -8370,11 +8281,11 @@ eot;
         $huoniaoTag->assign('channelDomain', $channelDomain);
 
         // 验证入驻情况
-        $sql = $dsql->SetQuery("SELECT `id`, `status` FROM `#@__house_distributor_company_user` WHERE `uid` = $userid");
+        $sql = $dsql->SetQuery("SELECT `id`, `state` FROM `#@__house_zjuser` WHERE `userid` = $userid");
         $res = $dsql->dsqlOper($sql, "results");
         $huoniaoTag->assign('enter_zjuser', $res ? 1 : 0);
 
-        $sql = $dsql->SetQuery("SELECT `id`, `status` FROM `#@__house_distributor_company` WHERE `uid` = $userid");
+        $sql = $dsql->SetQuery("SELECT `id`, `state` FROM `#@__house_zjcom` WHERE `userid` = $userid");
         $res = $dsql->dsqlOper($sql, "results");
         $huoniaoTag->assign('enter_zjcom', $res ? 1 : 0);
 
@@ -8408,44 +8319,40 @@ eot;
 
         //打印带访确认单
         if ($template == 'house_loupan_printVisitConfirm') {
-            $drid = (int)$id;
-            
-            //楼盘报备采用新版
-            $sql = $dsql->SetQuery("SELECT * FROM `#@__house_distributor_report` WHERE `id` = " . $drid);
-            $ret = $dsql->dsqlOper($sql, "results", "ASSOC", "", 0);
+            $bdID = (int)$id;
+
+            //根据报备ID查询报备信息
+            $sql = $dsql->SetQuery("SELECT f.`jzrid` uid, f.`username` name,f.`usertel` tel,f.`note`,f.`pubdate`, p.`title` loupan, p.`visitConfirmPrintTemplate` FROM `#@__house_fenxiaobb` f LEFT JOIN `#@__house_zjuser` z ON f.`jzrid` = z.`id` LEFT JOIN `#@__member` m ON z.`userid` = m.`id` LEFT JOIN `#@__house_loupan` p ON p.`id` = f.`lid` WHERE f.`id` = " . $bdID);
+            $ret = $dsql->dsqlOper($sql, "results");
             if ($ret) {
 
                 $data = $ret[0];
-                $name = $data['cname'];  //客户姓名
-                $tel = $data['phone'];  //客户电话
-                $note = $data['mark'];  //备注
-                $time = date('Y-m-d H:i:s', $data['report_time']);  //报备时间
-                $buildingName = $data['build_name'];  //报备楼盘
-                $uid = $data['report_uid'];  //报备人id
-                $seller = $data['rname']; //报备人姓名
-                $config = $data['config'] ? json_decode($data['config'], true) : array();
-                if ($config['dcoid']) {
-                    $channel = $config['title'];
-                } else {
-                    $channel = '全民分销';
-                }
+                $name = $data['name'];  //客户姓名
+                $tel = $data['tel'];  //客户电话
+                $note = $data['note'];  //备注
+                $time = date('Y-m-d H:i:s', $data['pubdate']);  //报备时间
+                $loupan = $data['loupan'];  //报备楼盘
+                $uid = $data['uid'];  //报备人
+                $visitConfirmPrintTemplate = $data['visitConfirmPrintTemplate'];  //打印模板
 
-                $sql = $dsql->SetQuery("SELECT `id`, `visitConfirmPrintTemplate` FROM `#@__house_loupan` WHERE `id` = " . $data['lpid']);
-                $loupan = $dsql->getArr($sql);
-                if ($loupan) {
-                    $visitConfirmPrintTemplate = $loupan['visitConfirmPrintTemplate'];  //打印模板
-                    $receiptArr = $visitConfirmPrintTemplate ? unserialize($visitConfirmPrintTemplate) : array();  //打印模板
-                    if (!$receiptArr) {
-                        echo '<script>alert("该楼盘未配置带访确认单打印模板，请联系客服处理！");"</script>';
-                        die;
-                    }
+                global $cfg_shortname;
+                $channel = $cfg_shortname;  //报备渠道
+
+                $uinfo = $userLogin->getMemberInfo($v['uid']);
+                $seller = $uinfo['nickname'];  //渠道销售
+
+                $receiptArr = $visitConfirmPrintTemplate ? unserialize($visitConfirmPrintTemplate) : array();  //打印模板
+
+                if (!$receiptArr) {
+                    echo '<script>alert("该楼盘未配置带访确认单打印模板，请联系客服处理！");location.href="house_baobei.html"</script>';
+                    die;
                 }
 
                 $huoniaoTag->assign('name', $name);
                 $huoniaoTag->assign('tel', $tel);
                 $huoniaoTag->assign('note', $note);
                 $huoniaoTag->assign('time', $time);
-                $huoniaoTag->assign('loupan', $buildingName);
+                $huoniaoTag->assign('loupan', $loupan);
                 $huoniaoTag->assign('channel', $channel);
                 $huoniaoTag->assign('seller', $seller);
                 $huoniaoTag->assign('receipt', $receiptArr);
@@ -8456,7 +8363,7 @@ eot;
                     $RenrenCrypt = new RenrenCrypt();
                     $imgid = $RenrenCrypt->php_decrypt(base64_decode($bgimg));
 
-                    if (is_numeric($imgid)) {
+                    if (is_numeric($id)) {
                         $attachment = $dsql->SetQuery("SELECT `width`, `height` FROM `#@__attachment` WHERE `id` = " . $imgid);
                         $results = $dsql->dsqlOper($attachment, "results");
                         if ($results) {
@@ -8467,9 +8374,8 @@ eot;
                 }
                 $huoniaoTag->assign('width', $width);
                 $huoniaoTag->assign('height', $height);
-
             } else {
-                echo '<script>alert("信息获取失败！");"</script>';
+                echo '<script>alert("信息获取失败！");location.href="house_baobei.html"</script>';
                 die;
             }
         }
@@ -9452,7 +9358,7 @@ eot;
         }
         /*身份验证*/
         if ($actionarr[1] == 'house') {
-            $sql = $dsql->SetQuery("SELECT `id`, `meal` FROM `#@__house_distributor_company_user` WHERE `uid` = $userid");
+            $sql = $dsql->SetQuery("SELECT `id`, `meal` FROM `#@__house_zjuser` WHERE `userid` = $userid");
             $ret = $dsql->dsqlOper($sql, "results");
             /*$zjusercom 0-经纪人身份，1-企业身份不是经纪人，2-自由人 3-中介经纪人*/
             $zjusercom = 0;
@@ -10255,7 +10161,7 @@ eot;
             if(!$cid && $template!="company_info" && $template!="index" && $template!="job"){
                 global $cfg_secureAccess;
                 global $cfg_basehost;
-                header("location: {$cfg_secureAccess}{$cfg_basehost}/supplier/job/company_info.html?appFullScreen=1");die;
+                header("location: {$cfg_secureAccess}{$cfg_basehost}/supplier/job/company_info.html");die;
             }
             //如果存在cid，尝试获取所有的信息
             $job_company_state = 0;
@@ -10447,34 +10353,9 @@ eot;
             $huoniaoTag->assign('fenxiaotime', $loupandetail['fenxiaotime'] ? date('Y-m-d H:i:s', $loupandetail['fenxiaotime']) : '');
             $huoniaoTag->assign('loupanid', $loupanid);
 
-            global $userLogin;
-            $userinfo = $userLogin->getMemberInfo($userid);
-            $ulogintime = strtotime($userinfo['lastlogintime']);
-
-            //记录授权标识参数
-            if ($grant) { //第一授权跳转过来带参数
-                global $cfg_cookiePath;
-                //记录用户登陆时间
-                PutCookie("house_grant", $grant, 86400, $cfg_cookiePath); //授权标识1天有效期
-                $huoniaoTag->assign('grant', $grant);
-            } else {
-                $grant = GetCookie("house_grant");
-                if (!empty($grant)) {
-                    list($mid, $uid, $cloginTime) = explode('_', $grant);
-                    if ($uid == $userid) {
-                        if ($cloginTime == $ulogintime) {
-                            $huoniaoTag->assign('grant', $grant);
-                        } else {
-                            DropCookie("house_grant");  //移除本机该用户通过用户名登陆账号后不该存在的权标识
-                        }
-                    } else {
-                        DropCookie("house_grant"); //非同一用户清理授权标识
-                    }
-                }
-            }
-
             $detailHandels = new handlers("house", "loupanDetail");
             $detailConfig = $detailHandels->getHandle($loupanid);
+
 
             $litpic = getFilePath($loupanres[0]['litpic']);
 
@@ -10546,7 +10427,7 @@ eot;
 
                         /*分销报备*/
 
-                        $fenxiaosql = $dsql->SetQuery("SELECT `id` FROM `#@__house_distributor_report` WHERE `lpid`= '$loupanid'");
+                        $fenxiaosql = $dsql->SetQuery("SELECT `id` FROM `#@__house_fenxiaobb` WHERE `lid`= '$loupanid'");
 
                         //总条数
                         $fenxiaocount = $dsql->dsqlOper($fenxiaosql, "totalCount");
@@ -10560,18 +10441,18 @@ eot;
                             $huoniaoTag->assign('detail_' . $key, $value);
                         }
 
-                        if ($template == 'base_info' || $template == 'ba<x>se_info' || $template == 'detail_info') {
+                        if ($template == 'base_info' || $template == 'ba<x>se_info') {
 
-                           //房屋类型
                             $archives = $dsql->SetQuery("SELECT `typename`,`id` FROM `#@__houseitem` WHERE `parentid` = 1 ORDER BY `weight` ASC");
                             $results = $dsql->dsqlOper($archives, "results");
                             $protypeval = array();
+
                             if ($results) {
                                 $protypeval = $results;
                             }
+
                             $huoniaoTag->assign('protypelist', json_encode($protypeval, true));
-         
-                            //建筑类型
+                        } elseif ($template == 'detail_info') {
                             $archives = $dsql->SetQuery("SELECT * FROM `#@__houseitem` WHERE `parentid` = 3 ORDER BY `weight` ASC");
                             $results = $dsql->dsqlOper($archives, "results");
                             $list = array();
@@ -10580,7 +10461,6 @@ eot;
                             }
                             $huoniaoTag->assign('buildlist', $list);
 
-                            //装修情况
                             $archives = $dsql->SetQuery("SELECT * FROM `#@__houseitem` WHERE `parentid` = 2 ORDER BY `weight` ASC");
                             $results = $dsql->dsqlOper($archives, "results");
                             $list = array(0 => '请选择');
@@ -10588,18 +10468,15 @@ eot;
                                 $list[$value['id']] = $value['typename'];
                             }
                             $huoniaoTag->assign('zhuangxiuList', $list);
-
-                            //楼盘特色
-                            $archives = $dsql->SetQuery("SELECT * FROM `#@__houseitem` WHERE `parentid` = 666 ORDER BY `weight` ASC");
-                            $results = $dsql->dsqlOper($archives, "results");
-                            $list = array(0 => '请选择');
-                            foreach ($results as $value) {
-                                $list[$value['id']] = $value['typename'];
-                            }
-                            $huoniaoTag->assign('featureList', $list);
                         }
 
                         if ($subordinate == 'albums-detail') {
+
+                            //                        if(!$id){
+                            //                            header("location:" . $cfg_secureAccess . $cfg_basehost . "/404.html");
+                            //                        }
+
+
                             if ($id) {
                                 $huoniaoTag->assign('albumid', (int)$id);
                                 $archives = $dsql->SetQuery("SELECT * FROM `#@__house_album` WHERE `id` = " . $id);
@@ -10628,6 +10505,11 @@ eot;
                                 $huoniaoTag->assign('imglist', $imglist ? json_encode($imglist, true) : '');
                             }
                         } elseif ($subordinate == 'add_huxing') {
+                            //                        if(!$id){
+                            //                            header("location:" . $cfg_secureAccess . $cfg_basehost . "/404.html");
+                            //                        }
+
+                            //                        if($id){
 
                             $huoniaoTag->assign('id', $id);
                             $detailHandels = new handlers('house', "apartmentDetail");
@@ -10641,19 +10523,16 @@ eot;
                                     }
                                 }
                             }
+                            //                        }
                         } elseif ($subordinate == 'add_article') {
+
+                            //                        if($id){
 
                             $huoniaoTag->assign('id', $id);
                             $detailHandels = new handlers('house', "loupanNewsDetail");
                             $detailConfig = $detailHandels->getHandle($id);
                             if (is_array($detailConfig) && $detailConfig['state'] == 100) {
                                 $detailConfig = $detailConfig['info'][0];
-                                //文件地址处理
-                                $imagesArr =  $detailConfig['images'] ? explode(',', $detailConfig['images']):array();
-                                $videosArr =  $detailConfig['videos'] ? explode(',', $detailConfig['videos']):array();
-                                $detailConfig['images_url'] = $imagesArr ? array_map('getFilePath', $imagesArr) : array();
-                                $detailConfig['videos_url'] = $videosArr ? array_map('getFilePath', $videosArr) : array();
-
                                 if (is_array($detailConfig)) {
                                     //输出详细信息
                                     foreach ($detailConfig as $key => $value) {
@@ -10661,6 +10540,7 @@ eot;
                                     }
                                 }
                             }
+                            //                        }
                         } elseif ($subordinate == 'shapan') {
 
                             $loupanSql = $dsql->SetQuery("SELECT `id`, `title` FROM `#@__house_loupan` WHERE `id` = " . $loupanid);
@@ -10670,7 +10550,7 @@ eot;
 
                             //获取该楼盘的户型数据
                             $apartment = array();
-                            $sql = $dsql->SetQuery("SELECT `id`, `title`, `room`, `hall`, `guard`, `area` FROM `#@__house_apartment` WHERE `action` = 'loupan' AND `loupan` = $loupanid");
+                            $sql = $dsql->SetQuery("SELECT `id`, `title` FROM `#@__house_apartment` WHERE `action` = 'loupan' AND `loupan` = $loupanid");
                             $ret = $dsql->dsqlOper($sql, "results");
                             if($ret){
                                 $apartment = $ret;
@@ -10694,6 +10574,7 @@ eot;
 
                             $gwlist = array();
                             if ($id) {
+                                //                            header("location:" . $cfg_secureAccess . $cfg_basehost . "/404.html");
                                 $huoniaoTag->assign('aid', (int)$id);
 
                                 $archives = $dsql->SetQuery("SELECT g.* FROM `#@__house_gw` g LEFT JOIN  `#@__member` m ON  g.`userid` = m.`id` WHERE g.`id` = " . $id);
@@ -10711,6 +10592,10 @@ eot;
                             }
                             $huoniaoTag->assign('gwlist', $gwlist ? json_encode($gwlist, true) : '');
                         } elseif ($subordinate == 'add_huodong') {
+
+                            //                        if(!$id){
+                            //                            header("location:" . $cfg_secureAccess . $cfg_basehost . "/404.html");
+                            //                        }
                             $loupansql = $dsql->SetQuery("SELECT * FROM `#@__house_huodong` WHERE 1=1 AND `id`  = '$id'");
 
                             $results = $dsql->dsqlOper($loupansql, "results");
@@ -10721,22 +10606,6 @@ eot;
                             }
                             $huoniaoTag->assign('huodonglist', $huodonglist);
                         }
-                        elseif ($subordinate == 'addHouse' || $subordinate == 'addMoment') { //一房一价 //楼盘时刻  所需内容一样
-                            //获取该楼盘的户型数据
-                            $apartment = array();
-                            $sql = $dsql->SetQuery("SELECT `id`, `title` FROM `#@__house_apartment` WHERE `action` = 'loupan' AND `loupan` = $loupanid");
-                            $ret = $dsql->dsqlOper($sql, "results");
-                            if($ret){
-                                $apartment = $ret;
-                            }
-                            $huoniaoTag->assign('apartment', $apartment);
-                            
-                            $sql = $dsql->SetQuery("SELECT `data` FROM `#@__house_shapan` WHERE `loupan` = $loupanid");
-                            $ret = $dsql->getOne($sql);
-                            $dataArr = $ret ? unserialize($ret) : array();
-                            $huoniaoTag->assign('shapan', $dataArr);
-                        }
-
                     }
                 }
             }

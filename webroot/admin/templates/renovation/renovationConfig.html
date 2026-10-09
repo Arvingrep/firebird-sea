@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset={#$cfg_soft_lang#}" />
+<title>{#$channelname#}设置</title>
+{#$cssFile#}
+<style media="screen">
+  .editform dt {width: 180px;}
+  .domain-rules {margin: 0 50px;}
+  .domain-rules th {font-size: 14px; line-height: 3em; border-bottom: 1px solid #ededed; padding: 0 5px; text-align: left;}
+  .domain-rules td {font-size: 14px; line-height: 3.5em; border-bottom: 1px solid #ededed; padding: 0 5px;}
+  .domain-rules .input-append, .domain-rules .input-prepend {margin: 15px 0 0;}
+  .domain-rules input {font-size: 16px;}
+  .editform dt label.sl {margin-top: -10px;}
+  .editform dt small {display: block; margin: -8px 12px 0 0;}
+  .editform dt small i {font-style: normal;}
+</style>
+<script>
+var thumbSize = {#$thumbSize#}, thumbType = "{#$thumbType#}", action = "{#$action#}", adminPath = "{#$adminPath#}";
+</script>
+<style>body {height: auto;}</style>
+</head>
+
+<body>
+<div class="btn-group config-nav" data-toggle="buttons-radio">
+  <button type="button" class="btn active" data-type="site">基本设置</button>
+  <button type="button" class="btn" data-type="temp">风格管理</button>
+  <button type="button" class="btn" data-type="upload">上传设置</button>
+  <button type="button" class="btn" data-type="ftp">远程附件</button>
+  <button type="button" class="btn" data-type="mark">水印设置</button>
+</div>
+
+<div class="info-tips hide" id="infoTip"></div>
+
+<form action="renovationConfig.php" method="post" name="editform" id="editform" class="editform">
+  <input type="hidden" name="configType" value="site" />
+  <input type="hidden" id="basehost" value="{#$cfg_basehost_#}" />
+  <input type="hidden" name="token" id="token" value="{#$token#}" />
+  <div class="item">
+    <dl class="clearfix">
+      <dt><label for="channelname">名称：</label></dt>
+      <dd>
+        <input class="input-large" type="text" name="channelname" id="channelname" data-regex=".{2,20}" maxlength="20" value="{#$channelname#}" />
+        <span class="input-tips"><s></s>请输入名称，2-20个汉字</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>LOGO：</dt>
+      <dd class="radio">
+        {#html_radios name="articleLogo" values=$articleLogo checked=$articleLogoChecked output=$articleLogoNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    {#if $articleLogoChecked == 1#}
+    <dl class="clearfix">
+    {#else#}
+    <dl class="clearfix hide">
+    {#/if#}
+      <dt>&nbsp;</dt>
+      <dd class="thumb fn-clear listImgBox">
+		<div class="uploadinp filePicker thumbtn{#if $articleLogoUrl != ""#} hide{#/if#}" id="filePicker1" data-type="logo"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+		{#if $articleLogoUrl != ""#}
+		<ul id="listSection1" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_1"><a href='{#$cfg_attachment#}{#$articleLogoUrl#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$articleLogoUrl#}" data-val="{#$articleLogoUrl#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+		{#else#}
+		<ul id="listSection1" class="listSection thumblist fn-clear"></ul>
+		{#/if#}
+		<input type="hidden" name="litpic" value="{#$articleLogoUrl#}" class="imglist-hidden" id="litpic">
+	  </dd>
+
+
+    </dl>
+    <dl class="clearfix">
+        <dt><label class="sl">分享默认图片：</label><small>尺寸：200*200</small></dt>
+        <dd class="thumb fn-clear listImgBox fn-hide">
+            <div class="uploadinp filePicker thumbtn{#if $sharePic != ""#} hide{#/if#}" id="filePicker2" data-type="logo"  data-count="1" data-size="{#$thumbSize#}" data-imglist=""><div></div><span></span></div>
+            {#if $sharePic != ""#}
+            <ul id="listSection2" class="listSection thumblist fn-clear" style="display:inline-block;"><li id="WU_FILE_0_2"><a href='{#$cfg_attachment#}{#$sharePic#}' target="_blank" title=""><img alt="" src="{#$cfg_attachment#}{#$sharePic#}" data-val="{#$sharePic#}"/></a><a class="reupload li-rm" href="javascript:;">删除图片</a></li></ul>
+            {#else#}
+            <ul id="listSection2" class="listSection thumblist fn-clear"></ul>
+            {#/if#}
+            <input type="hidden" name="sharePic" value="{#$sharePic#}" class="imglist-hidden" id="sharePic">
+        </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>访问方式：</label></dt>
+      <dd class="radio">
+        {#html_radios name="subdomain" values=$subdomain checked=$subdomainChecked output=$subdomainNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt>&nbsp;</dt>
+      <dd>
+        <div class="input-prepend input-append">
+          <span class="add-on"></span>
+          <input class="input-large" type="text" name="channeldomain" id="channeldomain" value="{#$channeldomain#}" />
+          <span class="add-on"></span>
+        </div>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>模块开关：</label></dt>
+      <dd class="radio">
+        {#html_radios name="channelswitch" values=$channelswitch checked=$channelswitchChecked output=$channelswitchNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    {#if $channelswitchChecked == 0#}
+    <dl class="clearfix hide">
+    {#else#}
+    <dl class="clearfix">
+    {#/if#}
+      <dt><label for="closecause">关闭原因：</label></dt>
+      <dd>
+        <textarea name="closecause" id="closecause" class="input-xxlarge" rows="5" placeholder="站点关闭时出现的提示信息">{#$closecause#}</textarea>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="title">seo标题：</label></dt>
+      <dd>
+        <input class="input-xxlarge" type="text" name="title" id="title" data-regex=".{0,80}" maxlength="80" placeholder="一般不超过80个字符" value="{#$title#}" />
+        <span class="input-tips"><s></s>一般不超过80个字符</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="keywords">关键字：</label></dt>
+      <dd>
+        <input class="input-xxlarge" type="text" name="keywords" id="keywords" data-regex=".{0,100}" maxlength="100" placeholder="一般不超过100个字符" value="{#$keywords#}" />
+        <span class="input-tips"><s></s>一般不超过100个字符</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="description">描述：</label></dt>
+      <dd>
+        <textarea name="description" id="description" placeholder="一般不超过200个字符" data-regex=".{0,200}">{#$description#}</textarea>
+        <span class="input-tips"><s></s>一般不超过200个字符</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>咨询热线：</label></dt>
+      <dd class="radio">
+        {#html_radios name="hotline_rad" values=$hotlineVal checked=$hotlineChecked output=$hotlineNames separator="&nbsp;&nbsp;"#}
+        <input class="input-large"{#if $hotlineChecked == 0#} style="display:none;"{#/if#} type="text" name="hotline" id="hotline" value="{#$hotline#}" placeholder="请输入频道咨询热线" />
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="map">地图配置：</label></dt>
+      <dd>
+        <select name="map" id="map">
+          {#html_options options=$mapList selected=$mapSelected#}
+        </select>
+        <span class="input-tips" style="display:inline-block;"><s></s>系统默认为：{#$defaultMap#}</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label for="atlasMax">图集数量限制：</label></dt>
+      <dd class="radio">
+        <div class="input-prepend input-append" style="margin: 0 10px 10px 0;">
+          <span class="add-on">小区相册</span>
+          <input class="span1" id="xq_atlasMax" name="xq_atlasMax" type="text" value="{#$xq_atlasMax#}">
+          <span class="add-on">张</span>
+        </div>
+        <div class="input-prepend input-append" style="margin: 0 10px 10px 0;">
+          <span class="add-on">公司资质</span>
+          <input class="span1" id="gs_atlasMax" name="gs_atlasMax" type="text" value="{#$gs_atlasMax#}">
+          <span class="add-on">张</span>
+        </div><br />
+        <div class="input-prepend input-append" style="margin: 0 10px 0 0;">
+          <span class="add-on">效&nbsp;&nbsp;果&nbsp;图</span>
+          <input class="span1" id="case_atlasMax" name="case_atlasMax" type="text" value="{#$case_atlasMax#}">
+          <span class="add-on">张</span>
+        </div>
+        <div class="input-prepend input-append" style="margin: 0 10px 0 0;">
+          <span class="add-on">施工现场</span>
+          <input class="span1" id="diary_atlasMax" name="diary_atlasMax" type="text" value="{#$diary_atlasMax#}">
+          <span class="add-on">张</span>
+        </div>
+        <span class="input-tips" style="display:inline-block; margin-top: -43px;"><s></s>0表示不限制</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>分站数据共享：</label></dt>
+      <dd class="radio">
+        {#html_radios name="dataShareSwtich" values=$dataShareSwitch checked=$dataShareSwitchChecked output=$dataShareSwitchNames separator="&nbsp;&nbsp;"#}
+        <span class="input-tips" style="display:inline-block;"><s></s>启用后，分站数据将会打通共享，每个分站下的模块数据将会统一。</span>
+      </dd>
+    </dl>
+    <dl class="clearfix">
+      <dt><label>发布审核：</label></dt>
+      <dd class="radio">
+        {#html_radios name="fabuCheck" values=$fabuCheck checked=$fabuCheckChecked output=$fabuCheckNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+  </div>
+  <div class="item hide" id="tplList">
+    <div class="tpl-list">
+      <h5 class="stit"><span class="label label-info">电脑端：</span><label class="routerTips" data-toggle="tooltip" data-placement="bottom" data-original-title="如果模板使用了自定义路由，请勾选此项，程序将不再对url地址做任何拦截处理，选择使用的模板名称前如果有vue标识，表示需要开启此项！"><input type="checkbox" id="router" name="router" value="1"{#if $router == 1#} checked{#/if#} />开启自定义路由 <i class="icon-question-sign"></i></label></h5>
+      <ul class="clearfix">
+        {#foreach from=$tplList item=tplItem#}
+        <li{#if $articleTemplate == $tplItem.directory#} class="current"{#/if#}>
+          <a href="javascript:;" data-id="{#$tplItem.directory#}" data-title="{#$tplItem.tplname#}" class="img" title="模板名称：{#$tplItem.tplname#}&#10;版权所有：{#$tplItem.copyright#}"><img src="{#$adminPath#}../templates/{#$action#}/{#$tplItem.directory#}/preview.jpg?v={#$cfg_staticVersion#}" /></a>
+          <p>
+            <span title="{#$tplItem.tplname#}">{#$tplItem.tplname#}({#$tplItem.directory#})</span><br />
+            <a href="javascript:;" class="choose">选择</a><br />
+            <a href="javascript:;" class="edit">编辑模板</a><br />
+            <a href="javascript:;" class="del">卸载</a>
+          </p>
+        </li>
+      	{#/foreach#}
+      </ul>
+      <input type="hidden" name="articleTemplate" id="articleTemplate" value="{#$articleTemplate#}" />
+    </div>
+    <div class="tpl-list touch">
+      <h5 class="stit"><span class="label label-warning">移动端：</span><label class="routerTips" data-toggle="tooltip" data-placement="bottom" data-original-title="如果模板使用了自定义路由，请勾选此项，程序将不再对url地址做任何拦截处理，选择使用的模板名称前如果有vue标识，表示需要开启此项！"><input type="checkbox" id="touchRouter" name="touchRouter" value="1"{#if $touchRouter == 1#} checked{#/if#} />开启自定义路由 <i class="icon-question-sign"></i></label></h5>
+      <ul class="clearfix">
+        {#foreach from=$touchTplList item=tplItem#}
+        <li{#if $touchTemplate == $tplItem.directory#} class="current"{#/if#}>
+          <a href="javascript:;" data-id="{#$tplItem.directory#}" data-title="{#$tplItem.tplname#}" class="img" title="模板名称：{#$tplItem.tplname#}&#10;版权所有：{#$tplItem.copyright#}"><img src="{#$adminPath#}../templates/{#$action#}/touch/{#$tplItem.directory#}/preview.jpg" /></a>
+          <p>
+            <span title="{#$tplItem.tplname#}">{#$tplItem.tplname#}({#$tplItem.directory#})</span><br />
+            <a href="javascript:;" class="choose">选择</a><br />
+            <a href="javascript:;" class="edit">编辑模板</a><br />
+            <a href="javascript:;" class="del">卸载</a>
+          </p>
+        </li>
+      	{#/foreach#}
+      </ul>
+      <input type="hidden" name="touchTemplate" id="touchTemplate" value="{#$touchTemplate#}" />
+    </div>
+  </div>
+  <div class="item hide">
+    <dl class="clearfix">
+      <dt>上传设置：</dt>
+      <dd class="radio">
+        {#html_radios name="articleUpload" values=$articleUpload checked=$articleUploadChecked output=$articleUploadNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    {#if $articleUploadChecked == 1#}
+    <div>
+    {#else#}
+    <div class="hide">
+    {#/if#}
+      <dl class="clearfix">
+        <dt><label for="uploadDir">上传目录：</label></dt>
+        <dd>
+          <input class="input-large" type="text" name="uploadDir" id="uploadDir" value="{#$uploadDir#}" data-regex=".*" />
+          <span class="input-tips"><s></s>&nbsp;</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="softSize">附件上传限制：</label></dt>
+        <dd>
+          <input class="input-small" type="number" name="softSize" id="softSize" data-regex="[0-9]\d*" min="0" value="{#$softSize#}" />kb
+          <span class="input-tips"><s></s>上传附件限制大小，如果超过这个大小将不能上传，只能填写数字</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="softType">附件类型限制：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="softType" id="softType" placeholder="多个用“|”分开" value="{#$softType#}" data-regex=".*" />
+          <span class="input-tips"><s></s>&nbsp;</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="thumbSize">缩略图上传限制：</label></dt>
+        <dd>
+          <input class="input-small" type="number" name="thumbSize" id="thumbSize" data-regex="[0-9]\d*" min="0" value="{#$thumbSize#}" />kb
+          <span class="input-tips"><s></s>上传图片限制大小，如果超过这个大小将不能上传，只能填写数字</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="thumbType">缩略图类型限制：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="thumbType" id="thumbType" placeholder="多个用“|”分开" value="{#$thumbType_#}" data-regex=".*" />
+          <span class="input-tips"><s></s>&nbsp;</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="atlasSize">图集上传限制：</label></dt>
+        <dd>
+          <input class="input-small" type="number" name="atlasSize" id="atlasSize" data-regex="[0-9]\d*" min="0" value="{#$atlasSize#}" />kb
+          <span class="input-tips"><s></s>上传图片限制大小，如果超过这个大小将不能上传，只能填写数字</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="atlasType">图集类型限制：</label></dt>
+        <dd>
+          <input class="input-xxlarge" type="text" name="atlasType" id="atlasType" placeholder="多个用“|”分开" value="{#$atlasType#}" data-regex=".*" />
+          <span class="input-tips"><s></s>&nbsp;</span>
+        </dd>
+      </dl>
+      <dl class="clearfix hide">
+        <dt><label>缩略图缩图：</label></dt>
+        <dd>
+          小图：
+          <div class="input-prepend input-append">
+            <span class="add-on">宽</span>
+            <input class="span1" id="thumbSmallWidth" name="thumbSmallWidth" type="text" value="{#$thumbSmallWidth#}" />
+            <span class="add-on">px</span>
+          </div>
+          &times;
+          <div class="input-prepend input-append">
+            <span class="add-on">高</span>
+            <input class="span1" id="thumbSmallHeight" name="thumbSmallHeight" type="text" value="{#$thumbSmallHeight#}" />
+            <span class="add-on">px</span>
+          </div><br />
+          中图：
+          <div class="input-prepend input-append">
+            <span class="add-on">宽</span>
+            <input class="span1" id="thumbMiddleWidth" name="thumbMiddleWidth" type="text" value="{#$thumbMiddleWidth#}" />
+            <span class="add-on">px</span>
+          </div>
+          &times;
+          <div class="input-prepend input-append">
+            <span class="add-on">高</span>
+            <input class="span1" id="thumbMiddleHeight" name="thumbMiddleHeight" type="text" value="{#$thumbMiddleHeight#}" />
+            <span class="add-on">px</span>
+          </div><br >
+          大图：
+          <div class="input-prepend input-append">
+            <span class="add-on">宽</span>
+            <input class="span1" id="thumbLargeWidth" name="thumbLargeWidth" type="text" value="{#$thumbLargeWidth#}" />
+            <span class="add-on">px</span>
+          </div>
+          &times;
+          <div class="input-prepend input-append">
+            <span class="add-on">高</span>
+            <input class="span1" id="thumbLargeHeight" name="thumbLargeHeight" type="text" value="{#$thumbLargeHeight#}" />
+            <span class="add-on">px</span>
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix hide">
+        <dt><label>图集缩图：</label></dt>
+        <dd>
+          小图：
+          <div class="input-prepend input-append">
+            <span class="add-on">宽</span>
+            <input class="span1" id="atlasSmallWidth" name="atlasSmallWidth" type="text" value="{#$atlasSmallWidth#}" />
+            <span class="add-on">px</span>
+          </div>
+          &times;
+          <div class="input-prepend input-append">
+            <span class="add-on">高</span>
+            <input class="span1" id="atlasSmallHeight" name="atlasSmallHeight" type="text" value="{#$atlasSmallHeight#}" />
+            <span class="add-on">px</span>
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix hide">
+        <dt><label>图片裁剪方法：</label></dt>
+        <dd>
+          <label style="display:block;"><input type="radio" name="photoCutType" value="force"{#if $photoCutType == "force"#} checked{#/if#} />按规定尺寸强制变形</label>
+          <label style="display:block;"><input type="radio" name="photoCutType" value="scale"{#if $photoCutType == "scale"#} checked{#/if#} />等比例裁剪（此方法不会导致图片变形，但是输出的图像大小不完全等于设置的尺寸）</label>
+          <label style="display:block;"><input type="radio" name="photoCutType" value="scale_fill"{#if $photoCutType == "scale_fill"#} checked{#/if#} />按比例在规定尺寸内缩放，空白处将以白色填充</label>
+          <label style="display:block;"><input type="radio" name="photoCutType" value="position"{#if $photoCutType == "position"#} checked{#/if#} />从指定位置截取</label>
+          {#if $photoCutType == "position"#}
+          <div id="photoCutPosition">
+          {#else#}
+          <div id="photoCutPosition" class="hide">
+          {#/if#}
+            <ul class="clearfix watermarkpostion">
+              <li{#if $photoCutPostion == "north_west"#} class="current"{#/if#} data-id="north_west"><a href="javascript:;">左上</a></li>
+              <li{#if $photoCutPostion == "north"#} class="current"{#/if#} data-id="north"><a href="javascript:;">中上</a></li>
+              <li{#if $photoCutPostion == "north_east"#} class="current"{#/if#} data-id="north_east"><a href="javascript:;">右上</a></li>
+              <li{#if $photoCutPostion == "west"#} class="current"{#/if#} data-id="west"><a href="javascript:;">左中</a></li>
+              <li{#if $photoCutPostion == "center"#} class="current"{#/if#} data-id="center"><a href="javascript:;">中心</a></li>
+              <li{#if $photoCutPostion == "east"#} class="current"{#/if#} data-id="east"><a href="javascript:;">右中</a></li>
+              <li{#if $photoCutPostion == "south_west"#} class="current"{#/if#} data-id="south_west"><a href="javascript:;">左下</a></li>
+              <li{#if $photoCutPostion == "south"#} class="current"{#/if#} data-id="south"><a href="javascript:;">中下</a></li>
+              <li{#if $photoCutPostion == "south_east"#} class="current"{#/if#} data-id="south_east"><a href="javascript:;">右下</a></li>
+            </ul>
+            <input type="hidden" name="photoCutPostion" value="{#$photoCutPostion#}" />
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix hide">
+        <dt><label for="quality">图片质量：</label></dt>
+        <dd>
+          <input class="input-small" type="number" name="quality" id="quality" data-regex="(([0-9]\d?)|(100)|(0))" min="0" max="100" value="{#$quality#}" />
+          <span class="input-tips"><s></s>数字越大越清晰，最高100，建议设置85</span>
+        </dd>
+      </dl>
+    </div>
+  </div>
+  <div class="item hide">
+      <div class="alert alert-success" style="margin:10px 10px 15px 50px;"><button type="button" class="close" data-dismiss="alert">×</button>阿里云OSS配置教程：<a href="https://help.kumanyun.com/help-225-653.html" target="_blank">https://help.kumanyun.com/help-225-653.html</a><br />华为云OBS配置教程：<a href="https://help.kumanyun.com/help-68-703.html" target="_blank">https://help.kumanyun.com/help-68-703.html</a><br />腾讯云COS配置教程：<a href="https://help.kumanyun.com/help-226-716.html" target="_blank">https://help.kumanyun.com/help-226-716.html</a><br /><span class="text-error">注意：远程附件最好选择和服务器同一个厂商的同一区域，如：用了阿里云上海一区域的服务器，也用阿里云上海一区域的OSS。<br />尽可能避免这类情况：使用华为云的服务器，远程附件用阿里云的OSS，这将可能出现大文件上传超时的情况。</span></div>
+    <dl class="clearfix">
+      <dt>FTP设置：</dt>
+      <dd class="radio">
+        {#html_radios name="articleFtp" values=$articleFtp checked=$articleFtpChecked output=$articleFtpNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    {#if $articleFtpChecked == 1#}
+    <div>
+    {#else#}
+    <div class="hide">
+    {#/if#}
+      <dl class="clearfix">
+        <dt><label for="ftpType">远程服务器类型：</label></dt>
+        <dd>
+          {#html_radios name="ftpType" values=$ftpType checked=$ftpTypeChecked output=$ftpTypeNames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <div id="ftpType0" class="hide ftpType">
+        <dl class="clearfix">
+          <dt><label for="ftpStateType">启用远程附件：</label></dt>
+          <dd>
+            {#html_radios name="ftpStateType" values=$ftpStateType checked=$ftpStateChecked output=$ftpStateNames separator="&nbsp;&nbsp;"#}
+          </dd>
+        </dl>
+        <div id="ftpConfig">
+          <dl class="clearfix">
+            <dt><label for="ftpSSL">启用SSL连接：</label></dt>
+            <dd>
+              {#html_radios name="ftpSSL" values=$ftpSSL checked=$ftpSSLChecked output=$ftpSSLNames separator="&nbsp;&nbsp;"#}
+            </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="ftpPasv">被动模式连接：</label></dt>
+            <dd>
+              {#html_radios name="ftpPasv" values=$ftpPasv checked=$ftpPasvChecked output=$ftpPasvNames separator="&nbsp;&nbsp;"#}
+            </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="ftpUrl">远程附件地址：</label></dt>
+            <dd>
+              <input class="input-large" type="text" name="ftpUrl" id="ftpUrl" value="{#$ftpUrl#}" data-regex=".*" />
+              <span class="input-tips"><s></s>&nbsp;</span>
+            </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="ftpServer">FTP服务器地址：</label></dt>
+            <dd>
+              <input class="input-large" type="text" name="ftpServer" id="ftpServer" value="{#$ftpServer#}" data-regex=".*" />
+              <span class="input-tips"><s></s>&nbsp;</span>
+            </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="ftpPort">FTP服务器端口：</label></dt>
+            <dd>
+              <input class="input-large" type="text" name="ftpPort" id="ftpPort" value="{#$ftpPort#}" data-regex="[0-9]\d*" />
+              <span class="input-tips"><s></s>请正确输入，类型为数字</span>
+            </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="ftpDir">FTP上传目录：</label></dt>
+            <dd>
+              <input class="input-large" type="text" name="ftpDir" id="ftpDir" value="{#$ftpDir#}" data-regex=".*" />
+              <span class="input-tips"><s></s>&nbsp;</span>
+            </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="ftpUser">FTP帐号：</label></dt>
+            <dd>
+              <input class="input-large" type="text" name="ftpUser" id="ftpUser" value="{#$ftpUser#}" data-regex=".*" />
+              <span class="input-tips"><s></s>&nbsp;</span>
+            </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="ftpPwd">FTP密码：</label></dt>
+            <dd>
+              <input class="input-large" type="text" name="ftpPwd" id="ftpPwd" value="{#$ftpPwd#}" data-regex=".*" />
+              <span class="input-tips"><s></s>&nbsp;</span>
+            </dd>
+          </dl>
+          <dl class="clearfix">
+            <dt><label for="ftpTimeout">FTP超时：</label></dt>
+            <dd>
+              <input class="input-large" type="text" name="ftpTimeout" id="ftpTimeout" value="{#$ftpTimeout#}" data-regex="[0-9]\d*" />秒
+              <span class="input-tips"><s></s>请正确输入，类型为数字</span>
+            </dd>
+          </dl>
+        </div>
+      </div>
+      <div id="ftpType1" class="hide ftpType">
+        <dl class="clearfix">
+          <dt><label for="OSSUrl">Bucket 域名：</label></dt>
+          <dd>
+            <input class="input-large" type="text" name="OSSUrl" id="OSSUrl" value="{#$OSSUrl#}" data-regex=".*" />
+            <span class="input-tips" style="display:inline-block;"><s></s>&nbsp;完整的Http地址。如果没有绑定域名地址为：（Bucket name）.oss.aliyuncs.com</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="OSSBucket">Bucket名称：</label></dt>
+          <dd>
+            <input class="input-large" type="text" name="OSSBucket" id="OSSBucket" value="{#$OSSBucket#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="EndPoint">EndPoint：</label></dt>
+          <dd>
+            <input class="input-large" type="text" name="EndPoint" id="EndPoint" value="{#$EndPoint#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="OSSKeyID">Access Key ID：</label></dt>
+          <dd>
+            <input class="input-large" type="text" name="OSSKeyID" id="OSSKeyID" value="{#$OSSKeyID#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="OSSKeySecret">Access Key Secret：</label></dt>
+          <dd>
+            <input class="input-large" type="text" name="OSSKeySecret" id="OSSKeySecret" value="{#$OSSKeySecret#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+      </div>
+      <div id="ftpType2" class="hide ftpType">
+        <dl class="clearfix">
+          <dt><label for="AccessKey">AccessKey：</label></dt>
+          <dd>
+            <input class="input-xxlarge" type="text" name="access_key" id="access_key" value="{#$access_key#}" />
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="SecretKey">SecretKey：</label></dt>
+          <dd>
+            <input class="input-xxlarge" type="text" name="secret_key" id="secret_key" value="{#$secret_key#}" />
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="bucket">存储空间（bucket）：</label></dt>
+          <dd>
+            <input class="input-xlarge" type="text" name="bucket" id="bucket" value="{#$bucket#}" />
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="domain">外链域名：</label></dt>
+          <dd>
+            <input class="input-xlarge" type="text" name="domain" id="domain" value="{#$domain#}" data-regex=".*" />
+            <span class="input-tips" style="display:inline-block;"><s></s>&nbsp;完整的Http地址。如果没有绑定域名地址填写测试域名</span>
+          </dd>
+        </dl>
+      </div>
+      <div id="ftpType3" class="hide ftpType">
+        <dl class="clearfix">
+          <dt><label for="OBSUrl">访问域名：</label></dt>
+          <dd>
+            <input class="input-xxlarge" type="text" name="OBSUrl" id="OBSUrl" value="{#$OBSUrl#}" data-regex=".*" />
+            <span class="input-tips" style="display:inline-block;"><s></s>&nbsp;完整的Http地址，域名在华为云OBS对象存储的基本信息中，<font color="#ff0000">以 / 结尾！</font>。</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="OBSBucket">桶名称：</label></dt>
+          <dd>
+            <input class="input-xlarge" type="text" name="OBSBucket" id="OBSBucket" value="{#$OBSBucket#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="OBSEndpoint">Endpoint：</label></dt>
+          <dd>
+            <input class="input-xlarge" type="text" name="OBSEndpoint" id="OBSEndpoint" value="{#$OBSEndpoint#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="OBSKeyID">Access Key Id：</label></dt>
+          <dd>
+            <input class="input-xlarge" type="text" name="OBSKeyID" id="OBSKeyID" value="{#$OBSKeyID#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="OBSKeySecret">Secret Access Key：</label></dt>
+          <dd>
+            <input class="input-xxlarge" type="text" name="OBSKeySecret" id="OBSKeySecret" value="{#$OBSKeySecret#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+      </div>
+      <div id="ftpType4" class="hide ftpType">
+        <dl class="clearfix">
+          <dt><label for="COSUrl">访问域名：</label></dt>
+          <dd>
+            <input class="input-xxlarge" type="text" name="COSUrl" id="COSUrl" value="{#$COSUrl#}" data-regex=".*" />
+            <span class="input-tips" style="display:inline-block;"><s></s>&nbsp;完整的Http地址，域名在腾讯云COS存储桶概览的域名信息中。</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="COSBucket">存储桶名称：</label></dt>
+          <dd>
+            <input class="input-xlarge" type="text" name="COSBucket" id="COSBucket" value="{#$COSBucket#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="COSRegion">所属地域：</label></dt>
+          <dd>
+            <input class="input-xlarge" type="text" name="COSRegion" id="COSRegion" value="{#$COSRegion#}" data-regex=".*" placeholder="ap-" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="COSSecretid">密钥SecretId：</label></dt>
+          <dd>
+            <input class="input-xxlarge" type="text" name="COSSecretid" id="COSSecretid" value="{#$COSSecretid#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="COSSecretkey">密钥SecretKey：</label></dt>
+          <dd>
+            <input class="input-xxlarge" type="text" name="COSSecretkey" id="COSSecretkey" value="{#$COSSecretkey#}" data-regex=".*" />
+            <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+      </div>
+    </div>
+    <dl class="clearfix">
+      <dt>状态：</dt>
+      <dd class="singel-line">
+        <a href="javascript:;" id="checkFtpConn">点击检测是否可用</a>
+      </dd>
+    </dl>
+  </div>
+  <div class="item hide">
+    <dl class="clearfix">
+      <dt>水印设置：</dt>
+      <dd class="radio">
+        {#html_radios name="articleMark" values=$articleMark checked=$articleMarkChecked output=$articleMarkNames separator="&nbsp;&nbsp;"#}
+      </dd>
+    </dl>
+    {#if $articleMarkChecked == 1#}
+    <div>
+    {#else#}
+    <div class="hide">
+    {#/if#}
+      <dl class="clearfix">
+        <dt><label for="thumbMarkState">缩略图水印：</label></dt>
+        <dd>
+          {#html_radios name="thumbMarkState" values=$thumbMarkState checked=$thumbMarkStateChecked output=$thumbMarkStateNames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="atlasMarkState">图集水印：</label></dt>
+        <dd>
+          {#html_radios name="atlasMarkState" values=$atlasMarkState checked=$atlasMarkStateChecked output=$atlasMarkStateNames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="editorMarkState">编辑器水印：</label></dt>
+        <dd>
+          {#html_radios name="editorMarkState" values=$editorMarkState checked=$editorMarkStateChecked output=$editorMarkStateNames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label>水印尺寸限制：</label></dt>
+        <dd>
+          <div class="input-prepend input-append">
+            <span class="add-on">宽</span>
+            <input class="span1" id="waterMarkWidth" name="waterMarkWidth" type="text" value="{#$waterMarkWidth#}" />
+            <span class="add-on">px</span>
+          </div>
+          &times;
+          <div class="input-prepend input-append">
+            <span class="add-on">高</span>
+            <input class="span1" id="waterMarkHeight" name="waterMarkHeight" type="text" value="{#$waterMarkHeight#}" />
+            <span class="add-on">px</span>
+          </div>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label>水印位置：</label></dt>
+        <dd>
+          <ul class="clearfix watermarkpostion">
+            <li{#if $waterMarkPostion == 1#} class="current"{#/if#} data-id="1"><a href="javascript:;">左上</a></li>
+            <li{#if $waterMarkPostion == 2#} class="current"{#/if#} data-id="2"><a href="javascript:;">中上</a></li>
+            <li{#if $waterMarkPostion == 3#} class="current"{#/if#} data-id="3"><a href="javascript:;">右上</a></li>
+            <li{#if $waterMarkPostion == 4#} class="current"{#/if#} data-id="4"><a href="javascript:;">左中</a></li>
+            <li{#if $waterMarkPostion == 5#} class="current"{#/if#} data-id="5"><a href="javascript:;">中心</a></li>
+            <li{#if $waterMarkPostion == 6#} class="current"{#/if#} data-id="6"><a href="javascript:;">右中</a></li>
+            <li{#if $waterMarkPostion == 7#} class="current"{#/if#} data-id="7"><a href="javascript:;">左下</a></li>
+            <li{#if $waterMarkPostion == 8#} class="current"{#/if#} data-id="8"><a href="javascript:;">中下</a></li>
+            <li{#if $waterMarkPostion == 9#} class="current"{#/if#} data-id="9"><a href="javascript:;">右下</a></li>
+            <li{#if $waterMarkPostion == 10#} class="current"{#/if#} data-id="10" style="width: 105px;"><a href="javascript:;">平铺</a></li>
+            <li{#if !$waterMarkPostion#} class="current"{#/if#} data-id="0" style="width: 103px;"><a href="javascript:;">随机</a></li>
+          </ul>
+          <input type="hidden" name="waterMarkPostion" id="waterMarkPostion" value="{#$waterMarkPostion#}" />
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label>水印类型：</label></dt>
+        <dd>
+          {#html_radios name="waterMarkType" values=$waterMarkType checked=$waterMarkTypeChecked output=$waterMarkTypeNames separator="&nbsp;&nbsp;"#}
+        </dd>
+      </dl>
+      {#if $waterMarkTypeChecked == 1#}
+      <div id="markType1">
+      {#else#}
+      <div id="markType1" class="hide">
+      {#/if#}
+        <dl class="clearfix">
+          <dt><label for="markText">水印文字：</label></dt>
+          <dd>
+            <input class="input-large" type="text" name="markText" id="markText" value="{#$markText#}" data-regex=".*" />
+          <span class="input-tips"><s></s>&nbsp;</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="markFontfamily">水印字体：</label></dt>
+          <dd>
+            <select name="markFontfamily" id="markFontfamily">
+              {#html_options values=$markFontfamily selected=$markFontfamilySelected output=$markFontfamily#}
+            </select>
+            <span class="input-tips" style="display:inline-block;"><s></s>水印文件存放在{#$HUONIAOINC#}/data/fonts下<br />如果是汉字水印，请选择“simhei.ttf”，否则水印不显示！</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label for="markFontsize">水印文字大小：</label></dt>
+          <dd>
+            <input class="input-small" type="number" min="0" name="markFontsize" id="markFontsize" data-regex="[0-9]\d*" value="{#$markFontsize#}" />
+            <span class="input-tips"><s></s>水印文字大小，类型为数字</span>
+          </dd>
+        </dl>
+        <dl class="clearfix">
+          <dt><label>文字颜色：</label></dt>
+          <dd>
+            <div class="color_pick" style="margin:0; border:1px solid #ccc;"><em style="background:{#$markFontColor#};"></em></div>
+            <input type="hidden" name="markFontColor" id="markFontColor" value="{#$markFontColor#}" />
+          </dd>
+        </dl>
+      </div>
+      {#if $waterMarkTypeChecked == 1#}
+      <div id="markType2" class="hide">
+      {#else#}
+      <div id="markType2">
+      {#/if#}
+        <dl class="clearfix">
+          <dt><label for="markFile">水印文件：</label></dt>
+          <dd>
+            <select name="markFile" id="markFile">
+              {#html_options values=$markFile selected=$markFileSelected output=$markFile#}
+            </select>
+            <span class="input-tips" style="display:inline-block;"><s></s>水印文件存放在{#$HUONIAOINC#}/data/mark下</span>
+          </dd>
+        </dl>
+      </div>
+      <dl class="clearfix">
+        <dt><label for="markPadding">水印边距：</label></dt>
+        <dd>
+          <input class="input-small" type="number" min="0" name="markPadding" id="markPadding" data-regex="[0-9]\d*" value="{#$markPadding#}" />
+          <span class="input-tips"><s></s>水印位置与周边距离</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="transparent">水印透明度：</label></dt>
+        <dd>
+          <input class="input-small" type="number" name="transparent" id="transparent" data-regex="(([0-9]\d?)|(100)|(0))" min="0" max="100" maxlength="3" value="{#$transparent#}" />
+          <span class="input-tips" style="display: inline-block;"><s></s>数值越大越清晰，范围0到100，注意：PNG图片水印需要调整水印自身透明度，此处设置无效！</span>
+        </dd>
+      </dl>
+      <dl class="clearfix">
+        <dt><label for="markQuality">水印质量：</label></dt>
+        <dd>
+          <input class="input-small" type="number" name="markQuality" id="markQuality" data-regex="(([0-9]\d?)|(100)|(0))" min="0" max="100" maxlength="3" value="{#$markQuality#}" />
+          <span class="input-tips"><s></s>数字越大越清晰，最高100，建议设置85</span>
+        </dd>
+      </dl>
+    </div>
+  </div>
+  <dl class="clearfix formbtn">
+    <dt>&nbsp;</dt>
+    <dd><input class="btn btn-large btn-success" type="submit" name="submit" id="btnSubmit" value="确认提交" /></dd>
+  </dl>
+</form>
+
+{#$jsFile#}
+</body>
+</html>

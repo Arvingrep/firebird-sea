@@ -23,26 +23,16 @@ if($dopost == "getList"){
     $page     = $page == "" ? 1 : $page;
 
     //搜索关键字
+    $sKeyword = trim($sKeyword);
     if($sKeyword!=""){
-        $sKeyword = trim($sKeyword);
-		$isId = false;
-		if(substr($sKeyword, 0, 1) == '#'){
-			$id = substr($sKeyword, 1);
-			if(is_numeric($id)){
-				$isId = true;
-				$where .= " AND m.`id` = $id";
-			}
-		}
-		if(!$isId){
-            $where .= " and (1=2";
-            if(is_numeric($sKeyword)){
-                $where .= " or p.`uid` like '%$sKeyword%'";  // 用户ID
-            }
-            $where .= " or p.`ordernum` like  '%$sKeyword%'"; // 订单号
-            $where .= " or m.`username` like  '%$sKeyword%'"; // 用户名
-            $where .= " or m.`nickname` like  '%$sKeyword%'"; // 昵称
-            $where .= ")";
+        $where .= " and (1=2";
+        if(is_numeric($sKeyword)){
+            $where .= " or p.`uid` like '%$sKeyword%'";  // 用户ID
         }
+        $where .= " or p.`ordernum` like  '%$sKeyword%'"; // 订单号
+        $where .= " or m.`username` like  '%$sKeyword%'"; // 用户名
+        $where .= " or m.`nickname` like  '%$sKeyword%'"; // 昵称
+        $where .= ")";
     }
     // 城市ID
     if($userType == 3){

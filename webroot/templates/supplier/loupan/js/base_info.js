@@ -1,9 +1,9 @@
 
-var pageVue = new Vue({
+var page = new Vue({
 	el:'#page',
 	data:{
 		navList:navList,
-		currid:currid,
+		currid:1,
 		hoverid:'',
 		salestatenames:salestatenames,  //销售状态数据
 		existingnames:existingnames,  //楼盘状态数据
@@ -13,100 +13,6 @@ var pageVue = new Vue({
 		protype:protype,   //物业类型
 		routeArr:subwayarr,
 		loading:false,
-		formScheme:{
-			// address:'',
-			// openStart:'', //开始时间
-			// openEnd:'', //结束时间
-			// tel:'', //电话
-			// copywriting:'', //致电文案
-			// verify_capital:'', //验资情况
-
-			// zhuangxiuval:'', //装修情况
-			// decoration_price:'', //装修单价
-			// planarea:'', //占地面积
-			// buildarea:'',//建筑面积
-			// planhouse:'', //规划户数
-			// parknum:'', //车位数
-			// above_parking:'', //地上车位数
-			// parking_ratio:'', //车位比例
-			// rongji:'', //容积率
-			// green:'', //绿化率
-			// green_area:'', //绿化面积
-			// property:'', //物业公司
-			// proprice:'', //物业费
-			// heating:1, //供暖
-			// water:1, //水
-			// power:1, //电
-			
-			// feature:'', //特色
-			// note:'', //楼盘简介
-			// peitao:[],
-			...formScheme
-		},
-		formbox3:{
-			license_data:license_data.length > 0 ? license_data :[{
-				no:'',  //许可证号
-				file:'', //图片
-				source:'', //图片预览
-			}]
-		},
-		feature:[],
-		peitaoList:peitaoList && peitaoList.length > 0 ?JSON.parse(JSON.stringify(peitaoList)):[], //配套信息
-
-		license_data:license_data.length > 0 ? license_data : [{
-			no:'',  //许可证号
-			file:'', //图片
-			source:'', //图片预览
-		}],
-		tabsArr:[
-			{
-				name:'重点资料',
-			},
-			{
-				name:'详细信息',
-			},
-			{
-				name:'预售许可证',
-			},
-		],
-		tabOn:tabOn,
-		rules:{
-			address: [
-				{ required: true, message: '请填写售楼处地址'}
-			],
-			openStart: [
-				{ required: true, message: '请选择开始时间'}
-			],
-			openEnd: [
-				{ required: true, message: '请选择结束时间'}
-			],
-			zhuangxiu: [
-				{ required: true, message: '请选择装修标准'}
-			],
-			planarea: [
-				{ required: true, message: '请填写占地面积'}
-			], //占地面积
-			buildarea: [
-				{ required: true, message: '请填写建筑面积'}
-			],//建筑面积
-			planhouse: [
-				{ required: true, message: '请填写规划户数'}
-			], //规划户数
-			above_parking: [
-				{ required: true, message: '请填写地面车位'}
-			],
-			parknum: [
-				{ required: true, message: '请填写地下车位'}
-			],
-			planarea: [
-				{ required: true, message: '请填写占地面积'}
-			],
-			parking_ratio:[{ required: false, message: '请填写车位比'}], //车位比
-			rongji:[{ required: false, message: '请填写容积率'}], //容积率
-			green:[{ required: false, message: '请填写绿化率'}], //绿化率
-			
-		},
-		
 	},
 	created() {
 		var tt = this;
@@ -356,7 +262,7 @@ var pageVue = new Vue({
 			$('#cityid').val(addrids[0]);
 
 			var go_submit = false;
-			$("#form .inpbox.required").each(function(){
+			$(".inpbox.required").each(function(){
 				var t = $(this);
 				if(t.find('input').length>0 && t.find('input').val()==''){
 					var tip = t.find('input').attr('placeholder');
@@ -367,14 +273,10 @@ var pageVue = new Vue({
 			});
 			if(tt.loading || go_submit) return false;
 			tt.loading = true;
-			let url =  '/include/ajax.php?service=house&action=supplierLoupanEdit&loupanid='+loupanid;
-			if($("#price").val()){
-				url += '&ptype=1'
-			}
 			axios({
 				method: 'post',
 				data:form.serialize(),
-				url: url,
+				url: masterDomain + '/include/ajax.php?service=house&action=supplierLoupanEdit&loupanid='+loupanid,
 			})
 			.then((response)=>{
 				tt.loading = false;
@@ -386,188 +288,6 @@ var pageVue = new Vue({
 				}
 			});
 		},
-
-
-	/**************************新版新增*****************************/	
-		submitData:function(formName){ 
-			const tt = this;
-			this.$refs[formName].validate((valid) => {
-				if (valid) {
-					
-					if(formName == 'formScheme'){
-						tt.formScheme['worktime'] = tt.formScheme.openStart + '-' + tt.formScheme.openEnd;
-						for(let i = 0; i < tt.peitaoList.length; i++){
-							if(tt.peitaoList[i][0] || tt.peitaoList[i][1]){
-								tt.formScheme[`peitao[${i}][0]`] = tt.peitaoList[i][0]
-								tt.formScheme[`peitao[${i}][1]`] = tt.peitaoList[i][1]
-							}
-						}
-					}
-
-
-
-					tt.toSubmit(formName)
-				} else {
-					return false;
-				}
-			});
-		},	
-
-		toSubmit(formName){
-			const tt = this;
-			tt.loading = true;
-			$.ajax({
-				url: '/include/ajax.php?service=house&action=supplierLoupanEdit&loupanid='+loupanid,
-				data: tt[formName],
-				type: "POST",
-				dataType: "json",
-				success: function (data) {
-					tt.loading = false;
-					if(data.info ==100){
-						alert('提交成功');
-						location.reload();
-					}else{
-						alert(data.info);
-					}
-				},
-				error: function () { }
-			});
-		},
-		loadConfig:function(){
-			const tt = this;
-			axios({
-				method: 'post',
-				url:'/include/ajax.php?service=house&action=route&route=property/config',
-			})
-			.then((response)=>{
-				var data = response.data;
-				if(data && data.state==100){
-					tt.config = data.info.config;
-				}
-			})
-		},
-		// 新增预售许可证
-		addPermission(){
-			var tt = this;
-			let stop = false;
-			for(let i = 0; i < tt.formbox3.license_data.length; i++){
-				let no = tt.formbox3.license_data[i].no;
-				let file = tt.formbox3.license_data[i].file;
-				if(no == ''){
-					this.$message({
-						message: '请填写预售许可证号',
-						type: 'error'
-					  });
-					stop = true;
-					return false;
-				}
-				if( file == ''){
-					this.$message({
-						message: '请上传预售许可证',
-						type: 'error'
-					  });
-					stop = true;
-					return false;
-				}
-			}
-			if(stop) return false;
-			tt.formbox3.license_data.push({
-				no:'',
-				file:'',
-				source:'',
-			})
-			
-		},
-
-		// 删除预售许可证
-		delPermission(index){
-			var tt = this;
-			tt.formbox3.license_data.splice(index,1);
-		},
-
-		// 新增配套
-		addPeitao(){
-			const that = this;
-			let list = that.peitaoList;
-			let stop = false;
-			for(let i = 0; i < list.length; i++){
-				if(list[i][0] == '' || list[i][1] == '' ){
-					this.$message({
-						message: '请先完善配套信息',
-						type: 'warning'
-					  });
-					stop = true
-					break;
-				}
-			}
-
-			if(stop) return false;
-			that.peitaoList.push(['',''])
-		},
-
-		// 删除配套
-		delPeitao(index){
-			const that = this;
-			that.peitaoList.splice(index,1);
-		},
-
-		// 上传图片
-		  // 上传图片
-		  fileChange(e,item){
-            const that = this;
-            let file = e.target['files'][0];
-            if (window.FileReader) {
-                var reader = new FileReader();
-                reader.readAsDataURL(file); 
-                reader.onload = function(e) {
-                    var formData = new FormData();
-                    let tempPath = this.result;
-					that.$set(item,'source',tempPath)
-                    formData.append("Filedata", file);
-                    formData.append("name", file.name);
-                    formData.append("lastModifiedDate", file.lastModifiedDate);
-                    formData.append("size", file.size);
-                    that.uploadImg(formData,item)
-                    
-                }
-            } 
-        },
-		uploadImg(data,obj){
-            const that = this;
-            $.ajax({
-                accepts:{},
-                url: '/include/upload.inc.php?mod=siteConfig&type=atlas&filetype=image',
-                data: data,
-                type: "POST",
-                processData: false, // 使数据不做处理
-                contentType: false,
-                dataType: "json",
-                success: function (data) {
-                    if(data.state == 'SUCCESS'){
-                        let imgPath = data.turl
-						that.$set(obj,'file',data.url)
-						that.$set(obj,'source',imgPath)
-                        
-                    }else{
-                        alert('图片上传失败，请稍后重试');
-                        that.$set(obj,'source','')
-                    }
-                },
-                error: function () { }
-            });
-        },
-
-
-		choseFeature(key){
-			const that = this;
-			let arr = that.formScheme.feature.split(',');
-			if(arr.indexOf(key) > -1){
-				arr.splice(arr.indexOf(key),1)
-			}else{
-				arr.push(key)
-			}
-			that.formScheme.feature = arr.join(',')
-		}
 	}
 
 });

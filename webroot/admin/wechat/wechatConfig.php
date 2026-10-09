@@ -40,7 +40,6 @@ if($_POST){
         $cfg_miniProgramAppid = $miniProgramAppid;
         $cfg_miniProgramAppsecret = $miniProgramAppsecret;
         $cfg_miniProgramId = $miniProgramId;
-        $cfg_miniProgramAppid_msg = $miniProgramAppid_msg;
         $cfg_useWxMiniProgramLogin = (int)$useWxMiniProgramLogin;
         $cfg_miniProgramLocationAuth = $miniProgramLocationAuth;
         $cfg_miniProgramLoginProfile = (int)$miniProgramLoginProfile;
@@ -49,7 +48,6 @@ if($_POST){
         $cfg_iosVirtualPaymentTip = $iosVirtualPaymentTip;
         $cfg_miniProgramQr   = $miniProgramQr;
         $cfg_miniProgramTemplate   = $touchTemplate;
-		$cfg_miniProgramShippingManage   = (int)$shippingManage; //微信小程序收货管理开关
     }
 
 	//站点信息文件内容
@@ -73,7 +71,6 @@ if($_POST){
 	$configFile .= "\$cfg_miniProgramAppid = '".$cfg_miniProgramAppid."';\r\n";
 	$configFile .= "\$cfg_miniProgramAppsecret = '".$cfg_miniProgramAppsecret."';\r\n";
 	$configFile .= "\$cfg_miniProgramId = '".$cfg_miniProgramId."';\r\n";
-    $configFile .= "\$cfg_miniProgramAppid_msg = '".$cfg_miniProgramAppid_msg."';\r\n";
 	$configFile .= "\$cfg_useWxMiniProgramLogin = ".$cfg_useWxMiniProgramLogin.";\r\n";
 	$configFile .= "\$cfg_miniProgramLocationAuth = '".$cfg_miniProgramLocationAuth."';\r\n";
 	$configFile .= "\$cfg_miniProgramLoginProfile = ".$cfg_miniProgramLoginProfile.";\r\n";
@@ -86,7 +83,6 @@ if($_POST){
 	$configFile .= "\$cfg_autoReplyWithSiteSearchModule = '".$cfg_autoReplyWithSiteSearchModule."';\r\n";
 	$configFile .= "\$cfg_autoReplyWithSiteSearchTitle = '".$cfg_autoReplyWithSiteSearchTitle."';\r\n";
 	$configFile .= "\$cfg_autoReplyWithSiteSearchDescption = '".$cfg_autoReplyWithSiteSearchDescption."';\r\n";
-	$configFile .= "\$cfg_miniProgramShippingManage = '".$cfg_miniProgramShippingManage."';\r\n";
 	$configFile .= "?".">";
 
 	$configIncFile = HUONIAOINC.'/config/wechatConfig.inc.php';
@@ -399,7 +395,7 @@ if($_POST){
 }
 
 //配置参数
-require(HUONIAOINC.'/config/wechatConfig.inc.php');
+require_once(HUONIAOINC.'/config/wechatConfig.inc.php');
 
 //验证模板文件
 if(file_exists($tpl."/".$templates)){
@@ -429,7 +425,6 @@ if(file_exists($tpl."/".$templates)){
 	$huoniaoTag->assign('miniProgramAppsecret', $cfg_miniProgramAppsecret);
 	$huoniaoTag->assign('miniProgramId', $cfg_miniProgramId);
 	$huoniaoTag->assign('miniProgramQr', $cfg_miniProgramQr);
-	$huoniaoTag->assign('miniProgramAppid_msg', $cfg_miniProgramAppid_msg);
 
 	//登录确认
 	$huoniaoTag->assign('typeState', array('1', '0'));
@@ -488,10 +483,6 @@ if(file_exists($tpl."/".$templates)){
 
 	$huoniaoTag->assign('iosVirtualPaymentTip', $cfg_iosVirtualPaymentTip);
 
-	//微信小程序收货管理开关
-	$huoniaoTag->assign('miniProgramShippingManageState', array('0', '1'));
-	$huoniaoTag->assign('miniProgramShippingManageStateNames',array('关闭','开启'));
-	$huoniaoTag->assign('miniProgramShippingManageStateChecked', (int)$cfg_miniProgramShippingManage);
 
     //模板风格
     $dir = "../../static/images/admin/platform"; //当前目录

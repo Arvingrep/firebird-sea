@@ -173,7 +173,7 @@ if($dopost == "getDetail"){
                 if($rid!=0){
                     $pcid = $rid;
                     $pltype = "回复了您";
-                    $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $pcid);
+                    $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $pcid);
                     $results  = $dsql->dsqlOper($archives, "results");
                     if($results){
                         $uid        = $results[0]['userid'];
@@ -291,7 +291,7 @@ if($dopost == "getDetail"){
 	                if($rid!=0){
 	                    $pcid = $rid;
 	                    $pltype = "回复了您";
-	                    $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment` WHERE `id` = " . $pcid);
+	                    $archives = $dsql->SetQuery("SELECT `userid` FROM `#@__public_comment_all` WHERE `id` = " . $pcid);
 	                    $results  = $dsql->dsqlOper($archives, "results");
 	                    if($results){
 	                        $uid        = $results[0]['userid'];
@@ -360,7 +360,7 @@ if($dopost == "getDetail"){
 		$sql = $dsql->SetQuery("SELECT `id` FROM `#@__".$action."_comment_all` WHERE `id` = " . $val . $where);
 		$ret = $dsql->dsqlOper($sql, "results");
 		if($ret){
-			$sql = $dsql->SetQuery("DELETE FROM `#@__public_up` WHERE `type` = '1' and `tid` = '$val'");
+			$sql = $dsql->SetQuery("DELETE FROM `#@__public_up_all` WHERE `type` = '1' and `tid` = '$val'");
 			$dsql->dsqlOper($sql, "update");
 			
 			$archives = $dsql->SetQuery("DELETE FROM `#@__".$action."_comment_all` WHERE `id` = ".$val);

@@ -10,10 +10,6 @@ var page = new Vue({
         dataList: dataList,
         currChosed: 0,//沙盘当前选择楼栋
         apartmentArr: apartmentList,//户型数据
-        dyList: [],
-        showPover:false,
-        prverClick:false, //弹窗被点击
-        apartChosed:[],
     },
     mounted() {
         var tt = this;
@@ -45,29 +41,8 @@ var page = new Vue({
             var form = t.closest('.form'), id = form.attr('data-id');
             tt.dataList[id][name] = t.val();
         })
-
-        $(".selectListBox").hover(function(){
-            tt.prverClick = true;
-        },function(){
-            tt.prverClick = false;
-        })
-        
     },
     methods: {
-        
-        // 新增单元
-        addDY(obj){
-            let list =  obj.dyList || [];
-            list.push({
-                id:new Date().getTime(),
-                name:'',
-            })
-            this.$set(obj, 'dyList', list)
-        },
-        // 删除单元
-        delDY(obj,ind){
-            obj.splice(ind,1)
-        },
         // 显示切换账户
         show_change: function () {
             $(".change_account").show()
@@ -181,41 +156,6 @@ var page = new Vue({
 
                     }
                 });
-        },
-
-        choseApart(obj,form){
-            const that = this;
-            that.poverClick = true;
-            let chosedIds =  that.apartChosed.map(item => item.id)
-            if(!chosedIds.includes(obj.id)){
-                that.apartChosed.push(obj);
-            }else{
-                that.apartChosed.splice(chosedIds.indexOf(obj.id),1)
-            }
-            chosedIds =  that.apartChosed.map(item => item.id)
-            
-            let ids = form.apartment;
-            if(typeof ids == 'string'){
-                ids = ids.split(',')
-            }
-            if(!ids.includes(obj.id)){
-                ids.push(obj.id);
-            }else{
-                ids.splice(ids.indexOf(obj.id),1)
-            }
-            that.$set(form, 'apartment', chosedIds)
-        },
-
-        delHX(form,ind){
-            // const that = this;
-            // this.apartChosed.splice(ind,1)
-            // that.$set(form, 'apartment', chosedIds)
-            form.apartment.splice(ind,1)
-        },
-
-        checkHX_name(id){
-            let obj = this.apartmentArr.find(item => item.id == id)
-            return obj?.title||''
         },
     },
     watch: {

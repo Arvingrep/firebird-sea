@@ -1,14 +1,4 @@
 $(function(){
-	$(".chosen-select").chosen();
-	$("#cityId").change(function(){
-		var cityId = $(this).val();
-		if(cityId == ""){
-			location.href = "/admin/wechat/wechatMenu.php";
-		}else{
-			location.href = "/admin/wechat/wechatMenu.php?cityid="+cityId;
-		}
-	});
-		
 	var treeLevel = 1;
 	var init = {
 
@@ -279,7 +269,7 @@ $(function(){
 	$("#list").delegate("input", "blur", function(){
 		var id = $(this).attr("data-id"), type = $(this).attr("data-type"), value = $(this).val();
 		if(id != "" && id != 0){
-			huoniao.operaJson("wechatMenu.php?dopost=updateType&id="+id+"&cityid="+cityid, "action=single&type="+type+"&val="+value, function(data){
+			huoniao.operaJson("wechatMenu.php?dopost=updateType&id="+id, "action=single&type="+type+"&val="+value, function(data){
 				if(data.state == 100){
 					huoniao.showTip("success", data.info, "auto");
 				}else if(data.state == 101){
@@ -333,7 +323,7 @@ $(function(){
 		if(type.indexOf("编辑") > -1){
 			$.dialog.confirm(tip+"删除后无法恢复，请谨慎操作！！！", function(){
 				huoniao.showTip("loading", "正在删除，，请稍候...");
-				huoniao.operaJson("wechatMenu.php?dopost=del", "id="+id+"&cityid="+cityid, function(data){
+				huoniao.operaJson("wechatMenu.php?dopost=del", "id="+id, function(data){
 					if(data.state == 100){
 						huoniao.showTip("success", data.info, "auto");
 						setTimeout(function() {
@@ -378,7 +368,7 @@ $(function(){
 					$.dialog.confirm("确定后，此分类下的子级也将同时删除！<br />删除后无法恢复，请谨慎操作！！！", function(){
 
 						huoniao.showTip("loading", "正在删除，，请稍候...");
-						huoniao.operaJson("wechatMenu.php?dopost=del", "id="+ids.join(",")+"&cityid="+cityid, function(data){
+						huoniao.operaJson("wechatMenu.php?dopost=del", "id="+ids.join(","), function(data){
 							if(data.state == 100){
 
 								huoniao.showTip("success", data.info, "auto");
@@ -400,31 +390,6 @@ $(function(){
 		});
 	});
 
-
-	//复制总站配置
-	$("#copyDefaultConfig").bind("click", function(){
-
-        $.dialog.confirm("确定后，此分站的微信自定义菜单将使用总站的配置，已有数据将会被覆盖！<br />确定后无法恢复，请谨慎操作！！！", function(){
-
-            huoniao.showTip("loading", "正在复制，请稍候...");
-            huoniao.operaJson("wechatMenu.php?dopost=copyDefaultConfig", "cityid="+cityid, function(data){
-                if(data.state == 100){
-
-                    huoniao.showTip("success", data.info, "auto");
-                    setTimeout(function() {
-                        location.reload();
-                    }, 800);
-
-                }else{
-                    alert(data.info);
-                    return false;
-                }
-            });
-
-        }, function(){});
-
-	});
-
 	//返回最近访问的位置
 	huoniao.scrollTop();
 
@@ -432,7 +397,7 @@ $(function(){
 	//发布上线
 	$("#releaseBtn").bind("click", function(){
 		huoniao.showTip("loading", "提交发布中，请稍候...");
-		huoniao.operaJson("wechatMenu.php?dopost=release", "cityid="+cityid, function(data){
+		huoniao.operaJson("wechatMenu.php?dopost=release", "", function(data){
 			huoniao.hideTip();
 			if(data.state == 100){
 				$.dialog({
@@ -495,7 +460,7 @@ function saveOpera(type){
 	var href = huoniao.changeURLPar(location.href, "scrolltop", scrolltop);
 
 	huoniao.showTip("loading", "正在保存，请稍候...");
-	huoniao.operaJson("wechatMenu.php?dopost=typeAjax", "data="+json+"&cityid="+cityid, function(data){
+	huoniao.operaJson("wechatMenu.php?dopost=typeAjax", "data="+json, function(data){
 		if(data.state == 100){
 			huoniao.showTip("success", data.info, "auto");
 			if(type == ""){

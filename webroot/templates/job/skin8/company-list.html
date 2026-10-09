@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset={#$cfg_soft_lang#}">
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE">
+<title>招聘企业-{#$job_title#}</title>
+<meta name="keywords" content="找公司,招聘网,招聘信息,互联网招聘" />
+<meta name="description" content="找公司,招聘网,求职网,互联网招聘,{#$cfg_shortname#}招聘是互联网领域垂直招聘网站,互联网职业机会尽在{#$cfg_shortname#}招聘" />
+<link rel="shortcut icon" href="{#$cfg_basehost#}/favicon.ico" type="image/x-icon" />
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/base.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/public.css?v={#$cfg_staticVersion#}" media="all" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/company-list.css?v={#$cfg_staticVersion#}" media="all" />
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$job_channelDomain#}', staticPath = '{#$cfg_staticPath#}';
+
+	var criticalPoint = 1240, criticalClass = "w1200";
+	$("html").addClass($(window).width() > criticalPoint ? criticalClass : "");
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var addr = {#$addr|string_format:"%d"#};
+    var userid='{#$userinfo.userid#}' //勿删
+</script>
+</head>
+<body style="background-color: #F7F9FC;">
+
+{#*
+$keyword  <!-- 搜索关键字 -->
+$addrid  <!-- 地址id -->
+$industry <!-- 公司行业 -->
+$gnature <!-- 公司性质 -->
+$scale  <!-- 公司规模 -->
+$famous 
+*#}
+
+{#include file="top.html"#}
+    <div class="substance">
+        <!-- 顶部搜索 -->
+        <form class="topSearch">
+            <input type="text" placeholder="搜索公司/行业" name="keyword" value="{#$keyword#}" onfocus="$('.topSearch').css('border-color','#1975FF')" onblur="$('.topSearch').css('border-color','#E6E6E6')">
+            <div>
+                <img src="{#$templets_skin#}images/search.png">
+            </div>
+        </form>
+        <!-- 筛选 -->
+        <div class="conFilter">
+            <!-- 地区筛选 -->
+            <div class="c-area">
+                <span>所在地区：</span>
+                <ul>
+                    <li {#if !{#$addrid#}||{#$addrid#}=={#$siteCityInfo['cityid']#}#} class="active" {#/if#}>全{#$siteCityInfo['name']#}</li>
+                    {#job action="addr" type="{#$siteCityInfo['cityid']#}" service="job" return="address"#}
+                    <li data-id="{#$address.id#}" {#if {#$addrid#}=={#$address.id#}#} class="active" {#/if#}>{#$address.title#}</li>
+                    {#/job#}
+                </ul>
+            </div>
+            <!-- 更多筛选 -->
+            <div class="c-more">
+                <!-- 筛选 -->
+                <div class="cm-filter">
+                    <span class="cmf-text">更多筛选：</span>
+                    <ul>
+                        <li class="item edu">
+                            {#if !$industry#}
+                                <span>所属行业</span>
+                            {#else#}
+                                {#job service="job" action="industry" return="indu"#}
+                                    {#if $industry==$indu.id#}
+                                    <span>{#$indu.title#}</span>
+                                    {#/if#}
+                                {#/job#}
+                            {#/if#}
+                            <img src="{#$templets_skin#}images/darrowBl.png">
+                            <div class="fItem">
+                                <div>不限行业</div>
+                                {#job service="job" action="industry" return="filter1"#}
+                                <div data-id="{#$filter1.id#}" {#if $filter1.id==$industry#}class="active"{#/if#}>{#$filter1.title#}</div>
+                                {#/job#}
+                            </div>
+                        </li>
+                        <li class="item exp">
+                            <span>公司性质</span>
+                            <img src="{#$templets_skin#}images/darrowBl.png">
+                            <div class="fItem">
+                            </div>
+                        </li>
+                        <li class="item time">
+                            <span>公司规模</span>
+                            <img src="{#$templets_skin#}images/darrowBl.png">
+                            <div class="fItem">
+                                <div>1</div>
+                                <div>2</div>
+                                <div>3</div>
+                                <div>4</div>
+                                <div>5</div>
+                                <div>6</div>
+                                <div>7</div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <!-- 清空筛选 -->
+                <a href="{#getUrlPath service='job' template='company-list'#}">
+                    <img src="{#$templets_skin#}images/trashG.png">
+                    <span class="clear">清空筛选条件<em>(0)</em></span>
+                </a>
+            </div>
+        </div>
+        <!-- 列表 -->
+        <div class="detList">
+            <!-- 左侧 -->
+            <div class="d-left">
+                <!-- tab切换 -->
+                <div class="dl-tab">
+                    <div {#if !$famous#}class="active"{#/if#}>全部企业</div>
+                    <div data-famous="1" {#if $famous==1#}class="active"{#/if#}>名企招聘</div>
+                </div>
+                <ul class="dl-list">
+                    {#job service="job" action="companyList" page="$page" pageSize="20" return="data" keyword="$keyword" addrid="$addrid" famous="$famous" industry="$industry" nature="$gnature" scale="$scale" orderby=2#}
+                    <li>
+                        <a href="{#$data.url#}" target="_blank">
+                            <div class="topPart" {#if count($data.jobs)!=0#}style="border-bottom: 1px solid #F2F2F2;padding-bottom: 16px;"{#/if#}>
+                                <div class="dll-left">
+                                    <div class="logo">
+                                        <img src="{#$data.logo_url#}" onerror="this.src='/static/images/404.jpg'">
+                                    </div>
+                                    <div class="detail">
+                                        <div class="title">
+                                            <span>{#$data.title#}</span>
+                                            {#if $data.famous!=0#}<div class="label">名企</div>{#/if#}
+                                            {#if $data.certification!=0#}<img src="{#$templets_skin#}images/shieldGreen.png">{#/if#}
+                                        </div>
+                                        <div class="require">{#$data.addrName#}{#if $data.addrName&&$data.industry[0]#}<span>|</span>{#/if#}{#$data.industry[0]#}{#if $data.scale&&$data.industry[0]#}<span>|</span>{#/if#}{#$data.scale#}</div>
+                                        <div class="welfare">
+                                            {#foreach from=$data.welfareNames item=welname#}
+                                            <div class="item">{#$welname#}</div>
+                                            {#/foreach#}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="dll-right">
+                                    <div class="salary">
+                                        {#if count($data.jobs)>0#}
+                                        {#if $data.salary_avg#}
+                                        <div>平均薪资</div>
+                                        <p>{#$data.salary_avg#}</p>
+                                        <span>|</span>
+                                        {#/if#}
+                                        <div>在招职位</div>
+                                        <p>{#$data.pcount#}</p>
+                                        {#else#}
+                                        <div>暂无在招职位</div>
+                                        {#/if#}
+                                    </div>
+                                    <div class="btn {#if $data.collect==1#}has{#/if#}" data-id="{#$data.id#}">
+                                        <img src="{#$templets_skin#}images/addW.png">
+                                        <span>{#if $data.collect==0#}关注{#else#}已关注{#/if#}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            {#if count($data.jobs)>0#}
+                            <div class="botPart">
+                                <span>招聘职位：</span>
+                                <div class="items">
+                                    {#foreach from=$data.jobs item="typedata"#}
+                                    <div class="item" data-id="{#$typedata.id#}">{#$typedata.title#}</div>
+                                    {#/foreach#}
+                                </div>
+                            </div>
+                            {#/if#}
+                        </a>
+                    </li>
+                    {#/job#}
+                </ul>
+                {#if $pageInfo.totalPage==0#}
+                <!-- 无数据 -->
+                <div class="cl-none">
+                    <img src="{#$templets_skin#}images/nonesearch.png">
+                    <p>没有相关企业，试试别的筛选条件</p>
+                </div>
+                {#/if#}
+                {#if $pageInfo.totalPage>1#}
+                <!-- 分页 -->
+                <div class="dll-page">
+                    {#getPageList service='job' template='company-list' pageType='dynamic' param="page=#page#"#}
+                    <!-- 输入框跳转 -->
+                    <div style="display: flex;align-items: center;">
+                        <!-- 输入框 -->
+                        <div>
+                            <span>前往</span>
+                            <input type="text" value="{#$page#}">
+                            <span>页</span>
+                        </div>
+                        <!-- 按钮 -->
+                        <div class="btn">跳转</div>
+                    </div>
+                </div>
+                {#/if#}
+            </div>
+            <!-- 右侧 -->
+            <div class="d-right">
+                <a href="{#if !$job_cid#}{#$cfg_basehost#}/supplier/job/company_info.html{#else#}{#$cfg_basehost#}/supplier/job{#/if#}" class="dr-fabu" target="_blank"><img src="{#$templets_skin#}images/fabuBanner.png" ></a>
+                <!-- 名企热招 -->
+                <div class="dr-hot">
+                    <div class="drh-title"><span>名企</span>热招</div>
+                    {#job service="job" action="postList" page=1 pageSize="4" famous=1 return="hots"#}
+                    <a class="item" href="{#$hots.url#}" target="_blank">
+                        <div class="title">
+                            <div class="job">{#$hots.title#}</div>
+                            <div class="salary">全部<span>{#$hots.companyDetail.pcount#}</span>个职位</div>
+                        </div>
+                        <div class="name">
+                            <img src="{#$templets_skin#}images/company2.png">
+                            <span>{#$hots.companyDetail.title#}</span>
+                        </div>
+                    </a>
+                    {#/job#}
+                </div>
+                <!-- 二维码 -->
+                <div class="dr-code">
+                    <img src="/include/qrcode.php?data={#$job_channelDomain#}" onerror="this.src='/static/images/404.jpg'">
+                    <div>
+                        <p>手机微信扫一扫</p>
+                        <p>随时随地找工作</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{#include file="footer.html" theme="white"#}
+</body>
+<script type="text/javascript" src="{#$templets_skin#}js/company-list.js?v={#$cfg_staticVersion#}"></script>
+</html>

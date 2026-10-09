@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="{#$cfg_soft_lang#}">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no,viewport-fit=cover" />
+<title>{#$detail_product['title']#}</title>
+<link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}" />
+<link rel="stylesheet" type="text/css" href="{#$templets_skin#}css/order.css?v={#$cfg_staticVersion#}">
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript" src="{#$cfg_staticPath#}js/core/zepto.min.js?v={#$cfg_staticVersion#}"></script>
+<script type="text/javascript">
+	var masterDomain = '{#$cfg_basehost#}', channelDomain = '{#$dating_channelDomain#}', staticPath = '{#$cfg_staticPath#}',templets_skin = '{#$templets_skin#}';
+
+	var hideFileUrl = {#$cfg_hideUrl#};
+	var cookiePre = '{#$cfg_cookiePre#}';
+
+	var imconfig = {
+		'mod':'tuan',
+		'chatid':"{#$detail_store['member']['userid']#}",
+		'title': '{#$detail_product['title']#}',
+		"price": '{#$detail_product['price']#}',
+		"imgUrl": '{#if $detail_product['litpic']#}{#$detail_product['litpic']#}{#else#}{#$tuan_logoUrl#}{#/if#}',
+		"link": '{#getUrlPath service="tuan" template="detail" id=$detail_product['id']#}',
+	};
+</script>
+</head>
+
+<body>
+{#include file="../../../siteConfig/touch_top.html"#}
+
+<div class="head_tips">
+  <p class="tips_01">{#if $detail_status==1#}拼单已成功{#elseif $detail_status==2#}活动过期{#elseif $detail_status==3#}拼单已失效{#else#}拼单还未成功{#/if#}</p>
+  <p class="tips_02">让小伙伴们都来拼单吧...</p>
+  <div><img src="{#$templets_skin#}images/shizhong.png"></div>
+</div>
+
+<!-- 地址 -->
+{#if $detail_product['tuantype'] == 2#}
+<div class="address_tuan fn-clear">
+  {#$n=1#}
+  {#member action="address" return="list"#}
+  {#if $n==1#}
+  <input type="hidden" name="addressid" id="addressid" value="{#$list.id#}" />
+  <span class="addr_img"></span>
+  <div class="addr_txt">
+    <p class="addr_name"><span>{#$list.person#}</span><span>{#if $list.mobile != ""#}{#$list.mobile#}{#/if#} {#if $list.mobile != "" && $list.tel != ""#}/ {#$list.tel#}{#elseif $list.mobile == "" && $list.tel != ""#}{#$list.tel#}{#/if#}</span></p>
+    <p class="addr">{#$list.addrname#} {#$list.address#}</p>
+  </div>
+  {#/if#}
+  {#$n=$n+1#}
+  {#/member#}
+  <!--<div class="addr_img_right"><a href="javaScript:;"><p class="bg"></p><p>修改</p></a></div>-->
+</div>
+{#/if#}
+<!-- 拼团成员 -->
+<div class="member">
+	<p class="member_name">{#if $detail_status==1#}拼单已成功{#elseif $detail_status==2#}活动过期{#elseif $detail_status==3#}拼单已失效{#else#}待分享，还差{#$detail_rest#}人，剩余{#$detail_resttime#}{#/if#}</p>
+	<div class="member_list fn-clear">
+		<div class="list_info">
+			<ul class="fn-clear">
+				<li class="zhu"><img src="{#$detail_masterPhoto|default:'/static/images/default_user.jpg'#}"><i>拼主</i></li>
+				{#foreach from=$detail_join key=k item=val#}
+				<li class="zhu_f"><img src="{#$val|default:"{#$templets_skin#}images/ren_01.png"#}"></li>
+				{#/foreach#}
+				{#if empty($detail_join)#}
+				<li class="zhu_k"><img src="{#$templets_skin#}images/ren_01.png"></li>
+				{#/if#}
+				<!--<li class="zhu_f"><img src="{#$templets_skin#}upfile/s_01.png"></li>
+				<li class="zhu_k"><img src="{#$templets_skin#}images/ren_01.png"></li>-->
+			</ul>
+		</div>
+		{#if $detail_dealorder!=1#}
+		{#if $detail_status==1 || $detail_status==2 || $detail_status==3#}{#else#}<button class="btn_order">邀请好友</button>{#/if#}
+		{#/if#}
+	</div>
+</div>
+
+<!-- 订单列表 -->
+<div class="dindan_list">
+	<div class="corporate_name"><p>{#$detail_store['member']['company']#}</p><i></i></div>
+	<div class="info fn-clear">
+
+	    <a href="{#getUrlPath service="tuan" template="detail" id={#$detail_product['id']#}#}" class="fn-clear">
+		<div class="info_img"><img src="{#$detail_product['litpic']#}"></div>
+		<div class="info_title">
+			<h2>{#$detail_product['title']#}</h2>
+			<p>{#$detail_product['subtitle']#}</p>
+		</div>
+		<div class="info_price">
+			<p class="info_price_p">{#echoCurrency type='symbol'#}<em>{#$detail_product['price']#}</em></p>
+			<p>x{#$detail_procount#}</p>
+		</div>
+		</a>
+	</div>
+	<div class="total_price">
+		<P class="yunfei">运费:<span>{#echoCurrency type='symbol'#}{#$detail_freight#}</span></P>
+		<P class="shifu">实付:<span>{#echoCurrency type='symbol'#}{#$detail_payprice#}</span><em>({#if $detail_freight>0#}含运费{#else#}免运费{#/if#})</em></P>
+	</div>
+	<div class="lianxi fn-clear">
+		<div class="lianxi_01 chat_to-Link"><span></span><span>联系卖家</span></div>
+		<div class="lianxi_02 tel"><span></span><span>拨打电话</span></div>
+	</div>
+</div>
+
+<!-- 订单号 下单时间 -->
+<div class="order_information">
+	<p>订单编号：<em>{#$detail_ordernum#}</em></p>
+	<p>支付方式：<em>{#$detail_paytype#}</em></p>
+	<p>下单时间：<em>{#date("Y.m.d H:i:s",$detail_orderdate)#}</em></p>
+</div>
+
+<!-- 底部按钮 -->
+<div class="dindan_btn fn-clear">
+	{#if $detail_own==1#}
+	<button class="btn_01 {#if $detail_status==1 || $detail_status==2 || $detail_status==3#}{#else#}quxiao{#/if#}">{#if $detail_status==1#}订单成功{#elseif $detail_status==2#}拼单过期{#elseif $detail_status==3#}拼单已失效{#else#}取消订单{#/if#}</button>
+	<button class="btn_02 btn_order">邀请好友拼单</button>
+	{#else#}
+	{#if $detail_dealorder==1#}
+	  <a style="display: block;height: .8rem;text-align: center;line-height: .8rem;width: 100%;float:none;border: 1px solid #ff4930;background: #ff4930;color: #fff;border-radius: .1rem;" {#if $detail_status==1 || $detail_status==2 || $detail_status==3#}href="javaScript:;"{#else#}href="{#getUrlPath service="tuan" template="buy" id={#$detail_product['id']#} count="1" param="type=pin&pinid={#$detail_id#}"#}"{#/if#}>{#if $detail_status==1#}订单成功{#elseif $detail_status==2#}拼单过期{#elseif $detail_status==3#}拼单已失效{#else#}去下单{#/if#}</a>
+	{#else#}
+	  <button style="width: 100%;float:none;" class="btn_02 btn_order">邀请好友拼单</button>
+	{#/if#}
+    {#/if#}
+</div>
+
+<!-- 电话弹出层 s-->
+<div class="modal-public m-telphone" tabindex="-1" role="dialog">
+    <div class="bgCover"></div>
+    <div class="modal-main">
+      <div class="topline">
+      <div class="lline"></div>
+      <div class="rline"></div>
+    </div>
+        <div class="close">
+            <img src="{#$templets_skin#}images/close.png" alt="">
+        </div>
+        <h3>联系商家</h3>
+        {#if $detail_store['phone']#}<p class="fn-clear"><a href="tel:{#$detail_store['phone']#}">{#$detail_store['phone']#}</a></p>{#/if#}
+        {#if $detail_store['tel']#}<p class="fn-clear"><a href="tel:{#$detail_store['tel']#}">{#$detail_store['tel']#}</a></p>{#/if#}
+    </div>
+</div>
+<!-- 电话弹出层 e-->
+
+<!-- 无法取消订单弹框 -->
+<div class="modal-public m_cancel" tabindex="-1" role="dialog">
+	<div class="bgCover"></div>
+	<div class="dindan_cancel">
+		<p class="cancel_01">暂时无法取消订单</p>
+		<p class="cancel_02">发送订单24小时后，若未拼单成功将</p>
+		<p class="cancel_03">自动取消订单并退款</p>
+		<p class="cancel_04">我知道了</p>
+	</div>
+</div>
+
+<!-- 邀请好友拼单 -->
+{#if $detail_status==1 || $detail_status==2 || $detail_status==3#}
+{#else#}
+<div class="modal-public in_friends HN_PublicShare_shearBox " tabindex="-1" role="dialog">
+	<div class="bgCover"></div>
+	<div class="inviting_friends">
+        <p class="inviting_txt">还差<em>{#$detail_rest#}</em>人，赶快邀请好友来拼单吧</p>
+        <p class="inviting_title">拼单已发起，人满后立即发货</p>
+        <div class="inviting_img">
+        	<ul class="fn-clear">
+        		<li><a class="HN_button_tweixin"><img src="{#$templets_skin#}images/wx.png"><p>微信</p></a></li>
+        		<li><a class="HN_button_ttqq"><img src="{#$templets_skin#}images/qq.png"><p>QQ</p></a></li>
+        		<li><a class="HN_button_tsina" href="http://service.weibo.com/share/share.php?url='+window.location+'&desc='+document.title+'"><img src="{#$templets_skin#}images/wb.png"><p>微博</p></a></li>
+        		<li><a class="HN_button_code"><img src="{#$templets_skin#}images/sm.png"><p>当面扫码</p></a></li>
+        		<!-- <li><a class="HN_button_comment"><img src="{#$templets_skin#}images/tp.png"><p>分享图片</p></a></li> -->
+        	</ul>
+        </div>
+	</div>
+
+<div class="HN_PublicShare_bg" id="HN_PublicShare_shearBg"></div>
+</div>
+{#/if#}
+
+<script type="text/javascript">
+	var wxconfig = {
+		"appId": '{#$wxjssdk_appId#}',
+		"timestamp": '{#$wxjssdk_timestamp#}',
+		"nonceStr": '{#$wxjssdk_nonceStr#}',
+		"signature": '{#$wxjssdk_signature#}',
+		"description": '{#$detail_product['subtitle']#}',
+		"title": '{#$detail_product['title']#}',
+		"imgUrl": '{#if $detail_product['litpic']#}{#$detail_product['litpic']#}{#else#}{#$tuan_logoUrl#}{#/if#}',
+		"link": '{#getUrlPath service="tuan" template="dindan" id=$detail_id#}',
+	};
+
+	document.write(unescape("%3Cscript src='{#$cfg_staticPath#}js/publicShare.js?v="+~(-new Date())+"'type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script src="{#$templets_skin#}js/jquery.smartScroll.js?v={#$cfg_staticVersion#}"></script>
+<script src="{#$templets_skin#}js/order.js?v={#$cfg_staticVersion#}"></script>
+</body>
+</html>
