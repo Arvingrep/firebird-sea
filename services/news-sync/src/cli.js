@@ -8,7 +8,7 @@ const { runSync, withRetry } = require('./sync');
 const { fileStore, makePublisher, makeAlerter } = require('./io');
 
 async function main({ env = process.env, readInput = () => fs.readFileSync(0, 'utf8'), fetchImpl = fetch, retry } = {}) {
-  const alert = makeAlerter({ botToken: env.NEWS_ALERT_BOT_TOKEN, chatId: env.NEWS_ALERT_CHAT_ID, fetchImpl });
+  const alert = makeAlerter({ botToken: env.NEWS_ALERT_BOT_TOKEN, chatId: env.NEWS_ALERT_CHAT_ID, fetchImpl, apiBase: env.NEWS_ALERT_API_BASE || undefined });
   try {
     const input = JSON.parse(readInput());
     if (!Array.isArray(input)) throw new Error('input must be a JSON array of news items');

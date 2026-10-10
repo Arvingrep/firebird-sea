@@ -20,6 +20,7 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 | `NEWS_PORTAL_PUBLISH_URL` | 门户发布接口(POST JSON) |
 | `NEWS_PORTAL_TOKEN` | 门户发布接口 Bearer Token(仅运行环境注入) |
 | `NEWS_ALERT_BOT_TOKEN` / `NEWS_ALERT_CHAT_ID` | 失败告警的 Telegram Bot 与运营者 Chat |
+| `NEWS_ALERT_API_BASE` | 告警 API 基址,默认 `https://api.telegram.org`;本地验收指向 mock |
 | `NEWS_SYNC_SEEN_FILE` | 已发布去重集合文件,默认 `./news-seen.json` |
 
 ## 健壮性
@@ -29,14 +30,15 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 
 ## 测试
 
-`cd services/news-sync && npm test`(`src/sync.test.js`、`src/io.test.js`、`src/cli.test.js`:去重 / 重试 / 告警 / 输入清洗 / 门户业务失败 / 文件持久化 / 告警分条与重试)。
+`cd services/news-sync && npm test`(`src/sync.test.js`、`src/io.test.js`、`src/cli.test.js`、`src/feed.test.js`:去重 / 重试 / 告警 / 输入清洗 / 门户业务失败 / 文件持久化 / 告警分条与重试 / RSS 适配)。`scripts/verify-task.sh` 已纳入本服务单测。
 
-## 待人工(受保护路径)
+## TASK-016 适配层与本地真实环境验收
 
-- `scripts/verify-task.sh` 目前只跑 `services/api`,需 Arvin 在受保护入口加入 `services/news-sync` 的 `npm test`(`node --test src/`)。
-- Zero-Dep 门禁把 package.json 的 `"version"` 误判为依赖;本次已移除该字段并标记 `private`。
+- `src/feed.js`:把 TASK-016(n8n 新闻工作流)RSS 源适配为 `[{title,url,summary}]`,可作 CLI 管道使用。
+- `e2e-local.sh <workdir>`:对本地 n8n-news-mock(与 TASK-016 验收同一数据面,端口 18080)跑完整一轮:采集→去重→发布→预置门户故障→有界重试→Telegram 告警,并断言第二轮发布数为 0、门户实收与第一轮发布数一致。
+- 2026-10-10 运行证据(无密钥):`docs/internal/evidence/story-6.3/`(round1/round2/fail-round/mock-state)。
 
 ## 待人工
 
-- 门户发布接口(火鸟新闻入库端点)需 Arvin 确认后配置;"真实环境运行一轮"需部署后手动验证。
+- 真实火鸟门户发布端点与 `NEWS_PORTAL_TOKEN` 需 Arvin 提供后,在真实环境复跑 `e2e-local.sh` 等价流程。
 - n8n 调度接入(`automation/n8n/workflows`)未包含,建议后续拆分。

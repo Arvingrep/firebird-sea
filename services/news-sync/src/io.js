@@ -45,8 +45,10 @@ function makePublisher({ url, token, fetchImpl = fetch, timeoutMs = TIMEOUT_MS }
     let body;
     try {
       body = await res.json();
-    } catch {
-      throw new Error('portal returned non-JSON body');
+    } catch (err) {
+      // 只把 JSON 解析失败归类为"非 JSON 响应";超时/中止等原因原样抛出,便于上层按原因重试与告警
+      if (err instanceof SyntaxError) throw new Error('portal returned non-JSON body');
+      throw err;
     }
     if (!body || body.success !== true) {
       const e = body && body.error;
@@ -72,10 +74,10 @@ function chunkText(text, limit = TG_LIMIT) {
   return chunks;
 }
 
-function makeAlerter({ botToken, chatId, fetchImpl = fetch, timeoutMs = TIMEOUT_MS }) {
+function makeAlerter({ botToken, chatId, fetchImpl = fetch, timeoutMs = TIMEOUT_MS, apiBase = 'https://api.telegram.org' }) {
   return async text => {
     for (const part of chunkText(text)) {
-      const res = await fetchImpl(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      const res = await fetchImpl(`${apiBase}/bot${botToken}/sendMessage`, {
         method: 'POST',
         signal: AbortSignal.timeout(timeoutMs),
         headers: { 'Content-Type': 'application/json' },

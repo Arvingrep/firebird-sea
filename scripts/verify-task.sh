@@ -66,7 +66,7 @@ for t in "node --test scripts/bmad/bmad.test.js scripts/bmad/sync.test.js" "bash
 done
 
 # 6. Node 服务单元测试 (node:test，零依赖，资金路径必须有测试)；服务目录不存在时跳过
-for svc in services/api; do
+for svc in services/api services/news-sync; do
     if [ -f "$svc/package.json" ] && grep -q '"test"' "$svc/package.json"; then
         if [ -f "$svc/package-lock.json" ] && [ ! -d "$svc/node_modules" ]; then (cd "$svc" && npm ci --workspaces=false --no-audit --no-fund >/dev/null 2>&1); fi
         if (cd "$svc" && npm test --silent >/dev/null 2>&1); then echo "  ✅ $svc 单元测试 [通过]"
