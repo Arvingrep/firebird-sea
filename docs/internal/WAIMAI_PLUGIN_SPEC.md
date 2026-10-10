@@ -61,3 +61,25 @@ webroot/
 2. **分成比例**：外卖骑手提成 `80%`，跑腿提成 `70%`。
 3. **准时宝 / 延误险**：内置延误 10 分钟、20 分钟、30 分钟的分级赔偿机制。
 4. **多币种结算**：全链路继承站点统一货币标识 `₱` (PHP 比索)。
+
+## 原样入库基线（Story 1.1）
+
+- **基线文件清单与路径审查（选定路径）**：
+  | 路径范围 | 模块职责 | 授权/数据检查 |
+  | :--- | :--- | :--- |
+  | `webroot/templates/waimai/` | 用户前台与触屏模板 | 纯 Smarty/HTML/CSS，无动态授权 |
+  | `webroot/admin/templates/waimai/` | 平台总控后台管理模板 | 纯后台模板文件 |
+  | `webroot/admin/waimai/` | 平台外卖运营与订单调度入口 | 平台超管逻辑，无外部商业授权 |
+  | `webroot/wmsj/` | 商家工作台与独立后台系统 | 商家独立工作台，无平台密钥 |
+  | `webroot/api/handlers/waimai.*` | 业务处理器、模板控制器与配置 | 纯 PHP 业务处理与路由分发 |
+  | `webroot/include/config/waimai.inc.php.example` | 脱敏配置样板（全脱敏） | 密钥全部置空，参数采用东南亚基线 |
+
+- **基线历史与溯源记录（Provenance）**：
+  外卖核心业务源码已由原始提交 `0049fa4f`（feat(waimai): sync waimai plugin, merchant portal, admin routing）与 `7f38edf5`（feat(release): merge stable immutable base image, waimai plugin）安全合入主干；Story 1.1 的核心职责是对该既有基线进行安全与合规治理：
+  1. 彻底移除真实密钥与运行时配置 `waimai.inc.php` 的 Git 跟踪，建立脱敏 `.example` 样板；
+  2. 确立针对授权文件、动态缓存及数据目录的零容忍安全防线；
+  3. 建立 `services/api/test/waimai-baseline.test.js` 自动化回归验证守卫。
+- 外卖模块文件作为独立基线入库，严格排除商业授权文件、运行时缓存（`templates_c/`）与 `webroot/data` 数据目录。
+- `webroot/include/config/waimai.inc.php.example` 为配置样板；真实配置 `waimai.inc.php` 须从 Git 索引移除（`git rm --cached webroot/include/config/waimai.inc.php`，保留本地文件）并写入 `.gitignore`，仓库只保留脱敏的 `.example`（密钥、FTP 密码留空，服务器/用户名为占位值）。部署时由运营者将 `.example` 复制为 `waimai.inc.php` 并填入真实值（经部署环境注入，不入库）。
+- 若基线提交因「增量行数」门禁失败：记录为需运营者决定的事项（人工审核 PR 或豁免），不绕过门禁。
+- 校验：`services/api/test/waimai-baseline.test.js`（`npm test`，由 verify-task 步骤 6 运行）。
