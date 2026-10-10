@@ -2,7 +2,7 @@
 $customChannelName = '图说新闻';
 $customLogo = 0;
 $customLogoUrl = '';
-$customSubDomain = 0;
+$customSubDomain = 2;
 $customChannelSwitch = 0;
 $customCloseCause = '站点升级中。。。';
 $customSeoTitle = '图说新闻';

@@ -88,7 +88,7 @@ $(function(){
 			l.push('<option value="2"'+(id == 2 ? 'selected' : "")+'>子目录</option>');
 		}else{
 			l.push('<option value="1"'+(id == 1 ? 'selected' : "")+'>子域名</option>');
-			l.push('<option value="2"'+(id == 2 ? 'selected' : "")+'>子目录</option>');
+			l.push('<option value="2"'+(id == 2 || id == 0 ? 'selected' : "")+'>子目录</option>');
 		}
 		l.push('</select>');
 		return l.join("");
@@ -103,19 +103,14 @@ $(function(){
 			i.push('<span class="add-on">http://'+basehost+'/</span>');
 			i.push('<input class="input-mini" type="text" value="'+name+'">');
 		}else{
-			//主域名
-			if(id == 0 && module == 'member'){
-				i.push('<span class="add-on">http://</span>');
-				i.push('<input class="input-large" type="text" value="'+name+'">');
-
 			//子域名
-			}else if(id == 1){
+			if(id == 1){
 				i.push('<span class="add-on">http://</span>');
 				i.push('<input class="input-mini" type="text" value="'+name+'">');
 				i.push('<span class="add-on">.'+basehost+'</span>');
 
-			//子目录
-			}else if(id == 2){
+			//子目录 (默认)
+			}else{
 				i.push('<span class="add-on">http://'+basehost+'/</span>');
 				i.push('<input class="input-mini" type="text" value="'+name+'">');
 			}
