@@ -16,9 +16,11 @@ metadata:
     site: {{ .Values.siteId }}
 spec:
   replicas: {{ .Values.replicaCount }}
-  {{- if and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+  {{- $rwoUploads := and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+  {{- $rwoConfig := and .Values.persistence.enabled (eq (.Values.persistence.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+  {{- if or $rwoUploads $rwoConfig }}
   strategy:
-    type: Recreate          # uploads 为 RWO 卷：新旧 Pod 不能跨节点同时挂载，先停后起
+    type: Recreate          # uploads / 配置 PVC 为 RWO 卷：新旧 Pod 不能跨节点同时挂载，先停后起（RollingUpdate 会因 Multi-Attach 卡死）
   {{- else }}
   strategy:
     type: RollingUpdate
