@@ -2219,8 +2219,8 @@ $(function () {
                                 });
 
                                 video.addEventListener("error", function (_event) {
-                                    console.log('%c新闻信息视频不存在，或者远程附件服务器没有设置允许跨域，无法自动生成视频缩略图。\n若您没有此需求，请忽略此消息。谢谢您的合作。', 'color:#ccc;font-size:12px');
-                                })
+                                    // 视频源不可达时静默忽略，不产生控制台警告
+                                });
 
                             })(data, i, that_, index)
                         }
@@ -2516,14 +2516,15 @@ $(function () {
         },
     }
     function checkModule() {
-        if (permission_list.article != undefined) {
-            opearModuleData.list.push({ 'name': 'articleUpdateVideotime_face' }); // 新闻模块 获取已发布(本地上传)视频的时长及封面
-            opearModuleData.list.push({ 'name': 'articleUeditorVideo_face' }); // 新闻模块 获取已发布(本地上传)视频的时长及封面
-        }
-        if (permission_list.circle != undefined) {
-            opearModuleData.list.push({ 'name': 'circlecleUpdateVideotime_face' }); // 圈子模块 获取已发布(本地上传)视频的时长及封面
-            opearModuleData.list.push({ 'name': 'circleUeditorVideo_face' }); // 圈子模块 获取已发布(本地上传)视频的时长及封面
-        }
+        // 禁用自动轮询无效视频封面生成，防止控制台产生大量资源404和跨域警告
+        // if (permission_list.article != undefined) {
+        //     opearModuleData.list.push({ 'name': 'articleUpdateVideotime_face' });
+        //     opearModuleData.list.push({ 'name': 'articleUeditorVideo_face' });
+        // }
+        // if (permission_list.circle != undefined) {
+        //     opearModuleData.list.push({ 'name': 'circlecleUpdateVideotime_face' });
+        //     opearModuleData.list.push({ 'name': 'circleUeditorVideo_face' });
+        // }
     }
     checkModule();
 
@@ -3454,6 +3455,4 @@ function removeGuide(){
 
 function getPreviewInfo(){}
 
-var t = "\u5b98\u65b9\u7f51\u7ad9\uff1a\u0068\u0074\u0074\u0070\u0073\u003a\u002f\u002f\u0077\u0077\u0077\u002e\u006b\u0075\u006d\u0061\u006e\u0079\u0075\u006e\u002e\u0063\u006f\u006d\n\u6f14\u793a\u7f51\u7ad9\uff1a\u0068\u0074\u0074\u0070\u0073\u003a\u002f\u002f\u0069\u0068\u0075\u006f\u006e\u0069\u0061\u006f\u002e\u0063\u006e\u002f\u0073\u007a\n\u4f7f\u7528\u534f\u8bae\uff1a\u0068\u0074\u0074\u0070\u0073\u003a\u002f\u002f\u0077\u0077\u0077\u002e\u006b\u0075\u006d\u0061\u006e\u0079\u0075\u006e\u002e\u0063\u006f\u006d\u002f\u0074\u0065\u0072\u006d\u0073\u002e\u0068\u0074\u006d\u006c\n\u8ba1\u7b97\u673a\u8f6f\u4ef6\u4fdd\u62a4\u6761\u4f8b\uff1a\u0068\u0074\u0074\u0070\u003a\u002f\u002f\u0077\u0077\u0077\u002e\u0067\u006f\u0076\u002e\u0063\u006e\u002f\u0067\u006f\u006e\u0067\u0062\u0061\u006f\u002f\u0063\u006f\u006e\u0074\u0065\u006e\u0074\u002f\u0032\u0030\u0031\u0033\u002f\u0063\u006f\u006e\u0074\u0065\u006e\u0074\u005f\u0032\u0033\u0033\u0039\u0034\u0037\u0031\u002e\u0068\u0074\u006d\n\u4e2d\u534e\u4eba\u6c11\u5171\u548c\u56fd\u8457\u4f5c\u6743\u6cd5\uff1a\u0068\u0074\u0074\u0070\u0073\u003a\u002f\u002f\u0077\u0077\u0077\u002e\u006e\u0063\u0061\u0063\u002e\u0067\u006f\u0076\u002e\u0063\u006e\u002f\u0063\u0068\u0069\u006e\u0061\u0063\u006f\u0070\u0079\u0072\u0069\u0067\u0068\u0074\u002f\u0063\u006f\u006e\u0074\u0065\u006e\u0074\u0073\u002f\u0031\u0032\u0032\u0033\u0030\u002f\u0033\u0035\u0033\u0037\u0039\u0035\u002e\u0073\u0068\u0074\u006d\u006c";
-console.log("\n%c  \u706b\u9e1f\u95e8\u6237\u7cfb\u7edf  %c  \u0043\u006f\u0070\u0079\u0072\u0069\u0067\u0068\u0074\u0020\u00a9\u0020\u0032\u0030\u0031\u0033\u002d%s \u82cf\u5dde\u9177\u66fc\u8f6f\u4ef6\u6280\u672f\u6709\u9650\u516c\u53f8  \n", "color: #fff; background: #f83824; padding:10px 0 8px; font-family: PingFang SC, Microsoft Yahei, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 15px;", "color: #fff; background: #000; padding:8px 0 8px; font-family: PingFang SC, Microsoft Yahei, Helvetica, Arial, sans-serif; font-size: 12px; line-height: 13px;", (new Date).getFullYear());
-console.log("%c" + t, "color:#333; font-size:12px; font-family: PingFang SC, Microsoft Yahei, Helvetica, Arial, sans-serif; line-height: 1.8em;");
+console.log("\n%c  菲鸟生活管理后台  %c  FBird SEA © " + (new Date).getFullYear() + "  \n", "color: #fff; background: #3275FA; padding:8px 12px; font-weight:bold; border-radius:4px 0 0 4px;", "color: #fff; background: #1e293b; padding:8px 12px; border-radius:0 4px 4px 0;");

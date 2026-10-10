@@ -91,8 +91,15 @@ $pagestep = $pagestep == "" ? ($pageSize ? $pageSize : 10) : $pagestep;
 $page = $page == "" ? 1 : $page;
 
 $cfg_basehost_ = $cfg_basehost;
-if(substr($cfg_basehost, 0, 4) == 'www.') {
-    $cfg_basehost_ = substr($cfg_basehost, 4);
+$cfg_basehost_ = str_replace('-admin.', '.', $cfg_basehost_);
+$cfg_basehost_ = preg_replace('/^admin\./', '', $cfg_basehost_);
+if(substr($cfg_basehost_, 0, 4) == 'www.') {
+    $cfg_basehost_ = substr($cfg_basehost_, 4);
+}
+// 若包含多级子域名（如 canary.fbird.men），提取主域名（fbird.men）用于各模块子域名配置
+$hostParts = explode('.', $cfg_basehost_);
+if (count($hostParts) >= 3 && !preg_match('/^\d+\.\d+\.\d+\.\d+$/', $cfg_basehost_)) {
+    $cfg_basehost_ = implode('.', array_slice($hostParts, -2));
 }
 
 $huoniaoTag->assign('cfg_basehost_', $cfg_basehost_);

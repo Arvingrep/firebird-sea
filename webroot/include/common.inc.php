@@ -74,7 +74,17 @@ else{
 
 // 动态适配当前访问域名，确保静态资源在当前子域名下同源加载，避免根域名缺少DNS解析导致 ERR_NAME_NOT_RESOLVED
 if (!empty($_SERVER['HTTP_HOST'])) {
-    $cfg_basehost = $_SERVER['HTTP_HOST'];
+    $currentHost = $_SERVER['HTTP_HOST'];
+    $currentHostNoPort = preg_replace('/:\d+$/', '', $currentHost);
+
+    // 如果是通过后台域名访问（如 canary-admin.fbird.men 或 admin.fbird.men），自动剥离 admin 标识映射到前台站点基准域名
+    if (strpos($currentHostNoPort, '-admin.') !== false) {
+        $cfg_basehost = str_replace('-admin.', '.', $currentHostNoPort);
+    } elseif (strpos($currentHostNoPort, 'admin.') === 0) {
+        $cfg_basehost = substr($currentHostNoPort, 6);
+    } else {
+        $cfg_basehost = $currentHostNoPort;
+    }
 } elseif (empty($cfg_basehost) || $cfg_basehost === '~domain') {
     $cfg_basehost = 'fbird.men';
 }
