@@ -72,7 +72,7 @@ test('正文生成：目标/验收/AD/规则/增量提示，且只带 agent:dev 
   const r = renderIssue(s, { key: '1-1-入库', adTitles: new Map([[14, '火鸟核心不改']]), specFile: 'spec-1-1-x.md', testFile: 'scripts/acceptance/story-1-1.sh' });
   assert.equal(r.title, '[story:1-1-入库] Story 1.1 入库');
   assert.deepEqual(r.labels, ['agent:dev']);
-  for (const frag of ['<!-- bmad-story: 1-1-入库 -->', 'I want 入库', '**Given** A', 'AD-14 — 火鸟核心不改', '`.github/`', 'spec-1-1-x.md', '≤ 300 行', '## 测试先行', '当前为红', 'scripts/acceptance/', '逐条验收条件', '<!-- test-first: present -->'])
+  for (const frag of ['<!-- bmad-story: 1-1-入库 -->', 'I want 入库', '**Given** A', 'AD-14 — 火鸟核心不改', '`.github/`', 'spec-1-1-x.md', '≤ 1200 行', '## 测试先行', '当前为红', 'scripts/acceptance/', '逐条验收条件', '<!-- test-first: present -->'])
     assert.ok(r.body.includes(frag), frag);
   assert.match(renderIssue(s, { key: '1-1-入库' }).body, /test-first: missing[\s\S]*尚无预置验收测试/);
   assert.doesNotMatch(r.body, /agent:qa|qa:accepted|qa:rejected|agent:blocked|agent:dev/);

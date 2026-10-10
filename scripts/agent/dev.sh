@@ -140,7 +140,7 @@ PROMPT_FILE="$(mktemp)"; trap 'rm -f "$PROMPT_FILE"' EXIT
   echo "## 硬性要求"
   echo "1. 只实现单一核心 AC，不做范围扩张；火鸟后台已有的配置能力不要重写。"
   echo "2. Docs-as-Code：业务代码（php/js/ts/vue/sql）有改动，必须同时更新 docs/ 下对应文档。"
-  echo "3. 新增代码（不含 docs）≤ 300 行；不新增依赖；不留 .bak/调试输出（var_dump/console.log）。"
+  echo "3. 新增代码（不含 docs）≤ 1200 行；不新增依赖；不留 .bak/调试输出（var_dump/console.log）。"
   echo "4. 绝不写入任何私钥、助记词、Token。"
   echo "5. 不要执行 git commit/push，不要改 .github/、scripts/agent/、scripts/acceptance/、.agents/（由外层流水线负责）。"
   if [ -n "$STORY_ID" ]; then

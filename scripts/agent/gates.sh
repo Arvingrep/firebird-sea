@@ -2,7 +2,7 @@
 # 确定性门禁（无 LLM）：只看「本分支相对 base 的改动」，结果据实输出，不写死 PASS。
 # 用法：scripts/agent/gates.sh [base-ref]     （默认 origin/main）
 # 输出：stdout 为 Markdown 报告；任一 FAIL => 退出码 1。
-# 阈值：GATE_MAX_ADDED（默认 300，不含 docs/、.agents/、_bmad-output/ 规划产物）
+# 阈值：GATE_MAX_ADDED（默认 1200，不含 docs/、.agents/、_bmad-output/ 规划产物）
 # 环境：GATE_REPO_DIR       被检查的仓库目录（QA 用 main 上的本脚本检查 PR 检出）
 #       GATE_AGENT_BRANCH=1 Agent 分支：禁止改动 .github/、scripts/agent/、scripts/acceptance/（测试先行用例）、.agents/
 #       GATE_REQUIRE_TOOLS=1 缺 php/helm 判 FAIL（托管 runner 上为权威结果）；否则记为 SKIP
@@ -11,7 +11,7 @@ set -uo pipefail
 cd "${GATE_REPO_DIR:-$(dirname "${BASH_SOURCE[0]}")/../..}"
 
 BASE="${1:-origin/main}"
-MAX_ADDED="${GATE_MAX_ADDED:-300}"
+MAX_ADDED="${GATE_MAX_ADDED:-1200}"
 RANGE="${BASE}...HEAD"
 # --no-renames：重命名拆成「删除源 + 新增目标」，避免把受保护文件挪走时源路径不出现
 CHANGED="$(git diff --no-renames --name-only --diff-filter=ACMR "$RANGE")"

@@ -26,7 +26,7 @@ reset; mkdir -p scripts/acceptance; echo ':' > scripts/acceptance/story-1-1.sh; 
 case_ "Agent 分支改 scripts/acceptance → FAIL" 1 1
 case_ "非 Agent 分支改 scripts/acceptance → 放行" 0 0
 reset; mkdir -p _bmad-output; seq 1 400 > _bmad-output/epics.md; git add -A; git commit -qm e
-case_ "_bmad-output 不计 300 行增量" 0 0
+case_ "_bmad-output 不计 1200 行增量" 0 0
 # --- story.sh：Story key 解析（dev.sh 注入规格/预检依赖它）---
 source "$ROOT/scripts/agent/story.sh"
 eq() { if [ "$2" = "$3" ]; then echo "✅ $1"; else echo "❌ $1（期望「$3」实际「$2」）"; FAIL=1; fi; }
