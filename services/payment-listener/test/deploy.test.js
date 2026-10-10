@@ -23,6 +23,8 @@ test('AC1: compose 含 payment-listener，副本数 1', () => {
   assert.match(block, /dockerfile: deploy\/docker\/Dockerfile\.payment-listener/);
   assert.match(block, /replicas: 1/);
   assert.doesNotMatch(block, /^\s+ports:/m, '监听器不对外暴露端口');
+  assert.match(block, /profiles: \[payment\]/);
+  assert.doesNotMatch(block, /:\?required/, '必填校验不得放在 compose 解析阶段');
 });
 
 test('AC1: Helm Deployment 副本数 1 且更新策略 Recreate', () => {
@@ -50,7 +52,18 @@ test('AC2: 网关 /api/fbs 对外被拒绝（AD-19）', () => {
 // 渲染级断言：helm 不可用时跳过
 const { spawnSync } = require('node:child_process');
 const rendered = spawnSync('helm', ['template', 'x', path.join(ROOT, chart), '--set', 'paymentListener.enabled=true'], { encoding: 'utf8' });
-const renderOpts = { skip: rendered.status !== 0 && 'helm 不可用' };
+// CI（CI=true）下 helm 缺失即失败，不允许跳过
+const renderOpts = { skip: rendered.status !== 0 && !process.env.CI && 'helm 不可用' };
+
+test('CI 下 helm 渲染必须成功', () => {
+  if (process.env.CI) assert.equal(rendered.status, 0, rendered.stderr);
+});
+
+test('denyGateway=false 时无悬空 Middleware 引用', renderOpts, () => {
+  const r = spawnSync('helm', ['template', 'x', path.join(ROOT, chart), '--set', 'ingressRoute.denyGateway=false'], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stdout, /firebird-deny-gateway-/);
+});
 
 test('AC1/AC2: helm 渲染出 replicas=1、Recreate、secretKeyRef', renderOpts, () => {
   const doc = rendered.stdout.split(/^---$/m).find((d) => /^  name: firebird-payment-listener/m.test(d) && /kind: Deployment/.test(d));

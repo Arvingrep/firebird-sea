@@ -110,13 +110,15 @@ services:
       dockerfile: deploy/docker/Dockerfile.payment-listener
     container_name: firebird-payment-listener
     restart: unless-stopped
+    profiles: [payment]  # 默认栈不启动；docker compose --profile payment up
     deploy:
       replicas: 1
     environment:
-      - TRON_MASTER_RECEIVE_ADDRESS=${TRON_MASTER_RECEIVE_ADDRESS:?required}
+      # 缺失时由监听器启动自检失败，不阻塞其他服务的 compose 解析
+      - TRON_MASTER_RECEIVE_ADDRESS=${TRON_MASTER_RECEIVE_ADDRESS:-}
       - TRONGRID_API_KEY=${TRONGRID_API_KEY:-}
-      # 回调目标（services/api 的 /tg-api/payment/chain-match）；compose 内尚无 api 服务，须显式指定
-      - API_BASE_URL=${API_BASE_URL:?required}
+      # 回调目标（回调尚未启用，见 docs/internal/GATEWAY_SPIKE.md）
+      - API_BASE_URL=${API_BASE_URL:-}
     networks:
       - firebird-net
 
