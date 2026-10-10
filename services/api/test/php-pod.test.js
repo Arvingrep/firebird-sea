@@ -178,3 +178,15 @@ test('GitOps config lock: root read-only enforcement + nginx message rewrite, de
   const mj = values.match(/messageJson: '([^']+)'/);
   assert.equal(JSON.parse('"' + mj[1] + '"'), values.match(/^  message: "([^"]+)"/m)[1]);
 });
+
+test('2 replicas everywhere, with sticky sessions and HPA still opt-in', () => {
+  assert.match(values, /^replicaCount: 2$/m);
+  assert.match(values, /^api:\s*\n\s+enabled: true\s*\n\s+replicaCount: 2$/m);
+  for (const site of ['manila', 'cebu', 'canary']) {
+    assert.match(read(`${chart}/values-${site}.yaml`), /^replicaCount: 2$/m, site);
+  }
+  const ing = T('ingressroute.yaml');
+  assert.match(ing, /sticky:\s*\n\s+cookie:/);
+  assert.match(values, /^ingressRoute:\s*\n\s+enabled: true\s*\n\s+sticky:\s*\n\s+enabled: true/m);
+  assert.match(values, /^autoscaling:\s*\n\s+enabled: false/m, 'HPA 仍需显式开启');
+});
