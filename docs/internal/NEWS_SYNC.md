@@ -1,0 +1,25 @@
+# AI 新闻同步到门户 (Story 6.3)
+
+服务:`services/news-sync`(零依赖,Node 内置 `fetch`/`crypto`/`fs`)。
+
+流程:采集结果(JSON 数组 `[{title,url,summary}]`)经 stdin 进入 `src/cli.js` → 清洗 → 按 URL SHA-256 去重 → 发布到门户 → 失败重试(3 次,线性退避)→ 仍失败则 Telegram 告警运营者,且不记入已见集合,下一轮自动重试。
+
+AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链接,丢弃其它字段(含价格)。
+
+## 环境变量
+
+| 变量 | 说明 |
+| :--- | :--- |
+| `NEWS_PORTAL_PUBLISH_URL` | 门户发布接口(POST JSON) |
+| `NEWS_PORTAL_TOKEN` | 门户发布接口 Bearer Token(仅运行环境注入) |
+| `NEWS_ALERT_BOT_TOKEN` / `NEWS_ALERT_CHAT_ID` | 失败告警的 Telegram Bot 与运营者 Chat |
+| `NEWS_SYNC_SEEN_FILE` | 已发布去重集合文件,默认 `./news-seen.json` |
+
+## 测试
+
+`cd services/news-sync && npm test`(`src/sync.test.js`:去重 / 重试 / 告警 / 输入清洗)。
+
+## 待人工
+
+- 门户发布接口(火鸟新闻入库端点)需 Arvin 确认后配置;"真实环境运行一轮"需部署后手动验证。
+- n8n 调度接入(`automation/n8n/workflows`)未包含,建议后续拆分。
