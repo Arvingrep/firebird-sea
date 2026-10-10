@@ -94,13 +94,14 @@ if [ -n "$REDIS_HOST" ] && ! php -m 2>/dev/null | grep -qi '^redis$'; then
     echo ">>> [WARN] 已配置 REDIS_HOST 但 PHP 缺少 redis 扩展（firebird-base 镜像过旧？），会话回退为文件存储，Pod 重建/多副本会丢登录态" >&2
 fi
 if [ -n "$REDIS_HOST" ] && php -m 2>/dev/null | grep -qi '^redis$'; then
-    if php -r '$r=new Redis(); exit($r->connect(getenv("REDIS_HOST"),(int)(getenv("REDIS_PORT")?:6379),2)?0:1);' 2>/dev/null; then
+    # 探活必须带认证 PING：裸 connect 对要求 AUTH 的 Redis 也会成功，导致运行期 session_start() 全站 NOAUTH Fatal
+    if php -r '$r=new Redis(); if(!$r->connect(getenv("REDIS_HOST"),(int)(getenv("REDIS_PORT")?:6379),2)) exit(1); $p=getenv("REDIS_PASSWORD"); if($p!==false && $p!=="" && !$r->auth($p)) exit(1); try { $r->ping(); } catch (Exception $e) { exit(1); } exit(0);' 2>/dev/null; then
         {
             echo 'session.save_handler = redis'
             echo "session.save_path = \"tcp://${REDIS_HOST}:${REDIS_PORT:-6379}?timeout=2&prefix=PHPREDIS_SESSION_${SITE_ID:-site}:${REDIS_PASSWORD:+&auth=${REDIS_PASSWORD}}\""
         } > /usr/local/etc/php/conf.d/zz-session-redis.ini
     else
-        echo ">>> [WARN] Redis ${REDIS_HOST}:${REDIS_PORT:-6379} 不可达，会话回退为文件存储" >&2
+        echo ">>> [WARN] Redis ${REDIS_HOST}:${REDIS_PORT:-6379} 不可达或认证失败（REDIS_PASSWORD 未配置/不正确？），会话回退为文件存储" >&2
     fi
 fi
 
