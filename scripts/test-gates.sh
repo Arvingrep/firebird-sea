@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gates.sh 自测：Zero-Dep 批准清单 / 受保护路径 / _bmad-output 不计行。在临时仓库里造 base+分支，不碰当前仓库。
+# gates.sh / story.sh 自测：Zero-Dep 批准清单 / 受保护路径 / _bmad-output 不计行 / Story key 解析。在临时仓库里造 base+分支，不碰当前仓库。
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
@@ -27,4 +27,12 @@ case_ "Agent 分支改 scripts/acceptance → FAIL" 1 1
 case_ "非 Agent 分支改 scripts/acceptance → 放行" 0 0
 reset; mkdir -p _bmad-output; seq 1 400 > _bmad-output/epics.md; git add -A; git commit -qm e
 case_ "_bmad-output 不计 300 行增量" 0 0
+# --- story.sh：Story key 解析（dev.sh 注入规格/预检依赖它）---
+source "$ROOT/scripts/agent/story.sh"
+eq() { if [ "$2" = "$3" ]; then echo "✅ $1"; else echo "❌ $1（期望「$3」实际「$2」）"; FAIL=1; fi; }
+eq "标题 [story:key] 解析（含中文）" "$(story_key 'feat [story:1-7-计划任务-cronjob] x' '')" "1-7-计划任务-cronjob"
+eq "正文标记兜底" "$(story_key '普通' 'a <!-- bmad-story: 2-1-foo --> b')" "2-1-foo"
+eq "无标记 → 空" "$(story_key '普通' '无')" ""
+eq "story_id 取前两段数字" "$(story_id '1-7-计划任务-cronjob')|$(story_id 2.4)" "1-7|2-4"
+eq "story_spec 无规格不报错" "$(cd "$T" && story_spec HEAD 9-9; echo "rc=$?")" "rc=0"
 exit $FAIL
