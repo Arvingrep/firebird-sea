@@ -77,15 +77,13 @@ if (!empty($_SERVER['HTTP_HOST'])) {
     $currentHost = $_SERVER['HTTP_HOST'];
     $currentHostNoPort = preg_replace('/:\d+$/', '', $currentHost);
 
-    // 如果是通过后台域名访问（如 canary-admin.fbird.men 或 admin.fbird.men），自动剥离 admin 标识映射到前台站点基准域名
-    if (strpos($currentHostNoPort, '-admin.') !== false) {
-        $cfg_basehost = str_replace('-admin.', '.', $currentHostNoPort);
-    } elseif (strpos($currentHostNoPort, 'admin.') === 0) {
-        $frontHost = getenv('SITE_BASEHOST') ?: '';
+    // 如果是通过后台域名访问（如 canary-admin.fbird.men、prod-admin.fbird.men 或 admin.fbird.men），优先映射到环境变量 SITE_BASEHOST，确保对齐前台站点主域名
+    $frontHost = getenv('SITE_BASEHOST') ?: '';
+    if (strpos($currentHostNoPort, '-admin.') !== false || strpos($currentHostNoPort, 'admin.') === 0) {
         if (!empty($frontHost) && $frontHost !== 'fbird.men') {
             $cfg_basehost = $frontHost;
-        } elseif ($currentHostNoPort === 'admin.fbird.men') {
-            $cfg_basehost = 'manila.fbird.men';
+        } elseif (strpos($currentHostNoPort, '-admin.') !== false) {
+            $cfg_basehost = str_replace('-admin.', '.', $currentHostNoPort);
         } else {
             $cfg_basehost = substr($currentHostNoPort, 6);
         }
