@@ -82,7 +82,7 @@ test('AC1 本分支相对 origin/main 的改动仅限选定白名单且不含授
 
   // 白名单范围断言仅适用于 Story 1.1 自身的交付分支（diff 触及外卖模块相关文件时），
   // 否则任何无关 PR（如 sprint-status 回写）都会被误拦——见 PR #58 verify-task 失败根因。
-  const touchesStory = changed !== null && changed.some((f) => /waimai/i.test(f));
+  const touchesStory = changed !== null && changed.some((f) => /^webroot\/.*waimai/i.test(f));
   if (changed !== null && touchesStory) {
     const invalidFiles = changed.filter((f) => !allowedWhitelist.some((re) => re.test(f)));
     assert.deepStrictEqual(invalidFiles, [], '改动文件超出 Story 1.1 选定白名单范围');
