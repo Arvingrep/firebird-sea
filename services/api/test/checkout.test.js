@@ -36,7 +36,7 @@ const args = (o = {}) => ({ ordernum: 'ORD1', phpCentavos: 12500, getRate: fresh
 
 test('AC1 应付金额 = ceil(centavos*1e4/rate) + tail*1e4，返回快照字段', async () => {
   assert.strictEqual(baseMicro(12500, '62.5'), 2000000n);
-  assert.strictEqual(baseMicro(100, '62.88'), 159033n); // ceil(1000000/62.88)
+  assert.strictEqual(baseMicro(100, '62.88'), 15904n); // ceil(1000000/62.88)
   const conn = fakeConn();
   const r = await createCheckout(conn, args());
   const tail = r.payable_micro - 2000000;
