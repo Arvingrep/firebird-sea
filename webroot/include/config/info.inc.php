@@ -1,14 +1,14 @@
 <?php
-$customChannelName = '夏威夷华人分类信息';
+$customChannelName = '马尼拉华人分类信息';
 $customLogo = 0;
 $customLogoUrl = '';
 $customSharePic = '';
 $customSubDomain = 0;
 $customChannelSwitch = 0;
 $customCloseCause = '站点升级中。。。';
-$customSeoTitle = '夏威夷华人分类信息 - 本地生活服务平台';
-$customSeoKeyword = '夏威夷华人,檀香山分类信息,华人二手交易,夏威夷租房,华人招聘,本地服务';
-$customSeoDescription = '夏威夷华人分类信息平台，提供房产租售、招聘求职、二手交易、生活服务等本地化信息服务，连接夏威夷华人社区';
+$customSeoTitle = '马尼拉华人分类信息 - 本地生活服务平台';
+$customSeoKeyword = '马尼拉华人,菲律宾分类信息,华人二手交易,马尼拉租房,华人招聘,本地服务';
+$customSeoDescription = '马尼拉华人分类信息平台，提供房产租售、招聘求职、二手交易、生活服务等本地化信息服务，连接菲律宾华人社区';
 $hotline_config = 0;
 $customHotline = '';
 $customAtlasMax = 20;
