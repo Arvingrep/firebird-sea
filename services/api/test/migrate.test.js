@@ -55,7 +55,8 @@ test('AC2: second run applies nothing; migration has no destructive/DML statemen
   const before = conn.executed.length;
   assert.deepEqual(await migrate(conn), []);
   assert.equal(conn.executed.length - before, 2); // 仅建记录表 + 查询已应用列表
-  assert.doesNotMatch(allSql(), /\b(DROP|TRUNCATE|DELETE|INSERT|UPDATE)\b/i);
+  // 只匹配语句起始的破坏性/DML 关键字，避免误伤列定义里的 `ON UPDATE CURRENT_TIMESTAMP`
+  assert.doesNotMatch(allSql(), /^\s*(DROP|TRUNCATE|DELETE|INSERT|UPDATE)\b/im);
 });
 
 // AC3: 零依赖 —— 不使用 mysql2，决定记录在文档
