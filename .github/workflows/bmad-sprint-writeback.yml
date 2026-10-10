@@ -1,0 +1,53 @@
+name: BMAD sprint-status 回写
+
+# agent PR 合并后，把对应 Story 置 done，并以「PR」形式回写 sprint-status.yaml（不直推 main，保持 main 只经 PR 变更）。
+# Story 定位：PR 标题里的 [story:<key>]（由 story-to-issue.js 生成的 Issue 标题继承而来）；没有标记则静默跳过。
+# 回写 PR 仅改 _bmad-output/，不触发镜像构建（ci-gke paths-ignore），门禁天然通过，由人合并。
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bmad-sprint-writeback
+  cancel-in-progress: false
+
+jobs:
+  writeback:
+    if: >-
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'agent/issue-') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}   # PAT：推分支并开 PR（GITHUB_TOKEN 开的 PR 不触发 CI）
+      PR_TITLE: ${{ github.event.pull_request.title }}   # 一律经 env 传入，不拼进脚本，防标题注入
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: 解析 story-key 并经 PR 回写
+        run: |
+          set -euo pipefail
+          re='\[story:([^]]+)\]'
+          [[ "$PR_TITLE" =~ $re ]] || { echo "标题无 [story:] 标记，跳过"; exit 0; }
+          KEY="${BASH_REMATCH[1]}"
+          F=_bmad-output/implementation-artifacts/sprint-status.yaml
+          [ -f "$F" ] || { echo "main 上没有 $F，跳过"; exit 0; }
+          node scripts/bmad/sync-sprint-status.js "$KEY" done --file "$F"
+          git diff --quiet -- "$F" && { echo "状态无变化，跳过"; exit 0; }
+          ID="$(printf '%s' "$KEY" | grep -oE '^[0-9]+-[0-9]+' || echo story)"
+          B="bmad/sprint-done-${ID}-pr${PR_NUMBER}"
+          git config user.name "firebird-agent"; git config user.email "agent@users.noreply.github.com"
+          git checkout -qb "$B"; git add "$F"
+          git commit -qm "chore(bmad): ${KEY} -> done (#${PR_NUMBER})"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -q origin "$B"
+          gh pr create -R "$REPO" --base main --head "$B" \
+            --title "chore(bmad): Story ${ID} -> done (#${PR_NUMBER})" \
+            --body "自动回写：PR #${PR_NUMBER} 已合并，\`${KEY}\` 置 \`done\`。仅改 \`sprint-status.yaml\`，无运行时影响，请人工合并。"
