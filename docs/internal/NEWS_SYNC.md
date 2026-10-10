@@ -8,7 +8,13 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 
 ## 门户契约与可靠性
 
-- 发布请求:`POST NEWS_PORTAL_PUBLISH_URL`,头 `Idempotency-Key: <sha256(url)>`,body 含 `title/url/summary/dedupeKey`。门户须以 `dedupeKey` 幂等入库;响应须为 HTTP 2xx 且 JSON `{ "success": true }`,否则(含 HTTP 200 + `success:false`)视为失败,重试并告警,不记入已见集合。此契约为本服务假定,需与火鸟新闻入库端点对齐。
+- **真实火鸟契约(Cookie 登录,`src/portal.js`,凭据齐备时自动启用)**:
+  1. 登录 `POST <origin>/loginCheck.html`(表单 `username/password/platform=app`,ajax.php 的 member 服务无 loginCheck,实测返回 action no found),成功 `{state:100}`;鉴权 Cookie 须整罐保存(`PHPSESSID` + `HN_userid/HN_login_user` 等,仅 PHPSESSID 会被判登录超时)。
+  2. 发布 `POST <origin>/include/ajax.php?service=article&action=put`(表单 `cityid/typeid/mold=0/title/body/sourceurl`,body 内嵌 `<!-- dedupe:<key> -->`)。经 handlers 包装:成功 `{state:100,info:{aid,...}}`;业务失败/未登录统一 `{state:101,info:...}`,info 含「登录超时」或返回 HTML 登录页 → 自动重新登录一次再发,仍失败抛错走告警;其它 `state!=100`(如「您还没有入驻自媒体」「申请正在审核中」、入库错)为业务失败,不重登(同源:`webroot/api/handlers/{handlers,article}.class.php`、`member.controller.php`)。
+  3. 下架 `action=del`(软删 `del=1`,仅作者本人,`state:100`),复验清理用(`publish.remove(id)`)。
+  - 发布账号须为门户会员且已入驻自媒体(`#@__article_selfmedia` state=1),否则 put 被拒。
+  - 凭据只从运行环境(env 文件)读入,任何日志/错误信息不输出凭据与 Cookie 值。
+- 旧 Bearer 契约(`src/io.js makePublisher`,未配 USER/PASS 时回退):`POST NEWS_PORTAL_PUBLISH_URL`,头 `Idempotency-Key`,响应须 HTTP 2xx 且 `{ "success": true }`。门户无 Bearer 端点,此路径仅供 mock/演练。
 - 去重文件 tmp + rename 原子写;文件不存在视为空,损坏/无权限则整轮报错退出(不会误当空集合重复发布)。
 - 门户成功但去重文件写入失败:计为已发布,并在告警中提示;下轮同一幂等键重发,由门户去重。
 - 告警按行切分为 ≤4000 字符多条发送,整体有界重试(3 次);仍失败则 `alertFailed=true`、进程退出码 1。失败项未入已见集合,下轮会再次告警。
@@ -17,8 +23,11 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 
 | 变量 | 说明 |
 | :--- | :--- |
-| `NEWS_PORTAL_PUBLISH_URL` | 门户发布接口(POST JSON) |
-| `NEWS_PORTAL_TOKEN` | 门户发布接口 Bearer Token(仅运行环境注入) |
+| `NEWS_PORTAL_PUBLISH_URL` | 门户发布接口;Cookie 适配取其 origin 拼 ajax 路径 |
+| `NEWS_PORTAL_USER` / `NEWS_PORTAL_PASS` | 门户会员账号(仅运行环境注入);配置后启用 Cookie 登录适配 |
+| `NEWS_PORTAL_CITYID` / `NEWS_PORTAL_TYPEID` | 发布城市/栏目 ID,默认均为 1 |
+| `NEWS_PORTAL_TOKEN` | 旧 Bearer 契约 Token(仅 mock/演练) |
+| `NEWS_SYNC_MAX_PER_RUN` | 单轮最多处理条数(n8n 定时限量),未设则不限 |
 | `NEWS_ALERT_BOT_TOKEN` / `NEWS_ALERT_CHAT_ID` | 失败告警的 Telegram Bot 与运营者 Chat |
 | `NEWS_ALERT_API_BASE` | 告警 API 基址,默认 `https://api.telegram.org`;本地验收指向 mock |
 | `NEWS_SYNC_SEEN_FILE` | 已发布去重集合文件,默认 `./news-seen.json` |
@@ -42,5 +51,4 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 
 ## 待人工
 
-- 真实火鸟门户发布端点与 `NEWS_PORTAL_TOKEN` 需 Arvin 提供后,在真实环境复跑 `e2e-local.sh` 等价流程。
-- n8n 调度接入(`automation/n8n/workflows`)未包含,建议后续拆分。
+- n8n 调度接入(`automation/n8n/workflows`)未包含,见 Issue #55(TASK-016 → news-sync 定时限量同步)。
