@@ -24,7 +24,7 @@ function sqlTime(ms) {
 
 // base = ceil(php_centavos * 1e4 / rate)（1 centavo = 0.01 PHP；1 USDT = 1e6 micro），全程整数运算。
 function baseMicro(phpCentavos, rateStr) {
-  const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(rateStr);
+  const m = /^(\d+)(?:\.(\d{1,18}))?$/.exec(rateStr);
   const num = m && BigInt(m[1] + (m[2] || ''));
   if (!num || num <= 0n) throw new CheckoutError('RATE_INVALID', '汇率无效');
   const scale = 10n ** BigInt((m[2] || '').length);
@@ -40,16 +40,20 @@ function pickTail(occupied) {
 }
 
 // ordernum / idempotency_key 重复：返回已有收银台（幂等）。
-async function findExisting(conn, ordernum, idempotencyKey, address) {
+async function findExisting(conn, ordernum, idempotencyKey, address, nowMs) {
   const byIdem = idempotencyKey === null ? '' : ` OR idempotency_key='${idempotencyKey}'`;
   const out = String(
     (await conn.query(
-      `SELECT ordernum, payable_micro, rate_str, rate_at, expires_at FROM fbs_charge WHERE ordernum='${ordernum}'${byIdem} LIMIT 1`,
+      `SELECT ordernum, payable_micro, rate_str, rate_at, expires_at, state FROM fbs_charge WHERE ordernum='${ordernum}'${byIdem} LIMIT 1`,
     )) || '',
   ).trim();
   if (!out) return null;
-  const [on, payable, rateStr, rateAt, expiresAt] = out.split('\t');
+  const [on, payable, rateStr, rateAt, expiresAt, state] = out.split('\t');
   const iso = (v) => new Date(`${v.replace(' ', 'T')}Z`).toISOString();
+  // 已过期 / 非 pending：尾数已释放，金额可能已分配给他人，不得返回
+  if (state !== 'pending' || Date.parse(iso(expiresAt)) < nowMs) {
+    throw new CheckoutError('EXPIRED', '收银台已过期，请重新下单');
+  }
   return { ordernum: on, payable_micro: Number(payable), rate_str: rateStr, rate_at: iso(rateAt), expires_at: iso(expiresAt), address };
 }
 
@@ -105,7 +109,7 @@ async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = nu
         continue;
       }
       if (/Duplicate entry/.test(err.message)) {
-        const existing = await findExisting(conn, ordernum, idempotencyKey, address);
+        const existing = await findExisting(conn, ordernum, idempotencyKey, address, t0);
         if (existing) return existing;
         throw new CheckoutError('ORDER_EXISTS', '订单已存在收银台');
       }
@@ -129,7 +133,7 @@ function coinsRateSource(client, now = Date.now) {
     const book = await client.getOrderBook('USDTPHP', 5);
     const bid = book.bids && book.bids[0];
     if (!bid || !(bid.price > 0)) throw new Error('empty order book');
-    return { rate_str: String(bid.price), rate_at: now() };
+    return { rate_str: bid.priceStr || String(bid.price), rate_at: now() };
   };
 }
 

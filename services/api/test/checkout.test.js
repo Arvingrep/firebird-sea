@@ -6,7 +6,7 @@ const NOW = Date.parse('2026-01-01T00:00:00Z');
 const fresh = () => Promise.resolve({ rate_str: '62.5', rate_at: NOW - 1000 });
 
 // 内存假连接：模拟 fbs_charge 的 tail_key 唯一约束；hook 可在 SELECT 之后注入并发写入。
-function fakeConn({ occupiedTails = [], base = 0, afterSelect, existing } = {}) {
+function fakeConn({ occupiedTails = [], base = 0, afterSelect, existing, failFirstInsert } = {}) {
   const rows = occupiedTails.map((t) => ({ tail: t, payable: base + t * 10000 }));
   const inserts = [];
   return {
@@ -23,6 +23,10 @@ function fakeConn({ occupiedTails = [], base = 0, afterSelect, existing } = {}) 
       inserts.push(sql);
       if (existing) throw new Error("ERROR 1062 (23000): Duplicate entry 'ORD1' for key 'uq_fbs_charge_ordernum'");
       const payable = Number(/, (\d+), '62\.5'/.exec(sql)[1]);
+      if (failFirstInsert && inserts.length === 1) {
+        // 确定性并发冲突：对首次选中的尾数，另一请求已抢先落库
+        rows.push({ tail: (payable % 1000000) / 10000, payable });
+      }
       if (rows.some((r) => r.payable === payable)) {
         throw new Error("ERROR 1062 (23000): Duplicate entry '" + payable + "' for key 'uq_fbs_charge_tail'");
       }
@@ -62,17 +66,10 @@ test('AC3 汇率获取失败或快照超过 60 秒：不写库并返回明确错
 });
 
 test('AC4 并发算出相同 payable_micro：唯一约束拒绝一方，其重新分配尾数', async () => {
-  let injected = false;
-  const conn = fakeConn({
-    afterSelect: (rows) => {
-      if (injected) return;
-      injected = true;
-      // 另一请求在本请求 SELECT 之后抢占了尾数 1..45；若本请求恰选中其一，INSERT 撞唯一约束后重选
-      for (let t = 1; t <= 45; t++) rows.push({ tail: t, payable: 2000000 + t * 10000 });
-    },
-  });
+  const conn = fakeConn({ failFirstInsert: true });
   const r = await createCheckout(conn, args());
-  assert.ok(conn.inserts.length >= 1);
+  assert.strictEqual(conn.inserts.length, 2); // 首次撞约束 → 重选 → 成功
+  assert.notStrictEqual(conn.inserts[0], conn.inserts[1]);
   const payables = conn.rows.map((x) => x.payable);
   assert.strictEqual(new Set(payables).size, payables.length);
   assert.ok(payables.includes(r.payable_micro));
@@ -87,8 +84,21 @@ test('AC4 跨基础金额占用同一 payable 区间：只剩一个尾数时仍�
 });
 
 test('幂等：ordernum 重复时返回已有收银台而非 ORDER_EXISTS', async () => {
-  const conn = fakeConn({ existing: 'ORD1\t2310000\t62.5\t2025-12-31 23:59:59\t2026-01-01 00:15:00' });
+  const conn = fakeConn({ existing: 'ORD1\t2310000\t62.5\t2025-12-31 23:59:59\t2026-01-01 00:15:00\tpending' });
   const r = await createCheckout(conn, args());
   assert.strictEqual(r.payable_micro, 2310000);
   assert.strictEqual(r.rate_at, '2025-12-31T23:59:59.000Z');
+});
+
+test('幂等命中已过期 / 非 pending 收银台：返回 EXPIRED 而非旧金额', async () => {
+  for (const row of [
+    'ORD1\t2310000\t62.5\t2025-12-31 23:00:00\t2025-12-31 23:15:00\tpending',
+    'ORD1\t2310000\t62.5\t2025-12-31 23:59:59\t2026-01-01 00:15:00\texpired',
+  ]) {
+    await assert.rejects(createCheckout(fakeConn({ existing: row }), args()), { code: 'EXPIRED' });
+  }
+});
+
+test('rate_str 保留原始价格字符串（高精度小数）', () => {
+  assert.strictEqual(baseMicro(100, '0.00000001'), 100000000000000n); // 100*1e4/1e-8
 });

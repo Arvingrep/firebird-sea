@@ -92,7 +92,7 @@ class CoinsPhClient {
     return {
       symbol,
       lastUpdateId: res.lastUpdateId,
-      bids: (res.bids || []).map(([price, qty]) => ({ price: parseFloat(price), qty: parseFloat(qty) })),
+      bids: (res.bids || []).map(([price, qty]) => ({ price: parseFloat(price), priceStr: String(price), qty: parseFloat(qty) })),
       asks: (res.asks || []).map(([price, qty]) => ({ price: parseFloat(price), qty: parseFloat(qty) }))
     };
   }

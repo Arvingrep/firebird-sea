@@ -149,6 +149,10 @@ const CHECKOUT_LIMIT = 5;
 const CHECKOUT_WINDOW_MS = 60 * 1000;
 
 router.post('/checkout', async (req, res) => {
+  // phpCentavos 目前由客户端提交且无订单归属校验：服务端可读订单金额前默认关闭
+  if (process.env.CHECKOUT_ENABLED !== '1') {
+    return res.status(503).json({ success: false, error: { code: 'CHECKOUT_DISABLED', message: '收银台暂未开放' } });
+  }
   const { ordernum, phpCentavos, idempotencyKey } = req.body || {};
   const initData = req.get('x-telegram-init-data') || (req.body && req.body.initData);
   const auth = validateTelegramInitData(initData, BOT_TOKEN);
@@ -162,6 +166,9 @@ router.post('/checkout', async (req, res) => {
   }
   hits.push(nowMs);
   checkoutHits.set(auth.user.id, hits);
+  for (const [uid, ts] of checkoutHits) {
+    if (nowMs - ts[ts.length - 1] >= CHECKOUT_WINDOW_MS) checkoutHits.delete(uid);
+  }
   try {
     const data = await createCheckout(cliConn(), {
       ordernum,

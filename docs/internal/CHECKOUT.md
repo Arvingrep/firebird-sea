@@ -30,3 +30,9 @@
 - `ordernum` 或 `idempotencyKey` 重复时返回已有收银台（不再 409）。
 - 占用查询按 `payable_micro` 区间 `[base+1e4, base+90e4]` 取，覆盖不同基础金额算出的相同金额；撞 `uq_fbs_charge_tail` 后把该尾数计入本次占用再重选。
 - 汇率取 Coins.ph depth 最高 bid；`rate_at` 为取价时刻（交易所未返回时间戳）。
+
+## 第 2 轮 QA 修复
+- 环境变量 `CHECKOUT_ENABLED`：默认关闭，路由返回 503 `CHECKOUT_DISABLED`；仅当 `=1` 开放。原因：`phpCentavos` 仍由客户端提交、无订单归属校验，须待服务端读取火鸟订单金额并校验归属后再开启。
+- 幂等命中的收银台若 `state != 'pending'` 或已过期，返回 503 `EXPIRED`（尾数已释放，金额可能已分配他人），顾客需重新下单。
+- `rate_str` 保留 depth 返回的原始价格字符串（`priceStr`，不经 parseFloat），最多支持 18 位小数；`rate_at` 仍为取价时刻。
+- 限流表每次请求清理已过窗口的用户 key。多副本下内存限流仍不共享，需网关侧限流（已知缺口）。
