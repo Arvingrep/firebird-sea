@@ -16,10 +16,14 @@ function pick(block, tag) {
   return m ? decodeEntities(m[1]) : '';
 }
 
-/** @param {string} xml RSS 2.0 文本 @returns {{title:string,url:string,summary:string}[]} 非 RSS 文档(损坏 XML/HTML 错误页)抛错,合法空频道返回 [] */
+/** @param {string} xml RSS 2.0 文本 @returns {{title:string,url:string,summary:string}[]} 非 RSS/截断文档抛错,合法空频道返回 [] */
 function rssToItems(xml) {
   const text = String(xml || '');
   if (!/<(rss|channel)[\s>]/i.test(text)) throw new Error('not an RSS document (collector output invalid)');
+  // 完整性:根元素必须闭合,否则视为截断/损坏(区别于合法空频道),避免被误判为"空轮成功"
+  if (!/<\/rss\s*>\s*$/i.test(text.trim()) && !/<\/channel\s*>\s*$/i.test(text.trim())) {
+    throw new Error('truncated RSS document (missing closing tag)');
+  }
   const items = [];
   for (const m of text.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
     items.push({ title: pick(m[1], 'title'), url: pick(m[1], 'link'), summary: pick(m[1], 'description') });

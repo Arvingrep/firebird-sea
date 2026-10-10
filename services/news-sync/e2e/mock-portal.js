@@ -7,13 +7,13 @@
  * 用法: node e2e/mock-portal.js [port]  (默认 18180,仅监听 127.0.0.1)
  */
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
 
-const RSS_ITEMS = `<item><title>火鸟门户完整流程模拟验收新闻</title><link>https://example.test/news/acceptance</link><description>这是一条用于本地完整流程验收的模拟新闻,正文长度明确超过五十个字符,以便稳定通过内容质量检查,并继续验证去重、发布与告警链路。</description></item>`;
-const DRILL_ITEM = `<item><title>failure drill 故障演练新闻</title><link>https://example.test/news/failure-drill</link><description>用于失败重试与告警演练的新增条目,经同一采集适配链路进入同步。</description></item>`;
-const rss = items => `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"><channel><title>Mock News</title><link>http://localhost/</link><description>Deterministic test feed</description>
-${items}
-</channel></rss>`;
+// 数据面不在此硬编码:原样回放 vendored 的 n8n-news-mock 同源 fixture(来源与 sha256 见 ../fixtures/README.md)
+const FIXTURES = path.join(__dirname, '..', 'fixtures');
+const RSS_MAIN = fs.readFileSync(path.join(FIXTURES, 'n8n-news-mock-rss.xml'), 'utf8');
+const RSS_DRILL = fs.readFileSync(path.join(FIXTURES, 'n8n-news-mock-rss-drill.xml'), 'utf8');
 
 function freshState() {
   return { portal: [], portalKeys: [], portalAttempts: 0, tg: [], failNext: 0 };
@@ -36,7 +36,7 @@ const server = http.createServer((req, res) => {
     const path = u.pathname;
     if (req.method === 'GET' && path === '/rss.xml') {
       res.writeHead(200, { 'Content-Type': 'application/rss+xml; charset=utf-8' });
-      return res.end(rss(u.searchParams.get('drill') ? RSS_ITEMS + '\n' + DRILL_ITEM : RSS_ITEMS));
+      return res.end(u.searchParams.get('drill') ? RSS_DRILL : RSS_MAIN);
     }
     if (req.method === 'GET' && path === '/state') return json(res, 200, state);
     if (req.method === 'GET' && path === '/health') return json(res, 200, { ok: true });
