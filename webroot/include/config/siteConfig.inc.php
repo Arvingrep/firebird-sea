@@ -2,11 +2,11 @@
 $cfg_basehost = 'fbird.men';
 $cfg_webname = '菲鸟东南亚生活网';
 $cfg_shortname = '菲鸟生活';
-$cfg_weblogo = 'https://upload.ihuoniao.cn//siteConfig/logo/large/2023/05/05/16832575477318.png';
+$cfg_weblogo = 'https://storage.googleapis.com/fbird-sea-uploads/siteConfig/logo/fbird_logo.png';
 $cfg_adminlogo = '';
 $cfg_adminWaterMark = '1';
 $cfg_adminBackgroundColor = '#3275FA';
-$cfg_sharePic = '';
+$cfg_sharePic = 'https://storage.googleapis.com/fbird-sea-uploads/siteConfig/logo/fbird_logo.png';
 $cfg_shareTitle = '菲鸟东南亚生活服务平台';
 $cfg_shareDesc = '外卖订餐、房屋租售、二手交易、求职招聘及本地生活便民服务';
 $cfg_keywords = '东南亚生活,马尼拉华人,宿务生活,东南亚外卖,马尼拉租房,东南亚同城便民,菲鸟生活,fbird.men';
