@@ -1,0 +1,118 @@
+-- AD-5: fbs_ 表（只由 Node 写，网关与火鸟只读）。全部 IF NOT EXISTS，可重复执行。
+
+CREATE TABLE IF NOT EXISTS fbs_charge (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  ordernum VARCHAR(64) NOT NULL,
+  idempotency_key VARCHAR(64) NULL,
+  php_centavos BIGINT NOT NULL,
+  tail_cents SMALLINT NOT NULL,
+  payable_micro BIGINT NOT NULL,
+  rate_str VARCHAR(32) NOT NULL,
+  rate_at DATETIME NOT NULL,
+  state VARCHAR(16) NOT NULL DEFAULT 'pending',
+  expires_at DATETIME NOT NULL,
+  holds_tail TINYINT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  tail_key BIGINT AS (IF(holds_tail = 1, payable_micro, NULL)) STORED,
+  UNIQUE KEY uq_fbs_charge_ordernum (ordernum),
+  UNIQUE KEY uq_fbs_charge_idem (idempotency_key),
+  UNIQUE KEY uq_fbs_charge_tail (tail_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_chain_tx (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  txid VARCHAR(80) NOT NULL,
+  event_index INT NOT NULL,
+  charge_id BIGINT UNSIGNED NULL,
+  from_address VARCHAR(64) NOT NULL,
+  to_address VARCHAR(64) NOT NULL,
+  contract VARCHAR(64) NOT NULL,
+  amount_micro BIGINT NOT NULL,
+  block_number BIGINT NOT NULL,
+  block_time DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_fbs_chain_tx (txid, event_index),
+  KEY idx_fbs_chain_tx_charge (charge_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_cursor (
+  name VARCHAR(32) NOT NULL PRIMARY KEY,
+  block_number BIGINT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_refund (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  ordernum VARCHAR(64) NULL,
+  kind VARCHAR(24) NOT NULL,
+  state VARCHAR(16) NOT NULL DEFAULT 'pending',
+  txid VARCHAR(80) NULL,
+  amount_micro BIGINT NOT NULL,
+  received_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_fbs_refund_ordernum (ordernum)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_audit (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  actor_role VARCHAR(16) NOT NULL,
+  actor_id VARCHAR(64) NOT NULL,
+  action VARCHAR(64) NOT NULL,
+  target VARCHAR(128) NOT NULL,
+  detail TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_role (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  tg_user_id VARCHAR(32) NOT NULL,
+  role VARCHAR(16) NOT NULL,
+  shop_id BIGINT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_fbs_role (tg_user_id, role, shop_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_member_map (
+  tg_user_id VARCHAR(32) NOT NULL PRIMARY KEY,
+  member_id BIGINT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_fbs_member_map_member (member_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_draft_item (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  shop_id BIGINT NOT NULL,
+  name_zh VARCHAR(255) NOT NULL,
+  price_centavos BIGINT NULL,
+  category VARCHAR(64) NULL,
+  image VARCHAR(255) NULL,
+  uncertain_fields VARCHAR(255) NULL,
+  state VARCHAR(16) NOT NULL DEFAULT 'draft',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_fbs_draft_item_shop (shop_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_i18n (
+  entity VARCHAR(32) NOT NULL,
+  id BIGINT NOT NULL,
+  lang VARCHAR(8) NOT NULL,
+  field VARCHAR(32) NOT NULL,
+  text TEXT NOT NULL,
+  source VARCHAR(8) NOT NULL DEFAULT 'ai',
+  edited TINYINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (entity, id, lang, field)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fbs_outbox (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  charge_id BIGINT UNSIGNED NOT NULL,
+  action VARCHAR(32) NOT NULL,
+  payload TEXT NOT NULL,
+  state VARCHAR(16) NOT NULL DEFAULT 'pending',
+  attempts INT NOT NULL DEFAULT 0,
+  next_try_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_fbs_outbox_state (state, next_try_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
