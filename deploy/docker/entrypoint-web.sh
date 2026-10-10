@@ -110,7 +110,7 @@ chown -R www-data:www-data /var/www/html/data 2>/dev/null || true
 
 # GitOps 配置锁（CONFIG_LOCK=1）：include/config 与 dbinfo.inc.php 置为 root 只读，php-fpm(www-data) 无法写入、
 # 重命名或新建。后台 48 个"保存配置"入口会因此失败并报"写入文件 … 失败，请检查权限！"，
-# nginx 再把这句话替换为"请联系管理员通过 Git 变更"（见 chart configmap.yaml）。
+# nginx 再把这句话替换为"该配置由 Git 管理变更并发布"（见 chart configmap.yaml）。
 # 必须放在所有配置生成/注入步骤之后。CONFIG_LOCK_WRITABLE 里的文件名（空格分隔）保持可写。
 if [ "${CONFIG_LOCK:-0}" = "1" ]; then
     CFG_DIR="/var/www/html/include/config"
