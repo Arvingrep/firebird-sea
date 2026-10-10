@@ -1,3 +1,12 @@
+{{- /*
+  webroot.mode：
+    copy  (默认，旧行为) init 把整站 cp -a 到 emptyDir，php-fpm 与 nginx 共享该 emptyDir
+    baked (P2)           代码直接来自镜像：php-fpm 用 php 镜像，nginx 用同 tag 的 firebird-nginx 静态镜像；
+                         仅 data/ 用 emptyDir 在两个容器间共享（init 只播种约 15MB，不再整站复制）
+  切换前提：firebird-nginx:<image.tag> 已由 CI 推送（CI 先推 nginx、后推 php）。
+*/ -}}
+{{- $baked := eq (.Values.webroot.mode | default "copy") "baked" -}}
+{{- $deep := and .Values.probes .Values.probes.deepReadiness -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,9 +16,11 @@ metadata:
     site: {{ .Values.siteId }}
 spec:
   replicas: {{ .Values.replicaCount }}
-  {{- if and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+  {{- $rwoUploads := and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+  {{- $rwoConfig := and .Values.persistence.enabled (eq (.Values.persistence.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+  {{- if or $rwoUploads $rwoConfig }}
   strategy:
-    type: Recreate          # uploads 为 RWO 卷：新旧 Pod 不能跨节点同时挂载，先停后起
+    type: Recreate          # uploads / 配置 PVC 为 RWO 卷：新旧 Pod 不能跨节点同时挂载，先停后起（RollingUpdate 会因 Multi-Attach 卡死）
   {{- else }}
   strategy:
     type: RollingUpdate
@@ -26,35 +37,38 @@ spec:
       labels:
         app: firebird-site
         site: {{ .Values.siteId }}
+      annotations:
+        # nginx 配置 / init 脚本变更时滚动 Pod（ConfigMap 不会触发 Deployment 重建）
+        checksum/nginx-conf: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/init-scripts: {{ include (print $.Template.BasePath "/configmap-init.yaml") . | sha256sum }}
     spec:
       terminationGracePeriodSeconds: 30
+      # 多副本时尽量打散到不同节点（ScheduleAnyway：单节点/资源紧张时不阻塞调度）
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: firebird-site
+              site: {{ .Values.siteId }}
       initContainers:
-        # Init: 从 firebird-php 镜像同步源码至共享卷，同时通过丝滑过渡引擎保护持久化配置
+        # Init: 同步/播种运行期状态。配置文件按"缺什么补什么"补齐，已有的绝不覆盖
         - name: init-webroot
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - "sh"
-            - "-c"
-            - |
-              cp -a /var/www/html/. /shared/ && chmod -R 777 /shared/data 2>/dev/null || true
-              if [ -d /config-pvc ]; then
-                if [ -f /config-pvc/siteConfig.inc.php ]; then
-                  echo ">>> [Transition Engine] 恢复 PVC 中保存的自定义运行配置..."
-                  cp -af /config-pvc/*.inc.php /shared/include/config/ 2>/dev/null || true
-                else
-                  echo ">>> [Transition Engine] 首次挂载 PVC，将镜像基线配置作为种子保存到 PVC..."
-                  cp -an /shared/include/config/*.inc.php /config-pvc/ 2>/dev/null || true
-                fi
-                chmod -R 777 /config-pvc 2>/dev/null || true
-              fi
-              # AD-17: 附件目录在独立 PVC 上，Pod 重建后文件仍在
-              if [ -d /uploads-pvc ]; then
-                chown -R www-data:www-data /uploads-pvc 2>/dev/null || chmod -R 777 /uploads-pvc 2>/dev/null || true
-              fi
+          command: ["sh", "/scripts/init-webroot.sh"]
+          env:
+            - name: MODE
+              value: {{ if $baked }}"baked"{{ else }}"copy"{{ end }}
           volumeMounts:
+            {{- if $baked }}
+            - name: data-shared
+              mountPath: /shared
+            {{- else }}
             - name: webroot-shared
               mountPath: /shared
+            {{- end }}
             {{- if .Values.persistence.enabled }}
             - name: config-persistent
               mountPath: /config-pvc
@@ -63,6 +77,9 @@ spec:
             - name: uploads-persistent
               mountPath: /uploads-pvc
             {{- end }}
+            - name: init-scripts
+              mountPath: /scripts
+              readOnly: true
 
       containers:
         # Container 1: PHP-FPM 处理引擎
@@ -117,8 +134,13 @@ spec:
                   key: resend-key
                   optional: true
           volumeMounts:
+            {{- if $baked }}
+            - name: data-shared
+              mountPath: /var/www/html/data
+            {{- else }}
             - name: webroot-shared
               mountPath: /var/www/html
+            {{- end }}
             {{- if .Values.persistence.enabled }}
             - name: config-persistent
               mountPath: /var/www/html/include/config
@@ -132,6 +154,12 @@ spec:
               mountPath: /etc/firebird-configs
               readOnly: true
             {{- end }}
+          # entrypoint 要做 Redis 探活、配置兜底生成，慢启动期间不让 liveness 误杀
+          startupProbe:
+            tcpSocket:
+              port: 9000
+            periodSeconds: 2
+            failureThreshold: 45
           readinessProbe:
             tcpSocket:
               port: 9000
@@ -150,10 +178,17 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
 
-        # Container 2: Nginx 静态文件与反向代理 Sidecar (挂载共享 webroot 直读 CSS/JS/图片)
+        # Container 2: Nginx 静态文件与反向代理 Sidecar
+        #   copy 模式：挂载共享 webroot 直读 CSS/JS/图片
+        #   baked 模式：静态资源已打进 firebird-nginx 镜像，仅共享 data/ 与 uploads
         - name: nginx
+          {{- if $baked }}
+          image: "{{ .Values.webroot.nginxImage.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.webroot.nginxImage.pullPolicy | default .Values.image.pullPolicy }}
+          {{- else }}
           image: "{{ .Values.nginxImage.repository }}:{{ .Values.nginxImage.tag }}"
           imagePullPolicy: {{ .Values.nginxImage.pullPolicy }}
+          {{- end }}
           ports:
             - containerPort: 80
           lifecycle:
@@ -162,14 +197,20 @@ spec:
                 command: ["/bin/sh", "-c", "sleep 3 && /usr/sbin/nginx -s quit"]
           readinessProbe:
             httpGet:
+              {{- if $deep }}
+              # 深度就绪：经 php-fpm 检查配置文件齐全 + DB 可连，首页类故障不再"Ready 但 500"
+              path: /healthz.php
+              {{- else }}
               path: /healthz
+              {{- end }}
               port: 80
             initialDelaySeconds: 3
             periodSeconds: 3
-            timeoutSeconds: 2
+            timeoutSeconds: 3
             successThreshold: 1
             failureThreshold: 3
           livenessProbe:
+            # liveness 保持只看 nginx 自身：php/DB 故障时重启 nginx 无济于事，只会放大抖动
             httpGet:
               path: /healthz
               port: 80
@@ -178,8 +219,14 @@ spec:
             timeoutSeconds: 2
             failureThreshold: 3
           volumeMounts:
+            {{- if $baked }}
+            - name: data-shared
+              mountPath: /var/www/html/data
+              readOnly: true
+            {{- else }}
             - name: webroot-shared
               mountPath: /var/www/html
+            {{- end }}
             {{- if .Values.uploads.enabled }}
             - name: uploads-persistent
               mountPath: /var/www/html/uploads
@@ -190,11 +237,19 @@ spec:
               subPath: default.conf
 
       volumes:
+        {{- if $baked }}
+        - name: data-shared
+          emptyDir: {}
+        {{- else }}
         - name: webroot-shared
           emptyDir: {}
+        {{- end }}
         - name: nginx-conf
           configMap:
             name: firebird-nginx-{{ .Values.siteId }}
+        - name: init-scripts
+          configMap:
+            name: firebird-init-{{ .Values.siteId }}
         {{- if .Values.persistence.enabled }}
         - name: config-persistent
           persistentVolumeClaim:

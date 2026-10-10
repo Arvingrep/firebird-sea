@@ -19,6 +19,35 @@ nginxImage:
   tag: "alpine"
   pullPolicy: IfNotPresent
 
+# P2 webroot 供给方式（见 deployment.yaml 头部说明）
+#   copy  : 旧行为。init 把整站（~1.1GB / 3.4 万文件）cp -a 到 emptyDir，每次 Pod 启动都要复制
+#   baked : 代码直接来自镜像，nginx 用同 tag 的 firebird-nginx 静态镜像，仅 data/ 用 emptyDir 共享
+# 切 baked 前提：firebird-nginx:<该站点当前 image.tag> 已存在于 GAR（CI 先推 nginx、后推 php）。
+# 先在 canary 验证，再逐站切换；默认 copy 以保证"合并本 chart ≠ 立刻改变线上拓扑"。
+webroot:
+  mode: copy
+  nginxImage:
+    repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-nginx"
+    pullPolicy: ""   # 留空则跟随 image.pullPolicy（latest tag 需要 Always）
+
+# HPA 显式开关。默认关闭：多副本会让"后台改配置只落到某一个 Pod"、文件会话无法跨 Pod 共享，
+# 这两件事不解决就不要放开（uploads 去 PVC 后 chart 不再强制单副本，所以需要这个显式闸门）。
+autoscaling:
+  enabled: false
+
+# 探针
+probes:
+  # true：nginx readinessProbe 改走 /healthz.php（配置文件齐全 + DB 可连）。
+  # 前提：运行的 php 镜像已包含 webroot/healthz.php，否则新 Pod 永远 NotReady，故默认关闭、先在 canary 验证。
+  deepReadiness: false
+
+# ArgoCD PostSync 冒烟：同步完成后真实请求页面，非 2xx/3xx 则标记发布失败（"已部署"≠"可用"）
+smokeTest:
+  enabled: true
+  paths:
+    - "/"
+  timeoutSeconds: 300
+
 service:
   type: ClusterIP
   port: 80

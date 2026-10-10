@@ -32,6 +32,16 @@ data:
             return 200 "OK\n";
         }
 
+        # 深度就绪端点：经 php-fpm 执行 healthz.php（配置文件齐全 + DB 可连），不引导火鸟框架
+        # 供 probes.deepReadiness=true 的 readinessProbe 使用；不进访问日志
+        location = /healthz.php {
+            access_log off;
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_param SCRIPT_FILENAME /var/www/html/healthz.php;
+            include fastcgi_params;
+            fastcgi_read_timeout 5;
+        }
+
         # 火鸟伪静态重写
         location / {
             try_files $uri $uri/ /index.php?$args;
