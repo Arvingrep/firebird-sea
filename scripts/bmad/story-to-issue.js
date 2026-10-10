@@ -101,7 +101,8 @@ function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need 
   const testFirst = testFile
     ? [`- ✅ 验收测试已预置：\`${testFile}\`，**当前为红**；你的任务是让它变绿。`,
       `- 运行：\`bash scripts/acceptance/run.sh --story ${tid}\`（CI 在本 PR 标题含 \`[story:${key}]\` 时强制执行）。`,
-      '- 该文件受保护：不得修改或删除，改动会被丢弃；不得靠削弱测试变绿。可另补自己的单测。']
+      '- 该文件受保护：不得修改或删除，改动会被丢弃；不得靠削弱测试变绿。可另补自己的单测。',
+      '- 用例只覆盖可静态/渲染判定的条件；运行态条件（如订单状态流转）仍需人工验收，请在清单中标注。']
     : [`- ⚠️ 尚无预置验收测试（\`scripts/acceptance/story-${tid}.sh\` 不存在），按 docs/internal/TEST_FIRST.md 先补用例再开工。`,
       '- 在此之前，请为每条验收条件各补一个可被 CI 运行的测试（就近放在相应服务的 test 目录），并在总结里逐条对应。'];
   const body = [

@@ -107,6 +107,15 @@ n8n / GKE 侧：
 - `services/api` 与 `scripts/test-api-db.sh` 入库前，verify-task 的 6、7 步自动跳过。
 - `bmad-sprint-writeback.yml`：agent PR 合并且标题含 `[story:<key>]` → 开 `bmad/sprint-done-<N-M>-pr<PR>` 分支与 PR，仅改 `sprint-status.yaml`（不直推 main）；回写 PR 由人合并。标题经 env 传入，不拼进脚本。
 
+## 5b. BMAD Story 增强（dev.sh）
+
+Issue 标题含 `[story:<key>]`（或正文 `<!-- bmad-story: KEY -->`）时，dev.sh 额外：
+1. 从 origin/main 读取 `_bmad-output/implementation-artifacts/spec-N-M-*.md` 注入提示词（最多 20KB）；
+2. **测试先行预检**（仅首轮「新建」）：以无凭据环境对 main 运行 `scripts/acceptance/run.sh --expect-red`；用例已绿 → Issue 打 `agent:blocked` 并留言、不施工；缺用例/缺工具 → 只警告；
+3. 要求 Agent 结束时输出「验收清单」（逐条 AC → 文件/测试 → 已满足/未满足），并随 PR 正文的「Dev Agent 自述」发布（Story 取末 80 行）；
+4. `scripts/acceptance/` 与 `.github/`、`scripts/agent/`、`.agents/` 一样，施工后强制还原。
+无标记的普通 Issue 行为不变。详见 [TEST_FIRST.md](TEST_FIRST.md)。
+
 ## 6. 运维
 
 ```bash

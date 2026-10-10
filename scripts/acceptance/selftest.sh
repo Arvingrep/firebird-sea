@@ -17,5 +17,6 @@ t 0 "缺工具非严格 → SKIP(0)"        --story 8-3
 GATE_REQUIRE_TOOLS=1 t 1 "缺工具严格 → 1" --story 8-3
 t 0 "标题无标记 → 跳过"             --title "feat: 普通 PR"
 t 1 "标题带 story 且红 → 1"         --title "feat(agent): #3 [story:8-2-某故事] x"
+t 0 "标题含占位符 [story:key] → 跳过" --title "docs: 说明 [story:key] 用法"
 t 0 "标题带 story 但无用例 → 0"     --title "[story:7-7-x] y"
 exit $F

@@ -21,6 +21,8 @@ while [ $# -gt 0 ]; do
     --title)
       if [[ "${2:-}" =~ \[story:([^]]+)\] ]]; then STORY="$(norm "${BASH_REMATCH[1]}")"; VIA_TITLE=1
       else echo "ℹ️ 标题不含 [story:<key>]，跳过测试先行用例"; exit 0; fi
+      # 标记存在但不是 N-M 形式的 key（如文档里写的占位符 [story:key]）：不是真 Story，跳过
+      [ -n "$STORY" ] || { echo "ℹ️ [story:…] 标记无法解析为 Story 编号，跳过"; exit 0; }
       shift ;;
     *) echo "未知参数 $1" >&2; exit 2 ;;
   esac
