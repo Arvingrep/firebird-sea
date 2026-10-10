@@ -91,3 +91,8 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 - `startingDeadlineSeconds: 30`、resources requests/limits 已设；imagePullPolicy 取 `image.pullPolicy`（Always 时每分钟拉镜像，节点有缓存层、开销可接受）。
 - cron 写到容器内 `log/cron/` 的日志随 Pod 销毁即丢，排障以 Job Pod 的 stdout/`kubectl logs` 为准。
 - 运行态 AC（30 分钟未支付订单 → state 6）需 owner 人工在集群验收（只读查询为主；手动触发 Job 属 owner 验收动作，Agent 不得执行，见 RULES §6）：`kubectl get cronjob,job -l app=firebird-cron` 与订单状态；并手动触发一次确认可执行：`kubectl create job cron-manual-test --from=cronjob/fbs-cron-<site>` 后查退出码与日志。
+
+## 后台域名与静态资源映射 (admin.*)
+- **协议保持**：Nginx 配置中开启 `absolute_redirect off;`，反向代理（Traefik/Cloudflare）下访问 `/` 302 重定向到 `/admin/` 时保持相对重定向，避免协议从 HTTPS 降级为 HTTP 引起浏览器拦截。
+- **静态资源同源与域名适配**：`common.inc.php` 处理后台域名（`admin.*`）时，自动优先匹配环境变量 `SITE_BASEHOST`（如 `manila.fbird.men`），避免错误截断为无公网 DNS 解析的裸根域名 `fbird.men` 导致前端样式/JS报 `ERR_NAME_NOT_RESOLVED`。
+- **分类空指针防守**：`shop.class.php` 在 PHP 7.1+ 环境遍历未配置二级分类的商品类型时增加 `is_array` 保护，防止 Fatal 错误。
