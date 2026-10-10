@@ -103,6 +103,25 @@ services:
     networks:
       - firebird-net
 
+  # 7. USDT 付款监听器 (独立服务：单实例，无对外端口，只出站轮询 TronGrid)
+  payment-listener:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.payment-listener
+    container_name: firebird-payment-listener
+    restart: unless-stopped
+    profiles: [payment]  # 默认栈不启动；docker compose --profile payment up
+    deploy:
+      replicas: 1
+    environment:
+      # 缺失时由监听器启动自检失败，不阻塞其他服务的 compose 解析
+      - TRON_MASTER_RECEIVE_ADDRESS=${TRON_MASTER_RECEIVE_ADDRESS:-}
+      - TRONGRID_API_KEY=${TRONGRID_API_KEY:-}
+      # 回调目标（回调尚未启用，见 docs/internal/GATEWAY_SPIKE.md）
+      - API_BASE_URL=${API_BASE_URL:-}
+    networks:
+      - firebird-net
+
 networks:
   firebird-net:
     driver: bridge

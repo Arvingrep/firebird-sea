@@ -136,9 +136,26 @@ api:
       cpu: 50m
       memory: 64Mi
 
+# USDT 付款监听器（单实例 + Recreate）。镜像由 CI 构建（deploy/docker/Dockerfile.payment-listener）后再置 enabled: true
+paymentListener:
+  enabled: false
+  image:
+    repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-payment-listener"
+    tag: "canary"
+    pullPolicy: IfNotPresent
+  secretRef: "firebird-api-secret"
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 20m
+      memory: 64Mi
+
 # Traefik IngressRoute 路由定义
 ingressRoute:
   enabled: true
+  denyGateway: true   # AD-19：对外拒绝 /api/fbs/
   sticky:
     enabled: true
   entryPoints:

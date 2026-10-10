@@ -1,0 +1,20 @@
+# ==============================================================================
+# USDT (TRC-20) 付款监听器 (Alpine 多阶段，非 Root；仅出站轮询 TronGrid，不监听端口)
+# ==============================================================================
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY services/payment-listener/package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi \
+    && npm cache clean --force
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node services/payment-listener/listener.js services/payment-listener/amount.js services/payment-listener/package.json ./
+
+USER node
+
+CMD ["node", "listener.js"]

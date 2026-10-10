@@ -11,7 +11,10 @@ require('dotenv').config({ path: '../../.env' });
 const axios = require('axios');
 const { parseTransferAmount } = require('./amount');
 
-const MASTER_ADDRESS = process.env.TRON_MASTER_RECEIVE_ADDRESS || 'TW4Q8tq6U1z3wWkEXAMPLETRONADDR9999';
+const MASTER_ADDRESS = process.env.TRON_MASTER_RECEIVE_ADDRESS;
+if (!MASTER_ADDRESS) {
+  throw new Error('TRON_MASTER_RECEIVE_ADDRESS is required');
+}
 const TRONGRID_API_KEY = process.env.TRONGRID_API_KEY;
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
 const USDT_TRC20_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
@@ -36,30 +39,20 @@ async function pollTronGrid() {
       // TRC-20 USDT 精度为 10^6
       const amount = parseTransferAmount(tx);
 
-      console.log(`[TronGrid 监听到入账] Tx: ${txId}, 金额: ${amount} USDT`);
+      process.stdout.write(`[TronGrid 监听到入账] Tx: ${txId}, 金额: ${amount} USDT\n`);
       seenTransactions.add(txId);
 
-      // 通知 API 服务核对与匹配
-      // 若使用 mock 测试：
-      /*
-      await axios.post(`${API_BASE_URL}/tg-api/payment/chain-match`, {
-        txHash: txId,
-        amountUsdt: amount,
-        fromAddress: tx.from,
-        blockTimestamp: tx.block_timestamp
-      });
-      */
+      // TODO: 回调 API（POST ${API_BASE_URL}/tg-api/payment/chain-match）尚未启用，
+      // 待服务端接口就绪后接入，并补匹配/重放测试（AD-15）
     }
   } catch (err) {
     if (err.response?.status === 404 || !TRONGRID_API_KEY) {
-      console.log('[Listener Standby] TronGrid 尚未配置正式密钥，处于开发待命模式。');
+      process.stdout.write('[Listener Standby] TronGrid 尚未配置正式密钥，处于开发待命模式。\n');
     } else {
-      console.error('[Listener Error]', err.message);
+      process.stderr.write(`[Listener Error] ${err.message}\n`);
     }
   }
 }
 
-// 开发环境下以 10 秒为周期轮询
-console.log('⚡ USDT (TRC-20) 链上监听进程已启动...');
-console.log(`🎯 目标收款主地址: ${MASTER_ADDRESS}`);
+process.stdout.write(`USDT (TRC-20) 链上监听进程已启动，收款主地址: ${MASTER_ADDRESS}\n`);
 setInterval(pollTronGrid, 10000);

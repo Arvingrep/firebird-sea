@@ -1,0 +1,46 @@
+{{- if .Values.paymentListener.enabled -}}
+# 付款监听器：单实例（多副本会重复入账）；Recreate 避免滚动更新时新旧 Pod 同时轮询。
+# 无 Service / 无入口：只出站轮询 TronGrid，再回调集群内 API。密钥一律经 Secret 注入。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firebird-payment-listener-{{ .Values.siteId }}
+  labels:
+    app: firebird-payment-listener
+    site: {{ .Values.siteId }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: firebird-payment-listener
+      site: {{ .Values.siteId }}
+  template:
+    metadata:
+      labels:
+        app: firebird-payment-listener
+        site: {{ .Values.siteId }}
+    spec:
+      containers:
+        - name: payment-listener
+          image: "{{ .Values.paymentListener.image.repository }}:{{ .Values.paymentListener.image.tag }}"
+          imagePullPolicy: {{ .Values.paymentListener.image.pullPolicy | default "IfNotPresent" }}
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: SITE_ID
+              value: "{{ .Values.siteId }}"
+            - name: API_BASE_URL
+              value: "http://firebird-api-{{ .Values.siteId }}:{{ .Values.api.service.port | default 3000 }}"
+            {{- range $name := list "TRON_MASTER_RECEIVE_ADDRESS" "TRONGRID_API_KEY" }}
+            - name: {{ $name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.paymentListener.secretRef | default "firebird-api-secret" }}
+                  key: {{ $name }}
+                  optional: {{ ne $name "TRON_MASTER_RECEIVE_ADDRESS" }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.paymentListener.resources | nindent 12 }}
+{{- end }}
