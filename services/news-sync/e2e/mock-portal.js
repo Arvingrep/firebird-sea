@@ -66,4 +66,4 @@ const server = http.createServer((req, res) => {
 });
 
 const port = Number(process.argv[2] || process.env.MOCK_PORT || 18180);
-server.listen(port, '127.0.0.1', () => process.stdout.write(`mock-portal listening on 127.0.0.1:${port}\n`));
+server.listen(port, process.env.MOCK_BIND_HOST || '127.0.0.1', () => process.stdout.write(`mock-portal listening on ${process.env.MOCK_BIND_HOST || '127.0.0.1'}:${port}\n`));
