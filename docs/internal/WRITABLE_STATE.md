@@ -64,6 +64,12 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 - **回滚**：`configLock.enabled: false` 并发布即可恢复可写。
 - 不在锁内的写入：`data/cache`、`templates_c`、`log` 等运行期可再生目录。
 
+### 副本数（2026-10-10 起：站点与 api 均为 2）
+- `replicaCount: 2`（站点）、`api.replicaCount: 2`；`autoscaling.enabled` 仍为 false（不自动扩缩）。2 副本下 PDB `minAvailable: 1` 才真正允许节点排空。
+- **粘性会话**：Traefik IngressRoute 的 `sticky.cookie`（`fb_srv_<site>`）。在会话改存 Redis（需 `firebird-base:7.4-r2` 构建上线）之前，文件会话无法跨 Pod，不加粘性会随机掉登录；之后粘性仍有价值——让后台保存者看到自己的改动。
+- **未开启 `configLock` 的站点**，后台保存的配置只落在处理该请求的 Pod：公开页面由两个 Pod 轮流服务，可能出现"同一页面两种配置"，直到重启或 Git 变更覆盖。canary 已开启配置锁，不受影响；manila/cebu 需要二选一：开启 `configLock`（推荐），或接受该不一致。
+- 滚动更新为 `maxUnavailable: 0, maxSurge: 1`，需要节点上能多放一个 Pod 的余量。
+
 ### 未解决 / 已知限制
 - **（未开启 `configLock` 时）后台保存的键不会实时同步到其他副本**；开启 `configLock` 后后台不再可改，该问题转化为"变更必须走 Git"。`configVars` 声明的键在每次 Pod 启动时被施加，但后台保存会整文件重写，保存后到下次重启前该 Pod 上的值可能与 Git 不一致；未在 `configVars` 声明的键（站点名称、Logo、SEO 等）仍然是每 Pod 各一份、重启即丢。要真正解决需 RWX 配置卷或"回写 ConfigMap"的 sidecar，本期未做。
 - 在此之前多副本下**后台改配置只会落到随机一个 Pod**：建议生产保持单副本（`replicaCount: 1`、`autoscaling.enabled: false`），或只把后台域名 `admin.*` 指向固定 Pod。
