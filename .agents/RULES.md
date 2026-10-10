@@ -56,3 +56,11 @@ firebird-sea/
    - 严禁遗留 `.bak`、`test_*.php`、未引用的僵尸函数或生产环境调试输出（如 `console.log`, `var_dump`）。
    - 任何开发任务完成后，必须通过 Acceptance Agent 审查；验收未通过前禁止合并。
 
+## 5. 分支与发布（Branch & Release）
+
+1. **`main` 是生产**，受保护：只经 PR 变更，禁止强推与删除；必需检查为「🔒 确定性门禁」与「🧪 verify-task」。
+2. **功能与 Agent 的 PR 一律以 `canary` 为目标分支**（`AGENT_BASE_BRANCH=canary`），合并后在 canary 环境验收；
+   验收通过后才允许开 `canary → main` 的晋升 PR。**严禁**绕过 canary 把未验收改动直接合入 main（hotfix 例外，且合并后必须回灌 canary）。
+3. **镜像 tag 纪律**：canary 构建只能推 `canary` / `canary-<sha12>`，**绝不推 40 位 SHA tag**（Image Updater 追 40 位 SHA，会把未验收镜像滚进生产）；`values-canary.yaml` 的 `image.tag` 不得改回 `latest`。
+4. 受保护路径（`.github/`、`scripts/agent/`、`scripts/acceptance/`、`.agents/`）只能由 owner 修改；Agent 分支触碰即门禁 FAIL。
+5. 详见 `docs/internal/RELEASE_FLOW.md`。

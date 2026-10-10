@@ -52,23 +52,23 @@ bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-progress
 STORY_KEY="$(story_key "$TITLE" "$BODY")"; STORY_ID="$(story_id "$STORY_KEY")"
 
 # 1. 分支：已有（返工）则续做，否则从 main 新建
-git fetch -q origin main
+git fetch -q origin "$BASE_BRANCH"
 if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
   git fetch -q origin "$BRANCH"; git checkout -q -B "$BRANCH" "origin/$BRANCH"
-  if ! git merge -q --no-edit origin/main; then
+  if ! git merge -q --no-edit origin/${BASE_BRANCH}; then
     git merge --abort 2>/dev/null || true
     set_label "$ISSUE" "agent:blocked" "agent:dev"
-    gh issue comment "$ISSUE" -R "$REPO" -b "🛑 \`${BRANCH}\` 与 main 冲突，Dev Agent 不自动解决冲突，请人工 rebase 后重新打 agent:dev。" >/dev/null
-    notify blocked "#${ISSUE} 分支与 main 冲突，需人工处理" "$ISSUE"
+    gh issue comment "$ISSUE" -R "$REPO" -b "🛑 \`${BRANCH}\` 与 ${BASE_BRANCH} 冲突，Dev Agent 不自动解决冲突，请人工 rebase 后重新打 agent:dev。" >/dev/null
+    notify blocked "#${ISSUE} 分支与 ${BASE_BRANCH} 冲突，需人工处理" "$ISSUE"
     exit 1
   fi
   MODE="返工"
 else
-  git checkout -q -B "$BRANCH" origin/main
+  git checkout -q -B "$BRANCH" origin/${BASE_BRANCH}
   MODE="新建"
 fi
 
-# 1b. 测试先行预检（仅「新建」：此时工作区就是 origin/main，用例代码可信；以无凭据环境运行）
+# 1b. 测试先行预检（仅「新建」：此时工作区就是 origin/${BASE_BRANCH}，用例代码可信；以无凭据环境运行）
 TF_STATE=""; TF_OUT=""
 if [ -n "$STORY_ID" ] && [ "$MODE" = "新建" ]; then
   if TF_OUT="$(agent_env bash scripts/acceptance/run.sh --expect-red --story "$STORY_ID" 2>&1)"; then TF_RC=0; else TF_RC=$?; fi
@@ -77,7 +77,7 @@ if [ -n "$STORY_ID" ] && [ "$MODE" = "新建" ]; then
     0) TF_STATE=red ;;
     2) TF_STATE=none ;;
     3) set_label "$ISSUE" "agent:blocked" "agent:dev"
-       gh issue comment "$ISSUE" -R "$REPO" -b "🛑 测试先行预检失败：Story ${STORY_ID} 的验收用例在 main 上**已经是绿的**，无法证明 Agent 改动有效（用例无效或需求已满足）。请人工修订用例或关闭 Issue。
+       gh issue comment "$ISSUE" -R "$REPO" -b "🛑 测试先行预检失败：Story ${STORY_ID} 的验收用例在 ${BASE_BRANCH} 上**已经是绿的**，无法证明 Agent 改动有效（用例无效或需求已满足）。请人工修订用例或关闭 Issue。
 
 \`\`\`
 $(printf '%s' "$TF_OUT" | redact)
@@ -114,10 +114,10 @@ PROMPT_FILE="$(mktemp)"; trap 'rm -f "$PROMPT_FILE"' EXIT
   echo "### ${TITLE}"
   echo "${BODY}"
   if [ -n "$STORY_ID" ]; then
-    SPEC_PATH="$(story_spec origin/main "$STORY_ID")"
+    SPEC_PATH="$(story_spec origin/${BASE_BRANCH} "$STORY_ID")"
     if [ -n "$SPEC_PATH" ]; then
       echo; echo "## BMAD Story 规格（${SPEC_PATH##*/}，验收以此与上面的 Given/When/Then 为准）"
-      git show "origin/main:${SPEC_PATH}" | head -c 20000
+      git show "origin/${BASE_BRANCH}:${SPEC_PATH}" | head -c 20000
     fi
     echo; echo "## 测试先行（流水线预检结果）"
     if [ -f "scripts/acceptance/story-${STORY_ID}.sh" ]; then
@@ -135,7 +135,7 @@ PROMPT_FILE="$(mktemp)"; trap 'rm -f "$PROMPT_FILE"' EXIT
   fi
   echo
   echo "## 工程铁律（.agents/RULES.md 全文）"
-  git show origin/main:.agents/RULES.md
+  git show origin/${BASE_BRANCH}:.agents/RULES.md
   echo
   echo "## 硬性要求"
   echo "1. 只实现单一核心 AC，不做范围扩张；火鸟后台已有的配置能力不要重写。"
@@ -197,7 +197,7 @@ fi
 
 # 6. 开/更新 PR（GH_TOKEN 为 PAT，才能触发 ci-verify / QA）
 if [ -z "$PR" ]; then
-  PR_URL="$(gh pr create -R "$REPO" --base main --head "$BRANCH" \
+  PR_URL="$(gh pr create -R "$REPO" --base "$BASE_BRANCH" --head "$BRANCH" \
     --title "feat(agent): #${ISSUE} ${TITLE}" \
     --label "agent:qa" \
     --body "Closes #${ISSUE}

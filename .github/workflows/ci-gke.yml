@@ -2,7 +2,9 @@ name: "CI: Build & Push to GAR (ArgoCD 负责部署)"
 
 on:
   push:
-    branches: [ main ]
+    # main = 生产（SHA tag + latest，由 Image Updater 追 SHA 滚 manila）
+    # canary = 验收（只推 canary / canary-<sha12>，绝不推 40 位 SHA，否则 Image Updater 会把未验收镜像滚进生产）
+    branches: [ main, canary ]
     # 纯文档/任务/看板/流程变更不产出新镜像（否则 Image Updater 会滚动一次无意义发布）
     paths-ignore:
       - 'docs/**'
@@ -40,7 +42,7 @@ jobs:
   build-and-push:
     needs: test-and-verify
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary'
     permissions:
       contents: read
       actions: write # 必须具备此权限，GitHub Actions 才能将 Docker 构建缓存持久化至 Caches 页面
@@ -62,11 +64,19 @@ jobs:
       - name: 4. 构建并推送镜像至 Google Artifact Registry (GAR)
         run: |
           GCP_PROJECT="${{ vars.GCP_PROJECT_ID || 'fh580-70533' }}"
+          SHA="${{ github.sha }}"
+          # 分支 → tag 策略（PRIMARY 不可变标识；ROLLING 浮动 tag，同时作 cache-from）
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            PRIMARY="$SHA"; ROLLING="latest"
+          else
+            PRIMARY="canary-${SHA:0:12}"; ROLLING="canary"
+          fi
+          echo "分支=${{ github.ref_name }} → tag: ${PRIMARY} / ${ROLLING}"
           BASE_IMAGE="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-base:7.4-r2"
-          IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:${{ github.sha }}"
-          IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:latest"
-          API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${{ github.sha }}"
-          API_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:latest"
+          IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:${PRIMARY}"
+          IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:${ROLLING}"
+          API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${PRIMARY}"
+          API_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${ROLLING}"
 
           # 4.1 检查/构建基础运行镜像 (firebird-base)
           # 注意：只在该 tag 不存在时才构建。修改 Dockerfile.base（加扩展/改 ini）后必须同步递增 tag 后缀
@@ -88,8 +98,8 @@ jobs:
           # 4.1b 构建 nginx 静态镜像 (与 firebird-php 同 SHA tag)。
           # 必须先于 firebird-php 推送：Image Updater 只盯 firebird-php 的 tag，
           # 一旦发现新 php tag 即触发同步，此时同 tag 的 nginx 镜像必须已就绪，否则 baked 站点 ImagePullBackOff。
-          NGINX_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-nginx:${{ github.sha }}"
-          NGINX_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-nginx:latest"
+          NGINX_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-nginx:${PRIMARY}"
+          NGINX_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-nginx:${ROLLING}"
           echo "🚀 构建 nginx 静态镜像: $NGINX_IMAGE_TAG ..."
           docker buildx build --push \
             --platform linux/amd64 \
@@ -125,7 +135,7 @@ jobs:
   # 独立通知 job：任一前置 job 失败（含 test-and-verify 被跳过构建）都能发出告警
   notify:
     needs: [test-and-verify, build-and-push]
-    if: always() && github.ref == 'refs/heads/main'
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,10 +148,15 @@ jobs:
           SHA: ${{ github.sha }}
           VERIFY: ${{ needs.test-and-verify.result }}
           BUILD: ${{ needs.build-and-push.result }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           source scripts/agent/lib.sh
           if [ "$BUILD" = "success" ]; then
-            notify image_pushed "GAR 镜像已推送 ${SHA:0:8}，Image Updater ≤2 分钟内发现并由 ArgoCD 同步上线"
+            if [ "$BRANCH" = "main" ]; then
+              notify image_pushed "GAR 镜像已推送 ${SHA:0:8}，Image Updater ≤2 分钟内发现并由 ArgoCD 同步上线"
+            else
+              notify image_pushed "canary 镜像已推送 ${SHA:0:8}（tag=canary），firebird-canary 同步后即可验收；验收通过后提 canary→main 的 PR"
+            fi
           else
-            notify deploy_failed "main ${SHA:0:8} 未上线：verify=${VERIFY} build=${BUILD}"
+            notify deploy_failed "${BRANCH} ${SHA:0:8} 未上线：verify=${VERIFY} build=${BUILD}"
           fi

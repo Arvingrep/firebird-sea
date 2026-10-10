@@ -84,11 +84,11 @@ fi
 if [ "$DRY_RUN" != "1" ]; then
   git push -q -u origin "$BRANCH" 2>/dev/null || echo "ℹ️ 推送跳过（无远端或已最新）"
   if command -v gh >/dev/null 2>&1; then
-    gh pr create --fill --base main --head "$BRANCH" 2>/dev/null \
+    gh pr create --fill --base "${AGENT_BASE_BRANCH:-main}" --head "$BRANCH" 2>/dev/null \
       && echo "✅ 已开 PR（等待独立验收 + 人工批准）" \
       || echo "ℹ️ PR 创建跳过（可能已存在）"
   else
-    echo "ℹ️ 无 gh CLI：手动开 PR → https://github.com/Arvingrep/firebird-sea/compare/main...${BRANCH}"
+    echo "ℹ️ 无 gh CLI：手动开 PR → https://github.com/Arvingrep/firebird-sea/compare/${AGENT_BASE_BRANCH:-main}...${BRANCH}"
   fi
 fi
 
@@ -98,6 +98,6 @@ echo "🛡️ 触发独立验收（独立进程，据实裁定）..."
 bash scripts/acceptance-runner.sh "${TASK_ID}"
 RC=$?
 echo ""
-[ $RC -eq 0 ] && echo "🟢 验收通过：等待你人工批准合并 ${BRANCH} → main（CI 自动上线）。" \
+[ $RC -eq 0 ] && echo "🟢 验收通过：等待你人工批准合并 ${BRANCH} → ${AGENT_BASE_BRANCH:-main}。" \
              || echo "🔴 验收打回：见 .agents/tasks/reports/${TASK_ID}-ACCEPTANCE.md，修复后重跑本执行器。"
 exit $RC
