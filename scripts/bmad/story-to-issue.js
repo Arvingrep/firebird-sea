@@ -92,7 +92,7 @@ function pickNext(epics, status, { inflight = 0, maxInflight = 1, story, ignoreD
   return { reason: blocked.join('；') || '没有可开工的 backlog Story' };
 }
 
-function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need = [], testFile = '' }) {
+function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need = [], testFile = '', labels = LABELS }) {
   const refs = new Set((s.lines.join('\n').match(/AD-(\d+)/g) || []).map((x) => +x.slice(3)));
   if (!refs.size) (STORY_AD[s.id] || EPIC_AD[s.epic] || []).forEach((n) => refs.add(n));
   const ads = [...refs].sort((a, b) => a - b).map((n) => `- AD-${n}${adTitles.get(n) ? ` — ${adTitles.get(n)}` : ''}`);
@@ -118,7 +118,7 @@ function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need 
     '- 全部 Story：`_bmad-output/planning-artifacts/epics.md`；架构：`ARCHITECTURE-SPINE.md`。',
     '', '## 增量上限', `单次增量 ≤ 1200 行（不含 docs/、_bmad-output/）；超出门禁直接打回。过大请只落地前几条验收条件，其余在 PR 说明里写明拆分建议，不要做范围扩张。${split}`,
   ].filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n');
-  return { title: `[story:${key}] Story ${s.id} ${s.title}`, body, labels: [...LABELS] };
+  return { title: `[story:${key}] Story ${s.id} ${s.title}`, body, labels: [...labels] };
 }
 
 function main(argv) {
@@ -165,5 +165,5 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { parseEpics, parseStatus, keyOf, unmet, analyzeIssues, pickNext, renderIssue, LABELS };
+module.exports = { parseEpics, parseStatus, keyOf, depsOf, unmet, analyzeIssues, pickNext, renderIssue, LABELS };
 if (require.main === module) process.exit(main(process.argv.slice(2)));

@@ -1,0 +1,40 @@
+# 【草案,须 Arvin 本人拷贝到 .github/workflows/bmad-approve.yml 提交】
+# 派发入口:Arvin 给 Story Issue 打 bmad:approved → 校验通过补 agent:dev(触发 agent-dev.yml),
+# 不通过则评论原因并移除 bmad:approved。校验逻辑在 scripts/bmad/approve-check.js(可单测纯函数)。
+name: BMAD 派发审批
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  approve:
+    # 只处理 bmad:approved,且仅接受 owner 本人添加(其他人加的标签直接忽略,不删不评)
+    if: github.event.label.name == 'bmad:approved'
+    runs-on: [self-hosted, firebird-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - name: 线上首页健康检查
+        id: health
+        env:
+          HOMEPAGE_URL: ${{ vars.BMAD_HOMEPAGE_URL }}  # 必配,不在 yml 里硬编码域名
+        run: |
+          set -uo pipefail
+          if [ -z "${HOMEPAGE_URL:-}" ]; then echo "缺 vars.BMAD_HOMEPAGE_URL,按不健康熔断"; echo "HOMEPAGE_OK=0" >> "$GITHUB_ENV"; exit 0; fi
+          CODE=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$HOMEPAGE_URL" || echo 000)
+          echo "code=$CODE"
+          # 2xx/3xx 视为健康;5xx/超时熔断
+          if [ "$CODE" -ge 200 ] && [ "$CODE" -lt 500 ]; then echo "HOMEPAGE_OK=1" >> "$GITHUB_ENV"; else echo "HOMEPAGE_OK=0" >> "$GITHUB_ENV"; fi
+      - name: 校验并派发
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+          AGENT_AUTO_MERGE: ${{ vars.AGENT_AUTO_MERGE || '0' }}
+          ISSUE: ${{ github.event.issue.number }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          set -euo pipefail
+          # verdict=reject 时脚本退出码 1,workflow 标红提醒;ignore/noop/approve 均为 0
+          node scripts/bmad/approve-check.js --issue "$ISSUE" --sender "$SENDER" --apply
