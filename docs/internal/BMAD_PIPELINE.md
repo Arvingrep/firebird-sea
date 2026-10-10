@@ -15,7 +15,7 @@
              ＋ verify-task.sh（Node 单测 + 数据库集成测试 scripts/test-api-db.sh，需 docker）
 ④ AI 验收    agent-qa（异厂商 codex，只读，裁判脚本取自 main）
 ⑤ 人合并     AGENT_AUTO_MERGE=0：Arvin 点合并 → ci-gke → ArgoCD
-⑥ 回写       bmad-sprint-writeback.yml：合并后开 PR 把 sprint-status 置 done（不直推 main）
+⑥ 回写       bmad-sprint-writeback.yml（后续 PR）：合并后开 PR 把 sprint-status 置 done（不直推 main）
 ```
 
 ## 2. 命令
@@ -25,7 +25,6 @@ make bmad-next ARGS="--story 1.7 --ignore-deps"       # 预览 Issue（dry-run�
 node scripts/bmad/story-to-issue.js --query-gh        # 只读查询在途 Issue 再选题（仍不建单）
 node scripts/bmad/story-to-issue.js --create          # 真正建单（带 agent:dev 即触发流水线）
                                                        # 退出码 10=无可建；11=缺测试先行用例（--no-test-first 显式放行）
-node scripts/bmad/sync-sprint-status.js 1-7 done --file _bmad-output/implementation-artifacts/sprint-status.yaml
 node --test scripts/bmad/                              # 单测
 ```
 
