@@ -8,6 +8,7 @@ metadata:
     site: {{ .Values.siteId }}
 spec:
   schedule: "* * * * *"
+  startingDeadlineSeconds: 30
   # 上一次未结束则跳过本周期，不并发重叠
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
@@ -23,6 +24,17 @@ spec:
             site: {{ .Values.siteId }}
         spec:
           restartPolicy: Never
+          {{- if .Values.persistence.enabled }}
+          # config PVC 是 RWO：亲和到站点 Pod 所在节点才能共挂
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app: firebird-site
+                      site: {{ .Values.siteId }}
+                  topologyKey: kubernetes.io/hostname
+          {{- end }}
           containers:
             - name: cron
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -30,6 +42,12 @@ spec:
               workingDir: /var/www/html
               # 不覆盖 ENTRYPOINT：entrypoint-web.sh 先生成 dbinfo.inc.php / 注入配置，再 exec args
               args: ["php", "include/cron.php"]
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
               env:
                 - name: DB_HOST
                   value: "{{ .Values.database.host }}"
@@ -75,15 +93,25 @@ spec:
                       name: firebird-storage-secret
                       key: resend-key
                       optional: true
-              {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
               volumeMounts:
+                {{- if .Values.persistence.enabled }}
+                # 与站点 Pod 共挂同一 config PVC：运营者后台改的运行期配置 cron 同步可见
+                - name: config-persistent
+                  mountPath: /var/www/html/include/config
+                {{- end }}
+                {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
                 - name: config-overrides
                   mountPath: /etc/firebird-configs
                   readOnly: true
-              {{- end }}
-          {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
+                {{- end }}
           volumes:
+            {{- if .Values.persistence.enabled }}
+            - name: config-persistent
+              persistentVolumeClaim:
+                claimName: firebird-config-{{ .Values.siteId }}
+            {{- end }}
+            {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
             - name: config-overrides
               configMap:
                 name: firebird-configs-{{ .Values.siteId }}
-          {{- end }}
+            {{- end }}
