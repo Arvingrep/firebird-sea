@@ -6,15 +6,32 @@
 const fs = require('node:fs');
 const { runSync, withRetry } = require('./sync');
 const { fileStore, makePublisher, makeAlerter } = require('./io');
+const { makeCookiePublisher } = require('./portal');
+
+/** 凭据齐备走门户 Cookie 登录适配(真实火鸟契约),否则回退 Bearer 契约 */
+function pickPublisher(env, fetchImpl) {
+  if (env.NEWS_PORTAL_USER && env.NEWS_PORTAL_PASS) {
+    return makeCookiePublisher({
+      baseUrl: new URL(env.NEWS_PORTAL_PUBLISH_URL).origin,
+      user: env.NEWS_PORTAL_USER,
+      pass: env.NEWS_PORTAL_PASS,
+      cityid: env.NEWS_PORTAL_CITYID || 1,
+      typeid: env.NEWS_PORTAL_TYPEID || 1,
+      fetchImpl
+    });
+  }
+  return makePublisher({ url: env.NEWS_PORTAL_PUBLISH_URL, token: env.NEWS_PORTAL_TOKEN, fetchImpl });
+}
 
 async function main({ env = process.env, readInput = () => fs.readFileSync(0, 'utf8'), fetchImpl = fetch, retry } = {}) {
   const alert = makeAlerter({ botToken: env.NEWS_ALERT_BOT_TOKEN, chatId: env.NEWS_ALERT_CHAT_ID, fetchImpl, apiBase: env.NEWS_ALERT_API_BASE || undefined });
   try {
     const input = JSON.parse(readInput());
     if (!Array.isArray(input)) throw new Error('input must be a JSON array of news items');
-    return await runSync(input, {
+    const max = Number(env.NEWS_SYNC_MAX_PER_RUN);
+    return await runSync(Number.isFinite(max) && max > 0 ? input.slice(0, max) : input, {
       seen: fileStore(env.NEWS_SYNC_SEEN_FILE || './news-seen.json'),
-      publish: makePublisher({ url: env.NEWS_PORTAL_PUBLISH_URL, token: env.NEWS_PORTAL_TOKEN, fetchImpl }),
+      publish: pickPublisher(env, fetchImpl),
       alert,
       retry
     });
