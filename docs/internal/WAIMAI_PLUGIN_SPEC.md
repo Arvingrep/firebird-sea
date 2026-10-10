@@ -61,3 +61,10 @@ webroot/
 2. **分成比例**：外卖骑手提成 `80%`，跑腿提成 `70%`。
 3. **准时宝 / 延误险**：内置延误 10 分钟、20 分钟、30 分钟的分级赔偿机制。
 4. **多币种结算**：全链路继承站点统一货币标识 `₱` (PHP 比索)。
+
+## 原样入库基线（Story 1.1）
+
+- 外卖模块文件（`webroot/admin/templates/waimai`、`webroot/wmsj`、`webroot/admin/waimai*`、`webroot/api/handlers/waimai.*`、静态资源）作为独立基线入库，不含授权文件、缓存、`webroot/data` 数据目录。
+- `webroot/include/config/waimai.inc.php.example` 为配置样板；真实配置含密钥时不得入库。当前已入库的 `waimai.inc.php` 密钥项均为空；是否改为仅入库 `.example`（需同步调整部署镜像）由运营者决定。
+- 若基线提交因「增量行数」门禁失败：记录为需运营者决定的事项（人工审核 PR 或豁免），不绕过门禁。
+- 校验：`services/api/test/waimai-baseline.test.js`（`npm test`，由 verify-task 步骤 6 运行）。
