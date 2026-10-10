@@ -39,9 +39,22 @@ jobs:
           set -o pipefail
           bash scripts/acceptance/run.sh --title "$PR_TITLE" | tee -a "$GITHUB_STEP_SUMMARY"
 
+  # 机器验证：Dev Agent 没有 Bash，行为正确性由这里兜底。
+  # 托管 ubuntu runner 自带 docker 与 PATH；verify-task.sh 内另补常见 docker 路径并在缺失时明确失败。
+  verify-task:
+    name: 🧪 verify-task（流程自测 + Node 单测 + 数据库集成测试）
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: scripts/verify-task.sh（CI=true 时含 scripts/test-api-db.sh，需 docker）
+        env:
+          CI: "true"
+        run: ./scripts/verify-task.sh
+
   agent-qa:
     name: 🛡️ 独立 QA Agent
-    needs: gates
+    needs: [gates, verify-task]
     # 门禁失败也要跑：由 QA 把失败项写成打回意见，驱动 Dev Agent 返工
     if: >-
       always() &&
@@ -60,7 +73,8 @@ jobs:
       AGENT_AUTO_MERGE: ${{ vars.AGENT_AUTO_MERGE || '1' }}
       AGENT_MAX_ATTEMPTS: ${{ vars.AGENT_MAX_ATTEMPTS || '3' }}
       # 托管 runner 上 gates job 的结论（含 test-helm 等全部步骤），非 success 不得合并
-      GATES_JOB_RESULT: ${{ needs.gates.result }}
+      # verify-task 也必须 success，否则等同门禁失败（qa.sh 无需改动）
+      GATES_JOB_RESULT: ${{ (needs.gates.result == 'success' && needs.verify-task.result == 'success') && 'success' || 'failure' }}
     steps:
       # 检出 base（main）而不是 PR：qa.sh / gates.sh / RULES 这些「裁判」必须来自 main，
       # PR 代码由 qa.sh 自行检出为被审数据

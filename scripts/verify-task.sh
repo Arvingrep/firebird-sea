@@ -59,6 +59,30 @@ if command -v php &>/dev/null; then
     fi
 fi
 
+# 5. 流程脚本自测（BMAD 建单/回写、测试先行运行器、门禁）：快、纯本地
+for t in "node --test scripts/bmad/" "bash scripts/acceptance/selftest.sh" "bash scripts/test-gates.sh"; do
+    f="${t##* }"; [ -e "$f" ] || continue
+    if $t >/dev/null 2>&1; then echo "  ✅ $t [通过]"; else echo "❌ [FAIL] $t"; $t 2>&1 | tail -15; exit 1; fi
+done
+
+# 6. Node 服务单元测试 (node:test，零依赖，资金路径必须有测试)；服务目录不存在时跳过
+for svc in services/api; do
+    if [ -f "$svc/package.json" ] && grep -q '"test"' "$svc/package.json"; then
+        if [ -f "$svc/package-lock.json" ] && [ ! -d "$svc/node_modules" ]; then (cd "$svc" && npm ci --workspaces=false --no-audit --no-fund >/dev/null 2>&1); fi
+        if (cd "$svc" && npm test --silent >/dev/null 2>&1); then echo "  ✅ $svc 单元测试 [通过]"
+        else echo "❌ [FAIL] $svc 单元测试，请运行 (cd $svc && npm test) 查看详情"; exit 1; fi
+    fi
+done
+
+# 7. 数据库集成测试：CI 里必跑（需要 docker）；本机用 RUN_DB_TESTS=1 开启，避免日常校验变慢
+#    scripts/test-api-db.sh 随 services/api 入库；不存在则跳过。非交互 runner 的 PATH 可能不含 docker，这里补常见位置。
+if [ -f scripts/test-api-db.sh ] && { [ -n "${CI:-}" ] || [ "${RUN_DB_TESTS:-0}" = "1" ]; }; then
+    export PATH="$HOME/.orbstack/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+    command -v docker >/dev/null || { echo "❌ [FAIL] 数据库集成测试需要 docker，但 runner 的 PATH 里没有 docker"; exit 1; }
+    if bash scripts/test-api-db.sh >/tmp/verify-task-db.log 2>&1; then echo "  ✅ 数据库集成测试 [通过]"
+    else echo "❌ [FAIL] 数据库集成测试（末尾日志）："; tail -25 /tmp/verify-task-db.log; exit 1; fi
+fi
+
 echo "=========================================================="
 echo "🎉 恭喜！全流程质检与文档卡点验证全部 PASS！可以安全合并/交付。"
 echo "=========================================================="

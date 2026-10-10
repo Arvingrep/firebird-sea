@@ -15,7 +15,7 @@
              ＋ verify-task.sh（Node 单测 + 数据库集成测试 scripts/test-api-db.sh，需 docker）
 ④ AI 验收    agent-qa（异厂商 codex，只读，裁判脚本取自 main）
 ⑤ 人合并     AGENT_AUTO_MERGE=0：Arvin 点合并 → ci-gke → ArgoCD
-⑥ 回写       bmad-sprint-writeback.yml（后续 PR）：合并后开 PR 把 sprint-status 置 done（不直推 main）
+⑥ 回写       bmad-sprint-writeback.yml：合并后开 PR 把 sprint-status 置 done（不直推 main）
 ```
 
 ## 2. 命令
@@ -25,6 +25,8 @@ make bmad-next ARGS="--story 1.7 --ignore-deps"       # 预览 Issue（dry-run�
 node scripts/bmad/story-to-issue.js --query-gh        # 只读查询在途 Issue 再选题（仍不建单）
 node scripts/bmad/story-to-issue.js --create          # 真正建单（带 agent:dev 即触发流水线）
                                                        # 退出码 10=无可建；11=缺测试先行用例（--no-test-first 显式放行）
+# 回写状态（幂等；未变化不改文件、不刷新 last_updated）
+node scripts/bmad/sync-sprint-status.js 1-7 done --file _bmad-output/implementation-artifacts/sprint-status.yaml
 node --test scripts/bmad/                              # 单测
 ```
 
@@ -46,7 +48,7 @@ node --test scripts/bmad/                              # 单测
 | Story 超过 300 行 | gates「增量」FAIL → QA 打回 | 拆 Story（改 epics.md 并同步 sprint-status）后重新建单 |
 | Story 需要新依赖 | Zero-Dep FAIL | Arvin 先在 `.agents/approved-deps.txt` 登记并合并，再放行 |
 | Story 需改受保护路径 | Agent 改动被丢弃 | 由 Arvin 提交 |
-| 回写 PR 未出现 | 合并后 sprint-status 仍旧 | 手动运行 sync 脚本并提交 |
+| 回写 PR 未出现 | 合并后 sprint-status 仍旧 | 检查合并 PR 标题是否含 `[story:<key>]`、`AGENT_GH_TOKEN` 是否有效；或手动运行 sync 脚本并提交 |
 
 ## 4. 已知边界
 
