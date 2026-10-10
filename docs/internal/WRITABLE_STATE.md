@@ -58,7 +58,7 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 
 - **真源**：镜像里的 `include/config/*.inc.php`（来自本仓库）+ `configVars`（键级覆盖）+ `configOverrides`（整文件覆盖）。发布时 ConfigMap 内容备份到 GCS（`configBackup`）。
 - **强制**：`CONFIG_LOCK=1` 时 entrypoint 在所有配置生成/注入之后，把 `include/config/*` 与 `dbinfo.inc.php` 置为 `root:root 0644`，目录 `0755`。php-fpm 以 www-data 运行，无法写入、重命名、新建。`configLock.writable` 里的文件名例外。
-- **提示**：后台 48 个"保存配置"入口（30 个模块 `*Config.php` + 18 个站点级）写失败时统一输出 `写入文件 … 失败，请检查权限！`（`json_encode`，非 ASCII 被转义为 `\uXXXX`）。nginx 只在 `/admin/` 的 PHP 响应上用 `sub_filter` 把它替换为"该配置由 GitOps 管理，不能在后台直接修改，请联系管理员通过 Git 提交变更并发布"，原文与转义两种形态都处理；成功响应不受影响。已用真实 nginx 验证。
+- **提示**：后台 48 个"保存配置"入口（30 个模块 `*Config.php` + 18 个站点级）写失败时统一输出 `写入文件 … 失败，请检查权限！`（`json_encode`，非 ASCII 被转义为 `\uXXXX`）。nginx 只在 `/admin/` 的 PHP 响应上用 `sub_filter` 把它替换为"该配置由 Git 管理变更并发布。"，原文与转义两种形态都处理；成功响应不受影响。已用真实 nginx 验证。
 - **变更流程**：改 `values*.yaml` 的 `configVars` / `configOverrides`（或仓库里的配置文件）→ PR → CI → ArgoCD 同步 → 所有副本一致，且 GCS 留有当次生效内容。
 - **只读之外的坑**：`admin/siteConfig/elasticSearch.php` 写失败时不报错（厂商代码），页面会显示成功但并未保存；`/admin/` 之外的入口（若有）会看到原始的"请检查权限"提示。
 - **回滚**：`configLock.enabled: false` 并发布即可恢复可写。
