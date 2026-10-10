@@ -9,7 +9,7 @@
 `fbs_charge`、`fbs_chain_tx`、`fbs_cursor`、`fbs_refund`、`fbs_audit`、`fbs_role`、`fbs_member_map`、`fbs_draft_item`、`fbs_i18n`、`fbs_outbox`，另有迁移记录表 `fbs_migrations`。
 
 - `fbs_chain_tx`：`UNIQUE (txid, event_index)`。
-- `fbs_charge`：含 `holds_tail`；MariaDB 无部分唯一索引，用生成列 `tail_key = IF(holds_tail=1, payable_micro, NULL)` + `UNIQUE`（NULL 不参与唯一性），实现"`holds_tail=1` 时 `payable_micro` 唯一"。`holds_tail` 的置位/清除由后续 Story（收银台）负责。
+- `fbs_charge`：含 `holds_tail`；MariaDB 无部分唯一索引，用生成列 `tail_key = IF(holds_tail=1, payable_micro, NULL)` + `UNIQUE`（NULL 不参与唯一性），实现"`holds_tail=1` 时 `payable_micro` 唯一"。`holds_tail` 的置位/清除由收银台负责，见 `CHECKOUT.md`。
 - `fbs_role`：`shop_id NOT NULL DEFAULT 0`（0 = 无店铺），使 `UNIQUE (tg_user_id, role, shop_id)` 对全局角色同样生效。
 
 ## 幂等与版本

@@ -8,6 +8,8 @@ const {
   confirmChargePaid 
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
+const { createCheckout, coinsRateSource, CheckoutError } = require('./checkout');
+const { cliConn } = require('./migrate');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 
 assertProductionConfig();
@@ -139,6 +141,51 @@ router.post('/payment/create-charge', (req, res) => {
     success: true,
     data: charge
   });
+});
+
+// 4b. 收银台：汇率快照 + 尾数分配（Story 2.1，落库 fbs_charge）
+const checkoutHits = new Map(); // tg user id -> 最近一次窗口内的请求时间戳
+const CHECKOUT_LIMIT = 5;
+const CHECKOUT_WINDOW_MS = 60 * 1000;
+
+router.post('/checkout', async (req, res) => {
+  // phpCentavos 目前由客户端提交且无订单归属校验：服务端可读订单金额前默认关闭
+  if (process.env.CHECKOUT_ENABLED !== '1') {
+    return res.status(503).json({ success: false, error: { code: 'CHECKOUT_DISABLED', message: '收银台暂未开放' } });
+  }
+  const { ordernum, phpCentavos, idempotencyKey } = req.body || {};
+  const initData = req.get('x-telegram-init-data') || (req.body && req.body.initData);
+  const auth = validateTelegramInitData(initData, BOT_TOKEN);
+  if (!auth.valid || !auth.user || !auth.user.id) {
+    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: auth.error || 'invalid initData' } });
+  }
+  const nowMs = Date.now();
+  const hits = (checkoutHits.get(auth.user.id) || []).filter((t) => nowMs - t < CHECKOUT_WINDOW_MS);
+  if (hits.length >= CHECKOUT_LIMIT) {
+    return res.status(429).json({ success: false, error: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后再试' } });
+  }
+  hits.push(nowMs);
+  checkoutHits.set(auth.user.id, hits);
+  for (const [uid, ts] of checkoutHits) {
+    if (nowMs - ts[ts.length - 1] >= CHECKOUT_WINDOW_MS) checkoutHits.delete(uid);
+  }
+  try {
+    const data = await createCheckout(cliConn(), {
+      ordernum,
+      phpCentavos,
+      idempotencyKey: idempotencyKey || null,
+      getRate: coinsRateSource(coinsClient),
+      address: process.env.TRON_MASTER_RECEIVE_ADDRESS || '',
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    if (!(err instanceof CheckoutError)) {
+      process.stderr.write(`${JSON.stringify({ level: 'error', route: 'checkout', ordernum, message: err.message })}\n`);
+      return res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'checkout failed' } });
+    }
+    const status = err.code === 'BAD_REQUEST' ? 400 : err.code === 'ORDER_EXISTS' ? 409 : 503;
+    res.status(status).json({ success: false, error: { code: err.code, message: err.message } });
+  }
 });
 
 // 5. 轮询支付状态
