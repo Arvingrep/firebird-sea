@@ -34,6 +34,14 @@ spec:
               value: "{{ .Values.siteId }}"
             - name: DEFAULT_CURRENCY
               value: "{{ .Values.localization.defaultCurrency }}"
+            {{- range $name := list "TELEGRAM_BOT_TOKEN" "COINS_PH_API_KEY" "COINS_PH_API_SECRET" "TRON_MASTER_RECEIVE_ADDRESS" "TRONGRID_API_KEY" }}
+            - name: {{ $name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.api.secretRef | default "firebird-api-secret" }}
+                  key: {{ $name }}
+                  optional: {{ ne $name "TELEGRAM_BOT_TOKEN" | and (ne $name "TRON_MASTER_RECEIVE_ADDRESS") }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /health

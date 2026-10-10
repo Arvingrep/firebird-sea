@@ -8,27 +8,36 @@ const {
   confirmChargePaid 
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
+const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
+
+assertProductionConfig();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || 'DEMO_BOT_TOKEN_123456';
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || DEMO_BOT_TOKEN;
 const coinsClient = new CoinsPhClient();
 
 app.use(cors());
 app.use(express.json());
 
-// 1. 健康检查 (支持 /, /health 与 /api/health 路径)
-app.get(['/', '/health', '/api/health'], (req, res) => {
+// AD-9：Node 路由统一挂在 /tg-api，/api 前缀留给火鸟 PHP（含 /api/payment/notify.php）
+const router = express.Router();
+app.use('/tg-api', router);
+
+// 1. 健康检查 (支持 /, /health 与 /tg-api/health 路径)
+function healthHandler(req, res) {
   res.json({
     status: 'online',
     timestamp: new Date().toISOString(),
     service: 'Firebird-SEA-Core-API',
     region: 'Philippines (Manila/Cebu)'
   });
-});
+}
+app.get(['/', '/health'], healthHandler);
+router.get('/health', healthHandler);
 
 // 2. Telegram Mini App 鉴权接口
-app.post('/api/auth/tg-verify', (req, res) => {
+router.post('/auth/tg-verify', (req, res) => {
   const { initData } = req.body;
   if (!initData) {
     return res.status(400).json({ success: false, error: 'Missing initData' });
@@ -61,7 +70,7 @@ app.post('/api/auth/tg-verify', (req, res) => {
 });
 
 // 3. 东南亚 MVP 四大核心模块元数据
-app.get('/api/services', (req, res) => {
+router.get('/services', (req, res) => {
   res.json({
     success: true,
     data: [
@@ -118,7 +127,7 @@ app.get('/api/services', (req, res) => {
 });
 
 // 4. 发起 USDT 支付申请
-app.post('/api/payment/create-charge', (req, res) => {
+router.post('/payment/create-charge', (req, res) => {
   const { orderId, amountUsdt, network = 'TRC-20' } = req.body;
   
   if (!orderId || !amountUsdt || amountUsdt <= 0) {
@@ -133,7 +142,7 @@ app.post('/api/payment/create-charge', (req, res) => {
 });
 
 // 5. 轮询支付状态
-app.get('/api/payment/status/:chargeId', (req, res) => {
+router.get('/payment/status/:chargeId', (req, res) => {
   const charge = getCharge(req.params.chargeId);
   if (!charge) {
     return res.status(404).json({ success: false, error: 'Charge not found' });
@@ -145,7 +154,7 @@ app.get('/api/payment/status/:chargeId', (req, res) => {
 });
 
 // 6. 模拟测试对账回调 (用于无链上手续费时的开发调试)
-app.post('/api/payment/mock-webhook', (req, res) => {
+if (process.env.NODE_ENV !== 'production') router.post('/payment/mock-webhook', (req, res) => {
   const { chargeId, txHash } = req.body;
   const hash = txHash || `mock_tx_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const result = confirmChargePaid(chargeId, hash);
@@ -162,7 +171,7 @@ app.post('/api/payment/mock-webhook', (req, res) => {
 });
 
 // 7. Coins.ph 官方行情汇率 (Public API)
-app.get('/api/rates/coins-ph', async (req, res) => {
+router.get('/rates/coins-ph', async (req, res) => {
   const symbol = req.query.symbol || 'USDTPHP';
   try {
     const ticker = await coinsClient.getTickerPrice(symbol);
@@ -181,7 +190,7 @@ app.get('/api/rates/coins-ph', async (req, res) => {
 });
 
 // 8. 菲律宾比索 ➔ USDT 实时换算接口
-app.get('/api/rates/convert', async (req, res) => {
+router.get('/rates/convert', async (req, res) => {
   const php = parseFloat(req.query.php || '0');
   if (php <= 0) {
     return res.status(400).json({ success: false, error: 'Invalid php amount' });
@@ -198,7 +207,7 @@ app.get('/api/rates/convert', async (req, res) => {
 });
 
 // 9. Coins.ph 账户余额查询 (Private API / HMAC-SHA256 鉴权)
-app.get('/api/wallet/coins-ph/balance', async (req, res) => {
+router.get('/wallet/coins-ph/balance', async (req, res) => {
   try {
     const balance = await coinsClient.getAccountBalance();
     res.json({
