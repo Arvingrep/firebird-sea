@@ -45,7 +45,7 @@ async function withRetry(fn, { attempts = 3, delayMs = 1000, sleep = ms => new P
 /**
  * @param {object[]} rawItems 采集到的原始新闻
  * @param {{seen: object, publish: Function, alert: Function, retry?: object}} deps
- *   seen: {has(key), add(key)};publish(item) / alert(text) 失败时抛错
+ *   seen: {has(key), add(key)};publish(item, dedupeKey) / alert(text) 失败时抛错
  * @returns {Promise<{published:number, duplicates:number, invalid:number, failed:number}>}
  */
 async function runSync(rawItems, deps) {
@@ -65,16 +65,27 @@ async function runSync(rawItems, deps) {
     }
     batchKeys.add(key);
     try {
-      await withRetry(() => deps.publish(item), deps.retry);
-      await deps.seen.add(key);
-      stats.published++;
+      await withRetry(() => deps.publish(item, key), deps.retry);
     } catch (err) {
       stats.failed++;
       failures.push(`${item.title} (${item.url}): ${err.message}`);
+      continue;
+    }
+    stats.published++;
+    try {
+      await deps.seen.add(key);
+    } catch (err) {
+      // 已发布但去重记录失败:不算发布失败;下轮会带同一幂等键重发,由门户去重
+      failures.push(`${item.title} (${item.url}): 已发布但去重记录写入失败: ${err.message}`);
     }
   }
   if (failures.length) {
-    await deps.alert(`[news-sync] ${failures.length} 条新闻发布失败:\n${failures.join('\n')}`);
+    try {
+      // alert 实现负责分条;有界重试,仍失败则置 alertFailed(失败项未入已见集合,下轮自动重新告警)
+      await withRetry(() => deps.alert(`[news-sync] ${failures.length} 条异常:\n${failures.join('\n')}`), deps.retry);
+    } catch {
+      stats.alertFailed = true;
+    }
   }
   return stats;
 }

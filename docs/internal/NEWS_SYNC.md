@@ -6,6 +6,13 @@
 
 AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链接,丢弃其它字段(含价格)。
 
+## 门户契约与可靠性
+
+- 发布请求:`POST NEWS_PORTAL_PUBLISH_URL`,头 `Idempotency-Key: <sha256(url)>`,body 含 `title/url/summary/dedupeKey`。门户须以 `dedupeKey` 幂等入库;响应须为 HTTP 2xx 且 JSON `{ "success": true }`,否则(含 HTTP 200 + `success:false`)视为失败,重试并告警,不记入已见集合。此契约为本服务假定,需与火鸟新闻入库端点对齐。
+- 去重文件 tmp + rename 原子写;文件不存在视为空,损坏/无权限则整轮报错退出(不会误当空集合重复发布)。
+- 门户成功但去重文件写入失败:计为已发布,并在告警中提示;下轮同一幂等键重发,由门户去重。
+- 告警按行切分为 ≤4000 字符多条发送,整体有界重试(3 次);仍失败则 `alertFailed=true`、进程退出码 1。失败项未入已见集合,下轮会再次告警。
+
 ## 环境变量
 
 | 变量 | 说明 |
@@ -17,7 +24,12 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 
 ## 测试
 
-`cd services/news-sync && npm test`(`src/sync.test.js`:去重 / 重试 / 告警 / 输入清洗)。
+`cd services/news-sync && npm test`(`src/sync.test.js`、`src/io.test.js`:去重 / 重试 / 告警 / 输入清洗 / 门户业务失败 / 文件持久化 / 告警分条与重试)。
+
+## 待人工(受保护路径)
+
+- `scripts/verify-task.sh` 目前只跑 `services/api`,需 Arvin 在受保护入口加入 `services/news-sync` 的 `npm test`(`node --test src/`)。
+- Zero-Dep 门禁把 package.json 的 `"version"` 误判为依赖;本次已移除该字段并标记 `private`。
 
 ## 待人工
 
