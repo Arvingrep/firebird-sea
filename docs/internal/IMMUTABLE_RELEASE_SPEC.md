@@ -45,8 +45,10 @@
    - 极少变更，由 [deploy/docker/Dockerfile.base](file:///Users/arvin/Documents/firebird-sea/deploy/docker/Dockerfile.base) 独立构建并长期保留在 Google Artifact Registry (GAR)。
 2. **极速业务镜像 (`firebird-php:<Git-SHA>`)**：
    - [deploy/docker/Dockerfile.web](file:///Users/arvin/Documents/firebird-sea/deploy/docker/Dockerfile.web) 直接继承 `firebird-base:7.4`，仅负责源码与配置复制，彻底消除耗时数分钟的重复扩展编译，业务构建缩短至 15~20 秒。
-3. **GAR 远端持久化缓存 (`type=registry`)**：
-   - Buildx 挂载 Google Artifact Registry 远端构建缓存（`buildcache` 与 `IMAGE_LATEST`），杜绝 GitHub Actions 本地磁盘配额不足导致的 Cache Miss，跨 Runner 100% 命中缓存。
+3. **双重持久化缓存（GAR Registry Cache + GitHub Actions Cache）**：
+   - **Google Artifact Registry 远端缓存 (`type=registry`)**：挂载 `firebird-php:buildcache` 与 `IMAGE_LATEST`，无论在任何环境均可跨 Runner 命中云端层。
+   - **GitHub Actions 原生缓存 (`type=gha`)**：工作流配置 `permissions: actions: write` 并划分独立 scope（`firebird-base`, `firebird-php`, `firebird-api`），使构建层直接持久化并呈现在 GitHub 仓库管理面板的 **Actions ➔ Caches** 界面中。
+
 
 ---
 

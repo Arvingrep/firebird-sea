@@ -37,6 +37,9 @@ jobs:
     needs: test-and-verify
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      actions: write # 必须具备此权限，GitHub Actions 才能将 Docker 构建缓存持久化至 Caches 页面
     steps:
       - uses: actions/checkout@v4
 
@@ -66,32 +69,35 @@ jobs:
             echo "📦 Base 镜像不存在，正在构建并发布不可变底层基座: $BASE_IMAGE ..."
             docker buildx build --push \
               --platform linux/amd64 \
-              --cache-from type=gha \
+              --cache-from type=gha,scope=firebird-base \
               --cache-from type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-base:buildcache" \
+              --cache-to type=gha,mode=max,scope=firebird-base \
               --cache-to type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-base:buildcache",mode=max \
               -t "$BASE_IMAGE" -f deploy/docker/Dockerfile.base .
           else
             echo "✅ 基础镜像已就绪，秒级跳过底层编译: $BASE_IMAGE"
           fi
 
-          # 4.2 构建极速业务 Web 镜像 (继承 base，仅 COPY 源码，搭配 GAR 远端缓存)
+          # 4.2 构建极速业务 Web 镜像 (继承 base，仅 COPY 源码，搭配 GHA + GAR 远端缓存)
           echo "🚀 构建业务 Web 镜像: $IMAGE_TAG ..."
           docker buildx build --push \
             --platform linux/amd64 \
             --build-arg BASE_IMAGE="$BASE_IMAGE" \
-            --cache-from type=gha \
+            --cache-from type=gha,scope=firebird-php \
             --cache-from type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:buildcache" \
             --cache-from "$IMAGE_LATEST" \
+            --cache-to type=gha,mode=max,scope=firebird-php \
             --cache-to type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:buildcache",mode=max \
             -t "$IMAGE_TAG" -t "$IMAGE_LATEST" -f deploy/docker/Dockerfile.web .
 
-          # 4.3 构建业务 API 镜像 (搭配 GAR 远端缓存)
+          # 4.3 构建业务 API 镜像 (搭配 GHA + GAR 远端缓存)
           echo "🚀 构建业务 API 镜像: $API_IMAGE_TAG ..."
           docker buildx build --push \
             --platform linux/amd64 \
-            --cache-from type=gha \
+            --cache-from type=gha,scope=firebird-api \
             --cache-from type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:buildcache" \
             --cache-from "$API_IMAGE_LATEST" \
+            --cache-to type=gha,mode=max,scope=firebird-api \
             --cache-to type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:buildcache",mode=max \
             -t "$API_IMAGE_TAG" -t "$API_IMAGE_LATEST" -f deploy/docker/Dockerfile.api .
 
