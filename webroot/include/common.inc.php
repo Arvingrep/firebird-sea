@@ -72,24 +72,9 @@ else{
     @include_once(HUONIAOINC.'/config/siteCityAdvanced.inc.php'); //付费查看电话配置
 }
 
-// 动态适配当前访问域名，确保静态资源在当前子域名下同源加载，避免根域名缺少DNS解析导致 ERR_NAME_NOT_RESOLVED
+// 动态适配当前访问域名，确保静态资源在当前子域名下同源加载，避免跨域与DNS解析异常导致的 CORB/404 拦截
 if (!empty($_SERVER['HTTP_HOST'])) {
-    $currentHost = $_SERVER['HTTP_HOST'];
-    $currentHostNoPort = preg_replace('/:\d+$/', '', $currentHost);
-
-    // 如果是通过后台域名访问（如 canary-admin.fbird.men、prod-admin.fbird.men 或 admin.fbird.men），优先映射到环境变量 SITE_BASEHOST，确保对齐前台站点主域名
-    $frontHost = getenv('SITE_BASEHOST') ?: '';
-    if (strpos($currentHostNoPort, '-admin.') !== false || strpos($currentHostNoPort, 'admin.') === 0) {
-        if (!empty($frontHost) && $frontHost !== 'fbird.men') {
-            $cfg_basehost = $frontHost;
-        } elseif (strpos($currentHostNoPort, '-admin.') !== false) {
-            $cfg_basehost = str_replace('-admin.', '.', $currentHostNoPort);
-        } else {
-            $cfg_basehost = substr($currentHostNoPort, 6);
-        }
-    } else {
-        $cfg_basehost = $currentHostNoPort;
-    }
+    $cfg_basehost = preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST']);
 } elseif (empty($cfg_basehost) || $cfg_basehost === '~domain') {
     $cfg_basehost = 'fbird.men';
 }
