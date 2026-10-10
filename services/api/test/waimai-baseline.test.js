@@ -76,6 +76,9 @@ test('AC1 本分支相对 origin/main 的改动仅限选定白名单且不含授
     /^docs\/internal\/WAIMAI_PLUGIN_SPEC\.md$/,
     /^services\/api\/package\.json$/,
     /^services\/api\/test\/waimai-baseline\.test\.js$/,
+    /^services\/api\/test\/gateway-spike\.test\.js$/,
+    /^services\/api\/src\/gatewayClient\.js$/,
+    /^docs\/internal\/GATEWAY_SPIKE\.md$/,
     /^webroot\/include\/config\/waimai\.inc\.php$/,
     /^webroot\/include\/config\/waimai\.inc\.php\.example$/
   ];
