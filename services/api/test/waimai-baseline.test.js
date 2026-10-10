@@ -86,7 +86,10 @@ test('AC1 本分支相对 origin/main 的改动仅限选定白名单且不含授
   if (changed !== null && touchesStory) {
     const invalidFiles = changed.filter((f) => !allowedWhitelist.some((re) => re.test(f)));
     assert.deepStrictEqual(invalidFiles, [], '改动文件超出 Story 1.1 选定白名单范围');
+  }
 
+  // 禁入路径检查无条件执行（与文档「真实配置/缓存检查保持无条件执行」一致），不随 touchesStory 放宽。
+  if (changed !== null) {
     const bad = changed.filter((f) => /^webroot\/data\//.test(f) || /^webroot\/templates_c\//.test(f)
       || /licen[cs]e|\.lic$/i.test(f) || (/^webroot\/include\/config\/waimai\.inc\.php$/.test(f) && fs.existsSync(path.join(root, f))));
     assert.deepStrictEqual(bad, [], '改动含禁入路径');
