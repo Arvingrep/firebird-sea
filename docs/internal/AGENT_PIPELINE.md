@@ -96,6 +96,10 @@ n8n / GKE 侧：
 - 合并需同时满足：托管 runner 上的 gates job = success（`GATES_JOB_RESULT`）、本地复跑门禁通过、QA 无 blocker/major。本机缺 php/helm 时门禁记为 SKIP，以托管 runner 结果为准。
 - 自动合并带 `--match-head-commit`：QA 之后再推的提交不会被带进 main。
 - 门禁拦截私钥 / 助记词 / TG Bot Token 进入 diff（RULES 资金安全禁区）。
+- **依赖批准清单**：Zero-Dep 门禁放行 `.agents/approved-deps.txt`（每行 `包名 版本串`，如 `mysql2 3.24.5`，`#` 起注释）中**名称与版本串都完全一致**的新增依赖。清单取自 **base 分支**，同一 PR 自己登记自己无效；清单在受保护路径 `.agents/`，只能 Arvin 提交。版本变化需重新登记。
+- **测试先行用例受保护**：`scripts/acceptance/` 对 Agent 分支同样受保护（dev.sh 丢弃改动、gates 判 FAIL），Agent 不能改写「验收标准」来让自己变绿，见 [TEST_FIRST.md](TEST_FIRST.md)。
+- `_bmad-output/`（BMAD 规划产物）与 `docs/`、`.agents/` 一样不计入 300 行增量。
+- 门禁自测：`scripts/test-gates.sh`（临时仓库内验证批准清单 / 受保护路径 / 增量豁免）。
 
 ## 6. 运维
 

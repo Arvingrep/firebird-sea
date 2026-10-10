@@ -2,9 +2,9 @@
 # 确定性门禁（无 LLM）：只看「本分支相对 base 的改动」，结果据实输出，不写死 PASS。
 # 用法：scripts/agent/gates.sh [base-ref]     （默认 origin/main）
 # 输出：stdout 为 Markdown 报告；任一 FAIL => 退出码 1。
-# 阈值：GATE_MAX_ADDED（默认 300，不含 docs/ 与 .agents/）
+# 阈值：GATE_MAX_ADDED（默认 300，不含 docs/、.agents/、_bmad-output/ 规划产物）
 # 环境：GATE_REPO_DIR       被检查的仓库目录（QA 用 main 上的本脚本检查 PR 检出）
-#       GATE_AGENT_BRANCH=1 Agent 分支：禁止改动 .github/、scripts/agent/、.agents/
+#       GATE_AGENT_BRANCH=1 Agent 分支：禁止改动 .github/、scripts/agent/、scripts/acceptance/（测试先行用例）、.agents/
 #       GATE_REQUIRE_TOOLS=1 缺 php/helm 判 FAIL（托管 runner 上为权威结果）；否则记为 SKIP
 
 set -uo pipefail
@@ -25,7 +25,7 @@ missing_tool() { # missing_tool <检查项> <工具>
 
 # 0. 受保护路径：Agent 分支不得改动流水线与规范自身（含新增文件）
 if [ "${GATE_AGENT_BRANCH:-0}" = "1" ]; then
-  PROT="$(git diff --no-renames --name-only "${BASE}...HEAD" | grep -E '^(\.github|scripts/agent|\.agents)/' || true)"
+  PROT="$(git diff --no-renames --name-only "${BASE}...HEAD" | grep -E '^(\.github|scripts/agent|scripts/acceptance|\.agents)/' || true)"
   [ -z "$PROT" ] && row "受保护路径未改动" "✅ PASS" || row "受保护路径未改动" "❌ FAIL" "$(echo $PROT | head -c 160)"
 fi
 
@@ -34,7 +34,7 @@ if [ -n "$CHANGED" ]; then row "非空交付" "✅ PASS" "$(printf '%s\n' "$CHAN
 else row "非空交付" "❌ FAIL" "相对 ${BASE} 无改动"; fi
 
 # 2. 增量控制（防臃肿）
-ADDED="$(git diff --numstat "$RANGE" -- . ':(exclude)docs/**' ':(exclude).agents/**' ':(exclude)**/package-lock.json' \
+ADDED="$(git diff --numstat "$RANGE" -- . ':(exclude)docs/**' ':(exclude).agents/**' ':(exclude)_bmad-output/**' ':(exclude)**/package-lock.json' \
          | awk '$1 != "-" {a+=$1} END{print a+0}')"
 if [ "$ADDED" -le "$MAX_ADDED" ]; then row "增量 ≤ ${MAX_ADDED} 行" "✅ PASS" "+${ADDED}"
 else row "增量 ≤ ${MAX_ADDED} 行" "❌ FAIL" "+${ADDED}，拆小或精简"; fi
@@ -50,9 +50,20 @@ JUNK="$(printf '%s\n' "$CHANGED" | grep -E '(\.bak|\.tmp|\.orig|/test_[^/]*\.php
 [ -z "$JUNK" ] && row "无垃圾文件" "✅ PASS" || row "无垃圾文件" "❌ FAIL" "$(echo $JUNK)"
 
 # 5. 依赖审计（Zero-Dep）：新增依赖必须人工确认
+#    批准记录：base 分支上的 .agents/approved-deps.txt（每行「包名 版本串」，版本须与 package.json 完全一致）。
+#    取自 base 而非 PR：同一 PR 里自己登记自己无效，须先由 Arvin 单独合并批准记录。
 NEWDEP="$(git diff "$RANGE" -- '**/package.json' 'package.json' '**/composer.json' \
-          | grep -E '^\+\s*"[@a-zA-Z0-9_./-]+"\s*:\s*"[~^0-9*]' || true)"
-[ -z "$NEWDEP" ] && row "Zero-Dep" "✅ PASS" || row "Zero-Dep" "❌ FAIL" "新增依赖: $(echo "$NEWDEP" | tr -s ' ' | head -c 160)"
+          | grep -E '^\+[[:space:]]*"[@a-zA-Z0-9_./-]+"[[:space:]]*:[[:space:]]*"[~^0-9*]' || true)"
+APPROVED="$(git show "${BASE}:.agents/approved-deps.txt" 2>/dev/null | sed -E 's/#.*//; s/[[:space:]]+/ /g; s/^ //; s/ $//' | grep -v '^$' || true)"
+if [ -n "$NEWDEP" ] && [ -n "$APPROVED" ]; then
+  REST=""
+  while IFS= read -r l; do
+    nv="$(printf '%s' "$l" | sed -E 's/^\+[[:space:]]*"([^"]+)"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1 \2/')"
+    printf '%s\n' "$APPROVED" | grep -qxF -- "$nv" || REST+="$l"$'\n'
+  done <<< "$NEWDEP"
+  NEWDEP="${REST%$'\n'}"
+fi
+[ -z "$NEWDEP" ] && row "Zero-Dep" "✅ PASS" || row "Zero-Dep" "❌ FAIL" "新增依赖未登记 .agents/approved-deps.txt: $(echo "$NEWDEP" | tr -s ' ' | head -c 160)"
 
 # 6. 密钥/助记词泄漏（资金安全禁区）
 LEAK="$(git diff "$RANGE" | grep -E '^\+' | grep -iE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|"private_key"|mnemonic|seed phrase|TRONGRID_API_KEY=[A-Za-z0-9]{8,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}' || true)"
