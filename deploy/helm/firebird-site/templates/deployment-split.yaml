@@ -1,0 +1,149 @@
+{{- /*
+  拓扑二（⑤）：nginx 与 php-fpm 拆成两个 Deployment，nginx 经 Service 直连 php-fpm（FastCGI）。
+  前提（均由 fail 强制）：
+    - webroot.mode=baked：nginx 用打好静态资源的 firebird-nginx 镜像，不再依赖与 php 共享的 emptyDir
+    - uploads / 配置 PVC 不得为 RWO：附件走 GCS；两个 Deployment 不会也不应共享 RWO 卷
+  注意：拆分只解决"独立扩缩容/资源/探针"，不解决 file_data 缓存与后台配置的一致性——那是 php 进程的本地状态，
+  由 fileCache.sweeper（陈旧有界）与 configVars（声明式配置）处理。
+*/ -}}
+{{- if .Values.split.enabled -}}
+{{- $baked := include "firebird.baked" . -}}
+{{- if not $baked }}{{ fail "split.enabled=true 要求 webroot.mode=baked（nginx 需要内置静态资源的镜像）" }}{{ end -}}
+{{- if and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}{{ fail "split.enabled=true 时 uploads 不能是 RWO PVC（请 uploads.enabled=false，附件走 GCS）" }}{{ end -}}
+{{- $deep := and .Values.probes .Values.probes.deepReadiness -}}
+---
+# php-fpm：无状态计算层（本地仅有可再生的缓存与 per-Pod 的配置副本）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firebird-php-{{ .Values.siteId }}
+  labels:
+    app: firebird-php
+    site: {{ .Values.siteId }}
+spec:
+  replicas: {{ .Values.split.php.replicaCount | default .Values.replicaCount }}
+  {{- if include "firebird.rwoPvc" . }}
+  strategy:
+    type: Recreate
+  {{- else }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      app: firebird-php
+      site: {{ .Values.siteId }}
+  template:
+    metadata:
+      labels:
+        app: firebird-php        # 刻意不带 app=firebird-site：否则 firebird-<site> Service（选 app=firebird-site）会把流量打进 :9000
+        site: {{ .Values.siteId }}
+      annotations:
+        checksum/init-scripts: {{ include (print $.Template.BasePath "/configmap-init.yaml") . | sha256sum }}
+        checksum/config-vars: {{ include (print $.Template.BasePath "/configmap-vars.yaml") . | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: firebird-php
+              site: {{ .Values.siteId }}
+      initContainers:
+        {{- include "firebird.initContainer" . | nindent 8 }}
+      containers:
+        {{- include "firebird.phpContainer" . | nindent 8 }}
+        {{- if .Values.fileCache.sweeper.enabled }}
+        {{- include "firebird.sweeper" . | nindent 8 }}
+        {{- end }}
+      volumes:
+        {{- include "firebird.phpVolumes" . | nindent 8 }}
+---
+# nginx：静态资源（镜像内置）+ 反向代理，FastCGI 经 firebird-php-<site>:9000 转给 php 层
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firebird-{{ .Values.siteId }}
+  labels:
+    app: firebird-site
+    site: {{ .Values.siteId }}
+spec:
+  replicas: {{ .Values.split.nginx.replicaCount | default .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: firebird-site
+      site: {{ .Values.siteId }}
+  template:
+    metadata:
+      labels:
+        app: firebird-site
+        site: {{ .Values.siteId }}
+      annotations:
+        checksum/nginx-conf: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: firebird-site
+              site: {{ .Values.siteId }}
+      containers:
+        - name: nginx
+          image: "{{ .Values.webroot.nginxImage.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.webroot.nginxImage.pullPolicy | default .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 3 && /usr/sbin/nginx -s quit"]
+          readinessProbe:
+            httpGet:
+              {{- if $deep }}
+              path: /healthz.php   # 经 Service 到 php 层：php 层整体不可用时 nginx 也摘流量
+              {{- else }}
+              path: /healthz
+              {{- end }}
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 3
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            {{- if .Values.split.nginx.resources }}
+            {{- toYaml .Values.split.nginx.resources | nindent 12 }}
+            {{- else }}
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { cpu: 300m, memory: 128Mi }
+            {{- end }}
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: firebird-nginx-{{ .Values.siteId }}
+{{- end }}

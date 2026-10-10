@@ -1,0 +1,102 @@
+{{- /*
+  配置备份：每次发布（PostSync）把"当时生效"的 ConfigMap 内容连同镜像 tag、时间戳上传到 GCS，便于回溯/回滚。
+  内容 = 声明式配置变量 (firebird-config-vars-<site>) + 整文件覆盖 (firebird-configs-<site>)，都是 Git 里已有的内容，不含密钥。
+  必须指向"私有"桶：uploads 桶 (fbird-sea-uploads) 是公开读的，不能放这里。
+  凭据复用 firebird-storage-secret 的 HMAC key（S3 兼容 API，curl --aws-sigv4），该 SA 需对备份桶有 objectCreator。
+*/ -}}
+{{- $hasOverrides := and .Values.configOverrides .Values.configOverrides.enabled .Values.configOverrides.files -}}
+{{- $hasCm := or (include "firebird.hasConfigVars" .) $hasOverrides -}}
+{{- if and .Values.configBackup.enabled .Values.configBackup.bucket $hasCm }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: firebird-config-backup-{{ .Values.siteId }}
+  labels:
+    app: firebird-config-backup
+    site: {{ .Values.siteId }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "2"      # 在冒烟(0)、上线通知(1)之后
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 180
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: backup
+          image: curlimages/curl:8.11.1
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 32Mi }
+          env:
+            - name: BUCKET
+              value: {{ .Values.configBackup.bucket | quote }}
+            - name: PREFIX
+              value: {{ .Values.configBackup.prefix | default "config-backup" | quote }}
+            - name: SITE
+              value: {{ .Values.siteId | quote }}
+            - name: IMAGE_TAG
+              value: {{ .Values.image.tag | quote }}
+            - name: FAIL_ON_ERROR
+              value: {{ ternary "1" "0" (.Values.configBackup.failOnError | default false) | quote }}
+            - name: GCS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: firebird-storage-secret
+                  key: gcs-key-id
+                  optional: true
+            - name: GCS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: firebird-storage-secret
+                  key: gcs-key-secret
+                  optional: true
+          command: ["sh", "-c"]
+          args:
+            - |
+              ts=$(date -u +%Y%m%dT%H%M%SZ)
+              base="${PREFIX}/${SITE}/${ts}-${IMAGE_TAG}"
+              rc=0; n=0
+              if [ -z "$GCS_KEY_ID" ] || [ -z "$GCS_KEY_SECRET" ]; then
+                echo "[config-backup] GCS 凭据为空，跳过（firebird-storage-secret 不存在？）"; rc=1
+              else
+                for f in /backup/*/*; do
+                  [ -f "$f" ] || continue
+                  name="$(basename "$(dirname "$f")")/$(basename "$f")"
+                  if curl -fsS -m 30 --retry 2 --aws-sigv4 "aws:amz:auto:s3" --user "${GCS_KEY_ID}:${GCS_KEY_SECRET}" \
+                       -T "$f" "https://storage.googleapis.com/${BUCKET}/${base}/${name}"; then
+                    echo "[config-backup] ok gs://${BUCKET}/${base}/${name}"; n=$((n+1))
+                  else
+                    echo "[config-backup] FAIL ${name}"; rc=1
+                  fi
+                done
+                [ "$n" -gt 0 ] || { echo "[config-backup] 没有可备份的文件"; rc=1; }
+              fi
+              [ "$FAIL_ON_ERROR" = "1" ] && exit $rc
+              exit 0
+          volumeMounts:
+            {{- if include "firebird.hasConfigVars" . }}
+            - name: config-vars
+              mountPath: /backup/config-vars
+              readOnly: true
+            {{- end }}
+            {{- if $hasOverrides }}
+            - name: config-overrides
+              mountPath: /backup/config-overrides
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- if include "firebird.hasConfigVars" . }}
+        - name: config-vars
+          configMap:
+            name: firebird-config-vars-{{ .Values.siteId }}
+        {{- end }}
+        {{- if $hasOverrides }}
+        - name: config-overrides
+          configMap:
+            name: firebird-configs-{{ .Values.siteId }}
+        {{- end }}
+{{- end }}

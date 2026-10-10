@@ -9,7 +9,9 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..', '..', '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
-const deployment = read('deploy/helm/firebird-site/templates/deployment.yaml');
+// Pod 定义由 deployment.yaml / deployment-split.yaml / _helpers.tpl 共同构成（php 容器、init、卷在 helpers 里复用）
+const tpl = (f) => read(`deploy/helm/firebird-site/templates/${f}`);
+const deployment = tpl('deployment.yaml') + tpl('_helpers.tpl') + tpl('deployment-split.yaml');
 const pvc = read('deploy/helm/firebird-site/templates/pvc.yaml');
 const values = read('deploy/helm/firebird-site/values.yaml');
 const entrypoint = read('deploy/docker/entrypoint-web.sh');
