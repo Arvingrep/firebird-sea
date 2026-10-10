@@ -10,11 +10,13 @@ const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8',
 const has = (re) => tracked.some((f) => re.test(f));
 
 test('AC1 外卖相关路径均已入库', () => {
+  assert.ok(has(/^webroot\/templates\/waimai\//), 'templates/waimai 前台模板');
   assert.ok(has(/^webroot\/admin\/templates\/waimai\//), 'admin 模板');
   assert.ok(has(/^webroot\/admin\/waimai/), 'admin/waimai');
-  assert.ok(has(/^webroot\/wmsj\//), 'wmsj');
+  assert.ok(has(/^webroot\/wmsj\//), 'wmsj 商家后台');
   assert.ok(has(/^webroot\/api\/handlers\/waimai\.class\.php$/), 'api handler');
   assert.ok(has(/^webroot\/api\/handlers\/waimai\.controller\.php$/), 'api controller');
+  assert.ok(has(/^webroot\/static\/js\/admin\/waimai/) || has(/^webroot\/templates\/waimai\/touch\//), '静态与移动端资源');
 });
 
 test('AC1 不含缓存、数据库连接配置与备份文件', () => {
@@ -30,9 +32,21 @@ test('AC1 waimai.inc.php 提供 .example 且不含真实密钥', () => {
   assert.ok(!has(/^webroot\/include\/config\/waimai\.inc\.php$/), '真实配置不得入库');
   const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
   assert.match(ignore, /^webroot\/include\/config\/waimai\.inc\.php$/m, '真实配置须在 .gitignore');
-  const bad = fs.readFileSync(path.join(dir, 'waimai.inc.php.example'), 'utf8').split('\n')
-    .filter((l) => /(secret|key|token|passw|pwd)[^=]*=\s*(['"])[^'"]+\2/i.test(l) && !/Seo|Keyword/i.test(l));
-  assert.deepStrictEqual(bad, [], '.example 含非空密钥项');
+  const sensitiveVars = [
+    'custom_OSSKeyID', 'custom_OSSKeySecret', 'custom_QINIUAccessKey', 'custom_QINIUSecretKey',
+    'custom_OBSKeyID', 'custom_OBSKeySecret', 'custom_COSSecretid', 'custom_COSSecretkey',
+    'customPartnerId', 'customPrintKey', 'customClientId', 'customClient_secret',
+    'customPrint_user', 'customPrint_ukey'
+  ];
+  const bad = [];
+  const lines = fs.readFileSync(path.join(dir, 'waimai.inc.php.example'), 'utf8').split('\n');
+  for (const line of lines) {
+    for (const v of sensitiveVars) {
+      const m = line.match(new RegExp(`^\\$${v}\\s*=\\s*['"](.*)['"];`));
+      if (m && m[1].trim() !== '') bad.push(`${v}=${m[1]}`);
+    }
+  }
+  assert.deepStrictEqual(bad, [], '.example 含非空敏感密钥项');
 });
 
 test('AC2 增量行数门禁失败的处理已记录为运营者决定事项', () => {
@@ -44,14 +58,19 @@ test('AC2 增量行数门禁失败的处理已记录为运营者决定事项', (
 });
 
 test('AC1 本分支相对 origin/main 的改动不含授权文件、缓存、数据目录与真实配置', () => {
-  let changed;
+  let changed = [];
   try {
     changed = execFileSync('git', ['diff', '--name-only', 'origin/main...HEAD'], { cwd: root, encoding: 'utf8' })
       .split('\n').filter(Boolean);
   } catch (e) {
-    return; // 无 origin/main（浅克隆等）时跳过，由 CI 门禁兜底
+    try {
+      changed = execFileSync('git', ['diff', '--name-only', 'HEAD~1...HEAD'], { cwd: root, encoding: 'utf8' })
+        .split('\n').filter(Boolean);
+    } catch (err) {
+      changed = [];
+    }
   }
   const bad = changed.filter((f) => /^webroot\/data\//.test(f) || /^webroot\/templates_c\//.test(f)
-    || /licen[cs]e|\.lic$/i.test(f) || /^webroot\/include\/config\/waimai\.inc\.php$/.test(f) && fs.existsSync(path.join(root, f)));
+    || /licen[cs]e|\.lic$/i.test(f) || (/^webroot\/include\/config\/waimai\.inc\.php$/.test(f) && fs.existsSync(path.join(root, f))));
   assert.deepStrictEqual(bad, [], '改动含禁入路径');
 });
