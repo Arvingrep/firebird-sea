@@ -115,7 +115,15 @@ function main(argv) {
   const out = path.resolve(__dirname, '../../_bmad-output');
   const epics = parseEpics(fs.readFileSync(path.join(out, 'planning-artifacts/epics.md'), 'utf8'));
   const status = parseStatus(fs.readFileSync(path.join(out, 'implementation-artifacts/sprint-status.yaml'), 'utf8'));
-  const issues = JSON.parse(gh(['issue', 'list', '-R', REPO, '--state', 'all', '--limit', '200', '--json', 'number,title,state,labels,body,url']));
+  let issues;
+  try { issues = JSON.parse(gh(['issue', 'list', '-R', REPO, '--state', 'all', '--limit', '200', '--json', 'number,title,state,labels,body,url'])); }
+  catch {
+    issues = JSON.parse(gh(['api', `repos/${REPO}/issues?state=all&per_page=100`, '--paginate'])).map((i) => ({
+      number: i.number, title: i.title, state: i.state,
+      labels: (i.labels || []).map((l) => ({ name: typeof l === 'string' ? l : l.name })),
+      body: i.body || '', url: i.html_url
+    }));
+  }
   let items = null, projectReadable = false, projErr = '';
   try { items = JSON.parse(gh(['project', 'item-list', PROJECT, '--owner', OWNER, '--limit', '500', '--format', 'json'])).items; projectReadable = true; }
   catch (e) { projErr = String(e.message || e).split('\n')[0]; }

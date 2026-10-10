@@ -24,7 +24,8 @@ AUTO_MERGE="${AGENT_AUTO_MERGE:-1}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 ensure_labels
-gh pr view "$PR" -R "$REPO" --json headRefName,headRefOid,body,title,isCrossRepository > "$TMP/pr.json"
+gh api "repos/${REPO}/pulls/${PR}" --jq '{headRefName: .head.ref, headRefOid: .head.sha, body: .body, title: .title, isCrossRepository: (.head.repo.full_name != .base.repo.full_name)}' > "$TMP/pr.json" 2>/dev/null \
+  || gh pr view "$PR" -R "$REPO" --json headRefName,headRefOid,body,title,isCrossRepository > "$TMP/pr.json"
 read_pr() { node -e 'const p=require(process.argv[1]);console.log(p[process.argv[2]] ?? "")' "$TMP/pr.json" "$1"; }
 [ "$(read_pr isCrossRepository)" = "false" ] || die "拒绝验收 fork PR（自托管 runner 安全边界）"
 HEAD_SHA="$(read_pr headRefOid)"
@@ -44,7 +45,7 @@ fi
 
 # 2. LLM 对抗审查
 SPEC="（PR 未关联 issue）"
-[ -n "$ISSUE" ] && SPEC="$(gh issue view "$ISSUE" -R "$REPO" --json title,body -q '"### " + .title + "\n" + .body')"
+[ -n "$ISSUE" ] && SPEC="$(gh api "repos/${REPO}/issues/${ISSUE}" --jq '"### " + .title + "\n" + .body' 2>/dev/null || gh issue view "$ISSUE" -R "$REPO" --json title,body -q '"### " + .title + "\n" + .body')"
 git diff origin/main...HEAD > "$TMP/diff.patch"
 DIFF_BYTES="$(wc -c < "$TMP/diff.patch" | tr -d ' ')"
 {
@@ -122,9 +123,18 @@ if [ "$VERDICT" = "ACCEPTED" ]; then
   [ -n "$ISSUE" ] && bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" ready-to-release
   if [ "$AUTO_MERGE" = "1" ]; then
     # --match-head-commit：防止验收后有人又推了未验收的提交
-    gh pr merge "$PR" -R "$REPO" --squash --delete-branch --match-head-commit "$HEAD_SHA" \
-      && notify merged "PR #${PR} QA 通过并已自动合并，CI 构建镜像中" "$ISSUE" "$PR" \
-      || { notify merge_failed "PR #${PR} QA 通过但自动合并失败，请检查" "$ISSUE" "$PR"; exit 1; }
+    MERGE_OK=0
+    if gh pr merge "$PR" -R "$REPO" --squash --delete-branch --match-head-commit "$HEAD_SHA" >/dev/null 2>&1; then
+      MERGE_OK=1
+    elif gh api -X PUT "repos/${REPO}/pulls/${PR}/merge" -f merge_method=squash -f sha="$HEAD_SHA" >/dev/null 2>&1; then
+      git push origin --delete "$(read_pr headRefName)" >/dev/null 2>&1 || true
+      MERGE_OK=1
+    fi
+    if [ "$MERGE_OK" = "1" ]; then
+      notify merged "PR #${PR} QA 通过并已自动合并，CI 构建镜像中" "$ISSUE" "$PR"
+    else
+      notify merge_failed "PR #${PR} QA 通过但自动合并失败，请检查" "$ISSUE" "$PR"; exit 1
+    fi
   else
     notify qa_accepted "PR #${PR} QA 通过，等待人工合并" "$ISSUE" "$PR"
   fi

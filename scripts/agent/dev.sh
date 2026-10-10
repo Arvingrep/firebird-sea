@@ -44,8 +44,8 @@ $(printf '%s' "$AUTH_OUT" | tail -n 5 | redact)
   fi
   log "✅ claude CLI 验活通过"
 fi
-TITLE="$(gh issue view "$ISSUE" -R "$REPO" --json title -q .title)"
-BODY="$(gh issue view "$ISSUE" -R "$REPO" --json body -q .body)"
+TITLE="$(gh api "repos/${REPO}/issues/${ISSUE}" --jq .title 2>/dev/null || gh issue view "$ISSUE" -R "$REPO" --json title -q .title)"
+BODY="$(gh api "repos/${REPO}/issues/${ISSUE}" --jq .body 2>/dev/null || gh issue view "$ISSUE" -R "$REPO" --json body -q .body)"
 log "🤖 Dev Agent 认领 #${ISSUE}: ${TITLE}"
 bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-progress
 # BMAD Story：标题 [story:<key>]（或正文标记）→ 注入规格与验收条件、测试先行预检、要求逐条验收清单

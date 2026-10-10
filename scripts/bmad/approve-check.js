@@ -29,7 +29,15 @@ function main(argv) {
   const a = {};
   for (let i = 0; i < argv.length; i++) if (argv[i].startsWith('--')) a[argv[i].slice(2)] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
   const gh = (args) => execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 16e6 });
-  const issues = JSON.parse(gh(['issue', 'list', '-R', REPO, '--state', 'open', '--limit', '200', '--json', 'number,labels,body']));
+  let issues;
+  try { issues = JSON.parse(gh(['issue', 'list', '-R', REPO, '--state', 'open', '--limit', '200', '--json', 'number,labels,body'])); }
+  catch {
+    issues = JSON.parse(gh(['api', `repos/${REPO}/issues?state=open&per_page=100`, '--paginate'])).map((i) => ({
+      number: i.number,
+      labels: (i.labels || []).map((l) => ({ name: typeof l === 'string' ? l : l.name })),
+      body: i.body || ''
+    }));
+  }
   const target = issues.find((i) => i.number === +a.issue);
   if (!target) { console.error(`Issue #${a.issue} 不是 open 状态或不存在`); return 2; }
   const labels = (target.labels || []).map((l) => l.name || l);

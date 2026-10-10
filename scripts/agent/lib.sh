@@ -67,7 +67,12 @@ set_label() { # set_label <issue|pr number> <add> [remove...]
   local n="$1" add="$2"; shift 2
   local args=(--add-label "$add")
   for r in "$@"; do args+=(--remove-label "$r"); done
-  gh issue edit "$n" -R "$REPO" "${args[@]}" >/dev/null 2>&1 || log "⚠️ 标签更新失败: #$n +$add"
+  if ! gh issue edit "$n" -R "$REPO" "${args[@]}" >/dev/null 2>&1; then
+    gh api -X POST "repos/${REPO}/issues/${n}/labels" -f "labels[]=${add}" >/dev/null 2>&1 || true
+    for r in "$@"; do
+      gh api -X DELETE "repos/${REPO}/issues/${n}/labels/$(node -e 'console.log(encodeURIComponent(process.argv[1]))' "$r")" >/dev/null 2>&1 || true
+    done
+  fi
 }
 
 bmad_stage() { # bmad_stage <issue-or-pr-url> <stage-key>
