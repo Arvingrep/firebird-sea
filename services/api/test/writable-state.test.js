@@ -24,12 +24,24 @@ test('AC1: uploads live on a PVC mounted into php-fpm and nginx', () => {
   assert.match(values, /^uploads:\s*\n\s+enabled: true/m);
 });
 
+// AC1: RWO 卷不得配 RollingUpdate / HPA，且各站点显式声明 uploads
+test('AC1: RWO uploads force Recreate, skip HPA, and sites declare uploads', () => {
+  assert.match(deployment, /type: Recreate/);
+  assert.match(deployment, /eq \(\.Values\.uploads\.accessMode/);
+  assert.match(read('deploy/helm/firebird-site/templates/hpa.yaml'), /\.Values\.uploads\.accessMode/);
+  for (const site of ['manila', 'cebu', 'canary']) {
+    assert.match(read(`deploy/helm/firebird-site/values-${site}.yaml`), /^uploads:\s*\n\s+enabled: true/m, site);
+  }
+});
+
 // AC2: 会话存 Redis，Pod 重启不丢
 test('AC2: PHP sessions are stored in Redis', () => {
   assert.match(deployment, /name: REDIS_HOST/);
   assert.match(deployment, /name: REDIS_PORT/);
   assert.match(entrypoint, /session\.save_handler = redis/);
-  assert.match(entrypoint, /tcp:\/\/\$\{REDIS_HOST\}:\$\{REDIS_PORT:-6379\}/);
+  assert.match(entrypoint, /tcp:\/\/\$\{REDIS_HOST\}:\$\{REDIS_PORT:-6379\}\?timeout=2&prefix=PHPREDIS_SESSION_/);
+  assert.match(entrypoint, /->connect\(/, '写 ini 前先探活 Redis');
+  assert.match(entrypoint, /回退为文件存储/);
   assert.match(baseImage, /pecl install redis/);
   assert.match(baseImage, /docker-php-ext-enable redis/);
 });

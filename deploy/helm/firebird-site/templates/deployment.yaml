@@ -7,11 +7,16 @@ metadata:
     site: {{ .Values.siteId }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  {{- if and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+  strategy:
+    type: Recreate          # uploads 为 RWO 卷：新旧 Pod 不能跨节点同时挂载，先停后起
+  {{- else }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 0     # 更新时不可用 Pod 数必须为 0，保证业务不中断
       maxSurge: 1           # 允许额外拉起 1 个新 Pod 完成平滑交接
+  {{- end }}
   selector:
     matchLabels:
       app: firebird-site
