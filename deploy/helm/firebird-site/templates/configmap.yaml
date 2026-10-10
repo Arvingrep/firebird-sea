@@ -36,7 +36,7 @@ data:
         # 供 probes.deepReadiness=true 的 readinessProbe 使用；不进访问日志
         location = /healthz.php {
             access_log off;
-            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_pass {{ if .Values.split.enabled }}firebird-php-{{ .Values.siteId }}:9000{{ else }}127.0.0.1:9000{{ end }};
             fastcgi_param SCRIPT_FILENAME /var/www/html/healthz.php;
             include fastcgi_params;
             fastcgi_read_timeout 5;
@@ -55,7 +55,7 @@ data:
 
         # PHP-FPM 反向代理到本地 9000 端口
         location ~ \.php$ {
-            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_pass {{ if .Values.split.enabled }}firebird-php-{{ .Values.siteId }}:9000{{ else }}127.0.0.1:9000{{ end }};
             fastcgi_index index.php;
             fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
             include fastcgi_params;

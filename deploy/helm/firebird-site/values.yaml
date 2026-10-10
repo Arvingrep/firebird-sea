@@ -35,6 +35,56 @@ webroot:
 autoscaling:
   enabled: false
 
+# ① file_data 缓存清扫。FileDataCache 缓存配置类表的 SQL 结果，TTL=0 永不过期，且没有任何清理路径
+# （后台"清除缓存"只删 data/cache 根目录的 *.json）。sidecar 按 mtime 清扫，使跨 Pod 陈旧时间有界。
+fileCache:
+  sweeper:
+    enabled: true
+    maxAgeMinutes: 5
+    intervalSeconds: 60
+
+# ② 应用层内存缓存（$HN_memory：多语言包等）声明式指向 Redis。
+# 原先只能在后台"站点缓存"页保存，写进 dbinfo.inc.php，而 entrypoint 每次启动都会重写该文件 → 设置必丢。
+# 需要 firebird-base:7.4-r2（含 redis 扩展）；扩展缺失时 memory 层自动禁用，不影响站点。
+memoryCache:
+  redis:
+    enabled: false
+    db: 1
+
+# ③ 声明式配置变量：Git 为准、每次 Pod 启动施加，所有副本一致。形如 { "<file>.inc.php": { <var>: <value> } }。
+# 后台页面保存会整文件重写，保存后到下次重启前这些键可能与 Git 不一致（见 docs/internal/WRITABLE_STATE.md）。
+# 当前值取自 waimai.inc.php.example 的出厂默认（不改变线上行为）。
+# ⚠ PRD 要求平台抽餐费从 18% 调为 0%、并确认配送费分成 89% 的含义——需业务决策后在此修改（改 Git + 发布）。
+configVars:
+  waimai.inc.php:
+    custom_fencheng_foodprice: 18
+    custom_fencheng_delivery: 89
+    custom_fencheng_addservice: 100
+    custom_fencheng_zsb: 100
+    custom_fencheng_dabao: 100
+    custom_fencheng_discount: 0
+    custom_fencheng_promotion: 0
+    custom_fencheng_firstdiscount: 0
+    custom_fencheng_quan: 0
+
+# 配置备份：每次发布时把当时生效的 ConfigMap 内容上传到 GCS。bucket 留空则不创建钩子。
+# 必须是私有桶（uploads 桶公开读）；凭据复用 firebird-storage-secret 的 HMAC key。
+configBackup:
+  enabled: true
+  bucket: ""
+  prefix: "config-backup"
+  failOnError: false
+
+# ⑤ nginx 与 php-fpm 拆成两个 Deployment，nginx 经 Service 直连 php-fpm（FastCGI :9000）。
+# 要求 webroot.mode=baked 且 uploads/配置 PVC 不为 RWO（模板里 fail 强制）。
+split:
+  enabled: false
+  php:
+    replicaCount: 0      # 0 = 跟随 replicaCount
+  nginx:
+    replicaCount: 0
+    resources: {}
+
 # 探针
 probes:
   # true：nginx readinessProbe 改走 /healthz.php（配置文件齐全 + DB 可连）。
