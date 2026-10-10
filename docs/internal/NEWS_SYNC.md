@@ -22,9 +22,14 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 | `NEWS_ALERT_BOT_TOKEN` / `NEWS_ALERT_CHAT_ID` | 失败告警的 Telegram Bot 与运营者 Chat |
 | `NEWS_SYNC_SEEN_FILE` | 已发布去重集合文件,默认 `./news-seen.json` |
 
+## 健壮性
+
+- 发布与告警请求各带 15s 截止时间(`AbortSignal.timeout`,覆盖响应体读取),超时计入有界重试。
+- 输入非 JSON 数组、去重文件损坏等整轮失败同样经 Telegram 告警并以非零码退出(`src/cli.js` 导出 `main` 便于测试)。
+
 ## 测试
 
-`cd services/news-sync && npm test`(`src/sync.test.js`、`src/io.test.js`:去重 / 重试 / 告警 / 输入清洗 / 门户业务失败 / 文件持久化 / 告警分条与重试)。
+`cd services/news-sync && npm test`(`src/sync.test.js`、`src/io.test.js`、`src/cli.test.js`:去重 / 重试 / 告警 / 输入清洗 / 门户业务失败 / 文件持久化 / 告警分条与重试)。
 
 ## 待人工(受保护路径)
 
