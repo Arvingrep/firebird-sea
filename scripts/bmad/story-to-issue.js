@@ -15,7 +15,7 @@ const STORY_AD = { '1.1': [14], '1.2': [3], '1.3': [9, 13], '1.4': [15], '1.5': 
   '2.1': [5, 6], '2.2': [5, 7], '2.3': [4, 7], '2.4': [7, 12], '2.5': [6, 12] };
 const EPIC_AD = { 1: [13, 14, 15], 2: [4, 5, 6, 7, 12], 3: [8, 9], 4: [2, 12], 5: [10, 11], 6: [10, 11] };
 const RULES = [
-  '不得修改 `.github/`、`scripts/agent/`、`.agents/`（改动会被丢弃，且门禁判 FAIL）。',
+  '受保护路径：不得修改 `.github/`、`scripts/agent/`、`scripts/acceptance/`、`.agents/`（改动会被丢弃，且门禁判 FAIL）；确需改动的部分在 PR 说明里列出，交 Arvin 提交。',
   '零依赖：只用 Node 内置模块；新增 npm/composer 依赖必须先经人工批准（Zero-Dep 门禁）。',
   '不得提交密钥、私钥、助记词、Bot Token；不得留下 `console.log`/`var_dump`/`debugger`/`.bak`。',
   '改动代码、表结构、API、环境变量或支付流程时，同一变更内更新 `docs/internal` 对应文档（Docs-as-Code）。',
@@ -92,29 +92,39 @@ function pickNext(epics, status, { inflight = 0, maxInflight = 1, story, ignoreD
   return { reason: blocked.join('；') || '没有可开工的 backlog Story' };
 }
 
-function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need = [] }) {
+function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need = [], testFile = '' }) {
   const refs = new Set((s.lines.join('\n').match(/AD-(\d+)/g) || []).map((x) => +x.slice(3)));
   if (!refs.size) (STORY_AD[s.id] || EPIC_AD[s.epic] || []).forEach((n) => refs.add(n));
   const ads = [...refs].sort((a, b) => a - b).map((n) => `- AD-${n}${adTitles.get(n) ? ` — ${adTitles.get(n)}` : ''}`);
   const split = s.acCount > 4 ? `\n> ⚠️ 本 Story 有 ${s.acCount} 条验收条件，很可能超出单次增量，请优先落地前几条并在 PR 中说明拆分。\n` : '';
+  const tid = `${s.epic}-${s.num}`;
+  const testFirst = testFile
+    ? [`- ✅ 验收测试已预置：\`${testFile}\`，**当前为红**；你的任务是让它变绿。`,
+      `- 运行：\`bash scripts/acceptance/run.sh --story ${tid}\`（CI 在本 PR 标题含 \`[story:${key}]\` 时强制执行）。`,
+      '- 该文件受保护：不得修改或删除，改动会被丢弃；不得靠削弱测试变绿。可另补自己的单测。']
+    : [`- ⚠️ 尚无预置验收测试（\`scripts/acceptance/story-${tid}.sh\` 不存在），按 docs/internal/TEST_FIRST.md 先补用例再开工。`,
+      '- 在此之前，请为每条验收条件各补一个可被 CI 运行的测试（就近放在相应服务的 test 目录），并在总结里逐条对应。'];
   const body = [
     `<!-- bmad-story: ${key} -->`,
+    testFile ? '<!-- test-first: present -->' : '<!-- test-first: missing -->',
     `> 来源：BMAD Epic ${s.epic} · Story ${s.id}（sprint key \`${key}\`）。本 Issue 由 \`scripts/bmad/story-to-issue.js\` 生成。`,
     need.length ? `> ⚠️ 依赖未满足（人工强制开工）：${need.join(', ')}` : '',
     '', '## 目标', s.intro, '', '## 验收条件（Given/When/Then）', s.ac || '（epics.md 未给出）', '',
     '## 相关架构决定', ...ads, '', '## 必须遵守（RULES / 门禁）', ...RULES.map((r) => `- ${r}`), '',
+    '## 测试先行', ...testFirst, '',
+    '## 完成时必须输出', '「逐条验收条件 → 对应文件 / 测试」清单；未满足的写明原因。不要声称跑过测试（你没有 Bash）。', '',
     '## 规格', specFile ? `- Story 规格：\`_bmad-output/implementation-artifacts/${specFile}\`` : '- 暂无独立规格文件，以本正文为准。',
     '- 全部 Story：`_bmad-output/planning-artifacts/epics.md`；架构：`ARCHITECTURE-SPINE.md`。',
-    '', '## 增量提示', `单次增量 ≤ 300 行（不含 docs/）；过大请拆，只做本 Story 范围。${split}`,
+    '', '## 增量上限', `单次增量 ≤ 300 行（不含 docs/、_bmad-output/）；超出门禁直接打回。过大请只落地前几条验收条件，其余在 PR 说明里写明拆分建议，不要做范围扩张。${split}`,
   ].filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n');
-  return { title: `[BMAD ${s.id}] ${s.title}`, body, labels: [...LABELS] };
+  return { title: `[story:${key}] Story ${s.id} ${s.title}`, body, labels: [...LABELS] };
 }
 
 function main(argv) {
   const a = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     if (!argv[i].startsWith('--')) a._.push(argv[i]);
-    else if (['create', 'ignore-deps', 'query-gh'].includes(argv[i].slice(2))) a[argv[i].slice(2)] = true;
+    else if (['create', 'ignore-deps', 'query-gh', 'no-test-first'].includes(argv[i].slice(2))) a[argv[i].slice(2)] = true;
     else a[argv[i].slice(2)] = argv[++i];
   }
   const out = a['out-dir'] || path.resolve(__dirname, '../../_bmad-output');
@@ -137,7 +147,14 @@ function main(argv) {
   if (!pick.story) { console.error(`无可创建的 Issue：${pick.reason}`); return 10; }
   const dir = path.join(out, 'implementation-artifacts');
   const specFile = fs.existsSync(dir) ? fs.readdirSync(dir).find((f) => f.startsWith(`spec-${pick.story.epic}-${pick.story.num}-`)) : '';
-  const issue = renderIssue(pick.story, { key: pick.key, adTitles, specFile, unmet: pick.unmet });
+  const root = a['repo-root'] ? path.resolve(a['repo-root']) : path.resolve(__dirname, '../..');
+  const rel = `scripts/acceptance/story-${pick.story.epic}-${pick.story.num}.sh`;
+  const testFile = fs.existsSync(path.join(root, rel)) ? rel : '';
+  const issue = renderIssue(pick.story, { key: pick.key, adTitles, specFile, unmet: pick.unmet, testFile });
+  if (a.create && !testFile && !a['no-test-first']) {
+    console.error(`拒绝建单：Story ${pick.story.id} 没有测试先行用例 ${rel}。先补用例（docs/internal/TEST_FIRST.md），或显式 --no-test-first。`);
+    return 11;
+  }
   if (!a.create) {
     console.log(`# DRY-RUN（未调用 gh；加 --create 才会创建）\n# title: ${issue.title}\n# labels: ${issue.labels.join(',')}\n\n${issue.body}`);
     return 0;
