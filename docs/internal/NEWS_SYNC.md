@@ -52,3 +52,6 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 ## 待人工
 
 - n8n 调度接入(`automation/n8n/workflows`)未包含,见 Issue #55(TASK-016 → news-sync 定时限量同步)。
+
+## 门户站点文案
+- `webroot/include/config/{article,info}.inc.php` 的频道名/SEO 为马尼拉定位;HawaiiHub seed 残留的「夏威夷」文案已于 2026-10 清理,新增模块 seed 时注意同步替换。

@@ -1,14 +1,14 @@
 <?php
-$customChannelName = '夏威夷华人资讯';
+$customChannelName = '马尼拉华人资讯';
 $customLogo = 0;
 $customLogoUrl = '';
 $customSharePic = '';
 $customSubDomain = 0;
 $customChannelSwitch = 0;
 $customCloseCause = '站点升级中。。。';
-$customSeoTitle = '夏威夷华人资讯 - 本地新闻动态';
-$customSeoKeyword = '夏威夷华人,檀香山新闻,华人资讯,夏威夷生活,本地新闻,华人社区';
-$customSeoDescription = '夏威夷华人资讯平台，提供最新的本地新闻、社区动态、生活资讯，连接夏威夷华人社区';
+$customSeoTitle = '马尼拉华人资讯 - 本地新闻动态';
+$customSeoKeyword = '马尼拉华人,菲律宾新闻,华人资讯,马尼拉生活,本地新闻,华人社区';
+$customSeoDescription = '马尼拉华人资讯平台，提供最新的本地新闻、社区动态、生活资讯，连接菲律宾华人社区';
 $hotline_config = 0;
 $customHotline = '';
 $customAtlasMax = 20;
