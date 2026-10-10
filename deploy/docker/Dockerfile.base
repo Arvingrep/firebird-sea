@@ -23,6 +23,8 @@ RUN apk add --no-cache \
         oniguruma-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_mysql mysqli gd zip bcmath opcache \
+    && pecl install redis-5.3.7 \
+    && docker-php-ext-enable redis \
     && apk del .build-deps \
     && rm -rf /var/cache/apk/* /tmp/* /usr/share/man
 
@@ -41,7 +43,13 @@ RUN { \
         echo 'upload_max_filesize = 50M'; \
         echo 'post_max_size = 50M'; \
         echo 'memory_limit = 256M'; \
-    } > /usr/local/etc/php/conf.d/production.ini
+        echo 'log_errors = On'; \
+        echo 'error_log = /proc/self/fd/2'; \
+    } > /usr/local/etc/php/conf.d/production.ini \
+    && { \
+        echo '[www]'; \
+        echo 'catch_workers_output = yes'; \
+    } > /usr/local/etc/php-fpm.d/zz-stdout.conf
 
 # 3. 固化底层火鸟/Swoole Loader 扩展到系统扩展目录，实现不可变基座
 COPY webroot/huoniao.so /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so

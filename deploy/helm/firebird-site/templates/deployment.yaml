@@ -7,11 +7,16 @@ metadata:
     site: {{ .Values.siteId }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  {{- if and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+  strategy:
+    type: Recreate          # uploads 为 RWO 卷：新旧 Pod 不能跨节点同时挂载，先停后起
+  {{- else }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 0     # 更新时不可用 Pod 数必须为 0，保证业务不中断
       maxSurge: 1           # 允许额外拉起 1 个新 Pod 完成平滑交接
+  {{- end }}
   selector:
     matchLabels:
       app: firebird-site
@@ -43,12 +48,20 @@ spec:
                 fi
                 chmod -R 777 /config-pvc 2>/dev/null || true
               fi
+              # AD-17: 附件目录在独立 PVC 上，Pod 重建后文件仍在
+              if [ -d /uploads-pvc ]; then
+                chown -R www-data:www-data /uploads-pvc 2>/dev/null || chmod -R 777 /uploads-pvc 2>/dev/null || true
+              fi
           volumeMounts:
             - name: webroot-shared
               mountPath: /shared
             {{- if .Values.persistence.enabled }}
             - name: config-persistent
               mountPath: /config-pvc
+            {{- end }}
+            {{- if .Values.uploads.enabled }}
+            - name: uploads-persistent
+              mountPath: /uploads-pvc
             {{- end }}
 
       containers:
@@ -77,6 +90,8 @@ spec:
             {{- end }}
             - name: REDIS_HOST
               value: "{{ .Values.redis.host }}"
+            - name: REDIS_PORT
+              value: "{{ .Values.redis.port | default 6379 }}"
             - name: DEFAULT_CURRENCY
               value: "{{ .Values.localization.defaultCurrency }}"
             - name: SITE_ID
@@ -107,6 +122,10 @@ spec:
             {{- if .Values.persistence.enabled }}
             - name: config-persistent
               mountPath: /var/www/html/include/config
+            {{- end }}
+            {{- if .Values.uploads.enabled }}
+            - name: uploads-persistent
+              mountPath: /var/www/html/uploads
             {{- end }}
             {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
             - name: config-overrides
@@ -161,6 +180,11 @@ spec:
           volumeMounts:
             - name: webroot-shared
               mountPath: /var/www/html
+            {{- if .Values.uploads.enabled }}
+            - name: uploads-persistent
+              mountPath: /var/www/html/uploads
+              readOnly: true
+            {{- end }}
             - name: nginx-conf
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
@@ -175,6 +199,11 @@ spec:
         - name: config-persistent
           persistentVolumeClaim:
             claimName: firebird-config-{{ .Values.siteId }}
+        {{- end }}
+        {{- if .Values.uploads.enabled }}
+        - name: uploads-persistent
+          persistentVolumeClaim:
+            claimName: firebird-uploads-{{ .Values.siteId }}
         {{- end }}
         {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
         - name: config-overrides
