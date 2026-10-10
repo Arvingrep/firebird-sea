@@ -27,7 +27,7 @@ node scripts/bmad/story-to-issue.js --create          # 真正建单（带 agent
                                                        # 退出码 10=无可建；11=缺测试先行用例（--no-test-first 显式放行）
 # 回写状态（幂等；未变化不改文件、不刷新 last_updated）
 node scripts/bmad/sync-sprint-status.js 1-7 done --file _bmad-output/implementation-artifacts/sprint-status.yaml
-node --test scripts/bmad/                              # 单测
+node --test scripts/bmad/*.test.js                  # 单测（Node 20 不能传目录）
 ```
 
 参数：`--out-dir`（默认 `_bmad-output/`）、`--epics`、`--status`、`--spine`、`--repo-root`（探测测试先行用例）、`--max-inflight`（默认 1）、`--inflight N | --inflight-file F`、`--deps-file F`。

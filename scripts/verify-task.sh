@@ -60,8 +60,8 @@ if command -v php &>/dev/null; then
 fi
 
 # 5. 流程脚本自测（BMAD 建单/回写、测试先行运行器、门禁）：快、纯本地
-for t in "node --test scripts/bmad/" "bash scripts/acceptance/selftest.sh" "bash scripts/test-gates.sh"; do
-    f="${t##* }"; [ -e "$f" ] || continue
+for t in "node --test scripts/bmad/bmad.test.js scripts/bmad/sync.test.js" "bash scripts/acceptance/selftest.sh" "bash scripts/test-gates.sh"; do
+    f="${t##* }"; [ -e "$f" ] || continue   # 显式列出测试文件：Node 20 对目录参数会把目录下所有 .js 当测试跑
     if $t >/dev/null 2>&1; then echo "  ✅ $t [通过]"; else echo "❌ [FAIL] $t"; $t 2>&1 | tail -15; exit 1; fi
 done
 
