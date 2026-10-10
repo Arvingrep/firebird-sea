@@ -55,3 +55,6 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 
 ## 门户站点文案
 - `webroot/include/config/{article,info}.inc.php` 的频道名/SEO 为马尼拉定位;HawaiiHub seed 残留的「夏威夷」文案已于 2026-10 清理,新增模块 seed 时注意同步替换。
+
+## 已知故障复盘:全站 500(2026-10-10)
+`webroot/include/config/waimai.inc.php` 被 .gitignore 排除(仓库只有 .example),新镜像 pod 缺该文件,首页渲染外卖区块时 require Fatal → 全站 500。entrypoint-web.sh 已加兜底:凡 `*.inc.php.example` 存在而真实配置缺失时自动从 example 生成。

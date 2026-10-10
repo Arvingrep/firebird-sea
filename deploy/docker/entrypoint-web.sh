@@ -45,6 +45,17 @@ if [ -d "/etc/firebird-configs" ] && [ -n "$(ls -A /etc/firebird-configs 2>/dev/
     chmod -R 777 /var/www/html/include/config 2>/dev/null || true
 fi
 
+# 兜底:仓库以 .example 提供但被 gitignore 的业务配置(如 waimai.inc.php),缺失时从 example 生成,
+# 否则对应模块 require 直接 Fatal 导致全站 500(2026-10-10 实际故障)
+for example in /var/www/html/include/config/*.inc.php.example; do
+    [ -f "$example" ] || continue
+    real="${example%.example}"
+    if [ ! -f "$real" ]; then
+        echo ">>> [Config Fallback] ${real##*/} 缺失,从 example 生成默认配置"
+        cp -f "$example" "$real" && chown www-data:www-data "$real" 2>/dev/null || true
+    fi
+done
+
 # 确保底层扩展在 webroot 与系统目录下双重就绪 (自愈机制)
 if [ ! -f /var/www/html/huoniao.so ] && [ -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so ]; then
     cp -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so /var/www/html/huoniao.so 2>/dev/null || true
