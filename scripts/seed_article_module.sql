@@ -1,0 +1,355 @@
+-- ==============================================================================
+-- 🔥 火鸟门户 资讯/自媒体模块数据表与初始种子数据 (GitOps 固化迁移脚本)
+-- 包含：16 张 article 标准表结构 + 初始分类 + news_sync_bot 预置自媒体
+-- ==============================================================================
+
+-- 1. 资讯主表与分表
+CREATE TABLE IF NOT EXISTS `huoniao_article` (
+  `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `aid` INT(10) UNSIGNED NOT NULL COMMENT '信息ID',
+  `body` MEDIUMTEXT NOT NULL COMMENT '信息内容',
+  PRIMARY KEY (`id`),
+  KEY `aid` (`aid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻内容';
+
+CREATE TABLE IF NOT EXISTS `huoniao_article_breakup_table` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `table_name` VARCHAR(255) NULL COMMENT '表名',
+  `begin_id` INT(11) NULL COMMENT '开始id',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='分表记录';
+
+CREATE TABLE IF NOT EXISTS `huoniao_article_historyclick` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `uid` INT(10) NOT NULL DEFAULT '0' COMMENT '浏览者id',
+  `fuid` INT(10) NOT NULL DEFAULT '0' COMMENT '发布者id',
+  `aid` INT(10) NOT NULL DEFAULT '0' COMMENT '信息id',
+  `module` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '模块',
+  `module2` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '二级类目',
+  `date` CHAR(20) NOT NULL DEFAULT '' COMMENT '时间',
+  PRIMARY KEY (`id`),
+  KEY `uid` (`uid`),
+  KEY `fuid` (`uid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COMMENT='资讯浏览足迹';
+
+CREATE TABLE IF NOT EXISTS `huoniao_article_pagecount_cache` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `key` TEXT NULL,
+  `value` INT(30) NULL,
+  `update_at` INT(30) NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='资讯列表count缓存表';
+
+-- 2. 自媒体核心表
+CREATE TABLE IF NOT EXISTS `huoniao_article_selfmedia` (
+  `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `cityid` INT(10) NOT NULL DEFAULT '0' COMMENT '城市',
+  `userid` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '用户id',
+  `type` INT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '入驻类型',
+  `ac_name` VARCHAR(50) NOT NULL DEFAULT '' COMMENT '自媒体名称',
+  `ac_profile` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '自媒体介绍',
+  `ac_field` INT(2) UNSIGNED NOT NULL DEFAULT '0' COMMENT '自媒体领域',
+  `ac_addrid` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '自媒体所在地',
+  `ac_photo` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '头像',
+  `mb_name` VARCHAR(30) NULL DEFAULT '' COMMENT '主体名称',
+  `mb_code` VARCHAR(18) NULL DEFAULT '' COMMENT '主体社会信用代码',
+  `mb_level` INT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '主体机构级别',
+  `mb_type` INT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '主体机构类型',
+  `mb_license` VARCHAR(255) NULL DEFAULT '' COMMENT '主体执照或证书',
+  `op_name` VARCHAR(200) NOT NULL DEFAULT '' COMMENT '运营者姓名',
+  `op_idcard` VARCHAR(200) NOT NULL DEFAULT '' COMMENT '运营者身份证号',
+  `op_idcardfront` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '运营者持身份证照片',
+  `areaCode` VARCHAR(10) NOT NULL DEFAULT '' COMMENT '区号',
+  `op_phone` VARCHAR(100) NOT NULL DEFAULT '' COMMENT '运营者联系手机',
+  `op_email` VARCHAR(150) NOT NULL DEFAULT '' COMMENT '运营者联系邮箱',
+  `op_authorize` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '运营者机构授权证书',
+  `org_major_license_type` INT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '专业资质类型',
+  `org_major_license` VARCHAR(255) NULL DEFAULT '' COMMENT '专业资质',
+  `outer` VARCHAR(255) NULL DEFAULT '' COMMENT '外平台信息',
+  `prove` VARCHAR(255) NULL DEFAULT '' COMMENT '证明材料',
+  `state` INT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '状态',
+  `editstate` INT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '资料修改状态',
+  `pubdate` INT(10) NOT NULL DEFAULT '0' COMMENT '入驻时间',
+  `editlog` TEXT NULL COMMENT '修改记录',
+  `click` INT(10) NOT NULL DEFAULT '0' COMMENT '浏览次数',
+  `weight` INT(10) NOT NULL DEFAULT '0' COMMENT '排序',
+  `ac_banner` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '幻灯',
+  PRIMARY KEY (`id`),
+  KEY `pubdate` (`pubdate`),
+  KEY `cityid` (`cityid`),
+  KEY `type` (`type`),
+  KEY `state` (`state`),
+  KEY `editstate` (`editstate`),
+  KEY `idx_state_editstate` (`state`,`editstate`,`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻自媒体';
+
+CREATE TABLE IF NOT EXISTS `huoniao_article_selfmedia_arctype` (
+  `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `parentid` INT(10) NOT NULL DEFAULT '0' COMMENT '父级id',
+  `aid` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '自媒体id',
+  `typename` CHAR(30) NOT NULL DEFAULT '' COMMENT '领域',
+  `weight` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
+  `pubdate` INT(10) NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `jump` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '跳转链接',
+  `icon` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '图标',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻自媒体自定义分类';
+
+CREATE TABLE IF NOT EXISTS `huoniao_article_selfmedia_field` (
+  `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `parentid` INT(10) NOT NULL DEFAULT '0' COMMENT '父级id',
+  `type` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '类型',
+  `typename` CHAR(30) NOT NULL DEFAULT '' COMMENT '领域',
+  `weight` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
+  `pubdate` INT(10) NOT NULL DEFAULT '0' COMMENT '创建时间',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='自媒体领域';
+
+CREATE TABLE IF NOT EXISTS `huoniao_article_selfmedia_manager` (
+  `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `aid` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '自媒体id',
+  `userid` INT(10) NOT NULL DEFAULT '0' COMMENT '用户id',
+  `pubdate` INT(10) NOT NULL DEFAULT '0' COMMENT '添加时间',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻自媒体编辑权限';
+
+-- 3. 专题与评论表
+CREATE TABLE IF NOT EXISTS `huoniao_article_zhuanti` (
+  `id` SMALLINT(5) NOT NULL AUTO_INCREMENT,
+  `parentid` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '父级id',
+  `typename` CHAR(200) NOT NULL DEFAULT '' COMMENT '分类名称',
+  `description` VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'SEO描述',
+  `weight` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '50' COMMENT '排序',
+  `pubdate` INT(10) NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `state` TINYINT(1) NOT NULL DEFAULT '0' COMMENT '状态',
+  `flag_r` TINYINT(1) NOT NULL DEFAULT '0' COMMENT '推荐',
+  `flag_h` TINYINT(1) NOT NULL DEFAULT '0' COMMENT '头条',
+  `litpic` CHAR(100) NOT NULL DEFAULT '' COMMENT '图片',
+  `click` INT(10) NOT NULL DEFAULT '0' COMMENT '浏览次数',
+  `banner_large` CHAR(255) NOT NULL DEFAULT '' COMMENT 'pc大banner',
+  `banner_small` CHAR(255) NOT NULL DEFAULT '' COMMENT 'pc小banner',
+  `typeid` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '分类id',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻专题';
+
+CREATE TABLE IF NOT EXISTS `huoniao_article_zhuantilist` (
+  `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `aid` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '信息id',
+  `typeid` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '专题分类id',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻专题文章';
+
+CREATE TABLE IF NOT EXISTS `huoniao_article_zhuantipar` (
+  `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `parentid` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '上级分类ID',
+  `typename` CHAR(20) NOT NULL DEFAULT '' COMMENT '分类名',
+  `weight` INT(4) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排序',
+  `pubdate` INT(10) NOT NULL DEFAULT '0' COMMENT '创建时间',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻-专题分类';
+
+CREATE TABLE IF NOT EXISTS `huoniao_articlecommon` (
+  `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `aid` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '信息ID',
+  `floor` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '楼层',
+  `userid` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '会员ID',
+  `content` CHAR(255) NOT NULL DEFAULT '' COMMENT '评论内容',
+  `dtime` INT(10) NOT NULL COMMENT '评论时间',
+  `ip` CHAR(15) NOT NULL DEFAULT '' COMMENT '评论IP',
+  `ipaddr` CHAR(30) NOT NULL DEFAULT '' COMMENT 'IP归属地',
+  `good` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '顶',
+  `bad` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '踩',
+  `ischeck` SMALLINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '状态',
+  `duser` TEXT NOT NULL COMMENT '顶过的会员',
+  PRIMARY KEY (`id`),
+  KEY `aid` (`aid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻评论';
+
+-- 4. 资讯发布列表与分类表
+CREATE TABLE IF NOT EXISTS `huoniao_articlelist` (
+  `id` MEDIUMINT(8) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `cityid` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '城市ID',
+  `title` CHAR(60) NOT NULL DEFAULT '' COMMENT '信息标题',
+  `subtitle` CHAR(36) NOT NULL DEFAULT '' COMMENT '短标题',
+  `flag` SET('H','R','B','P','T') NOT NULL DEFAULT '' COMMENT '附加属性',
+  `redirecturl` VARCHAR(255) NULL DEFAULT '' COMMENT '跳转地址',
+  `weight` SMALLINT(4) UNSIGNED NOT NULL DEFAULT '1' COMMENT '排序',
+  `litpic` CHAR(255) NULL DEFAULT '' COMMENT '缩略图',
+  `source` CHAR(30) NOT NULL DEFAULT '' COMMENT '来源',
+  `sourceurl` CHAR(200) NOT NULL DEFAULT '' COMMENT '来源网址',
+  `writer` CHAR(20) NOT NULL DEFAULT '' COMMENT '作者',
+  `typeid` INT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '分类ID',
+  `keywords` CHAR(50) NOT NULL DEFAULT '' COMMENT '关键字',
+  `description` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '描述',
+  `mbody` TEXT NOT NULL COMMENT '手机端内容',
+  `notpost` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '评论开关',
+  `click` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '阅读次数',
+  `color` CHAR(7) NOT NULL DEFAULT '' COMMENT '标题颜色',
+  `arcrank` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '信息状态',
+  `pubdate` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `admin` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '发布人',
+  `del` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否已删除',
+  `waitpay` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '等待支付',
+  `alonepay` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '单独支付',
+  `audit_log` TEXT NOT NULL COMMENT '审核记录',
+  `audit_state` CHAR(20) NOT NULL DEFAULT '' COMMENT '审核状态',
+  `audit_edit` TEXT NOT NULL COMMENT '审核修改记录',
+  `reward_switch` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '打赏开关',
+  `flag_h` VARCHAR(5) NOT NULL DEFAULT '',
+  `flag_b` VARCHAR(5) NOT NULL DEFAULT '',
+  `flag_r` VARCHAR(5) NOT NULL DEFAULT '',
+  `flag_t` VARCHAR(5) NOT NULL DEFAULT '',
+  `flag_p` VARCHAR(5) NOT NULL DEFAULT '',
+  `mold` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '类型',
+  `videotype` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '视频类型',
+  `videourl` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '视频地址',
+  `media_state` TINYINT(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '自媒体账号状态',
+  `zan` INT(6) UNSIGNED NOT NULL DEFAULT '0' COMMENT '赞',
+  `videotime` SMALLINT(4) UNSIGNED NOT NULL DEFAULT '0' COMMENT '视频时长',
+  `media_arctype` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '媒体号自定义分类',
+  `typeset` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排版方式 0小图,1大图',
+  `zhuanti` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '专题id',
+  `media` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '媒体号id',
+  `prop` INT(1) NOT NULL DEFAULT '0' COMMENT '0原创 1转载',
+  PRIMARY KEY (`id`),
+  KEY `typeid` (`typeid`),
+  KEY `admin` (`admin`),
+  KEY `keywords` (`keywords`),
+  KEY `mold` (`mold`),
+  KEY `cityid` (`cityid`),
+  KEY `title` (`title`),
+  KEY `flag_p` (`flag_p`),
+  KEY `flag_h` (`flag_h`),
+  KEY `flag_b` (`flag_b`),
+  KEY `flag_r` (`flag_r`),
+  KEY `flag_t` (`flag_t`),
+  KEY `state` (`del`,`arcrank`,`waitpay`,`media_state`),
+  KEY `click` (`click`,`weight`,`id`),
+  KEY `zhuanti` (`zhuanti`),
+  KEY `pubdate` (`pubdate`,`weight`,`id`),
+  KEY `media_state` (`media_state`),
+  KEY `arcrank` (`arcrank`),
+  KEY `media` (`media`),
+  KEY `waitpay` (`waitpay`),
+  KEY `weight` (`weight`,`pubdate`,`id`),
+  KEY `idx_del_cityid_arcrank_waitpay_media_state_weight_pubdate_id` (`del`,`cityid`,`arcrank`,`waitpay`,`media_state`,`weight`,`pubdate`,`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻信息';
+
+CREATE TABLE IF NOT EXISTS `huoniao_articlelist_all` (
+  `id` MEDIUMINT(8) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `cityid` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '城市ID',
+  `title` CHAR(60) NOT NULL DEFAULT '' COMMENT '信息标题',
+  `subtitle` CHAR(36) NOT NULL DEFAULT '' COMMENT '短标题',
+  `flag` SET('H','R','B','P','T') NOT NULL DEFAULT '' COMMENT '附加属性',
+  `redirecturl` VARCHAR(255) NULL DEFAULT '' COMMENT '跳转地址',
+  `weight` SMALLINT(4) UNSIGNED NOT NULL DEFAULT '1' COMMENT '排序',
+  `litpic` CHAR(255) NULL DEFAULT '' COMMENT '缩略图',
+  `source` CHAR(30) NOT NULL DEFAULT '' COMMENT '来源',
+  `sourceurl` CHAR(200) NOT NULL DEFAULT '' COMMENT '来源网址',
+  `writer` CHAR(20) NOT NULL DEFAULT '' COMMENT '作者',
+  `typeid` INT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '分类ID',
+  `keywords` CHAR(50) NOT NULL DEFAULT '' COMMENT '关键字',
+  `description` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '描述',
+  `mbody` TEXT NOT NULL COMMENT '手机端内容',
+  `notpost` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '评论开关',
+  `click` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '阅读次数',
+  `color` CHAR(7) NOT NULL DEFAULT '' COMMENT '标题颜色',
+  `arcrank` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '信息状态',
+  `pubdate` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `admin` INT(8) UNSIGNED NOT NULL DEFAULT '0' COMMENT '发布人',
+  `del` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '是否已删除',
+  `waitpay` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '等待支付',
+  `alonepay` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '单独支付',
+  `audit_log` TEXT NOT NULL COMMENT '审核记录',
+  `audit_state` CHAR(20) NOT NULL DEFAULT '' COMMENT '审核状态',
+  `audit_edit` TEXT NOT NULL COMMENT '审核修改记录',
+  `reward_switch` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '打赏开关',
+  `flag_h` VARCHAR(5) NOT NULL DEFAULT '',
+  `flag_b` VARCHAR(5) NOT NULL DEFAULT '',
+  `flag_r` VARCHAR(5) NOT NULL DEFAULT '',
+  `flag_t` VARCHAR(5) NOT NULL DEFAULT '',
+  `flag_p` VARCHAR(5) NOT NULL DEFAULT '',
+  `mold` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '类型',
+  `videotype` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '视频类型',
+  `videourl` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '视频地址',
+  `media_state` TINYINT(1) UNSIGNED NOT NULL DEFAULT '1' COMMENT '自媒体账号状态',
+  `zan` INT(6) UNSIGNED NOT NULL DEFAULT '0' COMMENT '赞',
+  `videotime` SMALLINT(4) UNSIGNED NOT NULL DEFAULT '0' COMMENT '视频时长',
+  `media_arctype` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '媒体号自定义分类',
+  `typeset` TINYINT(1) UNSIGNED NOT NULL DEFAULT '0' COMMENT '排版方式 0小图,1大图',
+  `zhuanti` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '专题id',
+  `media` INT(10) UNSIGNED NOT NULL DEFAULT '0' COMMENT '媒体号id',
+  `prop` INT(1) NOT NULL DEFAULT '0' COMMENT '0原创 1转载',
+  PRIMARY KEY (`id`),
+  KEY `typeid` (`typeid`),
+  KEY `admin` (`admin`),
+  KEY `keywords` (`keywords`),
+  KEY `mold` (`mold`),
+  KEY `cityid` (`cityid`),
+  KEY `title` (`title`),
+  KEY `flag_p` (`flag_p`),
+  KEY `flag_h` (`flag_h`),
+  KEY `flag_b` (`flag_b`),
+  KEY `flag_r` (`flag_r`),
+  KEY `flag_t` (`flag_t`),
+  KEY `state` (`del`,`arcrank`,`waitpay`,`media_state`),
+  KEY `click` (`click`,`weight`,`id`),
+  KEY `zhuanti` (`zhuanti`),
+  KEY `pubdate` (`pubdate`,`weight`,`id`),
+  KEY `media_state` (`media_state`),
+  KEY `arcrank` (`arcrank`),
+  KEY `media` (`media`),
+  KEY `waitpay` (`waitpay`),
+  KEY `weight` (`weight`,`pubdate`,`id`),
+  KEY `idx_del_cityid_arcrank_waitpay_media_state_weight_pubdate_id` (`del`,`cityid`,`arcrank`,`waitpay`,`media_state`,`weight`,`pubdate`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='新闻信息';
+
+CREATE TABLE IF NOT EXISTS `huoniao_articlepic` (
+  `id` INT(8) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `aid` INT(8) UNSIGNED NOT NULL COMMENT '信息ID',
+  `picPath` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '图片路径',
+  `picInfo` TEXT NULL COMMENT '图片注释',
+  PRIMARY KEY (`id`),
+  KEY `aid` (`aid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻图集';
+
+CREATE TABLE IF NOT EXISTS `huoniao_articletype` (
+  `id` SMALLINT(5) NOT NULL AUTO_INCREMENT,
+  `parentid` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '上级分类ID',
+  `typename` CHAR(30) NOT NULL DEFAULT '' COMMENT '分类名称',
+  `ishidden` SMALLINT(1) NOT NULL DEFAULT '0' COMMENT '是否显示',
+  `weight` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '50' COMMENT '排序',
+  `seotitle` VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'SEO标题',
+  `keywords` VARCHAR(60) NOT NULL DEFAULT '' COMMENT 'SEO关键字',
+  `description` CHAR(150) NOT NULL DEFAULT '' COMMENT 'SEO描述',
+  `pubdate` INT(10) NOT NULL DEFAULT '0' COMMENT '创建时间',
+  `pinyin` CHAR(100) NOT NULL DEFAULT '' COMMENT '分类全拼',
+  `py` CHAR(50) NOT NULL DEFAULT '' COMMENT '分类首字母',
+  `admin` CHAR(50) NULL DEFAULT '' COMMENT '管理员id',
+  `mold` TINYINT(1) NOT NULL DEFAULT '0' COMMENT '模型',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='新闻分类';
+
+-- 5. 初始种子数据：基础新闻分类
+INSERT INTO `huoniao_articletype` (`id`, `parentid`, `typename`, `ishidden`, `weight`, `pubdate`, `pinyin`, `py`, `mold`) VALUES
+(1, 0, '本地新闻', 0, 50, UNIX_TIMESTAMP(), 'bendixinwen', 'bdxw', 0),
+(2, 0, '国际新闻', 0, 50, UNIX_TIMESTAMP(), 'guojixinwen', 'gjxw', 0),
+(3, 0, '华人动态', 0, 50, UNIX_TIMESTAMP(), 'huarendongtai', 'hrdt', 0),
+(4, 0, '综合资讯', 0, 50, UNIX_TIMESTAMP(), 'zonghezixun', 'zhzx', 0)
+ON DUPLICATE KEY UPDATE `typename` = VALUES(`typename`);
+
+-- 6. 初始种子数据：news_sync_bot 预置已审核自媒体
+INSERT INTO `huoniao_article_selfmedia` (
+    `cityid`, `userid`, `type`, `ac_name`, `ac_profile`, `ac_field`, `ac_addrid`,
+    `ac_photo`, `mb_name`, `mb_code`, `mb_level`, `mb_type`, `mb_license`,
+    `op_name`, `op_idcard`, `op_idcardfront`, `areaCode`, `op_phone`, `op_email`,
+    `op_authorize`, `org_major_license_type`, `org_major_license`, `outer`, `prove`,
+    `state`, `editstate`, `pubdate`, `editlog`, `click`, `weight`, `ac_banner`
+) VALUES (
+    0, 3, 1, 'News Sync Bot', 'AI 新闻同步机器人', 0, 0,
+    '', '', '', 0, 0, '',
+    'News Bot', '', '', '', '', '',
+    '', 0, '', '', '',
+    1, 1, UNIX_TIMESTAMP(), '', 0, 50, ''
+)
+ON DUPLICATE KEY UPDATE `state` = 1, `editstate` = 1;

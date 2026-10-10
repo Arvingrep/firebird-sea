@@ -8102,6 +8102,10 @@ class siteConfig {
         global $cfg_km_accesskey_id;
         global $cfg_km_accesskey_secret;
 
+        if(empty($cfg_km_accesskey_id) || empty($cfg_km_accesskey_secret)){
+            return array("state" => 200, "info" => "No data!");
+        }
+
         //用户ID
         $userid = $this->param['userid'] ? $this->param['userid'] : $userLogin->getMemberID();
 
