@@ -1,11 +1,14 @@
 {{- /*
+  拓扑一：nginx 与 php-fpm 同 Pod（sidecar，默认）。split.enabled=true 时改由 deployment-split.yaml 渲染。
+
   webroot.mode：
     copy  (默认，旧行为) init 把整站 cp -a 到 emptyDir，php-fpm 与 nginx 共享该 emptyDir
     baked (P2)           代码直接来自镜像：php-fpm 用 php 镜像，nginx 用同 tag 的 firebird-nginx 静态镜像；
                          仅 data/ 用 emptyDir 在两个容器间共享（init 只播种约 15MB，不再整站复制）
   切换前提：firebird-nginx:<image.tag> 已由 CI 推送（CI 先推 nginx、后推 php）。
 */ -}}
-{{- $baked := eq (.Values.webroot.mode | default "copy") "baked" -}}
+{{- if not .Values.split.enabled -}}
+{{- $baked := include "firebird.baked" . -}}
 {{- $deep := and .Values.probes .Values.probes.deepReadiness -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -16,9 +19,7 @@ metadata:
     site: {{ .Values.siteId }}
 spec:
   replicas: {{ .Values.replicaCount }}
-  {{- $rwoUploads := and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
-  {{- $rwoConfig := and .Values.persistence.enabled (eq (.Values.persistence.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
-  {{- if or $rwoUploads $rwoConfig }}
+  {{- if include "firebird.rwoPvc" . }}
   strategy:
     type: Recreate          # uploads / 配置 PVC 为 RWO 卷：新旧 Pod 不能跨节点同时挂载，先停后起（RollingUpdate 会因 Multi-Attach 卡死）
   {{- else }}
@@ -38,9 +39,10 @@ spec:
         app: firebird-site
         site: {{ .Values.siteId }}
       annotations:
-        # nginx 配置 / init 脚本变更时滚动 Pod（ConfigMap 不会触发 Deployment 重建）
+        # nginx 配置 / init 脚本 / 配置变量变更时滚动 Pod（ConfigMap 不会触发 Deployment 重建）
         checksum/nginx-conf: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/init-scripts: {{ include (print $.Template.BasePath "/configmap-init.yaml") . | sha256sum }}
+        checksum/config-vars: {{ include (print $.Template.BasePath "/configmap-vars.yaml") . | sha256sum }}
     spec:
       terminationGracePeriodSeconds: 30
       # 多副本时尽量打散到不同节点（ScheduleAnyway：单节点/资源紧张时不阻塞调度）
@@ -53,130 +55,11 @@ spec:
               app: firebird-site
               site: {{ .Values.siteId }}
       initContainers:
-        # Init: 同步/播种运行期状态。配置文件按"缺什么补什么"补齐，已有的绝不覆盖
-        - name: init-webroot
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["sh", "/scripts/init-webroot.sh"]
-          env:
-            - name: MODE
-              value: {{ if $baked }}"baked"{{ else }}"copy"{{ end }}
-          volumeMounts:
-            {{- if $baked }}
-            - name: data-shared
-              mountPath: /shared
-            {{- else }}
-            - name: webroot-shared
-              mountPath: /shared
-            {{- end }}
-            {{- if .Values.persistence.enabled }}
-            - name: config-persistent
-              mountPath: /config-pvc
-            {{- end }}
-            {{- if .Values.uploads.enabled }}
-            - name: uploads-persistent
-              mountPath: /uploads-pvc
-            {{- end }}
-            - name: init-scripts
-              mountPath: /scripts
-              readOnly: true
+        {{- include "firebird.initContainer" . | nindent 8 }}
 
       containers:
         # Container 1: PHP-FPM 处理引擎
-        - name: php-fpm
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - containerPort: 9000
-          env:
-            - name: DB_HOST
-              value: "{{ .Values.database.host }}"
-            - name: DB_NAME
-              value: "{{ .Values.database.name }}"
-            - name: DB_USER
-              value: "{{ .Values.database.user | default "firebird_user" }}"
-            {{- if .Values.database.passwordSecretRef }}
-            - name: DB_PASS
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.database.passwordSecretRef }}
-                  key: {{ .Values.database.passwordSecretKey | default "password" }}
-            {{- else if .Values.database.password }}
-            - name: DB_PASS
-              value: "{{ .Values.database.password }}"
-            {{- end }}
-            - name: REDIS_HOST
-              value: "{{ .Values.redis.host }}"
-            - name: REDIS_PORT
-              value: "{{ .Values.redis.port | default 6379 }}"
-            - name: DEFAULT_CURRENCY
-              value: "{{ .Values.localization.defaultCurrency }}"
-            - name: SITE_ID
-              value: "{{ .Values.siteId }}"
-            - name: SITE_BASEHOST
-              value: "{{ .Values.domain | default "fbird.men" }}"
-            - name: GCS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: firebird-storage-secret
-                  key: gcs-key-id
-                  optional: true
-            - name: GCS_KEY_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: firebird-storage-secret
-                  key: gcs-key-secret
-                  optional: true
-            - name: RESEND_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: firebird-storage-secret
-                  key: resend-key
-                  optional: true
-          volumeMounts:
-            {{- if $baked }}
-            - name: data-shared
-              mountPath: /var/www/html/data
-            {{- else }}
-            - name: webroot-shared
-              mountPath: /var/www/html
-            {{- end }}
-            {{- if .Values.persistence.enabled }}
-            - name: config-persistent
-              mountPath: /var/www/html/include/config
-            {{- end }}
-            {{- if .Values.uploads.enabled }}
-            - name: uploads-persistent
-              mountPath: /var/www/html/uploads
-            {{- end }}
-            {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
-            - name: config-overrides
-              mountPath: /etc/firebird-configs
-              readOnly: true
-            {{- end }}
-          # entrypoint 要做 Redis 探活、配置兜底生成，慢启动期间不让 liveness 误杀
-          startupProbe:
-            tcpSocket:
-              port: 9000
-            periodSeconds: 2
-            failureThreshold: 45
-          readinessProbe:
-            tcpSocket:
-              port: 9000
-            initialDelaySeconds: 5
-            periodSeconds: 3
-            timeoutSeconds: 2
-            successThreshold: 1
-            failureThreshold: 3
-          livenessProbe:
-            tcpSocket:
-              port: 9000
-            initialDelaySeconds: 15
-            periodSeconds: 10
-            timeoutSeconds: 2
-            failureThreshold: 3
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+        {{- include "firebird.phpContainer" . | nindent 8 }}
 
         # Container 2: Nginx 静态文件与反向代理 Sidecar
         #   copy 模式：挂载共享 webroot 直读 CSS/JS/图片
@@ -236,32 +119,14 @@ spec:
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
 
-      volumes:
-        {{- if $baked }}
-        - name: data-shared
-          emptyDir: {}
-        {{- else }}
-        - name: webroot-shared
-          emptyDir: {}
+        {{- if .Values.fileCache.sweeper.enabled }}
+        # Container 3: ① file_data 缓存清扫（陈旧时间有界）
+        {{- include "firebird.sweeper" . | nindent 8 }}
         {{- end }}
+
+      volumes:
+        {{- include "firebird.phpVolumes" . | nindent 8 }}
         - name: nginx-conf
           configMap:
             name: firebird-nginx-{{ .Values.siteId }}
-        - name: init-scripts
-          configMap:
-            name: firebird-init-{{ .Values.siteId }}
-        {{- if .Values.persistence.enabled }}
-        - name: config-persistent
-          persistentVolumeClaim:
-            claimName: firebird-config-{{ .Values.siteId }}
-        {{- end }}
-        {{- if .Values.uploads.enabled }}
-        - name: uploads-persistent
-          persistentVolumeClaim:
-            claimName: firebird-uploads-{{ .Values.siteId }}
-        {{- end }}
-        {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
-        - name: config-overrides
-          configMap:
-            name: firebird-configs-{{ .Values.siteId }}
-        {{- end }}
+{{- end }}

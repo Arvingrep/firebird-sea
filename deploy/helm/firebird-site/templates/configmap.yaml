@@ -36,7 +36,7 @@ data:
         # 供 probes.deepReadiness=true 的 readinessProbe 使用；不进访问日志
         location = /healthz.php {
             access_log off;
-            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_pass {{ if .Values.split.enabled }}firebird-php-{{ .Values.siteId }}:9000{{ else }}127.0.0.1:9000{{ end }};
             fastcgi_param SCRIPT_FILENAME /var/www/html/healthz.php;
             include fastcgi_params;
             fastcgi_read_timeout 5;
@@ -53,16 +53,22 @@ data:
             add_header Cache-Control "public, no-transform";
         }
 
-        # PHP-FPM 反向代理到本地 9000 端口
+        {{- if .Values.configLock.enabled }}
+        {{- if or (contains "'" .Values.configLock.message) (contains "'" .Values.configLock.messageJson) }}{{ fail "configLock.message / messageJson 不能包含单引号" }}{{ end }}
+        # GitOps 配置锁：/admin/ 下 PHP 响应里，应用自己的"写入失败，请检查权限"被替换为"该配置由 Git 管理变更并发布"。
+        # 同时替换 json_encode 转义形式（\uXXXX）与原文形式。php 不压缩输出，sub_filter 可直接处理。
+        location ~ ^/admin/.*\.php$ {
+            {{- include "firebird.nginxPhpBody" . | nindent 12 }}
+            sub_filter_once off;
+            sub_filter_types application/json text/html text/plain;
+            sub_filter '{{ .Values.configLock.matchJson | replace "\\" "\\\\" }}' '{{ .Values.configLock.messageJson | replace "\\" "\\\\" }}';
+            sub_filter '{{ .Values.configLock.matchRaw }}' '{{ .Values.configLock.message }}';
+        }
+
+        {{- end }}
+        # PHP-FPM 反向代理（拆分拓扑时指向 firebird-php-<site> Service）
         location ~ \.php$ {
-            fastcgi_pass 127.0.0.1:9000;
-            fastcgi_index index.php;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            include fastcgi_params;
-            fastcgi_read_timeout 300;
-            fastcgi_buffer_size 128k;
-            fastcgi_buffers 4 256k;
-            fastcgi_busy_buffers_size 256k;
+            {{- include "firebird.nginxPhpBody" . | nindent 12 }}
         }
 
         # 禁止访问敏感隐藏文件

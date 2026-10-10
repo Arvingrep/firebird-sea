@@ -40,8 +40,45 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 | 镜像里的垃圾 | `webroot/data/sessions` 有 2800 个已提交的 `sess_*` 文件，随镜像发布。已加入 `.dockerignore` / `.gitignore`；仓库内需另行 `git rm -r --cached webroot/data/sessions` |
 | 其它 | PDB `minAvailable:1` + 单副本 = 节点排空无法驱逐该 Pod；HPA 现为显式开关 `autoscaling.enabled`（默认 false），多副本前提是 Redis 会话 + 后台配置有唯一来源 |
 
+## 多副本就绪：缓存 / 配置 / 拓扑（①–⑤）
+**④ 后台配置的真源是 PHP 文件，不是数据库。** `admin/waimai/waimaiFenchengConfig.php`、`waimaiConfig.php`、`siteConfig.php` 等均用 `fopen("w")` 整文件重写 `include/config/*.inc.php`，没有 DB 副本。后台保存 = 改本 Pod 容器层里的文件。所以"多副本 + 后台可改"只有三条路：共享文件系统（RWX）、配置回写 ConfigMap 的 sidecar、或把关键键交给 Git。本期选最后一条（③），其余见"未解决"。
+
+| # | 做了什么 | 位置 |
+|---|---|---|
+| ① | `cache-sweeper` sidecar：按 mtime（默认 5 分钟，每 60 秒）清扫 `data/cache/file_data`。`FileDataCache` 缓存配置类表的 SQL 结果、TTL=0 永不过期，且全仓库没有清理路径（后台"清除缓存"只删 `data/cache/*.json`），原先只靠重启 Pod 清空 | `fileCache.sweeper.*`、`_helpers.tpl` |
+| ② | `memoryCache.redis.enabled`：entrypoint 按环境变量声明式把 `$cfg_memory` 写进 `dbinfo.inc.php`（与后台"站点缓存"页同格式）。原先后台保存的值写进该文件，而 entrypoint 每次启动都重写它 → 必丢。注意它只覆盖 `$HN_memory`（多语言包等），**不覆盖** `FileDataCache` | `memoryCache.redis.*`、`entrypoint-web.sh` |
+| ③ | `configVars`：`{<file>.inc.php: {<var>: <value>}}` → ConfigMap → entrypoint 在 `.example` 兜底之后用 `apply-config-vars.php` 施加（原位替换保留 CRLF，缺失则追加；文件名与变量名白名单）。当前仅固定 `waimai.inc.php` 的 `custom_fencheng_*`，取出厂值，不改线上行为 | `configVars`、`configmap-vars.yaml` |
+| ③+ | `configBackup`：PostSync（wave 2）把当时生效的 ConfigMap 内容连同镜像 tag、时间戳上传到 GCS：`gs://<bucket>/<prefix>/<site>/<UTC时间>-<image.tag>/<configmap>/<file>`。`bucket` 默认空 = 不渲染。**必须是私有桶**（uploads 桶公开读）；凭据复用 `firebird-storage-secret` 的 HMAC key，走 S3 兼容 API（`curl --aws-sigv4`） | `configBackup.*`、`job-config-backup.yaml` |
+| ⑤ | `split.enabled`：nginx 与 php-fpm 拆成两个 Deployment，nginx 经 `firebird-php-<site>:9000`（FastCGI）直连 php。模板强制：`webroot.mode=baked` 且 uploads 不为 RWO。php Pod 刻意不带 `app=firebird-site` 标签，否则站点 Service 会把 HTTP 流量打进 :9000 | `split.*`、`deployment-split.yaml`、`service-php.yaml` |
+
+**拆分不解决缓存与配置一致性**：二者是 php 进程的本地状态，与 nginx 是否同 Pod 无关；由 ①（陈旧有界）与 ③（声明式）处理。
+
+### GitOps 配置锁（`configLock`，后台配置只读）
+目标：**配置真源只在 Git，后台页面不能改，要改找管理员走变更。**
+
+- **真源**：镜像里的 `include/config/*.inc.php`（来自本仓库）+ `configVars`（键级覆盖）+ `configOverrides`（整文件覆盖）。发布时 ConfigMap 内容备份到 GCS（`configBackup`）。
+- **强制**：`CONFIG_LOCK=1` 时 entrypoint 在所有配置生成/注入之后，把 `include/config/*` 与 `dbinfo.inc.php` 置为 `root:root 0644`，目录 `0755`。php-fpm 以 www-data 运行，无法写入、重命名、新建。`configLock.writable` 里的文件名例外。
+- **提示**：后台 48 个"保存配置"入口（30 个模块 `*Config.php` + 18 个站点级）写失败时统一输出 `写入文件 … 失败，请检查权限！`（`json_encode`，非 ASCII 被转义为 `\uXXXX`）。nginx 只在 `/admin/` 的 PHP 响应上用 `sub_filter` 把它替换为"该配置由 Git 管理变更并发布。"，原文与转义两种形态都处理；成功响应不受影响。已用真实 nginx 验证。
+- **变更流程**：改 `values*.yaml` 的 `configVars` / `configOverrides`（或仓库里的配置文件）→ PR → CI → ArgoCD 同步 → 所有副本一致，且 GCS 留有当次生效内容。
+- **只读之外的坑**：`admin/siteConfig/elasticSearch.php` 写失败时不报错（厂商代码），页面会显示成功但并未保存；`/admin/` 之外的入口（若有）会看到原始的"请检查权限"提示。
+- **回滚**：`configLock.enabled: false` 并发布即可恢复可写。
+- 不在锁内的写入：`data/cache`、`templates_c`、`log` 等运行期可再生目录。
+
+### 副本数（2026-10-10 起：站点与 api 均为 2）
+- `replicaCount: 2`（站点）、`api.replicaCount: 2`；`autoscaling.enabled` 仍为 false（不自动扩缩）。2 副本下 PDB `minAvailable: 1` 才真正允许节点排空。
+- **粘性会话**：Traefik IngressRoute 的 `sticky.cookie`（`fb_srv_<site>`）。在会话改存 Redis（需 `firebird-base:7.4-r2` 构建上线）之前，文件会话无法跨 Pod，不加粘性会随机掉登录；之后粘性仍有价值——让后台保存者看到自己的改动。
+- **未开启 `configLock` 的站点**，后台保存的配置只落在处理该请求的 Pod：公开页面由两个 Pod 轮流服务，可能出现"同一页面两种配置"，直到重启或 Git 变更覆盖。canary 已开启配置锁，不受影响；manila/cebu 需要二选一：开启 `configLock`（推荐），或接受该不一致。
+- 滚动更新为 `maxUnavailable: 0, maxSurge: 1`，需要节点上能多放一个 Pod 的余量。
+
+### 未解决 / 已知限制
+- **（未开启 `configLock` 时）后台保存的键不会实时同步到其他副本**；开启 `configLock` 后后台不再可改，该问题转化为"变更必须走 Git"。`configVars` 声明的键在每次 Pod 启动时被施加，但后台保存会整文件重写，保存后到下次重启前该 Pod 上的值可能与 Git 不一致；未在 `configVars` 声明的键（站点名称、Logo、SEO 等）仍然是每 Pod 各一份、重启即丢。要真正解决需 RWX 配置卷或"回写 ConfigMap"的 sidecar，本期未做。
+- 在此之前多副本下**后台改配置只会落到随机一个 Pod**：建议生产保持单副本（`replicaCount: 1`、`autoscaling.enabled: false`），或只把后台域名 `admin.*` 指向固定 Pod。
+- `FileDataCache` 的清扫是"有界陈旧"，不是失效通知：后台改了支付/域名/模块等配置，最多 5 分钟后其他副本才可见。
+- 配置备份依赖备份桶的写权限；`failOnError: false` 时失败只打日志。该 S3 兼容签名路径**未在真实 GCS 上验证**（仅验证了脚本与模板渲染）。
+- PRD 要求平台抽餐费 18% → 0% 与配送费 89% 的含义确认，仍需业务决策后改 `configVars`，不在本期。
+
 ## 测试
-`services/api/test/writable-state.test.js`（静态断言 Helm 模板、入口脚本与基础镜像）。
+`services/api/test/writable-state.test.js`、`services/api/test/php-pod.test.js`（静态断言 Helm 模板、入口脚本与基础镜像；有 docker 时额外跑行为测试：`files/init-webroot.test.sh`、`deploy/docker/entrypoint-web.test.sh`）。
 
 ## 计划任务 CronJob（AD-18，Story 1.7）
 

@@ -11,7 +11,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 
 const chart = 'deploy/helm/firebird-site';
-const deployment = read(`${chart}/templates/deployment.yaml`);
+const T = (f) => read(`${chart}/templates/${f}`);
+const deployment = T('deployment.yaml') + T('_helpers.tpl') + T('deployment-split.yaml');
 const nginxConf = read(`${chart}/templates/configmap.yaml`);
 const smoke = read(`${chart}/templates/job-smoke-test.yaml`);
 const notify = read(`${chart}/templates/job-notify-deployed.yaml`);
@@ -66,7 +67,7 @@ test('P0: PostSync smoke job runs before the deployed notification', () => {
 
 // P2: baked 模式不整站复制，nginx 用同 tag 静态镜像
 test('P2: baked mode shares only data/, and nginx image follows image.tag', () => {
-  assert.match(deployment, /\$baked := eq \(\.Values\.webroot\.mode \| default "copy"\) "baked"/);
+  assert.match(deployment, /eq \(\.Values\.webroot\.mode \| default "copy"\) "baked"/);
   assert.match(deployment, /\{\{ \.Values\.webroot\.nginxImage\.repository \}\}:\{\{ \.Values\.image\.tag \}\}/);
   assert.match(deployment, /name: data-shared\s*\n\s+mountPath: \/var\/www\/html\/data\s*\n\s+readOnly: true/, 'nginx 只读挂 data');
   assert.match(values, /^webroot:\s*\n\s+mode: copy/m, '默认 copy：合并 chart 不改变线上拓扑');
@@ -96,4 +97,96 @@ test('HPA is opt-in and session files are kept out of the image', () => {
   assert.match(read(`${chart}/templates/hpa.yaml`), /\(\.Values\.autoscaling\)\.enabled/);
   assert.match(values, /^autoscaling:\s*\n\s+enabled: false/m);
   assert.match(read('.dockerignore'), /webroot\/data\/sessions\/\*/);
+});
+
+// ---- ①–⑤ -----------------------------------------------------------------------------------
+const helpers = T('_helpers.tpl');
+const split = T('deployment-split.yaml');
+
+test('①: file_data sweeper sidecar bounds cache staleness', () => {
+  assert.match(helpers, /define "firebird\.sweeper"/);
+  assert.match(helpers, /find "\$SWEEP_DIR" -type f -mmin "\+\$MAX_AGE_MIN" -delete/);
+  assert.match(helpers, /\/vol\/cache\/file_data/);
+  assert.match(helpers, /\/vol\/data\/cache\/file_data/);
+  assert.match(deployment, /include "firebird\.sweeper"/);
+  assert.match(values, /^fileCache:\s*\n\s+sweeper:\s*\n\s+enabled: true/m);
+});
+
+test('②: memory cache is declared via env and written by entrypoint, default off', () => {
+  assert.match(helpers, /name: MEMORY_CACHE_REDIS\b/);
+  const ep = read('deploy/docker/entrypoint-web.sh');
+  assert.match(ep, /MEMORY_CACHE_REDIS:-0/);
+  assert.match(ep, /cfg_memory\['redis'\]\['server'\]/);
+  assert.match(ep, /\/\/--------------\+\+\+\+--------------/, '与后台"站点缓存"页写入的分隔线一致');
+  assert.match(values, /^memoryCache:\s*\n\s+redis:\s*\n\s+enabled: false/m);
+});
+
+test('③: configVars are applied by entrypoint after the .example fallback, via ConfigMap', () => {
+  const ep = read('deploy/docker/entrypoint-web.sh');
+  assert.ok(ep.indexOf('apply-vars.php') > ep.indexOf('Config Fallback'), '必须在 .example 兜底之后');
+  assert.match(T('configmap-vars.yaml'), /apply-config-vars\.php/);
+  assert.match(helpers, /mountPath: \/etc\/firebird-config-vars/);
+  assert.match(deployment, /checksum\/config-vars/);
+  assert.match(values, /custom_fencheng_foodprice: 18/);
+  assert.match(read(`${chart}/files/apply-config-vars.php`), /\^\[A-Za-z0-9_\.-\]\+\\\.inc\\\.php\$/, '文件名白名单');
+});
+
+test('③: config backup hook uploads rendered ConfigMaps to a private bucket only when configured', () => {
+  const b = T('job-config-backup.yaml');
+  assert.match(b, /argocd\.argoproj\.io\/hook: PostSync/);
+  assert.match(b, /sync-wave: "2"/);
+  assert.match(b, /--aws-sigv4 "aws:amz:auto:s3"/);
+  assert.match(b, /\.Values\.configBackup\.bucket/);
+  assert.match(values, /^configBackup:\s*\n(?:\s*#.*\n)*\s+enabled: true\s*\n\s+bucket: ""/m, 'bucket 默认为空：不渲染、不会误写公开桶');
+});
+
+test('⑤: split topology fronts php-fpm with its own Service and is guarded', () => {
+  assert.match(values, /^split:\s*\n\s+enabled: false/m);
+  assert.match(split, /name: firebird-php-\{\{ \.Values\.siteId \}\}/);
+  assert.match(split, /app: firebird-php\s+# 刻意不带 app=firebird-site/);
+  assert.match(split, /fail "split\.enabled=true 要求 webroot\.mode=baked/);
+  assert.match(split, /fail "split\.enabled=true 时 uploads 不能是 RWO PVC/);
+  assert.match(T('service-php.yaml'), /port: 9000/);
+  assert.match(T('configmap.yaml'), /firebird-php-\{\{ \.Values\.siteId \}\}:9000/);
+  assert.match(T('deployment.yaml'), /if not \.Values\.split\.enabled/);
+});
+
+test('entrypoint + config-vars behavior (docker php:7.4, skipped when docker is unavailable)', (t) => {
+  const { spawnSync } = require('node:child_process');
+  if (spawnSync('docker', ['info'], { stdio: 'ignore' }).status !== 0) return t.skip('docker 不可用');
+  const r = spawnSync('docker', ['run', '--rm', '-v', `${ROOT}:/repo:ro`, 'php:7.4-cli-alpine', 'sh', '/repo/deploy/docker/entrypoint-web.test.sh'], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('GitOps config lock: root read-only enforcement + nginx message rewrite, default off, canary first', () => {
+  const ep = read('deploy/docker/entrypoint-web.sh');
+  assert.match(ep, /CONFIG_LOCK:-0/);
+  assert.ok(ep.indexOf('Config Lock') > ep.indexOf('apply-vars.php'), '锁必须在 configVars 之后');
+  assert.ok(ep.lastIndexOf('exec "$@"') > ep.indexOf('Config Lock'), '锁在 exec 之前');
+  assert.match(ep, /chown root:root/);
+  const cm = T('configmap.yaml');
+  assert.match(cm, /location ~ \^\/admin\/\.\*\\\.php\$/, '只对 /admin/ 的 PHP 响应做改写');
+  assert.match(cm, /sub_filter '\{\{ \.Values\.configLock\.matchRaw \}\}'/);
+  assert.match(cm, /configLock\.matchJson/);
+  assert.match(helpers, /name: CONFIG_LOCK\b/);
+  assert.match(values, /^configLock:\s*\n(?:\s*#.*\n)*\s+enabled: false/m, '默认关闭');
+  assert.match(read(`${chart}/values-canary.yaml`), /^configLock:\s*\n(?:\s*#.*\n)*\s+enabled: true/m, 'canary 先行');
+  // 转义串必须与原文一致，且用单引号（YAML 双引号会把 \uXXXX 解码回汉字）
+  const m = values.match(/matchJson: '([^']+)'/);
+  assert.ok(m, 'matchJson 必须是单引号 YAML 串');
+  assert.equal(JSON.parse('"' + m[1] + '"'), values.match(/matchRaw: "([^"]+)"/)[1]);
+  const mj = values.match(/messageJson: '([^']+)'/);
+  assert.equal(JSON.parse('"' + mj[1] + '"'), values.match(/^  message: "([^"]+)"/m)[1]);
+});
+
+test('2 replicas everywhere, with sticky sessions and HPA still opt-in', () => {
+  assert.match(values, /^replicaCount: 2$/m);
+  assert.match(values, /^api:\s*\n\s+enabled: true\s*\n\s+replicaCount: 2$/m);
+  for (const site of ['manila', 'cebu', 'canary']) {
+    assert.match(read(`${chart}/values-${site}.yaml`), /^replicaCount: 2$/m, site);
+  }
+  const ing = T('ingressroute.yaml');
+  assert.match(ing, /sticky:\s*\n\s+cookie:/);
+  assert.match(values, /^ingressRoute:\s*\n\s+enabled: true\s*\n\s+sticky:\s*\n\s+enabled: true/m);
+  assert.match(values, /^autoscaling:\s*\n\s+enabled: false/m, 'HPA 仍需显式开启');
 });

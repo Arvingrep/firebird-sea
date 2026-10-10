@@ -26,6 +26,18 @@ spec:
       services:
         - name: firebird-{{ .Values.siteId }}
           port: {{ .Values.service.port }}
+          {{- if and .Values.ingressRoute.sticky .Values.ingressRoute.sticky.enabled }}
+          # 粘性会话：多副本下同一浏览器固定到一个 Pod。会话改存 Redis（firebird-base 7.4-r2）之前，
+          # 文件会话无法跨 Pod，不加粘性会随机掉登录；此外后台保存的配置只落在某一个 Pod，粘性能让保存者看到自己的改动
+          sticky:
+            cookie:
+              name: fb_srv_{{ .Values.siteId }}
+              httpOnly: true
+              sameSite: lax
+              {{- if and .Values.tls .Values.tls.enabled }}
+              secure: true
+              {{- end }}
+          {{- end }}
   {{- if and .Values.tls (and .Values.tls.enabled .Values.tls.secretName) }}
   tls:
     secretName: {{ .Values.tls.secretName }}
