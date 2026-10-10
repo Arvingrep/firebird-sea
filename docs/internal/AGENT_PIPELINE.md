@@ -137,3 +137,7 @@ argocd app rollback firebird-manila <ID>   # 回滚后 Image Updater 仍会追�
 - php 与 api 两个镜像由 Image Updater 各自独立追踪，CI 先推 php 后推 api，最长约一个检查周期（2 分钟）内两者版本可能错位；chart 改动（`targetRevision: main`）会先于镜像生效。当前两者接口兼容，若将来出现不兼容变更，需改为单一触发 tag 或写回 git。
 - Dev / QA 均为 LLM，存在被需求文本或 diff 中的提示词注入影响的可能；入口已限定为 Arvin 本人（TG chat/user ID、GitHub owner），QA 采用异厂商模型与 fail-closed 解析降低风险。
 
+
+## 8. 依赖批准记录
+
+批准清单见 `.agents/approved-deps.txt`（机制见 §5）。首批登记：`mysql2 3.24.5`（Story 2.1，AD-5）、`express ^4.21.2`（既有依赖）。
