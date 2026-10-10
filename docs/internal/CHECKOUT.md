@@ -19,3 +19,14 @@
 1. 先把已过期的 pending 订单置 `expired` 并清 `holds_tail`（释放尾数）。
 2. 查询同一基础金额下 `holds_tail=1` 的已占尾数，从剩余尾数随机取一个；无剩余 → `TAIL_EXHAUSTED`（请稍后再试）。
 3. `INSERT` 依赖 `uq_fbs_charge_tail`（`holds_tail=1` 时 `payable_micro` 唯一）；撞约束则重新查询并重选，最多 5 次。
+
+## 鉴权与限流（QA 第 1 轮修复）
+- `POST /tg-api/checkout` 必须携带 Telegram `initData`（请求头 `x-telegram-init-data` 或 body `initData`），HMAC 校验失败返回 401 `UNAUTHORIZED`。
+- 按 Telegram 用户 id 内存限流：每分钟最多 5 次，超出返回 429 `RATE_LIMITED`。
+- 非业务异常（如数据库故障）返回 500，并向 stderr 写一行结构化 JSON 错误日志。
+- 已知缺口：`phpCentavos` 目前仍由客户端提交，订单金额/归属需待 Node 侧可读取火鸟订单表后改为服务端读取（见 PR 说明）。
+
+## 幂等与尾数占用（QA 第 1 轮修复）
+- `ordernum` 或 `idempotencyKey` 重复时返回已有收银台（不再 409）。
+- 占用查询按 `payable_micro` 区间 `[base+1e4, base+90e4]` 取，覆盖不同基础金额算出的相同金额；撞 `uq_fbs_charge_tail` 后把该尾数计入本次占用再重选。
+- 汇率取 Coins.ph depth 最高 bid；`rate_at` 为取价时刻（交易所未返回时间戳）。

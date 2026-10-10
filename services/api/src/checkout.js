@@ -39,6 +39,20 @@ function pickTail(occupied) {
   return free[Math.floor(Math.random() * free.length)];
 }
 
+// ordernum / idempotency_key 重复：返回已有收银台（幂等）。
+async function findExisting(conn, ordernum, idempotencyKey, address) {
+  const byIdem = idempotencyKey === null ? '' : ` OR idempotency_key='${idempotencyKey}'`;
+  const out = String(
+    (await conn.query(
+      `SELECT ordernum, payable_micro, rate_str, rate_at, expires_at FROM fbs_charge WHERE ordernum='${ordernum}'${byIdem} LIMIT 1`,
+    )) || '',
+  ).trim();
+  if (!out) return null;
+  const [on, payable, rateStr, rateAt, expiresAt] = out.split('\t');
+  const iso = (v) => new Date(`${v.replace(' ', 'T')}Z`).toISOString();
+  return { ordernum: on, payable_micro: Number(payable), rate_str: rateStr, rate_at: iso(rateAt), expires_at: iso(expiresAt), address };
+}
+
 async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = null, getRate, address = '', now = Date.now }) {
   if (!SAFE_ID.test(ordernum || '') || (idempotencyKey !== null && !SAFE_ID.test(idempotencyKey))) {
     throw new CheckoutError('BAD_REQUEST', 'ordernum / idempotencyKey 格式无效');
@@ -64,9 +78,18 @@ async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = nu
     `UPDATE fbs_charge SET state='expired', holds_tail=NULL WHERE state='pending' AND holds_tail=1 AND expires_at < '${sqlTime(t0)}'`,
   );
 
+  const collided = new Set();
   for (let i = 0; i < MAX_RETRY; i++) {
-    const out = await conn.query(`SELECT tail_cents FROM fbs_charge WHERE holds_tail=1 AND payable_micro - tail_cents * 10000 = ${base}`);
-    const occupied = new Set(String(out || '').split('\n').map((s) => Number(s.trim())).filter(Boolean));
+    // 按 payable_micro 区间取占用（不同基础金额也可能算出相同 payable_micro）
+    const lo = base + TAIL_UNIT_MICRO * BigInt(TAIL_MIN);
+    const hi = base + TAIL_UNIT_MICRO * BigInt(TAIL_MAX);
+    const out = await conn.query(`SELECT payable_micro FROM fbs_charge WHERE holds_tail=1 AND payable_micro BETWEEN ${lo} AND ${hi}`);
+    const occupied = new Set(collided);
+    for (const line of String(out || '').split('\n')) {
+      if (!/^\d+$/.test(line.trim())) continue;
+      const d = BigInt(line.trim()) - base;
+      if (d % TAIL_UNIT_MICRO === 0n) occupied.add(Number(d / TAIL_UNIT_MICRO));
+    }
     const tail = pickTail(occupied);
     const payable = base + BigInt(tail) * TAIL_UNIT_MICRO;
     const expiresAt = t0 + WINDOW_MS;
@@ -77,8 +100,15 @@ async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = nu
           `VALUES ('${ordernum}', ${idem}, ${phpCentavos}, ${tail}, ${payable}, '${snap.rate_str}', '${sqlTime(snap.rate_at)}', 'pending', '${sqlTime(expiresAt)}', 1)`,
       );
     } catch (err) {
-      if (/uq_fbs_charge_tail/.test(err.message)) continue; // 并发撞尾数：重新分配
-      if (/Duplicate entry/.test(err.message)) throw new CheckoutError('ORDER_EXISTS', '订单已存在收银台');
+      if (/uq_fbs_charge_tail/.test(err.message)) {
+        collided.add(tail); // 并发撞尾数：排除该尾数后重新分配
+        continue;
+      }
+      if (/Duplicate entry/.test(err.message)) {
+        const existing = await findExisting(conn, ordernum, idempotencyKey, address);
+        if (existing) return existing;
+        throw new CheckoutError('ORDER_EXISTS', '订单已存在收银台');
+      }
       throw err;
     }
     return {
@@ -93,11 +123,13 @@ async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = nu
   throw new CheckoutError('TAIL_EXHAUSTED', '当前支付繁忙，请稍后再试');
 }
 
-// 默认汇率源：Coins.ph 买价，每次现取（rate_at = 取价时刻）。
+// 默认汇率源：Coins.ph 买价（depth 最高 bid），每次现取（rate_at = 取价时刻）。
 function coinsRateSource(client, now = Date.now) {
   return async () => {
-    const t = await client.getTickerPrice('USDTPHP');
-    return { rate_str: String(t.raw.price), rate_at: now() };
+    const book = await client.getOrderBook('USDTPHP', 5);
+    const bid = book.bids && book.bids[0];
+    if (!bid || !(bid.price > 0)) throw new Error('empty order book');
+    return { rate_str: String(bid.price), rate_at: now() };
   };
 }
 

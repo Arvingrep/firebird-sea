@@ -6,7 +6,7 @@ const NOW = Date.parse('2026-01-01T00:00:00Z');
 const fresh = () => Promise.resolve({ rate_str: '62.5', rate_at: NOW - 1000 });
 
 // 内存假连接：模拟 fbs_charge 的 tail_key 唯一约束；hook 可在 SELECT 之后注入并发写入。
-function fakeConn({ occupiedTails = [], base = 0, afterSelect } = {}) {
+function fakeConn({ occupiedTails = [], base = 0, afterSelect, existing } = {}) {
   const rows = occupiedTails.map((t) => ({ tail: t, payable: base + t * 10000 }));
   const inserts = [];
   return {
@@ -14,12 +14,14 @@ function fakeConn({ occupiedTails = [], base = 0, afterSelect } = {}) {
     inserts,
     async query(sql) {
       if (sql.startsWith('UPDATE')) return '';
+      if (sql.startsWith('SELECT ordernum')) return existing || '';
       if (sql.startsWith('SELECT')) {
-        const out = rows.map((r) => r.tail).join('\n');
+        const out = rows.map((r) => r.payable).join('\n');
         if (afterSelect) afterSelect(rows);
         return out;
       }
       inserts.push(sql);
+      if (existing) throw new Error("ERROR 1062 (23000): Duplicate entry 'ORD1' for key 'uq_fbs_charge_ordernum'");
       const payable = Number(/, (\d+), '62\.5'/.exec(sql)[1]);
       if (rows.some((r) => r.payable === payable)) {
         throw new Error("ERROR 1062 (23000): Duplicate entry '" + payable + "' for key 'uq_fbs_charge_tail'");
@@ -74,4 +76,19 @@ test('AC4 并发算出相同 payable_micro：唯一约束拒绝一方，其重�
   const payables = conn.rows.map((x) => x.payable);
   assert.strictEqual(new Set(payables).size, payables.length);
   assert.ok(payables.includes(r.payable_micro));
+});
+
+test('AC4 跨基础金额占用同一 payable 区间：只剩一个尾数时仍分配成功', async () => {
+  // 其他基础金额的订单占用了 2000000 + 1e4..89e4，只剩尾数 90
+  const conn = fakeConn();
+  for (let t = 1; t <= 89; t++) conn.rows.push({ tail: 0, payable: 2000000 + t * 10000 });
+  const r = await createCheckout(conn, args());
+  assert.strictEqual(r.payable_micro, 2000000 + 90 * 10000);
+});
+
+test('幂等：ordernum 重复时返回已有收银台而非 ORDER_EXISTS', async () => {
+  const conn = fakeConn({ existing: 'ORD1\t2310000\t62.5\t2025-12-31 23:59:59\t2026-01-01 00:15:00' });
+  const r = await createCheckout(conn, args());
+  assert.strictEqual(r.payable_micro, 2310000);
+  assert.strictEqual(r.rate_at, '2025-12-31T23:59:59.000Z');
 });
