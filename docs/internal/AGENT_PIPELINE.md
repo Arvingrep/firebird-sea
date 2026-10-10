@@ -1,6 +1,10 @@
 # 多 Agent 研发流水线（n8n → GitHub CI → ArgoCD CD）
 
-> 最后更新：2026-10-09 · 落地 `BMAD_AUTOMATION_PIPELINE_ARCHITECTURE.md` 的方案 C（外环 n8n / 内环 GitHub + 双 Agent）。
+> 最后更新：2026-10-10 · 落地 `BMAD_AUTOMATION_PIPELINE_ARCHITECTURE.md` 的方案 C（外环 n8n / 内环 GitHub + 双 Agent）。
+>
+> **分支与发布**：Agent PR 的目标分支已可配置（`AGENT_BASE_BRANCH`，默认 `main`；canary 验收流程启用后设为 `canary`），生产 `main` 只接收 `canary → main` 的晋升 PR。分支角色、镜像 tag、保护规则与启用步骤见 [RELEASE_FLOW.md](RELEASE_FLOW.md)。
+>
+> **GitOps 铁律**：一切变更以 Git 为准，`kubectl` / ArgoCD 工具只用于**查询**（logs、get、describe、events）。写操作只能走 PR；生产应急仅 owner、事后补 PR。详见 [`.agents/RULES.md`](../../.agents/RULES.md) 第 6 节。
 
 ## 1. 全链路
 
@@ -28,7 +32,7 @@ sequenceDiagram
         GH->>DEV: 返工（同分支，带 QA 意见）
     else ACCEPTED
         QA->>GH: squash 合并（--match-head-commit）
-        GH->>CI: push main → build+push GAR <sha>
+        GH->>CI: push canary → build :canary（验收）；晋升后 push main → build+push GAR <sha>
         CI->>N8N: image_pushed
         IU->>ARGO: 发现新 SHA → 改 Application helm 参数
         ARGO->>N8N: PostSync 钩子 deployed
@@ -45,7 +49,7 @@ sequenceDiagram
 | Dev Agent | `.github/workflows/agent-dev.yml` → `scripts/agent/dev.sh` | 默认 `claude -p`，限定工具集，不能改 `.github/`、`scripts/agent/` |
 | 确定性门禁 | `.github/workflows/ci-verify.yml` → `scripts/agent/gates.sh` | 只看分支 diff：非空、增量 ≤1200、Docs-as-Code、Zero-Dep、密钥、调试残留、语法、Helm |
 | QA Agent | `ci-verify.yml` job `agent-qa` → `scripts/agent/qa.sh` | 默认 `codex exec -s read-only`（与 Dev 不同厂商）；JSON 裁定，解析失败即打回 |
-| 构建 | `.github/workflows/ci-gke.yml` | push main → GAR `firebird-php/api:<sha>`；纯 docs/任务变更不构建 |
+| 构建 | `.github/workflows/ci-gke.yml` | push main → GAR `firebird-php/api/nginx:<sha40>` + `latest`；push canary → `:canary` + `:canary-<sha12>`（**不推 40 位 SHA**，防 Image Updater 误滚生产）；纯 docs/任务变更不构建 |
 | 发布 | homelab `platform/argocd-image-updater` + `apps/firebird-manila/application-gke.yaml` | Image Updater v1（CRD）追 40 位 SHA tag，write-back=argocd；Application 自动同步 |
 | 上线通知 | `deploy/helm/firebird-site/templates/job-notify-deployed.yaml` | ArgoCD PostSync Job，`deployNotify.webhook` 为空则不创建 |
 
@@ -67,6 +71,7 @@ sequenceDiagram
 | secret | `N8N_AGENT_EVENT_TOKEN` | 建议 | 事件 webhook 的 Header Auth token（`X-Firebird-Token`），与下方 n8n 凭据、GKE Secret 三处一致 |
 | var | `AGENT_AUTO_MERGE` | | 默认 `1`；设 `0` 即改为「QA 通过后人工合并」 |
 | var | `AGENT_MAX_ATTEMPTS` | | QA 打回上限，默认 `3` |
+| var | `AGENT_BASE_BRANCH` | | Dev Agent 的基线与 PR 目标分支，默认 `main`；canary 流程启用后设为 `canary`（QA/回写取 PR 的实际目标分支，无需再设） |
 | var | `DEV_AGENT_CMD` / `QA_AGENT_CMD` | | 覆盖默认 agent 命令（按 shell 语法 `eval` 成数组，**等同于在 runner 上执行任意命令**——仅 owner 可设，勿开放给他人；提示词走 stdin；`QA_AGENT_CMD` 需以输出文件参数结尾，如 `... -o`） |
 | secret | `GCP_SA_KEY` | ✅ | 已有，CI 推 GAR |
 
@@ -75,7 +80,7 @@ sequenceDiagram
 n8n / GKE 侧：
 - 导入 `agent_pipeline_events_to_tg.json` 后：Webhook 节点绑定 **Header Auth** 凭据（Name `X-Firebird-Token`，Value = 上面的 token），Telegram 节点绑定 Bot 凭据，**然后激活**——未激活时生产 webhook 路径 404，CI 与 PostSync 通知会静默失败。
 - `tg_to_github_issues_project`：TG Trigger 必须是 **typeVersion 1.2** 且填 Restrict to Chat/User IDs；Agent 节点为 `promptType=define`，后接「2b. 解析 Spec JSON」Code 节点。
-- GKE `default` 命名空间：`kubectl --context gcp-gke -n default create secret generic firebird-n8n-event-token --from-literal=token=<同一 token>`（PostSync 通知 Job 读取，缺失时不带鉴权头）。
+- （Secret 不入 Git，此为 owner 一次性操作，属 GitOps 的受控例外；Agent 不得执行）GKE `default` 命名空间：`kubectl --context gcp-gke -n default create secret generic firebird-n8n-event-token --from-literal=token=<同一 token>`（PostSync 通知 Job 读取，缺失时不带鉴权头）。
 
 ## 5. 安全边界
 
@@ -127,7 +132,7 @@ make gates                  # 当前分支对 origin/main 跑确定性门禁
 kubectl --context mac-mini-orbstack -n argocd get imageupdater firebird-manila
 argocd app history firebird-manila
 argocd app rollback firebird-manila <ID>   # 回滚后 Image Updater 仍会追最新 tag：
-                                           # 先 kubectl -n argocd patch imageupdater firebird-manila 暂停，或 revert main
+                                           # revert main 的那个 PR（GitOps 回滚）；紧急止血才由 owner 暂停 imageupdater（`kubectl -n argocd patch imageupdater firebird-manila`），事后补 PR
 ```
 
 暂停全自动：`AGENT_AUTO_MERGE=0`（保留 QA，只停合并）；或删 issue 上的 `agent:dev` 标签。

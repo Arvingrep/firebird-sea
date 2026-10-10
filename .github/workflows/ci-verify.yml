@@ -4,7 +4,8 @@ name: CI Verify & Quality Gate
 #    → ② 独立 QA Agent（本机自托管 runner，仅 agent/* 分支）→ 通过即自动合并 / 打回触发返工
 on:
   pull_request:
-    branches: [ main ]
+    # feature/agent PR → canary（验收）；canary → main 为晋升 PR（生产）；hotfix 可直接 → main
+    branches: [ main, canary ]
 
 permissions:
   contents: read
@@ -23,6 +24,8 @@ jobs:
         env:
           GATE_REQUIRE_TOOLS: "1"
           GATE_AGENT_BRANCH: ${{ startsWith(github.head_ref, 'agent/') && '1' || '0' }}
+          # canary → main 的晋升 PR 汇总了已逐个过门禁的改动，不再受「增量 ≤ 1200 行」限制（其余门禁照常）
+          GATE_MAX_ADDED: ${{ (github.base_ref == 'main' && github.head_ref == 'canary') && '1000000' || '1200' }}
         run: |
           command -v php >/dev/null || { echo "runner 缺少 php"; exit 1; }
           set -o pipefail
@@ -73,12 +76,14 @@ jobs:
       N8N_AGENT_EVENT_TOKEN: ${{ secrets.N8N_AGENT_EVENT_TOKEN }}
       QA_AGENT_CMD: ${{ vars.QA_AGENT_CMD || '' }}
       AGENT_AUTO_MERGE: ${{ vars.AGENT_AUTO_MERGE || '1' }}
+      # PR 的实际目标分支（canary 或 main）；脚本里所有 origin/main 均由它替换
+      AGENT_BASE_BRANCH: ${{ github.base_ref }}
       AGENT_MAX_ATTEMPTS: ${{ vars.AGENT_MAX_ATTEMPTS || '3' }}
       # 托管 runner 上 gates job 的结论（含 test-helm 等全部步骤），非 success 不得合并
       # verify-task 也必须 success，否则等同门禁失败（qa.sh 无需改动）
       GATES_JOB_RESULT: ${{ (needs.gates.result == 'success' && needs.verify-task.result == 'success') && 'success' || 'failure' }}
     steps:
-      # 检出 base（main）而不是 PR：qa.sh / gates.sh / RULES 这些「裁判」必须来自 main，
+      # 检出 base（canary 或 main）而不是 PR：qa.sh / gates.sh / RULES 这些「裁判」必须来自 base 分支，
       # PR 代码由 qa.sh 自行检出为被审数据
       - uses: actions/checkout@v4
         with:

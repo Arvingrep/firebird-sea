@@ -9,6 +9,10 @@ set -euo pipefail
 ROOT_DIR="${AGENT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 AGENT_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Agent 的基线/PR 目标分支：canary 验收流程下为 canary，默认 main（行为不变）。
+# 由 workflow 经 AGENT_BASE_BRANCH 注入；脚本里不再写死 origin/main。
+BASE_BRANCH="${AGENT_BASE_BRANCH:-main}"
+
 # 从当前（可信）检出复制 scripts/agent 到临时目录后重新执行自身：
 # 之后的 git checkout 无论切到哪个分支，都不会改变正在运行的脚本（bash 按需读取脚本文件），
 # 也保证 QA 的裁判脚本来自 main 而不是被审查的 PR。

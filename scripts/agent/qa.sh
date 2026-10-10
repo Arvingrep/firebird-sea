@@ -32,13 +32,13 @@ read_pr() { node -e 'const p=require(process.argv[1]);console.log(p[process.argv
 HEAD_SHA="$(read_pr headRefOid)"
 ISSUE="$(read_pr body | grep -oiE '(closes|fixes|resolves) #[0-9]+' | head -n1 | grep -oE '[0-9]+' || true)"
 
-git fetch -q origin main "$(read_pr headRefName)"
+git fetch -q origin "$BASE_BRANCH" "$(read_pr headRefName)"
 git checkout -q --detach "$HEAD_SHA"
 notify qa_started "QA Agent 开始验收 PR #${PR}" "$ISSUE" "$PR"
 
 # 1. 确定性门禁（真实执行）
 GATE_RC=0
-GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=1 bash "$AGENT_SELF_DIR/gates.sh" origin/main > "$TMP/gates.md" 2>&1 || GATE_RC=$?
+GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=1 bash "$AGENT_SELF_DIR/gates.sh" origin/${BASE_BRANCH} > "$TMP/gates.md" 2>&1 || GATE_RC=$?
 if [ "${GATES_JOB_RESULT:-}" != "success" ]; then
   GATE_RC=1
   printf '\n> ❌ 托管 runner 上的 gates job 结论为 `%s`（须为 success）\n' "${GATES_JOB_RESULT:-未提供}" >> "$TMP/gates.md"
@@ -47,7 +47,7 @@ fi
 # 2. LLM 对抗审查
 SPEC="（PR 未关联 issue）"
 [ -n "$ISSUE" ] && SPEC="$(gh api "repos/${REPO}/issues/${ISSUE}" --jq '"### " + .title + "\n" + .body' 2>/dev/null || gh issue view "$ISSUE" -R "$REPO" --json title,body -q '"### " + .title + "\n" + .body')"
-git diff origin/main...HEAD > "$TMP/diff.patch"
+git diff origin/${BASE_BRANCH}...HEAD > "$TMP/diff.patch"
 DIFF_BYTES="$(wc -c < "$TMP/diff.patch" | tr -d ' ')"
 {
   echo "你是 firebird-sea 的独立验收 Agent（红队 QA）。前提：假定代码有缺陷，你的工作是找出来。"
@@ -55,7 +55,7 @@ DIFF_BYTES="$(wc -c < "$TMP/diff.patch" | tr -d ' ')"
   echo
   echo "## 需求（Issue #${ISSUE:-?}）"; echo "$SPEC"
   echo
-  echo "## 工程铁律"; git show origin/main:.agents/RULES.md
+  echo "## 工程铁律"; git show origin/${BASE_BRANCH}:.agents/RULES.md
   echo
   echo "## 确定性门禁结果"; cat "$TMP/gates.md"
   echo

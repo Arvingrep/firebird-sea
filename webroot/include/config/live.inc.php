@@ -2,7 +2,7 @@
 $customChannelName = '视频直播';
 $customLogo = 0;
 $customLogoUrl = '';
-$customSubDomain = 0;
+$customSubDomain = 2;
 $customChannelSwitch = 0;
 $customCloseCause = '';
 $customSeoTitle = '';

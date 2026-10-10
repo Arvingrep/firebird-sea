@@ -49,7 +49,6 @@ $cfg_siteDebug = '0';
 $cfg_memberCityid = '0';
 $cfg_sitePageGray = '0';
 $cfg_vipAdvertising = '0';
-$cfg_vipAdvertising = '0';
 $cfg_kefu_pc_url = '';
 $cfg_kefu_touch_url = '';
 $cfg_kefuMiniProgram = '1';

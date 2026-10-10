@@ -37,7 +37,7 @@ if [ -z "$TASK_FILE" ]; then
   exit 2
 fi
 
-BASE="main"; git rev-parse --verify -q origin/main >/dev/null 2>&1 && BASE="origin/main"
+B0="${AGENT_BASE_BRANCH:-main}"; BASE="$B0"; git rev-parse --verify -q "origin/$B0" >/dev/null 2>&1 && BASE="origin/$B0"
 NUM="$(printf '%s' "$TASK_ID" | grep -oE '[0-9]+' | head -n1)"
 BRANCH="$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null \
           | grep -iE "task-0*${NUM}([^0-9]|$)" | head -n1 || true)"
