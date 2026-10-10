@@ -97,3 +97,20 @@ deployNotify:
   tokenSecret:
     name: firebird-n8n-event-token
     key: token
+
+# Pod 干扰预算与零中断平滑更新保护 (保证更新、节点维护时最低可用 Pod 数始终为 1)
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# 持久化存储与丝滑过渡引擎 (解决火鸟系统把配置写在 PHP 文件中的云原生持久化问题)
+persistence:
+  enabled: false # 设置为 true 即可自动创建并绑定 1Gi 配置专属持久卷 PVC，管理员在 UI 修改的配置跨部署永不丢失
+  storageClass: "standard-rwo"
+  size: "1Gi"
+  accessMode: "ReadWriteOnce"
+
+# 声明式配置注入引擎 (通过 ConfigMap 锁定关键业务配置，启动自动热同步，无需云磁盘)
+configOverrides:
+  enabled: false
+  files: {}

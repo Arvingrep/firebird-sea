@@ -37,6 +37,14 @@ if [ -n "$RESEND_KEY" ] && [ -f "$SITECONFIG_FILE" ]; then
     sed -i "s|\\\$cfg_mailPass = .*|\\\$cfg_mailPass = '${RESEND_KEY}';|" "$SITECONFIG_FILE"
 fi
 
+# 如果挂载了声明式 ConfigMap 配置注入目录 (/etc/firebird-configs)，启动时自动同步至 include/config 并赋予写权限
+if [ -d "/etc/firebird-configs" ] && [ -n "$(ls -A /etc/firebird-configs 2>/dev/null)" ]; then
+    echo ">>> [ConfigMap Engine] 正在从 ConfigMap 注入声明式业务配置..."
+    cp -f /etc/firebird-configs/* /var/www/html/include/config/ 2>/dev/null || true
+    chown -R www-data:www-data /var/www/html/include/config 2>/dev/null || true
+    chmod -R 777 /var/www/html/include/config 2>/dev/null || true
+fi
+
 # 确保底层扩展在 webroot 与系统目录下双重就绪 (自愈机制)
 if [ ! -f /var/www/html/huoniao.so ] && [ -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so ]; then
     cp -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so /var/www/html/huoniao.so 2>/dev/null || true

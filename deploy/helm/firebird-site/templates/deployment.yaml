@@ -7,6 +7,11 @@ metadata:
     site: {{ .Values.siteId }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0     # 更新时不可用 Pod 数必须为 0，保证业务不中断
+      maxSurge: 1           # 允许额外拉起 1 个新 Pod 完成平滑交接
   selector:
     matchLabels:
       app: firebird-site
@@ -17,15 +22,34 @@ spec:
         app: firebird-site
         site: {{ .Values.siteId }}
     spec:
+      terminationGracePeriodSeconds: 30
       initContainers:
-        # Init: 从 firebird-php 镜像同步源码至共享卷，确保 Nginx 拥有完整静态资产
+        # Init: 从 firebird-php 镜像同步源码至共享卷，同时通过丝滑过渡引擎保护持久化配置
         - name: init-webroot
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["sh", "-c", "cp -a /var/www/html/. /shared/ && chmod -R 777 /shared/data 2>/dev/null || true"]
+          command:
+            - "sh"
+            - "-c"
+            - |
+              cp -a /var/www/html/. /shared/ && chmod -R 777 /shared/data 2>/dev/null || true
+              if [ -d /config-pvc ]; then
+                if [ -f /config-pvc/siteConfig.inc.php ]; then
+                  echo ">>> [Transition Engine] 恢复 PVC 中保存的自定义运行配置..."
+                  cp -af /config-pvc/*.inc.php /shared/include/config/ 2>/dev/null || true
+                else
+                  echo ">>> [Transition Engine] 首次挂载 PVC，将镜像基线配置作为种子保存到 PVC..."
+                  cp -an /shared/include/config/*.inc.php /config-pvc/ 2>/dev/null || true
+                fi
+                chmod -R 777 /config-pvc 2>/dev/null || true
+              fi
           volumeMounts:
             - name: webroot-shared
               mountPath: /shared
+            {{- if .Values.persistence.enabled }}
+            - name: config-persistent
+              mountPath: /config-pvc
+            {{- end }}
 
       containers:
         # Container 1: PHP-FPM 处理引擎
@@ -80,6 +104,30 @@ spec:
           volumeMounts:
             - name: webroot-shared
               mountPath: /var/www/html
+            {{- if .Values.persistence.enabled }}
+            - name: config-persistent
+              mountPath: /var/www/html/include/config
+            {{- end }}
+            {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
+            - name: config-overrides
+              mountPath: /etc/firebird-configs
+              readOnly: true
+            {{- end }}
+          readinessProbe:
+            tcpSocket:
+              port: 9000
+            initialDelaySeconds: 5
+            periodSeconds: 3
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
 
@@ -89,6 +137,27 @@ spec:
           imagePullPolicy: {{ .Values.nginxImage.pullPolicy }}
           ports:
             - containerPort: 80
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 3 && /usr/sbin/nginx -s quit"]
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 3
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           volumeMounts:
             - name: webroot-shared
               mountPath: /var/www/html
@@ -102,3 +171,13 @@ spec:
         - name: nginx-conf
           configMap:
             name: firebird-nginx-{{ .Values.siteId }}
+        {{- if .Values.persistence.enabled }}
+        - name: config-persistent
+          persistentVolumeClaim:
+            claimName: firebird-config-{{ .Values.siteId }}
+        {{- end }}
+        {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
+        - name: config-overrides
+          configMap:
+            name: firebird-configs-{{ .Values.siteId }}
+        {{- end }}

@@ -1233,10 +1233,14 @@ class dsql extends db_connect
      */
     public function count(string $sql): int
     {
-        $pre = $this->db->prepare("select count(*) total from ( ".$sql." ) tmp_count");
-        $pre->execute();
-        $res =  $pre->fetch(PDO::FETCH_ASSOC);
-        return (int)$res['total'];
+        try {
+            $pre = $this->db->prepare("select count(*) total from ( ".$sql." ) tmp_count");
+            $pre->execute();
+            $res =  $pre->fetch(PDO::FETCH_ASSOC);
+            return (int)$res['total'];
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     /** by zfh
