@@ -1,5 +1,6 @@
-{{- if not (and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce")) }}
-# uploads 为 RWO 卷时不扩副本（多 Pod 跨节点无法同时挂载），需 HPA 请改 RWX
+{{- if and (.Values.autoscaling).enabled (not (and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce"))) }}
+# 需同时满足：autoscaling.enabled=true，且 uploads 不是 RWO 卷（RWO 多 Pod 跨节点无法同时挂载）
+# 多副本的前提还有：会话在 Redis（firebird-base 含 redis 扩展）、后台可写配置有唯一来源（见 docs/internal/WRITABLE_STATE.md）
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

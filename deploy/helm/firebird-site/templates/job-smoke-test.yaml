@@ -1,0 +1,60 @@
+{{- if .Values.smokeTest.enabled }}
+# ArgoCD PostSync 冒烟：Application 同步且健康之后，真实请求 Service（带站点 Host 头）。
+# "Pod Ready" 只证明进程起来了，不证明页面能渲染；2026-10-10 首页 500 时 Pod 一直是 Ready。
+# 任一路径在 timeoutSeconds 内始终非 2xx/3xx → Job 失败 → Sync 标记失败，且后续 wave 的上线通知不会发出。
+# 失败的 Job 不删除（HookSucceeded 只删成功的），日志可直接查看每次探测的状态码。
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: firebird-smoke-{{ .Values.siteId }}
+  labels:
+    app: firebird-smoke
+    site: {{ .Values.siteId }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ add (.Values.smokeTest.timeoutSeconds | default 300) 30 }}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: firebird-smoke
+        site: {{ .Values.siteId }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: smoke
+          image: curlimages/curl:8.11.1
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 32Mi }
+          env:
+            - name: BASE_URL
+              value: "http://firebird-{{ .Values.siteId }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port | default 80 }}"
+            - name: SITE_HOST
+              value: {{ .Values.domain | quote }}
+            - name: PATHS
+              value: {{ join " " .Values.smokeTest.paths | quote }}
+            - name: DEADLINE
+              value: {{ .Values.smokeTest.timeoutSeconds | default 300 | quote }}
+          command: ["sh", "-c"]
+          args:
+            - |
+              start=$(date +%s)
+              fail=0
+              for p in $PATHS; do
+                ok=0
+                while :; do
+                  code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' -H "Host: ${SITE_HOST}" "${BASE_URL}${p}" || true)
+                  echo "[smoke] ${SITE_HOST}${p} -> ${code}"
+                  case "$code" in 2??|3??) ok=1; break ;; esac
+                  [ $(( $(date +%s) - start )) -ge "$DEADLINE" ] && break
+                  sleep 5
+                done
+                [ "$ok" -eq 1 ] || { echo "[smoke] FAIL ${p}"; fail=1; }
+              done
+              exit $fail
+{{- end }}

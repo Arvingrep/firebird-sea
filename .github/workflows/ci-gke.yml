@@ -62,13 +62,16 @@ jobs:
       - name: 4. 构建并推送镜像至 Google Artifact Registry (GAR)
         run: |
           GCP_PROJECT="${{ vars.GCP_PROJECT_ID || 'fh580-70533' }}"
-          BASE_IMAGE="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-base:7.4"
+          BASE_IMAGE="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-base:7.4-r2"
           IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:${{ github.sha }}"
           IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:latest"
           API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${{ github.sha }}"
           API_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:latest"
 
           # 4.1 检查/构建基础运行镜像 (firebird-base)
+          # 注意：只在该 tag 不存在时才构建。修改 Dockerfile.base（加扩展/改 ini）后必须同步递增 tag 后缀
+          # (7.4-r2 → 7.4-r3)，并同步 Dockerfile.web 的 BASE_IMAGE 默认值——否则改动永远不会生效
+          # （2026-10-10 实测：旧 7.4 早于 redis 扩展加入，线上 Pod 缺 redis.so，会话一直回退为文件存储）。
           if ! docker manifest inspect "$BASE_IMAGE" > /dev/null 2>&1; then
             echo "📦 Base 镜像不存在，正在构建并发布不可变底层基座: $BASE_IMAGE ..."
             docker buildx build --push \
@@ -81,6 +84,19 @@ jobs:
           else
             echo "✅ 基础镜像已就绪，秒级跳过底层编译: $BASE_IMAGE"
           fi
+
+          # 4.1b 构建 nginx 静态镜像 (与 firebird-php 同 SHA tag)。
+          # 必须先于 firebird-php 推送：Image Updater 只盯 firebird-php 的 tag，
+          # 一旦发现新 php tag 即触发同步，此时同 tag 的 nginx 镜像必须已就绪，否则 baked 站点 ImagePullBackOff。
+          NGINX_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-nginx:${{ github.sha }}"
+          NGINX_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-nginx:latest"
+          echo "🚀 构建 nginx 静态镜像: $NGINX_IMAGE_TAG ..."
+          docker buildx build --push \
+            --platform linux/amd64 \
+            --cache-from type=gha,scope=firebird-nginx \
+            --cache-from "$NGINX_IMAGE_LATEST" \
+            --cache-to type=gha,mode=max,scope=firebird-nginx \
+            -t "$NGINX_IMAGE_TAG" -t "$NGINX_IMAGE_LATEST" -f deploy/docker/Dockerfile.nginx .
 
           # 4.2 构建极速业务 Web 镜像 (继承 base，仅 COPY 源码，搭配 GHA + GAR 远端缓存)
           echo "🚀 构建业务 Web 镜像: $IMAGE_TAG ..."
