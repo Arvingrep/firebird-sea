@@ -72,36 +72,6 @@ if(file_exists($tpl."/".$templates)){
 	);
 
 
-	//获取商家模块配置参数
-	$configHandels = new handlers("business", "config");
-	$moduleConfig  = $configHandels->getHandle();
-	$moduleConfig  = $moduleConfig['info'];
-	$subDomain = $moduleConfig['subDomain'];
-	$channelDomain = $moduleConfig['channelDomain'];
-
-	$channelDomainArr = explode('/', $channelDomain);
-	$businessDomain = $channelDomainArr[count($channelDomainArr)-1];
-	// $businessDomain = str_replace($cfg_basehost, "", str_replace("http://", "", str_replace("https://", "", $channelDomain)));
-	//
-	// if($subDomain){
-	// 	$businessDomain = preg_replace("/[\.\/]/", "", $businessDomain);
-	// }
-	//
-	// //兼容主域名是带www的情况
-	// $cfg_basehost_ = str_replace("www.", "", $cfg_basehost);
-	// $cfg_basehost_ = preg_replace("/[\.\/]/", "", $cfg_basehost_);
-	// $businessDomain = str_replace($cfg_basehost_, "", $businessDomain);
-
-
-	$moduleArr[] = array(
-		"module" => "business",
-		"name" => "商家中心",
-		"type" => $subDomain,
-		"typeName" => getDomainTypeName($subDomain),
-		"domain" => $businessDomain
-	);
-
-
 
 	$sql = $dsql->SetQuery("SELECT `title`, `subject`, `name` FROM `#@__site_module` WHERE `state` = 0 AND `type` = 0 ORDER BY `weight`, `id`");
 	$result = $dsql->dsqlOper($sql, "results");
