@@ -2,26 +2,27 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { makeCookiePublisher, classifyPutResponse } = require('./portal');
 
-// 同源 fixture:与 webroot/api/handlers/{member.controller,article.class}.php 的真实返回一致
+// 同源 fixture:与 webroot 真实返回一致(put/del 经 include/ajax.php 的 handlers 包装:
+// 成功裸 {aid} → {state:100,info:{aid}};state:200 → state:101;登录走 /loginCheck.html platform=app)
 const FX = {
   loginOk: { state: 100, info: [] },
-  loginBad: { state: 200, info: '用户名或密码错误' },
-  putOk: { auth: '', aid: 123, amount: 0 },
-  putExpired: { state: 200, info: '登录超时,请重新登录!' },
+  loginBad: { state: 200, info: '用户名或密码错误,请重试!' },
+  putOk: { state: 100, info: { auth: '', aid: 123, amount: 0 } },
+  putExpired: { state: 101, info: '登录超时,请重新登录!' },
   putDbErr: { state: 101, info: '发布到数据时发生错误,请检查字段内容!' },
-  putNoMedia: { state: 200, info: '您还没有入驻自媒体' },
+  putNoMedia: { state: 101, info: '您还没有入驻自媒体' },
   delOk: { state: 100, info: '删除成功!' },
   htmlLogin: '<!DOCTYPE html><html><form action="login"></form></html>'
 };
 const resp = (body, { cookie, status = 200 } = {}) => ({
   ok: status < 300,
   status,
-  headers: { getSetCookie: () => (cookie ? [`PHPSESSID=${cookie}; path=/`] : []) },
+  headers: { getSetCookie: () => (cookie ? [`PHPSESSID=${cookie}; path=/`, 'HN_userid=u1; path=/'] : []) },
   text: async () => (typeof body === 'string' ? body : JSON.stringify(body))
 });
 const mk = fetchImpl =>
   makeCookiePublisher({ baseUrl: 'https://demo.test', user: 'u', pass: 'p', cityid: 1, typeid: 2, fetchImpl });
-const isLogin = u => u.includes('action=loginCheck');
+const isLogin = u => u.includes('/loginCheck.html');
 
 test('登录成功取 Cookie 并发布,put 返回 aid 视为成功;凭据/Cookie 随表单传递', async () => {
   const reqs = [];
@@ -32,7 +33,7 @@ test('登录成功取 Cookie 并发布,put 返回 aid 视为成功;凭据/Cookie
   assert.strictEqual(await pub({ title: 'T', url: 'https://e.com/1', summary: 'S' }, 'k1'), 123);
   assert.ok(isLogin(reqs[0].u));
   const put = reqs[1];
-  assert.strictEqual(put.o.headers.Cookie, 'PHPSESSID=s1');
+  assert.strictEqual(put.o.headers.Cookie, 'PHPSESSID=s1; HN_userid=u1');
   const form = new URLSearchParams(put.o.body);
   assert.strictEqual(form.get('title'), 'T');
   assert.strictEqual(form.get('cityid'), '1');

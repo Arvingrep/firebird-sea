@@ -8,23 +8,30 @@ const TIMEOUT_MS = 15000;
 
 const EXPIRED_RE = /登录超时|登陆超时|重新登录|重新登陆/;
 
-function parseSessionCookie(res) {
+function parseCookieJar(res) {
   const raw = typeof res.headers.getSetCookie === 'function'
     ? res.headers.getSetCookie()
     : [res.headers.get && res.headers.get('set-cookie')].filter(Boolean);
-  const pairs = raw.map(c => String(c).split(';')[0].trim()).filter(c => c.startsWith('PHPSESSID='));
-  return pairs.length ? pairs[pairs.length - 1] : null;
+  const jar = new Map(); // 会话鉴权依赖 PHPSESSID + HN_userid/HN_login_user 等,整罐保存,同名后者覆盖
+  for (const c of raw) {
+    const pair = String(c).split(';')[0].trim();
+    const eq = pair.indexOf('=');
+    if (eq > 0) jar.set(pair.slice(0, eq), pair);
+  }
+  return jar.has('PHPSESSID') ? [...jar.values()].join('; ') : null;
 }
 
-/** 响应归类:ok(带 aid)/ authExpired / error(message) */
+/** 响应归类:ok(带 aid)/ authExpired / error(message);兼容裸返回与 ajax.php 包装({state:100,info:{aid}}) */
 function classifyPutResponse(body, text) {
   if (!body) {
     return /<html|<form|<!doctype/i.test(String(text)) ? { authExpired: true } : { error: 'portal returned non-JSON body' };
   }
-  const aid = Number(body.aid);
-  if (body.state === 100 || Number.isFinite(aid)) return { ok: true, aid: Number.isFinite(aid) ? aid : undefined };
-  if ((body.state === 101 || body.state === 200) && EXPIRED_RE.test(String(body.info || ''))) return { authExpired: true };
-  return { error: `portal rejected: state=${body.state} ${String(body.info || '').slice(0, 120)}` };
+  const aid = Number(body.aid != null ? body.aid : body.info && body.info.aid);
+  if (Number.isFinite(aid)) return { ok: true, aid };
+  if (body.state === 100) return { ok: true, aid: undefined };
+  const info = String((typeof body.info === 'string' && body.info) || '');
+  if ((body.state === 101 || body.state === 200) && EXPIRED_RE.test(info)) return { authExpired: true };
+  return { error: `portal rejected: state=${body.state} ${info.slice(0, 120)}` };
 }
 
 function makeCookiePublisher({ baseUrl, user, pass, cityid, typeid, fetchImpl = fetch, timeoutMs = TIMEOUT_MS }) {
@@ -51,12 +58,13 @@ function makeCookiePublisher({ baseUrl, user, pass, cityid, typeid, fetchImpl = 
   }
 
   async function login() {
-    const { res, body } = await post('/include/ajax.php?service=member&action=loginCheck', {
+    // 登录走页面路由 /loginCheck.html(ajax.php 的 member 服务无 loginCheck 方法,实测返回 action no found)
+    const { res, body } = await post('/loginCheck.html', {
       username: user, password: pass, platform: 'app'
     });
     if (!res.ok) throw new Error(`portal login HTTP ${res.status}`);
     if (!body || body.state !== 100) throw new Error(`portal login rejected: state=${body && body.state}`);
-    const c = parseSessionCookie(res);
+    const c = parseCookieJar(res);
     if (!c) throw new Error('portal login: no session cookie in response');
     cookie = c;
   }
@@ -98,4 +106,4 @@ function makeCookiePublisher({ baseUrl, user, pass, cityid, typeid, fetchImpl = 
   return publish;
 }
 
-module.exports = { makeCookiePublisher, classifyPutResponse, parseSessionCookie };
+module.exports = { makeCookiePublisher, classifyPutResponse, parseCookieJar };

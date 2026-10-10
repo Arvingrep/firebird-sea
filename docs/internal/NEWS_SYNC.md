@@ -9,8 +9,8 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 ## 门户契约与可靠性
 
 - **真实火鸟契约(Cookie 登录,`src/portal.js`,凭据齐备时自动启用)**:
-  1. 登录 `POST <origin>/include/ajax.php?service=member&action=loginCheck`(表单 `username/password/platform=app`),成功 `{state:100}` 并取 `Set-Cookie` 的 `PHPSESSID`(同源:`webroot/api/handlers/member.controller.php`)。
-  2. 发布 `POST <origin>/include/ajax.php?service=article&action=put`(表单 `cityid/typeid/mold=0/title/body/sourceurl`,body 内嵌 `<!-- dedupe:<key> -->`),成功返回含数字 `aid`(或 `state:100`);`state:200/101 + 登录超时` 或返回 HTML 登录页 → 自动重新登录一次再发,仍失败则抛错走告警;其它 `state!=100`(如「您还没有入驻自媒体」、101 入库错)为业务失败,不重登(同源:`webroot/api/handlers/article.class.php` `put()`)。
+  1. 登录 `POST <origin>/loginCheck.html`(表单 `username/password/platform=app`,ajax.php 的 member 服务无 loginCheck,实测返回 action no found),成功 `{state:100}`;鉴权 Cookie 须整罐保存(`PHPSESSID` + `HN_userid/HN_login_user` 等,仅 PHPSESSID 会被判登录超时)。
+  2. 发布 `POST <origin>/include/ajax.php?service=article&action=put`(表单 `cityid/typeid/mold=0/title/body/sourceurl`,body 内嵌 `<!-- dedupe:<key> -->`)。经 handlers 包装:成功 `{state:100,info:{aid,...}}`;业务失败/未登录统一 `{state:101,info:...}`,info 含「登录超时」或返回 HTML 登录页 → 自动重新登录一次再发,仍失败抛错走告警;其它 `state!=100`(如「您还没有入驻自媒体」「申请正在审核中」、入库错)为业务失败,不重登(同源:`webroot/api/handlers/{handlers,article}.class.php`、`member.controller.php`)。
   3. 下架 `action=del`(软删 `del=1`,仅作者本人,`state:100`),复验清理用(`publish.remove(id)`)。
   - 发布账号须为门户会员且已入驻自媒体(`#@__article_selfmedia` state=1),否则 put 被拒。
   - 凭据只从运行环境(env 文件)读入,任何日志/错误信息不输出凭据与 Cookie 值。
