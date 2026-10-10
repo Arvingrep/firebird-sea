@@ -43,7 +43,7 @@ async function pollTronGrid() {
       // 通知 API 服务核对与匹配
       // 若使用 mock 测试：
       /*
-      await axios.post(`${API_BASE_URL}/api/payment/chain-match`, {
+      await axios.post(`${API_BASE_URL}/tg-api/payment/chain-match`, {
         txHash: txId,
         amountUsdt: amount,
         fromAddress: tx.from,
