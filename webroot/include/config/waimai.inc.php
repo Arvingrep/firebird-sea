@@ -1,17 +1,17 @@
 <?php
-$customChannelName = '美食外卖';
-$customLogo = 0;
-$customLogoUrl = '';
-$customSharePic = '';
+$customChannelName = '菲鸟外卖';
+$customLogo = 1;
+$customLogoUrl = 'https://storage.googleapis.com/fbird-sea-uploads/siteConfig/logo/fbird_logo.png';
+$customSharePic = 'https://storage.googleapis.com/fbird-sea-uploads/siteConfig/logo/fbird_logo.png';
 $customSubDomain = 0;
 $customChannelSwitch = 0;
 $customMemberRefundswitch = 0;
 $customCloseCause = '0';
-$customSeoTitle = '美食外卖';
-$customSeoKeyword = '外卖关键词';
-$customSeoDescription = '火鸟门户外卖系统';
-$hotline_config = 0;
-$customHotline = '';
+$customSeoTitle = '菲鸟外卖 - 东南亚品质美食与即时配送';
+$customSeoKeyword = '菲鸟外卖,东南亚外卖,马尼拉外卖,宿务外卖,中餐外卖,品质美食,跑腿即配,fbird.men';
+$customSeoDescription = '菲鸟外卖是菲鸟生活旗下的专业本地生活即时配送平台，汇聚马尼拉及东南亚优质餐饮、特色中餐与商超便利，极速送达，为您提供省心便捷的用餐体验。';
+$hotline_config = 1;
+$customHotline = 'Telegram / WhatsApp 在线客服支持';
 $custom_map = '0';
 $custom_firstOrderType = 1;
 $custom_autoDispatchJuli = 7000;
