@@ -116,7 +116,7 @@ function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need 
     '## 完成时必须输出', '「逐条验收条件 → 对应文件 / 测试」清单；未满足的写明原因。不要声称跑过测试（你没有 Bash）。', '',
     '## 规格', specFile ? `- Story 规格：\`_bmad-output/implementation-artifacts/${specFile}\`` : '- 暂无独立规格文件，以本正文为准。',
     '- 全部 Story：`_bmad-output/planning-artifacts/epics.md`；架构：`ARCHITECTURE-SPINE.md`。',
-    '', '## 增量上限', `单次增量 ≤ 300 行（不含 docs/、_bmad-output/）；超出门禁直接打回。过大请只落地前几条验收条件，其余在 PR 说明里写明拆分建议，不要做范围扩张。${split}`,
+    '', '## 增量上限', `单次增量 ≤ 1200 行（不含 docs/、_bmad-output/）；超出门禁直接打回。过大请只落地前几条验收条件，其余在 PR 说明里写明拆分建议，不要做范围扩张。${split}`,
   ].filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n');
   return { title: `[story:${key}] Story ${s.id} ${s.title}`, body, labels: [...LABELS] };
 }

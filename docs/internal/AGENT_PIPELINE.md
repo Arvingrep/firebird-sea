@@ -43,7 +43,7 @@ sequenceDiagram
 | 需求入口 | `automation/n8n/workflows/tg_to_github_issues_project.json` | TG → Gemini 脱水 → Issue，自带 `agent:dev` |
 | 事件播报 | `automation/n8n/workflows/agent_pipeline_events_to_tg.json` | Webhook `POST /webhook/firebird-agent-event` → TG |
 | Dev Agent | `.github/workflows/agent-dev.yml` → `scripts/agent/dev.sh` | 默认 `claude -p`，限定工具集，不能改 `.github/`、`scripts/agent/` |
-| 确定性门禁 | `.github/workflows/ci-verify.yml` → `scripts/agent/gates.sh` | 只看分支 diff：非空、增量 ≤300、Docs-as-Code、Zero-Dep、密钥、调试残留、语法、Helm |
+| 确定性门禁 | `.github/workflows/ci-verify.yml` → `scripts/agent/gates.sh` | 只看分支 diff：非空、增量 ≤1200、Docs-as-Code、Zero-Dep、密钥、调试残留、语法、Helm |
 | QA Agent | `ci-verify.yml` job `agent-qa` → `scripts/agent/qa.sh` | 默认 `codex exec -s read-only`（与 Dev 不同厂商）；JSON 裁定，解析失败即打回 |
 | 构建 | `.github/workflows/ci-gke.yml` | push main → GAR `firebird-php/api:<sha>`；纯 docs/任务变更不构建 |
 | 发布 | homelab `platform/argocd-image-updater` + `apps/firebird-manila/application-gke.yaml` | Image Updater v1（CRD）追 40 位 SHA tag，write-back=argocd；Application 自动同步 |
@@ -98,7 +98,7 @@ n8n / GKE 侧：
 - 门禁拦截私钥 / 助记词 / TG Bot Token 进入 diff（RULES 资金安全禁区）。
 - **依赖批准清单**：Zero-Dep 门禁放行 `.agents/approved-deps.txt`（每行 `包名 版本串`，如 `mysql2 3.24.5`，`#` 起注释）中**名称与版本串都完全一致**的新增依赖。清单取自 **base 分支**，同一 PR 自己登记自己无效；清单在受保护路径 `.agents/`，只能 Arvin 提交。版本变化需重新登记。
 - **测试先行用例受保护**：`scripts/acceptance/` 对 Agent 分支同样受保护（dev.sh 丢弃改动、gates 判 FAIL），Agent 不能改写「验收标准」来让自己变绿，见 [TEST_FIRST.md](TEST_FIRST.md)。
-- `_bmad-output/`（BMAD 规划产物）与 `docs/`、`.agents/` 一样不计入 300 行增量。
+- `_bmad-output/`（BMAD 规划产物）与 `docs/`、`.agents/` 一样不计入 1200 行增量。
 - 门禁自测：`scripts/test-gates.sh`（临时仓库内验证批准清单 / 受保护路径 / 增量豁免）。
 
 ## 5b. BMAD Story 增强（dev.sh）

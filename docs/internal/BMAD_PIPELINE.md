@@ -7,7 +7,7 @@
 
 ```
 ① 任务质量   epics.md + sprint-status.yaml ─ scripts/bmad/story-to-issue.js ─▶ Issue「[story:<key>] Story N.M 标题」
-             正文：目标 / Given-When-Then / 相关 AD / 规则（含受保护路径）/ 测试先行 / 规格 / 增量上限 ≤300
+             正文：目标 / Given-When-Then / 相关 AD / 规则（含受保护路径）/ 测试先行 / 规格 / 增量上限 ≤1200
 ② Agent 实现 打 agent:dev → agent-dev.yml → dev.sh：按 [story:<key>] 注入规格；预检验收测试为红；
              Agent（无 Bash）实现 → 受保护路径丢弃 → 推 agent/issue-N → 开 PR（标题带 [story:<key>]）
 ③ 机器验证   ci-verify.yml：gates.sh（增量/Docs/Zero-Dep+批准清单/密钥/语法/Helm）
@@ -45,7 +45,7 @@ node --test scripts/bmad/*.test.js                  # 单测（Node 20 不能传
 | 建单退出 10/11 | 无输出 Issue | 看 stderr：等在途合并 / 补前序 Story / 先补测试先行用例 |
 | 预检发现验收测试已绿 | dev.sh 在 Issue 留言并 blocked | 说明用例无效或 Story 已满足：人工修用例或关 Issue |
 | Dev 空交付 / 连续 3 次被 QA 打回 | Issue 打 `agent:blocked` | 人工接手或拆小 Story |
-| Story 超过 300 行 | gates「增量」FAIL → QA 打回 | 拆 Story（改 epics.md 并同步 sprint-status）后重新建单 |
+| Story 超过 1200 行 | gates「增量」FAIL → QA 打回 | 拆 Story（改 epics.md 并同步 sprint-status）后重新建单 |
 | Story 需要新依赖 | Zero-Dep FAIL | Arvin 先在 `.agents/approved-deps.txt` 登记并合并，再放行 |
 | Story 需改受保护路径 | Agent 改动被丢弃 | 由 Arvin 提交 |
 | 回写 PR 未出现 | 合并后 sprint-status 仍旧 | 检查合并 PR 标题是否含 `[story:<key>]`、`AGENT_GH_TOKEN` 是否有效；或手动运行 sync 脚本并提交 |
@@ -53,7 +53,7 @@ node --test scripts/bmad/*.test.js                  # 单测（Node 20 不能传
 ## 4. 已知边界
 
 - **资金路径 Story（Epic 2、4.x）与破坏性路由迁移（1.3）、生产监听器（1.8）必须人工合并**；Agent 无 Bash，行为正确性靠测试先行用例 + CI 数据库集成测试兜底，仍不等于人审。
-- 300 行上限与 Story 粒度不匹配：约三分之一 Story 需先拆分。
+- 增量上限已由 300 放宽到 1200 行（2026-10-10，Arvin 决定）；Story 仍应小而完整。
 - sprint-status 中 1.3/1.4/1.5/2.1 的 `review` 指向尚未合入 main 的分支代码；依赖它们的 Story 先确认对应 PR 已合并。
 - spike（1.2）、含新依赖（1.5）的 Story 不适合 Agent，用 `--story` 跳过或人工完成。
 - 跨 Epic 依赖表与 AD 映射为启发式，需 Arvin 复核。

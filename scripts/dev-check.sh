@@ -26,7 +26,7 @@ fi
 # 2. 检查单次变更增量行数 (<200 行推荐)
 echo -n "  📏 [2/4] 代码增量脱水审计 (Diff Lines) ... "
 DIFF_LINES=$(git diff --shortstat 2>/dev/null | awk '{print $4}' || echo "0")
-if [ -n "$DIFF_LINES" ] && [ "$DIFF_LINES" -gt 300 ]; then
+if [ -n "$DIFF_LINES" ] && [ "$DIFF_LINES" -gt 1200 ]; then
     echo "⚠️ WARN (当前工作区增量代码达 ${DIFF_LINES} 行，超过 200 行建议上限，请检查是否存在过度封装)"
 else
     echo "✅ PASS (增量在极简控制区间内: ${DIFF_LINES:-0} 行)"
