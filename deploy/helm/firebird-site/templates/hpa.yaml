@@ -29,3 +29,27 @@ spec:
           type: Utilization
           averageUtilization: 80
 {{- end }}
+{{- if and .Values.split.enabled (.Values.autoscaling).enabled (not (include "firebird.rwoPvc" .)) }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: firebird-hpa-php-{{ .Values.siteId }}
+  labels:
+    app: firebird-php
+    site: {{ .Values.siteId }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: firebird-php-{{ .Values.siteId }}
+  minReplicas: {{ .Values.split.php.replicaCount | default .Values.replicaCount }}
+  maxReplicas: {{ mul (.Values.split.php.replicaCount | default .Values.replicaCount) 3 }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+{{- end }}

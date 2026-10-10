@@ -1,0 +1,19 @@
+{{- /* ③ 声明式配置变量：configVars 非空时渲染。包含 vars.txt 与应用脚本，entrypoint 在启动时施加 */ -}}
+{{- if include "firebird.hasConfigVars" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: firebird-config-vars-{{ .Values.siteId }}
+  labels:
+    app: firebird-site
+    site: {{ .Values.siteId }}
+data:
+  vars.txt: |
+    {{- range $file, $vars := .Values.configVars }}
+    {{- range $name, $val := $vars }}
+    {{ $file }} {{ $name }} {{ if kindIs "string" $val }}'{{ $val | replace "\\" "\\\\" | replace "'" "\\'" }}'{{ else if kindIs "bool" $val }}{{ if $val }}1{{ else }}0{{ end }}{{ else }}{{ $val }}{{ end }}
+    {{- end }}
+    {{- end }}
+  apply-vars.php: |
+{{ .Files.Get "files/apply-config-vars.php" | indent 4 }}
+{{- end }}

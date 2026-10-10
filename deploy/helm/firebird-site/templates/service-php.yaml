@@ -1,0 +1,36 @@
+{{- if .Values.split.enabled }}
+# ⑤ 拆分拓扑：nginx 经此 Service 以 FastCGI 直连 php-fpm
+apiVersion: v1
+kind: Service
+metadata:
+  name: firebird-php-{{ .Values.siteId }}
+  labels:
+    app: firebird-php
+    site: {{ .Values.siteId }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: fastcgi
+  selector:
+    app: firebird-php
+    site: {{ .Values.siteId }}
+---
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: firebird-pdb-php-{{ .Values.siteId }}
+  labels:
+    app: firebird-php
+    site: {{ .Values.siteId }}
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable | default 1 }}
+  selector:
+    matchLabels:
+      app: firebird-php
+      site: {{ .Values.siteId }}
+{{- end }}
+{{- end }}
