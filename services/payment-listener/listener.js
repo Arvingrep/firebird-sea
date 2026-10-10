@@ -11,7 +11,10 @@ require('dotenv').config({ path: '../../.env' });
 const axios = require('axios');
 const { parseTransferAmount } = require('./amount');
 
-const MASTER_ADDRESS = process.env.TRON_MASTER_RECEIVE_ADDRESS || 'TW4Q8tq6U1z3wWkEXAMPLETRONADDR9999';
+const MASTER_ADDRESS = process.env.TRON_MASTER_RECEIVE_ADDRESS;
+if (!MASTER_ADDRESS) {
+  throw new Error('TRON_MASTER_RECEIVE_ADDRESS is required');
+}
 const TRONGRID_API_KEY = process.env.TRONGRID_API_KEY;
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
 const USDT_TRC20_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';

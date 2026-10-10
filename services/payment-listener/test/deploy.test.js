@@ -46,3 +46,27 @@ test('AC2: 网关 /api/fbs 对外被拒绝（AD-19）', () => {
   assert.match(read(`${chart}/templates/middleware-deny-gateway.yaml`), /ipAllowList:\n\s+sourceRange:\n\s+- 127\.0\.0\.1\/32/);
   assert.match(read(`${chart}/values.yaml`), /denyGateway: true/);
 });
+
+// 渲染级断言：helm 不可用时跳过
+const { spawnSync } = require('node:child_process');
+const rendered = spawnSync('helm', ['template', 'x', path.join(ROOT, chart), '--set', 'paymentListener.enabled=true'], { encoding: 'utf8' });
+const renderOpts = { skip: rendered.status !== 0 && 'helm 不可用' };
+
+test('AC1/AC2: helm 渲染出 replicas=1、Recreate、secretKeyRef', renderOpts, () => {
+  const doc = rendered.stdout.split(/^---$/m).find((d) => /^  name: firebird-payment-listener/m.test(d) && /kind: Deployment/.test(d));
+  assert.ok(doc, '渲染结果应含 payment-listener Deployment');
+  assert.match(doc, /replicas: 1\n/);
+  assert.match(doc, /strategy:\n\s+type: Recreate/);
+  assert.match(doc, /secretKeyRef/);
+  assert.doesNotMatch(doc, /:latest/);
+});
+
+test('AC2: 渲染的 IngressRoute 含 /api/fbs 拒绝规则', renderOpts, () => {
+  assert.match(rendered.stdout, /PathPrefix\(`\/api\/fbs`\)/);
+  assert.match(rendered.stdout, /kind: Middleware/);
+});
+
+test('监听器缺少收款地址时启动即失败', () => {
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'services/payment-listener/listener.js')], { env: { PATH: process.env.PATH }, encoding: 'utf8' });
+  assert.notEqual(r.status, 0);
+});

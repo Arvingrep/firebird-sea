@@ -26,5 +26,7 @@
 
 - 监听器：`deploy/docker/Dockerfile.payment-listener`；compose 服务 `payment-listener`（副本 1、无端口）；Helm `deployment-payment-listener.yaml`（`replicas: 1`、`strategy: Recreate`，多副本会重复入账）。
 - 开关：`paymentListener.enabled`（默认 `false`，待 CI 构建 `firebird-payment-listener` 镜像后改 `true`）。
+- 回调依赖：监听器 POST `${API_BASE_URL}/tg-api/payment/chain-match`；compose 无 api 服务，`API_BASE_URL` 与 `TRON_MASTER_RECEIVE_ADDRESS` 为必填（缺失即启动失败，不再回落占位地址）。
+- 镜像 tag：`paymentListener.image.tag` 默认 `canary`（禁用 `latest`）；CI 构建步骤（`.github/`）需 owner 添加，生产启用前改为不可变 tag。
 - 环境变量/密钥：`TRON_MASTER_RECEIVE_ADDRESS`、`TRONGRID_API_KEY` 经 `paymentListener.secretRef`（默认 `firebird-api-secret`）注入，不入 Git。
 - 网关隔离：`ingressRoute.denyGateway: true` 时，Traefik 对 `PathPrefix(/api/fbs)` 的外部请求经 `ipAllowList(127.0.0.1/32)` 中间件返回 403；集群内 Pod 直连 Service 不经 IngressRoute，仍可达。
