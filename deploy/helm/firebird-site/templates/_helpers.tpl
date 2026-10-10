@@ -30,6 +30,14 @@
   value: "{{ .Values.redis.host }}"
 - name: REDIS_PORT
   value: "{{ .Values.redis.port | default 6379 }}"
+{{- if .Values.redis.passwordSecretRef }}
+- name: REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.redis.passwordSecretRef }}
+      key: {{ .Values.redis.passwordSecretKey | default "password" }}
+      optional: true
+{{- end }}
 {{- if .Values.configLock.enabled }}
 - name: CONFIG_LOCK
   value: "1"
