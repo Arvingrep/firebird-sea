@@ -94,6 +94,6 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 
 ## 后台域名与静态资源映射 (admin.* / prod-admin.*)
 - **协议保持**：Nginx 配置中开启 `absolute_redirect off;`，反向代理（Traefik/Cloudflare）下访问 `/` 302 重定向到 `/admin/` 时保持相对重定向，避免协议从 HTTPS 降级为 HTTP 引起浏览器拦截。
-- **静态资源同源与域名适配**：`common.inc.php` 处理后台域名（`admin.*` 或 `prod-admin.*`）时，自动优先匹配环境变量 `SITE_BASEHOST`（如 `manila.fbird.men`），避免错误截断为无公网 DNS 解析的裸根域名 `fbird.men` 导致前端样式/JS报 `ERR_NAME_NOT_RESOLVED`。
+- **静态资源同源与域名适配**：`common.inc.php` 保持同源动态绑定（直接采用当前访问主机的 `HTTP_HOST`），避免后台页面将静态资源跨域请求到未解析或未在 Ingress 监听的子域名（如 `prod.fbird.men`），彻底杜绝浏览器 CORB (Cross-Origin Read Blocking) 与 404 拦截。
 - **分类空指针防守**：`shop.class.php` 在 PHP 7.1+ 环境遍历未配置二级分类的商品类型时增加 `is_array` 保护，防止 Fatal 错误。
 - **生产后台专属域名**：Manila 生产环境后台专属域名收敛为 `prod-admin.fbird.men`。
