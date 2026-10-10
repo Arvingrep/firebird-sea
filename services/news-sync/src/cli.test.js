@@ -60,5 +60,12 @@ test('AC2 响应体持续不结束:超时后失败,可进入重试', async () =>
     json: () => new Promise((_, rej) => opts.signal.addEventListener('abort', () => rej(new Error('aborted'))))
   });
   const pub = makePublisher({ url: 'https://p/x', fetchImpl, timeoutMs: 20 });
-  await assert.rejects(() => pub({ title: 'A', url: 'https://example.com/a' }, 'k'), /aborted/);
+  // AbortSignal.timeout 的内部定时器是 unref 的:Node 20 下若事件循环空转会先退出,abort 永不触发,
+  // 测试被 cancelledByParent;用一个 ref 的定时器把事件循环保持到断言完成。
+  const keepAlive = setTimeout(() => {}, 5000);
+  try {
+    await assert.rejects(() => pub({ title: 'A', url: 'https://example.com/a' }, 'k'), /aborted/);
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
