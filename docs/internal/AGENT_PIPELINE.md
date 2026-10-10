@@ -101,12 +101,6 @@ n8n / GKE 侧：
 - `_bmad-output/`（BMAD 规划产物）与 `docs/`、`.agents/` 一样不计入 300 行增量。
 - 门禁自测：`scripts/test-gates.sh`（临时仓库内验证批准清单 / 受保护路径 / 增量豁免）。
 
-## 5c. 机器验证与回写（ci-verify / writeback）
-
-- `ci-verify.yml` 三个 job：`gates`（确定性门禁 + Helm 渲染 + Story 验收用例）、`verify-task`（`CI=true scripts/verify-task.sh`：流程脚本自测 + `services/api` 单测 + `scripts/test-api-db.sh` 数据库集成测试；ubuntu runner 自带 docker，脚本内另补 PATH 并在缺 docker 时明确失败）、`agent-qa`。QA 的 `GATES_JOB_RESULT` = gates 与 verify-task 都为 success 才算 success，**qa.sh 无需改动**。
-- `services/api` 与 `scripts/test-api-db.sh` 入库前，verify-task 的 6、7 步自动跳过。
-- `bmad-sprint-writeback.yml`：agent PR 合并且标题含 `[story:<key>]` → 开 `bmad/sprint-done-<N-M>-pr<PR>` 分支与 PR，仅改 `sprint-status.yaml`（不直推 main）；回写 PR 由人合并。标题经 env 传入，不拼进脚本。
-
 ## 5b. BMAD Story 增强（dev.sh）
 
 Issue 标题含 `[story:<key>]`（或正文 `<!-- bmad-story: KEY -->`）时，dev.sh 额外：
@@ -115,6 +109,12 @@ Issue 标题含 `[story:<key>]`（或正文 `<!-- bmad-story: KEY -->`）时，d
 3. 要求 Agent 结束时输出「验收清单」（逐条 AC → 文件/测试 → 已满足/未满足），并随 PR 正文的「Dev Agent 自述」发布（Story 取末 80 行）；
 4. `scripts/acceptance/` 与 `.github/`、`scripts/agent/`、`.agents/` 一样，施工后强制还原。
 无标记的普通 Issue 行为不变。详见 [TEST_FIRST.md](TEST_FIRST.md)。
+
+## 5c. 机器验证与回写（ci-verify / writeback）
+
+- `ci-verify.yml` 三个 job：`gates`（确定性门禁 + Helm 渲染 + Story 验收用例）、`verify-task`（`CI=true scripts/verify-task.sh`：流程脚本自测 + `services/api` 单测 + `scripts/test-api-db.sh` 数据库集成测试；ubuntu runner 自带 docker，脚本内另补 PATH 并在缺 docker 时明确失败）、`agent-qa`。QA 的 `GATES_JOB_RESULT` = gates 与 verify-task 都为 success 才算 success，**qa.sh 无需改动**。
+- `services/api` 与 `scripts/test-api-db.sh` 入库前，verify-task 的 6、7 步自动跳过。
+- `bmad-sprint-writeback.yml`：agent PR 合并且标题含 `[story:<key>]` → 开 `bmad/sprint-done-<N-M>-pr<PR>` 分支与 PR，仅改 `sprint-status.yaml`（不直推 main）；回写 PR 由人合并。标题经 env 传入，不拼进脚本。
 
 ## 6. 运维
 
