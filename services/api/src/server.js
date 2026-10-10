@@ -8,6 +8,8 @@ const {
   confirmChargePaid 
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
+const { createCheckout, coinsRateSource, CheckoutError } = require('./checkout');
+const { cliConn } = require('./migrate');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 
 assertProductionConfig();
@@ -139,6 +141,27 @@ router.post('/payment/create-charge', (req, res) => {
     success: true,
     data: charge
   });
+});
+
+// 4b. 收银台：汇率快照 + 尾数分配（Story 2.1，落库 fbs_charge）
+router.post('/checkout', async (req, res) => {
+  const { ordernum, phpCentavos, idempotencyKey } = req.body || {};
+  try {
+    const data = await createCheckout(cliConn(), {
+      ordernum,
+      phpCentavos,
+      idempotencyKey: idempotencyKey || null,
+      getRate: coinsRateSource(coinsClient),
+      address: process.env.TRON_MASTER_RECEIVE_ADDRESS || '',
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    if (!(err instanceof CheckoutError)) {
+      return res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'checkout failed' } });
+    }
+    const status = err.code === 'BAD_REQUEST' ? 400 : err.code === 'ORDER_EXISTS' ? 409 : 503;
+    res.status(status).json({ success: false, error: { code: err.code, message: err.message } });
+  }
 });
 
 // 5. 轮询支付状态
