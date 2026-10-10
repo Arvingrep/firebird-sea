@@ -53,7 +53,8 @@ JUNK="$(printf '%s\n' "$CHANGED" | grep -E '(\.bak|\.tmp|\.orig|/test_[^/]*\.php
 #    批准记录：base 分支上的 .agents/approved-deps.txt（每行「包名 版本串」，版本须与 package.json 完全一致）。
 #    取自 base 而非 PR：同一 PR 里自己登记自己无效，须先由 Arvin 单独合并批准记录。
 NEWDEP="$(git diff "$RANGE" -- '**/package.json' 'package.json' '**/composer.json' \
-          | grep -E '^\+[[:space:]]*"[@a-zA-Z0-9_./-]+"[[:space:]]*:[[:space:]]*"[~^0-9*]' || true)"
+          | grep -E '^\+[[:space:]]*"[@a-zA-Z0-9_./-]+"[[:space:]]*:[[:space:]]*"[~^0-9*]' \
+          | grep -vE '^\+[[:space:]]*"version"[[:space:]]*:' || true)"  # 包自身 version 字段不是依赖
 APPROVED="$(git show "${BASE}:.agents/approved-deps.txt" 2>/dev/null | sed -E 's/#.*//; s/[[:space:]]+/ /g; s/^ //; s/ $//' | grep -v '^$' || true)"
 if [ -n "$NEWDEP" ] && [ -n "$APPROVED" ]; then
   REST=""

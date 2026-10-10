@@ -20,6 +20,8 @@ reset; pj '    "mysql2": "3.99.0"'; git commit -qam d
 case_ "已登记名称但版本不同 → FAIL" 1 0
 reset; pj '    "lodash": "^4.0.0"'; git commit -qam d
 case_ "未登记依赖 → FAIL" 1 0
+reset; mkdir -p svc; printf '{\n  "name": "svc",\n  "version": "1.0.0"\n}\n' > svc/package.json; git add -A; git commit -qm v
+case_ "新包自身 version 字段不算依赖 → 放行" 0 0
 reset; pj '    "lodash": "^4.0.0"'; echo 'lodash ^4.0.0' >> .agents/approved-deps.txt; git commit -qam d
 case_ "同一 PR 自行登记无效 → FAIL" 1 0
 reset; mkdir -p scripts/acceptance; echo ':' > scripts/acceptance/story-1-1.sh; git add -A; git commit -qm t
