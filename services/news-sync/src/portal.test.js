@@ -40,6 +40,19 @@ test('登录成功取 Cookie 并发布,put 返回 aid 视为成功;凭据/Cookie
   assert.ok(form.get('body').includes('dedupe:k1'));
 });
 
+test('超长标题按门户列宽截到 60 字符(STRICT 模式),完整标题保留在正文', async () => {
+  let form;
+  const pub = mk(async (u, o) => {
+    if (isLogin(u)) return resp(FX.loginOk, { cookie: 's' });
+    form = new URLSearchParams(o.body);
+    return resp(FX.putOk);
+  });
+  const longTitle = 'A'.repeat(75);
+  await pub({ title: longTitle, url: 'https://e.com/long' }, 'k');
+  assert.strictEqual(form.get('title').length, 60);
+  assert.ok(form.get('body').includes(longTitle));
+});
+
 test('Cookie 过期(state:200 登录超时)自动重登一次后成功', async () => {
   let puts = 0;
   const pub = mk(async u => (isLogin(u) ? resp(FX.loginOk, { cookie: `s${puts}` }) : resp(++puts === 1 ? FX.putExpired : FX.putOk)));

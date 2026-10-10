@@ -71,10 +71,11 @@ function makeCookiePublisher({ baseUrl, user, pass, cityid, typeid, fetchImpl = 
 
   async function putOnce(item, key) {
     const summary = item.summary || item.title;
+    // 门户 STRICT 模式列宽:title char(60)、sourceurl char(200),超长入库报 101;完整标题保留在正文首段
     const { res, body, text } = await post('/include/ajax.php?service=article&action=put', {
-      cityid, typeid, mold: 0, title: item.title,
-      body: `<p>${summary}</p><p>来源:<a href="${item.url}">${item.url}</a></p><!-- dedupe:${key} -->`,
-      sourceurl: item.url
+      cityid, typeid, mold: 0, title: [...item.title].slice(0, 60).join(''),
+      body: `<p><strong>${item.title}</strong></p><p>${summary}</p><p>来源:<a href="${item.url}">${item.url}</a></p><!-- dedupe:${key} -->`,
+      sourceurl: [...item.url].slice(0, 200).join('')
     }, true);
     if (!res.ok) throw new Error(`portal HTTP ${res.status}`);
     return classifyPutResponse(body, text);
