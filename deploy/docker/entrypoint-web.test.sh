@@ -18,7 +18,10 @@ reset() {
   printf '<?php\r\n$custom_fencheng_foodprice = 18;\r\n$custom_fencheng_delivery = 89;\r\n$customCloseCause = '"'"'0'"'"';\r\n' > $W/include/config/waimai.inc.php
   printf '<?php\n$cfg_basehost = '"'"'x'"'"';\n' > $W/include/config/siteConfig.inc.php
   cp "$REPO/deploy/helm/firebird-site/files/apply-config-vars.php" /etc/firebird-config-vars/apply-vars.php
+  chown -R www-data:www-data $W   # 与镜像 COPY --chown 一致
 }
+www_can_write() { su -s /bin/sh www-data -c "[ -w '$1' ]" 2>/dev/null; }
+www_can_create() { su -s /bin/sh www-data -c "touch '$1/.probe' 2>/dev/null && rm -f '$1/.probe'" 2>/dev/null; }
 run_entry() { sh "$REPO/deploy/docker/entrypoint-web.sh" true >/tmp/entry.log 2>&1; }
 
 echo "# 1. 变量覆盖：存在则原位替换(保留 CRLF)、缺失则追加"
@@ -80,6 +83,25 @@ hasnt "无 cfg_memory" 'cfg_memory' $W/include/dbinfo.inc.php
 
 echo "# 7. 缺 redis 扩展时告警而不是静默"
 has "WARN 输出" '缺少 redis 扩展' /tmp/entry.log
+
+echo "# 8. GitOps 配置锁：开启后 www-data 不能写/新建配置"
+reset
+DB_HOST=db DB_NAME=n DB_USER=u DB_PASS=p run_entry
+www_can_write $W/include/config/waimai.inc.php && ok "未开启锁：可写" || bad "未开启锁：可写"
+reset
+DB_HOST=db DB_NAME=n DB_USER=u DB_PASS=p CONFIG_LOCK=1 run_entry
+www_can_write $W/include/config/waimai.inc.php  && bad "配置文件只读" || ok "配置文件只读"
+www_can_write $W/include/config/siteConfig.inc.php && bad "siteConfig 只读" || ok "siteConfig 只读"
+www_can_write $W/include/dbinfo.inc.php && bad "dbinfo 只读" || ok "dbinfo 只读"
+www_can_create $W/include/config && bad "目录不可新建" || ok "目录不可新建"
+has "锁定提示" '已锁定' /tmp/entry.log
+echo "# 9. 锁定在 configVars / 兜底之后：值已施加再上锁；writable 例外保持可写"
+reset
+printf 'waimai.inc.php custom_fencheng_foodprice 0\n' > /etc/firebird-config-vars/vars.txt
+DB_HOST=db DB_NAME=n DB_USER=u DB_PASS=p CONFIG_LOCK=1 CONFIG_LOCK_WRITABLE="siteConfig.inc.php" run_entry
+has "锁定前已施加 configVars" '$custom_fencheng_foodprice = 0;' $W/include/config/waimai.inc.php
+www_can_write $W/include/config/waimai.inc.php && bad "waimai 已锁" || ok "waimai 已锁"
+www_can_write $W/include/config/siteConfig.inc.php && ok "writable 例外可写" || bad "writable 例外可写"
 
 echo
 echo "pass=$pass fail=$fail"

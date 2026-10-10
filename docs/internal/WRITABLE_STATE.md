@@ -53,8 +53,19 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 
 **拆分不解决缓存与配置一致性**：二者是 php 进程的本地状态，与 nginx 是否同 Pod 无关；由 ①（陈旧有界）与 ③（声明式）处理。
 
+### GitOps 配置锁（`configLock`，后台配置只读）
+目标：**配置真源只在 Git，后台页面不能改，要改找管理员走变更。**
+
+- **真源**：镜像里的 `include/config/*.inc.php`（来自本仓库）+ `configVars`（键级覆盖）+ `configOverrides`（整文件覆盖）。发布时 ConfigMap 内容备份到 GCS（`configBackup`）。
+- **强制**：`CONFIG_LOCK=1` 时 entrypoint 在所有配置生成/注入之后，把 `include/config/*` 与 `dbinfo.inc.php` 置为 `root:root 0644`，目录 `0755`。php-fpm 以 www-data 运行，无法写入、重命名、新建。`configLock.writable` 里的文件名例外。
+- **提示**：后台 48 个"保存配置"入口（30 个模块 `*Config.php` + 18 个站点级）写失败时统一输出 `写入文件 … 失败，请检查权限！`（`json_encode`，非 ASCII 被转义为 `\uXXXX`）。nginx 只在 `/admin/` 的 PHP 响应上用 `sub_filter` 把它替换为"该配置由 GitOps 管理，不能在后台直接修改，请联系管理员通过 Git 提交变更并发布"，原文与转义两种形态都处理；成功响应不受影响。已用真实 nginx 验证。
+- **变更流程**：改 `values*.yaml` 的 `configVars` / `configOverrides`（或仓库里的配置文件）→ PR → CI → ArgoCD 同步 → 所有副本一致，且 GCS 留有当次生效内容。
+- **只读之外的坑**：`admin/siteConfig/elasticSearch.php` 写失败时不报错（厂商代码），页面会显示成功但并未保存；`/admin/` 之外的入口（若有）会看到原始的"请检查权限"提示。
+- **回滚**：`configLock.enabled: false` 并发布即可恢复可写。
+- 不在锁内的写入：`data/cache`、`templates_c`、`log` 等运行期可再生目录。
+
 ### 未解决 / 已知限制
-- **后台保存的键不会实时同步到其他副本**。`configVars` 声明的键在每次 Pod 启动时被施加，但后台保存会整文件重写，保存后到下次重启前该 Pod 上的值可能与 Git 不一致；未在 `configVars` 声明的键（站点名称、Logo、SEO 等）仍然是每 Pod 各一份、重启即丢。要真正解决需 RWX 配置卷或"回写 ConfigMap"的 sidecar，本期未做。
+- **（未开启 `configLock` 时）后台保存的键不会实时同步到其他副本**；开启 `configLock` 后后台不再可改，该问题转化为"变更必须走 Git"。`configVars` 声明的键在每次 Pod 启动时被施加，但后台保存会整文件重写，保存后到下次重启前该 Pod 上的值可能与 Git 不一致；未在 `configVars` 声明的键（站点名称、Logo、SEO 等）仍然是每 Pod 各一份、重启即丢。要真正解决需 RWX 配置卷或"回写 ConfigMap"的 sidecar，本期未做。
 - 在此之前多副本下**后台改配置只会落到随机一个 Pod**：建议生产保持单副本（`replicaCount: 1`、`autoscaling.enabled: false`），或只把后台域名 `admin.*` 指向固定 Pod。
 - `FileDataCache` 的清扫是"有界陈旧"，不是失效通知：后台改了支付/域名/模块等配置，最多 5 分钟后其他副本才可见。
 - 配置备份依赖备份桶的写权限；`failOnError: false` 时失败只打日志。该 S3 兼容签名路径**未在真实 GCS 上验证**（仅验证了脚本与模板渲染）。
