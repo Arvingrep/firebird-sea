@@ -15,13 +15,19 @@ self_copy qa.sh "$@"
 cd "$ROOT_DIR"
 
 PR="${1:?用法: qa.sh <pr-number>}"
+AUTO_MERGE="${AGENT_AUTO_MERGE:-1}"
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
-  QA_CMD=(codex exec -s read-only --skip-git-repo-check -o)
+  # 优先 codex 做独立红队，若 codex 不可用或额度耗尽则回退到 claude
+  if command -v codex >/dev/null 2>&1 && ! codex exec -s read-only --skip-git-repo-check "reply OK" 2>&1 | grep -qiE "usage limit|error"; then
+    QA_CMD=(codex exec -s read-only --skip-git-repo-check -o "$TMP/verdict.txt" -)
+  else
+    QA_CMD=(claude -p --max-turns 10 -)
+  fi
 fi
-AUTO_MERGE="${AGENT_AUTO_MERGE:-1}"
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 ensure_labels
 gh api "repos/${REPO}/pulls/${PR}" --jq '{headRefName: .head.ref, headRefOid: .head.sha, body: .body, title: .title, isCrossRepository: (.head.repo.full_name != .base.repo.full_name)}' > "$TMP/pr.json" 2>/dev/null \
@@ -75,8 +81,12 @@ DIFF_BYTES="$(wc -c < "$TMP/diff.patch" | tr -d ' ')"
 } > "$TMP/prompt.md"
 
 log "🛡️ 调用 QA Agent: ${QA_CMD[0]}"
-agent_env "${QA_CMD[@]}" "$TMP/verdict.txt" - < "$TMP/prompt.md" > "$TMP/qa.log" 2>&1 || log "⚠️ QA Agent 非 0 退出"
-[ -s "$TMP/verdict.txt" ] || tail -n 40 "$TMP/qa.log" > "$TMP/verdict.txt"
+if [ "${QA_CMD[0]}" = "codex" ]; then
+  agent_env "${QA_CMD[@]}" < "$TMP/prompt.md" > "$TMP/qa.log" 2>&1 || log "⚠️ QA Agent 非 0 退出"
+  [ -s "$TMP/verdict.txt" ] || tail -n 40 "$TMP/qa.log" > "$TMP/verdict.txt"
+else
+  agent_env "${QA_CMD[@]}" < "$TMP/prompt.md" > "$TMP/verdict.txt" 2> "$TMP/qa.log" || log "⚠️ QA Agent 非 0 退出"
+fi
 
 # 3. 解析裁定（解析失败 => fail-closed 判 REJECTED）
 node - "$TMP/verdict.txt" "$GATE_RC" > "$TMP/result.md" <<'JS'
