@@ -2,62 +2,65 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawn } = require('node:child_process');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
-
-function splitStatements(sql) {
-  return sql
-    .split('\n')
-    .filter((line) => !line.trim().startsWith('--'))
-    .join('\n')
-    .split(';')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
+const RECORD_TABLE_SQL =
+  'CREATE TABLE IF NOT EXISTS fbs_migrations (name VARCHAR(128) NOT NULL PRIMARY KEY, ' +
+  'applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4';
 
 function loadMigrations(dir = MIGRATIONS_DIR) {
   return fs
     .readdirSync(dir)
-    .filter((f) => f.endsWith('.sql'))
+    .filter((f) => /^\d+_.*\.sql$/.test(f))
     .sort()
-    .map((f) => ({ name: f, statements: splitStatements(fs.readFileSync(path.join(dir, f), 'utf8')) }));
+    .map((f) => ({ name: f, sql: fs.readFileSync(path.join(dir, f), 'utf8') }));
 }
 
-// conn: 任何带 query(sql) 的对象（mysql2/promise 连接或测试替身）。
-// 所有语句均为 CREATE TABLE IF NOT EXISTS，重复执行不报错、不改动已有数据。
+// conn: 任何带 query(sql) 的对象，返回客户端 stdout 文本（每行一条记录）。
+// 每个迁移文件按文件名只执行一次（记录在 fbs_migrations）；文件内 DDL 亦为 IF NOT EXISTS。
 async function migrate(conn, dir) {
-  let count = 0;
+  await conn.query(RECORD_TABLE_SQL);
+  const out = await conn.query('SELECT name FROM fbs_migrations');
+  const applied = new Set(String(out || '').split('\n').map((s) => s.trim()).filter(Boolean));
+  const ran = [];
   for (const m of loadMigrations(dir)) {
-    for (const stmt of m.statements) {
-      await conn.query(stmt);
-      count += 1;
-    }
+    if (applied.has(m.name)) continue;
+    await conn.query(m.sql);
+    await conn.query(`INSERT INTO fbs_migrations (name) VALUES ('${m.name.replace(/'/g, "''")}')`);
+    ran.push(m.name);
   }
-  return count;
+  return ran;
 }
 
-async function main() {
-  // mysql2 待 Zero-Dep 人工批准（见 docs/internal/DB_MIGRATIONS.md），仅在 CLI 运行时加载
-  const mysql = require('mysql2/promise');
-  const conn = await mysql.createConnection({
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-  });
-  try {
-    await migrate(conn);
-  } finally {
-    await conn.end();
-  }
+// 零依赖：通过 mariadb/mysql 命令行客户端执行 SQL（stdin 传入，密码走 MYSQL_PWD 环境变量）。
+function cliConn(env = process.env) {
+  const bin = env.DB_CLIENT || 'mariadb';
+  const args = ['-h', env.DB_HOST, '-P', String(env.DB_PORT || 3306), '-u', env.DB_USER, '-N', '-B', env.DB_NAME];
+  return {
+    query(sql) {
+      return new Promise((resolve, reject) => {
+        const child = spawn(bin, args, { env: { ...env, MYSQL_PWD: env.DB_PASSWORD || '' } });
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (d) => { stdout += d; });
+        child.stderr.on('data', (d) => { stderr += d; });
+        child.on('error', reject);
+        child.on('close', (code) => (code === 0 ? resolve(stdout) : reject(new Error(stderr.trim() || `exit ${code}`))));
+        child.stdin.end(sql);
+      });
+    },
+  };
 }
 
 if (require.main === module) {
-  main().catch((err) => {
-    process.stderr.write(`migrate failed: ${err.message}\n`);
-    process.exit(1);
-  });
+  migrate(cliConn()).then(
+    (ran) => process.stdout.write(`migrated: ${ran.length ? ran.join(', ') : 'nothing to do'}\n`),
+    (err) => {
+      process.stderr.write(`migrate failed: ${err.message}\n`);
+      process.exit(1);
+    },
+  );
 }
 
-module.exports = { splitStatements, loadMigrations, migrate };
+module.exports = { loadMigrations, migrate, cliConn };
