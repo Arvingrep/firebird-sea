@@ -51,6 +51,14 @@ if [ ! -f /var/www/html/huoniao.so ] && [ -f /usr/local/lib/php/extensions/no-de
     chown www-data:www-data /var/www/html/huoniao.so 2>/dev/null || true
 fi
 
+# AD-17: 配置了 REDIS_HOST 且镜像带 redis 扩展时，PHP 会话存入 Redis（Pod 重启/多副本不丢登录态）
+if [ -n "$REDIS_HOST" ] && php -m 2>/dev/null | grep -qi '^redis$'; then
+    {
+        echo 'session.save_handler = redis'
+        echo "session.save_path = \"tcp://${REDIS_HOST}:${REDIS_PORT:-6379}\""
+    } > /usr/local/etc/php/conf.d/zz-session-redis.ini
+fi
+
 # 确保目录与缓存写权限
 mkdir -p /var/www/html/data/cache /var/www/html/data/templates_c 2>/dev/null || true
 chown -R www-data:www-data /var/www/html/data 2>/dev/null || true

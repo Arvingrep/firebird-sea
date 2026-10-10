@@ -16,3 +16,23 @@ spec:
     requests:
       storage: {{ .Values.persistence.size | default "0.1Gi" }}
 {{- end }}
+{{- if .Values.uploads.enabled }}
+---
+# AD-17: 商家上传的菜品图片/附件（/var/www/html/uploads），独立于配置 PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: firebird-uploads-{{ .Values.siteId }}
+  labels:
+    app: firebird-site
+    site: {{ .Values.siteId }}
+spec:
+  accessModes:
+    - {{ .Values.uploads.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.uploads.storageClass }}
+  storageClassName: {{ .Values.uploads.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.uploads.size | default "10Gi" }}
+{{- end }}
