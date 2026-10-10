@@ -18,3 +18,11 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 
 ## 测试
 `services/api/test/writable-state.test.js`（静态断言 Helm 模板、入口脚本与基础镜像）。
+
+## 计划任务 CronJob（AD-18，Story 1.7）
+
+`deploy/helm/firebird-site/templates/cronjob.yaml` 渲染 `fbs-cron-<site>`：每分钟（`* * * * *`）在与 php-fpm 相同的 PHP 镜像中执行 `php include/cron.php`，环境变量与 php-fpm 容器一致。
+
+- `concurrencyPolicy: Forbid`：上一次未结束则跳过本周期，不并发重叠；`activeDeadlineSeconds: 55` 防止单次运行拖过一个周期；`restartPolicy: Never`、`backoffLimit: 0`（下一分钟自然重试）。
+- CronJob Pod 不挂载 config/uploads PVC（RWO 卷会与站点 Pod 争抢挂载），使用镜像基线配置 + 环境变量。
+- 运行态 AC（30 分钟未支付订单 → state 6）需人工在集群验收：`kubectl get cronjob,job -l app=firebird-cron` 与订单状态。

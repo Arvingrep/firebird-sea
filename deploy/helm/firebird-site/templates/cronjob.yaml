@@ -1,0 +1,75 @@
+# AD-18: 火鸟计划任务（订单超时、自动派单、超时提醒）由集群 CronJob 每分钟触发
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: fbs-cron-{{ .Values.siteId }}
+  labels:
+    app: firebird-cron
+    site: {{ .Values.siteId }}
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid     # 上一次未结束则跳过本周期，不并发重叠
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 55
+      template:
+        metadata:
+          labels:
+            app: firebird-cron
+            site: {{ .Values.siteId }}
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: cron
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              workingDir: /var/www/html
+              command: ["php", "include/cron.php"]
+              env:
+                - name: DB_HOST
+                  value: "{{ .Values.database.host }}"
+                - name: DB_NAME
+                  value: "{{ .Values.database.name }}"
+                - name: DB_USER
+                  value: "{{ .Values.database.user | default "firebird_user" }}"
+                {{- if .Values.database.passwordSecretRef }}
+                - name: DB_PASS
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.database.passwordSecretRef }}
+                      key: {{ .Values.database.passwordSecretKey | default "password" }}
+                {{- else if .Values.database.password }}
+                - name: DB_PASS
+                  value: "{{ .Values.database.password }}"
+                {{- end }}
+                - name: REDIS_HOST
+                  value: "{{ .Values.redis.host }}"
+                - name: REDIS_PORT
+                  value: "{{ .Values.redis.port | default 6379 }}"
+                - name: DEFAULT_CURRENCY
+                  value: "{{ .Values.localization.defaultCurrency }}"
+                - name: SITE_ID
+                  value: "{{ .Values.siteId }}"
+                - name: SITE_BASEHOST
+                  value: "{{ .Values.domain | default "fbird.men" }}"
+                - name: GCS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: firebird-storage-secret
+                      key: gcs-key-id
+                      optional: true
+                - name: GCS_KEY_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: firebird-storage-secret
+                      key: gcs-key-secret
+                      optional: true
+                - name: RESEND_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: firebird-storage-secret
+                      key: resend-key
+                      optional: true
