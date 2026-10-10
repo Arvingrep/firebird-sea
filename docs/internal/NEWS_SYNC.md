@@ -12,7 +12,7 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
   1. 登录 `POST <origin>/loginCheck.html`(表单 `username/password/platform=app`,ajax.php 的 member 服务无 loginCheck,实测返回 action no found),成功 `{state:100}`;鉴权 Cookie 须整罐保存(`PHPSESSID` + `HN_userid/HN_login_user` 等,仅 PHPSESSID 会被判登录超时)。
   2. 发布 `POST <origin>/include/ajax.php?service=article&action=put`(表单 `cityid/typeid/mold=0/title/body/sourceurl`,body 内嵌 `<!-- dedupe:<key> -->`)。经 handlers 包装:成功 `{state:100,info:{aid,...}}`;业务失败/未登录统一 `{state:101,info:...}`,info 含「登录超时」或返回 HTML 登录页 → 自动重新登录一次再发,仍失败抛错走告警;其它 `state!=100`(如「您还没有入驻自媒体」「申请正在审核中」、入库错)为业务失败,不重登(同源:`webroot/api/handlers/{handlers,article}.class.php`、`member.controller.php`)。
   3. 下架 `action=del`(软删 `del=1`,仅作者本人,`state:100`),复验清理用(`publish.remove(id)`)。
-  - 发布账号须为门户会员且已入驻自媒体(`#@__article_selfmedia` state=1),否则 put 被拒。
+  - 发布时 title 截 60 字符、sourceurl 截 200(门户 char 列+STRICT 模式,超长报 101),完整标题在正文首段。发布账号须为门户会员且已入驻自媒体(`#@__article_selfmedia` state=1),否则 put 被拒。
   - 凭据只从运行环境(env 文件)读入,任何日志/错误信息不输出凭据与 Cookie 值。
 - 旧 Bearer 契约(`src/io.js makePublisher`,未配 USER/PASS 时回退):`POST NEWS_PORTAL_PUBLISH_URL`,头 `Idempotency-Key`,响应须 HTTP 2xx 且 `{ "success": true }`。门户无 Bearer 端点,此路径仅供 mock/演练。
 - 去重文件 tmp + rename 原子写;文件不存在视为空,损坏/无权限则整轮报错退出(不会误当空集合重复发布)。
