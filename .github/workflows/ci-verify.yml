@@ -29,6 +29,15 @@ jobs:
           scripts/agent/gates.sh "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Helm 多站点模板合成
         run: ./scripts/test-helm.sh
+      # 测试先行：仅当 PR 标题含 [story:<key>] 时运行该 Story 预置的验收用例（必须绿）。
+      # 非 Story PR 一律跳过，main 上「待实现（红）」的用例不会拖累其他 PR。
+      - name: Story 验收用例（测试先行）
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}   # 经 env 传入，避免标题注入 shell
+          GATE_REQUIRE_TOOLS: "1"
+        run: |
+          set -o pipefail
+          scripts/acceptance/run.sh --title "$PR_TITLE" | tee -a "$GITHUB_STEP_SUMMARY"
 
   agent-qa:
     name: 🛡️ 独立 QA Agent
