@@ -1,4 +1,4 @@
-.PHONY: gates agent-dev agent-qa agent-runner help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes test-mcp
+.PHONY: bmad-next gates agent-dev agent-qa agent-runner help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes test-mcp
 
 help:
 	@echo "=========================================================="
@@ -129,3 +129,6 @@ hermes:
 test-mcp:
 	@chmod +x scripts/mcp-acceptance-test.js
 	@node scripts/mcp-acceptance-test.js
+
+bmad-next: ## BMAD：预览下一个可开工 Story 的 Issue（dry-run，不建单）
+	@node scripts/bmad/story-to-issue.js $(ARGS)
