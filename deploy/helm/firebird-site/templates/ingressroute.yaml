@@ -12,6 +12,16 @@ spec:
     - {{ . }}
     {{- end }}
   routes:
+    {{- if .Values.ingressRoute.denyGateway }}
+    - kind: Rule
+      match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/api/fbs`)
+      priority: 200
+      middlewares:
+        - name: firebird-deny-gateway-{{ .Values.siteId }}
+      services:
+        - name: firebird-{{ .Values.siteId }}
+          port: {{ .Values.service.port }}
+    {{- end }}
     {{- if .Values.api.enabled }}
     - kind: Rule
       match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tg-api`)

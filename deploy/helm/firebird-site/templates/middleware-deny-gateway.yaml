@@ -1,0 +1,15 @@
+{{- if and .Values.ingressRoute.enabled .Values.ingressRoute.denyGateway }}
+# AD-19：网关 /api/fbs/ 只在集群内可达。外部流量经 Traefik 进入时一律 403（仅放行回环地址）；
+# 集群内 Pod 直连 Service 不经过 IngressRoute，不受影响。
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: firebird-deny-gateway-{{ .Values.siteId }}
+  labels:
+    app: firebird-site
+    site: {{ .Values.siteId }}
+spec:
+  ipAllowList:
+    sourceRange:
+      - 127.0.0.1/32
+{{- end }}

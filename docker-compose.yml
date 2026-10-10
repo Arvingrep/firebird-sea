@@ -103,6 +103,24 @@ services:
     networks:
       - firebird-net
 
+  # 7. USDT 付款监听器 (独立服务：单实例，无对外端口，只出站轮询 TronGrid)
+  payment-listener:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.payment-listener
+    container_name: firebird-payment-listener
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+    environment:
+      - TRON_MASTER_RECEIVE_ADDRESS=${TRON_MASTER_RECEIVE_ADDRESS:-}
+      - TRONGRID_API_KEY=${TRONGRID_API_KEY:-}
+      - API_BASE_URL=http://nginx
+    depends_on:
+      - nginx
+    networks:
+      - firebird-net
+
 networks:
   firebird-net:
     driver: bridge

@@ -21,3 +21,10 @@
 
 ## 未完成
 联机实测（`deal()` 对 `pay_log` 的实际写入、`order_paid` 后 state、取消后 refrundstate 实值）需本地 docker 与网关就绪，暂未执行。
+
+## 付款监听器部署与网关隔离（Story 1.8，AD-19）
+
+- 监听器：`deploy/docker/Dockerfile.payment-listener`；compose 服务 `payment-listener`（副本 1、无端口）；Helm `deployment-payment-listener.yaml`（`replicas: 1`、`strategy: Recreate`，多副本会重复入账）。
+- 开关：`paymentListener.enabled`（默认 `false`，待 CI 构建 `firebird-payment-listener` 镜像后改 `true`）。
+- 环境变量/密钥：`TRON_MASTER_RECEIVE_ADDRESS`、`TRONGRID_API_KEY` 经 `paymentListener.secretRef`（默认 `firebird-api-secret`）注入，不入 Git。
+- 网关隔离：`ingressRoute.denyGateway: true` 时，Traefik 对 `PathPrefix(/api/fbs)` 的外部请求经 `ipAllowList(127.0.0.1/32)` 中间件返回 403；集群内 Pod 直连 Service 不经 IngressRoute，仍可达。
