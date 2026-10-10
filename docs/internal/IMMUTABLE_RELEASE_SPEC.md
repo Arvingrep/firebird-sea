@@ -39,17 +39,28 @@
 - 彻底杜绝百度地图官方 JS SDK 在无 AK 访问时向终端用户弹出 `APP不存在，AK有误请检查再重试` 模态弹窗，提供透明兼容保护。
 
 
+## 3. 基础镜像拆分与 CI/CD 极速构建架构
+1. **基础运行镜像 (`firebird-base:7.4`)**：
+   - 固化底层操作系统 Alpine + PHP 7.4-FPM + 扩展编译（gd/mysqli/pdo_mysql/zip 等）+ 商业解密引擎 `huoniao.so`。
+   - 极少变更，由 [deploy/docker/Dockerfile.base](file:///Users/arvin/Documents/firebird-sea/deploy/docker/Dockerfile.base) 独立构建并长期保留在 Google Artifact Registry (GAR)。
+2. **极速业务镜像 (`firebird-php:<Git-SHA>`)**：
+   - [deploy/docker/Dockerfile.web](file:///Users/arvin/Documents/firebird-sea/deploy/docker/Dockerfile.web) 直接继承 `firebird-base:7.4`，仅负责源码与配置复制，彻底消除耗时数分钟的重复扩展编译，业务构建缩短至 15~20 秒。
+3. **GAR 远端持久化缓存 (`type=registry`)**：
+   - Buildx 挂载 Google Artifact Registry 远端构建缓存（`buildcache` 与 `IMAGE_LATEST`），杜绝 GitHub Actions 本地磁盘配额不足导致的 Cache Miss，跨 Runner 100% 命中缓存。
+
 ---
 
-## 3. CI/CD 流水线与发布拓扑
+## 4. CI/CD 流水线与发布拓扑
 1. **CI 触发**：推送至 `main` 分支 ➔ 触发 `.github/workflows/ci-gke.yml`。
 2. **自动化质检**：
    - 一人团队 Quality & Documentation Gate 验证 (`scripts/verify-task.sh`)。
    - Helm Lint 与模板语法渲染验证。
 3. **镜像构建与推送**：
-   - Docker Buildx 多架构构建 `firebird-web` 与 `firebird-api`。
+   - 智能检测 Base 镜像，存在则秒级跳过底层编译；
+   - Docker Buildx 结合 GAR 远端缓存构建业务镜像；
    - 推送至 Google Artifact Registry (GAR)：
      - `asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-php:<Git-SHA>`
      - `asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-php:latest`
 4. **CD 自动同步**：
    - ArgoCD 监听到镜像/代码更新，实施 GKE 无损平滑滚动升级（RollingUpdate）。
+

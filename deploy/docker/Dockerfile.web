@@ -1,56 +1,14 @@
 # ==============================================================================
-# 🔥 火鸟门户 Web/PHP 生产容器 (PHP 7.4 Alpine + Swoole Loader 官方解密引擎)
+# 🔥 火鸟门户 Web/PHP 业务镜像 (极速秒级构建层)
+# 基于预编译不可变基础镜像 firebird-base，日常发版无需重复编译 PHP 扩展
 # ==============================================================================
 
-FROM php:7.4-fpm-alpine
-
-# 1. 运行时依赖与编译依赖分离，编译完成后立即卸载构建工具以极致瘦身
-RUN apk add --no-cache \
-        curl \
-        libpng \
-        libjpeg-turbo \
-        freetype \
-        libzip \
-        oniguruma \
-    && apk add --no-cache --virtual .build-deps \
-        $PHPIZE_DEPS \
-        libpng-dev \
-        libjpeg-turbo-dev \
-        freetype-dev \
-        libzip-dev \
-        oniguruma-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo_mysql mysqli gd zip bcmath opcache \
-    && apk del .build-deps \
-    && rm -rf /var/cache/apk/* /tmp/* /usr/share/man
-
-# 2. 生产级 PHP、OPcache 与 Swoole Loader 商业授权配置
-RUN { \
-        echo 'opcache.memory_consumption=128'; \
-        echo 'opcache.interned_strings_buffer=16'; \
-        echo 'opcache.max_accelerated_files=20000'; \
-        echo 'opcache.revalidate_freq=2'; \
-        echo 'opcache.validate_timestamps=1'; \
-        echo 'opcache.fast_shutdown=1'; \
-        echo 'opcache.enable_cli=1'; \
-    } > /usr/local/etc/php/conf.d/opcache-recommended.ini \
-    && { \
-        echo 'expose_php = Off'; \
-        echo 'upload_max_filesize = 50M'; \
-        echo 'post_max_size = 50M'; \
-        echo 'memory_limit = 256M'; \
-    } > /usr/local/etc/php/conf.d/production.ini
-
-# 固化底层火鸟/Swoole Loader 扩展到系统扩展目录，实现不可变基座
-COPY webroot/huoniao.so /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so
-RUN { \
-        echo 'extension=huoniao.so'; \
-        echo 'swoole_loader.license_files=/var/www/html/huoniao'; \
-    } > /usr/local/etc/php/conf.d/docker-php-ext-swoole_loader.ini
+ARG BASE_IMAGE=asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-base:7.4
+FROM ${BASE_IMAGE}
 
 WORKDIR /var/www/html
 
-# 3. 采用 --chown 复制源码与商业证书
+# 采用 --chown 复制业务源码与商业证书
 COPY --chown=www-data:www-data webroot/ /var/www/html/
 COPY --chown=www-data:www-data license/huoniao.php /var/www/html/include/huoniao.php
 COPY deploy/docker/entrypoint-web.sh /usr/local/bin/entrypoint.sh
