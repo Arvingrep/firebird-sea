@@ -9,6 +9,7 @@
 
 require('dotenv').config({ path: '../../.env' });
 const axios = require('axios');
+const { parseTransferAmount } = require('./amount');
 
 const MASTER_ADDRESS = process.env.TRON_MASTER_RECEIVE_ADDRESS || 'TW4Q8tq6U1z3wWkEXAMPLETRONADDR9999';
 const TRONGRID_API_KEY = process.env.TRONGRID_API_KEY;
@@ -33,9 +34,7 @@ async function pollTronGrid() {
       if (tx.to !== MASTER_ADDRESS) continue;
 
       // TRC-20 USDT 精度为 10^6
-      const decimals = tx.token_info?.decimals || 6;
-      const rawValue = tx.value;
-      const amount = Number(rawValue) / Math.pow(10, decimals);
+      const amount = parseTransferAmount(tx);
 
       console.log(`[TronGrid 监听到入账] Tx: ${txId}, 金额: ${amount} USDT`);
       seenTransactions.add(txId);
