@@ -28,6 +28,15 @@ if [ -n "$SITE_BASEHOST" ] && [ -f "$SITECONFIG_FILE" ]; then
     sed -i "s/\\\$cfg_basehost = .*/\\\$cfg_basehost = '${SITE_BASEHOST}';/" "$SITECONFIG_FILE"
 fi
 
+# 如果配置了远程附件/邮件密钥环境变量，动态注入 siteConfig.inc.php
+if [ -n "$GCS_KEY_ID" ] && [ -f "$SITECONFIG_FILE" ]; then
+    sed -i "s|\\\$cfg_OBSKeyID = .*|\\\$cfg_OBSKeyID = '${GCS_KEY_ID}';|" "$SITECONFIG_FILE"
+    sed -i "s|\\\$cfg_OBSKeySecret = .*|\\\$cfg_OBSKeySecret = '${GCS_KEY_SECRET}';|" "$SITECONFIG_FILE"
+fi
+if [ -n "$RESEND_KEY" ] && [ -f "$SITECONFIG_FILE" ]; then
+    sed -i "s|\\\$cfg_mailPass = .*|\\\$cfg_mailPass = '${RESEND_KEY}';|" "$SITECONFIG_FILE"
+fi
+
 # 确保底层扩展在 webroot 与系统目录下双重就绪 (自愈机制)
 if [ ! -f /var/www/html/huoniao.so ] && [ -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so ]; then
     cp -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so /var/www/html/huoniao.so 2>/dev/null || true
