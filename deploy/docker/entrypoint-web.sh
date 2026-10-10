@@ -64,6 +64,9 @@ fi
 
 # AD-17: 配置了 REDIS_HOST 且镜像带 redis 扩展、Redis 可连通时，PHP 会话存入 Redis（Pod 重启/多副本不丢登录态）
 # Redis 不可达则回退文件会话并告警，避免 session_start() 全站失败
+if [ -n "$REDIS_HOST" ] && ! php -m 2>/dev/null | grep -qi '^redis$'; then
+    echo ">>> [WARN] 已配置 REDIS_HOST 但 PHP 缺少 redis 扩展（firebird-base 镜像过旧？），会话回退为文件存储，Pod 重建/多副本会丢登录态" >&2
+fi
 if [ -n "$REDIS_HOST" ] && php -m 2>/dev/null | grep -qi '^redis$'; then
     if php -r '$r=new Redis(); exit($r->connect(getenv("REDIS_HOST"),(int)(getenv("REDIS_PORT")?:6379),2)?0:1);' 2>/dev/null; then
         {

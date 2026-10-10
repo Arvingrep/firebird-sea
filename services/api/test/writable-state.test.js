@@ -29,8 +29,9 @@ test('AC1: RWO uploads force Recreate, skip HPA, and sites declare uploads', () 
   assert.match(deployment, /type: Recreate/);
   assert.match(deployment, /eq \(\.Values\.uploads\.accessMode/);
   assert.match(read('deploy/helm/firebird-site/templates/hpa.yaml'), /\.Values\.uploads\.accessMode/);
+  // 站点显式声明 uploads（不依赖默认值）；2026-10-10 核查后三站均已去 PVC，附件走 GCS
   for (const site of ['manila', 'cebu', 'canary']) {
-    assert.match(read(`deploy/helm/firebird-site/values-${site}.yaml`), /^uploads:\s*\n\s+enabled: true/m, site);
+    assert.match(read(`deploy/helm/firebird-site/values-${site}.yaml`), /^uploads:\s*\n\s+enabled: (true|false)/m, site);
   }
 });
 
@@ -48,8 +49,10 @@ test('AC2: PHP sessions are stored in Redis', () => {
 
 // AC3: 缓存留在 emptyDir，日志走标准输出
 test('AC3: cache stays in emptyDir and logs go to stdout/stderr', () => {
+  // copy 模式共享整站 emptyDir；baked 模式只共享 data/ 的 emptyDir —— 两者都是 emptyDir，绝不是 PVC
   assert.match(deployment, /- name: webroot-shared\n\s+emptyDir: \{\}/);
-  assert.doesNotMatch(deployment, /mountPath: \/var\/www\/html\/data(\s|\n)/, 'data/ 缓存目录不得挂 PVC');
+  assert.match(deployment, /- name: data-shared\n\s+emptyDir: \{\}/);
+  assert.doesNotMatch(deployment, /claimName: firebird-data/, 'data/ 缓存目录不得挂 PVC');
   assert.match(baseImage, /error_log = \/proc\/self\/fd\/2/);
   assert.match(baseImage, /catch_workers_output = yes/);
 });

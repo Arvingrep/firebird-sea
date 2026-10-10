@@ -16,6 +16,30 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 - `uploads.accessMode` 默认 `ReadWriteOnce`：模板在 RWO 时自动把 Deployment 改为 `Recreate`（避免新 Pod 跨节点挂载失败卡死发布）并不渲染 HPA（单副本）；manila/cebu/canary 均显式声明 `uploads`。要多副本/滚动发布，改 RWX 存储类并设 `accessMode: ReadWriteMany`，或改用对象存储（火鸟后台已有远程附件配置，`GCS_KEY_*`）。
 - AC3 日志仅部分满足：PHP/php-fpm/nginx 日志走标准输出；火鸟 `data/log` 下的业务日志仍写本地文件（可再生数据，位于 emptyDir），转发到 stdout 另行立项。
 
+## PHP → Pod 改造（P0 / P2）
+**P0 — 配置与可用性**
+- 配置同步：init 执行随 chart 发布的 `files/init-webroot.sh`（经 ConfigMap 注入，与镜像版本解耦）。对镜像出厂 `include/config` 里每个文件做三方比较，基线记在 PVC 的 `.image-baseline`：PVC 缺失 → 补入；后台没改过 → 跟随镜像更新；后台改过（或旧 PVC 无基线）→ 保留，镜像版本另存 `<file>.image-new` 并在日志告警，人工合并。比较时忽略 entrypoint 按环境变量注入的 `cfg_basehost / OBSKey* / mailPass`。`*.inc.php.example` 缺真实文件时自动生成。仅在 `persistence.enabled=true` 时有意义（当前三站均为 false，配置在容器层，随镜像走）。行为测试：`files/init-webroot.test.sh`。
+- 深度就绪：`webroot/healthz.php`（不引导框架：配置文件齐全 + `DB_HOST` 可连），nginx 暴露 `/healthz.php`。`probes.deepReadiness: true` 时 nginx readinessProbe 走它；liveness 仍是静态 `/healthz`。默认 `false`——运行镜像不含该文件时新 Pod 会永远 NotReady。
+- 发布冒烟：`job-smoke-test.yaml` 为 ArgoCD PostSync（wave 0），带站点 Host 头请求 `smokeTest.paths`，2xx/3xx 通过；上线通知 Job 为 wave 1，冒烟失败不会发出「已上线」。
+
+**P2 — 去掉整站 `cp -a`**
+- `webroot.mode: copy`（默认，旧行为）：init 把整站（~1.1GB / 3.4 万文件）复制进 emptyDir。
+- `webroot.mode: baked`：代码直接来自镜像；nginx 用同 tag 的 `firebird-nginx` 静态镜像（`Dockerfile.nginx`：PHP 源码清空为 0 字节占位，剔除 `include/config`、授权文件、`.so`）；仅 `data/` 用 emptyDir 在 php-fpm（读写）与 nginx（只读）间共享，init 只播种约 15MB。
+- CI 先推 `firebird-nginx:<sha>`，后推 `firebird-php:<sha>`：Image Updater 只盯 php tag，发现时同 tag 的 nginx 镜像必须已存在。
+- 切换顺序：canary（已开）→ 验证 → manila → cebu。每站切换前确认 `firebird-nginx:<该站当前 image.tag>` 已在 GAR。
+- 未做：`readOnlyRootFilesystem`。静态审计只能覆盖字面量路径（`log/`、`include/data`、`include/config`、`data/`、`upload*`），动态拼接的写路径无法穷举，需用真实流量审计后再收紧。
+
+## 线上调查结论（2026-10-10，kubectl 实测）
+| 项 | 结论 |
+|---|---|
+| uploads PVC | canary：0 文件；manila：0MiB / 11 inodes（均为空，且 PVC 创建不足 2 小时）。无历史文件需迁移 → 三站已 `uploads.enabled: false` |
+| 附件存储配置 | `cfg_ftpType=3`、`cfg_OBSBucket=fbird-sea-uploads`（GCS）；`GCS_KEY_ID/SECRET`、`RESEND_KEY` 已注入（canary 实测；manila 同 Secret、同命名空间，exec 被权限策略拦截，未直接验证） |
+| 会话 | canary `session.save_handler=files`，`redis` 扩展 **缺失**。根因：CI 只在 `firebird-base:7.4` 不存在时构建，该 tag 早于 redis 加入，从未重建。已改为 `7.4-r2`；上线后会话切到 Redis，**所有人需重新登录一次** |
+| 运行期写路径（canary，~100 分钟真实流量） | `data/cache`、顶层 `templates_c/{compiled,admin}`、`log/`、`templates/` 少量文件。**未写** `include/config`、`uploads`，也没有浏览器可直接访问的生成物 → baked 模式（nginx 只共享 `data/`）成立 |
+| init 复制耗时 | 实测 `cp -a` 约 9 秒，webroot 811MB / 3.7 万 inodes；Pod 从调度到 Ready 约 70 秒。P2 收益是省这 9 秒和每 Pod 811MB 临时盘，不是数量级的提速 |
+| 镜像里的垃圾 | `webroot/data/sessions` 有 2800 个已提交的 `sess_*` 文件，随镜像发布。已加入 `.dockerignore` / `.gitignore`；仓库内需另行 `git rm -r --cached webroot/data/sessions` |
+| 其它 | PDB `minAvailable:1` + 单副本 = 节点排空无法驱逐该 Pod；HPA 现为显式开关 `autoscaling.enabled`（默认 false），多副本前提是 Redis 会话 + 后台配置有唯一来源 |
+
 ## 测试
 `services/api/test/writable-state.test.js`（静态断言 Helm 模板、入口脚本与基础镜像）。
 

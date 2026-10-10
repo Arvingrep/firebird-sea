@@ -1,0 +1,19 @@
+# ==============================================================================
+# 🔥 火鸟门户静态资源 Nginx 镜像 (P2：取代运行时整站 cp -a 到 emptyDir)
+# nginx 只需要"静态文件 + 目录结构"：PHP 源码清空为 0 字节占位（try_files 仍能判断存在，
+# 但源码与授权文件不会进入 nginx 镜像），配置目录、商业授权与 .so 一律剔除。
+# tag 必须与 firebird-php 同为 git SHA：Helm 里 nginx 的 tag 默认跟随 image.tag。
+# ==============================================================================
+
+ARG NGINX_BASE=nginx:1.27-alpine
+
+FROM alpine:3.20 AS prep
+COPY webroot/ /src/
+RUN cd /src \
+    && rm -rf include/config install \
+    && rm -f huoniao huoniao.dll huoniao.so \
+    && find . -type f \( -name '*.so' -o -name '*.example' -o -name '*.sql' \) -delete \
+    && find . -type f -name '*.php' -exec truncate -s 0 {} +
+
+FROM ${NGINX_BASE}
+COPY --from=prep /src/ /var/www/html/
