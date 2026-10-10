@@ -39,4 +39,19 @@ test('AC2 增量行数门禁失败的处理已记录为运营者决定事项', (
   const doc = fs.readFileSync(path.join(root, 'docs/internal/WAIMAI_PLUGIN_SPEC.md'), 'utf8');
   assert.match(doc, /原样入库基线/);
   assert.match(doc, /运营者决定/);
+  assert.match(doc, /人工审核 PR 或豁免/);
+  assert.match(doc, /不绕过门禁/);
+});
+
+test('AC1 本分支相对 origin/main 的改动不含授权文件、缓存、数据目录与真实配置', () => {
+  let changed;
+  try {
+    changed = execFileSync('git', ['diff', '--name-only', 'origin/main...HEAD'], { cwd: root, encoding: 'utf8' })
+      .split('\n').filter(Boolean);
+  } catch (e) {
+    return; // 无 origin/main（浅克隆等）时跳过，由 CI 门禁兜底
+  }
+  const bad = changed.filter((f) => /^webroot\/data\//.test(f) || /^webroot\/templates_c\//.test(f)
+    || /licen[cs]e|\.lic$/i.test(f) || /^webroot\/include\/config\/waimai\.inc\.php$/.test(f) && fs.existsSync(path.join(root, f)));
+  assert.deepStrictEqual(bad, [], '改动含禁入路径');
 });
