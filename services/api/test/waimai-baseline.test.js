@@ -27,13 +27,12 @@ test('AC1 不含缓存、数据库连接配置与备份文件', () => {
 test('AC1 waimai.inc.php 提供 .example 且不含真实密钥', () => {
   const dir = path.join(root, 'webroot/include/config');
   assert.ok(has(/^webroot\/include\/config\/waimai\.inc\.php\.example$/), '.example 未入库');
-  for (const f of ['waimai.inc.php.example', 'waimai.inc.php']) {
-    const p = path.join(dir, f);
-    if (!fs.existsSync(p)) continue;
-    const bad = fs.readFileSync(p, 'utf8').split('\n')
-      .filter((l) => /(secret|key|token|passw)[^=]*=\s*'[^']+'/i.test(l) && !/Seo|Keyword/i.test(l));
-    assert.deepStrictEqual(bad, [], `${f} 含非空密钥项`);
-  }
+  assert.ok(!has(/^webroot\/include\/config\/waimai\.inc\.php$/), '真实配置不得入库');
+  const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
+  assert.match(ignore, /^webroot\/include\/config\/waimai\.inc\.php$/m, '真实配置须在 .gitignore');
+  const bad = fs.readFileSync(path.join(dir, 'waimai.inc.php.example'), 'utf8').split('\n')
+    .filter((l) => /(secret|key|token|passw|pwd)[^=]*=\s*(['"])[^'"]+\2/i.test(l) && !/Seo|Keyword/i.test(l));
+  assert.deepStrictEqual(bad, [], '.example 含非空密钥项');
 });
 
 test('AC2 增量行数门禁失败的处理已记录为运营者决定事项', () => {

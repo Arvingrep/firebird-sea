@@ -65,6 +65,6 @@ webroot/
 ## 原样入库基线（Story 1.1）
 
 - 外卖模块文件（`webroot/admin/templates/waimai`、`webroot/wmsj`、`webroot/admin/waimai*`、`webroot/api/handlers/waimai.*`、静态资源）作为独立基线入库，不含授权文件、缓存、`webroot/data` 数据目录。
-- `webroot/include/config/waimai.inc.php.example` 为配置样板；真实配置含密钥时不得入库。当前已入库的 `waimai.inc.php` 密钥项均为空；是否改为仅入库 `.example`（需同步调整部署镜像）由运营者决定。
+- `webroot/include/config/waimai.inc.php.example` 为配置样板；真实配置 `waimai.inc.php` 已停止跟踪并写入 `.gitignore`，仓库只保留脱敏的 `.example`（密钥、FTP 密码留空，服务器/用户名为占位值）。部署时由运营者将 `.example` 复制为 `waimai.inc.php` 并填入真实值（经部署环境注入，不入库）。
 - 若基线提交因「增量行数」门禁失败：记录为需运营者决定的事项（人工审核 PR 或豁免），不绕过门禁。
 - 校验：`services/api/test/waimai-baseline.test.js`（`npm test`，由 verify-task 步骤 6 运行）。
