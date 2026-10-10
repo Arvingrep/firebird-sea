@@ -28,6 +28,22 @@ else
 fi
 
 ensure_labels
+# 0. CLI 验活（默认 claude 路径）：认证失效时提前打 agent:blocked + 告警，而不是施工阶段静默空转
+#    注意 claude -p 认证失败时退出码可能仍为 0，必须同时匹配输出文本
+if [ -z "${DEV_AGENT_CMD:-}" ]; then
+  if AUTH_OUT="$(agent_env claude -p "reply with exactly OK" --max-turns 1 2>&1)"; then AUTH_RC=0; else AUTH_RC=$?; fi
+  if [ "$AUTH_RC" -ne 0 ] || printf '%s' "$AUTH_OUT" | grep -qiE "failed to authenticate|oauth|invalid api key"; then
+    set_label "$ISSUE" "agent:blocked" "agent:dev"
+    gh issue comment "$ISSUE" -R "$REPO" -b "🛑 Dev Agent CLI 验活失败（claude 认证不可用），请检查 runner 的 CLAUDE_CODE_OAUTH_TOKEN（~/actions-runner-firebird/.env）。
+
+\`\`\`
+$(printf '%s' "$AUTH_OUT" | tail -n 5 | redact)
+\`\`\`" >/dev/null
+    notify blocked "#${ISSUE} Dev Agent CLI 验活失败（claude 认证）" "$ISSUE"
+    exit 1
+  fi
+  log "✅ claude CLI 验活通过"
+fi
 TITLE="$(gh issue view "$ISSUE" -R "$REPO" --json title -q .title)"
 BODY="$(gh issue view "$ISSUE" -R "$REPO" --json body -q .body)"
 log "🤖 Dev Agent 认领 #${ISSUE}: ${TITLE}"
