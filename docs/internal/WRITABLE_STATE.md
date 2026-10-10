@@ -24,5 +24,7 @@ Story 1.6：Pod 是可随时重建的，凡运行期写入的状态必须落在�
 `deploy/helm/firebird-site/templates/cronjob.yaml` 渲染 `fbs-cron-<site>`：每分钟（`* * * * *`）在与 php-fpm 相同的 PHP 镜像中执行 `php include/cron.php`，环境变量与 php-fpm 容器一致。
 
 - `concurrencyPolicy: Forbid`：上一次未结束则跳过本周期，不并发重叠；`activeDeadlineSeconds: 55` 防止单次运行拖过一个周期；`restartPolicy: Never`、`backoffLimit: 0`（下一分钟自然重试）。
-- CronJob Pod 不挂载 config/uploads PVC（RWO 卷会与站点 Pod 争抢挂载），使用镜像基线配置 + 环境变量。
+- 容器用 `args`（不写 `command`），保留镜像 ENTRYPOINT：`entrypoint-web.sh` 先生成 `dbinfo.inc.php`、注入 SITE_BASEHOST/GCS/RESEND 等配置，再 `exec php include/cron.php`。
+- CronJob Pod 不挂载 config/uploads PVC（RWO 卷会与站点 Pod 争抢挂载）；启用 `configOverrides` 时挂载同一只读 ConfigMap（entrypoint 同步到 include/config），与站点 Pod 的声明式配置保持一致。运营者写入 PVC 的运行期配置 cron 读不到——cron 依赖的配置项应放数据库或 configOverrides。
+- cron 写到容器内 `log/cron/` 的日志随 Pod 销毁即丢，排障以 Job Pod 的 stdout/`kubectl logs` 为准。
 - 运行态 AC（30 分钟未支付订单 → state 6）需人工在集群验收：`kubectl get cronjob,job -l app=firebird-cron` 与订单状态。

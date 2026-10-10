@@ -28,7 +28,8 @@ spec:
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               workingDir: /var/www/html
-              command: ["php", "include/cron.php"]
+              # 不覆盖 ENTRYPOINT：entrypoint-web.sh 先生成 dbinfo.inc.php / 注入配置，再 exec args
+              args: ["php", "include/cron.php"]
               env:
                 - name: DB_HOST
                   value: "{{ .Values.database.host }}"
@@ -74,3 +75,15 @@ spec:
                       name: firebird-storage-secret
                       key: resend-key
                       optional: true
+              {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
+              volumeMounts:
+                - name: config-overrides
+                  mountPath: /etc/firebird-configs
+                  readOnly: true
+              {{- end }}
+          {{- if and .Values.configOverrides (and .Values.configOverrides.enabled .Values.configOverrides.files) }}
+          volumes:
+            - name: config-overrides
+              configMap:
+                name: firebird-configs-{{ .Values.siteId }}
+          {{- end }}
