@@ -60,8 +60,20 @@ function main(argv) {
   console.log(JSON.stringify({ issue: +a.issue, key, ctx: { ...ctx, labels: undefined }, ...r }, null, 2));
   if (a.apply === true) {
     const msg = `bmad-approve: **${r.verdict}**\n\n${r.reasons.map((x) => `- ${x}`).join('\n')}`;
-    if (r.verdict === 'approve') { gh(['issue', 'edit', a.issue, '-R', REPO, '--add-label', r.addLabel]); gh(['issue', 'comment', a.issue, '-R', REPO, '--body', msg]); }
-    else if (r.verdict === 'reject') { gh(['issue', 'comment', a.issue, '-R', REPO, '--body', msg]); gh(['issue', 'edit', a.issue, '-R', REPO, '--remove-label', r.removeLabel]); }
+    const addLabel = (n, l) => {
+      try { gh(['issue', 'edit', n, '-R', REPO, '--add-label', l]); }
+      catch { gh(['api', '-X', 'POST', `repos/${REPO}/issues/${n}/labels`, '-f', `labels[]=${l}`]); }
+    };
+    const removeLabel = (n, l) => {
+      try { gh(['issue', 'edit', n, '-R', REPO, '--remove-label', l]); }
+      catch { gh(['api', '-X', 'DELETE', `repos/${REPO}/issues/${n}/labels/${encodeURIComponent(l)}`]); }
+    };
+    const addComment = (n, b) => {
+      try { gh(['issue', 'comment', n, '-R', REPO, '--body', b]); }
+      catch { gh(['api', '-X', 'POST', `repos/${REPO}/issues/${n}/comments`, '-f', `body=${b}`]); }
+    };
+    if (r.verdict === 'approve') { addLabel(a.issue, r.addLabel); addComment(a.issue, msg); }
+    else if (r.verdict === 'reject') { addComment(a.issue, msg); removeLabel(a.issue, r.removeLabel); }
   }
   return r.verdict === 'reject' ? 1 : 0;
 }
