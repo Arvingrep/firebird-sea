@@ -157,3 +157,24 @@ test('entrypoint + config-vars behavior (docker php:7.4, skipped when docker is 
   const r = spawnSync('docker', ['run', '--rm', '-v', `${ROOT}:/repo:ro`, 'php:7.4-cli-alpine', 'sh', '/repo/deploy/docker/entrypoint-web.test.sh'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
+
+test('GitOps config lock: root read-only enforcement + nginx message rewrite, default off, canary first', () => {
+  const ep = read('deploy/docker/entrypoint-web.sh');
+  assert.match(ep, /CONFIG_LOCK:-0/);
+  assert.ok(ep.indexOf('Config Lock') > ep.indexOf('apply-vars.php'), '锁必须在 configVars 之后');
+  assert.ok(ep.lastIndexOf('exec "$@"') > ep.indexOf('Config Lock'), '锁在 exec 之前');
+  assert.match(ep, /chown root:root/);
+  const cm = T('configmap.yaml');
+  assert.match(cm, /location ~ \^\/admin\/\.\*\\\.php\$/, '只对 /admin/ 的 PHP 响应做改写');
+  assert.match(cm, /sub_filter '\{\{ \.Values\.configLock\.matchRaw \}\}'/);
+  assert.match(cm, /configLock\.matchJson/);
+  assert.match(helpers, /name: CONFIG_LOCK\b/);
+  assert.match(values, /^configLock:\s*\n(?:\s*#.*\n)*\s+enabled: false/m, '默认关闭');
+  assert.match(read(`${chart}/values-canary.yaml`), /^configLock:\s*\n(?:\s*#.*\n)*\s+enabled: true/m, 'canary 先行');
+  // 转义串必须与原文一致，且用单引号（YAML 双引号会把 \uXXXX 解码回汉字）
+  const m = values.match(/matchJson: '([^']+)'/);
+  assert.ok(m, 'matchJson 必须是单引号 YAML 串');
+  assert.equal(JSON.parse('"' + m[1] + '"'), values.match(/matchRaw: "([^"]+)"/)[1]);
+  const mj = values.match(/messageJson: '([^']+)'/);
+  assert.equal(JSON.parse('"' + mj[1] + '"'), values.match(/^  message: "([^"]+)"/m)[1]);
+});

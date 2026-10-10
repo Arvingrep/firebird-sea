@@ -30,6 +30,12 @@
   value: "{{ .Values.redis.host }}"
 - name: REDIS_PORT
   value: "{{ .Values.redis.port | default 6379 }}"
+{{- if .Values.configLock.enabled }}
+- name: CONFIG_LOCK
+  value: "1"
+- name: CONFIG_LOCK_WRITABLE
+  value: {{ join " " .Values.configLock.writable | quote }}
+{{- end }}
 {{- if .Values.memoryCache.redis.enabled }}
 # ② 应用层内存缓存（$HN_memory）声明式指向 Redis；entrypoint 写入 dbinfo.inc.php 的 $cfg_memory
 - name: MEMORY_CACHE_REDIS
@@ -232,4 +238,16 @@
 {{- /* 配置 PVC / uploads PVC 任一为 RWO 时，滚动更新会因 Multi-Attach 卡死 → 返回 "true" */ -}}
 {{- define "firebird.rwoPvc" -}}
 {{- if or (and .Values.uploads.enabled (eq (.Values.uploads.accessMode | default "ReadWriteOnce") "ReadWriteOnce")) (and .Values.persistence.enabled (eq (.Values.persistence.accessMode | default "ReadWriteOnce") "ReadWriteOnce")) -}}true{{- end -}}
+{{- end -}}
+
+{{- /* nginx 里 PHP location 的公共指令（普通 PHP 与 GitOps 锁下的 /admin/ PHP 共用） */ -}}
+{{- define "firebird.nginxPhpBody" -}}
+fastcgi_pass {{ if .Values.split.enabled }}firebird-php-{{ .Values.siteId }}:9000{{ else }}127.0.0.1:9000{{ end }};
+fastcgi_index index.php;
+fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+include fastcgi_params;
+fastcgi_read_timeout 300;
+fastcgi_buffer_size 128k;
+fastcgi_buffers 4 256k;
+fastcgi_busy_buffers_size 256k;
 {{- end -}}
