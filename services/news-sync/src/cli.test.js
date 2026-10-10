@@ -16,7 +16,7 @@ const baseEnv = d => ({
 });
 const okFetch = sent => async (url, opts) => {
   sent.push({ url, body: JSON.parse(opts.body) });
-  return { ok: true, status: 200, json: async () => ({ success: true }) };
+  return { ok: true, status: 200, json: async () => ({ success: true, ok: true }) }; // success 供门户契约,ok 供 Telegram 契约
 };
 
 test('AC3 stdin 非法 JSON:整轮失败仍告警运营者并抛错', async () => {

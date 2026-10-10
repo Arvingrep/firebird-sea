@@ -81,7 +81,7 @@ test('AC3 大量失败告警被切分,每条 ≤ 4000 字符', async () => {
   const sent = [];
   const fetchImpl = async (u, o) => {
     sent.push(JSON.parse(o.body).text);
-    return resp(200, {});
+    return resp(200, { ok: true });
   };
   const alert = makeAlerter({ botToken: 'T', chatId: 'C', fetchImpl });
   const many = Array.from({ length: 300 }, (_, i) => item(i));
@@ -92,6 +92,30 @@ test('AC3 大量失败告警被切分,每条 ≤ 4000 字符', async () => {
   assert.ok(sent.length > 1);
   assert.ok(sent.every(t => t.length <= 4000));
   assert.ok(chunkText('x'.repeat(10000)).every(c => c.length <= 4000));
+});
+
+test('AC3 告警 HTTP 200 但 ok:false / 非 JSON:视为失败进入有界重试', async () => {
+  const mk = impl => makeAlerter({ botToken: 'T', chatId: 'C', fetchImpl: impl });
+  await assert.rejects(() => mk(async () => resp(200, { ok: false, description: 'blocked' }))('x'), /alert rejected/);
+  await assert.rejects(
+    () => mk(async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }))('x'),
+    /non-JSON body/
+  );
+});
+
+test('AC3 告警响应体停滞:超时中止计失败(不误报已送达)', async () => {
+  const fetchImpl = async (u, o) => ({
+    ok: true,
+    status: 200,
+    json: () => new Promise((_, rej) => o.signal.addEventListener('abort', () => rej(new Error('aborted'))))
+  });
+  const alert = makeAlerter({ botToken: 'T', chatId: 'C', fetchImpl, timeoutMs: 20 });
+  const keepAlive = setTimeout(() => {}, 5000); // 见 cli.test.js:AbortSignal.timeout 定时器是 unref 的
+  try {
+    await assert.rejects(() => alert('x'), /aborted/);
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
 
 test('AC3 告警接口失败:有界重试后标记 alertFailed 且不抛错', async () => {

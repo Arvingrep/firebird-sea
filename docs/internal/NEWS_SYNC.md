@@ -35,8 +35,9 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 ## TASK-016 适配层与本地真实环境验收
 
 - `src/feed.js`:把 TASK-016(n8n 新闻工作流)RSS 源适配为 `[{title,url,summary}]`,可作 CLI 管道使用。
-- `e2e-local.sh <workdir>`:对本地 n8n-news-mock(与 TASK-016 验收同一数据面,端口 18080)跑完整一轮:采集→去重→发布→预置门户故障→有界重试→Telegram 告警,并断言第二轮发布数为 0、门户实收与第一轮发布数一致。
-- 2026-10-10 运行证据(无密钥):`docs/internal/evidence/story-6.3/`(round1/round2/fail-round/mock-state)。
+- 替身实现随仓库提供:`e2e/mock-portal.js`(零依赖 node:http),同一进程提供 TASK-016 同款确定性 RSS 数据面、火鸟门户发布替身(按 `Idempotency-Key` 幂等、`POST /portal/fail-next` 预置连续失败)与 Telegram Bot API 替身;状态重置 `POST /reset` 或重启进程。
+- 一键复现:`bash services/news-sync/e2e-local.sh <workdir> [port]`(默认端口 18180,自行拉起/销毁 mock):采集→适配→去重→发布→同输入第二轮零发布→预置门户故障→3 次有界重试→Telegram 告警,并在脚本内断言各环节。
+- 2026-10-10 运行证据(无密钥):`docs/internal/evidence/story-6.3/`。逐条对应:采集→`feed.test.js` + `full-run.log`/`items.json`;去重与第二轮零发布→`sync.test.js`/`cli.test.js` + `round1.json`/`round2.json`;有界重试→`sync.test.js` + `mock-state.json` 的 `portalAttempts`(=第 1 轮发布数 + 失败轮 3 次重试);失败告警→`io.test.js` + `mock-state.json` 的 `tg`(本轮 Telegram 收件)。
 
 ## 待人工
 

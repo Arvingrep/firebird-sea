@@ -84,6 +84,14 @@ function makeAlerter({ botToken, chatId, fetchImpl = fetch, timeoutMs = TIMEOUT_
         body: JSON.stringify({ chat_id: chatId, text: part })
       });
       if (!res.ok) throw new Error(`alert HTTP ${res.status}`);
+      let body;
+      try {
+        body = await res.json(); // fetch 的 signal 覆盖响应体读取,停滞同样按超时中止
+      } catch (err) {
+        if (err instanceof SyntaxError) throw new Error('alert returned non-JSON body');
+        throw err;
+      }
+      if (!body || body.ok !== true) throw new Error(`alert rejected: ${JSON.stringify(body && body.description) || 'ok!=true'}`);
     }
   };
 }
