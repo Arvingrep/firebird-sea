@@ -21,12 +21,7 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
-  # 优先 codex 做独立红队，若 codex 不可用或额度耗尽则回退到 claude
-  if command -v codex >/dev/null 2>&1 && ! codex exec -s read-only --skip-git-repo-check "reply OK" 2>&1 | grep -qiE "usage limit|error"; then
-    QA_CMD=(codex exec -s read-only --skip-git-repo-check -o "$TMP/verdict.txt" -)
-  else
-    QA_CMD=(claude -p --max-turns 10 -)
-  fi
+  QA_CMD=(claude -p --max-turns 10 -)
 fi
 
 ensure_labels
