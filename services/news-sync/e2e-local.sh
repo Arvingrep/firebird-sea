@@ -3,12 +3,12 @@
 #   采集(TASK-016 同款 RSS 数据面) → 适配层 → 去重 → 发布 → 第二轮零发布 → 预置门户故障 → 有界重试 → Telegram 告警
 # 用法: bash services/news-sync/e2e-local.sh <workdir> [port]
 # 替身实现随仓库提供: services/news-sync/e2e/mock-portal.js(重置: POST /reset 或重启进程)
-# 产出(无任何密钥): <workdir>/{items,round1,round2,fail-round,mock-state}.json 与 full-run.log
+# 产出(无任何密钥): <workdir>/{items,round1,round2,fail-round,mock-state}.json 与 full-run.txt
 set -euo pipefail
 OUT="$(mkdir -p "${1:?usage: e2e-local.sh <workdir> [port]}" && cd "$1" && pwd)"
 PORT="${2:-18180}"
 cd "$(dirname "${BASH_SOURCE[0]}")"
-exec > >(tee "$OUT/full-run.log") 2>&1
+exec > >(tee "$OUT/full-run.txt") 2>&1
 
 node e2e/mock-portal.js "$PORT" & MOCK_PID=$!
 trap 'kill "$MOCK_PID" 2>/dev/null || true' EXIT
@@ -33,10 +33,10 @@ node src/cli.js < "$OUT/items.json" | tee "$OUT/round1.json"
 echo "== 第 2 轮:同输入应 published=0、duplicates>=1 =="
 node src/cli.js < "$OUT/items.json" | tee "$OUT/round2.json"
 
-echo "== 失败轮:门户预置连续失败,新条目应 failed=1 且触发告警 =="
+echo "== 失败轮:门户预置连续失败,演练条目经同一采集适配链路进入,应 failed=1 且触发告警 =="
 curl -fsS -X POST "$MOCK/portal/fail-next" -H 'Content-Type: application/json' -d '{"count":5}' >/dev/null
-echo '[{"title":"failure drill","url":"https://example.test/news/failure-drill","summary":"演练"}]' > "$OUT/fail-item.json"
-node src/cli.js < "$OUT/fail-item.json" > "$OUT/fail-round.json" && { echo "期望非零退出"; exit 1; } || true
+curl -fsS "$MOCK/rss.xml?drill=1" | node src/feed.js > "$OUT/fail-items.json"
+node src/cli.js < "$OUT/fail-items.json" > "$OUT/fail-round.json" && { echo "期望非零退出"; exit 1; } || true
 cat "$OUT/fail-round.json"
 
 curl -fsS "$MOCK/state" > "$OUT/mock-state.json"

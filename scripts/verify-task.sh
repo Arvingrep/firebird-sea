@@ -74,6 +74,13 @@ for svc in services/api services/news-sync; do
     fi
 done
 
+# 6.5 Story 6.3 完整链路替身验收(采集→去重→发布→重试→告警,零外部依赖,断言在脚本内);不存在则跳过
+if [ -f services/news-sync/e2e-local.sh ]; then
+    E2E_OUT="$(mktemp -d)"
+    if bash services/news-sync/e2e-local.sh "$E2E_OUT" 18190 >/dev/null 2>&1; then echo "  ✅ news-sync 完整链路替身验收 [通过]"
+    else echo "❌ [FAIL] news-sync 完整链路替身验收(末尾日志):"; tail -20 "$E2E_OUT/full-run.txt" 2>/dev/null; exit 1; fi
+fi
+
 # 7. 数据库集成测试：CI 里必跑（需要 docker）；本机用 RUN_DB_TESTS=1 开启，避免日常校验变慢
 #    scripts/test-api-db.sh 随 services/api 入库；不存在则跳过。非交互 runner 的 PATH 可能不含 docker，这里补常见位置。
 if [ -f scripts/test-api-db.sh ] && { [ -n "${CI:-}" ] || [ "${RUN_DB_TESTS:-0}" = "1" ]; }; then

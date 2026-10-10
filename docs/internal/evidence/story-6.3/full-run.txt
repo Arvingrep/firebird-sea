@@ -1,0 +1,16 @@
+mock-portal listening on 127.0.0.1:18180
+== 采集(RSS 适配层 src/feed.js) ==
+[{"title":"火鸟门户完整流程模拟验收新闻","url":"https://example.test/news/acceptance","summary":"这是一条用于本地完整流程验收的模拟新闻,正文长度明确超过五十个字符,以便稳定通过内容质量检查,并继续验证去重、发布与告警链路。"}]
+== 第 1 轮:应发布 published>=1 ==
+{"published":1,"duplicates":0,"invalid":0,"failed":0}
+== 第 2 轮:同输入应 published=0、duplicates>=1 ==
+{"published":0,"duplicates":1,"invalid":0,"failed":0}
+== 失败轮:门户预置连续失败,演练条目经同一采集适配链路进入,应 failed=1 且触发告警 ==
+{"published":0,"duplicates":1,"invalid":0,"failed":1}
+OK: 第1轮发布 1 条且无失败
+OK: 第2轮 0 发布、1 条去重
+OK: 失败轮 failed=1(重试耗尽后计失败)
+OK: 门户实收 1 条 = 第1轮发布数(无重复落库)
+OK: 门户请求数 4 = 第1轮发布数 + 失败轮 3 次有界重试(第2轮未触达门户)
+OK: 运营者告警已送达 mock Telegram(1 条)
+== E2E PASS,证据目录: /tmp/news-sync-e2e ==

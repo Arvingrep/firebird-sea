@@ -16,10 +16,12 @@ function pick(block, tag) {
   return m ? decodeEntities(m[1]) : '';
 }
 
-/** @param {string} xml RSS 2.0 文本 @returns {{title:string,url:string,summary:string}[]} */
+/** @param {string} xml RSS 2.0 文本 @returns {{title:string,url:string,summary:string}[]} 非 RSS 文档(损坏 XML/HTML 错误页)抛错,合法空频道返回 [] */
 function rssToItems(xml) {
+  const text = String(xml || '');
+  if (!/<(rss|channel)[\s>]/i.test(text)) throw new Error('not an RSS document (collector output invalid)');
   const items = [];
-  for (const m of String(xml || '').matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
+  for (const m of text.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
     items.push({ title: pick(m[1], 'title'), url: pick(m[1], 'link'), summary: pick(m[1], 'description') });
   }
   return items;
@@ -27,7 +29,12 @@ function rssToItems(xml) {
 
 if (require.main === module) {
   const fs = require('node:fs');
-  process.stdout.write(`${JSON.stringify(rssToItems(fs.readFileSync(0, 'utf8')))}\n`);
+  try {
+    process.stdout.write(`${JSON.stringify(rssToItems(fs.readFileSync(0, 'utf8')))}\n`);
+  } catch (err) {
+    process.stderr.write(`${err.message}\n`);
+    process.exit(1); // 非零退出:管道(set -o pipefail)或调度方据此告警,采集故障不被当作"空轮成功"掩盖
+  }
 }
 
 module.exports = { rssToItems };

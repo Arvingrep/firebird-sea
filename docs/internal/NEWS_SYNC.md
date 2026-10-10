@@ -36,8 +36,9 @@ AD-11:AI 输出为不可信输入,仅保留纯文本标题/摘要和 `https` 链
 
 - `src/feed.js`:把 TASK-016(n8n 新闻工作流)RSS 源适配为 `[{title,url,summary}]`,可作 CLI 管道使用。
 - 替身实现随仓库提供:`e2e/mock-portal.js`(零依赖 node:http),同一进程提供 TASK-016 同款确定性 RSS 数据面、火鸟门户发布替身(按 `Idempotency-Key` 幂等、`POST /portal/fail-next` 预置连续失败)与 Telegram Bot API 替身;状态重置 `POST /reset` 或重启进程。
-- 一键复现:`bash services/news-sync/e2e-local.sh <workdir> [port]`(默认端口 18180,自行拉起/销毁 mock):采集→适配→去重→发布→同输入第二轮零发布→预置门户故障→3 次有界重试→Telegram 告警,并在脚本内断言各环节。
-- 2026-10-10 运行证据(无密钥):`docs/internal/evidence/story-6.3/`。逐条对应:采集→`feed.test.js` + `full-run.log`/`items.json`;去重与第二轮零发布→`sync.test.js`/`cli.test.js` + `round1.json`/`round2.json`;有界重试→`sync.test.js` + `mock-state.json` 的 `portalAttempts`(=第 1 轮发布数 + 失败轮 3 次重试);失败告警→`io.test.js` + `mock-state.json` 的 `tg`(本轮 Telegram 收件)。
+- 一键复现:`bash services/news-sync/e2e-local.sh <workdir> [port]`(默认端口 18180,自行拉起/销毁 mock):采集→适配→去重→发布→同输入第二轮零发布→预置门户故障(演练条目同样经采集适配链路进入)→3 次有界重试→Telegram 告警,断言在脚本内;`scripts/verify-task.sh` 已将其接入 CI 必跑。
+- 2026-10-10 运行证据(无密钥):`docs/internal/evidence/story-6.3/`(含完整日志 `full-run.txt`)。逐条对应:采集→`feed.test.js` + `full-run.txt`/`items.json`;去重与第二轮零发布→`sync.test.js`/`cli.test.js` + `round1.json`/`round2.json`;有界重试→`sync.test.js` + `mock-state.json` 的 `portalAttempts`(=第 1 轮发布数 + 失败轮 3 次重试);失败告警→`io.test.js` + `mock-state.json` 的 `tg`(本轮 Telegram 收件)。
+- 状态如实说明:以上为仓库内确定性替身(mock-portal.js)的完整链路证据;与线上 TASK-016 工作流实际输出、真实火鸟门户端点的对接复验,待 Arvin 提供端点/凭据后进行(见「待人工」)。
 
 ## 待人工
 

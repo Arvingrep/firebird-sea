@@ -8,9 +8,11 @@
  */
 const http = require('node:http');
 
-const RSS = `<?xml version="1.0" encoding="UTF-8"?>
+const RSS_ITEMS = `<item><title>火鸟门户完整流程模拟验收新闻</title><link>https://example.test/news/acceptance</link><description>这是一条用于本地完整流程验收的模拟新闻,正文长度明确超过五十个字符,以便稳定通过内容质量检查,并继续验证去重、发布与告警链路。</description></item>`;
+const DRILL_ITEM = `<item><title>failure drill 故障演练新闻</title><link>https://example.test/news/failure-drill</link><description>用于失败重试与告警演练的新增条目,经同一采集适配链路进入同步。</description></item>`;
+const rss = items => `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>Mock News</title><link>http://localhost/</link><description>Deterministic test feed</description>
-<item><title>火鸟门户完整流程模拟验收新闻</title><link>https://example.test/news/acceptance</link><description>这是一条用于本地完整流程验收的模拟新闻,正文长度明确超过五十个字符,以便稳定通过内容质量检查,并继续验证去重、发布与告警链路。</description></item>
+${items}
 </channel></rss>`;
 
 function freshState() {
@@ -30,10 +32,11 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     let body = {};
     try { body = raw ? JSON.parse(raw) : {}; } catch { body = { raw }; }
-    const path = new URL(req.url, 'http://x').pathname;
+    const u = new URL(req.url, 'http://x');
+    const path = u.pathname;
     if (req.method === 'GET' && path === '/rss.xml') {
       res.writeHead(200, { 'Content-Type': 'application/rss+xml; charset=utf-8' });
-      return res.end(RSS);
+      return res.end(rss(u.searchParams.get('drill') ? RSS_ITEMS + '\n' + DRILL_ITEM : RSS_ITEMS));
     }
     if (req.method === 'GET' && path === '/state') return json(res, 200, state);
     if (req.method === 'GET' && path === '/health') return json(res, 200, { ok: true });
