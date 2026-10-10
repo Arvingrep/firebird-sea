@@ -658,13 +658,14 @@ class shop
         }
 
         $results = $dsql->getTypeList($type, "shop_type", $son, $page, $pageSize);
-        if ($gettype == "all") {
+        if ($gettype == "all" && is_array($results)) {
             foreach ($results as $k => &$v) {
+                if (!is_array($v)) continue;
                 $v['lowerarr'] = $dsql->getTypeList($v['id'], "shop_type", $son, $page, $pageSize);
                 // var_dump($v['lowerarr']);
-                if ($v['lowerarr']) {
+                if (!empty($v['lowerarr']) && is_array($v['lowerarr'])) {
                     foreach ($v['lowerarr'] as $a => &$b) {
-                        if (isset($b['lower'])) {
+                        if (is_array($b) && isset($b['lower'])) {
                             $b['sublowerarr'] = $dsql->getTypeList($b['id'], "shop_type", $son, $page, $pageSize);
                         }
                     }

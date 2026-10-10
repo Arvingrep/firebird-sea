@@ -81,7 +81,14 @@ if (!empty($_SERVER['HTTP_HOST'])) {
     if (strpos($currentHostNoPort, '-admin.') !== false) {
         $cfg_basehost = str_replace('-admin.', '.', $currentHostNoPort);
     } elseif (strpos($currentHostNoPort, 'admin.') === 0) {
-        $cfg_basehost = substr($currentHostNoPort, 6);
+        $frontHost = getenv('SITE_BASEHOST') ?: '';
+        if (!empty($frontHost) && $frontHost !== 'fbird.men') {
+            $cfg_basehost = $frontHost;
+        } elseif ($currentHostNoPort === 'admin.fbird.men') {
+            $cfg_basehost = 'manila.fbird.men';
+        } else {
+            $cfg_basehost = substr($currentHostNoPort, 6);
+        }
     } else {
         $cfg_basehost = $currentHostNoPort;
     }
