@@ -64,3 +64,37 @@ firebird-sea/
 3. **镜像 tag 纪律**：canary 构建只能推 `canary` / `canary-<sha12>`，**绝不推 40 位 SHA tag**（Image Updater 追 40 位 SHA，会把未验收镜像滚进生产）；`values-canary.yaml` 的 `image.tag` 不得改回 `latest`。
 4. 受保护路径（`.github/`、`scripts/agent/`、`scripts/acceptance/`、`.agents/`）只能由 owner 修改；Agent 分支触碰即门禁 FAIL。
 5. 详见 `docs/internal/RELEASE_FLOW.md`。
+
+## 6. GitOps 铁律：一切变更以 Git 为准，kubectl 只读
+
+> 适用于所有 Agent（Dev / QA / Acceptance）与人。**集群里的期望状态 = Git（`main` 生产 / `canary` 验收）**；
+> 集群只是 Git 的投影，由 CI 构建、ArgoCD 同步。凡是不在 Git 里的改动，下一次同步就会被 `selfHeal` 抹掉，且没有审计记录。
+
+### 6.1 唯一的变更路径
+```
+改 Git（chart / values / 配置 / 镜像 tag 的来源）→ PR → 门禁 + 验收 → 合并 → CI 构建 → ArgoCD 自动同步
+```
+副本数、资源、探针、环境变量、`configVars` / `configOverrides` / `configLock`、Ingress、CronJob、镜像版本……**全部**这样改。
+想改线上行为？去改 `deploy/helm/firebird-site/` 与对应 `values-*.yaml`，开 PR。
+
+### 6.2 `kubectl`（及 ArgoCD / 集群类 MCP 工具）只用于「查询」
+| 允许（只读） | 禁止（写） |
+|---|---|
+| `get` / `describe` / `logs` / `events` / `top` / `explain` | `apply` / `create` / `edit` / `patch` / `replace` |
+| `get application` / 看 ArgoCD 同步状态、历史、资源树 | `delete`（含删 Pod、删 PVC） / `scale` / `rollout restart` / `set image` |
+| 用日志与事件定位问题，把结论写进 PR / Issue | 在 Pod 里 `exec` 改文件、改配置、装包 |
+| 生产环境的 `exec` 只读诊断需 owner 授权（权限策略会拦截） | 改 ArgoCD Application / 暂停 Image Updater / 手动触发 sync |
+
+- 发现线上问题 → **先用 `logs` / `describe` / `events` 找原因 → 写成 Git 变更 → PR**。不要「顺手」在集群里修。
+- 「修复没生效，需要重启 Pod」也是 Git 问题：说明镜像 tag 用了可变 tag（如 `canary` / `latest`），应改为不可变 tag（SHA），让 Git 变更自然触发滚动，而不是手动删 Pod。
+- Secret 不入 Git：由 owner 一次性创建（如 `firebird-storage-secret`、`firebird-db-secret`），Agent 不创建、不读取其值。
+
+### 6.3 唯一的例外：生产应急（仅 owner）
+- 仅 owner 本人、仅为止血（如重启卡死的 Pod、暂停 Image Updater）可以直接操作集群，**Agent 一律不得**。
+- 事后必须补一个 PR 把「该有的状态」写回 Git，并在 PR 说明里记录：做了什么、为什么、时间。
+- 手改的内容不会被 ArgoCD 保留：`selfHeal` 会回滚漂移。不要依赖手改。
+
+### 6.4 自检清单（合并前问自己）
+1. 这次改动在 Git 里能看到吗？（不在 Git = 不存在）
+2. 我有没有用过 `kubectl` 的写操作？有 → 改成 PR，或按 6.3 补记录。
+3. 回滚方式是「revert 这个 PR」吗？不是 → 设计有问题。

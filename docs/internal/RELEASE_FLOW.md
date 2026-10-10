@@ -2,6 +2,10 @@
 
 > 最后更新：2026-10-10。与 [AGENT_PIPELINE.md](AGENT_PIPELINE.md) 配套：后者讲 Agent 与门禁，本文讲分支、镜像 tag、ArgoCD 与保护规则。
 
+## 0. 原则：一切以 Git 为准
+
+集群期望状态 = Git（`main` → 生产，`canary` → 验收）。**所有变更只能通过 PR 修改 Git**，由 CI 构建、ArgoCD 同步；`kubectl` 与 ArgoCD 工具只用于查询（logs / get / describe / events）。生产应急仅 owner 可手动操作，事后必须补 PR。详见 [`.agents/RULES.md`](../../.agents/RULES.md) 第 6 节。
+
 ## 1. 分支角色
 
 | 分支 | 作用 | 谁能进 | 部署到 |
@@ -25,6 +29,8 @@ feat/x ──PR──▶ canary ──(canary 环境验收)──PR──▶ mai
 | `canary` | `canary-<sha12>`、`canary`（浮动） | firebird-canary（`values-canary.yaml` 的 `image.tag: canary`） |
 
 **canary 构建绝不推 40 位 SHA tag**：Image Updater 只匹配 40 位 SHA，`canary*` 不会被选中，因此未验收的镜像不可能被滚进生产。不要把 canary 的 `image.tag` 改回 `latest`（main 构建也会推 `latest`，验收环境会吃到未验收的东西）。
+
+> ⚠ **已知缺口**：`canary` 是可变 tag（`imagePullPolicy: Always` 只在容器创建时拉取），新镜像推送后**不会自动滚动 Pod**——2026-10-10 就因此出现过 canary 停留在旧镜像、需要手动删 Pod 的情况，这违反 GitOps。后续应让 canary 也由 Image Updater 追 `canary-<sha12>`（不可变 tag）并写回 Git/ArgoCD，让滚动由 Git 变更触发。在此之前，canary 验收前先确认 Pod 的 imageID 与最新构建一致（只读：`kubectl describe pod`）。
 
 ## 3. 分支保护
 
@@ -55,7 +61,7 @@ feat/x ──PR──▶ canary ──(canary 环境验收)──PR──▶ mai
 1. 合并本流程的 PR（目前 main 仍是唯一分支）。
 2. 创建 `canary` 并与 main 对齐：`git push origin main:refs/heads/canary`。**先别保护 canary**——此时它还需要一次对齐。
 3. 等 `canary` 的 `ci-gke` 构建成功（确认 `firebird-php:canary`、`firebird-nginx:canary`、`firebird-api:canary` 已推送）。
-4. 把 ArgoCD `firebird-canary` 的 `targetRevision` 由 `main` 改为 `canary`（`kubectl -n argocd patch application firebird-canary --type merge -p '{"spec":{"source":{"targetRevision":"canary"}}}'`）。
+4. 把 ArgoCD `firebird-canary` 的 `targetRevision` 由 `main` 改为 `canary`——**在 Application 清单所在的仓库里改并走 PR**（homelab `apps/firebird-*/application-gke.yaml`；若该 Application 当初是手工 `kubectl apply` 的，先把清单提交进 homelab 仓库再改），不要 `kubectl patch`。
 5. 仓库变量 `AGENT_BASE_BRANCH=canary`（让 Dev/QA Agent 的基线与 PR 目标改为 canary；不设则仍是 main）。
 6. 保护 `main`、`canary`（见 §3）。
 
