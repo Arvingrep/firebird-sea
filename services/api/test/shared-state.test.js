@@ -1,7 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { createRevocationStore, createReplayCounter } = require('../src/sharedState');
+const { createRevocationStore, createReplayCounter, createIdempotencyStore, createMemoryIdempotencyStore } = require('../src/sharedState');
 const { createTokenService } = require('../src/tmaToken');
+const { createFbProxy } = require('../src/fbProxy');
 
 // 一个极简的"共享库"替身：多个 store 实例共用同一份数据，模拟多副本
 function sharedDb() {
@@ -61,3 +62,37 @@ test('重放计数跨副本一致，且拒绝非法 hash', async () => {
   assert.strictEqual(await a("h:x'; DROP TABLE fbs_replay;--"), false);
 });
 
+test('幂等占位：并发第二个请求得到 pending(409)，完成后重复请求回放首次结果', async () => {
+  const db = sharedDb();
+  const store = createIdempotencyStore({ conn: db.conn });
+  const tokens = createTokenService({ secret: 'shared-secret-0123456', env: 'canary' });
+  const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  let release; const gate = new Promise((r) => { release = r; });
+  let upstream = 0;
+  const fetchImpl = async () => { upstream += 1; await gate; return { json: async () => ({ state: 100, info: { ordernum: 'O1' } }) }; };
+  const p = createFbProxy({ upstreamBase: 'http://x', fetchImpl, tokens, idempotencyStore: store, credentialProvider: async () => 'c=1',
+    whitelist: { 'waimai:deal': { auth: 'member', idempotent: true } } });
+  const req = { service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'key-abcdefgh' } };
+  const first = p.handle(req);
+  await new Promise((r) => setTimeout(r, 5));
+  const second = await p.handle(req);
+  assert.strictEqual(second.status, 409);
+  release();
+  assert.strictEqual((await first).status, 200);
+  const third = await p.handle(req);
+  assert.strictEqual(third.replayed, true);
+  assert.strictEqual(upstream, 1);
+});
+
+test('上游失败释放占位，同键可重试', async () => {
+  const store = createMemoryIdempotencyStore();
+  const tokens = createTokenService({ secret: 'shared-secret-0123456', env: 'canary' });
+  const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  let n = 0;
+  const p = createFbProxy({ upstreamBase: 'http://x', tokens, idempotencyStore: store, credentialProvider: async () => 'c=1',
+    fetchImpl: async () => { n += 1; if (n === 1) throw new Error('down'); return { json: async () => ({ state: 100 }) }; },
+    whitelist: { 'waimai:deal': { auth: 'member', idempotent: true } } });
+  const req = { service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'key-retry-1234' } };
+  assert.strictEqual((await p.handle(req)).status, 502);
+  assert.strictEqual((await p.handle(req)).status, 200);
+});
