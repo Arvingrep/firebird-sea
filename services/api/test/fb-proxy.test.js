@@ -15,7 +15,7 @@ function proxyWith(over = {}) {
 
 test('白名单外的 service+action 返回 403 且不转发', async () => {
   const { p, calls } = proxyWith();
-  for (const [service, action] of [['waimai', 'deal'], ['article', 'orderDetail'], ['waimai', 'orderDetail'], ['member', 'login'], ['siteConfig', 'config']]) {
+  for (const [service, action] of [['article', 'orderDetail'], ['waimai', 'getAddressDetail'], ['member', 'login'], ['siteConfig', 'config'], ['waimai', 'paySuccess'], ['waimai', 'pay']]) {
     const r = await p.handle({ service, action, query: {} });
     assert.strictEqual(r.status, 403, `${service}:${action}`);
   }
@@ -23,10 +23,17 @@ test('白名单外的 service+action 返回 403 且不转发', async () => {
 });
 
 test('首轮白名单仅含 7 个纯展示接口，且全部匿名', () => {
-  assert.deepStrictEqual(Object.keys(WHITELIST).sort(), [
+  const anon = Object.entries(WHITELIST).filter(([, r]) => r.auth === 'anonymous').map(([k]) => k).sort();
+  assert.deepStrictEqual(anon, [
     'article:alist', 'article:detail', 'article:type', 'waimai:food', 'waimai:foodType', 'waimai:shopList', 'waimai:storeDetail',
   ]);
-  assert.ok(Object.values(WHITELIST).every((r) => r.auth === 'anonymous'));
+  const member = Object.entries(WHITELIST).filter(([, r]) => r.auth === 'member').map(([k]) => k).sort();
+  assert.deepStrictEqual(member, [
+    'waimai:cancelOrder', 'waimai:deal', 'waimai:delAddress', 'waimai:getMemberAddress', 'waimai:operAddress', 'waimai:order', 'waimai:orderDetail',
+  ]);
+  assert.strictEqual(WHITELIST['article:orderDetail'], undefined);
+  for (const [k, r] of Object.entries(WHITELIST)) if (r.auth === 'member') assert.ok(Array.isArray(r.params), `${k} 必须声明参数白名单`);
+  assert.strictEqual(WHITELIST['waimai:deal'].idempotent, true);
 });
 
 test('身份与旁路参数被剥离，不带客户端 Cookie，强制 platform_name=tma', async () => {
@@ -116,4 +123,19 @@ test('上游请求带超时信号', async () => {
   const p = createFbProxy({ upstreamBase: 'http://php/a', fetchImpl: async (u, init) => { signal = init.signal; return okJson({ state: 100 }); }, tokens });
   await p.handle({ service: 'article', action: 'type', query: {} });
   assert.ok(signal instanceof AbortSignal);
+});
+
+test('规则级 params 白名单：未列出的参数（含 userid/store）不会透传，GET 与 POST 均适用', async () => {
+  const wl = { 'waimai:order': { auth: 'member', params: ['page', 'pageSize', 'state'] } };
+  const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  const seen = [];
+  const p = createFbProxy({ upstreamBase: 'http://php/a', tokens, whitelist: wl, credentialProvider: async () => 'c=1',
+    fetchImpl: async (url, init) => { seen.push({ url, body: init.body }); return okJson({ state: 100 }); } });
+  const h = { authorization: `Bearer ${token}` };
+  await p.handle({ service: 'waimai', action: 'order', query: { page: '1', userid: '9', store: '3', state: '1' }, headers: h });
+  const u = new URL(seen[0].url);
+  assert.deepStrictEqual([...u.searchParams.keys()].sort(), ['action', 'page', 'platform_name', 'service', 'state']);
+  await p.handle({ service: 'waimai', action: 'order', method: 'POST', body: { page: '2', userid: '9' }, headers: h });
+  assert.strictEqual(new URLSearchParams(seen[1].body).has('userid'), false);
+  assert.strictEqual(new URLSearchParams(seen[1].body).get('page'), '2');
 });

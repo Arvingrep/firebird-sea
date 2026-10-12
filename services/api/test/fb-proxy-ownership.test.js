@@ -1,0 +1,209 @@
+// 7 个 waimai 会员级接口的归属校验对抗测试（Arvin 验收条件）：
+// 会员 A 携带会员 B 的订单/地址 ID 调用，必须 403/404，不得返回数据，且不得产生写入。
+// 上游用"行为等价的火鸟替身"：按注入的 Cookie 识别会员，按 uid 过滤；并模拟 courier Cookie 旁路与 userid 参数后门。
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+const { createFbProxy } = require('../src/fbProxy');
+const { createTokenService } = require('../src/tmaToken');
+
+const tokens = createTokenService({ secret: 'ownership-test-secret-01', env: 'canary' });
+const A = 100;
+const B = 200;
+
+function fakeFirebird() {
+  const addresses = { 1: { id: 1, uid: A, person: 'A' }, 2: { id: 2, uid: B, person: 'B-secret' } };
+  const orders = { 10: { id: 10, uid: A, ordernum: 'OA' }, 20: { id: 20, uid: B, ordernum: 'OB-secret', state: 0 } };
+  const log = { requests: [], mutations: [] };
+  const NOLOGIN = { state: 200, info: '未登录或登录超时！' };
+
+  async function fetchImpl(url, init) {
+    const u = new URL(url);
+    const p = Object.fromEntries(u.searchParams.entries());
+    if (init.body) for (const [k, v] of new URLSearchParams(init.body).entries()) p[k] = v;
+    const cookie = init.headers.Cookie || '';
+    log.requests.push({ action: p.action, params: p, cookie, headers: init.headers });
+    const m = /login_user=(\d+)/.exec(cookie);
+    const uid = m ? Number(m[1]) : null;
+    const courier = /(^|;\s*)courier=/.test(cookie); // 旁路：骑手 Cookie 可匿名读订单详情
+    const id = Number(p.id);
+    let out;
+    switch (p.action) {
+      case 'getAddressDetail':
+        out = uid === null ? NOLOGIN : (addresses[id] && addresses[id].uid === uid ? addresses[id] : { state: 200, info: '信息不存在' });
+        break;
+      case 'operAddress':
+        if (uid === null) { out = NOLOGIN; break; }
+        if (p.id && addresses[id] && addresses[id].uid === uid) { log.mutations.push(['edit', id]); }
+        else if (p.id) { log.mutations.push(['edit-noop', id]); } // 真实 handler：UPDATE ... AND uid 命中 0 行仍返回保存成功
+        out = { state: 100, info: '保存成功' };
+        break;
+      case 'delAddress':
+        if (uid === null) { out = NOLOGIN; break; }
+        if (addresses[id] && addresses[id].uid === uid) { log.mutations.push(['del', id]); out = { state: 100, info: '删除成功' }; }
+        else { log.mutations.push(['del-noop', id]); out = { state: 100, info: '删除成功' }; }
+        break;
+      case 'getMemberAddress': {
+        if (uid === null) { out = NOLOGIN; break; }
+        out = { state: 100, info: { list: Object.values(addresses).filter((a) => a.uid === uid) } };
+        break;
+      }
+      case 'order': {
+        if (uid === null) { out = NOLOGIN; break; }
+        const who = p.userid ? Number(p.userid) : uid; // 后门：未剥离时 userid 可越权
+        out = { state: 100, info: { list: Object.values(orders).filter((o) => o.uid === who) } };
+        break;
+      }
+      case 'orderDetail':
+        if (uid === null && !courier) { out = { state: 200, info: '请先登录！' }; break; }
+        out = orders[id] && (courier || orders[id].uid === uid) ? { state: 100, info: orders[id] } : { state: 200, info: '订单不存在' };
+        break;
+      case 'cancelOrder':
+        if (uid === null) { out = { state: 200, info: '登录超时，请重新登录！' }; break; }
+        if (orders[id] && orders[id].uid === uid) { orders[id].state = 6; log.mutations.push(['cancel', id]); out = { state: 100, info: '取消成功' }; }
+        else out = { state: 200, info: '订单不存在' };
+        break;
+      case 'deal':
+        if (uid === null) { out = NOLOGIN; break; }
+        if (!addresses[Number(p.address)] || addresses[Number(p.address)].uid !== uid) { out = { state: 200, info: '地址不存在' }; break; }
+        log.mutations.push(['deal', Number(p.address)]);
+        out = { state: 100, info: { ordernum: 'NEW1' } };
+        break;
+      default:
+        out = { state: 200, info: 'unknown' };
+    }
+    return { json: async () => out };
+  }
+  return { fetchImpl, log, addresses, orders };
+}
+
+function setup() {
+  const fx = fakeFirebird();
+  const proxy = createFbProxy({
+    upstreamBase: 'http://php/include/ajax.php',
+    fetchImpl: fx.fetchImpl,
+    tokens,
+    credentialProvider: async (mid) => `login_user=${mid}`,
+  });
+  const token = tokens.issue({ tgId: 1, memberId: A }).token;
+  const call = (action, over = {}) => proxy.handle({
+    service: 'waimai', action, method: 'GET', query: {}, headers: { authorization: `Bearer ${token}` }, ...over,
+  });
+  return { fx, proxy, token, call };
+}
+const leaks = (res, secret) => JSON.stringify(res.body).includes(secret);
+
+test('orderDetail：A 查 B 的订单 → 404，不含数据', async () => {
+  const { call } = setup();
+  const r = await call('orderDetail', { query: { id: '20' } });
+  assert.strictEqual(r.status, 404);
+  assert.strictEqual(leaks(r, 'OB-secret'), false);
+  assert.strictEqual((await call('orderDetail', { query: { id: '10' } })).status, 200); // 对照：自己的订单可读
+});
+
+test('cancelOrder：A 取消 B 的订单 → 404，订单状态不变', async () => {
+  const { call, fx } = setup();
+  const r = await call('cancelOrder', { query: { id: '20' } });
+  assert.strictEqual(r.status, 404);
+  assert.strictEqual(fx.orders[20].state, 0);
+  assert.deepStrictEqual(fx.log.mutations, []);
+});
+
+test('delAddress：A 删除 B 的地址 → 404，预检拦截，上游不收到删除请求', async () => {
+  const { call, fx } = setup();
+  const r = await call('delAddress', { query: { id: '2' } });
+  assert.strictEqual(r.status, 404);
+  assert.strictEqual(fx.log.requests.some((q) => q.action === 'delAddress'), false);
+  assert.ok(fx.addresses[2]);
+});
+
+test('operAddress：A 编辑 B 的地址 → 404，预检拦截，不产生任何写', async () => {
+  const { call, fx } = setup();
+  const r = await call('operAddress', { method: 'POST', body: { id: '2', person: 'hacked', tel: '1', address: 'x' } });
+  assert.strictEqual(r.status, 404);
+  assert.deepStrictEqual(fx.log.mutations, []);
+  assert.strictEqual(fx.addresses[2].person, 'B-secret');
+});
+
+test('getMemberAddress：携带 B 的 id/userid/uid 参数仍只返回 A 的地址（参数不透传）', async () => {
+  const { call, fx } = setup();
+  const r = await call('getMemberAddress', { query: { id: '2', userid: String(B), uid: String(B), cityid: '1' } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(leaks(r, 'B-secret'), false);
+  const sent = fx.log.requests[0].params;
+  assert.strictEqual(sent.userid, undefined);
+  assert.strictEqual(sent.uid, undefined);
+  assert.strictEqual(sent.id, undefined);
+});
+
+test('order：携带 userid=B / store 参数仍只返回 A 的订单', async () => {
+  const { call, fx } = setup();
+  const r = await call('order', { query: { userid: String(B), store: '1', page: '1' } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(leaks(r, 'OB-secret'), false);
+  assert.strictEqual(fx.log.requests[0].params.userid, undefined);
+  assert.strictEqual(fx.log.requests[0].params.store, undefined);
+});
+
+test('deal：使用 B 的地址 ID 下单 → 404，不创建订单；价格类参数不透传', async () => {
+  const { proxy, token, fx } = setup();
+  const base = { service: 'waimai', action: 'deal', method: 'POST', headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'key-attack-0001' } };
+  const r = await proxy.handle({ ...base, body: { shop: '1', address: '2', order_content: '[]', tprice: '0', quanid: '9', usePinput: '1', peerpay: '1' } });
+  assert.strictEqual(r.status, 404);
+  assert.deepStrictEqual(fx.log.mutations, []);
+  const sent = fx.log.requests[0].params;
+  for (const k of ['tprice', 'quanid', 'usePinput', 'peerpay']) assert.strictEqual(sent[k], undefined, k);
+  // 失败不占位：同一幂等键改用自己的地址可成功
+  const ok = await proxy.handle({ ...base, body: { shop: '1', address: '1', order_content: '[]' } });
+  assert.strictEqual(ok.status, 200);
+  assert.deepStrictEqual(fx.log.mutations, [['deal', 1]]);
+});
+
+test('orderDetail 骑手旁路：客户端 Cookie/courier 参数不会被转发，匿名路径拿不到数据', async () => {
+  const { proxy, token, fx } = setup();
+  // 1) 匿名（无令牌）：在代理层即 401，根本不触达上游
+  const anon = await proxy.handle({ service: 'waimai', action: 'orderDetail', query: { id: '20', courier: '1' }, headers: { cookie: 'courier=evil' } });
+  assert.strictEqual(anon.status, 401);
+  assert.strictEqual(fx.log.requests.length, 0);
+  // 2) 带令牌但夹带骑手 Cookie / 参数：上游只会看到服务端注入的会员凭证
+  const r = await proxy.handle({
+    service: 'waimai', action: 'orderDetail', query: { id: '20', courier: '1', HN_courier: 'x' },
+    headers: { authorization: `Bearer ${token}`, cookie: 'courier=evil; login_user=200' },
+  });
+  assert.strictEqual(r.status, 404);
+  assert.strictEqual(leaks(r, 'OB-secret'), false);
+  const up = fx.log.requests[0];
+  assert.strictEqual(up.cookie, `login_user=${A}`);
+  assert.deepStrictEqual(Object.keys(up.headers).sort(), ['Accept', 'Cookie']);
+  assert.strictEqual(up.params.courier, undefined);
+});
+
+test('防回归：代理与路由层源码不得读取或转发客户端 Cookie', () => {
+  const read = (f) => fs.readFileSync(path.join(__dirname, '../src', f), 'utf8');
+  const proxySrc = read('fbProxy.js');
+  // 排除 `init.headers.Cookie`（写入服务端注入凭证）；匹配的是读取入站 headers 的 cookie
+  assert.doesNotMatch(proxySrc, /(?<![\w.])headers\.cookie|(?<![\w.])headers\[['"]cookie['"]\]|get\('cookie'\)|req\.cookies|req\.headers/i);
+  const serverSrc = read('server.js');
+  const routeBlock = serverSrc.slice(serverSrc.indexOf("router.all('/fb/:service/:action'"), serverSrc.indexOf("// 3. 东南亚 MVP"));
+  assert.match(routeBlock, /headers: \{ authorization: req\.get\('authorization'\), 'idempotency-key': req\.get\('idempotency-key'\) \}/);
+  assert.doesNotMatch(routeBlock, /cookie/i);
+});
+
+test('上游 handler 源码：7 个接口均按会话会员 uid 做归属过滤（对抗测试的依据）', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../../../webroot/api/handlers/waimai.class.php'), 'utf8');
+  const body = (name) => {
+    const start = src.indexOf(`public function ${name}(`);
+    assert.ok(start > 0, name);
+    const next = src.indexOf('\n    public function ', start + 10);
+    return src.slice(start, next > 0 ? next : undefined);
+  };
+  assert.match(body('getMemberAddress'), /WHERE `uid` = \$uid/);
+  assert.match(body('operAddress'), /UPDATE `#@__waimai_address` SET [^"]*WHERE `id` = \$id AND `uid` = \$uid/);
+  assert.match(body('delAddress'), /DELETE FROM `#@__waimai_address` WHERE `id` = \$id AND `uid` = \$uid/);
+  assert.match(body('getAddressDetail'), /WHERE `id` = \$id AND `uid` = \$uid/);
+  assert.match(body('deal'), /FROM `#@__waimai_address` WHERE `uid` = \$uid AND `id` = \$address/);
+  assert.match(body('cancelOrder'), /o\.`id` = '\$id' AND o\.`uid` = '\$uid'/);
+  assert.match(body('orderDetail'), /WHERE `id` = \$id AND `uid` = \$userid/);
+  assert.match(body('order'), /o\.`uid` = \$uid/);
+});
