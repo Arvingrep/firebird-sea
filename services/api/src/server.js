@@ -9,6 +9,12 @@ const {
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
+const { createTokenService, createLimiter } = require('./tmaToken');
+const { createMemberMap } = require('./memberMap');
+const { createLoginService } = require('./loginService');
+const { cliConn } = require('./migrate');
+const gatewayClient = require('./gatewayClient');
+const { createRevocationStore, createReplayCounter } = require('./sharedState');
 
 assertProductionConfig();
 
@@ -17,7 +23,11 @@ const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || DEMO_BOT_TOKEN;
 const coinsClient = new CoinsPhClient();
 
-app.use(cors());
+// H2：置于 Traefik 之后，按配置的跳数信任 X-Forwarded-For，否则 req.ip 为 LB 地址（匿名限流变全局单桶）
+if (process.env.TRUST_PROXY_HOPS) app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS));
+// M4：CORS 白名单（逗号分隔 origin）；未配置时保持原行为，避免破坏既有调用方
+const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
 app.use(express.json());
 
 // AD-9：Node 路由统一挂在 /tg-api，/api 前缀留给火鸟 PHP（含 /api/payment/notify.php）
@@ -37,7 +47,9 @@ app.get(['/', '/health'], healthHandler);
 router.get('/health', healthHandler);
 
 // 2. Telegram Mini App 鉴权接口
+const allowLegacyVerify = createLimiter({ max: 30, windowSeconds: 60 });
 router.post('/auth/tg-verify', (req, res) => {
+  if (!allowLegacyVerify(req.ip)) return res.status(429).json({ success: false, error: 'Too many requests' });
   const { initData } = req.body;
   if (!initData) {
     return res.status(400).json({ success: false, error: 'Missing initData' });
@@ -67,6 +79,55 @@ router.post('/auth/tg-verify', (req, res) => {
     user: result.user,
     authDate: result.authDate
   });
+});
+
+// 2b. TMA 登录（T2.1–T2.3）：验签 → 映射火鸟会员 → 签发短期令牌。令牌密钥/环境来自环境变量（AD-13）。
+function buildAuth() {
+  const secret = process.env.TMA_TOKEN_SECRET;
+  const env = process.env.TMA_ENV;
+  if (!secret || !env || !process.env.FBS_GATEWAY_URL || !process.env.FBS_GATEWAY_SECRET || !process.env.DB_HOST) return null;
+  const gwCfg = { baseUrl: process.env.FBS_GATEWAY_URL, secret: process.env.FBS_GATEWAY_SECRET };
+  // 吊销、重放计数、幂等占位放共享库，api 可多副本运行（决定 3=B）
+  const conn = cliConn();
+  const revocation = createRevocationStore({ conn });
+  revocation.start();
+  const tokens = createTokenService({ secret, env, ttlSeconds: Number(process.env.TMA_TOKEN_TTL || 900), revocation });
+  const memberMap = createMemberMap({
+    conn,
+    gateway: { memberFindOrCreate: (p) => gatewayClient.memberFindOrCreate(gwCfg, p) }
+  });
+  const loginService = createLoginService({
+    botToken: BOT_TOKEN,
+    tokens,
+    memberMap,
+    allowLogin: createLimiter({ max: Number(process.env.TMA_LOGIN_MAX || 10), windowSeconds: 60 }),
+    allowReplay: createReplayCounter({ conn, max: Number(process.env.TMA_REPLAY_MAX || 5), ttlSeconds: 3600 })
+  });
+  return { tokens, loginService };
+}
+const auth = buildAuth();
+
+router.post('/auth/telegram', async (req, res) => {
+  if (!auth) {
+    return res.status(503).json({ success: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'TMA auth not configured' } });
+  }
+  try {
+    const r = await auth.loginService.login(req.body && req.body.initData);
+    res.status(r.status).json(r.body);
+  } catch (err) {
+    res.status(502).json({ success: false, error: { code: 'LOGIN_FAILED', message: 'Login temporarily unavailable' } });
+  }
+});
+
+router.post('/auth/logout', async (req, res) => {
+  if (!auth) return res.status(503).json({ success: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'TMA auth not configured' } });
+  const m = /^Bearer (.+)$/.exec(req.get('authorization') || '');
+  try {
+    const ok = m ? await auth.tokens.revokeAsync(m[1]) : false;
+    res.status(ok ? 200 : 401).json({ success: ok });
+  } catch (err) {
+    res.status(502).json({ success: false, error: { code: 'LOGOUT_FAILED', message: 'Please retry' } });
+  }
 });
 
 // 3. 东南亚 MVP 四大核心模块元数据
