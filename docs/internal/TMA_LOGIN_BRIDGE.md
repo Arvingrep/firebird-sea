@@ -44,3 +44,15 @@ TMA → `POST /tg-api/auth/telegram {initData}` → Node 验签 → 限频/防�
 ## 未包含（待排期）
 - Helm 对上述环境变量与密钥的注入、api 镜像内 mariadb 客户端、PHP 容器的 `FBS_GATEWAY_SECRET`：涉及密钥与部署，需 Arvin 确认后再改。
 - T2.4 前端登录流：随 apps/tma 脚手架（T4.1）落地，契约见 `apps/tma/src/auth.js`。
+
+## 白名单代理（T3.1 / T3.3）
+`/tg-api/fb/:service/:action`（GET/POST）→ 上游 `FB_UPSTREAM_URL`（`.../include/ajax.php`）。
+- 默认拒绝：`service:action` 不在 `src/fbProxy.js` 的 `WHITELIST` 返回 403。首轮仅 7 个匿名只读接口：`waimai` 的 `shopList`/`storeDetail`/`food`/`foodType`，`article` 的 `type`/`alist`/`detail`。`orderDetail`、`deal` 等涉订单/资金路径的接口须单独评审后再加入。
+- 剥离：`userkey`、`access_token`、`refresh_token`、`token`、`forcelogout`、`rsaEncrypt`、`uid`/`userid`、`platform_*`、`HN_*` 等客户端参数；不转发客户端 Cookie；代理固定写入 `platform_name=tma`。
+- 限流：`FB_RATE_MAX`（默认每分钟 120，按会员或来源 IP + 接口）。
+- 幂等：白名单项标记 `idempotent` 时要求 `Idempotency-Key`（8–64 位 `[A-Za-z0-9_-]`），同键重复返回首次结果（进程内、TTL 600 秒，单副本）。
+- member 级接口需要 `credentialProvider`（T3.2，未配置时 503，不转发）。
+| 变量 | 说明 |
+|---|---|
+| `FB_UPSTREAM_URL` | 上游 ajax.php 完整 URL；未设置则不挂载代理路由 |
+| `FB_RATE_MAX` | 可选，每分钟请求上限 |

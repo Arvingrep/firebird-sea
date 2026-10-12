@@ -14,6 +14,7 @@ const { createMemberMap } = require('./memberMap');
 const { createLoginService } = require('./loginService');
 const { cliConn } = require('./migrate');
 const gatewayClient = require('./gatewayClient');
+const { createFbProxy } = require('./fbProxy');
 
 assertProductionConfig();
 
@@ -114,6 +115,30 @@ router.post('/auth/logout', (req, res) => {
   const ok = m ? auth.tokens.revoke(m[1]) : false;
   res.status(ok ? 200 : 401).json({ success: ok });
 });
+
+// 2c. 火鸟白名单代理（T3.1/T3.3）：/tg-api/fb/:service/:action → 上游 ajax.php；默认拒绝（AD-20）。
+// credentialProvider（T3.2）未配置前，member 级接口返回 503；首轮白名单仅匿名只读。
+const fbUpstream = process.env.FB_UPSTREAM_URL;
+if (fbUpstream) {
+  const proxy = createFbProxy({
+    upstreamBase: fbUpstream,
+    tokens: auth ? auth.tokens : { verify: () => ({ valid: false }) },
+    allow: createLimiter({ max: Number(process.env.FB_RATE_MAX || 120), windowSeconds: 60 })
+  });
+  router.all('/fb/:service/:action', async (req, res) => {
+    if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ success: false });
+    const r = await proxy.handle({
+      service: req.params.service,
+      action: req.params.action,
+      query: req.query,
+      method: req.method,
+      body: req.body,
+      headers: { authorization: req.get('authorization'), 'idempotency-key': req.get('idempotency-key') },
+      clientKey: req.ip
+    });
+    res.status(r.status).json(r.body);
+  });
+}
 
 // 3. 东南亚 MVP 四大核心模块元数据
 router.get('/services', (req, res) => {
