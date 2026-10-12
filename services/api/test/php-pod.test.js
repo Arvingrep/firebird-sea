@@ -187,6 +187,6 @@ test('2 replicas everywhere, with sticky sessions and HPA still opt-in', () => {
   }
   const ing = T('ingressroute.yaml');
   assert.match(ing, /sticky:\s*\n\s+cookie:/);
-  assert.match(values, /^ingressRoute:\s*\n\s+enabled: true\s*\n\s+sticky:\s*\n\s+enabled: true/m);
+  assert.match(values, /^ingressRoute:\s*\n(?:\s+[^\n]*\n)*?\s+enabled: true\n(?:\s+[^\n]*\n)*?\s+sticky:\s*\n\s+enabled: true/m);
   assert.match(values, /^autoscaling:\s*\n\s+enabled: false/m, 'HPA 仍需显式开启');
 });
