@@ -34,6 +34,40 @@ spec:
               value: "{{ .Values.siteId }}"
             - name: DEFAULT_CURRENCY
               value: "{{ .Values.localization.defaultCurrency }}"
+            {{- if .Values.tma.enabled }}
+            # TMA 登录桥接与白名单代理（docs/internal/TMA_LOGIN_BRIDGE.md）。密钥只引用 secretName，值由运维创建
+            - name: TMA_ENV
+              value: "{{ .Values.tma.env | default .Values.siteId }}"
+            - name: FBS_GATEWAY_URL
+              value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/api/fbs/index.php"
+            - name: FB_UPSTREAM_URL
+              value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/include/ajax.php"
+            - name: TRUST_PROXY_HOPS
+              value: "{{ .Values.tma.trustProxyHops | default 1 }}"
+            - name: CORS_ORIGINS
+              value: "{{ range $i, $h := .Values.ingress.hosts }}{{ if $i }},{{ end }}https://{{ $h.host }}{{ end }}"
+            - name: DB_HOST
+              value: "{{ .Values.database.host }}"
+            - name: DB_PORT
+              value: "{{ .Values.database.port | default 3306 }}"
+            - name: DB_NAME
+              value: "{{ .Values.database.name }}"
+            - name: DB_USER
+              value: "{{ .Values.database.user | default "firebird_user" }}"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.passwordSecretRef | default "firebird-db-secret" }}
+                  key: {{ .Values.database.passwordSecretKey | default "password" }}
+            {{- range $name := list "TMA_TOKEN_SECRET" "FBS_GATEWAY_SECRET" }}
+            - name: {{ $name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.api.secretRef | default "firebird-api-secret" }}
+                  key: {{ $name }}
+                  optional: true
+            {{- end }}
+            {{- end }}
             {{- range $name := list "TELEGRAM_BOT_TOKEN" "COINS_PH_API_KEY" "COINS_PH_API_SECRET" "TRON_MASTER_RECEIVE_ADDRESS" "TRONGRID_API_KEY" }}
             - name: {{ $name }}
               valueFrom:
