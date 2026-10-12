@@ -4,7 +4,7 @@
  * 薄层：只做签名校验、参数校验与调用，不含业务规则；不修改火鸟核心文件。
  * 约定：POST /api/fbs/index.php?action=<action>，JSON 体；
  *       头 X-Fbs-Timestamp(秒)、X-Fbs-Signature = HMAC-SHA256(secret, timestamp\naction\nbody) 十六进制。
- * 当前动作：member_find_or_create（T2.3）。
+ * 当前动作：member_find_or_create（T2.3）、issue_session（T3.2，仅为 Telegram 创建的会员签发火鸟会话凭证，密钥不出火鸟进程）。
  */
 error_reporting(0);
 header('Content-Type: application/json; charset=utf-8');
@@ -30,7 +30,9 @@ $body = file_get_contents('php://input');
 $ts = isset($_SERVER['HTTP_X_FBS_TIMESTAMP']) ? (string)$_SERVER['HTTP_X_FBS_TIMESTAMP'] : '';
 $sig = isset($_SERVER['HTTP_X_FBS_SIGNATURE']) ? (string)$_SERVER['HTTP_X_FBS_SIGNATURE'] : '';
 
-if (!ctype_digit($ts) || abs(time() - (int)$ts) > 60) {
+// issue_session 返回的是活凭证，重放窗口收紧到 15 秒；其余动作 60 秒
+$window = ($action === 'issue_session') ? 15 : 60;
+if (!ctype_digit($ts) || abs(time() - (int)$ts) > $window) {
 	http_response_code(401);
 	fbs_out(401, 'stale or invalid timestamp');
 }
@@ -46,7 +48,7 @@ if (!is_array($params)) {
 	fbs_out(400, 'invalid json');
 }
 
-if ($action !== 'member_find_or_create') {
+if ($action !== 'member_find_or_create' && $action !== 'issue_session') {
 	http_response_code(404);
 	fbs_out(404, 'unknown action');
 }
@@ -55,6 +57,26 @@ if ($action !== 'member_find_or_create') {
 require_once dirname(__FILE__) . '/../../include/common.inc.php';
 $dsql = new dsql($dbo);
 $userLogin = new userLogin($dbo);
+
+if ($action === 'issue_session') {
+	// 只为 Telegram 创建的会员签发（username=tg_<数字>、regfrom=telegram、启用），绝不为其他会员/管理员签发
+	$mid = isset($params['member_id']) ? (string)$params['member_id'] : '';
+	if (!preg_match('/^[1-9][0-9]{0,18}$/', $mid)) {
+		http_response_code(400);
+		fbs_out(400, 'invalid member_id');
+	}
+	$sql = $dsql->SetQuery("SELECT `id`, `password` FROM `#@__member` WHERE `id` = $mid AND `state` = 1 AND `regfrom` = 'telegram' AND `username` REGEXP '^tg_[0-9]+$' LIMIT 1");
+	$rows = $dsql->dsqlOper($sql, "results");
+	if (!$rows) {
+		http_response_code(403);
+		fbs_out(403, 'member not eligible');
+	}
+	global $cfg_cookiePre;
+	$crypt = new RenrenCrypt();
+	$value = base64_encode($crypt->php_encrypt($rows[0]['id'] . '&' . $rows[0]['password']));
+	// 凭证只出现在响应体，不写任何日志；ttl 为建议缓存时长（火鸟凭证本身随密码哈希失效）
+	fbs_out(100, array('cookie_name' => $cfg_cookiePre . $userLogin->keepMemberID, 'cookie_value' => $value, 'ttl' => 300));
+}
 
 $tgId = isset($params['tg_id']) ? (string)$params['tg_id'] : '';
 if (!preg_match('/^[1-9][0-9]{0,18}$/', $tgId)) {

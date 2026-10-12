@@ -37,6 +37,7 @@ function call(baseUrl, secret, action, params = {}) {
 const deal = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'deal', params);
 const orderPaid = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'order_paid', params);
 const cancelOrder = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'cancelOrder', params);
+const issueSession = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'issue_session', params);
 const memberFindOrCreate = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'member_find_or_create', params);
 
-module.exports = { sign, call, deal, orderPaid, cancelOrder, memberFindOrCreate };
+module.exports = { sign, call, deal, orderPaid, cancelOrder, memberFindOrCreate, issueSession };
