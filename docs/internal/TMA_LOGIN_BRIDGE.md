@@ -68,3 +68,12 @@ TMA → `POST /tg-api/auth/telegram {initData}` → Node 验签 → 限频/防�
 - `idempotent` 白名单项必须是 `auth: member`，否则代理构造时即报错。
 - 限流与重放事件的审计按 tg_id 每分钟最多记录一次。
 
+
+## 代理输入加固（独立评审后）
+- **JSON 容器值与数组一律拒收**：上游 `ajax.php` 对「含 `[{`」「可被 json_decode 为数组」的字符串以及数组值跳过 `addslashes`，若落进 SQL 即可注入。代理对所有透传参数丢弃此类值；确需 JSON 的 `order_content` 由专用校验重新序列化。
+- **`waimai:deal` 参数校验**（不合规返回 400，且不占用幂等键）：
+  - `order_content` 仅接受 `[{id, count, ntitle?}]`，`id` 为 1–10 位正整数，`count` 为 1–99 整数，`ntitle` 仅限字母/数字/空格/`,.-_()/`、≤100 字符；其余键丢弃。上游对 `id` 未转义、对 `count` 未校验，故必须在代理层拦截（防 SQL 注入与负数量改价）。
+  - `preset` 只能是字面 `[]`；`shop`、`address` 为正整数；`paytype`/`peitype`/`phone`/`desk`/`lng`/`lat`/`selftime`/`orderTime` 有格式限制。
+- **归属预检**：火鸟对成功结果统一包装为 `{state:100, info:<行>}`，预检以 `state===100` 且 `info` 为对象为通过。
+- **幂等写接口遇网络超时**：结果未知（订单可能已写入），不释放占位，返回 504；同一 `Idempotency-Key` 重试得到 409，避免重复下单，至 TTL（600 秒）后释放。上游返回业务失败（state≠100）则释放占位，可同键重试。
+- **写接口独立限流**：`FB_WRITE_RATE_MAX`（默认每会员每分钟 20）覆盖 `deal`、`cancelOrder`、`operAddress`、`delAddress`；读接口仍用 `FB_RATE_MAX`。

@@ -84,15 +84,25 @@ test('幂等占位：并发第二个请求得到 pending(409)，完成后重复�
   assert.strictEqual(upstream, 1);
 });
 
-test('上游失败释放占位，同键可重试', async () => {
-  const store = createMemoryIdempotencyStore();
+test('上游业务失败(state!=100)释放占位，同键可重试；网络超时结果未知，保留占位', async () => {
   const tokens = createTokenService({ secret: 'shared-secret-0123456', env: 'canary' });
   const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  const rules = { 'waimai:deal': { auth: 'member', idempotent: true } };
+  const req = (key) => ({ service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: { authorization: `Bearer ${token}`, 'idempotency-key': key } });
+
+  // 业务失败 → 释放 → 重试成功
+  const results = [{ state: 101, info: 'busy' }, { state: 100 }];
   let n = 0;
-  const p = createFbProxy({ upstreamBase: 'http://x', tokens, idempotencyStore: store, credentialProvider: async () => 'c=1',
-    fetchImpl: async () => { n += 1; if (n === 1) throw new Error('down'); return { json: async () => ({ state: 100 }) }; },
-    whitelist: { 'waimai:deal': { auth: 'member', idempotent: true } } });
-  const req = { service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'key-retry-1234' } };
-  assert.strictEqual((await p.handle(req)).status, 502);
-  assert.strictEqual((await p.handle(req)).status, 200);
+  const p1 = createFbProxy({ upstreamBase: 'http://x', tokens, idempotencyStore: createMemoryIdempotencyStore(), credentialProvider: async () => 'c=1',
+    fetchImpl: async () => ({ json: async () => results[n++] }), whitelist: rules });
+  assert.strictEqual((await p1.handle(req('key-retry-1234'))).body.state, 101);
+  assert.strictEqual((await p1.handle(req('key-retry-1234'))).body.state, 100);
+
+  // 网络异常 → 504，占位保留 → 同键 409，上游只被调用一次
+  let calls = 0;
+  const p2 = createFbProxy({ upstreamBase: 'http://x', tokens, idempotencyStore: createMemoryIdempotencyStore(), credentialProvider: async () => 'c=1',
+    fetchImpl: async () => { calls += 1; throw new Error('down'); }, whitelist: rules });
+  assert.strictEqual((await p2.handle(req('key-down-12345'))).status, 504);
+  assert.strictEqual((await p2.handle(req('key-down-12345'))).status, 409);
+  assert.strictEqual(calls, 1);
 });

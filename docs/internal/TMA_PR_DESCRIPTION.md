@@ -11,7 +11,7 @@
 | `waimai:getMemberAddress` | cityid, gettype, lat, lng, shopid | 按会话会员过滤；`id`/`userid`/`uid` 不透传 |
 | `waimai:operAddress` | id, address, addressname, areaCode, default, lat, lng, mobile, people, person, street, tel | 编辑带 `id` 时先用同一凭证做归属预检，失败 404 且不转发写操作 |
 | `waimai:delAddress` | id | 归属预检，失败 404 |
-| `waimai:deal` | shop, address, paytype, order_content, preset, note, peitype, phone, desk, lng, lat, selftime, orderTime | 强制 `Idempotency-Key`；占位入共享库；**不透传** quanid、quantype、openlevel、level、usePinput、tprice、peerpay；失败 404 |
+| `waimai:deal` | shop, address, paytype, order_content, preset, note, peitype, phone, desk, lng, lat, selftime, orderTime | 强制 `Idempotency-Key`；占位入共享库；**不透传** quanid、quantype、openlevel、level、usePinput、tprice、peerpay；`order_content` 结构校验（id 正整数、count 1–99，防上游 SQL 注入与负数量改价）；`preset` 仅 `[]`；超时不释放占位（防重复下单）；写接口独立限流；失败 404 |
 | `waimai:order` | page, pageSize, state, iscomment | `userid`/`store`/`courierset` 不透传 |
 | `waimai:orderDetail` | id | 失败映射 404，不返回上游 body；骑手旁路由「不转发 Cookie」封死（有防回归测试） |
 | `waimai:cancelOrder` | id | 失败映射 404 |

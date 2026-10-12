@@ -92,8 +92,8 @@ test('幂等：缺 Idempotency-Key 返回 400；重复键返回首次结果且�
   assert.strictEqual(b.replayed, true);
 });
 
-test('sanitizeParams 丢弃非字符串值（防对象注入）', () => {
-  assert.deepStrictEqual(sanitizeParams({ a: '1', b: { $ne: 1 }, c: ['x', 'y'], d: [{}] }), { a: '1', c: ['x', 'y'] });
+test('sanitizeParams 丢弃数组、对象及 JSON 容器值（上游对其跳过转义）', () => {
+  assert.deepStrictEqual(sanitizeParams({ a: '1', b: { $ne: 1 }, c: ['x', 'y'], d: [{}], e: '[{"a":1}]', f: '[1]', g: '{"a":1}', h: 'plain [text' }), { a: '1', h: 'plain [text' });
 });
 
 test('上游异常返回 502 而非抛出', async () => {

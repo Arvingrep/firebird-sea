@@ -11,6 +11,7 @@ const { createTokenService } = require('../src/tmaToken');
 const tokens = createTokenService({ secret: 'ownership-test-secret-01', env: 'canary' });
 const A = 100;
 const B = 200;
+const VALID_OC = JSON.stringify([{ id: '5', count: 1 }]);
 
 function fakeFirebird() {
   const addresses = { 1: { id: 1, uid: A, person: 'A' }, 2: { id: 2, uid: B, person: 'B-secret' } };
@@ -73,7 +74,12 @@ function fakeFirebird() {
       default:
         out = { state: 200, info: 'unknown' };
     }
-    return { json: async () => out };
+    // 复刻 handlers.class.php getHandle 的包装语义
+    let wrapped;
+    if (out && (out.state === 200 || out.state === 101)) wrapped = { state: 101, info: out.info };
+    else if (out && out.state !== undefined && out.info !== undefined) wrapped = out;
+    else wrapped = { state: 100, info: out };
+    return { json: async () => wrapped };
   }
   return { fetchImpl, log, addresses, orders };
 }
@@ -149,13 +155,13 @@ test('order：携带 userid=B / store 参数仍只返回 A 的订单', async () 
 test('deal：使用 B 的地址 ID 下单 → 404，不创建订单；价格类参数不透传', async () => {
   const { proxy, token, fx } = setup();
   const base = { service: 'waimai', action: 'deal', method: 'POST', headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'key-attack-0001' } };
-  const r = await proxy.handle({ ...base, body: { shop: '1', address: '2', order_content: '[]', tprice: '0', quanid: '9', usePinput: '1', peerpay: '1' } });
+  const r = await proxy.handle({ ...base, body: { shop: '1', address: '2', order_content: VALID_OC, tprice: '0', quanid: '9', usePinput: '1', peerpay: '1' } });
   assert.strictEqual(r.status, 404);
   assert.deepStrictEqual(fx.log.mutations, []);
   const sent = fx.log.requests[0].params;
   for (const k of ['tprice', 'quanid', 'usePinput', 'peerpay']) assert.strictEqual(sent[k], undefined, k);
   // 失败不占位：同一幂等键改用自己的地址可成功
-  const ok = await proxy.handle({ ...base, body: { shop: '1', address: '1', order_content: '[]' } });
+  const ok = await proxy.handle({ ...base, body: { shop: '1', address: '1', order_content: VALID_OC } });
   assert.strictEqual(ok.status, 200);
   assert.deepStrictEqual(fx.log.mutations, [['deal', 1]]);
 });
@@ -206,4 +212,77 @@ test('上游 handler 源码：7 个接口均按会话会员 uid 做归属过滤�
   assert.match(body('cancelOrder'), /o\.`id` = '\$id' AND o\.`uid` = '\$uid'/);
   assert.match(body('orderDetail'), /WHERE `id` = \$id AND `uid` = \$userid/);
   assert.match(body('order'), /o\.`uid` = \$uid/);
+});
+
+test('F2 回归：自己的地址经真实包装 {state:100,info:row} 预检通过，编辑/删除可用', async () => {
+  const { call, fx } = setup();
+  const e = await call('operAddress', { method: 'POST', body: { id: '1', person: 'A2', tel: '123456', address: 'x' } });
+  assert.strictEqual(e.status, 200);
+  assert.deepStrictEqual(fx.log.mutations, [['edit', 1]]);
+  const d = await call('delAddress', { query: { id: '1' } });
+  assert.strictEqual(d.status, 200);
+});
+
+test('F1：order_content 注入与改价被拦截（400，上游不收到请求）', async () => {
+  const { proxy, token, fx } = setup();
+  const h = { authorization: `Bearer ${token}`, 'idempotency-key': 'key-f1-attack-1' };
+  const base = { service: 'waimai', action: 'deal', method: 'POST', headers: h };
+  const bad = [
+    JSON.stringify([{ id: '0 UNION SELECT password FROM x', count: 1 }]),
+    JSON.stringify([{ id: '5', count: -1 }]),
+    JSON.stringify([{ id: '5', count: 0 }]),
+    JSON.stringify([{ id: '5', count: 100 }]),
+    JSON.stringify([{ id: '5', count: 1.5 }]),
+    JSON.stringify([{ id: '5', count: 1, ntitle: "x' OR '1'='1" }]),
+    JSON.stringify([]),
+    JSON.stringify({ id: '5', count: 1 }),
+    '[{"id":"5","count":1}',
+    'not json',
+  ];
+  for (const oc of bad) {
+    const r = await proxy.handle({ ...base, body: { shop: '1', address: '1', order_content: oc } });
+    assert.strictEqual(r.status, 400, oc);
+  }
+  assert.strictEqual(fx.log.requests.length, 0);
+  // 非法 preset / 非数字 shop 同样拒绝；失败请求不占用幂等键
+  assert.strictEqual((await proxy.handle({ ...base, body: { shop: '1', address: '1', order_content: VALID_OC, preset: '[{"title":"x"}]' } })).status, 400);
+  assert.strictEqual((await proxy.handle({ ...base, body: { shop: '1 OR 1=1', address: '1', order_content: VALID_OC } })).status, 400);
+  assert.strictEqual((await proxy.handle({ ...base, body: { shop: '1', address: '1', order_content: VALID_OC } })).status, 200);
+});
+
+test('F1：额外键被丢弃、数量字符串被规整；note 中的 JSON 容器/[{ 不会透传', async () => {
+  const { proxy, token, fx } = setup();
+  const h = { authorization: `Bearer ${token}`, 'idempotency-key': 'key-f1-clean-001' };
+  await proxy.handle({ service: 'waimai', action: 'deal', method: 'POST', headers: h, body: {
+    shop: '1', address: '1', note: '[{"x":"\' OR 1=1 --"}]',
+    order_content: JSON.stringify([{ id: 5, count: '2', price: '0.01', evil: 'x' }]),
+  } });
+  const sent = fx.log.requests[0].params;
+  assert.deepStrictEqual(JSON.parse(sent.order_content), [{ id: '5', count: 2 }]);
+  assert.strictEqual(sent.note, undefined);
+});
+
+test('F3：超时结果未知，不释放幂等占位；同键重试得到 409 而不是第二笔订单', async () => {
+  const tokens2 = tokens;
+  const { token } = tokens2.issue({ tgId: 1, memberId: A });
+  let upstream = 0;
+  const proxy = createFbProxy({ upstreamBase: 'http://x', tokens: tokens2, credentialProvider: async () => `login_user=${A}`,
+    fetchImpl: async () => { upstream += 1; throw new Error('timeout'); } });
+  const req = { service: 'waimai', action: 'deal', method: 'POST', body: { shop: '1', address: '1', order_content: VALID_OC },
+    headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'key-f3-timeout-1' } };
+  assert.strictEqual((await proxy.handle(req)).status, 504);
+  assert.strictEqual((await proxy.handle(req)).status, 409);
+  assert.strictEqual(upstream, 1);
+});
+
+test('F5：写接口使用独立更紧的限流，不影响读接口', async () => {
+  const { limiterFor } = { limiterFor: (max) => { let n = 0; return () => { n += 1; return n <= max; }; } };
+  const fx = fakeFirebird();
+  const { token } = tokens.issue({ tgId: 1, memberId: A });
+  const proxy = createFbProxy({ upstreamBase: 'http://x', tokens, fetchImpl: fx.fetchImpl, credentialProvider: async (m) => `login_user=${m}`,
+    allow: () => true, allowWrite: limiterFor(1) });
+  const h = { authorization: `Bearer ${token}` };
+  assert.strictEqual((await proxy.handle({ service: 'waimai', action: 'cancelOrder', query: { id: '10' }, headers: h })).status, 200);
+  assert.strictEqual((await proxy.handle({ service: 'waimai', action: 'cancelOrder', query: { id: '10' }, headers: h })).status, 429);
+  assert.strictEqual((await proxy.handle({ service: 'waimai', action: 'order', query: {}, headers: h })).status, 200);
 });

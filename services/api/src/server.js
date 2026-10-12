@@ -145,7 +145,9 @@ if (fbUpstream) {
     tokens: auth ? auth.tokens : { verify: () => ({ valid: false }) },
     credentialProvider: auth ? auth.credentialProvider : null,
     idempotencyStore: auth ? auth.idempotencyStore : null,
-    allow: createLimiter({ max: Number(process.env.FB_RATE_MAX || 120), windowSeconds: 60 })
+    allow: createLimiter({ max: Number(process.env.FB_RATE_MAX || 120), windowSeconds: 60 }),
+    // 写接口（下单/取消/地址增删改）单独、更紧的配额，避免刷单骚扰商家
+    allowWrite: createLimiter({ max: Number(process.env.FB_WRITE_RATE_MAX || 20), windowSeconds: 60 })
   });
   router.all('/fb/:service/:action', async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ success: false });
