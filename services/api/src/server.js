@@ -9,6 +9,11 @@ const {
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
+const { createTokenService, createLimiter } = require('./tmaToken');
+const { createMemberMap } = require('./memberMap');
+const { createLoginService } = require('./loginService');
+const { cliConn } = require('./migrate');
+const gatewayClient = require('./gatewayClient');
 
 assertProductionConfig();
 
@@ -67,6 +72,47 @@ router.post('/auth/tg-verify', (req, res) => {
     user: result.user,
     authDate: result.authDate
   });
+});
+
+// 2b. TMA 登录（T2.1–T2.3）：验签 → 映射火鸟会员 → 签发短期令牌。令牌密钥/环境来自环境变量（AD-13）。
+function buildAuth() {
+  const secret = process.env.TMA_TOKEN_SECRET;
+  const env = process.env.TMA_ENV;
+  if (!secret || !env || !process.env.FBS_GATEWAY_URL || !process.env.FBS_GATEWAY_SECRET || !process.env.DB_HOST) return null;
+  const gwCfg = { baseUrl: process.env.FBS_GATEWAY_URL, secret: process.env.FBS_GATEWAY_SECRET };
+  const tokens = createTokenService({ secret, env, ttlSeconds: Number(process.env.TMA_TOKEN_TTL || 900) });
+  const memberMap = createMemberMap({
+    conn: cliConn(),
+    gateway: { memberFindOrCreate: (p) => gatewayClient.memberFindOrCreate(gwCfg, p) }
+  });
+  const loginService = createLoginService({
+    botToken: BOT_TOKEN,
+    tokens,
+    memberMap,
+    allowLogin: createLimiter({ max: Number(process.env.TMA_LOGIN_MAX || 10), windowSeconds: 60 }),
+    allowReplay: createLimiter({ max: Number(process.env.TMA_REPLAY_MAX || 5), windowSeconds: 3600 })
+  });
+  return { tokens, loginService };
+}
+const auth = buildAuth();
+
+router.post('/auth/telegram', async (req, res) => {
+  if (!auth) {
+    return res.status(503).json({ success: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'TMA auth not configured' } });
+  }
+  try {
+    const r = await auth.loginService.login(req.body && req.body.initData);
+    res.status(r.status).json(r.body);
+  } catch (err) {
+    res.status(502).json({ success: false, error: { code: 'LOGIN_FAILED', message: 'Login temporarily unavailable' } });
+  }
+});
+
+router.post('/auth/logout', (req, res) => {
+  if (!auth) return res.status(503).json({ success: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'TMA auth not configured' } });
+  const m = /^Bearer (.+)$/.exec(req.get('authorization') || '');
+  const ok = m ? auth.tokens.revoke(m[1]) : false;
+  res.status(ok ? 200 : 401).json({ success: ok });
 });
 
 // 3. 东南亚 MVP 四大核心模块元数据
