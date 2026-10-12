@@ -10,7 +10,9 @@ function sign(secret, timestamp, action, body) {
 function call(baseUrl, secret, action, params = {}) {
   const body = JSON.stringify(params);
   const timestamp = String(Math.floor(Date.now() / 1000));
-  const url = new URL(`${baseUrl.replace(/\/$/, '')}/${action}`);
+  // 网关入口为 .php 文件时用 ?action= 传递动作（nginx 不做 PATH_INFO 分发）
+  const base = baseUrl.replace(/\/$/, '');
+  const url = new URL(/\.php$/.test(base) ? `${base}?action=${encodeURIComponent(action)}` : `${base}/${action}`);
   const lib = url.protocol === 'https:' ? https : http;
   const headers = {
     'Content-Type': 'application/json',
@@ -34,5 +36,6 @@ function call(baseUrl, secret, action, params = {}) {
 const deal = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'deal', params);
 const orderPaid = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'order_paid', params);
 const cancelOrder = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'cancelOrder', params);
+const memberFindOrCreate = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'member_find_or_create', params);
 
-module.exports = { sign, call, deal, orderPaid, cancelOrder };
+module.exports = { sign, call, deal, orderPaid, cancelOrder, memberFindOrCreate };
