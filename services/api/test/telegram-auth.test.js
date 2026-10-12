@@ -27,15 +27,47 @@ test('缺失 initData / hash 被拒绝', () => {
 });
 
 test('篡改字段或错误 Bot Token 被拒绝', () => {
-  const good = sign({ auth_date: String(nowSec()), query_id: 'q1' });
+  const good = sign({ auth_date: String(nowSec()), query_id: 'q1', user: JSON.stringify({ id: 1 }) });
   const tampered = good.replace('q1', 'q2');
   assert.strictEqual(validateTelegramInitData(tampered, BOT_TOKEN).valid, false);
   assert.strictEqual(validateTelegramInitData(good, 'other-token').valid, false);
 });
 
-test('超过 24 小时的 initData 视为过期', () => {
-  const old = String(nowSec() - 86401);
-  const r = validateTelegramInitData(sign({ auth_date: old }), BOT_TOKEN);
+test('超过 1 小时的 initData 视为过期，1 小时内有效', () => {
+  const user = JSON.stringify({ id: 7 });
+  const old = String(nowSec() - 3601);
+  const r = validateTelegramInitData(sign({ auth_date: old, user }), BOT_TOKEN);
   assert.strictEqual(r.valid, false);
   assert.match(r.error, /expired/);
+  const fresh = String(nowSec() - 3000);
+  assert.strictEqual(validateTelegramInitData(sign({ auth_date: fresh, user }), BOT_TOKEN).valid, true);
+});
+
+test('缺失 auth_date 或 user.id 被拒绝', () => {
+  const user = JSON.stringify({ id: 7 });
+  assert.strictEqual(validateTelegramInitData(sign({ user }), BOT_TOKEN).valid, false);
+  assert.strictEqual(validateTelegramInitData(sign({ auth_date: String(nowSec()) }), BOT_TOKEN).valid, false);
+  const badUser = JSON.stringify({ id: 'abc' });
+  assert.strictEqual(validateTelegramInitData(sign({ auth_date: String(nowSec()), user: badUser }), BOT_TOKEN).valid, false);
+});
+
+test('未来的 auth_date 被拒绝', () => {
+  const user = JSON.stringify({ id: 7 });
+  const r = validateTelegramInitData(sign({ auth_date: String(nowSec() + 3600), user }), BOT_TOKEN);
+  assert.strictEqual(r.valid, false);
+});
+
+test('signature 字段参与 HMAC 数据串：带 signature 的合法 initData 通过，篡改 signature 失败', () => {
+  const user = JSON.stringify({ id: 7 });
+  const fields = { auth_date: String(nowSec()), user, signature: 'AAAA-opaque-signature-value' };
+  const good = sign(fields);
+  assert.strictEqual(validateTelegramInitData(good, BOT_TOKEN).valid, true);
+  const tampered = good.replace('AAAA-opaque-signature-value', 'BBBB-opaque-signature-value');
+  assert.strictEqual(validateTelegramInitData(tampered, BOT_TOKEN).valid, false);
+});
+
+test('hash 格式非法被拒绝（非 64 位十六进制）', () => {
+  const user = JSON.stringify({ id: 7 });
+  const q = new URLSearchParams({ auth_date: String(nowSec()), user, hash: 'zz' }).toString();
+  assert.strictEqual(validateTelegramInitData(q, BOT_TOKEN).valid, false);
 });
