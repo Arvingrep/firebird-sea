@@ -74,7 +74,8 @@ test('PHP 网关：先验签再加载火鸟、仅动作白名单、不改核心'
   const src = fs.readFileSync(path.join(__dirname, '../../../webroot/api/fbs/index.php'), 'utf8');
   assert.ok(src.indexOf('hash_equals') < src.indexOf("require_once dirname(__FILE__) . '/../../include/common.inc.php'"));
   assert.match(src, /hash_hmac\('sha256'/);
-  assert.match(src, /abs\(time\(\) - \(int\)\$ts\) > 60/);
+  assert.match(src, /abs\(time\(\) - \(int\)\$ts\) > \$window/);
+  assert.match(src, /\$window = \(\$action === 'issue_session'\) \? 15 : 60;/);
   assert.match(src, /\$action !== 'member_find_or_create' && \$action !== 'issue_session'/);
   assert.match(src, /preg_match\('\/\^\[1-9\]\[0-9\]\{0,18\}\$\/', \$tgId\)/);
   assert.doesNotMatch(src, /\$_(GET|POST|REQUEST)\['(nickname|username|password)'\]/);
