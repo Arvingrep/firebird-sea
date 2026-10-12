@@ -21,8 +21,9 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
-  QA_CMD=(codex exec -s read-only -)   # 默认异厂商（与 Dev 的 claude 分离）；文档与实现保持一致
+  QA_CMD=(codex exec -s read-only -)   # 默认异厂商（与 Dev 的 claude 分离）
 fi
+command -v "${QA_CMD[0]}" >/dev/null 2>&1 || { echo "❌ QA Agent 命令不存在: ${QA_CMD[0]}" >&2; exit 2; }
 
 ensure_labels
 gh api "repos/${REPO}/pulls/${PR}" --jq '{headRefName: .head.ref, headRefOid: .head.sha, body: .body, title: .title, isCrossRepository: (.head.repo.full_name != .base.repo.full_name)}' > "$TMP/pr.json" 2>/dev/null \
