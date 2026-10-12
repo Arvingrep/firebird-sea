@@ -4,6 +4,10 @@
 因此交付此协议的 PR **不得使用 `Closes #107`** 关闭 Issue；待 owner 填入真实数据与 PR 编号后，才可视为 Story 7.1 完成。
 结论归属：Issue #106 下留评论上报 Arvin；**未经 Arvin 批准，不得将 OpenHands Canvas 设为默认编排器，也不得下线 `dev.sh`/`qa.sh` Shell 管道。**
 
+## 执行归属
+AC1–AC4 需在 owner 本机安装并实跑 Agent Canvas、开真实 PR、在 #106 留评论，Dev Agent 无法代为执行，应作为 owner 人工任务单独跟踪。
+配套校验 `services/api/test/openhands-poc-doc.test.js` 在占位未清除时会失败（未挂入 `npm test`；填完后由 owner 迁入 `scripts/acceptance/story-7-1.sh`）。
+
 ## 边界（RULES §5/§6/§7）
 - 仅本机与 canary 范围；PR 目标分支 `canary`；不触碰生产集群与密钥值，不用 `kubectl` 写操作。
 - canary Story 须低风险、无资金路径（非 waimai / 支付相关）。
@@ -48,7 +52,7 @@
 |---|---|
 | Story 完成率（Intake → 开 PR） | 100%（本次 canary 必须产出 PR） |
 | 人工介入次数 | ≤ 2 次，且不多于 Shell 管道 |
-| Agent 失败后可自动恢复率 | ≥ 80% |
+| Agent 失败后恢复 | 以绝对计数记「恢复次数/失败次数」，须全部恢复；失败为 0 记 N/A（单样本不用百分比） |
 | QA 返工次数 | ≤ 1 轮，且不多于 Shell 管道 |
 | 完成耗时 | ≤ Shell 管道的 1.5 倍 |
 | 门禁 | `ci-verify.yml` 一次过，且无新增豁免 |
@@ -59,6 +63,7 @@
 - 结论（替换 / 部分替换 / 不替换）：待定。
 - 未达标阈值项与原因：待填。
 - 上报：在 Issue #106 下留结论评论，并通知 Arvin 决策。
+- 评论链接（形如 `…/issues/106#issuecomment-<id>`）：待填。
 
 ## 五、密钥与集群红线（AC5）
 全程不读取、不记录任何密钥值；产物仅限本地与 canary；遵守 `.agents/RULES.md` 第 6、7 节。
