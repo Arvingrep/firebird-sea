@@ -23,7 +23,11 @@ const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || DEMO_BOT_TOKEN;
 const coinsClient = new CoinsPhClient();
 
-app.use(cors());
+// H2：置于 Traefik 之后，按配置的跳数信任 X-Forwarded-For，否则 req.ip 为 LB 地址（匿名限流变全局单桶）
+if (process.env.TRUST_PROXY_HOPS) app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS));
+// M4：CORS 白名单（逗号分隔 origin）；未配置时保持原行为，避免破坏既有调用方
+const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
 app.use(express.json());
 
 // AD-9：Node 路由统一挂在 /tg-api，/api 前缀留给火鸟 PHP（含 /api/payment/notify.php）
@@ -43,7 +47,9 @@ app.get(['/', '/health'], healthHandler);
 router.get('/health', healthHandler);
 
 // 2. Telegram Mini App 鉴权接口
+const allowLegacyVerify = createLimiter({ max: 30, windowSeconds: 60 });
 router.post('/auth/tg-verify', (req, res) => {
+  if (!allowLegacyVerify(req.ip)) return res.status(429).json({ success: false, error: 'Too many requests' });
   const { initData } = req.body;
   if (!initData) {
     return res.status(400).json({ success: false, error: 'Missing initData' });

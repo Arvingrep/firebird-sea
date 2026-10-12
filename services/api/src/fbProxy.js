@@ -34,7 +34,11 @@ function sanitizeParams(query) {
 function createFbProxy({
   upstreamBase, fetchImpl = globalThis.fetch, tokens, whitelist = WHITELIST,
   allow = () => true, credentialProvider = null, idempotencyTtlSeconds = 600, now = () => Date.now(),
+  timeoutMs = 8000,
 }) {
+  for (const [name, rule] of Object.entries(whitelist)) {
+    if (rule.idempotent && rule.auth !== 'member') throw new Error(`白名单 ${name}: idempotent 规则必须 auth=member`);
+  }
   const idem = new Map(); // key -> { at, status, body }
 
   function purge() {
@@ -92,14 +96,15 @@ function createFbProxy({
     }
 
     let res;
-    try { res = await fetchImpl(url, init); } catch (e) {
+    try { res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }); } catch (e) {
       return { status: 502, body: { success: false, error: { code: 'UPSTREAM_UNAVAILABLE', message: 'Upstream unavailable' } } };
     }
     let json;
     try { json = await res.json(); } catch (e) {
       return { status: 502, body: { success: false, error: { code: 'UPSTREAM_INVALID', message: 'Upstream returned invalid data' } } };
     }
-    if (idemKey) idem.set(idemKey, { at: now(), status: 200, body: json });
+    // 仅缓存确认成功（火鸟 state=100）的响应，失败可被客户端用同一键重试
+    if (idemKey && json && json.state === 100) idem.set(idemKey, { at: now(), status: 200, body: json });
     return { status: 200, body: json };
   }
 

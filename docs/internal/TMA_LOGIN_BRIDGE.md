@@ -56,3 +56,14 @@ TMA → `POST /tg-api/auth/telegram {initData}` → Node 验签 → 限频/防�
 |---|---|
 | `FB_UPSTREAM_URL` | 上游 ajax.php 完整 URL；未设置则不挂载代理路由 |
 | `FB_RATE_MAX` | 可选，每分钟请求上限 |
+
+## 运行参数补充（评审后）
+| 变量 | 说明 |
+|---|---|
+| `TRUST_PROXY_HOPS` | 置于 Traefik 后时设为 1，使 `req.ip` 取真实客户端地址，否则匿名限流退化为全局单桶 |
+| `CORS_ORIGINS` | 逗号分隔的允许来源（如 `https://canary.fbird.men`）；未设置保持原行为 |
+| `FBS_GATEWAY_TIMEOUT_MS` | 网关调用超时，默认 8000；代理上游超时同为 8 秒 |
+
+- 幂等缓存只保存火鸟 `state=100` 的成功响应；失败可用同一 `Idempotency-Key` 重试。
+- `idempotent` 白名单项必须是 `auth: member`，否则代理构造时即报错。
+- 限流与重放事件的审计按 tg_id 每分钟最多记录一次。

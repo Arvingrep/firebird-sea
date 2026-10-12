@@ -11,10 +11,12 @@ const firstInt = (out) => {
 
 function createMemberMap({ conn, gateway }) {
   async function lookup(tgId) {
+    if (!isTgId(tgId)) throw new Error('invalid tg id');
     return firstInt(await conn.query(`SELECT member_id FROM fbs_member_map WHERE tg_user_id = '${tgId}' LIMIT 1`));
   }
 
   async function audit(tgId, action, target, detail = '') {
+    if (!isTgId(tgId)) throw new Error('invalid tg id');
     await conn.query(
       `INSERT INTO fbs_audit (actor_role, actor_id, action, target, detail) VALUES ('customer', '${tgId}', ${sqlStr(action)}, ${sqlStr(target)}, ${sqlStr(detail)})`
     );

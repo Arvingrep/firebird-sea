@@ -57,6 +57,13 @@ test('同一 tg_id 高频登录返回 429 并写审计', async () => {
   assert.ok(auditLog.includes('77:login_rate_limited'));
 });
 
+test('限流审计采样：窗口内重复 429 只写一条审计', async () => {
+  const { svc, auditLog } = build();
+  for (let i = 0; i < 3; i += 1) await svc.login(initFor(66, { query_id: `q${i}` }));
+  for (let i = 0; i < 5; i += 1) await svc.login(initFor(66, { query_id: `x${i}` }));
+  assert.strictEqual(auditLog.filter((a) => a === '66:login_rate_limited').length, 1);
+});
+
 test('同一 initData 重复换发超过上限返回 429', async () => {
   const { svc } = build();
   const data = initFor(88);

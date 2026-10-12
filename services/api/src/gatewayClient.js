@@ -28,6 +28,7 @@ function call(baseUrl, secret, action, params = {}) {
         try { resolve(JSON.parse(data)); } catch (e) { reject(new Error(`网关返回非 JSON: ${data.slice(0, 200)}`)); }
       });
     });
+    req.setTimeout(Number(process.env.FBS_GATEWAY_TIMEOUT_MS || 8000), () => req.destroy(new Error('网关请求超时')));
     req.on('error', reject);
     req.end(body);
   });

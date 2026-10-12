@@ -93,3 +93,27 @@ test('上游异常返回 502 而非抛出', async () => {
   const p = createFbProxy({ upstreamBase: 'http://php/a', fetchImpl: async () => { throw new Error('down'); }, tokens });
   assert.strictEqual((await p.handle({ service: 'article', action: 'type', query: {} })).status, 502);
 });
+
+test('idempotent 规则必须配 auth=member，否则构造即失败', () => {
+  assert.throws(() => createFbProxy({ upstreamBase: 'http://x', tokens, whitelist: { 'a:b': { auth: 'anonymous', idempotent: true } } }));
+});
+
+test('幂等只缓存 state=100 的响应，失败可用同一键重试', async () => {
+  const wl = { 'waimai:deal': { auth: 'member', idempotent: true } };
+  const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  const results = [{ state: 200, info: 'busy' }, { state: 100, info: { ordernum: 'O1' } }];
+  let n = 0;
+  const p = createFbProxy({ upstreamBase: 'http://php/a', fetchImpl: async () => okJson(results[n++]), tokens, whitelist: wl, credentialProvider: async () => 'c=1' });
+  const req = { service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'retry-key-1234' } };
+  assert.strictEqual((await p.handle(req)).body.state, 200);
+  assert.strictEqual((await p.handle(req)).body.state, 100);
+  assert.strictEqual((await p.handle(req)).replayed, true);
+  assert.strictEqual(n, 2);
+});
+
+test('上游请求带超时信号', async () => {
+  let signal;
+  const p = createFbProxy({ upstreamBase: 'http://php/a', fetchImpl: async (u, init) => { signal = init.signal; return okJson({ state: 100 }); }, tokens });
+  await p.handle({ service: 'article', action: 'type', query: {} });
+  assert.ok(signal instanceof AbortSignal);
+});
