@@ -21,7 +21,7 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
-  QA_CMD=(claude -p --max-turns 10 -)
+  QA_CMD=(codex exec -s read-only -)   # 默认异厂商（与 Dev 的 claude 分离）；文档与实现保持一致
 fi
 
 ensure_labels
