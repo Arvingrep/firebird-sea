@@ -164,6 +164,26 @@ if (fbUpstream) {
   });
 }
 
+// 2d. TMA 静态资源（T3.4）：同域 /tma/ 由 api 托管构建产物，不新增部署单元（AD-16）。仅在目录存在时挂载。
+const tmaStaticDir = process.env.TMA_STATIC_DIR;
+if (tmaStaticDir && require('node:fs').existsSync(tmaStaticDir)) {
+  // CSP：脚本只允许自身与 Telegram 官方脚本；只允许被 Telegram 内嵌；连接仅限同源（代理）
+  const TMA_CSP = "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: https:; connect-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org; base-uri 'self'";
+  app.use('/tma', (req, res, next) => {
+    res.setHeader('Content-Security-Policy', TMA_CSP);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
+  app.use('/tma', express.static(tmaStaticDir, {
+    index: 'index.html',
+    maxAge: '1h',
+    setHeaders(res, file) { if (file.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache'); }
+  }));
+  app.get('/tma', (req, res) => res.redirect(301, '/tma/'));
+}
+
 // 3. 东南亚 MVP 四大核心模块元数据
 router.get('/services', (req, res) => {
   res.json({
