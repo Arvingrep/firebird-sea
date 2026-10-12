@@ -77,3 +77,10 @@ TMA → `POST /tg-api/auth/telegram {initData}` → Node 验签 → 限频/防�
 - **归属预检**：火鸟对成功结果统一包装为 `{state:100, info:<行>}`，预检以 `state===100` 且 `info` 为对象为通过。
 - **幂等写接口遇网络超时**：结果未知（订单可能已写入），不释放占位，返回 504；同一 `Idempotency-Key` 重试得到 409，避免重复下单，至 TTL（600 秒）后释放。上游返回业务失败（state≠100）则释放占位，可同键重试。
 - **写接口独立限流**：`FB_WRITE_RATE_MAX`（默认每会员每分钟 20）覆盖 `deal`、`cancelOrder`、`operAddress`、`delAddress`；读接口仍用 `FB_RATE_MAX`。
+
+## TMA 前端与静态托管（Epic T4 / T3.4）
+- 工程：`apps/tma`（Vite + Vue 3 + TS + vue-router(hash) + Pinia + `@telegram-apps/sdk` + Vant 4）。`npm run build` 产物在 `dist/`，`base` 为 `/tma/`。
+- 托管：`deploy/docker/Dockerfile.api` 增加 `tma-build` 阶段，产物复制到镜像 `/app/tma`；`TMA_STATIC_DIR` 指向该目录时，api 在 `/tma/` 提供静态资源，并设置 CSP（脚本仅限自身与 telegram.org、仅允许被 Telegram 内嵌、连接仅限同源）、`nosniff`、`no-referrer`。
+- 路由：Traefik 需把 `/tma` 指向 api 服务（与 `/tg-api` 同级，优先级高于 PHP）；由 Helm 的 `tma.enabled` 打开（#95，默认关闭，canary 启用见独立 PR）。
+- 开发：`npm run dev` 时 `/tg-api` 代理到 `TMA_DEV_API`（默认 `http://localhost:3000`），同源无 CORS。
+- 页面（当前）：商家列表（`waimai/shopList`）、菜单（`foodType`、`food`）、购物车（跨商家需确认）。下单、地址、订单见后续 PR（依赖会员级白名单评审）。

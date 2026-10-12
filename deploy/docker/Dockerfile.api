@@ -11,6 +11,12 @@ COPY services/api/package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi \
     && npm cache clean --force
 
+# Stage 1b: TMA 前端构建（有 index.html 才构建；产物由 api 在 /tma/ 托管，不新增部署单元）
+FROM node:20-alpine AS tma-build
+WORKDIR /tma
+COPY apps/tma/ ./
+RUN if [ -f index.html ]; then npm ci --no-audit --no-fund && npm run build; else mkdir -p dist; fi
+
 # Stage 2: Minimal Runtime (安全无特权运行时)
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -25,6 +31,8 @@ RUN apk add --no-cache mariadb-client
 COPY --chown=node:node --from=builder /app/node_modules ./node_modules
 COPY --chown=node:node services/api/src ./src
 COPY --chown=node:node services/api/package.json ./
+COPY --chown=node:node --from=tma-build /tma/dist ./tma
+ENV TMA_STATIC_DIR=/app/tma
 
 # 切换为标准无特权账号
 USER node

@@ -1,0 +1,70 @@
+<script setup lang="ts">
+import { ref, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { fb, i18n } from '../services';
+
+interface Cat { id: string | number; typename: string }
+interface Article { id: string; title: string; litpic?: string; pubdate?: number | string; description?: string }
+const router = useRouter();
+const t = (k: string) => i18n.t(k);
+const cats = ref<Cat[]>([]);
+const active = ref(0);
+const list = ref<Article[]>([]);
+const page = ref(1);
+const finished = ref(false);
+const loading = ref(true);
+const failed = ref(false);
+const PAGE_SIZE = 10;
+
+async function loadList(reset: boolean) {
+  if (reset) { page.value = 1; finished.value = false; list.value = []; }
+  loading.value = true;
+  failed.value = false;
+  try {
+    const typeid = cats.value[active.value]?.id;
+    const info = await fb.get('article', 'alist', { page: page.value, pageSize: PAGE_SIZE, typeid }, { anonymous: true });
+    const rows: Article[] = Array.isArray(info?.list) ? info.list : [];
+    list.value = reset ? rows : list.value.concat(rows);
+    const total = Number(info?.pageInfo?.totalPage || 1);
+    finished.value = page.value >= total || rows.length === 0;
+    page.value += 1;
+  } catch (e) {
+    failed.value = true;
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(async () => {
+  try {
+    const info = await fb.get('article', 'type', {}, { anonymous: true });
+    cats.value = Array.isArray(info) ? info : [];
+  } catch { /* 分类失败时仍展示全部资讯 */ }
+  await loadList(true);
+});
+watch(active, () => loadList(true));
+const date = (v?: number | string) => (v ? new Date(Number(v) * 1000).toLocaleDateString() : '');
+</script>
+
+<template>
+  <div class="page">
+    <van-tabs v-if="cats.length" v-model:active="active" shrink>
+      <van-tab v-for="c in cats" :key="c.id" :title="c.typename" />
+    </van-tabs>
+    <van-empty v-if="!loading && !failed && list.length === 0" :description="t('news.empty')" />
+    <van-cell
+      v-for="a in list"
+      :key="a.id"
+      :title="a.title"
+      :label="date(a.pubdate)"
+      is-link
+      @click="router.push({ name: 'news-detail', params: { id: a.id } })"
+    />
+    <van-loading v-if="loading" vertical>{{ t('common.loading') }}</van-loading>
+    <div v-if="failed">
+      <p class="hint">{{ t('news.loadFailed') }}</p>
+      <van-button size="small" @click="loadList(page === 1)">{{ t('common.retry') }}</van-button>
+    </div>
+    <van-button v-else-if="!loading && !finished" block plain @click="loadList(false)">{{ t('news.more') }}</van-button>
+  </div>
+</template>
