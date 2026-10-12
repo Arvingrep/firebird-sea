@@ -52,3 +52,15 @@ jobs:
           gh pr create -R "$REPO" --base "$BASE" --head "$B" \
             --title "chore(bmad): Story ${ID} -> done (#${PR_NUMBER})" \
             --body "自动回写：PR #${PR_NUMBER} 已合并，\`${KEY}\` 置 \`done\`。仅改 \`sprint-status.yaml\`，无运行时影响，请人工合并。"
+      - name: 自动续派下一个 Story（RULES §7 自主推进）
+        if: ${{ vars.AGENT_AUTO_CONTINUE != '0' }}
+        env:
+          BMAD_EPICS_FILE: ${{ vars.BMAD_EPICS_FILE }}   # 可选：覆盖 epics 文件（如 planning-artifacts/epics-tma-frontend.md）
+        run: |
+          set -euo pipefail
+          # 当前工作区在回写分支上，sprint-status.yaml 已置 done（无需等回写 PR 被人合并），
+          # 据此选出下一个可开工的 backlog Story 并建 Issue（agent:dev 触发 Dev Agent）。
+          # story-to-issue.js 自带护栏：依赖未满足不派、在途 Issue ≥1 不派、已有同 key Issue 去重。
+          ARGS=(--create --query-gh)
+          [ -n "${BMAD_EPICS_FILE:-}" ] && ARGS+=(--epics "_bmad-output/${BMAD_EPICS_FILE#_bmad-output/}")
+          node scripts/bmad/story-to-issue.js "${ARGS[@]}" || echo "::warning::续派失败或无可开工 Story（见上方输出），不阻塞回写"
