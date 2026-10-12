@@ -22,6 +22,15 @@ spec:
         - name: firebird-{{ .Values.siteId }}
           port: {{ .Values.service.port }}
     {{- end }}
+    {{- if and .Values.api.enabled .Values.tma.enabled }}
+    # TMA 静态资源由 api 服务托管（AD-16：不新增部署单元）。/api/fbs 的 403 规则优先级更高，不受影响
+    - kind: Rule
+      match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tma`)
+      priority: 100
+      services:
+        - name: firebird-api-{{ .Values.siteId }}
+          port: {{ .Values.api.service.port | default 3000 }}
+    {{- end }}
     {{- if .Values.api.enabled }}
     - kind: Rule
       match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tg-api`)
