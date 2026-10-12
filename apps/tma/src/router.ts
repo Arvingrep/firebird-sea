@@ -7,6 +7,8 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'home', component: () => import('./pages/Home.vue') },
     { path: '/shop/:id(\\d+)', name: 'shop', component: () => import('./pages/Shop.vue'), props: true },
+    { path: '/news', name: 'news', component: () => import('./pages/News.vue') },
+    { path: '/news/:id(\\d+)', name: 'news-detail', component: () => import('./pages/NewsDetail.vue'), props: true },
     { path: '/cart', name: 'cart', component: () => import('./pages/Cart.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
