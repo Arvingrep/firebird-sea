@@ -117,3 +117,18 @@ test('上游请求带超时信号', async () => {
   await p.handle({ service: 'article', action: 'type', query: {} });
   assert.ok(signal instanceof AbortSignal);
 });
+
+test('规则级 params 白名单：未列出的参数（含 userid/store）不会透传，GET 与 POST 均适用', async () => {
+  const wl = { 'waimai:order': { auth: 'member', params: ['page', 'pageSize', 'state'] } };
+  const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  const seen = [];
+  const p = createFbProxy({ upstreamBase: 'http://php/a', tokens, whitelist: wl, credentialProvider: async () => 'c=1',
+    fetchImpl: async (url, init) => { seen.push({ url, body: init.body }); return okJson({ state: 100 }); } });
+  const h = { authorization: `Bearer ${token}` };
+  await p.handle({ service: 'waimai', action: 'order', query: { page: '1', userid: '9', store: '3', state: '1' }, headers: h });
+  const u = new URL(seen[0].url);
+  assert.deepStrictEqual([...u.searchParams.keys()].sort(), ['action', 'page', 'platform_name', 'service', 'state']);
+  await p.handle({ service: 'waimai', action: 'order', method: 'POST', body: { page: '2', userid: '9' }, headers: h });
+  assert.strictEqual(new URLSearchParams(seen[1].body).has('userid'), false);
+  assert.strictEqual(new URLSearchParams(seen[1].body).get('page'), '2');
+});

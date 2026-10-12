@@ -3,6 +3,7 @@
 // 首轮白名单仅含纯展示类只读接口（Arvin 2026-10-12 拍板）；orderDetail 等涉订单/资金路径的接口须单独评审后加入。
 
 // auth: 'anonymous' 无需令牌；'member' 需有效令牌（T3.2 注入凭证）。idempotent: 要求 Idempotency-Key。
+// params（可选）：该接口允许透传的参数名白名单；设置后其余参数一律丢弃（防越权类参数如 userid、store）。
 const { createMemoryIdempotencyStore } = require('./sharedState');
 
 const WHITELIST = Object.freeze({
@@ -22,9 +23,10 @@ const STRIPPED_EXACT = new Set([
 ]);
 const STRIPPED_PREFIXES = ['platform_', 'hn_'];
 
-function sanitizeParams(query) {
+function sanitizeParams(query, allowed = null) {
   const out = {};
   for (const [k, v] of Object.entries(query || {})) {
+    if (allowed && !allowed.includes(k)) continue;
     const lk = k.toLowerCase();
     if (STRIPPED_EXACT.has(lk) || STRIPPED_PREFIXES.some((p) => lk.startsWith(p))) continue;
     if (typeof v === 'string') out[k] = v;
@@ -73,7 +75,7 @@ function createFbProxy({
       }
     }
 
-    const params = { ...sanitizeParams(query), service, action, platform_name: 'tma' };
+    const params = { ...sanitizeParams(query, rule.params), service, action, platform_name: 'tma' };
     let cookie = null;
     if (claims) {
       if (!credentialProvider) {
@@ -95,7 +97,7 @@ function createFbProxy({
     let url = `${upstreamBase}?${qs.toString()}`;
     if (init.method === 'POST') {
       const form = new URLSearchParams();
-      for (const [k, v] of Object.entries(sanitizeParams(body))) (Array.isArray(v) ? v : [v]).forEach((x) => form.append(k, x));
+      for (const [k, v] of Object.entries(sanitizeParams(body, rule.params))) (Array.isArray(v) ? v : [v]).forEach((x) => form.append(k, x));
       init.headers['Content-Type'] = 'application/x-www-form-urlencoded';
       init.body = form.toString();
       url = `${upstreamBase}?${new URLSearchParams({ service, action, platform_name: 'tma' }).toString()}`;
