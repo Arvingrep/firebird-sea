@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
 import { i18n } from '../services';
 import { useCartStore } from '../stores/cart';
 import { formatPhp } from '../lib/cart.js';
 
 const cart = useCartStore();
+const router = useRouter();
 const t = (k: string) => i18n.t(k);
 </script>
 
@@ -17,6 +19,7 @@ const t = (k: string) => i18n.t(k);
         </template>
       </van-cell>
       <van-cell :title="t('cart.total')" :value="formatPhp(cart.totalCents)" />
+      <van-button block type="primary" :disabled="!cart.canCheckout" @click="router.push({ name: 'checkout' })">{{ t('cart.checkout') }}</van-button>
       <van-button block plain @click="cart.clear()">{{ t('cart.clear') }}</van-button>
     </template>
   </div>

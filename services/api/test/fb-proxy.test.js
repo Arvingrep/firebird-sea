@@ -15,7 +15,7 @@ function proxyWith(over = {}) {
 
 test('白名单外的 service+action 返回 403 且不转发', async () => {
   const { p, calls } = proxyWith();
-  for (const [service, action] of [['waimai', 'deal'], ['article', 'orderDetail'], ['waimai', 'orderDetail'], ['member', 'login'], ['siteConfig', 'config']]) {
+  for (const [service, action] of [['article', 'orderDetail'], ['waimai', 'getAddressDetail'], ['member', 'login'], ['siteConfig', 'config'], ['waimai', 'paySuccess'], ['waimai', 'pay']]) {
     const r = await p.handle({ service, action, query: {} });
     assert.strictEqual(r.status, 403, `${service}:${action}`);
   }
@@ -23,10 +23,17 @@ test('白名单外的 service+action 返回 403 且不转发', async () => {
 });
 
 test('首轮白名单仅含 7 个纯展示接口，且全部匿名', () => {
-  assert.deepStrictEqual(Object.keys(WHITELIST).sort(), [
+  const anon = Object.entries(WHITELIST).filter(([, r]) => r.auth === 'anonymous').map(([k]) => k).sort();
+  assert.deepStrictEqual(anon, [
     'article:alist', 'article:detail', 'article:type', 'waimai:food', 'waimai:foodType', 'waimai:shopList', 'waimai:storeDetail',
   ]);
-  assert.ok(Object.values(WHITELIST).every((r) => r.auth === 'anonymous'));
+  const member = Object.entries(WHITELIST).filter(([, r]) => r.auth === 'member').map(([k]) => k).sort();
+  assert.deepStrictEqual(member, [
+    'waimai:cancelOrder', 'waimai:deal', 'waimai:delAddress', 'waimai:getMemberAddress', 'waimai:operAddress', 'waimai:order', 'waimai:orderDetail',
+  ]);
+  assert.strictEqual(WHITELIST['article:orderDetail'], undefined);
+  for (const [k, r] of Object.entries(WHITELIST)) if (r.auth === 'member') assert.ok(Array.isArray(r.params), `${k} 必须声明参数白名单`);
+  assert.strictEqual(WHITELIST['waimai:deal'].idempotent, true);
 });
 
 test('身份与旁路参数被剥离，不带客户端 Cookie，强制 platform_name=tma', async () => {

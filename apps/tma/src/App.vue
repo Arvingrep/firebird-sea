@@ -19,6 +19,7 @@ const badge = computed(() => cart.count || undefined);
     <van-tabbar route>
       <van-tabbar-item to="/" icon="shop-o">{{ t('nav.food') }}</van-tabbar-item>
       <van-tabbar-item to="/news" icon="newspaper-o">{{ t('nav.news') }}</van-tabbar-item>
+      <van-tabbar-item to="/orders" icon="orders-o">{{ t('nav.orders') }}</van-tabbar-item>
       <van-tabbar-item to="/cart" icon="cart-o" :badge="badge">{{ t('nav.cart') }}</van-tabbar-item>
     </van-tabbar>
   </div>
