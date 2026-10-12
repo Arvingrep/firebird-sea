@@ -22,7 +22,7 @@ function createLoginService({ botToken, tokens, memberMap, allowLogin, allowRepl
       return { status: 429, body: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many login attempts' } } };
     }
     // 同一 initData 换发次数受限（防囤积重放）
-    if (!allowReplay(`h:${v.hash}`)) {
+    if (!(await allowReplay(`h:${v.hash}`))) {
       await auditLimited(tgId, 'login_replay_limited');
       return { status: 429, body: { success: false, error: { code: 'REPLAY_LIMITED', message: 'initData reused too many times' } } };
     }

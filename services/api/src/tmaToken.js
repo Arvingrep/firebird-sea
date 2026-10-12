@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 
 const b64 = (buf) => Buffer.from(buf).toString('base64url');
 
-function createTokenService({ secret, env, ttlSeconds = 900, now = () => Math.floor(Date.now() / 1000) }) {
+function createTokenService({ secret, env, ttlSeconds = 900, now = () => Math.floor(Date.now() / 1000), revocation = null }) {
   if (!secret || String(secret).length < 16) throw new Error('TMA_TOKEN_SECRET 缺失或过短');
   if (!env) throw new Error('TMA_ENV 缺失');
   const revoked = new Map(); // jti -> exp（过期后清理）
@@ -37,7 +37,7 @@ function createTokenService({ secret, env, ttlSeconds = 900, now = () => Math.fl
     if (p.env !== env) return { valid: false, error: 'wrong_env' };
     if (!(p.exp > now())) return { valid: false, error: 'expired' };
     purge();
-    if (revoked.has(p.jti)) return { valid: false, error: 'revoked' };
+    if (revoked.has(p.jti) || (revocation && revocation.isRevoked(p.jti))) return { valid: false, error: 'revoked' };
     return { valid: true, claims: p };
   }
 
@@ -48,7 +48,16 @@ function createTokenService({ secret, env, ttlSeconds = 900, now = () => Math.fl
     return true;
   }
 
-  return { issue, verify, revoke };
+  // 同时写本地与共享后端（跨副本生效）；持久化失败时抛错，由调用方决定如何回应
+  async function revokeAsync(token) {
+    const r = verify(token);
+    if (!r.valid) return false;
+    revoked.set(r.claims.jti, r.claims.exp);
+    if (revocation) await revocation.revoke(r.claims.jti, r.claims.exp);
+    return true;
+  }
+
+  return { issue, verify, revoke, revokeAsync };
 }
 
 // 固定窗口计数器：key 在 windowSeconds 内最多 max 次

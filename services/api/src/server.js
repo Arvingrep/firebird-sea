@@ -15,6 +15,8 @@ const { createLoginService } = require('./loginService');
 const { cliConn } = require('./migrate');
 const gatewayClient = require('./gatewayClient');
 const { createFbProxy } = require('./fbProxy');
+const { createCredentialProvider } = require('./credentialProvider');
+const { createRevocationStore, createReplayCounter, createIdempotencyStore } = require('./sharedState');
 
 assertProductionConfig();
 
@@ -87,19 +89,27 @@ function buildAuth() {
   const env = process.env.TMA_ENV;
   if (!secret || !env || !process.env.FBS_GATEWAY_URL || !process.env.FBS_GATEWAY_SECRET || !process.env.DB_HOST) return null;
   const gwCfg = { baseUrl: process.env.FBS_GATEWAY_URL, secret: process.env.FBS_GATEWAY_SECRET };
-  const tokens = createTokenService({ secret, env, ttlSeconds: Number(process.env.TMA_TOKEN_TTL || 900) });
+  // 吊销、重放计数、幂等占位放共享库，api 可多副本运行（决定 3=B）
+  const conn = cliConn();
+  const revocation = createRevocationStore({ conn });
+  revocation.start();
+  const tokens = createTokenService({ secret, env, ttlSeconds: Number(process.env.TMA_TOKEN_TTL || 900), revocation });
   const memberMap = createMemberMap({
-    conn: cliConn(),
+    conn,
     gateway: { memberFindOrCreate: (p) => gatewayClient.memberFindOrCreate(gwCfg, p) }
   });
+  const credentialProvider = createCredentialProvider({
+    gateway: { issueSession: (p) => gatewayClient.issueSession(gwCfg, p) }
+  });
+  const idempotencyStore = createIdempotencyStore({ conn });
   const loginService = createLoginService({
     botToken: BOT_TOKEN,
     tokens,
     memberMap,
     allowLogin: createLimiter({ max: Number(process.env.TMA_LOGIN_MAX || 10), windowSeconds: 60 }),
-    allowReplay: createLimiter({ max: Number(process.env.TMA_REPLAY_MAX || 5), windowSeconds: 3600 })
+    allowReplay: createReplayCounter({ conn, max: Number(process.env.TMA_REPLAY_MAX || 5), ttlSeconds: 3600 })
   });
-  return { tokens, loginService };
+  return { tokens, loginService, credentialProvider, idempotencyStore };
 }
 const auth = buildAuth();
 
@@ -115,11 +125,15 @@ router.post('/auth/telegram', async (req, res) => {
   }
 });
 
-router.post('/auth/logout', (req, res) => {
+router.post('/auth/logout', async (req, res) => {
   if (!auth) return res.status(503).json({ success: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'TMA auth not configured' } });
   const m = /^Bearer (.+)$/.exec(req.get('authorization') || '');
-  const ok = m ? auth.tokens.revoke(m[1]) : false;
-  res.status(ok ? 200 : 401).json({ success: ok });
+  try {
+    const ok = m ? await auth.tokens.revokeAsync(m[1]) : false;
+    res.status(ok ? 200 : 401).json({ success: ok });
+  } catch (err) {
+    res.status(502).json({ success: false, error: { code: 'LOGOUT_FAILED', message: 'Please retry' } });
+  }
 });
 
 // 2c. 火鸟白名单代理（T3.1/T3.3）：/tg-api/fb/:service/:action → 上游 ajax.php；默认拒绝（AD-20）。
@@ -129,6 +143,8 @@ if (fbUpstream) {
   const proxy = createFbProxy({
     upstreamBase: fbUpstream,
     tokens: auth ? auth.tokens : { verify: () => ({ valid: false }) },
+    credentialProvider: auth ? auth.credentialProvider : null,
+    idempotencyStore: auth ? auth.idempotencyStore : null,
     allow: createLimiter({ max: Number(process.env.FB_RATE_MAX || 120), windowSeconds: 60 })
   });
   router.all('/fb/:service/:action', async (req, res) => {

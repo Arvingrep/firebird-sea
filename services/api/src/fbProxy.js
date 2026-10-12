@@ -3,6 +3,8 @@
 // 首轮白名单仅含纯展示类只读接口（Arvin 2026-10-12 拍板）；orderDetail 等涉订单/资金路径的接口须单独评审后加入。
 
 // auth: 'anonymous' 无需令牌；'member' 需有效令牌（T3.2 注入凭证）。idempotent: 要求 Idempotency-Key。
+const { createMemoryIdempotencyStore } = require('./sharedState');
+
 const WHITELIST = Object.freeze({
   'waimai:shopList': { auth: 'anonymous' },
   'waimai:storeDetail': { auth: 'anonymous' },
@@ -34,18 +36,12 @@ function sanitizeParams(query) {
 function createFbProxy({
   upstreamBase, fetchImpl = globalThis.fetch, tokens, whitelist = WHITELIST,
   allow = () => true, credentialProvider = null, idempotencyTtlSeconds = 600, now = () => Date.now(),
-  timeoutMs = 8000,
+  timeoutMs = 8000, idempotencyStore = null,
 }) {
+  const idemStore = idempotencyStore || createMemoryIdempotencyStore({ ttlSeconds: idempotencyTtlSeconds, now });
   for (const [name, rule] of Object.entries(whitelist)) {
     if (rule.idempotent && rule.auth !== 'member') throw new Error(`白名单 ${name}: idempotent 规则必须 auth=member`);
   }
-  const idem = new Map(); // key -> { at, status, body }
-
-  function purge() {
-    const t = now();
-    for (const [k, v] of idem) if (t - v.at > idempotencyTtlSeconds * 1000) idem.delete(k);
-  }
-
   // 返回 { status, body }，由路由层写出
   async function handle({ service, action, query, method = 'GET', body, headers = {}, clientKey = 'anon' }) {
     const rule = whitelist[`${service}:${action}`];
@@ -70,16 +66,26 @@ function createFbProxy({
         return { status: 400, body: { success: false, error: { code: 'IDEMPOTENCY_KEY_REQUIRED', message: 'Idempotency-Key required' } } };
       }
       idemKey = `${claims.mid}:${service}:${action}:${k}`;
-      purge();
-      const prev = idem.get(idemKey);
-      if (prev) return { status: prev.status, body: prev.body, replayed: true };
+      const slot = await idemStore.begin(idemKey);
+      if (slot.status === 'done') return { status: 200, body: slot.body, replayed: true };
+      if (slot.status === 'pending') {
+        return { status: 409, body: { success: false, error: { code: 'REQUEST_IN_PROGRESS', message: 'A request with this key is in progress' } } };
+      }
     }
 
     const params = { ...sanitizeParams(query), service, action, platform_name: 'tma' };
     let cookie = null;
     if (claims) {
-      if (!credentialProvider) return { status: 503, body: { success: false, error: { code: 'CREDENTIALS_NOT_CONFIGURED', message: 'Not available' } } };
-      cookie = await credentialProvider(claims.mid); // T3.2：即时生成，不落盘、不写日志
+      if (!credentialProvider) {
+        if (idemKey) await idemStore.abort(idemKey);
+        return { status: 503, body: { success: false, error: { code: 'CREDENTIALS_NOT_CONFIGURED', message: 'Not available' } } };
+      }
+      try {
+        cookie = await credentialProvider(claims.mid); // T3.2：即时生成，不落盘、不写日志
+      } catch (e) {
+        if (idemKey) await idemStore.abort(idemKey);
+        return { status: 502, body: { success: false, error: { code: 'CREDENTIALS_UNAVAILABLE', message: 'Not available' } } };
+      }
     }
 
     const qs = new URLSearchParams();
@@ -97,14 +103,19 @@ function createFbProxy({
 
     let res;
     try { res = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(timeoutMs) }); } catch (e) {
+      if (idemKey) await idemStore.abort(idemKey);
       return { status: 502, body: { success: false, error: { code: 'UPSTREAM_UNAVAILABLE', message: 'Upstream unavailable' } } };
     }
     let json;
     try { json = await res.json(); } catch (e) {
+      if (idemKey) await idemStore.abort(idemKey);
       return { status: 502, body: { success: false, error: { code: 'UPSTREAM_INVALID', message: 'Upstream returned invalid data' } } };
     }
-    // 仅缓存确认成功（火鸟 state=100）的响应，失败可被客户端用同一键重试
-    if (idemKey && json && json.state === 100) idem.set(idemKey, { at: now(), status: 200, body: json });
+    // 仅保留确认成功（火鸟 state=100）的响应，失败释放占位，客户端可用同一键重试
+    if (idemKey) {
+      if (json && json.state === 100) await idemStore.finish(idemKey, json);
+      else await idemStore.abort(idemKey);
+    }
     return { status: 200, body: json };
   }
 

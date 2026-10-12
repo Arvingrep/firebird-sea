@@ -20,7 +20,7 @@ TMA → `POST /tg-api/auth/telegram {initData}` → Node 验签 → 限频/防�
 ## 令牌（T2.2）
 - 格式 `base64url(payload).base64url(HMAC-SHA256)`；payload：`sub`(tg_id)、`mid`(会员 id)、`env`、`iat`、`exp`、`jti`。
 - 默认 TTL 900 秒（`TMA_TOKEN_TTL`）；`env` 与服务的 `TMA_ENV` 不一致即拒绝（canary 令牌不能用于 prod）。
-- 吊销与限频状态在进程内，仅支持单副本（AD-18）；多副本前须改为共享存储。
+- 吊销、initData 重放计数、幂等占位保存在共享库（迁移 002：`fbs_token_revoked`、`fbs_replay`、`fbs_idem`），api 可多副本运行（Arvin 决定 3=B）。吊销在其他副本最长约 5 秒后生效（本地集合定时刷新）；登录与代理的普通限频仍为每副本独立计数（有效上限约为配置值 × 副本数）。
 
 ## 环境变量（新增，仅服务端）
 | 变量 | 服务 | 说明 |
@@ -50,8 +50,8 @@ TMA → `POST /tg-api/auth/telegram {initData}` → Node 验签 → 限频/防�
 - 默认拒绝：`service:action` 不在 `src/fbProxy.js` 的 `WHITELIST` 返回 403。首轮仅 7 个匿名只读接口：`waimai` 的 `shopList`/`storeDetail`/`food`/`foodType`，`article` 的 `type`/`alist`/`detail`。`orderDetail`、`deal` 等涉订单/资金路径的接口须单独评审后再加入。
 - 剥离：`userkey`、`access_token`、`refresh_token`、`token`、`forcelogout`、`rsaEncrypt`、`uid`/`userid`、`platform_*`、`HN_*` 等客户端参数；不转发客户端 Cookie；代理固定写入 `platform_name=tma`。
 - 限流：`FB_RATE_MAX`（默认每分钟 120，按会员或来源 IP + 接口）。
-- 幂等：白名单项标记 `idempotent` 时要求 `Idempotency-Key`（8–64 位 `[A-Za-z0-9_-]`），同键重复返回首次结果（进程内、TTL 600 秒，单副本）。
-- member 级接口需要 `credentialProvider`（T3.2，未配置时 503，不转发）。
+- 幂等：白名单项标记 `idempotent` 时要求 `Idempotency-Key`（8–64 位 `[A-Za-z0-9_-]`）；先占位再转发，同键并发返回 409，成功后同键回放首次结果（TTL 600 秒，共享库）。
+- member 级接口的会话凭证由 PHP 网关 `issue_session` 在火鸟进程内生成（仅限 `regfrom='telegram'` 且 `username=tg_<数字>` 的会员，窗口 15 秒），Node 只在内存缓存 ≤120 秒，不落盘、不写日志；火鸟凭证本身不带过期时间，随会员密码哈希失效。
 | 变量 | 说明 |
 |---|---|
 | `FB_UPSTREAM_URL` | 上游 ajax.php 完整 URL；未设置则不挂载代理路由 |
