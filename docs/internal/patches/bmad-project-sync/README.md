@@ -25,3 +25,8 @@ git push -u origin owner/bmad-project-sync-fix
 - 仓库名已全部参数化为 `$GITHUB_REPOSITORY`，无硬编码域名/仓库。
 - **应用后必须在同一 owner PR 内删除本目录**（`git rm -r docs/internal/patches/bmad-project-sync/`），
   避免草案变成僵尸文件；负责人 Arvin，跟踪 issue 由开 owner PR 时关联本拆分 PR。
+
+## 2026-10-16 增量（随 PR #132 拆分，Hermes）
+
+- 在 `pull_request:closed`(merged) 分支补充：PR 设 ready-to-release 的同时，用 `find_linked_issue` 同步把关联 Issue 卡也设为 ready-to-release（PR #132 workflow 改动中唯一未被本草案覆盖的增量）。
+- PR #132 原分支对 `.github/workflows/bmad-project-sync.yml` 的直接改动已还原（受保护路径）；其「提交消息裸 #N 推断 Issue」兜底经 QA 判定有缺陷（会误匹配 squash PR 号），不采纳——本草案的 `find_pr_by_sha` + `expand_feature_prs` 已正确覆盖该场景。
