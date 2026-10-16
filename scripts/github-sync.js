@@ -32,7 +32,7 @@ const BOARD_COLUMNS = Object.values(STAGES);
 function gh(args) {
   const env = { ...process.env };
   if (env.BMAD_USE_GH_OAUTH === '1') delete env.GH_TOKEN;
-  return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 16e6 }).trim();
+  return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 16e6, env }).trim();
 }
 
 function ghJson(args) {
@@ -40,7 +40,6 @@ function ghJson(args) {
 }
 
 function ghApi(query, vars = {}) {
-  const input = JSON.stringify({ query, variables: vars });
   return JSON.parse(gh(['api', 'graphql', '-f', `query=${query}`, ...Object.entries(vars).map(([k, v]) => ['-F', `${k}=${v}`]).flat()]));
 }
 
