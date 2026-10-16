@@ -1457,8 +1457,8 @@ class shop
                 global $data;
                 $data                  = "";
                 $addrArr               = getParentArr("site_area", $val['addrid']);
-                $addrArr               = array_reverse(parent_foreach($addrArr, "typename"));
-                $list[$key]['addr']    = is_array($addrArr) ? $addrArr : array();
+                $addrArr               = parent_foreach($addrArr, "typename");
+                $list[$key]['addr']    = is_array($addrArr) ? array_reverse($addrArr) : array();
                 $list[$key]['address'] = $val['address'];
 
                 $archives = $dsql->SetQuery("SELECT `typename` FROM `#@__shop_type` WHERE `id` = " . $val['industry']);
@@ -19213,8 +19213,8 @@ $noteText
                 global $data;
                 $data                  = "";
                 $addrArr               = getParentArr("site_area", $val['addrid']);
-                $addrArr               = array_reverse(parent_foreach($addrArr, "typename"));
-                $list[$key]['addr']    = is_array($addrArr) ? $addrArr : array();
+                $addrArr               = parent_foreach($addrArr, "typename");
+                $list[$key]['addr']    = is_array($addrArr) ? array_reverse($addrArr) : array();
                 $list[$key]['address'] = $val['address'];
 
                 $archives = $dsql->SetQuery("SELECT `typename` FROM `#@__shop_type` WHERE `id` = " . $val['industry']);
