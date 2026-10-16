@@ -74,3 +74,58 @@ api:
 # 前置：TMA_TOKEN_SECRET / FBS_GATEWAY_SECRET 已在集群 firebird-api-secret 中创建；revert 本提交即回滚。
 tma:
   enabled: true
+
+# 模块入口统一为「子目录」（customSubDomain=2）。
+# 路径 → DB 写入见 scripts/fix_module_domain_aliases.sql；
+# PHP 配置文件由此处的 configVars 在 Pod 启动时覆盖（apply-config-vars.php）。
+# 根因：seed_module_domains.php 的「非空即 skip」逻辑导致 domain 别名未从
+#   article→article/shop→shop/… 更新为 news/shop/zhuang/baokan/jianzhan；
+#   同时 shop/renovation/paper/website 的 state=1（offline）需一并恢复。
+configVars:
+  article.inc.php:
+    customSubDomain: 2
+  shop.inc.php:
+    customSubDomain: 2
+  renovation.inc.php:
+    customSubDomain: 2
+  paper.inc.php:
+    customSubDomain: 2
+  website.inc.php:
+    customSubDomain: 2
+  info.inc.php:
+    customSubDomain: 2
+  job.inc.php:
+    customSubDomain: 2
+  car.inc.php:
+    customSubDomain: 2
+  special.inc.php:
+    customSubDomain: 2
+  quanjing.inc.php:
+    customSubDomain: 2
+  business.inc.php:
+    customSubDomain: 2
+
+# 冒烟覆盖模块入口（PostSync Job）。
+# /fenlei = info 模块子目录别名（与 fix_module_domain_aliases.sql 一致）。
+smokeTest:
+  paths:
+    - "/"
+    - "/u"
+    - "/b"
+    - "/supplier"
+    - "/supplier/job"
+    - "/member"
+    - "/business"
+    - "/info"
+    - "/house"
+    - "/job"
+    - "/car"
+    - "/special"
+    - "/waimai"
+    - "/quanjing"
+    - "/shop"
+    - "/news"
+    - "/baokan"
+    - "/jianzhan"
+    - "/fenlei"
+    - "/zhuang"
