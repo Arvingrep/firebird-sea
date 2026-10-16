@@ -487,8 +487,10 @@ $(function(){
 	      data: data  + '&qr=1',
 	      dataType: 'jsonp',
 	      success: function(str){
-	      	console.log('code 执行2')
-	        if(str.state == 100){
+	        if(str.state != 100){
+	          clearTimeout(qrExpireTimer);
+	          qrExpireTimer = setTimeout(getQrCode, 5000);
+	        }else{
 	          var data = [], info = str.info;
 	          for(var k in info) {
 	            data.push(k+'='+info[k]);
@@ -527,6 +529,10 @@ $(function(){
 
 
 	        }
+	      },
+	      error: function(){
+	        clearTimeout(qrExpireTimer);
+	        qrExpireTimer = setTimeout(getQrCode, 5000);
 	      }
 	    });
 
