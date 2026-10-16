@@ -8,6 +8,7 @@ const {
   confirmChargePaid 
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
+const { runCallTest } = require('./callTest');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 
 assertProductionConfig();
@@ -220,6 +221,35 @@ router.get('/wallet/coins-ph/balance', async (req, res) => {
       error: err.message,
       tip: '请在 .env 中正确配置 COINS_PH_API_KEY 与 COINS_PH_API_SECRET' 
     });
+  }
+});
+
+// 10. Call test 语音呼叫测试（失败自动重试 2 次，间隔 3s）
+let callTestBusy = false;
+router.post('/call-test', async (req, res) => {
+  const { initData, to, message } = req.body || {};
+  const auth = initData ? validateTelegramInitData(initData, BOT_TOKEN) : { valid: false };
+  if (!auth.valid) {
+    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid or missing initData' } });
+  }
+  const url = process.env.CALL_TEST_URL;
+  if (!url) {
+    return res.status(503).json({ success: false, error: { code: 'CALL_TEST_NOT_CONFIGURED', message: 'CALL_TEST_URL is not set' } });
+  }
+  if (callTestBusy) {
+    return res.status(429).json({ success: false, error: { code: 'CALL_TEST_BUSY', message: 'A call test is already running' } });
+  }
+  callTestBusy = true;
+  try {
+    const result = await runCallTest(url, { to, message });
+    if (!result.passed) {
+      return res.status(502).json({ success: false, error: { code: 'CALL_TEST_FAILED', message: result.error }, data: { attempts: result.attempts } });
+    }
+    res.json({ success: true, data: { attempts: result.attempts } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } });
+  } finally {
+    callTestBusy = false;
   }
 });
 
