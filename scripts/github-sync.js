@@ -12,6 +12,7 @@ const PROJECT_ID = process.env.BMAD_PROJECT_ID || 'PVT_kwHOAuOIfM4BmVo3';
 
 // ── Field definitions (name only — id resolved dynamically via `gh project field-list`) ──
 const FIELD_BMAD_STAGE = 'BMAD Stage';
+const FIELD_STATUS = 'Status';
 const FIELD_EPIC = 'Epic';
 const FIELD_READY = '可开工 (Ready)';
 const FIELD_BLOCKER = '阻塞原因';
@@ -27,6 +28,15 @@ const STAGES = {
   done: '✅ 已上线闭环 (Done / Closed)',
 };
 const BOARD_COLUMNS = Object.values(STAGES);
+
+// BMAD Stage → built-in Status mapping (keeps board columns in sync)
+const STATUS_MAP = {
+  [STAGES.backlog]: 'Todo',
+  [STAGES['in-progress']]: 'In Progress',
+  [STAGES['in-qa']]: 'In Progress',
+  [STAGES['ready-to-release']]: 'In Progress',
+  [STAGES.done]: 'Done',
+};
 
 // ── gh helpers ─────────────────────────────────────────────────
 function gh(args) {
@@ -79,6 +89,21 @@ function setIteration(itemId, field, iterationId) {
 function clearField(itemId, field) {
   gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
     '--field-id', field.id, '--clear']);
+}
+
+// Keep built-in Status in sync with BMAD Stage
+function syncStatus(itemId, bmadStage) {
+  const statusOption = STATUS_MAP[bmadStage];
+  if (!statusOption) {
+    console.error(`WARNING: No Status mapping for BMAD Stage "${bmadStage}", skipping Status sync`);
+    return;
+  }
+  try {
+    const statusField = fieldByName(FIELD_STATUS);
+    setSingleSelect(itemId, statusField, statusOption);
+  } catch (e) {
+    console.error(`WARNING: Failed to sync Status for BMAD Stage "${bmadStage}": ${e.message}`);
+  }
 }
 
 // ── Iteration helpers ──────────────────────────────────────────
@@ -187,6 +212,7 @@ function onIssueOpened(url, labelsCsv) {
   const bmadField = fieldByName(FIELD_BMAD_STAGE);
   setSingleSelect(itemId, bmadField, initStage);
   result.fields[FIELD_BMAD_STAGE] = initStage;
+  syncStatus(itemId, initStage);
 
   // Cycle → 当前迭代
   if (cycle.iterationId) {
@@ -226,6 +252,7 @@ function onAgentDev(url) {
   const itemId = addItem(url);
   const bmadField = fieldByName(FIELD_BMAD_STAGE);
   setSingleSelect(itemId, bmadField, STAGES['in-progress']);
+  syncStatus(itemId, STAGES['in-progress']);
   return { url, itemId, fields: { [FIELD_BMAD_STAGE]: STAGES['in-progress'] } };
 }
 
@@ -238,6 +265,7 @@ function onPrClosedUnmerged(url, reason) {
   const bmadField = fieldByName(FIELD_BMAD_STAGE);
   setSingleSelect(itemId, bmadField, STAGES['in-progress']);
   result.fields[FIELD_BMAD_STAGE] = STAGES['in-progress'];
+  syncStatus(itemId, STAGES['in-progress']);
 
   // 阻塞原因
   const blockerText = reason || 'PR 关闭未合并（无明确原因）';
@@ -258,6 +286,7 @@ function onDeploySuccess(url, issueUrl) {
     const bmadField = fieldByName(FIELD_BMAD_STAGE);
     setSingleSelect(itemId, bmadField, STAGES.done);
     result.fields[FIELD_BMAD_STAGE] = STAGES.done;
+    syncStatus(itemId, STAGES.done);
   } catch (e) {
     result.errors.push(`set-stage: ${e.message}`);
   }
@@ -290,6 +319,7 @@ function setStage(url, key) {
   const itemId = addItem(url);
   const bmadField = fieldByName(FIELD_BMAD_STAGE);
   setSingleSelect(itemId, bmadField, stage);
+  syncStatus(itemId, stage);
   return { url, stage, itemId };
 }
 
