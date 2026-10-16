@@ -83,4 +83,11 @@ TMA → `POST /tg-api/auth/telegram {initData}` → Node 验签 → 限频/防�
 - 托管：`deploy/docker/Dockerfile.api` 增加 `tma-build` 阶段，产物复制到镜像 `/app/tma`；`TMA_STATIC_DIR` 指向该目录时，api 在 `/tma/` 提供静态资源，并设置 CSP（脚本仅限自身与 telegram.org、仅允许被 Telegram 内嵌、连接仅限同源）、`nosniff`、`no-referrer`。
 - 路由：Traefik 需把 `/tma` 指向 api 服务（与 `/tg-api` 同级，优先级高于 PHP）；由 Helm 的 `tma.enabled` 打开（#95，默认关闭，canary 启用见独立 PR）。
 - 开发：`npm run dev` 时 `/tg-api` 代理到 `TMA_DEV_API`（默认 `http://localhost:3000`），同源无 CORS。
-- 页面（当前）：商家列表（`waimai/shopList`）、菜单（`foodType`、`food`）、购物车（跨商家需确认）。下单、地址、订单见后续 PR（依赖会员级白名单评审）。
+- 页面（当前）：商家列表（`waimai/shopList`）、菜单（`foodType`、`food`）、购物车（跨商家需确认）。下单、地址、订单见下节。
+
+## 下单、地址与订单页面（Epic T4.4–T4.6）
+- **下单（货到付款）**：`Checkout` 页选择配送地址后提交 `waimai/deal`。前端只提交 `shop`、`address`、`order_content`（仅 `[{id,count}]`）、`preset`（固定 `[]`）、`peitype`、`note`；**不提交任何金额、优惠、积分字段**，价格由火鸟按数据库重算。同一次下单尝试复用同一个 `Idempotency-Key`，网络重试不会产生第二张订单；超时（504）表示结果未知，提示用户到订单列表确认，不要重复提交。
+- **地址管理**：`Addresses` 页经 `getMemberAddress` / `operAddress` / `delAddress` 增删改；编辑和删除由代理做归属预检（读不到即 404）。
+- **订单**：`Orders` 页（`waimai/order`）列表与取消，`OrderDetail` 页（`waimai/orderDetail`）详情；可取消状态为火鸟 state 0 与 2（`cancelOrder` 现有规则）。归属失败统一表现为「订单不存在或无权查看」。
+- **校验**：`apps/tma/src/lib/checkout.js` 提供下单参数构造与地址校验，测试在 `apps/tma/test/checkout.test.mjs`。
+- **晋升门槛**：canary 真机走通 下单 → 取消 → 地址增删改 后才允许提晋升 PR。
