@@ -260,13 +260,13 @@ function onDeploySuccess(url, issueUrl) {
     result.errors.push(`clear-blocker: ${e.message}`);
   }
 
-  // Close the linked issue
+  // Close the linked issue（owner/repo 从 issueUrl 解析，不写死仓库名）
   if (issueUrl) {
-    const m = issueUrl.match(/\/issues\/(\d+)$/);
+    const m = issueUrl.match(/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)$/);
     if (m) {
-      result.issueNumber = m[1];
+      result.issueNumber = m[2];
       try {
-        gh(['issue', 'close', m[1], '-R', `${OWNER}/firebird-sea`, '--reason', 'completed']);
+        gh(['issue', 'close', m[2], '-R', m[1], '--reason', 'completed']);
       } catch (e) {
         result.errors.push(`close-issue: ${e.message}`);
       }

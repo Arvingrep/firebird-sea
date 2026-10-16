@@ -91,17 +91,17 @@ jobs:
           # ── Helper: find PR by commit SHA (handles canary→main merge chain) ──
           find_pr_by_sha() {
             local sha="$1"
-            # Strategy 1: direct PR list search
-            local pr_info
-            pr_info="$(gh pr list -R "$GITHUB_REPOSITORY" --state merged --search "$sha" --json number,url --jq 'first(.[])' 2>/dev/null || echo '')"
-            if [ -n "$pr_info" ]; then
-              echo "$pr_info"
+            # Strategy 1: precise commit→PR association API (not text search)
+            local pr_num
+            pr_num="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" \
+              --jq '[.[] | select(.merged_at != null)] | first | .number // empty' 2>/dev/null || echo '')"
+            if [ -n "$pr_num" ]; then
+              echo "{\"number\":$pr_num,\"url\":\"https://github.com/$GITHUB_REPOSITORY/pull/$pr_num\"}"
               return 0
             fi
             # Strategy 2: commit message (handles canary→main squash/merge commits)
             local commit_msg
             commit_msg="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha" --jq '.commit.message' 2>/dev/null || echo '')"
-            local pr_num
             pr_num="$(echo "$commit_msg" | grep -oE 'Merge pull request #[0-9]+' | grep -oE '[0-9]+' || echo '')"
             if [ -n "$pr_num" ]; then
               echo "{\"number\":$pr_num,\"url\":\"https://github.com/$GITHUB_REPOSITORY/pull/$pr_num\"}"
@@ -114,6 +114,17 @@ jobs:
               return 0
             fi
             return 1
+          }
+
+          # ── Helper: expand a promotion PR (canary→main) into original feature PR numbers ──
+          # RULES §5: 功能 PR 先进 canary，进 main 的是晋升 PR；晋升 PR 本身通常无 Closes #N。
+          # 从晋升 PR 包含的 commits 里提取 "Merge pull request #N" 与 "(#N)"，去重并排除自身。
+          expand_feature_prs() {
+            local promo_num="$1"
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$promo_num/commits" --paginate \
+              --jq '.[].commit.message' 2>/dev/null \
+              | grep -oE '(Merge pull request #[0-9]+|\(#[0-9]+\))' \
+              | grep -oE '[0-9]+' | sort -un | grep -vx "$promo_num" || true
           }
 
           case "$EVENT_NAME:$ACTION" in
@@ -182,10 +193,20 @@ jobs:
                 exit 0
               fi
               PR_URL="$(echo "$PR_INFO" | jq -r '.url')"
-              # 找到 PR 关联的 Issue URL
-              ISSUE_URL="$(find_linked_issue "$PR_URL" 2>/dev/null || echo '')"
-              echo "Deploy success → PR=$PR_URL Issue=$ISSUE_URL"
-              node scripts/github-sync.js --on-deploy-success "$PR_URL" "${ISSUE_URL:-}"
+              PR_NUM="$(echo "$PR_INFO" | jq -r '.number')"
+              # 晋升 PR（canary→main）展开为原始功能 PR；无法展开时退回处理定位到的 PR 本身
+              FEATURE_PRS="$(expand_feature_prs "$PR_NUM")"
+              if [ -z "$FEATURE_PRS" ]; then
+                FEATURE_PRS="$PR_NUM"
+              fi
+              FAILED=0
+              for num in $FEATURE_PRS; do
+                FP_URL="https://github.com/$GITHUB_REPOSITORY/pull/$num"
+                FP_ISSUE="$(find_linked_issue "$FP_URL" 2>/dev/null || echo '')"
+                echo "Deploy success → PR=$FP_URL Issue=${FP_ISSUE:-无}"
+                node scripts/github-sync.js --on-deploy-success "$FP_URL" "${FP_ISSUE:-}" || FAILED=1
+              done
+              exit "$FAILED"
               ;;
 
             # ── Manual dispatch ──

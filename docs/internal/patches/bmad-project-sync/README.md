@@ -23,4 +23,5 @@ git push -u origin owner/bmad-project-sync-fix
 ## 说明
 
 - 仓库名已全部参数化为 `$GITHUB_REPOSITORY`，无硬编码域名/仓库。
-- 应用后可删除本目录。
+- **应用后必须在同一 owner PR 内删除本目录**（`git rm -r docs/internal/patches/bmad-project-sync/`），
+  避免草案变成僵尸文件；负责人 Arvin，跟踪 issue 由开 owner PR 时关联本拆分 PR。
