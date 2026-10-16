@@ -15,6 +15,9 @@ function fakeDb() {
   db.conn = {
     async query(sql) {
       if (sql.startsWith('SELECT block_number FROM fbs_cursor')) return db.cursor === null ? '' : `${db.cursor}\n`;
+      if (sql.startsWith('SELECT txid FROM fbs_chain_tx')) {
+        return [...rows.values()].map((r) => r.txid).filter((t) => sql.includes(`'${t}'`)).join('\n');
+      }
       if (sql.startsWith('INSERT IGNORE INTO fbs_chain_tx')) {
         const m = /VALUES \('([0-9a-f]+)',0,'([^']+)','([^']+)','([^']+)',(\d+),(\d+),/.exec(sql);
         const key = `${m[1]}:0`;
@@ -70,6 +73,33 @@ test('AC2: 同一笔交易重复返回不重复入库', async () => {
   assert.equal(db.rows.size, 1);
 });
 
+test('已入库的 txid 不再查询 solidity 节点', async () => {
+  const db = fakeDb();
+  let posts = 0;
+  const http = {
+    async get() { return { data: { data: [mkTx(1)] } }; },
+    async post() { posts += 1; return { data: { blockNumber: 100 } }; },
+  };
+  await scanOnce({ conn: db.conn, http, masterAddress: MASTER });
+  await scanOnce({ conn: db.conn, http, masterAddress: MASTER });
+  assert.equal(posts, 1);
+});
+
+test('翻页：一轮新增超过一页时不漏旧的那部分', async () => {
+  const db = fakeDb();
+  const pages = [
+    { data: [mkTx(2)], meta: { fingerprint: 'p2' } },
+    { data: [mkTx(1)] },
+  ];
+  const http = {
+    async get(url) { return { data: url.includes('fingerprint=p2') ? pages[1] : pages[0] }; },
+    async post(_u, body) { return { data: { blockNumber: body.value === tid(1) ? 100 : 101 } }; },
+  };
+  const r = await scanOnce({ conn: db.conn, http, masterAddress: MASTER });
+  assert.equal(r.saved, 2);
+  assert.equal(db.rows.size, 2);
+});
+
 test('AC3: 重启后从 fbs_cursor 继续，不漏不重', async () => {
   const db = fakeDb();
   const blocks = { [tid(1)]: 100, [tid(2)]: 101 };
@@ -78,7 +108,7 @@ test('AC3: 重启后从 fbs_cursor 继续，不漏不重', async () => {
   // “重启”：新扫描只依赖库中游标；旧块（99）被跳过，同块与新块被处理
   const later = { ...blocks, [tid(0)]: 99, [tid(3)]: 100 };
   const r = await run(db, [mkTx(0), mkTx(1), mkTx(3), mkTx(2)], later);
-  assert.equal(r.saved, 3);
+  assert.equal(r.saved, 2); // tx1 已在库，跳过；tx3、tx2 新入库
   assert.equal(db.cursor, 101);
   assert.equal(db.rows.has(`${tid(0)}:0`), false);
   assert.equal(db.rows.size, 3);

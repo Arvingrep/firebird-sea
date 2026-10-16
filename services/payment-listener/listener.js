@@ -24,7 +24,8 @@ async function pollTronGrid() {
     const { saved, cursor } = await scanOnce({ conn, http: axios, masterAddress: MASTER_ADDRESS, apiKey: TRONGRID_API_KEY });
     if (saved) process.stdout.write(`[TronGrid 入账] 本轮写入 ${saved} 笔，游标区块 ${cursor}\n`);
   } catch (err) {
-    if (err.response?.status === 404 || !TRONGRID_API_KEY) {
+    // 仅 TronGrid HTTP 错误可视为待命；DB / spawn 等本地错误（无 err.response）一律按错误输出
+    if (err.response && (err.response.status === 404 || !TRONGRID_API_KEY)) {
       process.stdout.write('[Listener Standby] TronGrid 尚未配置正式密钥，处于开发待命模式。\n');
     } else {
       process.stderr.write(`[Listener Error] ${err.message}\n`);

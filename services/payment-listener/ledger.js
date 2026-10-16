@@ -5,6 +5,7 @@ const { spawn } = require('node:child_process');
 
 const USDT_TRC20_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 const CURSOR_NAME = 'payment-listener';
+const MAX_PAGES = 10;
 const TRON_ADDR = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 const TXID = /^[0-9a-fA-F]{64}$/;
 const sqlStr = (s) => `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
@@ -44,6 +45,12 @@ async function getCursor(conn) {
   return out ? Number(out) : 0;
 }
 
+async function knownTxids(conn, txids) {
+  if (!txids.length) return new Set();
+  const out = String(await conn.query(`SELECT txid FROM fbs_chain_tx WHERE txid IN (${txids.map(sqlStr).join(',')})`));
+  return new Set(out.split('\n').map((s) => s.trim().toLowerCase()).filter(Boolean));
+}
+
 // 唯一键 (txid,event_index) + INSERT IGNORE：重复返回不重复入库
 function insertTx(conn, row) {
   const sql = 'INSERT IGNORE INTO fbs_chain_tx (txid,event_index,from_address,to_address,contract,amount_micro,block_number,block_time) VALUES ('
@@ -64,10 +71,21 @@ async function scanOnce({ conn, http, masterAddress, apiKey, baseUrl = 'https://
   const cursor = await getCursor(conn);
   const url = `${baseUrl}/v1/accounts/${masterAddress}/transactions/trc20?contract_address=${USDT_TRC20_CONTRACT}`
     + '&only_to=true&only_confirmed=true&limit=200';
-  const list = (await http.get(url, { headers, timeout: 8000 })).data?.data || [];
+  // 新→旧翻页；本地已入库的 txid 不再查 solidity 节点，整页都已入库即停止（不漏一轮内超过 200 笔的新增）
+  const fresh = [];
+  let fingerprint = '';
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const body = (await http.get(fingerprint ? `${url}&fingerprint=${encodeURIComponent(fingerprint)}` : url, { headers, timeout: 8000 })).data;
+    const ok = (body?.data || []).filter((t) => isAcceptable(t, masterAddress));
+    const known = await knownTxids(conn, ok.map((t) => t.transaction_id.toLowerCase()));
+    const unseen = ok.filter((t) => !known.has(t.transaction_id.toLowerCase()));
+    fresh.push(...unseen);
+    fingerprint = body?.meta?.fingerprint;
+    if (!fingerprint || (ok.length && !unseen.length)) break;
+  }
   let maxBlock = cursor;
   let saved = 0;
-  for (const tx of list.filter((t) => isAcceptable(t, masterAddress)).reverse()) {
+  for (const tx of fresh.reverse()) {
     const info = (await http.post(`${baseUrl}/walletsolidity/gettransactioninfobyid`, { value: tx.transaction_id }, { headers, timeout: 8000 })).data;
     const blockNumber = Number(info?.blockNumber);
     if (!Number.isInteger(blockNumber) || blockNumber < cursor) continue; // 未固化或早于游标
