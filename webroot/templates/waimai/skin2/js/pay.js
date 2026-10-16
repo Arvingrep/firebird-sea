@@ -487,10 +487,7 @@ $(function(){
 	      data: data  + '&qr=1',
 	      dataType: 'jsonp',
 	      success: function(str){
-	        if(str.state != 100){
-	          clearTimeout(qrExpireTimer);
-	          qrExpireTimer = setTimeout(getQrCode, 5000);
-	        }else{
+	        if(str.state == 100){
 	          var data = [], info = str.info;
 	          for(var k in info) {
 	            data.push(k+'='+info[k]);
@@ -500,7 +497,9 @@ $(function(){
 
 	          //二维码展示满10分钟未支付，自动重新获取
 	          clearTimeout(qrExpireTimer);
-	          qrExpireTimer = setTimeout(getQrCode, 10 * 60 * 1000);
+	          qrExpireTimer = setTimeout(function(){
+	            if($('.qrpay').is(':visible')) getQrCode();
+	          }, 10 * 60 * 1000);
 
 	          //验证是否支付成功，如果成功跳转到指定页面
 	      		if(timer != null){
@@ -518,6 +517,7 @@ $(function(){
 	      					if(str.state == 100 && str.info != ""){
 	      						//如果已经支付成功，则跳转到会员中心页面
 	                  clearInterval(timer);
+	                  clearTimeout(qrExpireTimer);
 	      						location.href = str.info;
 	      					}else if(str.state == 101 && str.info == langData['siteConfig'][21][162]){   //订单不存在！
 	                  getQrCode();
@@ -529,10 +529,6 @@ $(function(){
 
 
 	        }
-	      },
-	      error: function(){
-	        clearTimeout(qrExpireTimer);
-	        qrExpireTimer = setTimeout(getQrCode, 5000);
 	      }
 	    });
 
