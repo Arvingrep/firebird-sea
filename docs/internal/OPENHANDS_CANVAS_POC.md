@@ -1,11 +1,11 @@
 # Story 7.1 OpenHands Agent Canvas 本机 POC 与管道对照
 
-状态：**仅为 POC 协议（模板），AC1–AC4 的实测均未完成，转 owner 本机执行。** 本文件不含任何伪造的实测值；未填项一律标"待测"。
-因此交付此协议的 PR **不得使用 `Closes #107`** 关闭 Issue；待 owner 填入真实数据与 PR 编号后，才可视为 Story 7.1 完成。
+状态：**仅为 POC 协议（模板），AC1–AC4 的实测均未完成，转 owner 本机执行（跟踪 Issue #119）。** 本文件不含任何伪造的实测值；未填项一律标"待测"。
+因此交付此协议的 PR **不得使用 `Closes #107`** 关闭 Issue；待 owner 按 #119 填入真实数据与 PR 编号后，才可视为 Story 7.1 完成。
 结论归属：Issue #106 下留评论上报 Arvin；**未经 Arvin 批准，不得将 OpenHands Canvas 设为默认编排器，也不得下线 `dev.sh`/`qa.sh` Shell 管道。**
 
 ## 执行归属
-AC1–AC4 需在 owner 本机安装并实跑 Agent Canvas、开真实 PR、在 #106 留评论，Dev Agent 无法代为执行，应作为 owner 人工任务单独跟踪。
+AC1–AC4 需在 owner 本机安装并实跑 Agent Canvas、开真实 PR、在 #106 留评论，Dev Agent 无法代为执行，已拆为独立 owner 人工任务 Issue #119 跟踪（关联 #107）。
 配套校验 `services/api/test/openhands-poc-doc.test.js` 在占位未清除时会失败（未挂入 `npm test`；填完后由 owner 迁入 `scripts/acceptance/story-7-1.sh`）。
 
 ## 边界（RULES §5/§6/§7）
@@ -46,7 +46,8 @@ AC1–AC4 需在 owner 本机安装并实跑 Agent Canvas、开真实 PR、在 #
 | 是否值得替换 | 待测 | — |
 
 ## 三·补、判定阈值（实跑前先定，事后不得调整）
-以下任一项未达标即判「不替换」或「部分替换」，并在第四节逐项列出：
+以下阈值为 Dev Agent 建议值，**非 Story 原文要求，owner 实跑前须先由 Arvin 确认或调整**；确认后即冻结，事后不得调整。
+任一项未达标即判「不替换」或「部分替换」，并在第四节逐项列出：
 
 | 指标 | 达标线（OpenHands Canvas 相对 Shell 管道） |
 |---|---|

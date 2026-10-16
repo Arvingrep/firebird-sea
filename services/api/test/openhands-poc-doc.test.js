@@ -1,6 +1,6 @@
-// Story 7.1 POC 协议文档校验（非 API 业务测试）。
+// Story 7.1 POC 协议文档校验（非 API 业务测试；本 PR 只交付协议，不代表 Story 完成）。
 // 结构测试只证明模板完整；验收结果测试在仍有「待测/待定/待选/待填」占位时直接失败，不冒充 AC 已满足。
-// 故意不挂入 npm test（否则 owner 填写实测前 CI 恒红）；owner 填完后迁入 scripts/acceptance/story-7-1.sh。
+// 故意不挂入 npm test（否则 owner 按 Issue #119 填写实测前 CI 恒红）；实测完成后由 owner 迁入 scripts/acceptance/story-7-1.sh（受保护路径）。
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
