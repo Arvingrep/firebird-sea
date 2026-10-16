@@ -199,7 +199,7 @@ function onIssueOpened(url, labelsCsv) {
   setDate(itemId, fieldByName(FIELD_TARGET_DATE), targetDate);
   result.fields[FIELD_TARGET_DATE] = targetDate;
 
-  // Epic (if label epic:N or epic/xxx)
+  // Epic（label 约定：epic:N 或 epic/N，N 为数字；见 docs/internal/BMAD_BOARD.md）
   if (epicOption) {
     const epicField = fieldByName(FIELD_EPIC);
     setSingleSelect(itemId, epicField, epicOption);
@@ -240,7 +240,8 @@ function onPrClosedUnmerged(url, reason) {
   return result;
 }
 
-// 4. Deploy success → 已上线闭环 + close issue (errors logged, not silently swallowed)
+// 4. Deploy success → 已上线闭环 + close issue
+// 错误收集进 result.errors；CLI 入口在 errors 非空时输出 stderr 并以 exitCode=1 退出
 function onDeploySuccess(url, issueUrl) {
   const itemId = addItem(url);
   const result = { url, itemId, fields: {}, errors: [] };
@@ -332,7 +333,12 @@ try {
     console.log(JSON.stringify(onPrClosedUnmerged(args[1], args[2] || '')));
   } else if (cmd === '--on-deploy-success') {
     if (args.length < 2 || args.length > 3) throw new Error('Usage: --on-deploy-success <url> [issue-url]');
-    console.log(JSON.stringify(onDeploySuccess(args[1], args[2] || '')));
+    const result = onDeploySuccess(args[1], args[2] || '');
+    console.log(JSON.stringify(result));
+    if (result.errors.length > 0) {
+      for (const err of result.errors) console.error(`on-deploy-success error: ${err}`);
+      process.exitCode = 1;
+    }
   } else if (cmd === '--iteration-info') {
     console.log(JSON.stringify(getCurrentIterationInfo()));
   } else if (args.length) {

@@ -66,7 +66,7 @@ jobs:
                       body
                     }
                   }
-                }' -f owner=Arvingrep -f repo=firebird-sea -F pr="$pr_number" 2>/dev/null || echo '')"
+                }' -f owner="${GITHUB_REPOSITORY%/*}" -f repo="${GITHUB_REPOSITORY#*/}" -F pr="$pr_number" 2>/dev/null || echo '')"
               if [ -n "$result" ]; then
                 local issue_url
                 issue_url="$(echo "$result" | jq -r '.data.repository.pullRequest.closingIssuesReferences.nodes[0].url // empty' 2>/dev/null || echo '')"
@@ -80,7 +80,7 @@ jobs:
                 local ref
                 ref="$(echo "$body" | grep -oE '(Closes|Fixes|Resolves)[[:space:]]+#[0-9]+' | head -1 | grep -oE '[0-9]+' || echo '')"
                 if [ -n "$ref" ]; then
-                  echo "https://github.com/Arvingrep/firebird-sea/issues/$ref"
+                  echo "https://github.com/$GITHUB_REPOSITORY/issues/$ref"
                   return 0
                 fi
               fi
@@ -93,24 +93,24 @@ jobs:
             local sha="$1"
             # Strategy 1: direct PR list search
             local pr_info
-            pr_info="$(gh pr list -R Arvingrep/firebird-sea --state merged --search "$sha" --json number,url --jq 'first(.[])' 2>/dev/null || echo '')"
+            pr_info="$(gh pr list -R "$GITHUB_REPOSITORY" --state merged --search "$sha" --json number,url --jq 'first(.[])' 2>/dev/null || echo '')"
             if [ -n "$pr_info" ]; then
               echo "$pr_info"
               return 0
             fi
             # Strategy 2: commit message (handles canary→main squash/merge commits)
             local commit_msg
-            commit_msg="$(gh api "repos/Arvingrep/firebird-sea/commits/$sha" --jq '.commit.message' 2>/dev/null || echo '')"
+            commit_msg="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha" --jq '.commit.message' 2>/dev/null || echo '')"
             local pr_num
             pr_num="$(echo "$commit_msg" | grep -oE 'Merge pull request #[0-9]+' | grep -oE '[0-9]+' || echo '')"
             if [ -n "$pr_num" ]; then
-              echo "{\"number\":$pr_num,\"url\":\"https://github.com/Arvingrep/firebird-sea/pull/$pr_num\"}"
+              echo "{\"number\":$pr_num,\"url\":\"https://github.com/$GITHUB_REPOSITORY/pull/$pr_num\"}"
               return 0
             fi
             # Strategy 3: look for (#N) reference anywhere in commit message
             pr_num="$(echo "$commit_msg" | grep -oE '\(#[0-9]+\)' | grep -oE '[0-9]+' | head -1 || echo '')"
             if [ -n "$pr_num" ]; then
-              echo "{\"number\":$pr_num,\"url\":\"https://github.com/Arvingrep/firebird-sea/pull/$pr_num\"}"
+              echo "{\"number\":$pr_num,\"url\":\"https://github.com/$GITHUB_REPOSITORY/pull/$pr_num\"}"
               return 0
             fi
             return 1
