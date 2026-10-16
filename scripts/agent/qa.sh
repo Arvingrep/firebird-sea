@@ -21,7 +21,9 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
-  QA_CMD=(codex exec -s read-only --output-last-message "$TMP/verdict.txt" -)   # 默认异厂商（与 Dev 的 claude 分离）；-o 写入最后一条消息供解析
+  # codex 因账户配额耗尽持续失败（5 轮 fail-closed），临时切换为 claude。
+  # 待 codex 账户配额恢复后，可通过仓库变量 QA_AGENT_CMD='codex exec -s read-only -' 覆盖。
+  QA_CMD=(claude -p --max-turns 10 -)
 fi
 
 ensure_labels
