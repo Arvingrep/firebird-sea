@@ -21,7 +21,7 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
-  QA_CMD=(codex exec -s read-only -)   # 默认异厂商（与 Dev 的 claude 分离）；文档与实现保持一致
+  QA_CMD=(codex exec -s read-only --output-last-message "$TMP/verdict.txt" -)   # 默认异厂商（与 Dev 的 claude 分离）；-o 写入最后一条消息供解析
 fi
 
 ensure_labels
@@ -77,8 +77,18 @@ DIFF_BYTES="$(wc -c < "$TMP/diff.patch" | tr -d ' ')"
 
 log "🛡️ 调用 QA Agent: ${QA_CMD[0]}"
 if [ "${QA_CMD[0]}" = "codex" ]; then
+  # codex exec 用 --output-last-message 将最后一条消息写到 verdict.txt；stdout 是 JSONL 事件流，保存到 qa.log 备查
   agent_env "${QA_CMD[@]}" < "$TMP/prompt.md" > "$TMP/qa.log" 2>&1 || log "⚠️ QA Agent 非 0 退出"
-  [ -s "$TMP/verdict.txt" ] || tail -n 40 "$TMP/qa.log" > "$TMP/verdict.txt"
+  # 若 -o 未写入（老版本/自定义命令），降级：从 JSONL 事件流提取最后一个 assistant 消息的文本
+  if [ ! -s "$TMP/verdict.txt" ]; then
+    node -e '
+      const fs = require("fs");
+      const lines = fs.readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean);
+      let last = "";
+      for (const l of lines) { try { const o = JSON.parse(l); const t = o?.message?.content ?? o?.delta?.text ?? o?.text; if (typeof t === "string" && t.trim()) last = t.trim(); } catch(_){} }
+      console.log(last);
+    ' "$TMP/qa.log" > "$TMP/verdict.txt" 2>/dev/null || tail -n 40 "$TMP/qa.log" > "$TMP/verdict.txt"
+  fi
 else
   agent_env "${QA_CMD[@]}" < "$TMP/prompt.md" > "$TMP/verdict.txt" 2> "$TMP/qa.log" || log "⚠️ QA Agent 非 0 退出"
 fi
