@@ -2,9 +2,13 @@ name: BMAD Project 状态同步
 
 on:
   issues:
-    types: [opened, closed]
+    types: [opened, closed, labeled]
   pull_request:
     types: [opened, closed]
+  workflow_run:
+    workflows: ["CI: Build & Push to GAR (ArgoCD 负责部署)"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       url:
@@ -22,26 +26,138 @@ jobs:
     runs-on: [self-hosted, firebird-agent]
     steps:
       - uses: actions/checkout@v4
-      - name: 更新 BMAD Stage
+      - name: 事件路由 → BMAD Project 字段同步
         env:
           BMAD_USE_GH_OAUTH: "1"
           EVENT_NAME: ${{ github.event_name }}
           ACTION: ${{ github.event.action }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_LABELS: ${{ toJson(github.event.issue.labels.*.name) }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          LABEL_NAME: ${{ github.event.label.name }}
           INPUT_URL: ${{ inputs.url }}
           INPUT_STAGE: ${{ inputs.stage }}
+          # workflow_run 相关
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+
+          # ── Helper: extract issue URL from a PR (via body or linked issues) ──
+          find_linked_issue() {
+            local pr_url="$1"
+            # Try GraphQL to find closing issues
+            local pr_number
+            pr_number="$(echo "$pr_url" | grep -oE '[0-9]+$' || echo '')"
+            if [ -n "$pr_number" ]; then
+              local result
+              result="$(gh api graphql -f query='
+                query($owner:String!,$repo:String!,$pr:Int!) {
+                  repository(owner:$owner,name:$repo) {
+                    pullRequest(number:$pr) {
+                      closingIssuesReferences(first:5) { nodes { url } }
+                    }
+                  }
+                }' -f owner=Arvingrep -f repo=firebird-sea -F pr="$pr_number" 2>/dev/null || echo '')"
+              if [ -n "$result" ]; then
+                local issue_url
+                issue_url="$(echo "$result" | jq -r '.data.repository.pullRequest.closingIssuesReferences.nodes[0].url // empty' 2>/dev/null || echo '')"
+                [ -n "$issue_url" ] && echo "$issue_url" && return 0
+              fi
+            fi
+            # Fallback: look for "Closes #N" or "Fixes #N" in PR body
+            local body
+            body="$(gh pr view "$pr_url" --json body -q .body 2>/dev/null || echo '')"
+            local ref
+            ref="$(echo "$body" | grep -oE '(Closes|Fixes|Resolves)\s+#[0-9]+' | head -1 | grep -oE '[0-9]+' || echo '')"
+            if [ -n "$ref" ]; then
+              echo "https://github.com/Arvingrep/firebird-sea/issues/$ref"
+              return 0
+            fi
+            return 1
+          }
+
           case "$EVENT_NAME:$ACTION" in
-            issues:opened) URL="$ISSUE_URL"; STAGE=backlog ;;
-            issues:closed) URL="$ISSUE_URL"; STAGE=done ;;
-            pull_request:opened) URL="$PR_URL"; STAGE=in-qa ;;
+            # ── Issue opened: 全字段填充 ──
+            issues:opened)
+              LABELS_CSV="$(echo '${{ toJson(github.event.issue.labels.*.name) }}' | jq -r 'join(",")')"
+              node scripts/github-sync.js --init-issue "$ISSUE_URL" "$LABELS_CSV"
+              ;;
+
+            # ── Issue closed → done ──
+            issues:closed)
+              node scripts/github-sync.js --set-stage "$ISSUE_URL" done
+              ;;
+
+            # ── Label agent:dev → 编码实现 ──
+            issues:labeled)
+              if [ "$LABEL_NAME" = "agent:dev" ]; then
+                node scripts/github-sync.js --on-agent-dev "$ISSUE_URL"
+              fi
+              ;;
+
+            # ── PR opened → 独立验收 ──
+            pull_request:opened)
+              node scripts/github-sync.js --set-stage "$PR_URL" in-qa
+              ;;
+
+            # ── PR closed ──
             pull_request:closed)
-              [ "$PR_MERGED" = "true" ] || exit 0
-              URL="$PR_URL"; STAGE=ready-to-release ;;
-            workflow_dispatch:*) URL="$INPUT_URL"; STAGE="$INPUT_STAGE" ;;
-            *) exit 0 ;;
+              if [ "$PR_MERGED" = "true" ]; then
+                # 合并 → 待发布
+                node scripts/github-sync.js --set-stage "$PR_URL" ready-to-release
+              else
+                # 未合并关闭 → 退回编码实现 + 阻塞原因
+                REASON="PR #${PR_URL##*/} 关闭未合并"
+                # Try to get the closing reason from PR
+                BODY="$(gh pr view "$PR_URL" --json body -q .body 2>/dev/null || echo '')"
+                if [ -n "$BODY" ]; then
+                  REASON="$REASON — $(echo "$BODY" | head -3 | tr '\n' ' ' | cut -c1-200)"
+                fi
+                node scripts/github-sync.js --on-pr-closed-unmerged "$PR_URL" "$REASON"
+              fi
+              ;;
+
+            # ── CI 部署成功（workflow_run） → 已上线闭环 ──
+            workflow_run:completed)
+              if [ "${WORKFLOW_RUN_CONCLUSION:-}" != "success" ]; then
+                echo "CI workflow 未成功 (${WORKFLOW_RUN_CONCLUSION:-unknown})，跳过"
+                exit 0
+              fi
+              SHA="${WORKFLOW_RUN_HEAD_SHA:-}"
+              if [ -z "$SHA" ]; then
+                echo "无 HEAD SHA，跳过"
+                exit 0
+              fi
+              # 找到与此 SHA 关联的已合并 PR
+              PR_INFO="$(gh pr list -R Arvingrep/firebird-sea --state merged --search "$SHA" --json number,url,body --jq 'first(.[])' 2>/dev/null || echo '')"
+              if [ -z "$PR_INFO" ]; then
+                echo "未找到关联 PR，尝试从提交消息推断"
+                COMMIT_MSG="$(gh api "repos/Arvingrep/firebird-sea/commits/$SHA" --jq '.commit.message' 2>/dev/null || echo '')"
+                PR_NUM="$(echo "$COMMIT_MSG" | grep -oE 'Merge pull request #[0-9]+' | grep -oE '[0-9]+' || echo '')"
+                if [ -n "$PR_NUM" ]; then
+                  PR_URL="https://github.com/Arvingrep/firebird-sea/pull/$PR_NUM"
+                else
+                  echo "无法找到关联 Issue/PR，跳过"
+                  exit 0
+                fi
+              else
+                PR_URL="$(echo "$PR_INFO" | jq -r '.url')"
+              fi
+              # 找到 PR 关联的 Issue URL
+              ISSUE_URL="$(find_linked_issue "$PR_URL" 2>/dev/null || echo '')"
+              echo "Deploy success → PR=$PR_URL Issue=$ISSUE_URL"
+              node scripts/github-sync.js --on-deploy-success "$PR_URL" "${ISSUE_URL:-}"
+              ;;
+
+            # ── Manual dispatch ──
+            workflow_dispatch:*)
+              node scripts/github-sync.js --set-stage "$INPUT_URL" "$INPUT_STAGE"
+              ;;
+
+            *)
+              echo "未匹配事件: $EVENT_NAME:$ACTION，跳过"
+              ;;
           esac
-          node scripts/github-sync.js --set-stage "$URL" "$STAGE"
