@@ -143,6 +143,56 @@ test('getMemberAddress：携带 B 的 id/userid/uid 参数仍只返回 A 的地�
   assert.strictEqual(sent.id, undefined);
 });
 
+// T6.1 补充：上面逐接口的用例各自只走了一条传输通道（orderDetail/cancelOrder/delAddress 走 query，
+// operAddress 走 POST body）。fbProxy 的 merged = POST ? { ...query, ...body } : query，
+// 归属判定不得依赖 id 从哪一侧进来；否则该合并逻辑回归时四个接口都没有用例兜底。
+test('交叉传输面：id 改走另一侧通道（POST body / query），A 访问 B 的对象仍 404 且无写入', async () => {
+  const cases = [
+    ['orderDetail', { method: 'POST', body: { id: '20' } }],
+    ['cancelOrder', { method: 'POST', body: { id: '20' } }],
+    ['delAddress', { method: 'POST', body: { id: '2' } }],
+    ['operAddress', { query: { id: '2', person: 'hacked', tel: '1', address: 'x' } }],
+  ];
+  for (const [action, over] of cases) {
+    const { call, fx } = setup();
+    const r = await call(action, over);
+    assert.strictEqual(r.status, 404, action);
+    assert.strictEqual(leaks(r, 'OB-secret'), false, action);
+    assert.strictEqual(leaks(r, 'B-secret'), false, action);
+    assert.deepStrictEqual(fx.log.mutations, [], action);
+    assert.strictEqual(fx.orders[20].state, 0, action);
+    assert.strictEqual(fx.addresses[2].person, 'B-secret', action);
+  }
+});
+
+// T6.1 补充：fbProxy.js 的归属预检是条件式的 —— `if (rule.ownershipPrecheck && clientParams[idParam])`。
+// 净化会丢弃数组值与不在 params 白名单里的大小写变体，此时预检静默跳过、写操作仍然转发上游。
+// 当前不可越权（上游仍按会话 uid 收口），但这是个脆弱不变量，必须有用例锁住：
+// id 丢失只能退化为「不带 id」，绝不能退化为「带着 B 的 id 透传」。
+test('预检跳过路径的兜底：id 被净化丢弃（数组 / 大小写变体）时绝不触及 B 的行', async () => {
+  const cases = [
+    ['delAddress', { query: { id: ['1', '2'] } }],
+    ['delAddress', { query: { ID: '2' } }],
+    ['orderDetail', { query: { ID: '20' } }],
+    ['cancelOrder', { query: { ID: '20' } }],
+    ['operAddress', { method: 'POST', body: { id: ['1', '2'], person: 'hacked', tel: '1', address: 'x' } }],
+    ['operAddress', { method: 'POST', body: { ID: '2', person: 'hacked', tel: '1', address: 'x' } }],
+  ];
+  for (const [action, over] of cases) {
+    const { call, fx } = setup();
+    const r = await call(action, over);
+    assert.strictEqual(leaks(r, 'OB-secret'), false, action);
+    assert.strictEqual(leaks(r, 'B-secret'), false, action);
+    assert.ok(fx.addresses[2], action);                                  // B 的地址未被删除
+    assert.strictEqual(fx.addresses[2].person, 'B-secret', action);      // B 的地址未被改写
+    assert.strictEqual(fx.orders[20].state, 0, action);                  // B 的订单未被取消
+    for (const q of fx.log.requests) {
+      assert.notStrictEqual(q.params.id, '2', `${action} 上游收到了 B 的地址 id`);
+      assert.notStrictEqual(q.params.id, '20', `${action} 上游收到了 B 的订单 id`);
+    }
+  }
+});
+
 test('order：携带 userid=B / store 参数仍只返回 A 的订单', async () => {
   const { call, fx } = setup();
   const r = await call('order', { query: { userid: String(B), store: '1', page: '1' } });
