@@ -1,7 +1,7 @@
 // Call test 语音呼叫：失败/超时自动原生重试（最多 2 次，间隔硬编码 3s），零依赖
 const RETRY_MAX = 2;
 const RETRY_DELAY_MS = 3000;
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 5000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
