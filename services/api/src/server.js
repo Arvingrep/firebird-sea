@@ -8,6 +8,7 @@ const {
   confirmChargePaid 
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
+const { runCallTest } = require('./callTest');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 
 assertProductionConfig();
@@ -221,6 +222,19 @@ router.get('/wallet/coins-ph/balance', async (req, res) => {
       tip: '请在 .env 中正确配置 COINS_PH_API_KEY 与 COINS_PH_API_SECRET' 
     });
   }
+});
+
+// 10. Call test 语音呼叫测试（失败自动重试 2 次，间隔 3s）
+router.post('/call-test', async (req, res) => {
+  const url = process.env.CALL_TEST_URL;
+  if (!url) {
+    return res.status(503).json({ success: false, error: { code: 'CALL_TEST_NOT_CONFIGURED', message: 'CALL_TEST_URL is not set' } });
+  }
+  const result = await runCallTest(url, req.body);
+  if (!result.passed) {
+    return res.status(502).json({ success: false, error: { code: 'CALL_TEST_FAILED', message: result.error }, data: { attempts: result.attempts } });
+  }
+  res.json({ success: true, data: { attempts: result.attempts } });
 });
 
 app.listen(PORT, () => {
