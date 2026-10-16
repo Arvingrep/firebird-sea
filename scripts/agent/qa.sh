@@ -46,7 +46,11 @@ notify qa_started "QA Agent 开始验收 PR #${PR}" "$ISSUE" "$PR"
 
 # 1. 确定性门禁（真实执行）
 GATE_RC=0
-GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=1 bash "$AGENT_SELF_DIR/gates.sh" origin/${BASE_BRANCH} > "$TMP/gates.md" 2>&1 || GATE_RC=$?
+# GATE_AGENT_BRANCH 与 ci-verify.yml 保持一致：仅 agent/ feature/ 分支触发受保护路径门禁；
+# owner/ arvino/ 等 owner 直接操作的分支跳过，避免基础设施 PR 被自己的门禁拦住。
+HEAD_REF="$(read_pr headRefName)"
+case "$HEAD_REF" in agent/*|feature/*) AGENT_BRANCH=1 ;; *) AGENT_BRANCH=0 ;; esac
+GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=$AGENT_BRANCH bash "$AGENT_SELF_DIR/gates.sh" origin/${BASE_BRANCH} > "$TMP/gates.md" 2>&1 || GATE_RC=$?
 if [ "${GATES_JOB_RESULT:-}" != "success" ]; then
   GATE_RC=1
   printf '\n> ❌ 托管 runner 上的 gates job 结论为 `%s`（须为 success）\n' "${GATES_JOB_RESULT:-未提供}" >> "$TMP/gates.md"
