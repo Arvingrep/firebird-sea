@@ -1,0 +1,220 @@
+name: BMAD Project 状态同步
+
+on:
+  issues:
+    types: [opened, closed, labeled]
+  pull_request:
+    types: [opened, closed]
+  workflow_run:
+    workflows: ["CI: Build & Push to GAR (ArgoCD 负责部署)"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Issue 或 PR URL
+        required: true
+      stage:
+        description: backlog | in-progress | in-qa | ready-to-release | done
+        required: true
+
+# Prevent race: only one sync job at a time per group (fixes Major 4)
+concurrency:
+  group: bmad-sync-${{ github.event.issue.number || github.event.pull_request.number || 'deploy' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: [self-hosted, firebird-agent]
+    steps:
+      - uses: actions/checkout@v4
+      - name: 事件路由 → BMAD Project 字段同步
+        env:
+          BMAD_USE_GH_OAUTH: "1"
+          EVENT_NAME: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_LABELS: ${{ toJson(github.event.issue.labels.*.name) }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          LABEL_NAME: ${{ github.event.label.name }}
+          INPUT_URL: ${{ inputs.url }}
+          INPUT_STAGE: ${{ inputs.stage }}
+          # workflow_run 相关
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          # ── Helper: extract issue URL from a PR ──
+          find_linked_issue() {
+            local pr_url="$1"
+            local pr_number
+            pr_number="$(echo "$pr_url" | grep -oE '[0-9]+$' || echo '')"
+            if [ -n "$pr_number" ]; then
+              # Try GraphQL closingIssuesReferences (works for PRs that link "Closes #N" in body)
+              local result
+              result="$(gh api graphql -f query='
+                query($owner:String!,$repo:String!,$pr:Int!) {
+                  repository(owner:$owner,name:$repo) {
+                    pullRequest(number:$pr) {
+                      closingIssuesReferences(first:5) { nodes { url } }
+                      body
+                    }
+                  }
+                }' -f owner="${GITHUB_REPOSITORY%/*}" -f repo="${GITHUB_REPOSITORY#*/}" -F pr="$pr_number" 2>/dev/null || echo '')"
+              if [ -n "$result" ]; then
+                local issue_url
+                issue_url="$(echo "$result" | jq -r '.data.repository.pullRequest.closingIssuesReferences.nodes[0].url // empty' 2>/dev/null || echo '')"
+                if [ -n "$issue_url" ]; then
+                  echo "$issue_url"
+                  return 0
+                fi
+                # Also check PR body for Closes/Fixes/Resolves #N
+                local body
+                body="$(echo "$result" | jq -r '.data.repository.pullRequest.body // empty' 2>/dev/null || echo '')"
+                local ref
+                ref="$(echo "$body" | grep -oE '(Closes|Fixes|Resolves)[[:space:]]+#[0-9]+' | head -1 | grep -oE '[0-9]+' || echo '')"
+                if [ -n "$ref" ]; then
+                  echo "https://github.com/$GITHUB_REPOSITORY/issues/$ref"
+                  return 0
+                fi
+              fi
+            fi
+            return 1
+          }
+
+          # ── Helper: find PR by commit SHA (handles canary→main merge chain) ──
+          find_pr_by_sha() {
+            local sha="$1"
+            # Strategy 1: precise commit→PR association API (not text search)
+            local pr_num
+            pr_num="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" \
+              --jq '[.[] | select(.merged_at != null)] | first | .number // empty' 2>/dev/null || echo '')"
+            if [ -n "$pr_num" ]; then
+              echo "{\"number\":$pr_num,\"url\":\"https://github.com/$GITHUB_REPOSITORY/pull/$pr_num\"}"
+              return 0
+            fi
+            # Strategy 2: commit message (handles canary→main squash/merge commits)
+            local commit_msg
+            commit_msg="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha" --jq '.commit.message' 2>/dev/null || echo '')"
+            pr_num="$(echo "$commit_msg" | grep -oE 'Merge pull request #[0-9]+' | grep -oE '[0-9]+' || echo '')"
+            if [ -n "$pr_num" ]; then
+              echo "{\"number\":$pr_num,\"url\":\"https://github.com/$GITHUB_REPOSITORY/pull/$pr_num\"}"
+              return 0
+            fi
+            # Strategy 3: look for (#N) reference anywhere in commit message
+            pr_num="$(echo "$commit_msg" | grep -oE '\(#[0-9]+\)' | grep -oE '[0-9]+' | head -1 || echo '')"
+            if [ -n "$pr_num" ]; then
+              echo "{\"number\":$pr_num,\"url\":\"https://github.com/$GITHUB_REPOSITORY/pull/$pr_num\"}"
+              return 0
+            fi
+            return 1
+          }
+
+          # ── Helper: expand a promotion PR (canary→main) into original feature PR numbers ──
+          # RULES §5: 功能 PR 先进 canary，进 main 的是晋升 PR；晋升 PR 本身通常无 Closes #N。
+          # 从晋升 PR 包含的 commits 里提取 "Merge pull request #N" 与 "(#N)"，去重并排除自身。
+          expand_feature_prs() {
+            local promo_num="$1"
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$promo_num/commits" --paginate \
+              --jq '.[].commit.message' 2>/dev/null \
+              | grep -oE '(Merge pull request #[0-9]+|\(#[0-9]+\))' \
+              | grep -oE '[0-9]+' | sort -un | grep -vx "$promo_num" || true
+          }
+
+          case "$EVENT_NAME:$ACTION" in
+            # ── Issue opened: 全字段填充 ──
+            issues:opened)
+              LABELS_CSV="$(printf '%s' "$ISSUE_LABELS" | jq -r 'join(",")')"
+              node scripts/github-sync.js --init-issue "$ISSUE_URL" "$LABELS_CSV"
+              ;;
+
+            # ── Issue closed → done ──
+            issues:closed)
+              node scripts/github-sync.js --set-stage "$ISSUE_URL" done
+              ;;
+
+            # ── Label agent:dev → 编码实现 ──
+            issues:labeled)
+              if [ "$LABEL_NAME" = "agent:dev" ]; then
+                node scripts/github-sync.js --on-agent-dev "$ISSUE_URL"
+              fi
+              ;;
+
+            # ── PR opened → 独立验收 ──
+            pull_request:opened)
+              node scripts/github-sync.js --set-stage "$PR_URL" in-qa
+              ;;
+
+            # ── PR closed ──
+            pull_request:closed)
+              if [ "$PR_MERGED" = "true" ]; then
+                # 合并 → 待发布
+                node scripts/github-sync.js --set-stage "$PR_URL" ready-to-release
+              else
+                # 未合并关闭 → 退回编码实现 + 阻塞原因（包含 PR title）
+                REASON="PR #${PR_URL##*/} (${PR_TITLE:-无标题}) 关闭未合并"
+                # Try to get the closing reason from PR body
+                BODY="$(gh pr view "$PR_URL" --json body -q .body 2>/dev/null || echo '')"
+                if [ -n "$BODY" ]; then
+                  REASON="$REASON — $(echo "$BODY" | head -3 | tr '\n' ' ' | cut -c1-200)"
+                fi
+                node scripts/github-sync.js --on-pr-closed-unmerged "$PR_URL" "$REASON"
+
+                # Also update linked Issue card if one exists
+                LINKED_ISSUE="$(find_linked_issue "$PR_URL" 2>/dev/null || echo '')"
+                if [ -n "$LINKED_ISSUE" ]; then
+                  echo "→ 同步更新关联 Issue: $LINKED_ISSUE"
+                  node scripts/github-sync.js --on-pr-closed-unmerged "$LINKED_ISSUE" "$REASON" || true
+                fi
+              fi
+              ;;
+
+            # ── CI 部署成功（workflow_run） → 已上线闭环 ──
+            workflow_run:completed)
+              if [ "${WORKFLOW_RUN_CONCLUSION:-}" != "success" ]; then
+                echo "CI workflow 未成功 (${WORKFLOW_RUN_CONCLUSION:-unknown})，跳过"
+                exit 0
+              fi
+              SHA="${WORKFLOW_RUN_HEAD_SHA:-}"
+              if [ -z "$SHA" ]; then
+                echo "无 HEAD SHA，跳过"
+                exit 0
+              fi
+              # 找到与此 SHA 关联的已合并 PR（支持 canary→main 合并链）
+              PR_INFO="$(find_pr_by_sha "$SHA" 2>/dev/null || echo '')"
+              if [ -z "$PR_INFO" ]; then
+                echo "未找到关联 PR，跳过"
+                exit 0
+              fi
+              PR_URL="$(echo "$PR_INFO" | jq -r '.url')"
+              PR_NUM="$(echo "$PR_INFO" | jq -r '.number')"
+              # 晋升 PR（canary→main）展开为原始功能 PR；无法展开时退回处理定位到的 PR 本身
+              FEATURE_PRS="$(expand_feature_prs "$PR_NUM")"
+              if [ -z "$FEATURE_PRS" ]; then
+                FEATURE_PRS="$PR_NUM"
+              fi
+              FAILED=0
+              for num in $FEATURE_PRS; do
+                FP_URL="https://github.com/$GITHUB_REPOSITORY/pull/$num"
+                FP_ISSUE="$(find_linked_issue "$FP_URL" 2>/dev/null || echo '')"
+                echo "Deploy success → PR=$FP_URL Issue=${FP_ISSUE:-无}"
+                node scripts/github-sync.js --on-deploy-success "$FP_URL" "${FP_ISSUE:-}" || FAILED=1
+              done
+              exit "$FAILED"
+              ;;
+
+            # ── Manual dispatch ──
+            workflow_dispatch:*)
+              node scripts/github-sync.js --set-stage "$INPUT_URL" "$INPUT_STAGE"
+              ;;
+
+            *)
+              echo "未匹配事件: $EVENT_NAME:$ACTION，跳过"
+              ;;
+          esac
