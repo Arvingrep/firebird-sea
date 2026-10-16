@@ -1,7 +1,7 @@
 name: CI Verify & Quality Gate
 
 # PR → ① 确定性门禁（GitHub 托管 runner，所有 PR）
-#    → ② 独立 QA Agent（本机自托管 runner，仅 agent/* 分支）→ 通过即自动合并 / 打回触发返工
+#    → ② 独立 QA Agent（本机自托管 runner，agent/* 或 arvino/* 分支）→ 通过即自动合并 / 打回触发返工
 on:
   pull_request:
     # feature/agent PR → canary（验收）；canary → main 为晋升 PR（生产）；hotfix 可直接 → main
@@ -23,7 +23,7 @@ jobs:
       - name: 门禁（分支 diff：增量 / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
         env:
           GATE_REQUIRE_TOOLS: "1"
-          GATE_AGENT_BRANCH: ${{ startsWith(github.head_ref, 'agent/') && '1' || '0' }}
+          GATE_AGENT_BRANCH: ${{ (startsWith(github.head_ref, 'agent/') || startsWith(github.head_ref, 'arvino/')) && '1' || '0' }}
           # canary → main 的晋升 PR 汇总了已逐个过门禁的改动，不再受「增量 ≤ 1200 行」限制（其余门禁照常）
           GATE_MAX_ADDED: ${{ (github.base_ref == 'main' && github.head_ref == 'canary') && '1000000' || '1200' }}
         run: |
@@ -63,7 +63,7 @@ jobs:
     # 门禁失败也要跑：由 QA 把失败项写成打回意见，驱动 Dev Agent 返工
     if: >-
       always() &&
-      startsWith(github.head_ref, 'agent/') &&
+      (startsWith(github.head_ref, 'agent/') || startsWith(github.head_ref, 'arvino/')) &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, firebird-agent]
     timeout-minutes: 30
