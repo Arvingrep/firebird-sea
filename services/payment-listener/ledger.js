@@ -51,11 +51,12 @@ async function knownTxids(conn, txids) {
   return new Set(out.split('\n').map((s) => s.trim().toLowerCase()).filter(Boolean));
 }
 
-// 唯一键 (txid,event_index) + INSERT IGNORE：重复返回不重复入库
+// 唯一键 (txid,event_index) + ON DUPLICATE KEY UPDATE txid=txid：重复返回不重复入库，且不吞其它错误
 function insertTx(conn, row) {
-  const sql = 'INSERT IGNORE INTO fbs_chain_tx (txid,event_index,from_address,to_address,contract,amount_micro,block_number,block_time) VALUES ('
+  const sql = 'INSERT INTO fbs_chain_tx (txid,event_index,from_address,to_address,contract,amount_micro,block_number,block_time) VALUES ('
     + [sqlStr(row.txid), 0, sqlStr(row.from), sqlStr(row.to), sqlStr(row.contract), Number(row.amountMicro),
-      Number(row.blockNumber), `FROM_UNIXTIME(${Math.floor(Number(row.blockTimeMs) / 1000)})`].join(',') + ')';
+      Number(row.blockNumber), `FROM_UNIXTIME(${Math.floor(Number(row.blockTimeMs) / 1000)})`].join(',')
+    + ') ON DUPLICATE KEY UPDATE txid=txid';
   return conn.query(sql);
 }
 
@@ -88,7 +89,7 @@ async function scanOnce({ conn, http, masterAddress, apiKey, baseUrl = 'https://
   for (const tx of fresh.reverse()) {
     const info = (await http.post(`${baseUrl}/walletsolidity/gettransactioninfobyid`, { value: tx.transaction_id }, { headers, timeout: 8000 })).data;
     const blockNumber = Number(info?.blockNumber);
-    if (!Number.isInteger(blockNumber) || blockNumber < cursor) continue; // 未固化或早于游标
+    if (!Number.isInteger(blockNumber)) continue; // 未固化：下一轮重试；游标不用于丢弃记录，去重靠唯一键
     await insertTx(conn, {
       txid: tx.transaction_id.toLowerCase(), from: tx.from, to: tx.to, contract: USDT_TRC20_CONTRACT,
       amountMicro: tx.value, blockNumber, blockTimeMs: tx.block_timestamp,

@@ -18,7 +18,7 @@ function fakeDb() {
       if (sql.startsWith('SELECT txid FROM fbs_chain_tx')) {
         return [...rows.values()].map((r) => r.txid).filter((t) => sql.includes(`'${t}'`)).join('\n');
       }
-      if (sql.startsWith('INSERT IGNORE INTO fbs_chain_tx')) {
+      if (sql.startsWith('INSERT INTO fbs_chain_tx') && sql.endsWith('ON DUPLICATE KEY UPDATE txid=txid')) {
         const m = /VALUES \('([0-9a-f]+)',0,'([^']+)','([^']+)','([^']+)',(\d+),(\d+),/.exec(sql);
         const key = `${m[1]}:0`;
         if (!rows.has(key)) rows.set(key, { txid: m[1], to: m[3], contract: m[4], amount: Number(m[5]), block: Number(m[6]) });
@@ -105,11 +105,11 @@ test('AC3: 重启后从 fbs_cursor 继续，不漏不重', async () => {
   const blocks = { [tid(1)]: 100, [tid(2)]: 101 };
   await run(db, [mkTx(1)], blocks);
   assert.equal(db.cursor, 100);
-  // “重启”：新扫描只依赖库中游标；旧块（99）被跳过，同块与新块被处理
+  // “重启”：游标只前进不回退；块号低于游标但未入库的 tx0（99）也必须入库，已在库的 tx1 不重复
   const later = { ...blocks, [tid(0)]: 99, [tid(3)]: 100 };
   const r = await run(db, [mkTx(0), mkTx(1), mkTx(3), mkTx(2)], later);
-  assert.equal(r.saved, 2); // tx1 已在库，跳过；tx3、tx2 新入库
+  assert.equal(r.saved, 3); // tx1 已在库，跳过；tx0、tx3、tx2 新入库
   assert.equal(db.cursor, 101);
-  assert.equal(db.rows.has(`${tid(0)}:0`), false);
-  assert.equal(db.rows.size, 3);
+  assert.equal(db.rows.has(`${tid(0)}:0`), true);
+  assert.equal(db.rows.size, 4);
 });
