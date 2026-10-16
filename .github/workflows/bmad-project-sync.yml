@@ -35,6 +35,7 @@ jobs:
           ISSUE_LABELS: ${{ toJson(github.event.issue.labels.*.name) }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
           LABEL_NAME: ${{ github.event.label.name }}
           INPUT_URL: ${{ inputs.url }}
           INPUT_STAGE: ${{ inputs.stage }}
@@ -70,23 +71,12 @@ jobs:
             local body
             body="$(gh pr view "$pr_url" --json body -q .body 2>/dev/null || echo '')"
             local ref
-            ref="$(echo "$body" | grep -oE '(Closes|Fixes|Resolves)[[:space:]]+#[0-9]+' | head -1 | grep -oE '[0-9]+' || echo '')"
+            ref="$(echo "$body" | grep -oE '(Closes|Fixes|Resolves)\s+#[0-9]+' | head -1 | grep -oE '[0-9]+' || echo '')"
             if [ -n "$ref" ]; then
               echo "https://github.com/Arvingrep/firebird-sea/issues/$ref"
               return 0
             fi
             return 1
-          }
-
-          # ── Helper: find and update linked issue item on the board ──
-          update_linked_issue_stage() {
-            local pr_url="$1"
-            local stage_key="$2"
-            local issue_url
-            issue_url="$(find_linked_issue "$pr_url" 2>/dev/null || echo '')"
-            if [ -n "$issue_url" ]; then
-              node scripts/github-sync.js --set-stage "$issue_url" "$stage_key" 2>/dev/null || true
-            fi
           }
 
           case "$EVENT_NAME:$ACTION" in
@@ -116,11 +106,10 @@ jobs:
             # ── PR closed ──
             pull_request:closed)
               if [ "$PR_MERGED" = "true" ]; then
-                # 合并 → 待发布 (PR + linked issue)
+                # 合并 → 待发布
                 node scripts/github-sync.js --set-stage "$PR_URL" ready-to-release
-                update_linked_issue_stage "$PR_URL" ready-to-release
               else
-                # 未合并关闭 → 退回编码实现 + 阻塞原因 (PR + linked issue)
+                # 未合并关闭 → 退回编码实现 + 阻塞原因
                 REASON="PR #${PR_URL##*/} 关闭未合并"
                 # Try to get the closing reason from PR
                 BODY="$(gh pr view "$PR_URL" --json body -q .body 2>/dev/null || echo '')"
@@ -128,7 +117,6 @@ jobs:
                   REASON="$REASON — $(echo "$BODY" | head -3 | tr '\n' ' ' | cut -c1-200)"
                 fi
                 node scripts/github-sync.js --on-pr-closed-unmerged "$PR_URL" "$REASON"
-                update_linked_issue_stage "$PR_URL" in-progress
               fi
               ;;
 
@@ -145,21 +133,13 @@ jobs:
               fi
               # 找到与此 SHA 关联的已合并 PR
               PR_INFO="$(gh pr list -R Arvingrep/firebird-sea --state merged --search "$SHA" --json number,url,body --jq 'first(.[])' 2>/dev/null || echo '')"
-              COMMIT_MSG="$(gh api "repos/Arvingrep/firebird-sea/commits/$SHA" --jq '.commit.message' 2>/dev/null || echo '')"
               if [ -z "$PR_INFO" ]; then
                 echo "未找到关联 PR，尝试从提交消息推断"
+                COMMIT_MSG="$(gh api "repos/Arvingrep/firebird-sea/commits/$SHA" --jq '.commit.message' 2>/dev/null || echo '')"
                 PR_NUM="$(echo "$COMMIT_MSG" | grep -oE 'Merge pull request #[0-9]+' | grep -oE '[0-9]+' || echo '')"
                 if [ -n "$PR_NUM" ]; then
                   PR_URL="https://github.com/Arvingrep/firebird-sea/pull/$PR_NUM"
                 else
-                  # Last resort: direct issue reference in commit message
-                  ISSUE_REF="$(echo "$COMMIT_MSG" | grep -oE '#[0-9]+' | head -1 | tr -d '#' || echo '')"
-                  if [ -n "$ISSUE_REF" ]; then
-                    ISSUE_URL="https://github.com/Arvingrep/firebird-sea/issues/$ISSUE_REF"
-                    echo "Deploy success → direct issue ref: $ISSUE_URL"
-                    node scripts/github-sync.js --on-deploy-success "$ISSUE_URL" "$ISSUE_URL"
-                    exit 0
-                  fi
                   echo "无法找到关联 Issue/PR，跳过"
                   exit 0
                 fi
@@ -168,17 +148,8 @@ jobs:
               fi
               # 找到 PR 关联的 Issue URL
               ISSUE_URL="$(find_linked_issue "$PR_URL" 2>/dev/null || echo '')"
-              # Fallback: search commit message for direct issue refs
-              if [ -z "$ISSUE_URL" ]; then
-                ISSUE_REF="$(echo "$COMMIT_MSG" | grep -oE '#[0-9]+' | head -1 | tr -d '#' || echo '')"
-                [ -n "$ISSUE_REF" ] && ISSUE_URL="https://github.com/Arvingrep/firebird-sea/issues/$ISSUE_REF"
-              fi
               echo "Deploy success → PR=$PR_URL Issue=$ISSUE_URL"
               node scripts/github-sync.js --on-deploy-success "$PR_URL" "${ISSUE_URL:-}"
-              # Also update linked issue item on board to done
-              if [ -n "$ISSUE_URL" ]; then
-                node scripts/github-sync.js --set-stage "$ISSUE_URL" done 2>/dev/null || true
-              fi
               ;;
 
             # ── Manual dispatch ──
