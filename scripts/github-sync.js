@@ -51,7 +51,10 @@ function addItem(url) {
 
 function setSingleSelect(itemId, field, optionName) {
   const opt = field.options.find(o => o.name === optionName);
-  if (!opt) throw new Error(`Option not found: ${optionName} in field ${field.name}`);
+  if (!opt) {
+    console.error(`WARNING: Option "${optionName}" not found in field "${field.name}", skipping setSingleSelect`);
+    return;
+  }
   gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
     '--field-id', field.id, '--single-select-option-id', opt.id]);
 }
@@ -137,8 +140,10 @@ function getCurrentIterationInfo() {
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
   if (upcoming.length > 0) return { iterationId: upcoming[0].id, title: upcoming[0].title, startDate: upcoming[0].startDate, endDate: endDate(upcoming[0]) };
 
-  // All iterations expired — fallback to today so target date isn't stuck in the past
-  return { iterationId: null, title: 'N/A', startDate: today, endDate: today };
+  // All iterations expired — fallback to today+14d so target date isn't stuck in the past
+  const fallback = new Date();
+  fallback.setUTCDate(fallback.getUTCDate() + 14);
+  return { iterationId: null, title: 'N/A', startDate: today, endDate: fallback.toISOString().slice(0, 10) };
 }
 
 // ── Field cache ────────────────────────────────────────────────
@@ -176,10 +181,12 @@ function onIssueOpened(url, labelsCsv) {
 
   const result = { url, itemId, fields: {} };
 
-  // BMAD Stage → 需求池
+  // BMAD Stage → 需求池（若已有 agent:dev label 则直接设为编码实现）
+  const isAgentDev = labels.includes('agent:dev');
+  const initStage = isAgentDev ? STAGES['in-progress'] : STAGES.backlog;
   const bmadField = fieldByName(FIELD_BMAD_STAGE);
-  setSingleSelect(itemId, bmadField, STAGES.backlog);
-  result.fields[FIELD_BMAD_STAGE] = STAGES.backlog;
+  setSingleSelect(itemId, bmadField, initStage);
+  result.fields[FIELD_BMAD_STAGE] = initStage;
 
   // Cycle → 当前迭代
   if (cycle.iterationId) {
