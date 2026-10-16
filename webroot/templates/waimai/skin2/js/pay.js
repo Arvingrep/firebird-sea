@@ -476,6 +476,7 @@ $(function(){
 
 
 	//获取付款二维码
+	var qrExpireTimer = null;
 	function getQrCode(){
 	   // $('.payTab li:eq(0)').hasClass('curr') ? $('.stepBtn').hide() : null;
 	    var data = $('#payform').serialize(), action = $('#payform').attr('action');
@@ -494,6 +495,10 @@ $(function(){
 	          }
 	          var src = masterDomain + '/include/qrPay.php?' + data.join('&');
 	          $('#qrimg').attr('src', masterDomain + '/include/qrcode.php?data=' + encodeURIComponent(src));
+
+	          //二维码展示满10分钟未支付，自动重新获取
+	          clearTimeout(qrExpireTimer);
+	          qrExpireTimer = setTimeout(getQrCode, 10 * 60 * 1000);
 
 	          //验证是否支付成功，如果成功跳转到指定页面
 	      		if(timer != null){
