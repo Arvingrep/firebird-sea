@@ -147,8 +147,13 @@ jobs:
             # ── PR closed ──
             pull_request:closed)
               if [ "$PR_MERGED" = "true" ]; then
-                # 合并 → 待发布
+                # 合并 → 待发布（PR 卡片 + 关联 Issue 卡片）
                 node scripts/github-sync.js --set-stage "$PR_URL" ready-to-release
+                LINKED_ISSUE="$(find_linked_issue "$PR_URL" 2>/dev/null || echo '')"
+                if [ -n "$LINKED_ISSUE" ]; then
+                  echo "→ 同步更新关联 Issue: $LINKED_ISSUE"
+                  node scripts/github-sync.js --set-stage "$LINKED_ISSUE" ready-to-release
+                fi
               else
                 # 未合并关闭 → 退回编码实现 + 阻塞原因（包含 PR title）
                 REASON="PR #${PR_URL##*/} (${PR_TITLE:-无标题}) 关闭未合并"
@@ -163,7 +168,7 @@ jobs:
                 LINKED_ISSUE="$(find_linked_issue "$PR_URL" 2>/dev/null || echo '')"
                 if [ -n "$LINKED_ISSUE" ]; then
                   echo "→ 同步更新关联 Issue: $LINKED_ISSUE"
-                  node scripts/github-sync.js --on-pr-closed-unmerged "$LINKED_ISSUE" "$REASON" || true
+                  node scripts/github-sync.js --on-pr-closed-unmerged "$LINKED_ISSUE" "$REASON"
                 fi
               fi
               ;;
