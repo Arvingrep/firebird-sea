@@ -87,4 +87,4 @@ webroot/
 
 ## 验收测试适用范围说明（2026-10-10 修正）
 
-`services/api/test/waimai-baseline.test.js` 中「改动仅限选定白名单」断言仅在分支 diff 触及 `webroot/**waimai**` 模块路径时执行；无关 PR（如 sprint-status 回写、其他 Story）不受该白名单约束。真实配置/缓存不得入 Git 索引等检查保持无条件执行。
+`services/api/test/waimai-baseline.test.js` 中「改动仅限选定白名单」断言仅在分支 diff 触及 Story 1.1 基线文件本身（`webroot/include/config/waimai.inc.php*`、`docs/internal/WAIMAI_PLUGIN_SPEC.md`）时执行；无关 PR（如 sprint-status 回写、其他 Story，含后续外卖功能 Story 对 `webroot/templates/waimai/**` 等的合法改动）不受该白名单约束（2026-10-17 收窄，背景见 PR #130 误拦）。真实配置/缓存不得入 Git 索引等检查保持无条件执行。
