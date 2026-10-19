@@ -11,11 +11,26 @@ const REAL_TAIL_ERR =
 
 // 内存假连接：模拟 fbs_charge 的 tail_key / ordernum 唯一约束。
 // existingRow：findExisting SELECT 的一行（id..state 制表符分隔）；forUpdateRow 缺省同上。
-function fakeConn({ occupiedTails = [], base = 0, afterSelect, existingRow, forUpdateRow, failFirstInsert, realTailError = false } = {}) {
+function fakeConn({ occupiedTails = [], base = 0, afterSelect, existingRow, competingRow, failFirstInsert, realTailError = false } = {}) {
   const rows = occupiedTails.map((t) => ({ tail: t, payable: base + t * 10000 }));
   const inserts = [];
   const updates = [];
   const calls = [];
+  let row = existingRow || '';
+  // 模拟单行 UPDATE 落库（cliConn 无跨语句事务，续期路径只用条件 UPDATE + 读回）。
+  const applyUpdate = (sql, id) => {
+    if (competingRow) {
+      row = competingRow; // 另一请求在我们读回前后写
+      return;
+    }
+    const pm = /payable_micro=(\d+)/.exec(sql);
+    const rs = /rate_str='([^']*)'/.exec(sql);
+    const ra = /rate_at='([^']*)'/.exec(sql);
+    const ex = /expires_at='([^']*)'/.exec(sql);
+    if (!pm) return; // 过期清理等非续期 UPDATE 不改单行
+    const ord = row.split('\t')[1] || 'ORD1';
+    row = `${id}\t${ord}\t${pm[1]}\t${rs ? rs[1] : ''}\t${ra ? ra[1] : ''}\t${ex ? ex[1] : ''}\tpending`;
+  };
   return {
     rows,
     inserts,
@@ -24,10 +39,11 @@ function fakeConn({ occupiedTails = [], base = 0, afterSelect, existingRow, forU
     async query(sql) {
       calls.push(sql);
       if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return '';
-      if (/FOR UPDATE/.test(sql)) return (forUpdateRow === undefined ? existingRow : forUpdateRow) || '';
-      if (/^SELECT id, ordernum/.test(sql)) return existingRow || '';
+      if (/^SELECT id, ordernum/.test(sql)) return row;
       if (sql.startsWith('UPDATE')) {
         updates.push(sql);
+        const m = /WHERE id='([^']+)'/.exec(sql);
+        if (m) applyUpdate(sql, m[1]);
         return '';
       }
       if (sql.startsWith('SELECT')) {
@@ -138,6 +154,7 @@ test('major 1：同 ordernum 过期后可复用旧行续期（UPDATE，不新增
   const rowUpdates = conn.updates.filter((u) => /WHERE id='/.test(u));
   assert.strictEqual(rowUpdates.length, 1);
   assert.match(rowUpdates[0], /WHERE id='7'/);
+  assert.match(rowUpdates[0], /AND state IN \('pending','expired'\)/);
   assert.match(rowUpdates[0], /state='pending', holds_tail=1/);
   assert.match(rowUpdates[0], /expires_at='2026-01-01 00:15:00'/);
   const tail = r.payable_micro - 2000000;
@@ -153,13 +170,21 @@ test('major 1：expired 状态旧行同样可复用', async () => {
   assert.ok(r.payable_micro > 2000000);
 });
 
-test('major 1：事务内重读发现并发请求已续期 → 幂等返回其结果，不再 UPDATE', async () => {
+test('并发续期：读回发现另一请求后写 → 两个调用方都以库中同一 payable 为准', async () => {
   const expiredRow = '7\tORD1\t2310000\t62.5\t2025-12-31 23:00:00\t2025-12-31 23:15:00\tpending';
-  const renewedRow = '7\tORD1\t2320000\t62.5\t2025-12-31 23:59:59\t2026-01-01 00:14:59\tpending';
-  const conn = fakeConn({ existingRow: expiredRow, forUpdateRow: renewedRow });
+  const winner = '7\tORD1\t2320000\t62.5\t2025-12-31 23:59:59\t2026-01-01 00:14:59\tpending';
+  const conn = fakeConn({ existingRow: expiredRow, competingRow: winner });
   const r = await createCheckout(conn, args());
-  assert.strictEqual(conn.updates.filter((u) => /WHERE id='/.test(u)).length, 0);
-  assert.strictEqual(r.payable_micro, 2320000);
+  assert.strictEqual(r.payable_micro, 2320000, '必须返回库中现值而不是本地算出的金额');
+  assert.strictEqual(conn.inserts.length, 0);
+});
+
+test('major 2（第 6 轮）：续期 UPDATE 带 state 守卫，读回已是 matched 则拒绝覆盖', async () => {
+  const expiredRow = '7\tORD1\t2310000\t62.5\t2025-12-31 23:00:00\t2025-12-31 23:15:00\tpending';
+  const matched = '7\tORD1\t2310000\t62.5\t2025-12-31 23:00:00\t2026-01-01 00:15:00\tmatched';
+  const conn = fakeConn({ existingRow: expiredRow, competingRow: matched });
+  await assert.rejects(createCheckout(conn, args()), { code: 'ORDER_EXISTS' });
+  assert.match(conn.updates.filter((u) => /WHERE id='/.test(u))[0], /AND state IN \('pending','expired'\)/);
 });
 
 test('matched 终态不得复用重建（资金安全守卫）', async () => {

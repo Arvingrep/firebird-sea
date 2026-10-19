@@ -40,8 +40,8 @@
 
 ## 幂等与过期复用（QA 第 4 轮 major 1 / minor 2 修复）
 - 幂等检查**先于取汇率**：已有可用（pending 且未过期）收银台时直接返回，汇率故障不影响重复请求。
-- `ordernum` / `idempotencyKey` 命中已过期（或非 pending 超时）的旧行时，**事务内锁行（`SELECT … FOR UPDATE`）复用该行**：UPDATE 新的金额、汇率、尾数、`expires_at`，重置 `holds_tail=1`、`state='pending'`。同一订单过期后可无限次重新获得收银台，不再撞 `uq_fbs_charge_ordernum` 死锁。
-- 并发续期：事务内重读若发现其他请求已续期（可用行），直接幂等返回其结果。
+- `ordernum` / `idempotencyKey` 命中已过期（或非 pending 超时）的旧行时，用**单条条件 UPDATE**（`WHERE id=… AND state IN ('pending','expired')`）复用该行：写入新金额、汇率、尾数、`expires_at`，重置 `holds_tail=1`、`state='pending'`。同一订单过期后可无限次重新获得收银台，不再撞 `uq_fbs_charge_ordernum` 死锁。数据库通道 `cliConn` 每次 `query()` 都是一个新的 `mariadb` 客户端进程，`BEGIN` / `SELECT … FOR UPDATE` 不构成事务，因此续期路径**不依赖跨语句锁**（QA 第 6 轮 major 1）。
+- 并发续期：UPDATE 后立即读回该行；仅当库中 `payable_micro` 与 `rate_str` 与本次计算一致才返回本次结果，否则以库中现值为准幂等返回（后写者胜，两个调用方拿到同一金额）。读回已是 `matched` / `void` 等资金终态则 409 `ORDER_EXISTS`，绝不覆盖终态（QA 第 6 轮 major 2）。
 - 资金终态保护：`state` 为 `matched` / `void` 的行**不得**复用重建（返回 409 `ORDER_EXISTS`），由 Story 2.3/2.5 的状态机负责。
 - `rate_at` / `expires_at` 在首次创建与幂等返回两条路径统一为落库秒精度（`YYYY-MM-DDTHH:mm:ssZ`），两次响应一致。
 

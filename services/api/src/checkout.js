@@ -145,26 +145,28 @@ async function createCheckout(conn, { ordernum, serverCentavos, buyerMemberId, i
       `VALUES ('${ordernum}', ${idem}, ${centavos}, ${tail}, ${payable}, '${snap.rate_str}', '${rateAtSql}', 'pending', '${expiresSql}', 1)`;
     try {
       if (existing) {
-        // 过期 / 非 pending 旧行：事务内锁行复用（major 1 修复）。并发下另一请求若已续期，重读后走幂等返回。
-        await conn.query('BEGIN');
+        // 过期 / 非 pending 旧行：单条条件 UPDATE 原子复用（cliConn 每次 query 一个新进程，BEGIN/FOR UPDATE 不生效）。
+        // WHERE 带 state 守卫：读行到写行之间可能已进入 matched/void 等资金终态，无守卫会覆盖终态导致重复收款（QA 第 6 轮 major 2）。
         try {
-          const nowSec2 = Math.floor(now() / 1000);
-          const fresh = parseRow(String(await conn.query(`SELECT ${SELECT_COLS} FROM fbs_charge WHERE id='${existing.id}' FOR UPDATE`)));
-          if (fresh && !rowReusable(fresh)) {
-            await conn.query('COMMIT');
-            throw new CheckoutError('ORDER_EXISTS', '该订单已有收银台记录，状态不允许重建');
+          await conn.query(
+            `UPDATE fbs_charge SET ${fields} WHERE id='${existing.id}' AND state IN ('pending','expired')`,
+          );
+        } catch (err) {
+          if (/uq_fbs_charge_tail/.test(err.message)) {
+            collided.add(tail); // 续期撞他人尾数：排除该尾数后重新分配
+            continue;
           }
-          if (fresh && rowUsable(fresh, nowSec2)) {
-            await conn.query('COMMIT');
-            return rowToData(fresh, address);
-          }
-          await conn.query(`UPDATE fbs_charge SET ${fields} WHERE id='${existing.id}'`);
-          await conn.query('COMMIT');
-        } catch (txErr) {
-          await conn.query('ROLLBACK').catch(() => {});
-          throw txErr;
+          throw err;
         }
-        return rowToData({ ...existing, payable_micro: Number(payable), rate_str: snap.rate_str, rate_at: rateAtSql, expires_at: expiresSql, state: 'pending' }, address);
+        // 读回确认：并发续期时后写者胜，两个调用方一律以库中现值为准，不会各自持有不同 payable。
+        const after = parseRow(String(await conn.query(`SELECT ${SELECT_COLS} FROM fbs_charge WHERE id='${existing.id}'`)));
+        if (!after) throw new CheckoutError('ORDER_EXISTS', '该订单收银台记录不存在');
+        if (!rowReusable(after)) throw new CheckoutError('ORDER_EXISTS', '该订单已有收银台记录，状态不允许重建');
+        if (Number(after.payable_micro) === Number(payable) && after.rate_str === snap.rate_str) {
+          return rowToData(after, address);
+        }
+        if (rowUsable(after, nowSec)) return rowToData(after, address); // 另一请求已续期：幂等返回其值
+        throw new CheckoutError('ORDER_EXISTS', '该订单收银台正在续期，请稍后重试');
       }
       await conn.query(insertSql);
     } catch (err) {
