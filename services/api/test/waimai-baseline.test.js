@@ -82,7 +82,12 @@ test('AC1 本分支相对 origin/main 的改动仅限选定白名单且不含授
 
   // 白名单范围断言仅适用于 Story 1.1 自身的交付分支（diff 触及外卖模块相关文件时），
   // 否则任何无关 PR（如 sprint-status 回写、或配置标准化）都会被误拦——见 PR #58 verify-task 失败根因。
-  const touchesStory = changed !== null && changed.some((f) => /^webroot\/.*waimai/i.test(f) && !allowedWhitelist.some((re) => re.test(f)));
+  // 2026-10-17 再收窄（同 #58 根因的残留）：触发条件改为「动到 Story 1.1 基线文件本身」
+  // （waimai.inc.php* / WAIMAI_PLUGIN_SPEC.md）。此前用 /^webroot\/.*waimai/ 匹配，
+  // 导致后续合法的外卖功能 Story（如 #127 改 templates/waimai/**/pay.js）也被误拦（见 PR #130）。
+  // 下方禁入路径检查（data/templates_c/license/真实配置）仍无条件执行，不受影响。
+  const baselineFiles = [/^webroot\/include\/config\/waimai\.inc\.php/, /^docs\/internal\/WAIMAI_PLUGIN_SPEC\.md$/];
+  const touchesStory = changed !== null && changed.some((f) => baselineFiles.some((re) => re.test(f)));
   if (changed !== null && touchesStory) {
     const invalidFiles = changed.filter((f) => !allowedWhitelist.some((re) => re.test(f)));
     assert.deepStrictEqual(invalidFiles, [], '改动文件超出 Story 1.1 选定白名单范围');

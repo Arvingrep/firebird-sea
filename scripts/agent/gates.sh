@@ -2,7 +2,7 @@
 # 确定性门禁（无 LLM）：只看「本分支相对 base 的改动」，结果据实输出，不写死 PASS。
 # 用法：scripts/agent/gates.sh [base-ref]     （默认 origin/main）
 # 输出：stdout 为 Markdown 报告；任一 FAIL => 退出码 1。
-# 阈值：GATE_MAX_ADDED（默认 1200，不含 docs/、.agents/、_bmad-output/ 规划产物）
+# 阈值：GATE_MAX_ADDED（默认 1200，不含 docs/、.agents/、_bmad-output/、_bmad/、.claude/skills/bmad-*/ 规划产物）
 # 环境：GATE_REPO_DIR       被检查的仓库目录（QA 用 main 上的本脚本检查 PR 检出）
 #       GATE_AGENT_BRANCH=1 Agent 分支：禁止改动 .github/、scripts/agent/、scripts/acceptance/（测试先行用例）、.agents/
 #       GATE_REQUIRE_TOOLS=1 缺 php/helm 判 FAIL（托管 runner 上为权威结果）；否则记为 SKIP
@@ -34,7 +34,7 @@ if [ -n "$CHANGED" ]; then row "非空交付" "✅ PASS" "$(printf '%s\n' "$CHAN
 else row "非空交付" "❌ FAIL" "相对 ${BASE} 无改动"; fi
 
 # 2. 增量控制（防臃肿）
-ADDED="$(git diff --numstat "$RANGE" -- . ':(exclude)docs/**' ':(exclude).agents/**' ':(exclude)_bmad-output/**' ':(exclude)**/package-lock.json' \
+ADDED="$(git diff --numstat "$RANGE" -- . ':(exclude)docs/**' ':(exclude).agents/**' ':(exclude)_bmad-output/**' ':(exclude)_bmad/**' ':(exclude).claude/skills/bmad-*/**' ':(exclude)**/package-lock.json' \
          | awk '$1 != "-" {a+=$1} END{print a+0}')"
 if [ "$ADDED" -le "$MAX_ADDED" ]; then row "增量 ≤ ${MAX_ADDED} 行" "✅ PASS" "+${ADDED}"
 else row "增量 ≤ ${MAX_ADDED} 行" "❌ FAIL" "+${ADDED}，拆小或精简"; fi

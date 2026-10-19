@@ -8,7 +8,9 @@ const {
   confirmChargePaid 
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
-const { createCheckout, coinsRateSource, CheckoutError } = require('./checkout');
+const { runCallTest } = require('./callTest');
+const { createCheckoutRouter } = require('./checkoutRoute');
+const { coinsRateSource } = require('./checkout');
 const { cliConn } = require('./migrate');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 
@@ -143,50 +145,15 @@ router.post('/payment/create-charge', (req, res) => {
   });
 });
 
-// 4b. 收银台：汇率快照 + 尾数分配（Story 2.1，落库 fbs_charge）
-const checkoutHits = new Map(); // tg user id -> 最近一次窗口内的请求时间戳
-const CHECKOUT_LIMIT = 5;
-const CHECKOUT_WINDOW_MS = 60 * 1000;
-
-router.post('/checkout', async (req, res) => {
-  // phpCentavos 目前由客户端提交且无订单归属校验：服务端可读订单金额前默认关闭
-  if (process.env.CHECKOUT_ENABLED !== '1') {
-    return res.status(503).json({ success: false, error: { code: 'CHECKOUT_DISABLED', message: '收银台暂未开放' } });
-  }
-  const { ordernum, phpCentavos, idempotencyKey } = req.body || {};
-  const initData = req.get('x-telegram-init-data') || (req.body && req.body.initData);
-  const auth = validateTelegramInitData(initData, BOT_TOKEN);
-  if (!auth.valid || !auth.user || !auth.user.id) {
-    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: auth.error || 'invalid initData' } });
-  }
-  const nowMs = Date.now();
-  const hits = (checkoutHits.get(auth.user.id) || []).filter((t) => nowMs - t < CHECKOUT_WINDOW_MS);
-  if (hits.length >= CHECKOUT_LIMIT) {
-    return res.status(429).json({ success: false, error: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后再试' } });
-  }
-  hits.push(nowMs);
-  checkoutHits.set(auth.user.id, hits);
-  for (const [uid, ts] of checkoutHits) {
-    if (nowMs - ts[ts.length - 1] >= CHECKOUT_WINDOW_MS) checkoutHits.delete(uid);
-  }
-  try {
-    const data = await createCheckout(cliConn(), {
-      ordernum,
-      phpCentavos,
-      idempotencyKey: idempotencyKey || null,
-      getRate: coinsRateSource(coinsClient),
-      address: process.env.TRON_MASTER_RECEIVE_ADDRESS || '',
-    });
-    res.json({ success: true, data });
-  } catch (err) {
-    if (!(err instanceof CheckoutError)) {
-      process.stderr.write(`${JSON.stringify({ level: 'error', route: 'checkout', ordernum, message: err.message })}\n`);
-      return res.status(500).json({ success: false, error: { code: 'INTERNAL', message: 'checkout failed' } });
-    }
-    const status = err.code === 'BAD_REQUEST' ? 400 : err.code === 'ORDER_EXISTS' ? 409 : 503;
-    res.status(status).json({ success: false, error: { code: err.code, message: err.message } });
-  }
-});
+// 4b. 收银台：服务端读订单金额与归属 + 尾数分配（Story 2.1，落库 fbs_charge；路由实现见 checkoutRoute.js）
+router.post('/checkout', createCheckoutRouter({
+  env: process.env,
+  conn: cliConn,
+  getRate: coinsRateSource(coinsClient),
+  validateInitData: validateTelegramInitData,
+  botToken: BOT_TOKEN,
+  coinsClient,
+}));
 
 // 5. 轮询支付状态
 router.get('/payment/status/:chargeId', (req, res) => {
@@ -267,6 +234,35 @@ router.get('/wallet/coins-ph/balance', async (req, res) => {
       error: err.message,
       tip: '请在 .env 中正确配置 COINS_PH_API_KEY 与 COINS_PH_API_SECRET' 
     });
+  }
+});
+
+// 10. Call test 语音呼叫测试（失败自动重试 2 次，间隔 3s）
+let callTestBusy = false;
+router.post('/call-test', async (req, res) => {
+  const { initData, to, message } = req.body || {};
+  const auth = initData ? validateTelegramInitData(initData, BOT_TOKEN) : { valid: false };
+  if (!auth.valid) {
+    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid or missing initData' } });
+  }
+  const url = process.env.CALL_TEST_URL;
+  if (!url) {
+    return res.status(503).json({ success: false, error: { code: 'CALL_TEST_NOT_CONFIGURED', message: 'CALL_TEST_URL is not set' } });
+  }
+  if (callTestBusy) {
+    return res.status(429).json({ success: false, error: { code: 'CALL_TEST_BUSY', message: 'A call test is already running' } });
+  }
+  callTestBusy = true;
+  try {
+    const result = await runCallTest(url, { to, message });
+    if (!result.passed) {
+      return res.status(502).json({ success: false, error: { code: 'CALL_TEST_FAILED', message: result.error }, data: { attempts: result.attempts } });
+    }
+    res.json({ success: true, data: { attempts: result.attempts } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } });
+  } finally {
+    callTestBusy = false;
   }
 });
 

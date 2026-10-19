@@ -22,6 +22,11 @@ function sqlTime(ms) {
   return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// 响应中的 rate_at / expires_at 统一为落库精度（秒），幂等返回与首次返回一致（QA 第 4 轮 minor）。
+function dbIso(ms) {
+  return new Date(ms).toISOString().slice(0, 19) + 'Z';
+}
+
 // base = ceil(php_centavos * 1e4 / rate)（1 centavo = 0.01 PHP；1 USDT = 1e6 micro），全程整数运算。
 function baseMicro(phpCentavos, rateStr) {
   const m = /^(\d+)(?:\.(\d{1,18}))?$/.exec(rateStr);
@@ -39,31 +44,62 @@ function pickTail(occupied) {
   return free[Math.floor(Math.random() * free.length)];
 }
 
-// ordernum / idempotency_key 重复：返回已有收银台（幂等）。
-async function findExisting(conn, ordernum, idempotencyKey, address, nowMs) {
-  const byIdem = idempotencyKey === null ? '' : ` OR idempotency_key='${idempotencyKey}'`;
-  const out = String(
-    (await conn.query(
-      `SELECT ordernum, payable_micro, rate_str, rate_at, expires_at, state FROM fbs_charge WHERE ordernum='${ordernum}'${byIdem} LIMIT 1`,
-    )) || '',
-  ).trim();
-  if (!out) return null;
-  const [on, payable, rateStr, rateAt, expiresAt, state] = out.split('\t');
-  const iso = (v) => new Date(`${v.replace(' ', 'T')}Z`).toISOString();
-  // 已过期 / 非 pending：尾数已释放，金额可能已分配给他人，不得返回
-  if (state !== 'pending' || Date.parse(iso(expiresAt)) < nowMs) {
-    throw new CheckoutError('EXPIRED', '收银台已过期，请重新下单');
-  }
-  return { ordernum: on, payable_micro: Number(payable), rate_str: rateStr, rate_at: iso(rateAt), expires_at: iso(expiresAt), address };
+const SELECT_COLS = 'id, ordernum, payable_micro, rate_str, rate_at, expires_at, state';
+
+function parseRow(out) {
+  const line = String(out || '').trim().split('\n')[0];
+  if (!line) return null;
+  const [id, on, payable, rateStr, rateAt, expiresAt, state] = line.split('\t');
+  return { id, ordernum: on, payable_micro: Number(payable), rate_str: rateStr, rate_at: rateAt, expires_at: expiresAt, state };
 }
 
-async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = null, getRate, address = '', now = Date.now }) {
+// 命中已有收银台：pending 且未过期 → 幂等返回；否则（过期 / 非 pending）复用该行重新分配（QA 第 4 轮 major 1）。
+// 行内判定统一用秒精度（与落库一致）。
+function rowUsable(row, nowSec) {
+  return row.state === 'pending' && Date.parse(row.expires_at.replace(' ', 'T') + 'Z') / 1000 > nowSec;
+}
+
+// 复用旧行只允许 pending（已超时）/ expired；matched/void 等资金终态不得覆盖。
+function rowReusable(row) {
+  return row.state === 'pending' || row.state === 'expired';
+}
+
+function rowToData(row, address) {
+  return {
+    ordernum: row.ordernum,
+    payable_micro: row.payable_micro,
+    rate_str: row.rate_str,
+    rate_at: row.rate_at.replace(' ', 'T') + 'Z',
+    expires_at: row.expires_at.replace(' ', 'T') + 'Z',
+    address,
+  };
+}
+
+async function findExisting(conn, ordernum, idempotencyKey, nowSec) {
+  const byIdem = idempotencyKey === null ? '' : ` OR idempotency_key='${idempotencyKey}'`;
+  const out = await conn.query(
+    `SELECT ${SELECT_COLS} FROM fbs_charge WHERE ordernum='${ordernum}'${byIdem} LIMIT 1`,
+  );
+  return parseRow(out);
+}
+
+async function createCheckout(conn, { ordernum, serverCentavos, buyerMemberId, idempotencyKey = null, getRate, address = '', now = Date.now }) {
   if (!SAFE_ID.test(ordernum || '') || (idempotencyKey !== null && !SAFE_ID.test(idempotencyKey))) {
     throw new CheckoutError('BAD_REQUEST', 'ordernum / idempotencyKey 格式无效');
   }
-  if (!Number.isSafeInteger(phpCentavos) || phpCentavos <= 0) {
-    throw new CheckoutError('BAD_REQUEST', 'phpCentavos 必须为正整数');
+  // 金额只接受服务端读数（pay_log × 100 的整数 centavos），不接受客户端提交（QA 第 2/4 轮 major）。
+  if (!Number.isSafeInteger(serverCentavos) || serverCentavos <= 0) {
+    throw new CheckoutError('BAD_REQUEST', '订单金额无效');
   }
+  const centavos = serverCentavos;
+  const idem = idempotencyKey === null ? 'NULL' : `'${idempotencyKey}'`;
+
+  // 幂等先于取价（QA 第 4 轮 minor 2）：已有可用收银台时，汇率失败也照常返回。
+  const t0 = now();
+  const nowSec = Math.floor(t0 / 1000);
+  let existing = await findExisting(conn, ordernum, idempotencyKey, nowSec);
+  if (existing && rowUsable(existing, nowSec)) return rowToData(existing, address);
+  if (existing && !rowReusable(existing)) throw new CheckoutError('ORDER_EXISTS', '该订单已有收银台记录，状态不允许重建');
 
   let snap;
   try {
@@ -71,16 +107,10 @@ async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = nu
   } catch (err) {
     throw new CheckoutError('RATE_UNAVAILABLE', '汇率获取失败，请稍后再试');
   }
-  const t0 = now();
   if (!snap || !(t0 - snap.rate_at <= RATE_MAX_AGE_MS)) {
     throw new CheckoutError('RATE_STALE', '汇率已过期，请稍后再试');
   }
-  const base = baseMicro(phpCentavos, snap.rate_str);
-
-  // 释放已过期订单占用的尾数
-  await conn.query(
-    `UPDATE fbs_charge SET state='expired', holds_tail=NULL WHERE state='pending' AND holds_tail=1 AND expires_at < '${sqlTime(t0)}'`,
-  );
+  const base = baseMicro(centavos, snap.rate_str);
 
   const collided = new Set();
   for (let i = 0; i < MAX_RETRY; i++) {
@@ -97,20 +127,48 @@ async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = nu
     const tail = pickTail(occupied);
     const payable = base + BigInt(tail) * TAIL_UNIT_MICRO;
     const expiresAt = t0 + WINDOW_MS;
-    const idem = idempotencyKey === null ? 'NULL' : `'${idempotencyKey}'`;
+    const rateAtSql = sqlTime(snap.rate_at);
+    const expiresSql = sqlTime(expiresAt);
+    const fields = `php_centavos=${centavos}, tail_cents=${tail}, payable_micro=${payable}, rate_str='${snap.rate_str}', rate_at='${rateAtSql}', expires_at='${expiresSql}', state='pending', holds_tail=1, idempotency_key=${idem}`;
+    const insertSql =
+      'INSERT INTO fbs_charge (ordernum, idempotency_key, php_centavos, tail_cents, payable_micro, rate_str, rate_at, state, expires_at, holds_tail) ' +
+      `VALUES ('${ordernum}', ${idem}, ${centavos}, ${tail}, ${payable}, '${snap.rate_str}', '${rateAtSql}', 'pending', '${expiresSql}', 1)`;
     try {
-      await conn.query(
-        'INSERT INTO fbs_charge (ordernum, idempotency_key, php_centavos, tail_cents, payable_micro, rate_str, rate_at, state, expires_at, holds_tail) ' +
-          `VALUES ('${ordernum}', ${idem}, ${phpCentavos}, ${tail}, ${payable}, '${snap.rate_str}', '${sqlTime(snap.rate_at)}', 'pending', '${sqlTime(expiresAt)}', 1)`,
-      );
+      if (existing) {
+        // 过期 / 非 pending 旧行：事务内锁行复用（major 1 修复）。并发下另一请求若已续期，重读后走幂等返回。
+        await conn.query('BEGIN');
+        try {
+          const nowSec2 = Math.floor(now() / 1000);
+          const fresh = parseRow(String(await conn.query(`SELECT ${SELECT_COLS} FROM fbs_charge WHERE id='${existing.id}' FOR UPDATE`)));
+          if (fresh && !rowReusable(fresh)) {
+            await conn.query('COMMIT');
+            throw new CheckoutError('ORDER_EXISTS', '该订单已有收银台记录，状态不允许重建');
+          }
+          if (fresh && rowUsable(fresh, nowSec2)) {
+            await conn.query('COMMIT');
+            return rowToData(fresh, address);
+          }
+          await conn.query(`UPDATE fbs_charge SET ${fields} WHERE id='${existing.id}'`);
+          await conn.query('COMMIT');
+        } catch (txErr) {
+          await conn.query('ROLLBACK').catch(() => {});
+          throw txErr;
+        }
+        return rowToData({ ...existing, payable_micro: Number(payable), rate_str: snap.rate_str, rate_at: rateAtSql, expires_at: expiresSql, state: 'pending' }, address);
+      }
+      await conn.query(insertSql);
     } catch (err) {
       if (/uq_fbs_charge_tail/.test(err.message)) {
         collided.add(tail); // 并发撞尾数：排除该尾数后重新分配
         continue;
       }
       if (/Duplicate entry/.test(err.message)) {
-        const existing = await findExisting(conn, ordernum, idempotencyKey, address, t0);
-        if (existing) return existing;
+        const again = await findExisting(conn, ordernum, idempotencyKey, Math.floor(now() / 1000));
+        if (again && rowUsable(again, Math.floor(now() / 1000))) return rowToData(again, address);
+        if (again && rowReusable(again)) {
+          existing = again; // 并发写入的旧行已过期：下一轮循环复用续期
+          continue;
+        }
         throw new CheckoutError('ORDER_EXISTS', '订单已存在收银台');
       }
       throw err;
@@ -119,8 +177,8 @@ async function createCheckout(conn, { ordernum, phpCentavos, idempotencyKey = nu
       ordernum,
       payable_micro: Number(payable),
       rate_str: snap.rate_str,
-      rate_at: new Date(snap.rate_at).toISOString(),
-      expires_at: new Date(expiresAt).toISOString(),
+      rate_at: dbIso(snap.rate_at),
+      expires_at: dbIso(expiresAt),
       address,
     };
   }
