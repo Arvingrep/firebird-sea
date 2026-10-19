@@ -45,6 +45,10 @@
 - 资金终态保护：`state` 为 `matched` / `void` 的行**不得**复用重建（返回 409 `ORDER_EXISTS`），由 Story 2.3/2.5 的状态机负责。
 - `rate_at` / `expires_at` 在首次创建与幂等返回两条路径统一为落库秒精度（`YYYY-MM-DDTHH:mm:ssZ`），两次响应一致。
 
+## QA 第 5 轮补强
+- `idempotencyKey` 命中他人订单（命中行 `ordernum` 与本次请求不一致）时直接 409 `ORDER_EXISTS`，不返回他人收银台字段。
+- `rate_at` 晚于当前时间超过 1 秒容差按 `RATE_STALE` 拒绝；取尾数前的过期清理现已落地为单条 `UPDATE … state='expired', holds_tail=0`（此前文档有描述但代码缺失）。
+
 ## 开关与启用条件
 - `CHECKOUT_ENABLED` 默认关闭（503 `CHECKOUT_DISABLED`）。服务端金额读取 + 归属校验已就位，生产启用仍需运营确认 `pay_log` 数据一致性（`state=0` 约定）与网关限流就绪。
 

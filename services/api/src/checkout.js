@@ -7,6 +7,7 @@ const TAIL_MIN = 1;
 const TAIL_MAX = 90; // 尾数 0.01 ~ 0.90 USDT，共 90 个
 const TAIL_UNIT_MICRO = 10000n; // 1 cent = 10000 micro
 const RATE_MAX_AGE_MS = 60 * 1000;
+const RATE_FUTURE_TOLERANCE_MS = 1000; // rate_at 不得晚于当前时间（容差 1s，QA 第 5 轮 minor）
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_RETRY = 5;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -75,12 +76,17 @@ function rowToData(row, address) {
   };
 }
 
-async function findExisting(conn, ordernum, idempotencyKey, nowSec) {
+async function findExisting(conn, ordernum, idempotencyKey) {
   const byIdem = idempotencyKey === null ? '' : ` OR idempotency_key='${idempotencyKey}'`;
   const out = await conn.query(
     `SELECT ${SELECT_COLS} FROM fbs_charge WHERE ordernum='${ordernum}'${byIdem} LIMIT 1`,
   );
-  return parseRow(out);
+  const row = parseRow(out);
+  // 命中行必须属于本次 ordernum：idempotencyKey 撞到别的订单时不得返回他人收银台（QA 第 5 轮 major 2）
+  if (row && row.ordernum !== ordernum) {
+    throw new CheckoutError('ORDER_EXISTS', '幂等键已绑定其他订单');
+  }
+  return row;
 }
 
 async function createCheckout(conn, { ordernum, serverCentavos, buyerMemberId, idempotencyKey = null, getRate, address = '', now = Date.now }) {
@@ -97,7 +103,7 @@ async function createCheckout(conn, { ordernum, serverCentavos, buyerMemberId, i
   // 幂等先于取价（QA 第 4 轮 minor 2）：已有可用收银台时，汇率失败也照常返回。
   const t0 = now();
   const nowSec = Math.floor(t0 / 1000);
-  let existing = await findExisting(conn, ordernum, idempotencyKey, nowSec);
+  let existing = await findExisting(conn, ordernum, idempotencyKey);
   if (existing && rowUsable(existing, nowSec)) return rowToData(existing, address);
   if (existing && !rowReusable(existing)) throw new CheckoutError('ORDER_EXISTS', '该订单已有收银台记录，状态不允许重建');
 
@@ -107,12 +113,16 @@ async function createCheckout(conn, { ordernum, serverCentavos, buyerMemberId, i
   } catch (err) {
     throw new CheckoutError('RATE_UNAVAILABLE', '汇率获取失败，请稍后再试');
   }
-  if (!snap || !(t0 - snap.rate_at <= RATE_MAX_AGE_MS)) {
+  if (!snap || typeof snap.rate_at !== 'number' || snap.rate_at > t0 + RATE_FUTURE_TOLERANCE_MS || t0 - snap.rate_at > RATE_MAX_AGE_MS) {
     throw new CheckoutError('RATE_STALE', '汇率已过期，请稍后再试');
   }
   const base = baseMicro(centavos, snap.rate_str);
 
   const collided = new Set();
+  // 取尾数前释放已过期未支付的占用，否则 holds_tail 会累积到 90 个后全部误报 TAIL_EXHAUSTED（QA 第 5 轮 major 1）
+  await conn.query(
+    `UPDATE fbs_charge SET state='expired', holds_tail=0 WHERE state='pending' AND holds_tail=1 AND expires_at <= '${sqlTime(t0)}'`,
+  );
   for (let i = 0; i < MAX_RETRY; i++) {
     // 按 payable_micro 区间取占用（不同基础金额也可能算出相同 payable_micro）
     const lo = base + TAIL_UNIT_MICRO * BigInt(TAIL_MIN);
@@ -163,7 +173,7 @@ async function createCheckout(conn, { ordernum, serverCentavos, buyerMemberId, i
         continue;
       }
       if (/Duplicate entry/.test(err.message)) {
-        const again = await findExisting(conn, ordernum, idempotencyKey, Math.floor(now() / 1000));
+        const again = await findExisting(conn, ordernum, idempotencyKey);
         if (again && rowUsable(again, Math.floor(now() / 1000))) return rowToData(again, address);
         if (again && rowReusable(again)) {
           existing = again; // 并发写入的旧行已过期：下一轮循环复用续期

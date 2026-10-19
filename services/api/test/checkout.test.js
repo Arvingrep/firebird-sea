@@ -15,11 +15,14 @@ function fakeConn({ occupiedTails = [], base = 0, afterSelect, existingRow, forU
   const rows = occupiedTails.map((t) => ({ tail: t, payable: base + t * 10000 }));
   const inserts = [];
   const updates = [];
+  const calls = [];
   return {
     rows,
     inserts,
     updates,
+    calls,
     async query(sql) {
+      calls.push(sql);
       if (/^(BEGIN|COMMIT|ROLLBACK)/.test(sql)) return '';
       if (/FOR UPDATE/.test(sql)) return (forUpdateRow === undefined ? existingRow : forUpdateRow) || '';
       if (/^SELECT id, ordernum/.test(sql)) return existingRow || '';
@@ -132,10 +135,11 @@ test('major 1：同 ordernum 过期后可复用旧行续期（UPDATE，不新增
   const conn = fakeConn({ existingRow: expiredRow });
   const r = await createCheckout(conn, args());
   assert.strictEqual(conn.inserts.length, 0);
-  assert.strictEqual(conn.updates.length, 1);
-  assert.match(conn.updates[0], /WHERE id='7'/);
-  assert.match(conn.updates[0], /state='pending', holds_tail=1/);
-  assert.match(conn.updates[0], /expires_at='2026-01-01 00:15:00'/);
+  const rowUpdates = conn.updates.filter((u) => /WHERE id='/.test(u));
+  assert.strictEqual(rowUpdates.length, 1);
+  assert.match(rowUpdates[0], /WHERE id='7'/);
+  assert.match(rowUpdates[0], /state='pending', holds_tail=1/);
+  assert.match(rowUpdates[0], /expires_at='2026-01-01 00:15:00'/);
   const tail = r.payable_micro - 2000000;
   assert.ok(tail >= 10000 && tail <= 900000);
   assert.strictEqual(r.expires_at, '2026-01-01T00:15:00Z');
@@ -145,7 +149,7 @@ test('major 1：expired 状态旧行同样可复用', async () => {
   const row = '9\tORD1\t2310000\t62.5\t2025-12-31 23:00:00\t2025-12-31 23:15:00\texpired';
   const conn = fakeConn({ existingRow: row });
   const r = await createCheckout(conn, args());
-  assert.strictEqual(conn.updates.length, 1);
+  assert.strictEqual(conn.updates.filter((u) => /WHERE id='/.test(u)).length, 1);
   assert.ok(r.payable_micro > 2000000);
 });
 
@@ -154,7 +158,7 @@ test('major 1：事务内重读发现并发请求已续期 → 幂等返回其�
   const renewedRow = '7\tORD1\t2320000\t62.5\t2025-12-31 23:59:59\t2026-01-01 00:14:59\tpending';
   const conn = fakeConn({ existingRow: expiredRow, forUpdateRow: renewedRow });
   const r = await createCheckout(conn, args());
-  assert.strictEqual(conn.updates.length, 0);
+  assert.strictEqual(conn.updates.filter((u) => /WHERE id='/.test(u)).length, 0);
   assert.strictEqual(r.payable_micro, 2320000);
 });
 
@@ -165,4 +169,35 @@ test('matched 终态不得复用重建（资金安全守卫）', async () => {
 
 test('rate_str 保留原始价格字符串（高精度小数）', () => {
   assert.strictEqual(baseMicro(100, '0.00000001'), 100000000000000n); // 100*1e4/1e-8
+});
+
+test('major 1（第 5 轮）：取尾数前先释放过期 pending 占用，再扫描占用区间', async () => {
+  const conn = fakeConn();
+  await createCheckout(conn, args());
+  assert.strictEqual(conn.updates.length, 1);
+  assert.match(conn.updates[0], /SET state='expired', holds_tail=0/);
+  assert.match(conn.updates[0], /state='pending' AND holds_tail=1 AND expires_at <= '2026-01-01 00:00:00'/);
+  const sweepIdx = conn.calls.findIndex((q) => /SET state='expired'/.test(q));
+  const scanIdx = conn.calls.findIndex((q) => /SELECT payable_micro FROM fbs_charge/.test(q));
+  assert.ok(sweepIdx >= 0 && scanIdx > sweepIdx, '清理必须发生在占用扫描之前');
+});
+
+test('major 2（第 5 轮）：幂等键命中他人订单时拒绝，不返回他人收银台', async () => {
+  const foreign = '7	OTHER-ORD	2310000	62.5	2025-12-31 23:59:00	2026-01-01 00:15:00	pending';
+  const conn = fakeConn({ existingRow: foreign });
+  await assert.rejects(
+    createCheckout(conn, args({ idempotencyKey: 'IDEM-B' })),
+    (e) => e instanceof CheckoutError && e.code === 'ORDER_EXISTS' && /其他订单/.test(e.message),
+  );
+  assert.strictEqual(conn.inserts.length, 0);
+  assert.strictEqual(conn.updates.length, 0);
+});
+
+test('minor（第 5 轮）：rate_at 晚于当前时间（未来时间戳）按汇率过期处理', async () => {
+  const conn = fakeConn();
+  await assert.rejects(
+    createCheckout(conn, args({ getRate: () => Promise.resolve({ rate_str: '62.5', rate_at: NOW + 60000 }) })),
+    { code: 'RATE_STALE' },
+  );
+  assert.strictEqual(conn.inserts.length, 0);
 });
