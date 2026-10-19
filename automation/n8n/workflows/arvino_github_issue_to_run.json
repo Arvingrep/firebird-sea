@@ -1,0 +1,197 @@
+{
+  "name": "arvino-github-webhook",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "arvino-github-webhook",
+        "responseMode": "onReceived",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "node-gh-webhook-in",
+      "name": "1. GitHub Webhook 接收",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "arvino-github-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_N8N_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "arvino-n8n-relay-token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-is-issues-event",
+              "leftValue": "={{ $json.headers['x-github-event'] }}",
+              "rightValue": "issues",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "node-gh-is-issues",
+      "name": "2. 是 issues 事件?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-is-opened",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "node-gh-is-opened",
+      "name": "2b. 是 opened?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://arvino-orchestrator.arvino-production.svc.cluster.local/webhooks/github",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-github-event",
+              "value": "={{ $('1. GitHub Webhook 接收').item.json.headers['x-github-event'] }}"
+            },
+            {
+              "name": "x-github-delivery",
+              "value": "={{ $('1. GitHub Webhook 接收').item.json.headers['x-github-delivery'] || $now }}"
+            },
+            {
+              "name": "x-hub-signature-256",
+              "value": "={{ $('1. GitHub Webhook 接收').item.json.headers['x-hub-signature-256'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($('1. GitHub Webhook 接收').item.json.body) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "node-arvino-forward",
+      "name": "3. 转发到 arvino /webhooks/github",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [950, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_N8N_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "arvino-n8n-relay-token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log forwarding result for debugging\nconst result = $input.first().json;\nconst statusCode = result.statusCode || result.status || '?';\nconst runIds = (result.body?.results?.[0]?.run_ids || []).join(', ');\nconst status = result.body?.results?.[0]?.status || result.body?.status || '?';\nconsole.log(`arvino webhook forwarded: HTTP ${statusCode}, status=${status}, run_ids=[${runIds}]`);\nreturn [{ json: { statusCode, status, runIds } }];"
+      },
+      "id": "node-log-result",
+      "name": "4. 记录结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 200]
+    }
+  ],
+  "connections": {
+    "1. GitHub Webhook 接收": {
+      "main": [
+        [
+          {
+            "node": "2. 是 issues 事件?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. 是 issues 事件?": {
+      "main": [
+        [
+          {
+            "node": "2b. 是 opened?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "2b. 是 opened?": {
+      "main": [
+        [
+          {
+            "node": "3. 转发到 arvino /webhooks/github",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "3. 转发到 arvino /webhooks/github": {
+      "main": [
+        [
+          {
+            "node": "4. 记录结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
