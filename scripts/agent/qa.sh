@@ -19,11 +19,17 @@ AUTO_MERGE="${AGENT_AUTO_MERGE:-1}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 if [ -n "${QA_AGENT_CMD:-}" ]; then
-  eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
+  eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设；设了就不走故障转移链
+  QA_CHAIN=()
 else
-  # codex 因账户配额耗尽持续失败（5 轮 fail-closed），临时切换为 claude。
+# codex 因账户配额耗尽持续失败（5 轮 fail-closed），临时切换为 claude。
   # 待 codex 账户配额恢复后，可通过仓库变量 QA_AGENT_CMD='codex exec -s read-only -' 覆盖。
   QA_CMD=(claude -p --max-turns 10 -)
+  # TODO(2026-10-13): agy/Gemini 本想作订阅兜底，但 headless 模式下工具调用会被
+  # permissions 拦住（"a tool required the 'command' permission...auto-denied"），
+  # --sandbox/--mode plan 都绕不开，需要配 permissions.allow 只读白名单才能用，
+  # 还没配通。先留空链，只做配额识别不做真实转移，别在失败态上再加一层空转。
+  QA_CHAIN=()
 fi
 
 ensure_labels
@@ -40,7 +46,11 @@ notify qa_started "QA Agent 开始验收 PR #${PR}" "$ISSUE" "$PR"
 
 # 1. 确定性门禁（真实执行）
 GATE_RC=0
-GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=1 bash "$AGENT_SELF_DIR/gates.sh" origin/${BASE_BRANCH} > "$TMP/gates.md" 2>&1 || GATE_RC=$?
+# GATE_AGENT_BRANCH 与 ci-verify.yml 保持一致：仅 agent/ feature/ 分支触发受保护路径门禁；
+# owner/ arvino/ 等 owner 直接操作的分支跳过，避免基础设施 PR 被自己的门禁拦住。
+HEAD_REF="$(read_pr headRefName)"
+case "$HEAD_REF" in agent/*|feature/*) AGENT_BRANCH=1 ;; *) AGENT_BRANCH=0 ;; esac
+GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=$AGENT_BRANCH bash "$AGENT_SELF_DIR/gates.sh" origin/${BASE_BRANCH} > "$TMP/gates.md" 2>&1 || GATE_RC=$?
 if [ "${GATES_JOB_RESULT:-}" != "success" ]; then
   GATE_RC=1
   printf '\n> ❌ 托管 runner 上的 gates job 结论为 `%s`（须为 success）\n' "${GATES_JOB_RESULT:-未提供}" >> "$TMP/gates.md"
@@ -78,6 +88,8 @@ DIFF_BYTES="$(wc -c < "$TMP/diff.patch" | tr -d ' ')"
 } > "$TMP/prompt.md"
 
 log "🛡️ 调用 QA Agent: ${QA_CMD[0]}"
+QA_MODEL_USED="${QA_CMD[0]}"
+QUOTA_RE='usage limit|rate limit|rate_limit|quota|429|Upgrade to Pro|insufficient_quota'
 if [ "${QA_CMD[0]}" = "codex" ]; then
   # codex exec 用 --output-last-message 将最后一条消息写到 verdict.txt；stdout 是 JSONL 事件流，保存到 qa.log 备查
   agent_env "${QA_CMD[@]}" < "$TMP/prompt.md" > "$TMP/qa.log" 2>&1 || log "⚠️ QA Agent 非 0 退出"
@@ -95,6 +107,27 @@ else
   agent_env "${QA_CMD[@]}" < "$TMP/prompt.md" > "$TMP/verdict.txt" 2> "$TMP/qa.log" || log "⚠️ QA Agent 非 0 退出"
 fi
 
+# 主力命中配额/限流 => 按链路依次切换到订阅兜底 Agent，而不是直接 fail-closed 打回。
+if grep -qiE "$QUOTA_RE" "$TMP/qa.log" "$TMP/verdict.txt" 2>/dev/null && ! grep -q '"verdict"' "$TMP/verdict.txt" 2>/dev/null; then
+  log "⚠️ ${QA_CMD[0]} 疑似配额/限流（命中: $(grep -ioE "$QUOTA_RE" "$TMP/qa.log" "$TMP/verdict.txt" 2>/dev/null | head -1)），尝试故障转移链"
+  for FALLBACK in "${QA_CHAIN[@]}"; do
+    log "🛡️ 故障转移 → ${FALLBACK}"
+    case "$FALLBACK" in
+      agy)
+        if agent_env agy -p "$(cat "$TMP/prompt.md")" --sandbox --print-timeout 300s > "$TMP/verdict.txt" 2> "$TMP/qa.log"; then
+          QA_MODEL_USED="agy(gemini)"
+          break
+        else
+          log "⚠️ agy 也失败，继续下一个或 fail-closed"
+        fi
+        ;;
+      *)
+        log "⚠️ 未知故障转移目标: $FALLBACK，跳过"
+        ;;
+    esac
+  done
+fi
+
 # 3. 解析裁定（解析失败 => fail-closed 判 REJECTED）
 node - "$TMP/verdict.txt" "$GATE_RC" > "$TMP/result.md" <<'JS'
 const fs = require('fs');
@@ -104,7 +137,10 @@ let v = null;
 const m = raw.match(/\{[\s\S]*"verdict"[\s\S]*\}/);
 try { v = m && JSON.parse(m[0]); } catch (_) {}
 if (!v || !['ACCEPTED', 'REJECTED'].includes(v.verdict)) {
-  v = { verdict: 'REJECTED', summary: 'QA Agent 输出无法解析，按 fail-closed 打回', findings: [] };
+  const looksQuota = /usage limit|rate limit|quota|429|upgrade to pro|insufficient_quota/i.test(raw);
+  v = { verdict: 'REJECTED', summary: looksQuota
+    ? 'QA Agent（codex）配额/限流失败，按 fail-closed 打回（非代码问题，需等配额重置或补额度；故障转移兜底 Agent 尚未配通，见 qa.sh TODO）'
+    : 'QA Agent 输出无法解析，按 fail-closed 打回', findings: [] };
 }
 const findings = Array.isArray(v.findings) ? v.findings : [];
 if (findings.some(f => ['blocker', 'major'].includes(f.severity))) v.verdict = 'REJECTED';
@@ -126,7 +162,7 @@ if [ "$VERDICT" = "ACCEPTED" ]; then MARK="$QA_MARK_ACCEPT"; BADGE="🟢 ACCEPTE
 {
   echo "$MARK"
   echo "## 🛡️ 独立 QA 验收：${BADGE}"
-  echo "> commit \`${HEAD_SHA:0:8}\` · 第 ${ATTEMPT} 轮 · QA 模型：\`${QA_CMD[0]}\`${RUN_URL:+ · [运行日志](${RUN_URL})}"
+  echo "> commit \`${HEAD_SHA:0:8}\` · 第 ${ATTEMPT} 轮 · QA 模型：\`${QA_MODEL_USED}\`${RUN_URL:+ · [运行日志](${RUN_URL})}"
   echo
   tail -n +2 "$TMP/result.md"
   echo
