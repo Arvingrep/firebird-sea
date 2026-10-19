@@ -9,6 +9,9 @@ const {
 } = require('./paymentManager');
 const { CoinsPhClient } = require('./coinsPhClient');
 const { runCallTest } = require('./callTest');
+const { createCheckoutRouter } = require('./checkoutRoute');
+const { coinsRateSource } = require('./checkout');
+const { cliConn } = require('./migrate');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 
 assertProductionConfig();
@@ -141,6 +144,16 @@ router.post('/payment/create-charge', (req, res) => {
     data: charge
   });
 });
+
+// 4b. 收银台：服务端读订单金额与归属 + 尾数分配（Story 2.1，落库 fbs_charge；路由实现见 checkoutRoute.js）
+router.post('/checkout', createCheckoutRouter({
+  env: process.env,
+  conn: cliConn,
+  getRate: coinsRateSource(coinsClient),
+  validateInitData: validateTelegramInitData,
+  botToken: BOT_TOKEN,
+  coinsClient,
+}));
 
 // 5. 轮询支付状态
 router.get('/payment/status/:chargeId', (req, res) => {

@@ -4,7 +4,7 @@
 
 | 服务 | 命令 | 覆盖 |
 |------|------|------|
-| `services/api` | `npm test` | `test/telegram-auth.test.js`（initData HMAC 校验、篡改、过期）、`test/payment-manager.test.js`（USDT 尾数分配、唯一性、匹配与确认） 及既有用例 |
+| `services/api` | `npm test` | `test/telegram-auth.test.js`（initData HMAC 校验、篡改、过期）、`test/payment-manager.test.js`（USDT 尾数分配、唯一性、匹配与确认）、`test/checkout.test.js`（Story 2.1 收银台：金额公式、尾数耗尽、汇率失败/过期、尾数唯一约束冲突重分配、过期行复用续期、终态守卫，内存假连接）、`test/pay-order-read.test.js`（订单金额/归属只读通道与拒绝路径）、`test/checkout-route.test.js`（收银台路由层：CHECKOUT_ENABLED、401/403/429/400、服务端金额） 及既有用例 |
 | `services/payment-listener` | `npm test` | `test/amount.test.js`（TRC-20 金额换算，`amount.js` 自 `listener.js` 抽出以便测试） |
 
 CI：`.github/workflows/ci-verify.yml` 的 `verify-task` job 运行 `scripts/verify-task.sh`，其步骤 6 依次执行 `services/api`、`services/payment-listener`、`services/news-sync` 的 `npm test`；任一失败则 job 失败，`agent-qa` 依赖该 job，失败不会合并。
