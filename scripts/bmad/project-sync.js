@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // BMAD Story 全量建档上板：epics.md + sprint-status.yaml → Issue(bmad:story) + Project #3 字段。
-// 默认 dry-run，只有显式 --apply 才写；幂等键 <!-- bmad-story: KEY -->。全链路见 docs/internal/BMAD_BOARD.md
+// 默认 dry-run，只有显式 --apply 才写；幂等键 <!-- bmad-story: KEY -->。全链路见 docs/internal/BMAD_INTEGRATION.md
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');

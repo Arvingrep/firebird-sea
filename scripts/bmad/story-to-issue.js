@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // BMAD Story → GitHub Issue：选出下一个可开工的 backlog Story，生成 Issue（默认 dry-run，--create 才调 gh）。
-// 用法与参数见 docs/internal/BMAD_PIPELINE.md
+// 用法与参数见 docs/internal/BMAD_INTEGRATION.md
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
