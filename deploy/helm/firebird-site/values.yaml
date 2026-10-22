@@ -52,16 +52,20 @@ memoryCache:
     db: 1
 
 # ③ 声明式配置变量：Git 为准、每次 Pod 启动施加，所有副本一致。形如 { "<file>.inc.php": { <var>: <value> } }。
-# 后台页面保存会整文件重写，保存后到下次重启前这些键可能与 Git 不一致（见 docs/internal/WRITABLE_STATE.md）。
-# 当前值取自 waimai.inc.php.example 的出厂默认（不改变线上行为）。
-# ⚠ PRD 要求平台抽餐费从 18% 调为 0%、并确认配送费分成 89% 的含义——需业务决策后在此修改（改 Git + 发布）。
+# W1 B 线（2026-10-22 拍板）：线下结佣 + 商家自配送 + 3% 技术服务费。
+#  - customClearingswitch=1：结算时跳过平台给商家余额入账（common.func.php:15509/15565 仅 =0 才打款）= 线下结佣
+#  - fencheng_foodprice 18→3：技术服务费 3%，基数 = 商品原价（含规格/加料）− 整单退款，不含打包/配送/增值（common.func.php:15209）
+#  - fencheng_delivery 89→0：配送费 100% 归商家；运营红线：绝不派平台骑手（peisongid≠0 时平台每单倒贴，见 W1 细则 3.3）
+#  - fencheng_dabao 100→0：打包费 100% 归商家
+# ⚠ 存量店不读全局值：必须同批执行 W1 细则 2.7 的逐店 UPDATE 回填，否则 3% 对老店不生效。
 configVars:
   waimai.inc.php:
-    custom_fencheng_foodprice: 18
-    custom_fencheng_delivery: 89
+    customClearingswitch: 1
+    custom_fencheng_foodprice: 3
+    custom_fencheng_delivery: 0
     custom_fencheng_addservice: 100
     custom_fencheng_zsb: 100
-    custom_fencheng_dabao: 100
+    custom_fencheng_dabao: 0
     custom_fencheng_discount: 0
     custom_fencheng_promotion: 0
     custom_fencheng_firstdiscount: 0
@@ -82,7 +86,7 @@ configBackup:
 # 例外：writable 里的文件名保持可写（例如确认有运行期写入的文件）。
 # 注意：admin/siteConfig/elasticSearch.php 写失败时不报错（厂商代码），页面会显示"成功"但实际未保存。
 configLock:
-  enabled: false
+  enabled: true
   writable: []
   # message（原文）与 messageJson（\uXXXX 转义）必须一致：应用用 json_encode 输出错误，默认转义非 ASCII。
   # 转义串必须用 YAML 单引号，双引号会把 \uXXXX 解码回汉字

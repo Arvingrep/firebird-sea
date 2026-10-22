@@ -82,6 +82,17 @@ if [ -f "$VARS_DIR/vars.txt" ] && [ -f "$VARS_DIR/apply-vars.php" ]; then
         || echo ">>> [WARN] configVars 施加失败，沿用镜像/PVC 中的配置" >&2
 fi
 
+# ④ 资金开关硬断言：B 线要求 clearingswitch=1（线下结佣 + 商家自配送）
+# 位置约束：必须位于 .example→真实文件的 cp（66-75 行）与 configVars 施加（77-83 行）之后，
+# 否则校验到的是旧值或尚不存在的文件。fail-closed：文件缺失/值不为 1 一律拒绝启动。
+# 用 grep 而非 php -r：不执行用户可写目录里的代码；if ! 在 set -e 下不会提前退出。
+WAIMAI_CFG="/var/www/html/include/config/waimai.inc.php"
+if ! grep -Eq '^[[:space:]]*\$customClearingswitch[[:space:]]*=[[:space:]]*1[[:space:]]*;' "$WAIMAI_CFG"; then
+    echo ">>> [FATAL] clearingswitch 不是 1（当前：$(grep -E '\$customClearingswitch' "$WAIMAI_CFG" 2>/dev/null | tr -d '\r')）。B 线要求线下结佣，拒绝启动。" >&2
+    exit 1
+fi
+echo ">>> [Guard] clearingswitch=1（线下结佣）OK"
+
 # 确保底层扩展在 webroot 与系统目录下双重就绪 (自愈机制)
 if [ ! -f /var/www/html/huoniao.so ] && [ -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so ]; then
     cp -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so /var/www/html/huoniao.so 2>/dev/null || true
