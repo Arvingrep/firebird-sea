@@ -1,6 +1,15 @@
 # 多 Agent 研发流水线（n8n → GitHub CI → ArgoCD CD）
 
-> 最后更新：2026-10-10 · 落地 `BMAD_AUTOMATION_PIPELINE_ARCHITECTURE.md` 的方案 C（外环 n8n / 内环 GitHub + 双 Agent）。
+> 最后更新：2026-10-22 · 落地 `archive/BMAD_AUTOMATION_PIPELINE_ARCHITECTURE.md` 的方案 C（外环 n8n / 内环 GitHub + 双 Agent）。
+>
+> **文档地图**（Agent 体系文档共 3 份 + 1 份规范，过期文档见 [archive/](archive/README.md)）：
+>
+> | 文档 | 讲什么 |
+> |---|---|
+> | **AGENT_PIPELINE.md**（本文） | 流水线主干：外环 n8n / 内环双 Agent / 门禁 / 构建发布 |
+> | [BMAD_INTEGRATION.md](BMAD_INTEGRATION.md) | BMAD Story 接入 + Project #3 交付看板（原 BMAD_PIPELINE + BMAD_BOARD 合并） |
+> | [RELEASE_FLOW.md](RELEASE_FLOW.md) | 分支模型 / 镜像 tag / ArgoCD 与保护规则 |
+> | [`.agents/RULES.md`](../../.agents/RULES.md) | 所有 Agent 必须遵守的工程规范（铁律） |
 >
 > **分支与发布**：Agent PR 的目标分支已可配置（`AGENT_BASE_BRANCH`，默认 `main`；canary 验收流程启用后设为 `canary`），生产 `main` 只接收 `canary → main` 的晋升 PR。分支角色、镜像 tag、保护规则与启用步骤见 [RELEASE_FLOW.md](RELEASE_FLOW.md)。
 >
