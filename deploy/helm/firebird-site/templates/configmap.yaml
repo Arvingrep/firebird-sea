@@ -69,6 +69,12 @@ data:
         }
 
         {{- end }}
+        # W1-1（2026-10-22 决策，安全加固）：安装目录禁止公网访问。k8s 镜像本就无 install（.dockerignore 排除），
+        # 此条为纵深防御；本地 dev 挂 ./webroot 时 install/ 真实暴露（db_default.txt 可被拉去重建库）。
+        # 必须用 ^~ 前缀匹配：/install/index.php 若落入下方 ~ \.php$ 正则会被执行，deny all 拦不住
+        location ^~ /install/ {
+            return 404;
+        }
         # PHP-FPM 反向代理（拆分拓扑时指向 firebird-php-<site> Service）
         location ~ \.php$ {
             {{- include "firebird.nginxPhpBody" . | nindent 12 }}

@@ -139,8 +139,9 @@ router.post('/auth/logout', async (req, res) => {
 // 2c. 火鸟白名单代理（T3.1/T3.3）：/tg-api/fb/:service/:action → 上游 ajax.php；默认拒绝（AD-20）。
 // credentialProvider（T3.2）未配置前，member 级接口返回 503；首轮白名单仅匿名只读。
 const fbUpstream = process.env.FB_UPSTREAM_URL;
+let fbProxy = null;
 if (fbUpstream) {
-  const proxy = createFbProxy({
+  fbProxy = createFbProxy({
     upstreamBase: fbUpstream,
     tokens: auth ? auth.tokens : { verify: () => ({ valid: false }) },
     credentialProvider: auth ? auth.credentialProvider : null,
@@ -151,7 +152,7 @@ if (fbUpstream) {
   });
   router.all('/fb/:service/:action', async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ success: false });
-    const r = await proxy.handle({
+    const r = await fbProxy.handle({
       service: req.params.service,
       action: req.params.action,
       query: req.query,
@@ -163,6 +164,11 @@ if (fbUpstream) {
     res.status(r.status).json(r.body);
   });
 }
+
+// 2e. 火鸟外卖语义化路由（T3.5）：门店/菜单/下单/订单/地址，复用同一 fbProxy（白名单 + 服务端会话凭证透传）。
+// 未配置上游时各路由返回 503，不影响其它路由。
+const createWaimaiRoutes = require('./waimaiRoutes');
+router.use(createWaimaiRoutes({ proxy: fbProxy }));
 
 // 2d. TMA 静态资源（T3.4）：同域 /tma/ 由 api 托管构建产物，不新增部署单元（AD-16）。仅在目录存在时挂载。
 const tmaStaticDir = process.env.TMA_STATIC_DIR;

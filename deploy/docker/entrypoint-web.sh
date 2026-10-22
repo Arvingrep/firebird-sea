@@ -82,6 +82,22 @@ if [ -f "$VARS_DIR/vars.txt" ] && [ -f "$VARS_DIR/apply-vars.php" ]; then
         || echo ">>> [WARN] configVars 施加失败，沿用镜像/PVC 中的配置" >&2
 fi
 
+# ④ 启动断言（2026-10-22 决策①，见项目「决策记录-2026-10-22.md」）：
+# B 线下结佣模式要求 waimai customClearingswitch = 1（=1 时结算跳过 UPDATE member SET money，
+# 见 common.func.php:15509/:15565 的 if($clearingswitch == 0) 门控）。
+# 若该值漂移（如后台保存整文件重写覆盖 configVars），表观上"订单正常"，实际结算口径静默偏离，
+# 到月底对账才会暴露 → 宁可启动失败，也不带病上线。
+_WAIMAI_CFG="/var/www/html/include/config/waimai.inc.php"
+if [ -f "$_WAIMAI_CFG" ]; then
+    _CLSW=$(php -r "\$c = include '$_WAIMAI_CFG'; echo isset(\$customClearingswitch) ? (int)\$customClearingswitch : -1;" 2>/dev/null || echo -1)
+    if [ "$_CLSW" != "1" ]; then
+        echo ">>> [FATAL] customClearingswitch=${_CLSW}（期望 1 = B 线下结佣）。生效配置与 configVars 漂移，拒绝启动。" >&2
+        echo ">>> 排查：① Helm configVars 是否包含 customClearingswitch: 1；② 后台是否整文件重写过 waimai.inc.php。" >&2
+        exit 1
+    fi
+    echo ">>> [OK] 启动断言通过：customClearingswitch=1（B 线下结佣）"
+fi
+
 # 确保底层扩展在 webroot 与系统目录下双重就绪 (自愈机制)
 if [ ! -f /var/www/html/huoniao.so ] && [ -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so ]; then
     cp -f /usr/local/lib/php/extensions/no-debug-non-zts-20190902/huoniao.so /var/www/html/huoniao.so 2>/dev/null || true

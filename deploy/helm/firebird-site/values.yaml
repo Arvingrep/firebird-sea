@@ -53,15 +53,22 @@ memoryCache:
 
 # ③ 声明式配置变量：Git 为准、每次 Pod 启动施加，所有副本一致。形如 { "<file>.inc.php": { <var>: <value> } }。
 # 后台页面保存会整文件重写，保存后到下次重启前这些键可能与 Git 不一致（见 docs/internal/WRITABLE_STATE.md）。
-# 当前值取自 waimai.inc.php.example 的出厂默认（不改变线上行为）。
-# ⚠ PRD 要求平台抽餐费从 18% 调为 0%、并确认配送费分成 89% 的含义——需业务决策后在此修改（改 Git + 发布）。
+# 2026-10-22 决策（见项目「决策记录-2026-10-22.md」）：
+#   - 资金开关 B 线下结佣：customClearingswitch 必须显式为 1（=1 时跳过 UPDATE member SET money，见 common.func.php:15509/15565）。
+#     注意 .example 仅在配置文件缺失时被 cp，存量环境以 configVars 为权威 → 必须在此声明，防止漂移。
+#   - 收费形态：0% 商品抽佣 + 3% 技术服务费 → fencheng_foodprice: 3（零开发口径，账单文案需在模板改为"技术服务费"）。
+#   - 商家自配送：fencheng_delivery: 0（配送费 100% 归商家）。硬约束：不自建骑手（骑手 80% 分成会让平台每单倒亏）。
+#   - 打包费归商家：fencheng_dabao: 0。
+#   ⚠ 费率是四段快照（configVars → 建店抄进 waimai_shop → 付款抄进订单行 → 结算读订单快照）：
+#     本文件只影响新建店铺，存量店必须回填 huoniao_waimai_shop（见 deploy/sql/backfill-waimai-fencheng.sql）。
 configVars:
   waimai.inc.php:
-    custom_fencheng_foodprice: 18
-    custom_fencheng_delivery: 89
+    customClearingswitch: 1
+    custom_fencheng_foodprice: 3
+    custom_fencheng_delivery: 0
     custom_fencheng_addservice: 100
     custom_fencheng_zsb: 100
-    custom_fencheng_dabao: 100
+    custom_fencheng_dabao: 0
     custom_fencheng_discount: 0
     custom_fencheng_promotion: 0
     custom_fencheng_firstdiscount: 0
@@ -75,14 +82,15 @@ configBackup:
   prefix: "config-backup"
   failOnError: false
 
-# GitOps 配置锁（默认关闭，先在 canary 验证）。
+# GitOps 配置锁（W1 收尾已开启：真源归 Git，后台页面改配置会失败并被 nginx 替换文案）。
 # 真源在 Git：镜像里的 include/config/*.inc.php + configVars + configOverrides；后台页面不能再改。
 #  - 强制：entrypoint 把 include/config 与 dbinfo.inc.php 置为 root 只读，www-data 无法写入/重命名
 #  - 提示：后台 48 个保存入口失败时统一报「写入文件 … 失败，请检查权限！」，nginx 把这句话替换成下面的 message
 # 例外：writable 里的文件名保持可写（例如确认有运行期写入的文件）。
 # 注意：admin/siteConfig/elasticSearch.php 写失败时不报错（厂商代码），页面会显示"成功"但实际未保存。
+# ⚠ 上线前务必先完成「后台会员折扣特权置 10」（或改为 Git 走 configVars 回填），锁开启后后台无法改配置。
 configLock:
-  enabled: false
+  enabled: true
   writable: []
   # message（原文）与 messageJson（\uXXXX 转义）必须一致：应用用 json_encode 输出错误，默认转义非 ASCII。
   # 转义串必须用 YAML 单引号，双引号会把 \uXXXX 解码回汉字

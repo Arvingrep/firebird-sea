@@ -15,7 +15,8 @@ async function load() {
   loading.value = true;
   failed.value = false;
   try {
-    const info = await fb.get('waimai', 'shopList', { page: 1, pageSize: 20 }, { anonymous: true });
+    // 匿名只读：默认马尼拉坐标；后续可由 Telegram/浏览器定位授权覆盖 lat/lng。
+    const info = await fb.get('waimai', 'shopList', { page: 1, pageSize: 20, lat: 14.5995, lng: 120.9842 }, { anonymous: true });
     shops.value = Array.isArray(info?.list) ? info.list : [];
   } catch (e) {
     failed.value = true;

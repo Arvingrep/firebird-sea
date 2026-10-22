@@ -3,6 +3,7 @@ version: '3.8'
 services:
   # 1. Web 服务器 (Nginx - 包含火鸟伪静态与静态资源分发)
   nginx:
+    platform: linux/amd64
     image: nginx:alpine
     container_name: firebird-nginx
     restart: unless-stopped
@@ -21,11 +22,16 @@ services:
 
   # 2. PHP 运行环境 (PHP 7.4-FPM + mysqli + gd + redis)
   php:
+    platform: linux/amd64
     build:
-      context: ./deploy/dev/php
-      dockerfile: Dockerfile
+      # context 提到仓库根：Dockerfile 需 COPY webroot/huoniao.so（火鸟加密内核 loader）
+      context: .
+      dockerfile: deploy/dev/php/Dockerfile
     container_name: firebird-php
     restart: unless-stopped
+    environment:
+      # 本地 dev 用 secret（api/fbs HMAC 网关）。生产值在 K8s Secret（见 values.yaml 注释），勿与生产共用
+      FBS_GATEWAY_SECRET: "2830cb71aba8ae97717b6ca308add9fb82734a8cfe98773e"
     volumes:
       - ./webroot:/var/www/html/webroot
     depends_on:
@@ -36,6 +42,7 @@ services:
 
   # 3. MySQL 数据库 (兼容火鸟 SQL 语法的 MySQL 5.7 / MariaDB 10.5)
   mysql:
+    platform: linux/amd64
     image: mariadb:10.5
     container_name: firebird-mysql
     restart: unless-stopped
@@ -53,6 +60,7 @@ services:
 
   # 4. Redis 缓存与会话
   redis:
+    platform: linux/amd64
     image: redis:7-alpine
     container_name: firebird-redis
     restart: unless-stopped
@@ -65,6 +73,7 @@ services:
 
   # 5. n8n 自动化任务引擎 (一人团队工作流核心)
   n8n:
+    platform: linux/amd64
     image: n8nio/n8n:latest
     container_name: firebird-n8n
     restart: unless-stopped
@@ -84,6 +93,7 @@ services:
 
   # 6. Telegram Bot 前哨服务 (Zero-Dep Native Node.js)
   tg-bot:
+    platform: linux/amd64
     image: node:20-alpine
     container_name: firebird-tg-bot
     restart: unless-stopped
@@ -105,6 +115,7 @@ services:
 
   # 7. USDT 付款监听器 (独立服务：单实例，无对外端口，只出站轮询 TronGrid)
   payment-listener:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.payment-listener

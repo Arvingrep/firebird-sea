@@ -10,6 +10,8 @@ const router = createRouter({
     { path: '/news', name: 'news', component: () => import('./pages/News.vue') },
     { path: '/news/:id(\\d+)', name: 'news-detail', component: () => import('./pages/NewsDetail.vue'), props: true },
     { path: '/cart', name: 'cart', component: () => import('./pages/Cart.vue') },
+    { path: '/checkout', name: 'checkout', component: () => import('./pages/Checkout.vue') },
+    { path: '/order/:id(\\w+)', name: 'order', component: () => import('./pages/OrderDetail.vue'), props: true },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 });
