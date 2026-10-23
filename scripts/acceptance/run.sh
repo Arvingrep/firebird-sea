@@ -12,7 +12,17 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 DIR="${ACCEPTANCE_DIR:-scripts/acceptance}"   # ACCEPTANCE_DIR 仅供 selftest 使用
 # Story 编号归一：取前两段数字，保留可选 T 前缀（TMA Story）并归一大写 → `1-1` / `T1-1`。
 # 必须与 scripts/agent/story.sh 的 story_id() 完全一致，否则预检与 CI 会指向不同用例文件。
-norm() { sed -nE 's/^[^0-9Tt]*([Tt]?)([0-9]+)[.-]([0-9]+).*/\1\2-\3/p' <<<"$1" | head -n1 | tr 'a-z' 'A-Z'; }
+# 不用 sed：`^[^0-9Tt]*([Tt]?)…` 会把「数字前出现过 t/T」的串整条判为不匹配（[story:T1-1]、Story 1.1、task 1-1 全都解析不出），
+# 而 `^[^0-9]*([Tt]?)…` 又会被左最长匹配把前缀 T 吞进垃圾前缀。改成「截到第一个数字，再看紧邻字符是不是 T」。
+norm() {
+  local s="$1" head p=""
+  head="${s%%[0-9]*}"    # 第一个数字之前的全部内容
+  s="${s#"$head"}"       # 从第一个数字开始（head 为空时即为原串）
+  # T 紧邻串首、或 T 前一位不是字母（如 `[story:T1-1]` 的冒号）才算前缀；`test1-2` 这类不走 T 分支
+  case "$head" in [Tt]) p="T" ;; *[!a-zA-Z][Tt]) p="T" ;; esac
+  if [[ "$s" =~ ^([0-9]+)[.-]([0-9]+) ]]; then printf '%s%s-%s' "$p" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"; fi
+  return 0               # 解析不了也必须返回 0：调用方在 set -e 下用 $(norm ...)
+}
 
 EXPECT_RED=0; STORY=""; VIA_TITLE=0
 while [ $# -gt 0 ]; do
