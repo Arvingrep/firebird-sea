@@ -80,6 +80,11 @@ if [ -f services/news-sync/e2e-local.sh ]; then
     # 端口不能写死：端口是机器级资源，同机并发验收（不同 worktree 也一样）会抢同一个端口，
     # 症状是 EADDRINUSE / curl 502，报错看起来像功能坏了而不是环境冲突。这里探一个空闲端口再传进去。
     E2E_PORT="$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>console.log(p))})' 2>/dev/null || true)"
+    if [ -z "$E2E_PORT" ]; then
+        # 只有探测失败（无 node / node 报错被 2>/dev/null 吞掉）才走到这里：回落旧值，但必须留痕。
+        # 不留痕的话，下次有人撞上 EADDRINUSE / curl 502，会重新排查一遍已经查过的并发问题。
+        echo "  ⚠️ [WARN] 未探到空闲端口，回落 18190（同机并发跑验收可能撞 EADDRINUSE/502）"
+    fi
     if bash services/news-sync/e2e-local.sh "$E2E_OUT" "${E2E_PORT:-18190}" >/dev/null 2>&1; then echo "  ✅ news-sync 完整链路替身验收 [通过]"
     else echo "❌ [FAIL] news-sync 完整链路替身验收(末尾日志):"; tail -20 "$E2E_OUT/full-run.txt" 2>/dev/null; exit 1; fi
 fi
