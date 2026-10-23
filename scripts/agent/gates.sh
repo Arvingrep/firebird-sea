@@ -2,6 +2,7 @@
 # 确定性门禁（无 LLM）：只看「本分支相对 base 的改动」，结果据实输出，不写死 PASS。
 # 用法：scripts/agent/gates.sh [base-ref]     （默认 origin/main）
 # 输出：stdout 为 Markdown 报告；任一 FAIL => 退出码 1。
+#       基线 ref 不可解析时只输出一行 FAIL 并退出 1（不跑任何 diff 检查，避免噪声与假 PASS）。
 # 阈值：GATE_MAX_ADDED（默认 1200，不含 docs/、.agents/、_bmad-output/、_bmad/、.claude/skills/bmad-*/ 规划产物）
 # 环境：GATE_REPO_DIR       被检查的仓库目录（QA 用 main 上的本脚本检查 PR 检出）
 #       GATE_AGENT_BRANCH=1 Agent 分支：禁止改动 .github/、scripts/agent/、scripts/acceptance/（测试先行用例）、.agents/
@@ -13,6 +14,25 @@ cd "${GATE_REPO_DIR:-$(dirname "${BASH_SOURCE[0]}")/../..}"
 BASE="${1:-origin/main}"
 MAX_ADDED="${GATE_MAX_ADDED:-1200}"
 RANGE="${BASE}...HEAD"
+
+# 基线可解析性：**在跑任何 git diff 之前**先判定，不可解析就立刻退出。
+# 为什么早退而不是照常跑完再报错：基线拼错（如 AGENT_BASE_BRANCH 多写 origin/）时，
+#   1) 每个 git diff 都会甩 3 行 `fatal: ambiguous argument …` 到 stderr，把真正的结论埋到第 15 行 ——
+#      而报告是攒完 ROWS 最后统一输出的，内部怎么调顺序都改不了「噪声在前」；
+#   2) 结论是假的：「相对 X 无改动」「增量 +0 ✅ PASS」看起来像真问题/真通过，实际是 ref 不存在。
+# 所以只输出一行 FAIL 指回配置，声明「未执行任何 diff 检查」，退出码仍是 1（与逐项 FAIL 的语义一致）。
+if ! git rev-parse -q --verify "${BASE}^{commit}" >/dev/null 2>&1; then
+  echo "### 🔒 确定性门禁（基线不可解析）"
+  echo
+  echo "| 检查项 | 结果 | 说明 |"
+  echo "| :--- | :--- | :--- |"
+  echo "| 基线 | ❌ FAIL | ref 不存在：${BASE}（检查 AGENT_BASE_BRANCH 是否多写了 origin/） |"
+  echo
+  echo "**结论：FAIL（1 项）— 未执行任何 diff 检查**"
+  echo "（基线不可解析时其余检查结果无意义，故不输出；避免出现「增量 +0 ✅ PASS」这类假 PASS）"
+  exit 1
+fi
+
 # --no-renames：重命名拆成「删除源 + 新增目标」，避免把受保护文件挪走时源路径不出现
 CHANGED="$(git diff --no-renames --name-only --diff-filter=ACMR "$RANGE")"
 FAILS=0; ROWS=""
@@ -23,14 +43,9 @@ missing_tool() { # missing_tool <检查项> <工具>
   else row "$1" "⚠️ SKIP" "本机缺少 $2，以托管 runner 的 gates 结果为准"; fi
 }
 
-# 基线可解析性：先报出「到底跟谁比」，ref 拼错时给出指向配置的诊断。
-# 为什么要单独一行：不 fetch 时基线落后只会表现为「增量虚高 / 相对 X 无改动」这种看起来像真问题的 FAIL，
-# 而 ref 拼错（AGENT_BASE_BRANCH 多写了 origin/）原本只会在「非空交付」处失败，人去查代码而不是查配置。
-if git rev-parse -q --verify "${BASE}^{commit}" >/dev/null 2>&1; then
-  row "基线" "${BASE}" "$(git log -1 --format='%cs' "${BASE}")"
-else
-  row "基线" "❌ FAIL" "ref 不存在：${BASE}（检查 AGENT_BASE_BRANCH 是否多写了 origin/）"
-fi
+# 基线可见性：把「和谁比」写进报告。基线是本地远端跟踪 ref（本脚本不 fetch），
+# 这一行的日期就是「要不要先 git fetch」的判据 —— 落后时增量会虚高，看起来像真问题。
+row "基线" "${BASE}" "$(git log -1 --format='%cs' "${BASE}")"
 
 # 0. 受保护路径：Agent 分支不得改动流水线与规范自身（含新增文件）
 if [ "${GATE_AGENT_BRANCH:-0}" = "1" ]; then
