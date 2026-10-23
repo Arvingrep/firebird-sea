@@ -11,6 +11,16 @@
 //
 // 做法：在临时仓库里复刻一个最小 make 环境（bare remote + 假 gates.sh 打印它收到的基线），
 // 不碰当前仓库、不联网、不执行真实 gates.sh。本机无 make/git 时整组跳过。
+//
+// ⚠️ 判别性矩阵（别只看「全绿」就以为全覆盖了）——由反证实测得出，改任何一个 Makefile 基线实现后请重跑：
+//   用例 1/2/3/5：对「跟随上游 @{u}」版为红（如 cd4b045b、aeb9c5cc），对「硬编码 origin/main」版为**绿**
+//                （因为它们的期望值恰好就是 origin/main，硬编码版在默认路径上碰巧正确）
+//   用例 4/6/7：  对「硬编码 origin/main」版为红，对「跟随上游」版为绿（覆盖语义两版都有）
+//   即：任意单条都不足以防回退，靠的是两组互补。这两组数字若不落到文件里，一年后没人能重建。
+//
+// ⚠️ 环境隔离：runMake() 会 delete GATE_BASE / AGENT_BASE_BRANCH / MAKEFLAGS。
+//   本机 shell 若残留 AGENT_BASE_BRANCH（例如忘了 unset），用例 1/2/3/5 会全红，
+//   且失败信息指向「基线错」而不是「环境污染」——很容易误导下一个人去查 Makefile。
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -118,4 +128,13 @@ test('make gates GATE_BASE 命令行：优先于 AGENT_BASE_BRANCH，取 origin/
 
 test('make gates：同名 env 变量 GATE_BASE 同样能覆盖目标分支', { skip: SKIP }, () => {
   assert.equal(runMake('no-upstream', { env: { GATE_BASE: 'origin/canary' } }), 'GATES_BASE=origin/canary');
+});
+
+test('make gates env GATE_BASE：与 AGENT_BASE_BRANCH 同时存在时 env GATE_BASE 胜出', { skip: SKIP }, () => {
+  // 补上优先级矩阵的最后一格：默认值 / AGENT_BASE_BRANCH / env GATE_BASE / 命令行 GATE_BASE 四者并存时的先后。
+  // 命令 `GATE_BASE` 覆盖 `AGENT_BASE_BRANCH` 已由上面第 6 条覆盖，这条补「env GATE_BASE 也压过 AGENT_BASE_BRANCH」。
+  assert.equal(
+    runMake('feat/x', { env: { GATE_BASE: 'origin/foo', AGENT_BASE_BRANCH: 'canary' } }),
+    'GATES_BASE=origin/foo',
+  );
 });
