@@ -4,11 +4,11 @@
 # 用上游 @{u} 是错的：agent/*、chore/* 的上游就是它自己，push 完 git diff @{u}...HEAD 恒空 → 又是假 FAIL。
 # 目标分支由 AGENT_BASE_BRANCH 决定（与 lib.sh / agent-dev.yml 同一个变量；默认 main，启用 canary 后设为 canary）；
 # 临时想比对别的 ref 用 GATE_BASE 覆盖（命令行 > 同名 env > AGENT_BASE_BRANCH）。
-# 注意 1：AGENT_BASE_BRANCH 填**裸分支名**（canary，不是 origin/canary）——这里会自己拼 origin/ 前缀，
-#         与 lib.sh:14「origin/${BASE_BRANCH}」的约定一致；填成 origin/canary 会拼出 origin/origin/canary。
+# 注意 1：AGENT_BASE_BRANCH 应填**裸分支名**（canary，不是 origin/canary）；本文件与 lib.sh:14 都自行拼 origin/，
+#         lib.sh 已做归一，这里再 `$(patsubst origin/%,%,…)` 一次，裸名与带前缀两种写法都得到 origin/canary。
 # 注意 2：本目标**不 fetch**，比的是本地远端跟踪 ref。本地 origin/<分支> 落后于真实远端时，
 #         会把别人已合入的改动算进本次增量（可能虚高甚至误判 >1200 行）→ 门禁报错前先 git fetch。
-GATE_BASE ?= origin/$(or $(AGENT_BASE_BRANCH),main)
+GATE_BASE ?= origin/$(patsubst origin/%,%,$(or $(AGENT_BASE_BRANCH),main))
 
 help:
 	@echo "=========================================================="

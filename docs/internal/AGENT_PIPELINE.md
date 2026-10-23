@@ -72,7 +72,7 @@ sequenceDiagram
 | secret | `N8N_AGENT_EVENT_TOKEN` | 建议 | 事件 webhook 的 Header Auth token（`X-Firebird-Token`），与下方 n8n 凭据、GKE Secret 三处一致 |
 | var | `AGENT_AUTO_MERGE` | | 默认 `1`；设 `0` 即改为「QA 通过后人工合并」 |
 | var | `AGENT_MAX_ATTEMPTS` | | QA 打回上限，默认 `3` |
-| var | `AGENT_BASE_BRANCH` | | Dev Agent 的基线与 PR 目标分支，默认 `main`；canary 流程启用后设为 `canary`（QA/回写取 PR 的实际目标分支，无需再设） |
+| var | `AGENT_BASE_BRANCH` | | Dev Agent 的基线与 PR 目标分支，默认 `main`；canary 流程启用后设为 `canary`（QA/回写取 PR 的实际目标分支，无需再设）。**填裸分支名**（`canary`，不要写 `origin/canary`）：`lib.sh` 与 `Makefile` 都自行拼 `origin/` 前缀，误填前缀虽会被归一，但别依赖它 |
 | var | `DEV_AGENT_CMD` / `QA_AGENT_CMD` | | 覆盖默认 agent 命令（按 shell 语法 `eval` 成数组，**等同于在 runner 上执行任意命令**——仅 owner 可设，勿开放给他人；提示词走 stdin；`QA_AGENT_CMD` 需以输出文件参数结尾，如 `... -o`） |
 | secret | `GCP_SA_KEY` | ✅ | 已有，CI 推 GAR |
 
