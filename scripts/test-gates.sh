@@ -11,7 +11,9 @@ git update-ref refs/remotes/origin/main HEAD
 FAIL=0
 case_() { # case_ <名称> <期望退出码> <GATE_AGENT_BRANCH>
   local out rc; out="$(GATE_REPO_DIR="$T" GATE_AGENT_BRANCH="$3" bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
-  if [ "$rc" = "$2" ]; then echo "✅ $1"; else echo "❌ ${1}（期望 ${2} 实际 ${rc}）"; echo "$out" | grep -E 'FAIL'; FAIL=1; fi
+  # 失败时打全文尾部，不再只 grep 'FAIL'：rc 异常（如 rc=2 早退）时可能一行 FAIL 都没有，
+  # 那种情况旧写法啥也不打，下次再红仍然是瞎子（本条 assertion 曾偶发 rc=2，50 次未复现，见报告）。
+  if [ "$rc" = "$2" ]; then echo "✅ $1"; else echo "❌ ${1}（期望 ${2} 实际 ${rc}）"; printf '%s\n' "$out" | tail -20; FAIL=1; fi
 }
 reset() { git checkout -q -f -B work origin/main; }
 reset; pj '    "mysql2": "3.24.5",\n    "express": "^4.21.2"'; git commit -qam d
