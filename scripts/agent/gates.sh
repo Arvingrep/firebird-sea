@@ -9,7 +9,23 @@
 #       GATE_REQUIRE_TOOLS=1 缺 php/helm 判 FAIL（托管 runner 上为权威结果）；否则记为 SKIP
 
 set -uo pipefail
-cd "${GATE_REPO_DIR:-$(dirname "${BASH_SOURCE[0]}")/../..}"
+# 仓库目录必须先进得去、且真是 git 仓库：`set -uo pipefail` 没有 `-e`，cd 失败不会中止，后续所有 git diff
+# 会在**调用者的当前目录**里跑 —— 于是门禁评估的是别人的仓库，还可能给出 PASS（实测 `GATE_REPO_DIR=/tmp/nope-xyz`
+# 时报告出的正是调用者仓库的文件数并 rc=0）。目录存在但不是仓库时，原本会一路走到「ref 不存在 → 检查
+# AGENT_BASE_BRANCH 是否多写了 origin/」，把人指去查配置而真实原因是路径。这里统一 fail-closed。
+GATE_DIR="${GATE_REPO_DIR:-$(dirname "${BASH_SOURCE[0]}")/../..}"
+if ! cd "$GATE_DIR" || ! git rev-parse --git-dir >/dev/null 2>&1; then
+  cat <<EOF
+### 🔒 确定性门禁（仓库目录不可用）
+
+| 检查项 | 结果 | 说明 |
+| :--- | :--- | :--- |
+| 仓库目录 | ❌ FAIL | 不是可用的 git 仓库：${GATE_DIR}（GATE_REPO_DIR 由调用方指定；检查是否指向了错误路径） |
+
+**结论：FAIL（1 项）— 未执行任何 diff 检查**
+EOF
+  exit 1
+fi
 
 BASE="${1:-origin/main}"
 MAX_ADDED="${GATE_MAX_ADDED:-1200}"
