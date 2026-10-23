@@ -57,7 +57,9 @@ GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=1 bash "$AGENT_SELF_DIR/gates.sh" or
 # 空报告守卫：gates.sh 被截断/写坏到只剩开头注释时，bash 正常退出、rc=0、零输出（实测 13 个截断点里 8 个如此），
 # 上面那个 `|| GATE_RC=$?` 只在非 0 时赋值，于是 GATE_RC 留在 0 —— 一张没有报告的空门禁会被当成通过。
 # 判据用「结论行存在」而不是「文件非空」：gates.sh 任何一条正常出口都会打 `**结论：…`，有表无结论仍是坏报告。
-grep -qF '**结论：' "$TMP/gates.md" || GATE_RC=1
+# 只在 GATE_RC 仍为 0 时赋值：rc=2（bash 崩）与 rc=1（判据失败）是两类事，压成同一个码会毁掉下游分类的依据。
+# 用 if 而不是 `A && B || C`：后者在 A 为假时会短路执行 C，非零值照样被改写。
+if [ "$GATE_RC" -eq 0 ] && ! grep -qF '**结论：' "$TMP/gates.md"; then GATE_RC=1; fi
 if [ "${GATES_JOB_RESULT:-}" != "success" ]; then
   GATE_RC=1
   printf '\n> ❌ 托管 runner 上的 gates job 结论为 `%s`（须为 success）\n' "${GATES_JOB_RESULT:-未提供}" >> "$TMP/gates.md"
