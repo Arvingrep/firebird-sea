@@ -104,8 +104,13 @@ function pickNext(epics, status, { inflight = 0, maxInflight = 1, story, ignoreD
 
 function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need = [], testFile = '', labels = LABELS }) {
   const refs = new Set((s.lines.join('\n').match(/AD-(\d+)/g) || []).map((x) => +x.slice(3)));
-  if (!refs.size) (STORY_AD[s.id] || EPIC_AD[s.epic] || []).forEach((n) => refs.add(n));
+  // T 前缀 Epic 不套用数字 Epic 的 AD 表：STORY_AD/EPIC_AD 的编号来自火鸟（Epic 1-6）的架构脊柱，
+  // 按 s.epic 数字回退会给 T1/T2 挂上完全不相干的 AD（实测 T2.1 会拿到 USDT 收银台那套 AD-4/5/6/7/12）。
+  // T Story 正文自己写了 AD-n 仍照常收集（上面 refs 不受影响）。
+  if (!refs.size && !s.t) (STORY_AD[s.id] || EPIC_AD[s.epic] || []).forEach((n) => refs.add(n));
   const ads = [...refs].sort((a, b) => a - b).map((n) => `- AD-${n}${adTitles.get(n) ? ` — ${adTitles.get(n)}` : ''}`);
+  // 一个 AD 都没有时不要留空小节（T Story 不再回退数字 Epic 的表，见上）
+  if (!ads.length) ads.push('- 本 Story 正文未引用具体 AD；架构约束以 epics 文件与架构脊柱为准，实现前请自行核对。');
   const split = s.acCount > 4 ? `\n> ⚠️ 本 Story 有 ${s.acCount} 条验收条件，很可能超出单次增量，请优先落地前几条并在 PR 中说明拆分。\n` : '';
   const tid = tidOf(s);
   const testFirst = testFile

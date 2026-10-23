@@ -25,6 +25,13 @@ issue_is_blocked() { # issue_is_blocked <issue-number>
   labels="$(gh issue view "$1" -R "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || true)"
   printf '%s\n' "$labels" | grep -qx 'agent:blocked'
 }
+# 该 issue 上是否已留过「已达上限」留言（幂等标记）。每轮 QA 打回都会走到 blocked 分支，
+# 没有这个判断会重复刷评论。同样先落变量再 grep，避免 pipefail + grep -q 的 SIGPIPE 误判。
+issue_blocked_noted() { # issue_blocked_noted <issue-number>
+  local bodies
+  bodies="$(gh issue view "$1" -R "$REPO" --json comments --jq '.comments[].body' 2>/dev/null || true)"
+  printf '%s\n' "$bodies" | grep -qF '<!-- agent-blocked-limit -->'
+}
 
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
@@ -161,16 +168,28 @@ else
   # 上限就只是「这一轮不干」（PR #92 因此走到第 7 轮）。故先查标签：已 blocked 只留言 + 通知，不再重排返工。
   if [ -n "$ISSUE" ] && issue_is_blocked "$ISSUE"; then
     log "🛑 Issue #${ISSUE} 已达返工上限（agent:blocked），不再重排 Dev Agent"
-    cat > "$TMP/blocked.md" <<EOF
+    # 摘掉 agent:qa：此刻不是「等 QA」，是「等人」，否则看板会一直显示等待 QA
+    set_label "$ISSUE" "agent:blocked" "agent:qa"
+    if issue_blocked_noted "$ISSUE"; then
+      log "ℹ️ Issue #${ISSUE} 已有「已达上限」留言，跳过重复评论"
+    else
+      cat > "$TMP/blocked.md" <<EOF
+<!-- agent-blocked-limit -->
 ## 🛑 已达自动返工上限，停止返工
 
-Issue #${ISSUE} 已带 \`agent:blocked\`（Dev Agent 返工上限 \`${MAX_ATTEMPTS}\` 次已用尽），PR #${PR} 第 ${ATTEMPT} 轮仍被 QA 拒收。
-流水线**不再**重新派遣 Dev Agent。需要人工介入：复核 PR #${PR} 的 QA 缺陷清单，调整需求或拆小 Story，然后手动移除 \`agent:blocked\` 并重新打 \`agent:dev\`。
+Issue #${ISSUE} 已带 \`agent:blocked\`（返工上限 \`${MAX_ATTEMPTS}\` 次已用尽），PR #${PR} 第 ${ATTEMPT} 轮仍被 QA 拒收。流水线**不再**重新派遣 Dev Agent。
+
+**仅移除 \`agent:blocked\` 标签是无效的**：PR #${PR} 上的 QA 打回记录只增不减（\`qa_reject_count\`），「打回数 ≥ 上限」恒成立，\`dev.sh\` 会立刻再次 block。真实可行的出路：
+
+1. **调高上限**：改仓库变量 \`AGENT_MAX_ATTEMPTS\`，然后重新打 \`agent:dev\`；
+2. **换一张工单**：关闭 PR #${PR} 并删除其 \`agent/<分支>\`，重新建单（打回计数随 PR 归零）；
+3. **人工收尾**：直接在该分支改代码并推送到同一 PR —— 不需要 Dev Agent，QA 会自动重跑。
 
 - PR：https://github.com/${REPO}/pull/${PR}
 EOF
-    gh issue comment "$ISSUE" -R "$REPO" -F "$TMP/blocked.md" >/dev/null 2>&1 \
-      || log "⚠️ 追加 blocked 留言失败（忽略）"
+      gh issue comment "$ISSUE" -R "$REPO" -F "$TMP/blocked.md" >/dev/null 2>&1 \
+        || log "⚠️ 追加 blocked 留言失败（忽略）"
+    fi
     notify blocked "Issue #${ISSUE} 已达返工上限，PR #${PR} 第 ${ATTEMPT} 轮仍被拒，停止自动返工，需人工介入" "$ISSUE" "$PR"
   elif [ -n "$ISSUE" ]; then
     set_label "$ISSUE" "agent:dev" "agent:qa"

@@ -49,7 +49,7 @@ sequenceDiagram
 | Dev Agent | `.github/workflows/agent-dev.yml` → `scripts/agent/dev.sh` | 默认 `claude -p`，限定工具集，不能改 `.github/`、`scripts/agent/` |
 | 确定性门禁 | `.github/workflows/ci-verify.yml` → `scripts/agent/gates.sh` | 只看分支 diff：非空、增量 ≤1200、Docs-as-Code、Zero-Dep、密钥、调试残留、语法、Helm |
 | QA Agent | `ci-verify.yml` job `agent-qa` → `scripts/agent/qa.sh` | 默认 `codex exec -s read-only`（与 Dev 不同厂商）；JSON 裁定，解析失败即打回 |
-| ↳ 打回分支 | `qa.sh` REJECTED | 重打 `agent:dev` **之前**先查 issue 标签：已带 `agent:blocked`（Dev 侧返工上限用尽）则只追加说明评论 + `notify blocked`，不再重排返工；取不到标签按未 blocked 处理（fail-open），本次验收仍 `exit 1` |
+| ↳ 打回分支 | `qa.sh` REJECTED | 重打 `agent:dev` **之前**先查 issue 标签：已带 `agent:blocked`（Dev 侧返工上限用尽）则摘掉 `agent:qa`、追加一条说明评论（带 `<!-- agent-blocked-limit -->` 标记，已有则跳过，不刷屏）+ `notify blocked`，不再重排返工；取不到标签按未 blocked 处理（fail-open），本次验收仍 `exit 1` |
 | 构建 | `.github/workflows/ci-gke.yml` | push main → GAR `firebird-php/api/nginx:<sha40>` + `latest`；push canary → `:canary` + `:canary-<sha12>`（**不推 40 位 SHA**，防 Image Updater 误滚生产）；纯 docs/任务变更不构建 |
 | 发布 | homelab `platform/argocd-image-updater` + `apps/firebird-manila/application-gke.yaml` | Image Updater v1（CRD）追 40 位 SHA tag，write-back=argocd；Application 自动同步 |
 | 上线通知 | `deploy/helm/firebird-site/templates/job-notify-deployed.yaml` | ArgoCD PostSync Job，`deployNotify.webhook` 为空则不创建 |
@@ -127,7 +127,7 @@ Issue 标题含 `[story:<key>]`（或正文 `<!-- bmad-story: KEY -->`）时，d
 ```bash
 make agent-dev ISSUE=12     # 本地手动跑一次 Dev Agent（需 gh 登录）
 GATES_JOB_RESULT=success make agent-qa PR=34   # 本地手动跑一次 QA（须声明托管 gates 已通过，否则一律打回）
-make gates                  # 当前分支对 origin/main 跑确定性门禁
+make gates                  # 对目标分支（AGENT_BASE_BRANCH，默认 origin/main）跑确定性门禁；GATE_BASE=<ref> 可临时覆盖
 
 # 发布状态 / 回滚（hub 集群）
 kubectl --context mac-mini-orbstack -n argocd get imageupdater firebird-manila
@@ -137,6 +137,12 @@ argocd app rollback firebird-manila <ID>   # 回滚后 Image Updater 仍会追�
 ```
 
 暂停全自动：`AGENT_AUTO_MERGE=0`（保留 QA，只停合并）；或删 issue 上的 `agent:dev` 标签。
+
+已到返工上限（`agent:blocked`）后怎么办——**只移除 `agent:blocked` 标签没用**：`qa_reject_count` 统计的是 PR 上的 QA 打回评论，只增不减，「打回数 ≥ `AGENT_MAX_ATTEMPTS`」恒成立，`dev.sh` 会立刻再次 block。真实可行的三条出路：
+
+1. **调高上限**：改仓库变量 `AGENT_MAX_ATTEMPTS`，再重新打 `agent:dev`；
+2. **换一张工单**：关闭该 PR 并删除它的 `agent/<branch>`，重新建单（打回计数随 PR 归零）；
+3. **人工收尾**：直接在该分支改代码并推到同一 PR —— 不走 Dev Agent，QA 会自动重跑。
 
 ## 7. 已知限制
 
