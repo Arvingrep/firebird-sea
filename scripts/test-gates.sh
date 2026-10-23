@@ -85,6 +85,32 @@ case_ "Agent 分支改 scripts/acceptance → FAIL" 1 1
 case_ "非 Agent 分支改 scripts/acceptance → 放行" 0 0
 reset; mkdir -p _bmad-output; seq 1 400 > _bmad-output/epics.md; git add -A; git commit -qm e
 case_ "_bmad-output 不计 1200 行增量" 0 0
+# --- 跨文件契约：gates.sh 的每条出口都必须在**行首**打 `**结论：`（qa.sh 侧为 03e07088）---
+# 这条契约此前只活在 qa.sh 的注释里，没有任何断言：qa.sh:62 用 `grep -qE '^\*\*结论：'` 判「报告是否成立」，
+# 但「行首」这件事是 gates.sh 需要保证的，两个文件各写一半、谁都没测。
+# 防的退化：有人给结论行加缩进或 `> ` 引用符（做对齐美化、把结论塞进引用块）→ qa.sh 恒判「无结论」
+# → 整轮 QA 恒 REJECTED，而本文件**此前所有用例仍然全绿**（它们只断言报告里「有」结论，不断言行首），
+# 现场表现是「门禁自己 PASS、QA 却永远打回」，没有任何一条红指向这里。
+# 三个出口逐一覆盖，少一个就等于那个出口的缩进退化没人管：
+#   正常收尾 gates.sh:152 / 基线不可解析 gates.sh:49(exit 51) / 仓库目录不可用 gates.sh:25(heredoc, exit 27)
+# 每条都同时锚 rc 与行首：只锚行首的话，出口根本没被触发时也可能被别的行混过去（那就是「从未求值」的变体）。
+concl_bol() { printf '%s\n' "$1" | grep -qE '^\*\*结论：'; }
+# 出口 1/3 正常收尾：先造一次非空交付，rc=0 才是这个场景的确定结论，而不是「仓库恰好干净」的副产品。
+reset; echo 'y' >> b.txt; git add -A; git commit -qm d
+out="$(GATE_REPO_DIR="$T" bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
+if [ "$rc" = "0" ] && concl_bol "$out"; then
+  echo "✅ 正常出口的结论行在行首（qa.sh 的 ^\\*\\*结论： 能命中）"
+else echo "❌ 正常出口未在行首给结论（rc=${rc}）→ qa.sh 会恒判「无结论」"; printf '%s\n' "$out" | tail -6; FAIL=1; fi
+# 出口 2/3 基线不可解析（早退，不跑任何 diff 检查）
+out="$(GATE_REPO_DIR="$T" bash "$ROOT/scripts/agent/gates.sh" origin/does-not-exist 2>&1)"; rc=$?
+if [ "$rc" = "1" ] && concl_bol "$out"; then
+  echo "✅ 基线不可解析出口的结论行在行首"
+else echo "❌ 基线不可解析出口未在行首给结论（rc=${rc}）"; printf '%s\n' "$out" | tail -6; FAIL=1; fi
+# 出口 3/3 仓库目录不可用（fail-closed，结论在 heredoc 正文里——heredoc 最容易被人加缩进改坏）
+out="$(GATE_REPO_DIR=/tmp/nope-xyz bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
+if [ "$rc" = "1" ] && concl_bol "$out"; then
+  echo "✅ 仓库目录不可用出口的结论行在行首"
+else echo "❌ 仓库目录不可用出口未在行首给结论（rc=${rc}）"; printf '%s\n' "$out" | tail -6; FAIL=1; fi
 # --- story.sh：Story key 解析（dev.sh 注入规格/预检依赖它）---
 source "$ROOT/scripts/agent/story.sh"
 eq() { if [ "$2" = "$3" ]; then echo "✅ $1"; else echo "❌ $1（期望「$3」实际「$2」）"; FAIL=1; fi; }
