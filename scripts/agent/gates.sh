@@ -23,6 +23,15 @@ missing_tool() { # missing_tool <检查项> <工具>
   else row "$1" "⚠️ SKIP" "本机缺少 $2，以托管 runner 的 gates 结果为准"; fi
 }
 
+# 基线可解析性：先报出「到底跟谁比」，ref 拼错时给出指向配置的诊断。
+# 为什么要单独一行：不 fetch 时基线落后只会表现为「增量虚高 / 相对 X 无改动」这种看起来像真问题的 FAIL，
+# 而 ref 拼错（AGENT_BASE_BRANCH 多写了 origin/）原本只会在「非空交付」处失败，人去查代码而不是查配置。
+if git rev-parse -q --verify "${BASE}^{commit}" >/dev/null 2>&1; then
+  row "基线" "${BASE}" "$(git log -1 --format='%cs' "${BASE}")"
+else
+  row "基线" "❌ FAIL" "ref 不存在：${BASE}（检查 AGENT_BASE_BRANCH 是否多写了 origin/）"
+fi
+
 # 0. 受保护路径：Agent 分支不得改动流水线与规范自身（含新增文件）
 if [ "${GATE_AGENT_BRANCH:-0}" = "1" ]; then
   PROT="$(git diff --no-renames --name-only "${BASE}...HEAD" | grep -E '^(\.github|scripts/agent|scripts/acceptance|\.agents)/' || true)"
