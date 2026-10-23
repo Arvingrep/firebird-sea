@@ -1,5 +1,10 @@
 .PHONY: bmad-next local-accept gates agent-dev agent-qa agent-runner help setup up down restart logs ps clean download-package extract-package dispatch verify backlog accept bmad-spec test-coins sync-gh bmad-ui clean-bloat dev-check release tg-bot test-tg test-k8s hermes test-mcp
 
+# gates 的对比基线：默认取当前分支的上游 @{u}（形如 origin/main），取不到（无上游 / 游离 HEAD）时回落 main。
+# 刻意不剥掉 origin/ 前缀：上游与本地分支同名时（agent/*、chore/* 都这样）剥掉就成了「分支和自己比」，又是假 FAIL。
+# 可用 GATE_BASE 显式覆盖：make gates GATE_BASE=origin/main（同名 env 变量同样生效）。
+GATE_BASE ?= $(shell git rev-parse --abbrev-ref 'HEAD@{u}' 2>/dev/null)
+
 help:
 	@echo "=========================================================="
 	@echo "🔥 火鸟模式东南亚（菲律宾）一人 AI 团队基地操作指令"
@@ -7,7 +12,7 @@ help:
 	@echo "  make agent-runner     - 🤖 注册本机自托管 runner（多 Agent 流水线，见 docs/internal/AGENT_PIPELINE.md）"
 	@echo "  make agent-dev        - Dev Agent 施工 GitHub Issue (例: make agent-dev ISSUE=12)"
 	@echo "  make agent-qa         - 独立 QA Agent 验收 PR (例: make agent-qa PR=34)"
-	@echo "  make gates            - 当前分支对 origin/main 跑确定性门禁"
+	@echo "  make gates            - 对当前分支上游（无上游则 main）跑确定性门禁，可用 GATE_BASE=<ref> 覆盖"
 	@echo "  make hermes           - 🏛️  启动 Agent 2 (Hermes) 执行全链路独立红队总验收"
 	@echo "  make test-mcp         - ⚡ 验证 n8n MCP Server 协议及 4 核心工作流端到端状态"
 	@echo "  make setup            - 初始化基地目录与环境检查"
@@ -64,7 +69,7 @@ accept:
 	@bash scripts/acceptance-runner.sh $(TASK)
 
 gates:
-	@bash scripts/agent/gates.sh origin/main
+	@bash scripts/agent/gates.sh $(or $(GATE_BASE),main)
 
 local-accept:
 	@bash scripts/local-accept.sh

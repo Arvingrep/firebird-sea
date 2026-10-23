@@ -49,6 +49,7 @@ sequenceDiagram
 | Dev Agent | `.github/workflows/agent-dev.yml` → `scripts/agent/dev.sh` | 默认 `claude -p`，限定工具集，不能改 `.github/`、`scripts/agent/` |
 | 确定性门禁 | `.github/workflows/ci-verify.yml` → `scripts/agent/gates.sh` | 只看分支 diff：非空、增量 ≤1200、Docs-as-Code、Zero-Dep、密钥、调试残留、语法、Helm |
 | QA Agent | `ci-verify.yml` job `agent-qa` → `scripts/agent/qa.sh` | 默认 `codex exec -s read-only`（与 Dev 不同厂商）；JSON 裁定，解析失败即打回 |
+| ↳ 打回分支 | `qa.sh` REJECTED | 重打 `agent:dev` **之前**先查 issue 标签：已带 `agent:blocked`（Dev 侧返工上限用尽）则只追加说明评论 + `notify blocked`，不再重排返工；取不到标签按未 blocked 处理（fail-open），本次验收仍 `exit 1` |
 | 构建 | `.github/workflows/ci-gke.yml` | push main → GAR `firebird-php/api/nginx:<sha40>` + `latest`；push canary → `:canary` + `:canary-<sha12>`（**不推 40 位 SHA**，防 Image Updater 误滚生产）；纯 docs/任务变更不构建 |
 | 发布 | homelab `platform/argocd-image-updater` + `apps/firebird-manila/application-gke.yaml` | Image Updater v1（CRD）追 40 位 SHA tag，write-back=argocd；Application 自动同步 |
 | 上线通知 | `deploy/helm/firebird-site/templates/job-notify-deployed.yaml` | ArgoCD PostSync Job，`deployNotify.webhook` 为空则不创建 |
@@ -60,7 +61,7 @@ sequenceDiagram
 | `agent:dev` | 待 Dev Agent 施工（打上即触发） | n8n / 人 / QA 打回 |
 | `agent:qa` | PR 等待 QA | Dev Agent |
 | `qa:accepted` / `qa:rejected` | QA 裁定 | QA Agent |
-| `agent:blocked` | 空交付或打回 ≥ `AGENT_MAX_ATTEMPTS`，需人工 | Dev Agent |
+| `agent:blocked` | 空交付或打回 ≥ `AGENT_MAX_ATTEMPTS`，需人工 | Dev Agent（QA 读到即停止自动返工） |
 
 ## 4. 配置（GitHub → Settings → Secrets and variables → Actions）
 

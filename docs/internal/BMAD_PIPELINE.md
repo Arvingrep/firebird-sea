@@ -37,6 +37,8 @@ node --test scripts/bmad/*.test.js                  # 单测（Node 20 不能传
 - 在途上限：开放、带 `agent:dev` 且含 `bmad-story` 标记的 Issue 数 ≥ 上限即不建单；同 key 已有开放 Issue 不重复建。
 - 标签只有 `agent:dev`；其它标签由流水线自己维护。
 - Issue 标题约定 `[story:<sprint key>] …`：dev.sh 注入规格、ci-verify 选测试先行用例、回写工作流定位 Story，都靠它。正文还带 `<!-- bmad-story: KEY -->` 标记作兜底。
+- 编号支持可选 `T` 前缀（`## Epic T1:` / `### Story T1.1:`，见 `planning-artifacts/epics-tma-frontend.md`；`--epics` 指定该文件即可）：Story id 为 `T1.1`，因 TMA Story 不在 `sprint-status.yaml` 中，其 sprint key 派生为 `T1-1` 并视为 `backlog`（**不**退化成 `1-1`，那会撞上 `1-1-外卖模块原样入库`）。
+- 同一套 id 规则贯穿到底：`T1-1` 同时用于 sprint key、`scripts/acceptance/story-T1-1.sh` 与 `spec-T1-1-*.md`；非 T Epic（`1.1` / key `1-1-slug`）行为与之前完全一致。
 
 ## 3. 失败与人工介入点
 

@@ -18,6 +18,14 @@ PR="${1:?用法: qa.sh <pr-number>}"
 AUTO_MERGE="${AGENT_AUTO_MERGE:-1}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
+# issue 是否已被 dev.sh 打上 agent:blocked（返工上限用尽）。
+# 取不到标签（gh 失败/限流）时返回非 0 => 按「未 blocked」处理（fail-open），不因 API 抖动停掉正常返工。
+issue_is_blocked() { # issue_is_blocked <issue-number>
+  local labels
+  labels="$(gh issue view "$1" -R "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || true)"
+  printf '%s\n' "$labels" | grep -qx 'agent:blocked'
+}
+
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
@@ -148,7 +156,24 @@ else
   bmad_stage "https://github.com/${REPO}/pull/${PR}" in-qa
   [ -n "$ISSUE" ] && bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-progress
   notify qa_rejected "PR #${PR} 第 ${ATTEMPT} 轮被 QA 打回" "$ISSUE" "$PR"
-  # 打回 => issue 重新进入 agent:dev，触发 Dev Agent 返工（dev.sh 内部有次数上限）
-  [ -n "$ISSUE" ] && set_label "$ISSUE" "agent:dev" "agent:qa"
+  # 打回 => issue 重新进入 agent:dev，触发 Dev Agent 返工（dev.sh 内部有次数上限）。
+  # 但 dev.sh 达上限后已给 issue 打上 agent:blocked；此时若仍重打 agent:dev，下一轮 QA 又会把 Dev 拉起来，
+  # 上限就只是「这一轮不干」（PR #92 因此走到第 7 轮）。故先查标签：已 blocked 只留言 + 通知，不再重排返工。
+  if [ -n "$ISSUE" ] && issue_is_blocked "$ISSUE"; then
+    log "🛑 Issue #${ISSUE} 已达返工上限（agent:blocked），不再重排 Dev Agent"
+    cat > "$TMP/blocked.md" <<EOF
+## 🛑 已达自动返工上限，停止返工
+
+Issue #${ISSUE} 已带 \`agent:blocked\`（Dev Agent 返工上限 \`${MAX_ATTEMPTS}\` 次已用尽），PR #${PR} 第 ${ATTEMPT} 轮仍被 QA 拒收。
+流水线**不再**重新派遣 Dev Agent。需要人工介入：复核 PR #${PR} 的 QA 缺陷清单，调整需求或拆小 Story，然后手动移除 \`agent:blocked\` 并重新打 \`agent:dev\`。
+
+- PR：https://github.com/${REPO}/pull/${PR}
+EOF
+    gh issue comment "$ISSUE" -R "$REPO" -F "$TMP/blocked.md" >/dev/null 2>&1 \
+      || log "⚠️ 追加 blocked 留言失败（忽略）"
+    notify blocked "Issue #${ISSUE} 已达返工上限，PR #${PR} 第 ${ATTEMPT} 轮仍被拒，停止自动返工，需人工介入" "$ISSUE" "$PR"
+  elif [ -n "$ISSUE" ]; then
+    set_label "$ISSUE" "agent:dev" "agent:qa"
+  fi
   exit 1
 fi
