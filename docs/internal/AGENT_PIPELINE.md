@@ -5,6 +5,11 @@
 > **分支与发布**：Agent PR 的目标分支已可配置（`AGENT_BASE_BRANCH`，默认 `main`；canary 验收流程启用后设为 `canary`），生产 `main` 只接收 `canary → main` 的晋升 PR。分支角色、镜像 tag、保护规则与启用步骤见 [RELEASE_FLOW.md](RELEASE_FLOW.md)。
 >
 > **GitOps 铁律**：一切变更以 Git 为准，`kubectl` / ArgoCD 工具只用于**查询**（logs、get、describe、events）。写操作只能走 PR；生产应急仅 owner、事后补 PR。详见 [`.agents/RULES.md`](../../.agents/RULES.md) 第 6 节。
+>
+> **唯一真源仓库是 GitHub `Arvingrep/firebird-sea`。不存在任何官方镜像/副本仓库。**
+> `git.k8shome.com/gitea_admin/firebird-sea` 是 2026-10-16 一次性「验收 Gitea Actions 能否替代 GitHub Actions」的实验快照，**已于 2026-10-23 被 Arvin 明确放弃**，`mirror: false`（不自动同步，两边会静默分叉）。
+> 该实验期间 ArgoCD `firebird-canary` 的 `repoURL` 曾被命令式改到这个 Gitea 仓库（且从未在 `devops/gitops/homelab` 里声明过），导致 canary 环境停滞 4 天未更新且不受 GitOps 管控；已在 2026-10-23 修复（`apps/firebird-canary/application-gke.yaml` 补齐声明，`repoURL` 收回 GitHub）。
+> **任何 agent/人工都不要再 push 代码、开 PR、或把任何 ArgoCD Application 的 `repoURL` 指向 `git.k8shome.com/gitea_admin/firebird-sea`**——该仓库只作历史存档保留，不接收新提交。发现 ArgoCD Application 的 `spec.source.repoURL` 不是 `git@github.com:Arvingrep/firebird-sea.git` 时，视为配置漂移，立即按 `devops/gitops/homelab` PR 流程修复并上报。
 
 ## 1. 全链路
 
