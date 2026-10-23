@@ -38,6 +38,20 @@ if [ "$rc" != "0" ] && printf '%s\n' "$out" | grep -q 'ref 不存在：origin/do
    && printf '%s\n' "$out" | grep -q '多写了 origin/'; then
   echo "✅ 基线 ref 不存在 → 显式 FAIL 且诊断同时含「ref 不存在」与「多写了 origin/」"
 else echo "❌ 基线 ref 不存在时未按预期失败（rc=${rc}）"; printf '%s\n' "$out" | head -6; FAIL=1; fi
+# --- 基线不可解析时不得输出假 PASS（ccd75b62 前会打出「增量 ≤ 1200 行 ✅ PASS +0」）---
+# 为什么单列一条：基线解析失败时所有依赖 diff 的检查都在拿空 diff 算，+0 的 PASS 是假绿，
+# 人扫一眼「大多 PASS」会当成「只错了一行」；断言「任何 ✅ 都不许出现」比断言 FAIL 一行更严。
+# no-fatal：旧实现把 git 的 `fatal: ambiguous argument ...` 原样打进报告（实测 9 行），
+# 恰恰是配置写错、人真会去读日志的场景，报告不该被原始错误刷屏。
+# 注意：必须锚定「表格结果行」（`^\| … \| ✅`），不能只 grep '✅'——ccd75b62 的说明文字里
+# 本身就写着「避免出现「增量 +0 ✅ PASS」这类假 PASS」，直接匹配符号会把解释文案当成结果行（我第一版就这么红的）。
+if printf '%s\n' "$out" | grep -qE '^\| [^|]+ \| ✅'; then
+  echo "❌ 基线不可解析时仍输出 ✅ 结果行（假 PASS）"; printf '%s\n' "$out" | grep -E '^\| [^|]+ \| ✅' | head -3; FAIL=1
+elif printf '%s\n' "$out" | grep -q 'fatal:'; then
+  echo "❌ 报告里混入 git 原始 fatal 噪声"; printf '%s\n' "$out" | grep 'fatal:' | head -2; FAIL=1
+elif ! printf '%s\n' "$out" | grep -q '未执行任何 diff 检查'; then
+  echo "❌ 未说明「未执行 diff 检查」，人无法判断结论覆盖范围"; printf '%s\n' "$out" | tail -3; FAIL=1
+else echo "✅ 基线不可解析 → 无 ✅ 结果行、无 fatal 噪声，且明说未执行 diff 检查"; fi
 reset; mkdir -p scripts/acceptance; echo ':' > scripts/acceptance/story-1-1.sh; git add -A; git commit -qm t
 case_ "Agent 分支改 scripts/acceptance → FAIL" 1 1
 case_ "非 Agent 分支改 scripts/acceptance → 放行" 0 0
