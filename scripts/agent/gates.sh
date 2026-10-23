@@ -29,7 +29,7 @@ if ! git rev-parse -q --verify "${BASE}^{commit}" >/dev/null 2>&1; then
   echo "| 基线 | ❌ FAIL | ref 不存在：${BASE}（检查 AGENT_BASE_BRANCH 是否多写了 origin/） |"
   echo
   echo "**结论：FAIL（1 项）— 未执行任何 diff 检查**"
-  echo "（基线不可解析时其余检查结果无意义，故不输出；避免出现「增量 +0 ✅ PASS」这类假 PASS）"
+  echo "（基线不可解析时其余检查结果无意义，故不输出；避免出现「增量 +0、结果却算通过」这类假通过）"
   exit 1
 fi
 
