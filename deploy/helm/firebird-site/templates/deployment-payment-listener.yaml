@@ -33,6 +33,22 @@ spec:
               value: "{{ .Values.siteId }}"
             - name: API_BASE_URL
               value: "http://firebird-api-{{ .Values.siteId }}:{{ .Values.api.service.port | default 3000 }}"
+            - name: DB_HOST
+              value: "{{ .Values.database.host }}"
+            - name: DB_NAME
+              value: "{{ .Values.database.name }}"
+            - name: DB_USER
+              value: "{{ .Values.database.user | default "firebird_user" }}"
+            {{- if .Values.database.passwordSecretRef }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.passwordSecretRef }}
+                  key: {{ .Values.database.passwordSecretKey | default "password" }}
+            {{- else if .Values.database.password }}
+            - name: DB_PASSWORD
+              value: "{{ .Values.database.password }}"
+            {{- end }}
             {{- range $name := list "TRON_MASTER_RECEIVE_ADDRESS" "TRONGRID_API_KEY" }}
             - name: {{ $name }}
               valueFrom:

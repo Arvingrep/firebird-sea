@@ -9,7 +9,17 @@ const ROOT = path.resolve(__dirname, '..');
 const OWNER = process.env.BMAD_PROJECT_OWNER || 'Arvingrep';
 const NUMBER = process.env.BMAD_PROJECT_NUMBER || '3';
 const PROJECT_ID = process.env.BMAD_PROJECT_ID || 'PVT_kwHOAuOIfM4BmVo3';
-const FIELD_NAME = 'BMAD Stage';
+
+// ── Field definitions (name only — id resolved dynamically via `gh project field-list`) ──
+const FIELD_BMAD_STAGE = 'BMAD Stage';
+const FIELD_STATUS = 'Status';
+const FIELD_EPIC = 'Epic';
+const FIELD_READY = '可开工 (Ready)';
+const FIELD_BLOCKER = '阻塞原因';
+const FIELD_START_DATE = '开始日期';
+const FIELD_TARGET_DATE = '目标日期';
+const FIELD_CYCLE = '周期 (Cycle)';
+
 const STAGES = {
   backlog: '📋 需求池 (Backlog)',
   'in-progress': '🚧 编码实现 (In Progress)',
@@ -19,34 +29,303 @@ const STAGES = {
 };
 const BOARD_COLUMNS = Object.values(STAGES);
 
+// BMAD Stage → built-in Status mapping (keeps board columns in sync)
+const STATUS_MAP = {
+  [STAGES.backlog]: 'Todo',
+  [STAGES['in-progress']]: 'In Progress',
+  [STAGES['in-qa']]: 'In Progress',
+  [STAGES['ready-to-release']]: 'In Progress',
+  [STAGES.done]: 'Done',
+};
+
+// ── gh helpers ─────────────────────────────────────────────────
 function gh(args) {
   const env = { ...process.env };
-  // The self-hosted runner's gh OAuth login has user-project scope; the repo PAT does not.
   if (env.BMAD_USE_GH_OAUTH === '1') delete env.GH_TOKEN;
-  return execFileSync('gh', args, { encoding: 'utf8', env }).trim();
+  return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 16e6, env }).trim();
 }
 
+function ghJson(args) {
+  return JSON.parse(gh([...args, '--format', 'json']));
+}
+
+function ghApi(query, vars = {}) {
+  return JSON.parse(gh(['api', 'graphql', '-f', `query=${query}`, ...Object.entries(vars).map(([k, v]) => ['-F', `${k}=${v}`]).flat()]));
+}
+
+// ── Project item helpers ───────────────────────────────────────
+function addItem(url) {
+  // Project item-add is idempotent — returns existing item if URL already on board
+  return ghJson(['project', 'item-add', NUMBER, '--owner', OWNER, '--url', url]).id;
+}
+
+function setSingleSelect(itemId, field, optionName) {
+  const opt = field.options.find(o => o.name === optionName);
+  if (!opt) {
+    console.error(`WARNING: Option "${optionName}" not found in field "${field.name}", skipping setSingleSelect`);
+    return;
+  }
+  gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
+    '--field-id', field.id, '--single-select-option-id', opt.id]);
+}
+
+function setText(itemId, field, value) {
+  if (!value) return;
+  gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
+    '--field-id', field.id, '--text', value]);
+}
+
+function setDate(itemId, field, value) {
+  if (!value) return;
+  gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
+    '--field-id', field.id, '--date', value]);
+}
+
+function setIteration(itemId, field, iterationId) {
+  gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
+    '--field-id', field.id, '--iteration-id', iterationId]);
+}
+
+function clearField(itemId, field) {
+  gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
+    '--field-id', field.id, '--clear']);
+}
+
+// Keep built-in Status in sync with BMAD Stage
+function syncStatus(itemId, bmadStage) {
+  const statusOption = STATUS_MAP[bmadStage];
+  if (!statusOption) {
+    console.error(`WARNING: No Status mapping for BMAD Stage "${bmadStage}", skipping Status sync`);
+    return;
+  }
+  try {
+    const statusField = fieldByName(FIELD_STATUS);
+    setSingleSelect(itemId, statusField, statusOption);
+  } catch (e) {
+    console.error(`WARNING: Failed to sync Status for BMAD Stage "${bmadStage}": ${e.message}`);
+  }
+}
+
+// ── Iteration helpers ──────────────────────────────────────────
+function getIterations() {
+  const query = `
+    query($projectId: ID!) {
+      node(id: $projectId) {
+        ... on ProjectV2 {
+          fields(first: 30) {
+            nodes {
+              ... on ProjectV2IterationField {
+                id
+                name
+                configuration {
+                  iterations {
+                    id title startDate duration
+                  }
+                  completedIterations {
+                    id title startDate duration
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+  const result = ghApi(query, { projectId: PROJECT_ID });
+  const fields = result.data.node.fields.nodes;
+  const cycleField = fields.find(f => f.configuration && f.configuration.iterations);
+  if (!cycleField) return [];
+  const all = [
+    ...(cycleField.configuration.iterations || []),
+    ...(cycleField.configuration.completedIterations || []),
+  ];
+  return all;
+}
+
+// getCurrentIterationId and getCurrentIterationEndDate removed — dead code.
+// Use getCurrentIterationInfo() (below) instead; it returns id + endDate + title.
+
+function getCurrentIterationInfo() {
+  // Use ISO UTC date to avoid DST boundary issues
+  const today = new Date().toISOString().slice(0, 10);
+  const iterations = getIterations();
+
+  const endDate = (it) => {
+    const d = new Date(it.startDate + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + it.duration - 1);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const active = iterations.find(it => it.startDate <= today && endDate(it) >= today);
+  if (active) return { iterationId: active.id, title: active.title, startDate: active.startDate, endDate: endDate(active) };
+
+  const upcoming = iterations
+    .filter(it => it.startDate > today)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  if (upcoming.length > 0) return { iterationId: upcoming[0].id, title: upcoming[0].title, startDate: upcoming[0].startDate, endDate: endDate(upcoming[0]) };
+
+  // All iterations expired — fallback to today+14d so target date isn't stuck in the past
+  const fallback = new Date();
+  fallback.setUTCDate(fallback.getUTCDate() + 14);
+  return { iterationId: null, title: 'N/A', startDate: today, endDate: fallback.toISOString().slice(0, 10) };
+}
+
+// ── Field cache ────────────────────────────────────────────────
+let _fields = null;
 function fields() {
-  return JSON.parse(gh(['project', 'field-list', NUMBER, '--owner', OWNER, '--format', 'json'])).fields;
+  if (_fields) return _fields;
+  _fields = ghJson(['project', 'field-list', NUMBER, '--owner', OWNER]).fields;
+  return _fields;
 }
 
+function fieldByName(name) {
+  const f = fields().find(x => x.name === name);
+  if (!f) throw new Error(`Project field not found: ${name}`);
+  return f;
+}
+
+// ── Core commands ──────────────────────────────────────────────
+
+// 1. Issue opened: add to project, set all initial fields
+function onIssueOpened(url, labelsCsv) {
+  const labels = (labelsCsv || '').split(',').map(s => s.trim()).filter(Boolean);
+  const itemId = addItem(url);
+
+  // Determine epic from labels: epic:1 → Epic 1, epic/1 → Epic 1
+  let epicOption = null;
+  for (const label of labels) {
+    let m = label.match(/^epic:(\d+)$/);
+    if (!m) m = label.match(/^epic\/(\d+)$/);
+    if (m) { epicOption = `Epic ${m[1]}`; break; }
+  }
+
+  // Get current iteration info
+  const cycle = getCurrentIterationInfo();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const result = { url, itemId, fields: {} };
+
+  // BMAD Stage → 需求池（若已有 agent:dev label 则直接设为编码实现）
+  const isAgentDev = labels.includes('agent:dev');
+  const initStage = isAgentDev ? STAGES['in-progress'] : STAGES.backlog;
+  const bmadField = fieldByName(FIELD_BMAD_STAGE);
+  setSingleSelect(itemId, bmadField, initStage);
+  result.fields[FIELD_BMAD_STAGE] = initStage;
+  syncStatus(itemId, initStage);
+
+  // Cycle → 当前迭代
+  if (cycle.iterationId) {
+    const cycleField = fieldByName(FIELD_CYCLE);
+    setIteration(itemId, cycleField, cycle.iterationId);
+    result.fields[FIELD_CYCLE] = cycle.title;
+  } else {
+    result.fields[FIELD_CYCLE] = 'no-active-iteration';
+  }
+
+  // 开始日期 → today
+  setDate(itemId, fieldByName(FIELD_START_DATE), today);
+  result.fields[FIELD_START_DATE] = today;
+
+  // 目标日期 → iteration end date (clamped: never in the past)
+  const targetDate = (cycle.endDate && cycle.endDate >= today) ? cycle.endDate : today;
+  setDate(itemId, fieldByName(FIELD_TARGET_DATE), targetDate);
+  result.fields[FIELD_TARGET_DATE] = targetDate;
+
+  // Epic（label 约定：epic:N 或 epic/N，N 为数字；见 docs/internal/BMAD_BOARD.md）
+  if (epicOption) {
+    const epicField = fieldByName(FIELD_EPIC);
+    setSingleSelect(itemId, epicField, epicOption);
+    result.fields[FIELD_EPIC] = epicOption;
+  }
+
+  // 可开工 → No (default)
+  const readyField = fieldByName(FIELD_READY);
+  setSingleSelect(itemId, readyField, 'No');
+  result.fields[FIELD_READY] = 'No';
+
+  return result;
+}
+
+// 2. Agent 开工 → 编码实现
+function onAgentDev(url) {
+  const itemId = addItem(url);
+  const bmadField = fieldByName(FIELD_BMAD_STAGE);
+  setSingleSelect(itemId, bmadField, STAGES['in-progress']);
+  syncStatus(itemId, STAGES['in-progress']);
+  return { url, itemId, fields: { [FIELD_BMAD_STAGE]: STAGES['in-progress'] } };
+}
+
+// 3. PR closed unmerged → 退回编码实现 + 阻塞原因（同时更新关联 Issue）
+function onPrClosedUnmerged(url, reason) {
+  const itemId = addItem(url);
+  const result = { url, itemId, fields: {} };
+
+  // BMAD Stage → 编码实现
+  const bmadField = fieldByName(FIELD_BMAD_STAGE);
+  setSingleSelect(itemId, bmadField, STAGES['in-progress']);
+  result.fields[FIELD_BMAD_STAGE] = STAGES['in-progress'];
+  syncStatus(itemId, STAGES['in-progress']);
+
+  // 阻塞原因
+  const blockerText = reason || 'PR 关闭未合并（无明确原因）';
+  setText(itemId, fieldByName(FIELD_BLOCKER), blockerText);
+  result.fields[FIELD_BLOCKER] = blockerText;
+
+  return result;
+}
+
+// 4. Deploy success → 已上线闭环 + close issue
+// 错误收集进 result.errors；CLI 入口在 errors 非空时输出 stderr 并以 exitCode=1 退出
+function onDeploySuccess(url, issueUrl) {
+  const itemId = addItem(url);
+  const result = { url, itemId, fields: {}, errors: [] };
+
+  // BMAD Stage → 已上线闭环
+  try {
+    const bmadField = fieldByName(FIELD_BMAD_STAGE);
+    setSingleSelect(itemId, bmadField, STAGES.done);
+    result.fields[FIELD_BMAD_STAGE] = STAGES.done;
+    syncStatus(itemId, STAGES.done);
+  } catch (e) {
+    result.errors.push(`set-stage: ${e.message}`);
+  }
+
+  // Clear blocker if any
+  try { clearField(itemId, fieldByName(FIELD_BLOCKER)); } catch (e) {
+    result.errors.push(`clear-blocker: ${e.message}`);
+  }
+
+  // Close the linked issue（owner/repo 从 issueUrl 解析，不写死仓库名）
+  if (issueUrl) {
+    const m = issueUrl.match(/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)$/);
+    if (m) {
+      result.issueNumber = m[2];
+      try {
+        gh(['issue', 'close', m[2], '-R', m[1], '--reason', 'completed']);
+      } catch (e) {
+        result.errors.push(`close-issue: ${e.message}`);
+      }
+    }
+  }
+
+  return result;
+}
+
+// 5. Set stage only (existing backward-compat)
 function setStage(url, key) {
   const stage = STAGES[key] || key;
   if (!BOARD_COLUMNS.includes(stage)) throw new Error(`Unknown BMAD stage: ${key}`);
-  const field = fields().find(f => f.name === FIELD_NAME);
-  if (!field) throw new Error(`Project field not found: ${FIELD_NAME}`);
-  const option = field.options.find(o => o.name === stage);
-  if (!option) throw new Error(`Project option not found: ${stage}`);
-  const added = JSON.parse(gh(['project', 'item-add', NUMBER, '--owner', OWNER, '--url', url, '--format', 'json']));
-  const itemId = added.id;
-  if (!itemId) throw new Error(`Project item was not added: ${url}`);
-  gh(['project', 'item-edit', '--id', itemId, '--project-id', PROJECT_ID,
-    '--field-id', field.id, '--single-select-option-id', option.id]);
+  const itemId = addItem(url);
+  const bmadField = fieldByName(FIELD_BMAD_STAGE);
+  setSingleSelect(itemId, bmadField, stage);
+  syncStatus(itemId, stage);
   return { url, stage, itemId };
 }
 
+// 6. Export board data (existing)
 function exportBoard() {
-  const response = JSON.parse(gh(['project', 'item-list', NUMBER, '--owner', OWNER, '--limit', '1000', '--format', 'json']));
+  const response = ghJson(['project', 'item-list', NUMBER, '--owner', OWNER, '--limit', '1000']);
   const board = Object.fromEntries(BOARD_COLUMNS.map(name => [name, []]));
   const tasks = response.items.map(item => {
     const c = item.content || {};
@@ -72,12 +351,39 @@ function exportBoard() {
   console.log(`Exported ${tasks.length} GitHub Project items to apps/bmad-dashboard/board-data.{json,js}`);
 }
 
+// ── CLI dispatch ───────────────────────────────────────────────
 const args = process.argv.slice(2);
-if (args[0] === '--set-stage') {
-  if (args.length !== 3) throw new Error('Usage: --set-stage <url> <stage-key>');
-  console.log(JSON.stringify(setStage(args[1], args[2])));
-} else if (args.length) {
-  throw new Error(`Unknown arguments: ${args.join(' ')}`);
-} else {
-  exportBoard();
+const cmd = args[0];
+
+try {
+  if (cmd === '--set-stage') {
+    if (args.length !== 3) throw new Error('Usage: --set-stage <url> <stage-key>');
+    console.log(JSON.stringify(setStage(args[1], args[2])));
+  } else if (cmd === '--init-issue') {
+    if (args.length < 2 || args.length > 3) throw new Error('Usage: --init-issue <url> [labels-csv]');
+    console.log(JSON.stringify(onIssueOpened(args[1], args[2] || '')));
+  } else if (cmd === '--on-agent-dev') {
+    if (args.length !== 2) throw new Error('Usage: --on-agent-dev <url>');
+    console.log(JSON.stringify(onAgentDev(args[1])));
+  } else if (cmd === '--on-pr-closed-unmerged') {
+    if (args.length < 2 || args.length > 3) throw new Error('Usage: --on-pr-closed-unmerged <url> [reason]');
+    console.log(JSON.stringify(onPrClosedUnmerged(args[1], args[2] || '')));
+  } else if (cmd === '--on-deploy-success') {
+    if (args.length < 2 || args.length > 3) throw new Error('Usage: --on-deploy-success <url> [issue-url]');
+    const result = onDeploySuccess(args[1], args[2] || '');
+    console.log(JSON.stringify(result));
+    if (result.errors.length > 0) {
+      for (const err of result.errors) console.error(`on-deploy-success error: ${err}`);
+      process.exitCode = 1;
+    }
+  } else if (cmd === '--iteration-info') {
+    console.log(JSON.stringify(getCurrentIterationInfo()));
+  } else if (args.length) {
+    throw new Error(`Unknown arguments: ${args.join(' ')}`);
+  } else {
+    exportBoard();
+  }
+} catch (e) {
+  console.error(`ERROR: ${e.message}`);
+  process.exit(1);
 }
