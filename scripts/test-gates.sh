@@ -33,8 +33,10 @@ if printf '%s\n' "$out" | grep -qE '^\| 基线 \| origin/main \| [0-9]{4}-[0-9]{
   echo "✅ 报告含基线 ref 与提交日期（落后时人能看到）"
 else echo "❌ 报告缺「基线」行或无日期"; printf '%s\n' "$out" | head -6; FAIL=1; fi
 out="$(GATE_REPO_DIR="$T" bash "$ROOT/scripts/agent/gates.sh" origin/does-not-exist 2>&1)"; rc=$?
-if [ "$rc" != "0" ] && printf '%s\n' "$out" | grep -q 'ref 不存在'; then
-  echo "✅ 基线 ref 不存在 → 显式 FAIL 并指向 AGENT_BASE_BRANCH 多写 origin/"
+# 两个子串都要断言：只说「ref 不存在」人还得自己猜为什么；说「多写了 origin/」才指得动人去看 AGENT_BASE_BRANCH
+if [ "$rc" != "0" ] && printf '%s\n' "$out" | grep -q 'ref 不存在：origin/does-not-exist' \
+   && printf '%s\n' "$out" | grep -q '多写了 origin/'; then
+  echo "✅ 基线 ref 不存在 → 显式 FAIL 且诊断同时含「ref 不存在」与「多写了 origin/」"
 else echo "❌ 基线 ref 不存在时未按预期失败（rc=${rc}）"; printf '%s\n' "$out" | head -6; FAIL=1; fi
 reset; mkdir -p scripts/acceptance; echo ':' > scripts/acceptance/story-1-1.sh; git add -A; git commit -qm t
 case_ "Agent 分支改 scripts/acceptance → FAIL" 1 1
@@ -50,7 +52,8 @@ eq "无标记 → 空" "$(story_key '普通' '无')" ""
 eq "story_id 取前两段数字" "$(story_id '1-7-计划任务-cronjob')|$(story_id 2.4)" "1-7|2-4"
 # --- story_id 的 T 前缀语义（0b976062「改左匹配」的护栏）---
 # 该提交修的是「数字前出现过 t/T 时整条不匹配」：旧正则 ^[^0-9Tt]* 会被 [story:T1-1] / Story 1.1 / task 1-1 整条打空。
-# 下面六条把修复前后的边界都钉住，尤其 test1-2（词内 t 不算前缀）——这正是「左匹配」与「字符类排除」的分界点。
+# 下面八条把修复前后的边界都钉住。分界点是「t 是不是独立前缀」：test1-2 / next2-3 里的 t 属于单词（前面紧邻字母），
+# 应解析成普通 Story，不能被误判成 T Story —— 这正是 head 末字符判定（*[!a-zA-Z][Tt]）与「凡带 t 就当 T」的分野。
 eq "story_id 大小写归一 t1.1 → T1-1" "$(story_id 't1.1')" "T1-1"
 eq "story_id 已是 T1-1 保持原样" "$(story_id 'T1-1')" "T1-1"
 eq "story_id 小数写法 T2.10 → T2-10" "$(story_id 'T2.10')" "T2-10"
@@ -58,5 +61,6 @@ eq "story_id 标题前缀 [story:T1-1] → T1-1" "$(story_id '[story:T1-1]')" "T
 eq "story_id 句子前缀 Story 1.1 → 1-1" "$(story_id 'Story 1.1')" "1-1"
 eq "story_id 句子前缀 task 1-1 → 1-1" "$(story_id 'task 1-1')" "1-1"
 eq "story_id 词内 t 不算前缀 test1-2 → 1-2" "$(story_id 'test1-2')" "1-2"
+eq "story_id 词内 t 不算前缀 next2-3 → 2-3（旧实现会误判成 T2-3）" "$(story_id 'next2-3')" "2-3"
 eq "story_spec 无规格不报错" "$(cd "$T" && story_spec HEAD 9-9; echo "rc=$?")" "rc=0"
 exit $FAIL
