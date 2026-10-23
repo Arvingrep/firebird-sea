@@ -120,7 +120,8 @@ So that 可行。
 **Then** F
 `;
 const epicsT = parseEpics(EPICS_T);
-// 真实 TMA 文件（pickNext 的验收场景就是它）
+// 真实文件（pickNext / keyOf 的验收场景就是它们，避免用手搓夹具测不可达路径）
+const REAL_EPICS = path.resolve(__dirname, '../../_bmad-output/planning-artifacts/epics.md');
 const TMA_EPICS = path.resolve(__dirname, '../../_bmad-output/planning-artifacts/epics-tma-frontend.md');
 const SPRINT_STATUS = path.resolve(__dirname, '../../_bmad-output/implementation-artifacts/sprint-status.yaml');
 
@@ -155,13 +156,29 @@ test('keyOf 派生：T Story 未登记时派生「T1-1」，非 T Story 未登�
   assert.equal(keyOf(epicsT[0].stories[0], st), 'T1-1');
   // 非 T Story：查不到必须是 undefined。这个差异是刻意的——若为所有 Story 都派生 key，
   // 忘了登记 sprint-status 的旧数字 Story 会突然变成可派单（见 BMAD_PIPELINE.md §2）。
-  const 未登记 = new Map([['9-9-别的-story', 'backlog']]);
+  // 夹具走真实 parseStatus，key 形态保证是解析器真能产出的那种
+  const 未登记 = parseStatus('development_status:\n  9-9-别的-story: backlog\n');
   assert.equal(keyOf(epics[0].stories[0], 未登记), undefined);
 });
 
-test('keyOf 命中：sprint-status 有「T1-1-<slug>」行时返回带 slug 的完整 key', () => {
-  const 有行 = new Map([['T1-1-凭证-spike', 'backlog']]);
-  assert.equal(keyOf(epicsT[0].stories[0], 有行), 'T1-1-凭证-spike');
+test('keyOf 命中：真实 sprint-status 经 parseStatus 解析后能命中带 slug 的完整 key', () => {
+  // 夹具必须走真实解析链路（parseStatus → Map），不能手搓 Map：
+  // parseStatus 的行正则是 ^\s{2}(\d+-\d+-[^\s:]+):，手搓能造出正则造不出的 key，那样的「命中」是假信心。
+  const 真实status = parseStatus(fs.readFileSync(SPRINT_STATUS, 'utf8'));
+  const 真实epics = parseEpics(fs.readFileSync(REAL_EPICS, 'utf8'));
+  const key = keyOf(真实epics[0].stories[0], 真实status);
+  assert.equal(key, '1-1-外卖模块原样入库');
+  assert.ok(真实status.has(key), '命中的 key 必须真实存在于 parseStatus 的产出里');
+});
+
+test('parseStatus 造不出 T 前缀 key：T Story 走不到「命中」分支，只能是派生（KI-2 的另一面）', () => {
+  // 这条把「不可达」本身钉成断言：T Story 的带 slug 命中路径当前**不存在**，
+  // 所以任何用手搓 Map 断言 keyOf 能命中「T1-1-<slug>」的用例都是假信心。
+  // 等 KI-2 修好（parseStatus 接受 T 前缀）时，这条会变红——那是应该改测试的信号，不是 bug。
+  const st = parseStatus('development_status:\n  T1-1-凭证-spike: done\n  1-1-入库: review\n');
+  assert.deepEqual([...st.keys()], ['1-1-入库'], 'parseStatus 不该把 T 前缀行收进 Map');
+  // 因此在真实链路上，T Story 只可能拿到派生 key
+  assert.equal(keyOf(epicsT[0].stories[0], st), 'T1-1');
 });
 
 test('pickNext 选 T Story：真实 TMA epics 选中 T1.1，key 为「T1-1」且依赖为空', () => {
@@ -196,5 +213,8 @@ test('KI-3 已知限制：T1.1 未登记时 T1.2 被判「依赖未满足」', (
 });
 
 test('KI-3 解锁条件：sprint-status 出现「T1-1: done」后 T1.2 依赖即满足', () => {
+  // ⚠️ 夹具是**假设性**的：这个 Map 当前造不出来——parseStatus 不收 T 前缀行（见「造不出 T 前缀 key」那条）。
+  // 保留它是为了钉住 keyOf/unmet 的解耦方式：缺口只在上游回写（KI-2），不在依赖判定逻辑本身。
+  // 修好 KI-2 后这条应当改成「喂真实 YAML → parseStatus → unmet」，届时会更可信。
   assert.deepEqual(unmet(epicsT[0].stories[1], epicsT, new Map([['T1-1', 'done']])), []);
 });

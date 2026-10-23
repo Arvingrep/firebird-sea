@@ -107,9 +107,13 @@ test('make gates AGENT_BASE_BRANCH 为空串：$(or ...) 回落 main，不产出
   assert.equal(runMake('feat/x', { env: { AGENT_BASE_BRANCH: '' } }), 'GATES_BASE=origin/main');
 });
 
-test('make gates GATE_BASE=origin/release：命令行覆盖优先于目标分支', { skip: SKIP }, () => {
-  // 取一个既不是默认值、也不等于任何分支上游的 ref，避免「覆盖」被默认值巧合掩盖
-  assert.equal(runMake('feat/x', { args: ['gates', 'GATE_BASE=origin/release'] }), 'GATES_BASE=origin/release');
+test('make gates GATE_BASE 命令行：优先于 AGENT_BASE_BRANCH，取 origin/foo', { skip: SKIP }, () => {
+  // 三者同时在场（默认值 / AGENT_BASE_BRANCH=canary / 命令行 origin/foo），只允许命令行胜出。
+  // 取 origin/foo 这种既非默认值、也不等于 canary 的值，避免「覆盖生效」被别的来源巧合掩盖。
+  assert.equal(
+    runMake('feat/x', { args: ['gates', 'GATE_BASE=origin/foo'], env: { AGENT_BASE_BRANCH: 'canary' } }),
+    'GATES_BASE=origin/foo',
+  );
 });
 
 test('make gates：同名 env 变量 GATE_BASE 同样能覆盖目标分支', { skip: SKIP }, () => {
