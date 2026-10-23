@@ -3,7 +3,20 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
-git -C "$T" init -q -b main && cd "$T" && git config user.email t@t && git config user.name t
+# 下面三行必须分开写，不能写成 `git init && cd "$T" && git config …`：本脚本是 set -uo pipefail（没有 -e），
+# init 失败时 `cd` 会被 && 短路跳过，脚本继续在**调用者目录**里跑，紧接着造 base 提交的那句
+# `git add -A` 就落进别人的仓库。
+# 实测（用只让 init 返回 128 的 git 桩）：调用者仓库里凭空出现 .agents/ package.json a.txt b.txt、
+# 多出 base/d 两个提交，且 `git update-ref refs/remotes/origin/main HEAD` 把调用者的 origin/main
+# 指向了合成的 base 提交 —— 而 `git status --porcelain` 是**空的**（全都已提交），人从外部看不出来被污染。
+# 所以这里改成硬失败（exit 2 = 场地故障，不是用例失败）：宁可这一轮测试根本不跑，
+# 也不能在别人的仓库里 add -A。
+# 另外 `${T}` 必须带花括号：写成 `$T）` 时 bash 会把全角右括号当成变量名的一部分（实测报
+# `T）: unbound variable`），于是这两条 fail-fast 自己先崩、`exit 2` 根本不执行 —— 加固措施
+# 本身成了新的静默点。这条对任何「$变量 紧跟中文」的写法都成立。
+git -C "$T" init -q -b main || { echo "❌ 无法在临时目录建 git 仓（${T}），已中止：后续 git add -A 会落在调用者目录" >&2; exit 2; }
+cd "$T" || { echo "❌ 无法进入临时目录（${T}），已中止" >&2; exit 2; }  # 兜底，未证明可达：init 成功后 $T 必定可进，别把它算进覆盖
+git config user.email t@t && git config user.name t
 mkdir -p .agents && printf '# 批准\nmysql2 3.24.5  # Story 2.1\nexpress ^4.21.2\n' > .agents/approved-deps.txt
 pj() { printf '{\n  "dependencies": {\n%b\n  }\n}\n' "$1" > package.json; }
 pj '    "left-pad": "1.0.0"'; echo x > a.txt; git add -A; git commit -qm base
