@@ -138,3 +138,15 @@ test('make gates env GATE_BASE：与 AGENT_BASE_BRANCH 同时存在时 env GATE_
     'GATES_BASE=origin/foo',
   );
 });
+
+// ── 双前缀归一（Ray 指出：AGENT_BASE_BRANCH 被四个消费点各自拼 origin/）────────────────
+// lib.sh:14 与 Makefile 都假设变量是裸分支名，各自拼 origin/ 前缀。若有人从 `git branch -r`
+// 拷了 `origin/canary` 贴进 GitHub 变量，会拼出 `origin/origin/canary` → 不存在的 ref。
+// 这条断言「归一后仍是 origin/canary」，即只允许一个 origin/。
+// 判别性：未做归一（如 7b0b0f3e 及更早的 Makefile）时，实际值为 origin/origin/canary，本条必红。
+test('AGENT_BASE_BRANCH 带 origin/ 前缀应归一，不产生 origin/origin/', { skip: SKIP }, () => {
+  assert.equal(
+    runMake('feat/x', { env: { AGENT_BASE_BRANCH: 'origin/canary' } }),
+    'GATES_BASE=origin/canary',
+  );
+});
