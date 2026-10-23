@@ -4,6 +4,10 @@
 # 用上游 @{u} 是错的：agent/*、chore/* 的上游就是它自己，push 完 git diff @{u}...HEAD 恒空 → 又是假 FAIL。
 # 目标分支由 AGENT_BASE_BRANCH 决定（与 lib.sh / agent-dev.yml 同一个变量；默认 main，启用 canary 后设为 canary）；
 # 临时想比对别的 ref 用 GATE_BASE 覆盖（命令行 > 同名 env > AGENT_BASE_BRANCH）。
+# 注意 1：AGENT_BASE_BRANCH 填**裸分支名**（canary，不是 origin/canary）——这里会自己拼 origin/ 前缀，
+#         与 lib.sh:14「origin/${BASE_BRANCH}」的约定一致；填成 origin/canary 会拼出 origin/origin/canary。
+# 注意 2：本目标**不 fetch**，比的是本地远端跟踪 ref。本地 origin/<分支> 落后于真实远端时，
+#         会把别人已合入的改动算进本次增量（可能虚高甚至误判 >1200 行）→ 门禁报错前先 git fetch。
 GATE_BASE ?= origin/$(or $(AGENT_BASE_BRANCH),main)
 
 help:
@@ -13,7 +17,7 @@ help:
 	@echo "  make agent-runner     - 🤖 注册本机自托管 runner（多 Agent 流水线，见 docs/internal/AGENT_PIPELINE.md）"
 	@echo "  make agent-dev        - Dev Agent 施工 GitHub Issue (例: make agent-dev ISSUE=12)"
 	@echo "  make agent-qa         - 独立 QA Agent 验收 PR (例: make agent-qa PR=34)"
-	@echo "  make gates            - 对目标分支（AGENT_BASE_BRANCH，默认 origin/main）跑确定性门禁，可用 GATE_BASE=<ref> 覆盖"
+	@echo "  make gates            - 对目标分支（AGENT_BASE_BRANCH，填裸分支名，默认 origin/main）跑门禁；GATE_BASE 覆盖；落后时先 git fetch"
 	@echo "  make hermes           - 🏛️  启动 Agent 2 (Hermes) 执行全链路独立红队总验收"
 	@echo "  make test-mcp         - ⚡ 验证 n8n MCP Server 协议及 4 核心工作流端到端状态"
 	@echo "  make setup            - 初始化基地目录与环境检查"

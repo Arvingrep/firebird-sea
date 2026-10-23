@@ -127,7 +127,8 @@ Issue 标题含 `[story:<key>]`（或正文 `<!-- bmad-story: KEY -->`）时，d
 ```bash
 make agent-dev ISSUE=12     # 本地手动跑一次 Dev Agent（需 gh 登录）
 GATES_JOB_RESULT=success make agent-qa PR=34   # 本地手动跑一次 QA（须声明托管 gates 已通过，否则一律打回）
-make gates                  # 对目标分支（AGENT_BASE_BRANCH，默认 origin/main）跑确定性门禁；GATE_BASE=<ref> 可临时覆盖
+make gates                  # 对目标分支（AGENT_BASE_BRANCH 填裸分支名，默认 origin/main）跑确定性门禁；GATE_BASE=<ref> 可临时覆盖
+                            # 不 fetch：比的是本地远端跟踪 ref，落后时先 git fetch，否则别人的改动会被算进本次增量
 
 # 发布状态 / 回滚（hub 集群）
 kubectl --context mac-mini-orbstack -n argocd get imageupdater firebird-manila
