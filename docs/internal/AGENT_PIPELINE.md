@@ -49,6 +49,7 @@ sequenceDiagram
 | Dev Agent | `.github/workflows/agent-dev.yml` → `scripts/agent/dev.sh` | 默认 `claude -p`，限定工具集，不能改 `.github/`、`scripts/agent/` |
 | 确定性门禁 | `.github/workflows/ci-verify.yml` → `scripts/agent/gates.sh` | 只看分支 diff：非空、增量 ≤1200、Docs-as-Code、Zero-Dep、密钥、调试残留、语法、Helm |
 | QA Agent | `ci-verify.yml` job `agent-qa` → `scripts/agent/qa.sh` | 默认 `codex exec -s read-only`（与 Dev 不同厂商）；JSON 裁定，解析失败即打回 |
+| ↳ 打回分支 | `qa.sh` REJECTED | 重打 `agent:dev` **之前**先查 issue 标签：已带 `agent:blocked`（Dev 侧返工上限用尽）则摘掉 `agent:qa`、追加一条说明评论（带 `<!-- agent-blocked-limit -->` 标记，已有则跳过，不刷屏）+ `notify blocked`，不再重排返工；取不到标签按未 blocked 处理（fail-open），本次验收仍 `exit 1` |
 | 构建 | `.github/workflows/ci-gke.yml` | push main → GAR `firebird-php/api/nginx:<sha40>` + `latest`；push canary → `:canary` + `:canary-<sha12>`（**不推 40 位 SHA**，防 Image Updater 误滚生产）；纯 docs/任务变更不构建 |
 | 发布 | homelab `platform/argocd-image-updater` + `apps/firebird-manila/application-gke.yaml` | Image Updater v1（CRD）追 40 位 SHA tag，write-back=argocd；Application 自动同步 |
 | 上线通知 | `deploy/helm/firebird-site/templates/job-notify-deployed.yaml` | ArgoCD PostSync Job，`deployNotify.webhook` 为空则不创建 |
@@ -60,7 +61,7 @@ sequenceDiagram
 | `agent:dev` | 待 Dev Agent 施工（打上即触发） | n8n / 人 / QA 打回 |
 | `agent:qa` | PR 等待 QA | Dev Agent |
 | `qa:accepted` / `qa:rejected` | QA 裁定 | QA Agent |
-| `agent:blocked` | 空交付或打回 ≥ `AGENT_MAX_ATTEMPTS`，需人工 | Dev Agent |
+| `agent:blocked` | 空交付 / CLI 失效 / 分支冲突 / 用例已绿 / 打回 ≥ `AGENT_MAX_ATTEMPTS`，需人工 | Dev Agent 打（QA 读到即停止自动返工）；Dev **正常交付成功时自动摘掉** |
 
 ## 4. 配置（GitHub → Settings → Secrets and variables → Actions）
 
@@ -71,7 +72,7 @@ sequenceDiagram
 | secret | `N8N_AGENT_EVENT_TOKEN` | 建议 | 事件 webhook 的 Header Auth token（`X-Firebird-Token`），与下方 n8n 凭据、GKE Secret 三处一致 |
 | var | `AGENT_AUTO_MERGE` | | 默认 `1`；设 `0` 即改为「QA 通过后人工合并」 |
 | var | `AGENT_MAX_ATTEMPTS` | | QA 打回上限，默认 `3` |
-| var | `AGENT_BASE_BRANCH` | | Dev Agent 的基线与 PR 目标分支，默认 `main`；canary 流程启用后设为 `canary`（QA/回写取 PR 的实际目标分支，无需再设） |
+| var | `AGENT_BASE_BRANCH` | | Dev Agent 的基线与 PR 目标分支，默认 `main`；canary 流程启用后设为 `canary`（QA/回写取 PR 的实际目标分支，无需再设）。**填裸分支名**（`canary`，不要写 `origin/canary`）：`lib.sh` 与 `Makefile` 都自行拼 `origin/` 前缀，误填前缀虽会被归一，但别依赖它 |
 | var | `DEV_AGENT_CMD` / `QA_AGENT_CMD` | | 覆盖默认 agent 命令（按 shell 语法 `eval` 成数组，**等同于在 runner 上执行任意命令**——仅 owner 可设，勿开放给他人；提示词走 stdin；`QA_AGENT_CMD` 需以输出文件参数结尾，如 `... -o`） |
 | secret | `GCP_SA_KEY` | ✅ | 已有，CI 推 GAR |
 
@@ -126,7 +127,8 @@ Issue 标题含 `[story:<key>]`（或正文 `<!-- bmad-story: KEY -->`）时，d
 ```bash
 make agent-dev ISSUE=12     # 本地手动跑一次 Dev Agent（需 gh 登录）
 GATES_JOB_RESULT=success make agent-qa PR=34   # 本地手动跑一次 QA（须声明托管 gates 已通过，否则一律打回）
-make gates                  # 当前分支对 origin/main 跑确定性门禁
+make gates                  # 对目标分支（AGENT_BASE_BRANCH 填裸分支名，默认 origin/main）跑确定性门禁；GATE_BASE=<ref> 可临时覆盖
+                            # 不 fetch：比的是本地远端跟踪 ref，落后时先 git fetch，否则别人的改动会被算进本次增量
 
 # 发布状态 / 回滚（hub 集群）
 kubectl --context mac-mini-orbstack -n argocd get imageupdater firebird-manila
@@ -136,6 +138,12 @@ argocd app rollback firebird-manila <ID>   # 回滚后 Image Updater 仍会追�
 ```
 
 暂停全自动：`AGENT_AUTO_MERGE=0`（保留 QA，只停合并）；或删 issue 上的 `agent:dev` 标签。
+
+已到返工上限（`agent:blocked`）后怎么办——**在打回数仍 ≥ 上限期间，只移除 `agent:blocked` 标签没用**：`qa_reject_count` 统计的是 PR 上的 QA 打回评论，只增不减，`dev.sh` 一被唤起就立刻再次 block。（`agent:blocked` 只会被「Dev 正常交付成功」摘掉，那一步之后标签就不在了。）真实可行的三条出路：
+
+1. **调高上限**：改仓库变量 `AGENT_MAX_ATTEMPTS`（要大于当前打回数），再重新打 `agent:dev`；Dev 交付成功时会自动摘掉 `agent:blocked`；
+2. **换一张工单**：关闭该 PR 并删除它的 `agent/<branch>`，重新建单（打回计数随 PR 归零）；
+3. **人工收尾**：直接在该分支改代码并推到同一 PR —— 不走 Dev Agent，QA 会自动重跑。
 
 ## 7. 已知限制
 

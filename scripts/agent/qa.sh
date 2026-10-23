@@ -18,6 +18,21 @@ PR="${1:?用法: qa.sh <pr-number>}"
 AUTO_MERGE="${AGENT_AUTO_MERGE:-1}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
+# issue 是否已被 dev.sh 打上 agent:blocked（返工上限用尽）。
+# 取不到标签（gh 失败/限流）时返回非 0 => 按「未 blocked」处理（fail-open），不因 API 抖动停掉正常返工。
+issue_is_blocked() { # issue_is_blocked <issue-number>
+  local labels
+  labels="$(gh issue view "$1" -R "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || true)"
+  printf '%s\n' "$labels" | grep -qx 'agent:blocked'
+}
+# 该 issue 上是否已留过「已达上限」留言（幂等标记）。每轮 QA 打回都会走到 blocked 分支，
+# 没有这个判断会重复刷评论。同样先落变量再 grep，避免 pipefail + grep -q 的 SIGPIPE 误判。
+issue_blocked_noted() { # issue_blocked_noted <issue-number>
+  local bodies
+  bodies="$(gh issue view "$1" -R "$REPO" --json comments --jq '.comments[].body' 2>/dev/null || true)"
+  printf '%s\n' "$bodies" | grep -qF '<!-- agent-blocked-limit -->'
+}
+
 if [ -n "${QA_AGENT_CMD:-}" ]; then
   eval "QA_CMD=(${QA_AGENT_CMD})"   # 仓库变量，仅 owner 可设
 else
@@ -41,6 +56,14 @@ notify qa_started "QA Agent 开始验收 PR #${PR}" "$ISSUE" "$PR"
 # 1. 确定性门禁（真实执行）
 GATE_RC=0
 GATE_REPO_DIR="$ROOT_DIR" GATE_AGENT_BRANCH=1 bash "$AGENT_SELF_DIR/gates.sh" origin/${BASE_BRANCH} > "$TMP/gates.md" 2>&1 || GATE_RC=$?
+# 空报告守卫：gates.sh 被截断/写坏到只剩开头注释时，bash 正常退出、rc=0、零输出（实测 13 个截断点里 8 个如此），
+# 上面那个 `|| GATE_RC=$?` 只在非 0 时赋值，于是 GATE_RC 留在 0 —— 一张没有报告的空门禁会被当成通过。
+# 判据用「结论行存在」而不是「文件非空」：gates.sh 任何一条正常出口都会打 `**结论：…`，有表无结论仍是坏报告。
+# 且必须**行首**匹配：正文里「提了一嘴结论」（表格单元格、引用块、缩进）不算结论行，否则守卫自己有假绿口子。
+# 契约：结论行必须行首输出（不加缩进、不加 `> ` 引用符）；新增出口若写成缩进形式会被判为无结论 → 整轮 QA 恒 REJECTED。
+# 只在 GATE_RC 仍为 0 时赋值：rc=2（bash 崩）与 rc=1（判据失败）是两类事，压成同一个码会毁掉下游分类的依据。
+# 用 if 而不是 `A && B || C`：后者在 A 为假时会短路执行 C，非零值照样被改写。
+if [ "$GATE_RC" -eq 0 ] && ! grep -qE '^\*\*结论：' "$TMP/gates.md"; then GATE_RC=1; fi
 if [ "${GATES_JOB_RESULT:-}" != "success" ]; then
   GATE_RC=1
   printf '\n> ❌ 托管 runner 上的 gates job 结论为 `%s`（须为 success）\n' "${GATES_JOB_RESULT:-未提供}" >> "$TMP/gates.md"
@@ -160,7 +183,36 @@ else
   bmad_stage "https://github.com/${REPO}/pull/${PR}" in-qa
   [ -n "$ISSUE" ] && bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-progress
   notify qa_rejected "PR #${PR} 第 ${ATTEMPT} 轮被 QA 打回" "$ISSUE" "$PR"
-  # 打回 => issue 重新进入 agent:dev，触发 Dev Agent 返工（dev.sh 内部有次数上限）
-  [ -n "$ISSUE" ] && set_label "$ISSUE" "agent:dev" "agent:qa"
+  # 打回 => issue 重新进入 agent:dev，触发 Dev Agent 返工（dev.sh 内部有次数上限）。
+  # 但 dev.sh 达上限后已给 issue 打上 agent:blocked；此时若仍重打 agent:dev，下一轮 QA 又会把 Dev 拉起来，
+  # 上限就只是「这一轮不干」（PR #92 因此走到第 7 轮）。故先查标签：已 blocked 只留言 + 通知，不再重排返工。
+  if [ -n "$ISSUE" ] && issue_is_blocked "$ISSUE"; then
+    log "🛑 Issue #${ISSUE} 已达返工上限（agent:blocked），不再重排 Dev Agent"
+    # 摘掉 agent:qa：此刻不是「等 QA」，是「等人」，否则看板会一直显示等待 QA
+    set_label "$ISSUE" "agent:blocked" "agent:qa"
+    if issue_blocked_noted "$ISSUE"; then
+      log "ℹ️ Issue #${ISSUE} 已有「已达上限」留言，跳过重复评论"
+    else
+      cat > "$TMP/blocked.md" <<EOF
+<!-- agent-blocked-limit -->
+## 🛑 已达自动返工上限，停止返工
+
+Issue #${ISSUE} 带 \`agent:blocked\`（需人工介入；通常意味着打回数已达上限，也可能是上限刚被调高、标签尚未被 Dev 的交付摘除），PR #${PR} 第 ${ATTEMPT} 轮仍被 QA 拒收——含本次累计打回 ${ATTEMPT} 次，上限 \`AGENT_MAX_ATTEMPTS=${MAX_ATTEMPTS}\`。流水线**不再**重新派遣 Dev Agent。
+
+**只摘 \`agent:blocked\` 标签、不动上限，依然无效**：PR #${PR} 上的 QA 打回记录只增不减（\`qa_reject_count\`），只要「打回数 ≥ 上限」仍成立，\`dev.sh\` 一被唤起就会立刻重新 block（Dev 正常交付成功时它会自动摘掉该标签，不用手动删）。真实可行的出路：
+
+1. **调高上限**：改仓库变量 \`AGENT_MAX_ATTEMPTS\`（要大于上面这个打回数），然后重新打 \`agent:dev\`；Dev 交付后会自动摘掉 \`agent:blocked\`；
+2. **换一张工单**：关闭 PR #${PR} 并删除其 \`agent/<分支>\`，重新建单（打回计数随 PR 归零）；
+3. **人工收尾**：直接在该分支改代码并推送到同一 PR —— 不需要 Dev Agent，QA 会自动重跑。
+
+- PR：https://github.com/${REPO}/pull/${PR}
+EOF
+      gh issue comment "$ISSUE" -R "$REPO" -F "$TMP/blocked.md" >/dev/null 2>&1 \
+        || log "⚠️ 追加 blocked 留言失败（忽略）"
+    fi
+    notify blocked "Issue #${ISSUE} 已达返工上限，PR #${PR} 第 ${ATTEMPT} 轮仍被拒，停止自动返工，需人工介入" "$ISSUE" "$PR"
+  elif [ -n "$ISSUE" ]; then
+    set_label "$ISSUE" "agent:dev" "agent:qa"
+  fi
   exit 1
 fi

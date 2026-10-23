@@ -27,9 +27,10 @@ function parseEpics(md) {
   let epic = null, st = null;
   for (const line of md.split('\n')) {
     let m;
-    if ((m = line.match(/^## Epic (\d+): (.+)$/))) { epic = { n: +m[1], title: m[2].trim(), stories: [] }; epics.push(epic); st = null; }
-    else if ((m = line.match(/^### Story (\d+)\.(\d+): (.+)$/)) && epic) {
-      st = { epic: +m[1], num: +m[2], id: `${m[1]}.${m[2]}`, title: m[3].trim(), lines: [] }; epic.stories.push(st);
+    // 编号允许可选 T 前缀（TMA epics：`## Epic T1:` / `### Story T1.1:`）；非 T 格式的解析结果完全不变
+    if ((m = line.match(/^## Epic (T?)(\d+): (.+)$/))) { epic = { n: +m[2], t: m[1], title: m[3].trim(), stories: [] }; epics.push(epic); st = null; }
+    else if ((m = line.match(/^### Story (T?)(\d+)\.(\d+): (.+)$/)) && epic) {
+      st = { epic: +m[2], num: +m[3], t: m[1], id: `${m[1]}${m[2]}.${m[3]}`, title: m[4].trim(), lines: [] }; epic.stories.push(st);
     } else if (/^##? /.test(line)) st = null;
     else if (st) st.lines.push(line);
   }
@@ -52,10 +53,17 @@ function parseStatus(yaml) { // story-key → status（只收 N-M-slug，忽略 
   return out;
 }
 
-const keyOf = (story, status) => [...status.keys()].find((k) => k.startsWith(`${story.epic}-${story.num}-`));
+// Story 的目录/用例 id：`1-1` / `T1-1`。key 派生、spec 与 acceptance 路径一律用它，避免同一 Story 出现两套 id
+const tidOf = (s) => `${s.t || ''}${s.epic}-${s.num}`;
+// sprint-status 的 key 形如 `N-M-slug`。TMA Story（id 形如 `T1.1`）不在 sprint-status 中，
+// 为其派生 `${tidOf}`（如 `T1-1`；**不能**退化成 `1-1`，那会撞上 `1-1-外卖模块原样入库`）。
+// 非 T Story 查不到仍返回 undefined（维持「不在 sprint-status 中」的原有判定）。
+const keyOf = (story, status) => [...status.keys()].find((k) => k.startsWith(`${tidOf(story)}-`))
+  || (story.t ? tidOf(story) : undefined);
 const depsOf = (s, epics, extra = EPIC_DEPS) => [
-  ...epics.flatMap((e) => e.stories).filter((x) => x.epic === s.epic && x.num < s.num).map((x) => x.id),
-  ...(extra[s.epic] || []),
+  ...epics.flatMap((e) => e.stories).filter((x) => x.epic === s.epic && x.num < s.num && (x.t || '') === (s.t || '')).map((x) => x.id),
+  // EPIC_DEPS 的 id 是数字 Epic 的 Story（如 1.5），T 前缀 Epic 不适用其跨 Epic 依赖
+  ...(s.t ? [] : extra[s.epic] || []),
 ];
 const unmet = (s, epics, status, extra) => depsOf(s, epics, extra).filter((id) => {
   const dep = epics.flatMap((e) => e.stories).find((x) => x.id === id);
@@ -83,7 +91,9 @@ function pickNext(epics, status, { inflight = 0, maxInflight = 1, story, ignoreD
   for (const s of pool) {
     const key = keyOf(s, status);
     if (!key) { blocked.push(`${s.id} 不在 sprint-status 中`); continue; }
-    if (status.get(key) !== 'backlog') { if (story) blocked.push(`${s.id} 状态为 ${status.get(key)}，非 backlog`); continue; }
+    // 派生 key（T 前缀）不在 sprint-status 中 => 视为 backlog 而不是跳过
+    const state = status.has(key) ? status.get(key) : 'backlog';
+    if (state !== 'backlog') { if (story) blocked.push(`${s.id} 状态为 ${state}，非 backlog`); continue; }
     if (skipKeys.has(key)) { blocked.push(`${s.id} 已存在对应 Issue`); continue; }
     const need = unmet(s, epics, status, depsExtra);
     if (need.length && !ignoreDeps) { blocked.push(`${s.id} 依赖未满足：${need.join(', ')}`); if (story) continue; break; }
@@ -94,10 +104,15 @@ function pickNext(epics, status, { inflight = 0, maxInflight = 1, story, ignoreD
 
 function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need = [], testFile = '', labels = LABELS }) {
   const refs = new Set((s.lines.join('\n').match(/AD-(\d+)/g) || []).map((x) => +x.slice(3)));
-  if (!refs.size) (STORY_AD[s.id] || EPIC_AD[s.epic] || []).forEach((n) => refs.add(n));
+  // T 前缀 Epic 不套用数字 Epic 的 AD 表：STORY_AD/EPIC_AD 的编号来自火鸟（Epic 1-6）的架构脊柱，
+  // 按 s.epic 数字回退会给 T1/T2 挂上完全不相干的 AD（实测 T2.1 会拿到 USDT 收银台那套 AD-4/5/6/7/12）。
+  // T Story 正文自己写了 AD-n 仍照常收集（上面 refs 不受影响）。
+  if (!refs.size && !s.t) (STORY_AD[s.id] || EPIC_AD[s.epic] || []).forEach((n) => refs.add(n));
   const ads = [...refs].sort((a, b) => a - b).map((n) => `- AD-${n}${adTitles.get(n) ? ` — ${adTitles.get(n)}` : ''}`);
+  // 一个 AD 都没有时不要留空小节（T Story 不再回退数字 Epic 的表，见上）
+  if (!ads.length) ads.push('- 本 Story 正文未引用具体 AD；架构约束以 epics 文件与架构脊柱为准，实现前请自行核对。');
   const split = s.acCount > 4 ? `\n> ⚠️ 本 Story 有 ${s.acCount} 条验收条件，很可能超出单次增量，请优先落地前几条并在 PR 中说明拆分。\n` : '';
-  const tid = `${s.epic}-${s.num}`;
+  const tid = tidOf(s);
   const testFirst = testFile
     ? [`- ✅ 验收测试已预置：\`${testFile}\`，**当前为红**；你的任务是让它变绿。`,
       `- 运行：\`bash scripts/acceptance/run.sh --story ${tid}\`（CI 在本 PR 标题含 \`[story:${key}]\` 时强制执行）。`,
@@ -108,7 +123,7 @@ function renderIssue(s, { key, adTitles = new Map(), specFile = '', unmet: need 
   const body = [
     `<!-- bmad-story: ${key} -->`,
     testFile ? '<!-- test-first: present -->' : '<!-- test-first: missing -->',
-    `> 来源：BMAD Epic ${s.epic} · Story ${s.id}（sprint key \`${key}\`）。本 Issue 由 \`scripts/bmad/story-to-issue.js\` 生成。`,
+    `> 来源：BMAD Epic ${s.t || ''}${s.epic} · Story ${s.id}（sprint key \`${key}\`）。本 Issue 由 \`scripts/bmad/story-to-issue.js\` 生成。`,
     need.length ? `> ⚠️ 依赖未满足（人工强制开工）：${need.join(', ')}` : '',
     '', '## 目标', s.intro, '', '## 验收条件（Given/When/Then）', s.ac || '（epics.md 未给出）', '',
     '## 相关架构决定', ...ads, '', '## 必须遵守（RULES / 门禁）', ...RULES.map((r) => `- ${r}`), '',
@@ -147,9 +162,10 @@ function main(argv) {
   });
   if (!pick.story) { console.error(`无可创建的 Issue：${pick.reason}`); return 10; }
   const dir = path.join(out, 'implementation-artifacts');
-  const specFile = fs.existsSync(dir) ? fs.readdirSync(dir).find((f) => f.startsWith(`spec-${pick.story.epic}-${pick.story.num}-`)) : '';
+  const tid = tidOf(pick.story);
+  const specFile = fs.existsSync(dir) ? fs.readdirSync(dir).find((f) => f.startsWith(`spec-${tid}-`)) : '';
   const root = a['repo-root'] ? path.resolve(a['repo-root']) : path.resolve(__dirname, '../..');
-  const rel = `scripts/acceptance/story-${pick.story.epic}-${pick.story.num}.sh`;
+  const rel = `scripts/acceptance/story-${tid}.sh`;
   const testFile = fs.existsSync(path.join(root, rel)) ? rel : '';
   const issue = renderIssue(pick.story, { key: pick.key, adTitles, specFile, unmet: pick.unmet, testFile });
   if (a.create && !testFile && !a['no-test-first']) {

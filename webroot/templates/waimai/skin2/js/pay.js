@@ -476,6 +476,7 @@ $(function(){
 
 
 	//获取付款二维码
+	var qrExpireTimer = null;
 	function getQrCode(){
 	   // $('.payTab li:eq(0)').hasClass('curr') ? $('.stepBtn').hide() : null;
 	    var data = $('#payform').serialize(), action = $('#payform').attr('action');
@@ -486,7 +487,6 @@ $(function(){
 	      data: data  + '&qr=1',
 	      dataType: 'jsonp',
 	      success: function(str){
-	      	console.log('code 执行2')
 	        if(str.state == 100){
 	          var data = [], info = str.info;
 	          for(var k in info) {
@@ -494,6 +494,12 @@ $(function(){
 	          }
 	          var src = masterDomain + '/include/qrPay.php?' + data.join('&');
 	          $('#qrimg').attr('src', masterDomain + '/include/qrcode.php?data=' + encodeURIComponent(src));
+
+	          //二维码展示满10分钟未支付，自动重新获取
+	          clearTimeout(qrExpireTimer);
+	          qrExpireTimer = setTimeout(function(){
+	            if($('.qrpay').is(':visible')) getQrCode();
+	          }, 10 * 60 * 1000);
 
 	          //验证是否支付成功，如果成功跳转到指定页面
 	      		if(timer != null){
@@ -511,6 +517,7 @@ $(function(){
 	      					if(str.state == 100 && str.info != ""){
 	      						//如果已经支付成功，则跳转到会员中心页面
 	                  clearInterval(timer);
+	                  clearTimeout(qrExpireTimer);
 	      						location.href = str.info;
 	      					}else if(str.state == 101 && str.info == langData['siteConfig'][21][162]){   //订单不存在！
 	                  getQrCode();
