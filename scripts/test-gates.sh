@@ -36,5 +36,15 @@ eq "标题 [story:key] 解析（含中文）" "$(story_key 'feat [story:1-7-计�
 eq "正文标记兜底" "$(story_key '普通' 'a <!-- bmad-story: 2-1-foo --> b')" "2-1-foo"
 eq "无标记 → 空" "$(story_key '普通' '无')" ""
 eq "story_id 取前两段数字" "$(story_id '1-7-计划任务-cronjob')|$(story_id 2.4)" "1-7|2-4"
+# --- story_id 的 T 前缀语义（0b976062「改左匹配」的护栏）---
+# 该提交修的是「数字前出现过 t/T 时整条不匹配」：旧正则 ^[^0-9Tt]* 会被 [story:T1-1] / Story 1.1 / task 1-1 整条打空。
+# 下面六条把修复前后的边界都钉住，尤其 test1-2（词内 t 不算前缀）——这正是「左匹配」与「字符类排除」的分界点。
+eq "story_id 大小写归一 t1.1 → T1-1" "$(story_id 't1.1')" "T1-1"
+eq "story_id 已是 T1-1 保持原样" "$(story_id 'T1-1')" "T1-1"
+eq "story_id 小数写法 T2.10 → T2-10" "$(story_id 'T2.10')" "T2-10"
+eq "story_id 标题前缀 [story:T1-1] → T1-1" "$(story_id '[story:T1-1]')" "T1-1"
+eq "story_id 句子前缀 Story 1.1 → 1-1" "$(story_id 'Story 1.1')" "1-1"
+eq "story_id 句子前缀 task 1-1 → 1-1" "$(story_id 'task 1-1')" "1-1"
+eq "story_id 词内 t 不算前缀 test1-2 → 1-2" "$(story_id 'test1-2')" "1-2"
 eq "story_spec 无规格不报错" "$(cd "$T" && story_spec HEAD 9-9; echo "rc=$?")" "rc=0"
 exit $FAIL
