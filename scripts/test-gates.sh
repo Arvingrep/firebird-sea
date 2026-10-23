@@ -76,5 +76,11 @@ eq "story_id 句子前缀 Story 1.1 → 1-1" "$(story_id 'Story 1.1')" "1-1"
 eq "story_id 句子前缀 task 1-1 → 1-1" "$(story_id 'task 1-1')" "1-1"
 eq "story_id 词内 t 不算前缀 test1-2 → 1-2" "$(story_id 'test1-2')" "1-2"
 eq "story_id 词内 t 不算前缀 next2-3 → 2-3（旧实现会误判成 T2-3）" "$(story_id 'next2-3')" "2-3"
+# 〔契约〕不是 B2 的回归用例：对 49d83449 无判别力（那版同样返回 T1-1），
+# 但对 aeb9c5cc（T 支持尚不存在那版）是 1-1，因此能拦住「T 支持被整体回退」。
+# 具体拦截场景：把 *[!a-zA-Z][Tt]) 改成 *[[:punct:]][Tt]) 这类「看起来更规范」的重构，
+# 会让 故事T1-1 静默变 1-1 并跑到 epic 1 story 1 的验收路径上——其余断言全绿，看不出来（已实测）。
+# 说「无判别力」必须指明对哪两个 commit，否则这个词会被当成绝对判断而删掉本条。
+eq "story_id CJK 前导仍按分隔符处理 故事T1-1 → T1-1〔契约〕" "$(story_id '故事T1-1')" "T1-1"
 eq "story_spec 无规格不报错" "$(cd "$T" && story_spec HEAD 9-9; echo "rc=$?")" "rc=0"
 exit $FAIL
