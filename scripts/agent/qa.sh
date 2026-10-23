@@ -177,11 +177,11 @@ else
 <!-- agent-blocked-limit -->
 ## 🛑 已达自动返工上限，停止返工
 
-Issue #${ISSUE} 已带 \`agent:blocked\`（返工上限 \`${MAX_ATTEMPTS}\` 次已用尽），PR #${PR} 第 ${ATTEMPT} 轮仍被 QA 拒收。流水线**不再**重新派遣 Dev Agent。
+Issue #${ISSUE} 带 \`agent:blocked\`（需人工介入；通常意味着打回数已达上限，也可能是上限刚被调高、标签尚未被 Dev 的交付摘除），PR #${PR} 第 ${ATTEMPT} 轮仍被 QA 拒收——含本次累计打回 ${ATTEMPT} 次，上限 \`AGENT_MAX_ATTEMPTS=${MAX_ATTEMPTS}\`。流水线**不再**重新派遣 Dev Agent。
 
-**仅移除 \`agent:blocked\` 标签是无效的**：PR #${PR} 上的 QA 打回记录只增不减（\`qa_reject_count\`），「打回数 ≥ 上限」恒成立，\`dev.sh\` 会立刻再次 block。真实可行的出路：
+**只摘 \`agent:blocked\` 标签、不动上限，依然无效**：PR #${PR} 上的 QA 打回记录只增不减（\`qa_reject_count\`），只要「打回数 ≥ 上限」仍成立，\`dev.sh\` 一被唤起就会立刻重新 block（Dev 正常交付成功时它会自动摘掉该标签，不用手动删）。真实可行的出路：
 
-1. **调高上限**：改仓库变量 \`AGENT_MAX_ATTEMPTS\`，然后重新打 \`agent:dev\`；
+1. **调高上限**：改仓库变量 \`AGENT_MAX_ATTEMPTS\`（要大于上面这个打回数），然后重新打 \`agent:dev\`；Dev 交付后会自动摘掉 \`agent:blocked\`；
 2. **换一张工单**：关闭 PR #${PR} 并删除其 \`agent/<分支>\`，重新建单（打回计数随 PR 归零）；
 3. **人工收尾**：直接在该分支改代码并推送到同一 PR —— 不需要 Dev Agent，QA 会自动重跑。
 

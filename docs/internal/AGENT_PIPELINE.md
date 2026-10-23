@@ -61,7 +61,7 @@ sequenceDiagram
 | `agent:dev` | 待 Dev Agent 施工（打上即触发） | n8n / 人 / QA 打回 |
 | `agent:qa` | PR 等待 QA | Dev Agent |
 | `qa:accepted` / `qa:rejected` | QA 裁定 | QA Agent |
-| `agent:blocked` | 空交付或打回 ≥ `AGENT_MAX_ATTEMPTS`，需人工 | Dev Agent（QA 读到即停止自动返工） |
+| `agent:blocked` | 空交付 / CLI 失效 / 分支冲突 / 用例已绿 / 打回 ≥ `AGENT_MAX_ATTEMPTS`，需人工 | Dev Agent 打（QA 读到即停止自动返工）；Dev **正常交付成功时自动摘掉** |
 
 ## 4. 配置（GitHub → Settings → Secrets and variables → Actions）
 
@@ -139,9 +139,9 @@ argocd app rollback firebird-manila <ID>   # 回滚后 Image Updater 仍会追�
 
 暂停全自动：`AGENT_AUTO_MERGE=0`（保留 QA，只停合并）；或删 issue 上的 `agent:dev` 标签。
 
-已到返工上限（`agent:blocked`）后怎么办——**只移除 `agent:blocked` 标签没用**：`qa_reject_count` 统计的是 PR 上的 QA 打回评论，只增不减，「打回数 ≥ `AGENT_MAX_ATTEMPTS`」恒成立，`dev.sh` 会立刻再次 block。真实可行的三条出路：
+已到返工上限（`agent:blocked`）后怎么办——**在打回数仍 ≥ 上限期间，只移除 `agent:blocked` 标签没用**：`qa_reject_count` 统计的是 PR 上的 QA 打回评论，只增不减，`dev.sh` 一被唤起就立刻再次 block。（`agent:blocked` 只会被「Dev 正常交付成功」摘掉，那一步之后标签就不在了。）真实可行的三条出路：
 
-1. **调高上限**：改仓库变量 `AGENT_MAX_ATTEMPTS`，再重新打 `agent:dev`；
+1. **调高上限**：改仓库变量 `AGENT_MAX_ATTEMPTS`（要大于当前打回数），再重新打 `agent:dev`；Dev 交付成功时会自动摘掉 `agent:blocked`；
 2. **换一张工单**：关闭该 PR 并删除它的 `agent/<branch>`，重新建单（打回计数随 PR 归零）；
 3. **人工收尾**：直接在该分支改代码并推到同一 PR —— 不走 Dev Agent，QA 会自动重跑。
 

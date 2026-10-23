@@ -17,7 +17,7 @@ help:
 	@echo "  make agent-runner     - 🤖 注册本机自托管 runner（多 Agent 流水线，见 docs/internal/AGENT_PIPELINE.md）"
 	@echo "  make agent-dev        - Dev Agent 施工 GitHub Issue (例: make agent-dev ISSUE=12)"
 	@echo "  make agent-qa         - 独立 QA Agent 验收 PR (例: make agent-qa PR=34)"
-	@echo "  make gates            - 对目标分支（AGENT_BASE_BRANCH，填裸分支名，默认 origin/main）跑门禁；GATE_BASE 覆盖；落后时先 git fetch"
+	@echo "  make gates            - 对目标分支（AGENT_BASE_BRANCH，填裸分支名，默认 origin/main）跑门禁；GATE_BASE 覆盖；本目标不自动 fetch，落后时请先手动 git fetch"
 	@echo "  make hermes           - 🏛️  启动 Agent 2 (Hermes) 执行全链路独立红队总验收"
 	@echo "  make test-mcp         - ⚡ 验证 n8n MCP Server 协议及 4 核心工作流端到端状态"
 	@echo "  make setup            - 初始化基地目录与环境检查"
