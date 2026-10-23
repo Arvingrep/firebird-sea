@@ -56,6 +56,30 @@ elif printf '%s\n' "$out" | grep -q 'fatal:'; then
 elif ! printf '%s\n' "$out" | grep -q '未执行任何 diff 检查'; then
   echo "❌ 未说明「未执行 diff 检查」，人无法判断结论覆盖范围"; printf '%s\n' "$out" | tail -3; FAIL=1
 else echo "✅ 基线不可解析 → 无 ✅ 结果行、无 fatal 噪声，且明说未执行 diff 检查"; fi
+# --- gates.sh：GATE_REPO_DIR / GATE_BASE 的优先级与 fail-closed（d607178f, 0099fbd3）---
+# 第 3 条防的是「三层默认值 ${1:-${GATE_BASE:-origin/main}} 被简化成 GATE_BASE 优先」：
+# 那样 CI（传位置参数）与本地（export GATE_BASE）会行为分裂——gates 判的是 ref A、人以为在比 ref B。
+# 这是本轮 AGENT_BASE_BRANCH 那个坑的同构版本，只是换了变量名。
+# 断言只锚 rc 与表格行（^\| 仓库目录 \| / ^\| 基线 \|），不匹配「仓库目录不可用」这类解释性标题。
+out="$(GATE_REPO_DIR=/tmp/nope-does-not-exist bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
+if [ "$rc" != "0" ] && printf '%s\n' "$out" | grep -qE '^\| 仓库目录 \| ❌ FAIL' \
+   && ! printf '%s\n' "$out" | grep -q '结论：PASS'; then
+  echo "✅ GATE_REPO_DIR 不可进入 → fail-closed（不出 PASS）"
+else echo "❌ GATE_REPO_DIR 不可进入时未 fail-closed（rc=${rc}）"; printf '%s\n' "$out" | tail -6; FAIL=1; fi
+
+out="$(GATE_BASE=origin/does-not-exist bash "$ROOT/scripts/agent/gates.sh" 2>&1)"; rc=$?
+if [ "$rc" != "0" ] && printf '%s\n' "$out" | grep -q 'ref 不存在：origin/does-not-exist'; then
+  echo "✅ 无位置参数时 GATE_BASE 生效"
+else echo "❌ GATE_BASE 未生效（rc=${rc}）"; printf '%s\n' "$out" | tail -6; FAIL=1; fi
+
+# 在 $T 里跑而不是真仓：真仓的「增量 ≤ 1200 行」「Zero-Dep」「无调试残留」会随分支内容变，
+# 把它当 rc=0 的前提会让这条用例在别人分支上无缘无故变红（实测：真仓当前 rc=0，但那是巧合）。
+# 先造一次非空交付，rc=0 才是这个场景的确定结论，而不是"当前仓库恰好干净"的副产品。
+reset; echo 'x' >> a.txt; git add -A; git commit -qm d
+out="$(GATE_REPO_DIR="$T" GATE_BASE=origin/does-not-exist bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
+if [ "$rc" = "0" ] && printf '%s\n' "$out" | grep -qE '^\| 基线 \| origin/main \|'; then
+  echo "✅ 位置参数优先于 GATE_BASE（rc=0 且基线仍是 origin/main）"
+else echo "❌ 位置参数未优先于 GATE_BASE（rc=${rc}）"; printf '%s\n' "$out" | tail -6; FAIL=1; fi
 reset; mkdir -p scripts/acceptance; echo ':' > scripts/acceptance/story-1-1.sh; git add -A; git commit -qm t
 case_ "Agent 分支改 scripts/acceptance → FAIL" 1 1
 case_ "非 Agent 分支改 scripts/acceptance → 放行" 0 0
