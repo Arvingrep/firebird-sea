@@ -16,7 +16,6 @@ const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 const { createTokenService, createLimiter } = require('./tmaToken');
 const { createMemberMap } = require('./memberMap');
 const { createLoginService } = require('./loginService');
-const { cliConn } = require('./migrate');
 const gatewayClient = require('./gatewayClient');
 const { createFbProxy } = require('./fbProxy');
 const { createCredentialProvider } = require('./credentialProvider');
