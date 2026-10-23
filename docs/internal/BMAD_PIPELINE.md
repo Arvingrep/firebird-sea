@@ -28,6 +28,8 @@ node scripts/bmad/story-to-issue.js --create          # 真正建单（带 agent
 # 回写状态（幂等；未变化不改文件、不刷新 last_updated）
 node scripts/bmad/sync-sprint-status.js 1-7 done --file _bmad-output/implementation-artifacts/sprint-status.yaml
 node --test scripts/bmad/*.test.js                  # 单测（Node 20 不能传目录）
+# ⚠️ 新增测试文件必须同时加进 scripts/verify-task.sh 第 5 步的 for 列表，否则 CI 的 verify-task job 不会执行它
+#    （那一步是显式枚举命令的：「文件存在」不等于「有地方跑」）
 ```
 
 参数：`--out-dir`（默认 `_bmad-output/`）、`--epics`、`--status`、`--spine`、`--repo-root`（探测测试先行用例）、`--max-inflight`（默认 1）、`--inflight N | --inflight-file F`、`--deps-file F`。
@@ -37,6 +39,8 @@ node --test scripts/bmad/*.test.js                  # 单测（Node 20 不能传
 - 在途上限：开放、带 `agent:dev` 且含 `bmad-story` 标记的 Issue 数 ≥ 上限即不建单；同 key 已有开放 Issue 不重复建。
 - 标签只有 `agent:dev`；其它标签由流水线自己维护。
 - Issue 标题约定 `[story:<sprint key>] …`：dev.sh 注入规格、ci-verify 选测试先行用例、回写工作流定位 Story，都靠它。正文还带 `<!-- bmad-story: KEY -->` 标记作兜底。
+- 编号支持可选 `T` 前缀（`## Epic T1:` / `### Story T1.1:`，见 `planning-artifacts/epics-tma-frontend.md`；`--epics` 指定该文件即可）：Story id 为 `T1.1`，因 TMA Story 不在 `sprint-status.yaml` 中，其 sprint key 派生为 `T1-1` 并视为 `backlog`（**不**退化成 `1-1`，那会撞上 `1-1-外卖模块原样入库`）。
+- 同一套 id 规则贯穿到底：`T1-1` 同时用于 sprint key、`scripts/acceptance/story-T1-1.sh` 与 `spec-T1-1-*.md`；非 T Epic（`1.1` / key `1-1-slug`）行为与之前完全一致。
 
 ## 3. 失败与人工介入点
 
@@ -56,7 +60,8 @@ node --test scripts/bmad/*.test.js                  # 单测（Node 20 不能传
 - 增量上限已由 300 放宽到 1200 行（2026-10-10，Arvin 决定）；Story 仍应小而完整。
 - sprint-status 中 1.3/1.4/1.5/2.1 的 `review` 指向尚未合入 main 的分支代码；依赖它们的 Story 先确认对应 PR 已合并。
 - spike（1.2）、含新依赖（1.5）的 Story 不适合 Agent，用 `--story` 跳过或人工完成。
-- 跨 Epic 依赖表与 AD 映射为启发式，需 Arvin 复核。
+- 跨 Epic 依赖表与 AD 映射为启发式，需 Arvin 复核（T 前缀 Epic 不再套用数字 Epic 的 AD 表，只在 Story 正文写了 `AD-n` 时才列出）。
+- **T 前缀 Epic 目前只能派第一个 Story**（`T1.1`）：T Story 不在 `sprint-status.yaml` 中，其 sprint key 由脚本派生（`T1-1`），而后续 Story 的依赖判定依赖 sprint-status 回写——回写脚本（`sync-sprint-status.js`）只认 `N-M-slug`，写不进 `T1-1`。**启动 TMA Epic 前必须先解决回写**（见实现报告 KI-2/KI-3）。
 
 ## 工作原则（Arvin 2026-10-10，长期有效）
 

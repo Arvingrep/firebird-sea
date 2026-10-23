@@ -212,7 +212,9 @@ ${SUMMARY}
 else
   set_label "$PR" "agent:qa" "qa:rejected"
 fi
-set_label "$ISSUE" "agent:qa" "agent:dev"
+# 交付成功一并摘掉 agent:blocked：全仓没有别处 remove 它，不摘的话 issue 会永久停在「需人工介入」，
+# 而且下一轮 QA 再拒时会误走「上限已用尽」分支（实际早已重派成功）。上面四种 block 路径都在本行之前 exit，不会误摘。
+set_label "$ISSUE" "agent:qa" "agent:dev" "agent:blocked"
 bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-qa
 bmad_stage "https://github.com/${REPO}/pull/${PR}" in-qa
 log "✅ 已推送 ${BRANCH} → PR #${PR}"
