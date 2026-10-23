@@ -18,7 +18,9 @@ norm() {
   local s="$1" head p=""
   head="${s%%[0-9]*}"    # 第一个数字之前的全部内容
   s="${s#"$head"}"       # 从第一个数字开始（head 为空时即为原串）
-  # T 紧邻串首、或 T 前一位不是字母（如 `[story:T1-1]` 的冒号）才算前缀；`test1-2` 这类不走 T 分支
+  # 判据：'T' 只有在「不是一个英文单词的内部字母」时才算 T 前缀。
+  # [Tt]) 覆盖开头即 T（T1-1 / t1-1）；*[!a-zA-Z][Tt]) 覆盖中文等非 ASCII 前导（故事T1-1）。
+  # 故意不匹配 next2-3 / test1-2 / xT1-1 这类词内字母——它们不是 Story 编号。
   case "$head" in [Tt]) p="T" ;; *[!a-zA-Z][Tt]) p="T" ;; esac
   if [[ "$s" =~ ^([0-9]+)[.-]([0-9]+) ]]; then printf '%s%s-%s' "$p" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"; fi
   return 0               # 解析不了也必须返回 0：调用方在 set -e 下用 $(norm ...)
