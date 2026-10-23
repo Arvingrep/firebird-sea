@@ -24,6 +24,18 @@ reset; mkdir -p svc; printf '{\n  "name": "svc",\n  "version": "1.0.0"\n}\n' > s
 case_ "新包自身 version 字段不算依赖 → 放行" 0 0
 reset; pj '    "lodash": "^4.0.0"'; echo 'lodash ^4.0.0' >> .agents/approved-deps.txt; git commit -qam d
 case_ "同一 PR 自行登记无效 → FAIL" 1 0
+# --- gates.sh：基线可解析性（dec2f8be）---
+# 断言的是「人真的会看到跟谁比」，比断言 help 文案结实：基线落后只会表现为「增量虚高 / 相对 X 无改动」
+# 这种看起来像真问题的 FAIL，光靠文档提示挡不住；ref 拼错（AGENT_BASE_BRANCH 多写 origin/）也要给出配置侧诊断。
+reset
+out="$(GATE_REPO_DIR="$T" bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"
+if printf '%s\n' "$out" | grep -qE '^\| 基线 \| origin/main \| [0-9]{4}-[0-9]{2}-[0-9]{2} \|$'; then
+  echo "✅ 报告含基线 ref 与提交日期（落后时人能看到）"
+else echo "❌ 报告缺「基线」行或无日期"; printf '%s\n' "$out" | head -6; FAIL=1; fi
+out="$(GATE_REPO_DIR="$T" bash "$ROOT/scripts/agent/gates.sh" origin/does-not-exist 2>&1)"; rc=$?
+if [ "$rc" != "0" ] && printf '%s\n' "$out" | grep -q 'ref 不存在'; then
+  echo "✅ 基线 ref 不存在 → 显式 FAIL 并指向 AGENT_BASE_BRANCH 多写 origin/"
+else echo "❌ 基线 ref 不存在时未按预期失败（rc=${rc}）"; printf '%s\n' "$out" | head -6; FAIL=1; fi
 reset; mkdir -p scripts/acceptance; echo ':' > scripts/acceptance/story-1-1.sh; git add -A; git commit -qm t
 case_ "Agent 分支改 scripts/acceptance → FAIL" 1 1
 case_ "非 Agent 分支改 scripts/acceptance → 放行" 0 0
