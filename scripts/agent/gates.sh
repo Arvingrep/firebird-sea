@@ -27,7 +27,9 @@ EOF
   exit 1
 fi
 
-BASE="${1:-origin/main}"
+# 基线 ref：位置参数优先，其次 GATE_BASE 环境变量（Makefile:6 的帮助文案承诺了这个覆盖方式），最后默认 origin/main。
+# 本脚本其它开关（GATE_REPO_DIR / GATE_AGENT_BRANCH / GATE_MAX_ADDED / GATE_REQUIRE_TOOLS）都是 env，走位置参数是例外。
+BASE="${1:-${GATE_BASE:-origin/main}}"
 MAX_ADDED="${GATE_MAX_ADDED:-1200}"
 RANGE="${BASE}...HEAD"
 
