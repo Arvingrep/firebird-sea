@@ -74,6 +74,12 @@ data:
             {{- include "firebird.nginxPhpBody" . | nindent 12 }}
         }
 
+        # W1: 安装目录纵深防御。^~ 前缀优先级高于 ~ \.php$ 正则，/install/index.php 一并拦截。
+        # k8s 镜像内本无 install（.dockerignore 已排除），此条防的是本地挂载 webroot 的暴露面。
+        location ^~ /install/ {
+            return 404;
+        }
+
         # 禁止访问敏感隐藏文件
         location ~ /\. {
             deny all;
