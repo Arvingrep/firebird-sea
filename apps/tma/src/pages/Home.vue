@@ -29,27 +29,45 @@ onMounted(load);
 
 <template>
   <div class="page">
-    <van-loading v-if="loading" vertical>{{ t('common.loading') }}</van-loading>
-    <div v-else-if="failed">
-      <p class="hint">{{ t('shop.loadFailed') }}</p>
-      <van-button size="small" @click="load">{{ t('common.retry') }}</van-button>
+    <!-- 骨架屏：与真实卡片同构，避免加载时跳动 -->
+    <template v-if="loading">
+      <div v-for="i in 5" :key="i" class="fbs-card fbs-skeleton-card">
+        <div class="fbs-skeleton-block" style="width: 86px; height: 86px" />
+        <div style="flex: 1">
+          <div class="fbs-skeleton-block" style="width: 70%; height: 16px" />
+          <div class="fbs-skeleton-block" style="width: 40%; height: 12px; margin-top: 10px" />
+          <div class="fbs-skeleton-block" style="width: 85%; height: 12px; margin-top: 26px" />
+        </div>
+      </div>
+    </template>
+
+    <!-- 加载失败：居中 + 重试 -->
+    <div v-else-if="failed" class="fbs-error">
+      <p class="msg">{{ t('shop.loadFailed') }}</p>
+      <van-button size="small" round @click="load">{{ t('common.retry') }}</van-button>
     </div>
+
     <van-empty v-else-if="shops.length === 0" :description="t('shop.empty')" />
-    <van-card
-      v-for="s in shops"
-      v-else
-      :key="s.id"
-      :title="s.shopname"
-      :desc="s.typename"
-      :thumb="s.pic"
-      @click="router.push({ name: 'shop', params: { id: s.id } })"
-    >
-      <template #tags>
-        <van-tag :type="s.yingye ? 'success' : 'default'">{{ s.yingye ? t('shop.open') : t('shop.closed') }}</van-tag>
-      </template>
-      <template #footer>
-        <span class="hint">{{ t('shop.minOrder') }} {{ money(s.basicprice) }} · {{ t('shop.deliveryFee') }} {{ money(s.delivery_fee) }}</span>
-      </template>
-    </van-card>
+
+    <!-- 商家列表 -->
+    <template v-else>
+      <p class="fbs-section-title">{{ t('shop.section') }}</p>
+      <div
+        v-for="s in shops"
+        :key="s.id"
+        class="fbs-card shop-card"
+        @click="router.push({ name: 'shop', params: { id: s.id } })"
+      >
+        <img class="pic" :src="s.pic" alt="" loading="lazy" />
+        <div class="info">
+          <div class="name">{{ s.shopname }}</div>
+          <div class="desc">{{ s.typename }}</div>
+          <div class="meta">
+            <span :class="s.yingye ? 'fbs-open' : 'fbs-closed'">{{ s.yingye ? t('shop.open') : t('shop.closed') }}</span>
+            <span>{{ t('shop.minOrder') }} <b>{{ money(s.basicprice) }}</b> · {{ t('shop.deliveryFee') }} <b>{{ money(s.delivery_fee) }}</b></span>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>

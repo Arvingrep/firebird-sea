@@ -43,7 +43,7 @@ onMounted(async () => {
   await loadList(true);
 });
 watch(active, () => loadList(true));
-const date = (v?: number | string) => (v ? new Date(Number(v) * 1000).toLocaleDateString() : '');
+const date = (v?: number | string) => (v ? new Date(Number(v) * 1000).toLocaleDateString('zh-CN') : '');
 </script>
 
 <template>
@@ -51,20 +51,30 @@ const date = (v?: number | string) => (v ? new Date(Number(v) * 1000).toLocaleDa
     <van-tabs v-if="cats.length" v-model:active="active" shrink>
       <van-tab v-for="c in cats" :key="c.id" :title="c.typename" />
     </van-tabs>
+
     <van-empty v-if="!loading && !failed && list.length === 0" :description="t('news.empty')" />
-    <van-cell
-      v-for="a in list"
-      :key="a.id"
-      :title="a.title"
-      :label="date(a.pubdate)"
-      is-link
-      @click="router.push({ name: 'news-detail', params: { id: a.id } })"
-    />
-    <van-loading v-if="loading" vertical>{{ t('common.loading') }}</van-loading>
-    <div v-if="failed">
-      <p class="hint">{{ t('news.loadFailed') }}</p>
-      <van-button size="small" @click="loadList(page === 1)">{{ t('common.retry') }}</van-button>
+
+    <div v-else-if="!loading && !failed" class="fbs-card" style="margin-top: 12px">
+      <div
+        v-for="a in list"
+        :key="a.id"
+        class="news-item"
+        @click="router.push({ name: 'news-detail', params: { id: a.id } })"
+      >
+        <div class="title">{{ a.title }}</div>
+        <div class="date">{{ date(a.pubdate) }}</div>
+      </div>
     </div>
-    <van-button v-else-if="!loading && !finished" block plain @click="loadList(false)">{{ t('news.more') }}</van-button>
+
+    <van-loading v-if="loading" vertical>{{ t('common.loading') }}</van-loading>
+
+    <div v-if="failed" class="fbs-error">
+      <p class="msg">{{ t('news.loadFailed') }}</p>
+      <van-button size="small" round @click="loadList(page === 1)">{{ t('common.retry') }}</van-button>
+    </div>
+
+    <van-button v-else-if="!loading && !finished" block plain round style="margin-top: 14px" @click="loadList(false)">
+      {{ t('news.more') }}
+    </van-button>
   </div>
 </template>

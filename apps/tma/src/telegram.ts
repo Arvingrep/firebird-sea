@@ -27,6 +27,9 @@ export function applyTheme(): void {
 
 export const getInitData = (): string => tg()?.initData || '';
 export const getStartParam = (): string | undefined => tg()?.initDataUnsafe?.start_param;
+// 个人中心展示用：头像/昵称来自 Telegram 用户资料（只读，不参与鉴权）
+export const getTgUser = (): { id: number; first_name?: string; last_name?: string; username?: string; photo_url?: string } | undefined =>
+  tg()?.initDataUnsafe?.user as never;
 export const openExternal = (url: string): void => {
   const app = tg();
   if (app) app.openLink(url);
