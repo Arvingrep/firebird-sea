@@ -11,14 +11,15 @@
 | 分支 | 作用 | 谁能进 | 部署到 |
 |---|---|---|---|
 | `main` | **生产**真源 | 只经 PR：`canary → main` 晋升，或 hotfix PR | manila / cebu（`targetRevision: main`，Image Updater 追 SHA） |
-| `canary` | **验收**集成分支 | 只经 PR：feature / agent PR → canary | firebird-canary（`targetRevision: canary`，tag `canary`） |
+| `canary` | **验收**集成分支 | 只经 PR：feature / agent PR → canary | firebird-canary（`targetRevision: canary`，Image Updater 追 `canary-<sha12>`） |
 | `feat/*` `agent/*` `chore/*` | 开发 | 作者 | 无 |
 
 ```
 feat/x ──PR──▶ canary ──(canary 环境验收)──PR──▶ main ──▶ manila / cebu
                  │                                  │
-        ci-gke: 推 :canary                  ci-gke: 推 :<sha40> + :latest
-        ArgoCD canary 自动同步              Image Updater 追 40 位 SHA → ArgoCD 同步
+        ci-gke: 推 :canary-<sha12>          ci-gke: 推 :<sha40> + :latest
+        Image Updater CR 追 canary-<sha12>  Image Updater 追 40 位 SHA → ArgoCD 同步
+        → ArgoCD 同步（合并即上线）
 ```
 
 ## 2. 镜像 tag（关键安全点）
@@ -30,7 +31,11 @@ feat/x ──PR──▶ canary ──(canary 环境验收)──PR──▶ mai
 
 **canary 构建绝不推 40 位 SHA tag**：Image Updater 只匹配 40 位 SHA，`canary*` 不会被选中，因此未验收的镜像不可能被滚进生产。不要把 canary 的 `image.tag` 改回 `latest`（main 构建也会推 `latest`，验收环境会吃到未验收的东西）。
 
-> ⚠ **已知缺口**：`canary` 是可变 tag（`imagePullPolicy: Always` 只在容器创建时拉取），新镜像推送后**不会自动滚动 Pod**——2026-10-10 就因此出现过 canary 停留在旧镜像、需要手动删 Pod 的情况，这违反 GitOps。后续应让 canary 也由 Image Updater 追 `canary-<sha12>`（不可变 tag）并写回 Git/ArgoCD，让滚动由 Git 变更触发。在此之前，canary 验收前先确认 Pod 的 imageID 与最新构建一致（只读：`kubectl describe pod`）。
+> ✅ **缺口已修复（2026-10-25）**：canary 现由 Image Updater v1.3 的 `ImageUpdater` CR 自动接管。PR 合并进 canary → CI 推 `canary-<sha12>` → updater 按 `allowTags: regexp:^canary-[0-9a-f]{12}$` + `updateStrategy: newest-build` 发现新镜像 → 写回 Application 的 helm 参数（`image.tag` / `api.image.tag` / `nginx.image.tag`）→ ArgoCD 自动同步滚动。**合并即上线，无需人工步骤。**
+>
+> 配置位于 ArgoCD 集群（`mac-mini-orbstack` / `argocd` ns）的 `ImageUpdater/firebird-canary` CR，与 `firebird-manila` CR 同构（manila 追 40 位 SHA，canary 追 `canary-<sha12>`，二者模式互不重叠，未验收镜像不可能滚进生产）。CR 状态验证：`kubectl --context mac-mini-orbstack -n argocd get imageupdaters` 应显示 firebird-canary Ready 且 `images_considered=3, errors=0`。
+>
+> ⚠ **两笔遗留债务**：① `Application/firebird-canary`（含其 helm 参数覆盖）是**手工 `kubectl apply` 的**，清单不在本仓库——重建集群时按 `argocd-image-updater` CR + 本节参数重建；② v1.3 控制器只认 `ImageUpdater` CR，**不再读 Application 上的旧式注解**，不要往 Application 上加 `argocd-image-updater.argoproj.io/*` 注解（无效）。
 
 ## 3. 分支保护
 
