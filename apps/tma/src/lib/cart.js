@@ -1,6 +1,14 @@
 // T4.3：购物车纯逻辑（Pinia store 的底座）。金额以"分"整数计算，展示时 /100 保留两位。
 const toCents = (price) => Math.round(Number(price) * 100);
 
+// 首图 → 160×160 缩略地址：仅接受 https 绝对地址；剥掉上游查询串后拼 GCS 实时缩放参数。
+// 非 https / 空数组 / 非法输入一律返回 null（模板渲染占位 emoji，不产生混合内容或注入面）。
+function toThumb(pics) {
+  const first = Array.isArray(pics) ? pics[0] : null;
+  if (typeof first !== 'string' || !first.startsWith('https://')) return null;
+  return first.split('?')[0] + '?x-image-process=image/resize,m_fill,w_160,h_160';
+}
+
 export function createCart() {
   let shopId = null;
   const lines = new Map(); // foodId -> { id, title, priceCents, qty }
@@ -21,8 +29,9 @@ export function createCart() {
       if (cur) cur.qty += 1;
       else lines.set(String(food.id), {
         id: String(food.id), title: food.title, priceCents, qty: 1,
-        // 首图缩略地址（上游 waimai:food 的 pics[0]，GCS 支持 x-image-process 实时缩放）；无图时为 null
-        pic: Array.isArray(food.pics) && food.pics[0] ? String(food.pics[0]).split('?')[0] + '?x-image-process=image/resize,m_fill,w_160,h_160' : null,
+        // 首图缩略地址（上游 waimai:food 的 pics[0]，GCS 支持 x-image-process 实时缩放）；无图/非 https 一律为 null，
+        // 非空 pic 必为可安全放进 <img src> 的 https 地址（QA 147 轮 2 minor）
+        pic: toThumb(food.pics),
       });
       return 'added';
     },
@@ -48,3 +57,4 @@ export function createCart() {
 }
 
 export const formatPhp = (cents) => `₱${(cents / 100).toFixed(2)}`;
+export const _toThumb = toThumb;

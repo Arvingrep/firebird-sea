@@ -48,5 +48,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health || exit 1
 
-# 启动前先跑数据库迁移（幂等：fbs_migrations 记账 + DDL IF NOT EXISTS）
-CMD ["sh", "-c", "node src/migrate.js && exec node src/server.js"]
+# 启动前先跑数据库迁移（幂等：fbs_migrations 记账 + DDL IF NOT EXISTS）。
+# DB 暂时不可达（如滚动期）时退避重试 3 次，仍失败才退出——避免瞬时抖动把整个 API 打崩循环重启（QA 147 轮 2 minor）
+CMD ["sh", "-c", "ok=0; for i in 1 2 3; do if node src/migrate.js; then ok=1; break; fi; echo \"migrate failed, retry $i/3\"; sleep 5; done; [ \"$ok\" = 1 ] && exec node src/server.js || { echo 'migrate failed after 3 attempts'; exit 1; }"]

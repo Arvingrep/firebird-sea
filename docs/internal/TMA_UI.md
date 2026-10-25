@@ -52,3 +52,11 @@ npm run build      # 产物
 - **[minor]** Maps key 构建期注入前端包（浏览器端 key 本就公开可见），**必须在 Google Cloud Console 给该 key 加 HTTP referrer 限制（只允许 canary.fbird.men / fbird.men）并仅启用 Maps JavaScript API + Places API**，防止盗用计费。
 - **[minor]** 用户联想选中后手动改写地址时清空 lat/lng；弹窗每次打开重建 Autocomplete 绑定。
 - **[minor]** 迁移并发：`migrate.js` 为幂等设计（DDL `IF NOT EXISTS` + `fbs_migrations` 记账），多副本滚动时并发执行安全；如未来引入非幂等迁移，需加 DB 锁或改 Helm pre-install hook（当前权衡：启动自动迁移优于人工步骤）。
+
+### 第 2 轮整改（QA 抓到假实现，2026-10-26）
+
+- **[blocker] 地址联想是假实现**：`addrInput` ref 从未绑定模板，且 van-field 的 ref 是组件实例不是原生 input——联想从未生效。已改为**弹窗容器 ref + `@opened` 事件 + `querySelector` 取第 3 个原生 `<input>`**（van-popup 内容动画期间 `nextTick` 取不到，必须用 `@opened`）。
+- **[major] 文档宣称的 CI 注入当时不存在**：Maps key 的 build-arg 在受保护路径上，拆出的 chore PR #148 **先于本 PR 合入 canary**，文档现已与事实一致。依赖顺序：#148（CI 注入）→ #147（消费 key）。
+- **[minor]** `Dockerfile.api` 迁移失败改为退避重试 3 次（间隔 5s）才退出，避免 DB 瞬时抖动引发容器循环重启。
+- **[minor]** 缩略图派生提为 `toThumb()`：仅接受 https 绝对地址，非法输入一律 null；新增 3 例单测（有图/无图/落车行），`<img @error>` 隐藏失败图。
+- **验证盲区再确认**：`.vue` 语法只有 `npm run build` 能抓；假实现（ref 未绑定）只有真实渲染才暴露——门禁的语法检查覆盖不了这两类，QA 的对抗审查是必要层。

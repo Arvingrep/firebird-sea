@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { showConfirmDialog, showToast } from 'vant';
 import { fb, i18n } from '../services';
 import { validateAddress } from '../lib/checkout.js';
@@ -19,12 +19,13 @@ async function load() {
     list.value = Array.isArray(info?.list) ? info.list : [];
   } catch { list.value = []; } finally { loading.value = false; }
 }
-function openForm(a?: Address) { form.value = a ? { ...a } : {}; errors.value = {}; editing.value = true; nextTick(() => attachAutocomplete()); }
+function openForm(a?: Address) { form.value = a ? { ...a } : {}; errors.value = {}; editing.value = true; }
 // 监视地址文本：用户在联想选中后手动改写地址时，坐标已与文本不符，必须清空（QA 147 轮 1 minor）
 function watchAddressManualEdit() {
-  if (addrInput.value && !addrInput.value.dataset.watch) {
-    addrInput.value.dataset.watch = '1';
-    addrInput.value.addEventListener('input', () => {
+  const el = addressNativeInput();
+  if (el && !el.dataset.watch) {
+    el.dataset.watch = '1';
+    el.addEventListener('input', () => {
       if (form.value.lat !== undefined || form.value.lng !== undefined) { delete form.value.lat; delete form.value.lng; }
     });
   }
@@ -49,9 +50,17 @@ const err = (k: string) => (errors.value[k] === 'REQUIRED' ? t('address.required
 
 // —— Google Places 地址联想（可选能力）：key 未注入或脚本加载失败时静默降级为纯手输 ——
 const MAPS_KEY = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
-const addrInput = ref<HTMLInputElement | null>(null);
+// van-field 的 ref 是组件实例而非原生 <input>，Google Places 需要原生元素：
+// 用弹窗容器 ref + querySelector 定位「详细地址」输入框（第 3 个 field），并在弹窗 @opened 后再绑定
+const popupWrap = ref<HTMLElement | null>(null);
 let autocomplete: any = null;
 let mapsListener: any = null;
+
+function addressNativeInput(): HTMLInputElement | null {
+  const inputs = popupWrap.value?.querySelectorAll<HTMLInputElement>('input') ?? [];
+  // 弹窗内 field 顺序：联系人 / 电话 / 详细地址
+  return inputs.length >= 3 ? inputs[2] : (inputs[inputs.length - 1] ?? null);
+}
 
 function loadMapsScript(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -65,12 +74,14 @@ function loadMapsScript(): Promise<void> {
   });
 }
 async function attachAutocomplete() {
-  if (!MAPS_KEY || !addrInput.value) return;
+  if (!MAPS_KEY) return;
+  const el = addressNativeInput();
+  if (!el) return;
   try {
     await loadMapsScript();
-    // 弹窗每次打开都会重建 input 元素（v-if/重挂载），旧实例绑定的 DOM 已销毁——必须重建并重绑（QA 147 轮 1 minor）
+    // 弹窗每次打开都会重建 input 元素，旧实例绑定的 DOM 已销毁——必须重建并重绑（QA 147 轮 1 minor）
     if (autocomplete) { if (mapsListener) mapsListener.remove(); autocomplete = null; }
-    autocomplete = new (window as any).google.maps.places.Autocomplete(addrInput.value, {
+    autocomplete = new (window as any).google.maps.places.Autocomplete(el, {
       fields: ['formatted_address', 'geometry'],
       // 菲律宾为主营区域，限制过窄会漏掉跨境地址，这里只做偏好不做硬约束
       componentRestrictions: undefined,
@@ -106,18 +117,16 @@ onMounted(load);
       </div>
       <van-button block round type="primary" @click="openForm()">{{ t('address.add') }}</van-button>
     </template>
-    <van-popup v-model:show="editing" position="bottom" round>
-      <van-cell-group>
-        <van-field v-model="form.person" :label="t('address.person')" :error-message="err('person')" maxlength="50" />
-        <van-field v-model="form.tel" :label="t('address.tel')" :error-message="err('tel')" maxlength="20" />
-        <van-field v-model="form.address" :label="t('address.detail')" :error-message="err('address')" maxlength="200">
-          <template #left-icon>
-            <span v-if="MAPS_KEY" class="addr-hint">📍</span>
-          </template>
-        </van-field>
-        <div v-if="MAPS_KEY" class="addr-tip">{{ t('address.mapsTip') }}</div>
-      </van-cell-group>
-      <van-button block type="primary" @click="save">{{ t('address.save') }}</van-button>
+    <van-popup v-model:show="editing" position="bottom" round @opened="attachAutocomplete">
+      <div ref="popupWrap">
+        <van-cell-group>
+          <van-field v-model="form.person" :label="t('address.person')" :error-message="err('person')" maxlength="50" />
+          <van-field v-model="form.tel" :label="t('address.tel')" :error-message="err('tel')" maxlength="20" />
+          <van-field v-model="form.address" :label="t('address.detail')" :error-message="err('address')" maxlength="200" />
+          <div v-if="MAPS_KEY" class="addr-tip">{{ t('address.mapsTip') }}</div>
+        </van-cell-group>
+        <van-button block type="primary" @click="save">{{ t('address.save') }}</van-button>
+      </div>
     </van-popup>
   </div>
 </template>
