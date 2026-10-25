@@ -34,3 +34,14 @@ npx tsc --noEmit   # 类型
 npm test           # node --test，29 例
 npm run build      # 产物
 ```
+
+## 地址选择与购物车图片（2026-10-26 追加）
+
+- **地址联想**：`Addresses.vue` 动态加载 Google Maps JS（`libraries=places`，`language=zh-CN&region=PH`），输入详细地址时给出联想候选，选中自动回填 `formatted_address` 与 `lat/lng`（上游 `operAddress` 白名单本来就收 `lat/lng`）。Key 经 `VITE_GOOGLE_MAPS_API_KEY` 构建期注入（CI secret `GOOGLE_MAPS_API_KEY` → `Dockerfile.api` ARG）；**key 缺失或脚本加载失败时静默降级为纯手输，不阻塞主流程**。CSP 已放行 `maps.googleapis.com` / `maps.gstatic.com`。
+- **登录失效文案**：任何 catch 到含 "reopen" 的错误一律显示 `auth.reopen`（中英双语），不再裸抛英文串。
+- **购物车缩略图**：上游 `waimai:food` 的 `pics[0]` 经 GCS `x-image-process` 缩到 160×160（`lib/cart.js` add 时裁剪查询参数后拼接），无图显示占位 emoji；`img-src https:` CSP 已允许。
+
+## 部署链路配套（同批修复）
+
+- `Dockerfile.api` 现在打包 `services/api/migrations/` 并在容器启动时先执行 `node src/migrate.js`（幂等：`fbs_migrations` 记账 + DDL `IF NOT EXISTS`）。**新环境缺表导致登录 502 的缺陷（2026-10-26 canary 实测）由此根治**。
+- `server.js` 已挂 `express.urlencoded({extended:true})`——TMA 前端 `fbClient.post` 全部走表单编码，缺它则所有写接口 body 为空。
