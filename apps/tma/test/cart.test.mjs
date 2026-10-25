@@ -53,3 +53,25 @@ test('i18n：默认中文，切换英文，缺失回退，两种语言 key 一�
   assert.strictEqual(i.lang, 'en');
   assert.deepStrictEqual([...EN_KEYS].sort(), [...MESSAGE_KEYS].sort());
 });
+
+// —— QA 147 轮 2：缩略图派生规则（有图 / 无图 / 非法输入 / 带查询参数）——
+import { _toThumb as toThumb } from '../src/lib/cart.js';
+
+test('toThumb：https 有图剥查询串并拼 160 缩放参数', () => {
+  const u = 'https://storage.googleapis.com/bkt/waimai/a.jpg?x-image-process=image/resize,w_4096';
+  assert.strictEqual(toThumb([u]), 'https://storage.googleapis.com/bkt/waimai/a.jpg?x-image-process=image/resize,m_fill,w_160,h_160');
+});
+test('toThumb：无图 / 空数组 / http 明文 / 非字符串 一律 null', () => {
+  assert.strictEqual(toThumb(undefined), null);
+  assert.strictEqual(toThumb([]), null);
+  assert.strictEqual(toThumb(['http://example.com/a.jpg']), null);
+  assert.strictEqual(toThumb([42]), null);
+});
+test('toThumb：pic 落进购物车行（add 后可读）', () => {
+  const c = createCart();
+  c.add(1, { id: 9, title: 'X', price: '10', pics: ['https://storage.googleapis.com/bkt/p.png'] });
+  assert.match(c.items()[0].pic, /^https:\/\/storage\.googleapis\.com\/bkt\/p\.png\?x-image-process/);
+  const c2 = createCart();
+  c2.add(1, { id: 9, title: 'X', price: '10' });
+  assert.strictEqual(c2.items()[0].pic, null);
+});

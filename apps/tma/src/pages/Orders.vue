@@ -20,6 +20,7 @@ async function load() {
     orders.value = Array.isArray(info?.list) ? info.list : [];
   } catch { failed.value = true; } finally { loading.value = false; }
 }
+const friendly = (e: any) => (/reopen/i.test(e?.message || '') ? t('auth.reopen') : (e?.message || ''));
 const label = (s: number | string) => t(`state.${(ORDER_STATE as Record<string, string>)[String(s)] || 'pending'}`);
 const stateClass = (s: number | string) => {
   const k = (ORDER_STATE as Record<string, string>)[String(s)] || 'pending';
@@ -31,7 +32,7 @@ async function cancel(o: Order) {
     await fb.post('waimai', 'cancelOrder', { id: o.id });
     showToast(t('orders.cancelled'));
     await load();
-  } catch (e: any) { if (e && e.message) showToast(e.message); }
+  } catch (e: any) { const m = friendly(e); if (m) showToast(m); }
 }
 onMounted(load);
 </script>
