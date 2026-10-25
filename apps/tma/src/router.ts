@@ -14,6 +14,7 @@ const router = createRouter({
     { path: '/orders', name: 'orders', component: () => import('./pages/Orders.vue') },
     { path: '/orders/:id(\\d+)', name: 'order-detail', component: () => import('./pages/OrderDetail.vue'), props: true },
     { path: '/cart', name: 'cart', component: () => import('./pages/Cart.vue') },
+    { path: '/profile', name: 'profile', component: () => import('./pages/Profile.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 });

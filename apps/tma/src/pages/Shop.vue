@@ -64,11 +64,15 @@ onMounted(load);
         <van-tab v-for="ty in types" :key="ty.id" :title="ty.title" />
       </van-tabs>
       <van-empty v-if="visible.length === 0" :description="t('menu.empty')" />
-      <van-cell v-for="f in visible" :key="f.id" :title="f.title" :label="money(f.price)">
-        <template #right-icon>
-          <van-button size="mini" type="primary" @click="addFood(f)">{{ t('cart.add') }}</van-button>
-        </template>
-      </van-cell>
+      <div class="fbs-card" style="margin-top: 12px">
+        <div v-for="f in visible" :key="f.id" class="cart-line">
+          <div class="t">
+            <div>{{ f.title }}</div>
+            <div class="p">{{ money(f.price) }}</div>
+          </div>
+          <van-button size="small" round type="primary" @click="addFood(f)">＋ {{ t('cart.add') }}</van-button>
+        </div>
+      </div>
     </template>
     <van-submit-bar
       v-if="cart.count"
