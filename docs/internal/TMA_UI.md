@@ -60,3 +60,10 @@ npm run build      # 产物
 - **[minor]** `Dockerfile.api` 迁移失败改为退避重试 3 次（间隔 5s）才退出，避免 DB 瞬时抖动引发容器循环重启。
 - **[minor]** 缩略图派生提为 `toThumb()`：仅接受 https 绝对地址，非法输入一律 null；新增 3 例单测（有图/无图/落车行），`<img @error>` 隐藏失败图。
 - **验证盲区再确认**：`.vue` 语法只有 `npm run build` 能抓；假实现（ref 未绑定）只有真实渲染才暴露——门禁的语法检查覆盖不了这两类，QA 的对抗审查是必要层。
+
+### 第 3 轮整改（2026-10-26）
+
+- **[major]** `.pac-container`（联想下拉）默认 z-index 1000 < van-popup 2000+，会被弹窗盖住——已加全局 `.pac-container{z-index:3000!important}`。（QA 自评"凭了解判断、未渲染验证"——本轮实测间接证实：Vant 默认 z-index 确实 2000+，规则为防御性修复，真机待用户验收。）
+- **[minor]** 坐标一致性监听改为弹窗 `@opened` 时**无条件挂载**，不再依赖 Maps 脚本加载成功。
+- **[minor]** 重建 Autocomplete 前 `clearInstanceListeners` + 移除残留 `.pac-container` DOM，防多次开关累积。
+- **[minor·实测裁决]** `x-image-process` 参数当前被 GCS 忽略：`w_4096` / `w_160` / 不带参数三种请求字节数**完全一致**（874KB 原图）。上游 pics 自带该参数说明处理代理在规划中——缩略参数保留（代理接入即生效），现状由 56px 显示尺寸 + `loading=lazy` + `@error` 兜底，文档不再声称"GCS 支持"。

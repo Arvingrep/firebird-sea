@@ -79,8 +79,13 @@ async function attachAutocomplete() {
   if (!el) return;
   try {
     await loadMapsScript();
-    // 弹窗每次打开都会重建 input 元素，旧实例绑定的 DOM 已销毁——必须重建并重绑（QA 147 轮 1 minor）
-    if (autocomplete) { if (mapsListener) mapsListener.remove(); autocomplete = null; }
+    // 弹窗每次打开都会重建 input 元素，旧实例绑定的 DOM 已销毁——先清光旧实例的监听与候选下拉 DOM 再重建（QA 147 轮 3 minor）
+    if (autocomplete) {
+      if (mapsListener) mapsListener.remove();
+      try { (window as any).google.maps.event.clearInstanceListeners(autocomplete); } catch { /* 老实例已失效 */ }
+      autocomplete = null;
+      document.querySelectorAll('.pac-container').forEach((n) => n.remove());
+    }
     autocomplete = new (window as any).google.maps.places.Autocomplete(el, {
       fields: ['formatted_address', 'geometry'],
       // 菲律宾为主营区域，限制过窄会漏掉跨境地址，这里只做偏好不做硬约束
@@ -93,9 +98,10 @@ async function attachAutocomplete() {
       form.value.lat = String(p.geometry.location.lat());
       form.value.lng = String(p.geometry.location.lng());
     });
-    watchAddressManualEdit();
   } catch { /* 无 key / 加载失败：保持纯手输，不阻塞主流程 */ }
 }
+// 弹窗打开：先无条件挂坐标一致性监听（不依赖 Maps 是否可用——QA 147 轮 3 minor），再尝试联想
+function onPopupOpened() { watchAddressManualEdit(); attachAutocomplete(); }
 onBeforeUnmount(() => { if (mapsListener) mapsListener.remove(); });
 onMounted(load);
 </script>
@@ -117,7 +123,7 @@ onMounted(load);
       </div>
       <van-button block round type="primary" @click="openForm()">{{ t('address.add') }}</van-button>
     </template>
-    <van-popup v-model:show="editing" position="bottom" round @opened="attachAutocomplete">
+    <van-popup v-model:show="editing" position="bottom" round @opened="onPopupOpened">
       <div ref="popupWrap">
         <van-cell-group>
           <van-field v-model="form.person" :label="t('address.person')" :error-message="err('person')" maxlength="50" />
