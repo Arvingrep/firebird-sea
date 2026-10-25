@@ -19,7 +19,11 @@ export function createCart() {
       shopId = String(shop);
       const cur = lines.get(String(food.id));
       if (cur) cur.qty += 1;
-      else lines.set(String(food.id), { id: String(food.id), title: food.title, priceCents, qty: 1 });
+      else lines.set(String(food.id), {
+        id: String(food.id), title: food.title, priceCents, qty: 1,
+        // 首图缩略地址（上游 waimai:food 的 pics[0]，GCS 支持 x-image-process 实时缩放）；无图时为 null
+        pic: Array.isArray(food.pics) && food.pics[0] ? String(food.pics[0]).split('?')[0] + '?x-image-process=image/resize,m_fill,w_160,h_160' : null,
+      });
       return 'added';
     },
     switchShop(shop, food) {

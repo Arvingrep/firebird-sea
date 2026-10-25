@@ -33,6 +33,10 @@ if (process.env.TRUST_PROXY_HOPS) app.set('trust proxy', Number(process.env.TRUS
 // M4：CORS 白名单（逗号分隔 origin）；未配置时保持原行为，避免破坏既有调用方
 const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
 app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
+// urlencoded 与 json 必须同时挂：TMA 前端 fbClient.post 走 application/x-www-form-urlencoded
+// （fbClient.js:57），缺 urlencoded 时 req.body 恒为 {}，所有写接口（地址/下单/取消）字段全部丢失，
+// 上游只会回「请输入联系人」一类误导性错误（2026-10-26 canary 实测）。
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // AD-9：Node 路由统一挂在 /tg-api，/api 前缀留给火鸟 PHP（含 /api/payment/notify.php）
@@ -171,8 +175,8 @@ if (fbUpstream) {
 const tmaStaticDir = process.env.TMA_STATIC_DIR;
 if (tmaStaticDir && require('node:fs').existsSync(tmaStaticDir)) {
   // CSP：脚本只允许自身与 Telegram 官方脚本；只允许被 Telegram 内嵌；连接仅限同源（代理）
-  const TMA_CSP = "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: https:; connect-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org; base-uri 'self'";
+  const TMA_CSP = "default-src 'self'; script-src 'self' https://telegram.org https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://maps.googleapis.com; " +
+    "img-src 'self' data: https:; connect-src 'self' https://maps.googleapis.com; frame-ancestors https://web.telegram.org https://*.telegram.org; base-uri 'self'";
   app.use('/tma', (req, res, next) => {
     res.setHeader('Content-Security-Policy', TMA_CSP);
     res.setHeader('X-Content-Type-Options', 'nosniff');

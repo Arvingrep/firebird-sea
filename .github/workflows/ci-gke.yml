@@ -62,6 +62,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: 4. 构建并推送镜像至 Google Artifact Registry (GAR)
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           GCP_PROJECT="${{ vars.GCP_PROJECT_ID || 'fh580-70533' }}"
           SHA="${{ github.sha }}"
@@ -124,6 +126,7 @@ jobs:
           echo "🚀 构建业务 API 镜像: $API_IMAGE_TAG ..."
           docker buildx build --push \
             --platform linux/amd64 \
+            --build-arg VITE_GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-}" \
             --cache-from type=gha,scope=firebird-api \
             --cache-from type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:buildcache" \
             --cache-from "$API_IMAGE_LATEST" \

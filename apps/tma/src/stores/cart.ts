@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { createCart } from '../lib/cart.js';
 
-export interface Food { id: string | number; title: string; price: string | number }
+export interface Food { id: string | number; title: string; price: string | number; pics?: string[] }
 
 // Pinia 外壳：纯逻辑在 lib/cart.js（可被 node:test 直接测试），这里只做响应式桥接。
 export const useCartStore = defineStore('cart', () => {
