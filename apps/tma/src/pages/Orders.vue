@@ -21,7 +21,6 @@ async function load() {
   } catch { failed.value = true; } finally { loading.value = false; }
 }
 const friendly = (e: any) => (/reopen/i.test(e?.message || '') ? t('auth.reopen') : (e?.message || ''));
-}
 const label = (s: number | string) => t(`state.${(ORDER_STATE as Record<string, string>)[String(s)] || 'pending'}`);
 const stateClass = (s: number | string) => {
   const k = (ORDER_STATE as Record<string, string>)[String(s)] || 'pending';

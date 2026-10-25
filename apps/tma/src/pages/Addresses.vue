@@ -20,6 +20,15 @@ async function load() {
   } catch { list.value = []; } finally { loading.value = false; }
 }
 function openForm(a?: Address) { form.value = a ? { ...a } : {}; errors.value = {}; editing.value = true; nextTick(() => attachAutocomplete()); }
+// 监视地址文本：用户在联想选中后手动改写地址时，坐标已与文本不符，必须清空（QA 147 轮 1 minor）
+function watchAddressManualEdit() {
+  if (addrInput.value && !addrInput.value.dataset.watch) {
+    addrInput.value.dataset.watch = '1';
+    addrInput.value.addEventListener('input', () => {
+      if (form.value.lat !== undefined || form.value.lng !== undefined) { delete form.value.lat; delete form.value.lng; }
+    });
+  }
+}
 async function save() {
   errors.value = validateAddress(form.value);
   if (Object.keys(errors.value).length) return;
@@ -56,9 +65,11 @@ function loadMapsScript(): Promise<void> {
   });
 }
 async function attachAutocomplete() {
-  if (!MAPS_KEY || !addrInput.value || autocomplete) return;
+  if (!MAPS_KEY || !addrInput.value) return;
   try {
     await loadMapsScript();
+    // 弹窗每次打开都会重建 input 元素（v-if/重挂载），旧实例绑定的 DOM 已销毁——必须重建并重绑（QA 147 轮 1 minor）
+    if (autocomplete) { if (mapsListener) mapsListener.remove(); autocomplete = null; }
     autocomplete = new (window as any).google.maps.places.Autocomplete(addrInput.value, {
       fields: ['formatted_address', 'geometry'],
       // 菲律宾为主营区域，限制过窄会漏掉跨境地址，这里只做偏好不做硬约束
@@ -71,6 +82,7 @@ async function attachAutocomplete() {
       form.value.lat = String(p.geometry.location.lat());
       form.value.lng = String(p.geometry.location.lng());
     });
+    watchAddressManualEdit();
   } catch { /* 无 key / 加载失败：保持纯手输，不阻塞主流程 */ }
 }
 onBeforeUnmount(() => { if (mapsListener) mapsListener.remove(); });
