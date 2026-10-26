@@ -185,3 +185,23 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **反查只用主地址**（E2E 发现）：查询串曾拼上 `address`（含补充项），Google 对
   「Robinsons Place Manila，Level 3 near cinema」返回 `partial_match=true` → 被精度门槛拒绝 → 仍存不下。
   现改为「`street` + 分站城市名」→ 失败再试 `street` 单串；补充项/备注只影响展示，不参与 geocode。
+
+## 视觉系统 v2 —— 对齐主流外卖平台（2026-10-26）
+
+- **设计令牌重写**（style.css）：暖米底 `#F7F6F4`、卡片白底大圆角（14/18/22/28）、双层柔和阴影、
+  品牌渐变 `#FF9A4A→#EE3C08`、价格红 `--price`、金星级 `--gold`；暗色主题只换表面并提亮一档。
+- **自绘组件替代 Vant 默认皮肤**：AppIcon（内联 SVG 图标库，23 个线性图标，不依赖字体）、
+  自绘底部 tabbar（毛玻璃 + 激活品牌色 pill + 购物车角标）、悬浮深色结算条 `.cartbar`
+  （半透明近黑 94% + 模糊 + 白字 + 渐变按钮）。Vant 只保留 Loading/Field/Popup 三个必要组件，
+  包体从全量引入显著下降。
+- **首页**：渐变头部（定位 + 按时段问候 + 语言切换）→ 白色悬浮搜索框（本地过滤商家/菜品）→
+  三枚服务亮点 → 品类 pills（取自商家 typename）→ 排序 pills（评分/销量/起送，客户端排序）→
+  **图片优先商家卡**（16:9 封面 + 营业中/送达时长玻璃角标 + 封面店名叠字 + ★评分/月售/起送/配送费 + 优惠 tag）。
+- **店铺页**：封面 hero + 返回玻璃钮 → 叠加信息卡（名称/简介/评分·月售·送达·配送费四格/地址营业时间）→
+  吸顶品类 pills → 分类分组菜品行（价格/划线原价/月售/圆形加购钮，加购后变步进器）→ 悬浮结算条。
+- **其余页面统一**：购物车（账单卡 + 悬浮结算条）、结算（地址单选卡/商品清单/备注/账单）、
+  订单（状态 chip + 金额 + 操作钮）、我的（渐变头部 + 三格统计 + 服务列表）、资讯（分类 pills + 卡片流）。
+- **配套接口**：`waimai::shopList` 输出补 `star`、`sale`（SQL 本就查出，仅未透出），供首页评分/销量展示。
+- **截图验收流程**：vite build → /tmp 预览目录注入 mock fetch（固定数据 + 假 Telegram WebApp）→
+  puppeteer-core 驱动本机 Chrome 以 390×844@2x 视口逐页截图检查。注意 macOS headless `--window-size`
+  实际最小视口约 470px， CLI 截图不可信，必须用 CDP 设备模拟。

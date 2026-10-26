@@ -2,12 +2,12 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showConfirmDialog, showToast } from 'vant';
-import { fb, i18n } from '../services';
+import { fb, t } from '../services';
 import { ORDER_STATE, isCancellable } from '../lib/checkout.js';
+import AppIcon from '../components/AppIcon.vue';
 
-interface Order { id: string; ordernum: string; shopname?: string; amount?: string; state: number | string }
+interface Order { id: string; ordernum: string; shopname?: string; amount?: string; state: number | string; addtime?: string; food?: any[] }
 const router = useRouter();
-const t = (k: string) => i18n.t(k);
 const orders = ref<Order[]>([]);
 const loading = ref(true);
 const failed = ref(false);
@@ -21,10 +21,11 @@ async function load() {
   } catch { failed.value = true; } finally { loading.value = false; }
 }
 const friendly = (e: any) => (/reopen/i.test(e?.message || '') ? t('auth.reopen') : (e?.message || ''));
-const label = (s: number | string) => t(`state.${(ORDER_STATE as Record<string, string>)[String(s)] || 'pending'}`);
-const stateClass = (s: number | string) => {
-  const k = (ORDER_STATE as Record<string, string>)[String(s)] || 'pending';
-  return k === 'done' || k === 'cancelled' ? `state ${k}` : 'state';
+const stateKey = (s: number | string) => (ORDER_STATE as Record<string, string>)[String(s)] || 'pending';
+const label = (s: number | string) => t(`state.${stateKey(s)}`);
+const chipClass = (s: number | string) => {
+  const k = stateKey(s);
+  return k === 'done' ? 'chip chip--ok' : k === 'cancelled' ? 'chip chip--mute' : 'chip';
 };
 async function cancel(o: Order) {
   try {
@@ -39,33 +40,39 @@ onMounted(load);
 
 <template>
   <div class="page">
-    <van-loading v-if="loading" vertical>{{ t('common.loading') }}</van-loading>
+    <div class="nav"><span class="title">{{ t('orders.title') }}</span></div>
 
-    <div v-else-if="failed" class="fbs-error">
+    <div v-if="loading" class="state"><van-loading vertical>{{ t('common.loading') }}</van-loading></div>
+
+    <div v-else-if="failed" class="state">
+      <div class="emoji">😵</div>
       <p class="msg">{{ t('shop.loadFailed') }}</p>
-      <van-button size="small" round @click="load">{{ t('common.retry') }}</van-button>
+      <button class="btn btn--primary" @click="load">{{ t('common.retry') }}</button>
+    </div>
+
+    <div v-else-if="orders.length === 0" class="state">
+      <div class="emoji">🧾</div>
+      <p class="msg">{{ t('orders.empty') }}</p>
+      <button class="btn btn--ghost" @click="router.push('/')">{{ t('cart.goShopping') }}</button>
     </div>
 
     <template v-else>
-      <van-empty v-if="orders.length === 0" :description="t('orders.empty')" />
-      <div
-        v-for="o in orders"
-        :key="o.id"
-        class="fbs-card order-card"
-        @click="router.push({ name: 'order-detail', params: { id: o.id } })"
-      >
-        <div class="row1">
+      <article v-for="o in orders" :key="o.id" class="order" @click="router.push({ name: 'order-detail', params: { id: o.id } })">
+        <div class="top">
           <span class="shop">{{ o.shopname || t('orders.title') }}</span>
-          <span :class="stateClass(o.state)">{{ label(o.state) }}</span>
+          <span :class="chipClass(o.state)">{{ label(o.state) }}</span>
         </div>
-        <div class="row2">
-          <span>#{{ o.ordernum }}</span>
-          <span class="amount">₱{{ Number(o.amount || 0).toFixed(2) }}</span>
+        <div class="mid">
+          <span class="num">#{{ o.ordernum }}</span>
+          <span class="amt">₱{{ Number(o.amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}</span>
         </div>
-        <div v-if="isCancellable(o.state)" class="row2" style="justify-content: flex-end">
-          <van-button size="mini" plain round type="danger" @click.stop="cancel(o)">{{ t('orders.cancel') }}</van-button>
+        <div v-if="isCancellable(o.state)" class="acts">
+          <button class="btn btn--ghost" @click.stop="cancel(o)">{{ t('orders.cancel') }}</button>
+          <button class="btn btn--dark" @click.stop="router.push({ name: 'order-detail', params: { id: o.id } })">
+            {{ t('orders.detail') }}<AppIcon name="chevron-right" :size="14" />
+          </button>
         </div>
-      </div>
+      </article>
     </template>
   </div>
 </template>

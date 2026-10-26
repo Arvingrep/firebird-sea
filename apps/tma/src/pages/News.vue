@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { fb, i18n } from '../services';
+import { fb, t } from '../services';
+import AppIcon from '../components/AppIcon.vue';
 
 interface Cat { id: string | number; typename: string }
-interface Article { id: string; title: string; litpic?: string; pubdate?: number | string; description?: string }
+interface Article { id: string; title: string; litpic?: string; pubdate?: number | string; description?: string; source?: string }
 const router = useRouter();
-const t = (k: string) => i18n.t(k);
 const cats = ref<Cat[]>([]);
 const active = ref(0);
 const list = ref<Article[]>([]);
@@ -28,15 +28,15 @@ async function loadList(reset: boolean) {
     const total = Number(info?.pageInfo?.totalPage || 1);
     finished.value = page.value >= total || rows.length === 0;
     page.value += 1;
-  } catch (e) {
+  } catch {
     failed.value = true;
   } finally {
     loading.value = false;
   }
 }
 
-// 首次进入时默认分类可能没有内容（如本地新闻为空）：探测一次，自动切到第一个有文章的分类，
-// 避免用户一进资讯页看到空白；用户之后手动切回空分类时不做任何干预。
+// 首次进入时默认分类可能没有内容：探测一次，自动切到第一个有文章的分类，
+// 避免一进资讯页就是空白；用户之后手动点空分类时不做干预。
 async function pickFirstNonEmpty() {
   for (let i = 0; i < cats.value.length; i += 1) {
     if (i === active.value) continue;
@@ -56,38 +56,55 @@ onMounted(async () => {
   if (!failed.value && list.value.length === 0) await pickFirstNonEmpty();
 });
 watch(active, () => loadList(true));
-const date = (v?: number | string) => (v ? new Date(Number(v) * 1000).toLocaleDateString('zh-CN') : '');
+const date = (v?: number | string) => (v ? new Date(Number(v) * 1000).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : '');
 </script>
 
 <template>
   <div class="page">
-    <van-tabs v-if="cats.length" v-model:active="active" shrink>
-      <van-tab v-for="c in cats" :key="c.id" :title="c.typename" />
-    </van-tabs>
+    <div class="nav"><span class="title">{{ t('nav.news') }}</span></div>
 
-    <van-empty v-if="!loading && !failed && list.length === 0" :description="t('news.empty')" />
-
-    <div v-else-if="!loading && !failed" class="fbs-card" style="margin-top: 12px">
-      <div
-        v-for="a in list"
-        :key="a.id"
-        class="news-item"
-        @click="router.push({ name: 'news-detail', params: { id: a.id } })"
-      >
-        <div class="title">{{ a.title }}</div>
-        <div class="date">{{ date(a.pubdate) }}</div>
-      </div>
+    <div v-if="cats.length" class="pills" style="margin-top: 4px">
+      <button
+        v-for="(c, i) in cats"
+        :key="c.id"
+        class="pill"
+        :class="{ 'is-active': active === i }"
+        @click="active = i"
+      >{{ c.typename }}</button>
     </div>
 
-    <van-loading v-if="loading" vertical>{{ t('common.loading') }}</van-loading>
+    <div v-if="loading" class="state"><van-loading vertical>{{ t('common.loading') }}</van-loading></div>
 
-    <div v-if="failed" class="fbs-error">
+    <div v-else-if="failed" class="state">
+      <div class="emoji">📭</div>
       <p class="msg">{{ t('news.loadFailed') }}</p>
-      <van-button size="small" round @click="loadList(page === 1)">{{ t('common.retry') }}</van-button>
+      <button class="btn btn--primary" @click="loadList(page === 1)">{{ t('common.retry') }}</button>
     </div>
 
-    <van-button v-else-if="!loading && !finished" block plain round style="margin-top: 14px" @click="loadList(false)">
-      {{ t('news.more') }}
-    </van-button>
+    <div v-else-if="list.length === 0" class="state">
+      <div class="emoji">📰</div>
+      <p class="msg">{{ t('news.empty') }}</p>
+    </div>
+
+    <template v-else>
+      <div style="margin-top: 14px">
+        <article
+          v-for="a in list"
+          :key="a.id"
+          class="news"
+          @click="router.push({ name: 'news-detail', params: { id: a.id } })"
+        >
+          <div class="main">
+            <div class="t">{{ a.title }}</div>
+            <div class="d"><AppIcon name="clock" :size="12" />{{ date(a.pubdate) }}<template v-if="a.source"> · {{ a.source }}</template></div>
+          </div>
+          <img v-if="a.litpic" class="pic" :src="a.litpic" alt="" loading="lazy" />
+        </article>
+      </div>
+
+      <button v-if="!finished" class="btn btn--ghost" style="width: 100%; margin-top: 16px" @click="loadList(false)">
+        {{ t('news.more') }}
+      </button>
+    </template>
   </div>
 </template>
