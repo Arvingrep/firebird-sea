@@ -8,7 +8,15 @@
 const { createMemoryIdempotencyStore } = require('./sharedState');
 
 const WHITELIST = Object.freeze({
-  'waimai:shopList': { auth: 'anonymous' },
+  // shopList：首页搜索/筛选/分页。参数白名单刻意排除三个注入面——
+  //   ids（直接拼进 `AND s.id in (...)`）、lng/lat（拼进 SQL 数学表达式）、cityid（getCityId 内部处理）。
+  // keywords 会落进 `LIKE '%$keywords%'`，由上游 ajax.php 的 addslashes 兜底；这里只允许标量字符串。
+  'waimai:shopList': {
+    auth: 'anonymous',
+    params: ['page', 'pageSize', 'keywords', 'orderby', 'typeid', 'filter', 'deliver', 'yingye',
+      'recBrand', 'youhui', 'fullHui', 'freePei', 'firstDel', 'timeZhe'],
+  },
+  'waimai:shopType': { auth: 'anonymous', params: ['nav'] },
   'waimai:storeDetail': { auth: 'anonymous' },
   'waimai:food': { auth: 'anonymous' },
   'waimai:foodType': { auth: 'anonymous' },

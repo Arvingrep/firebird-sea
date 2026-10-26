@@ -22,10 +22,11 @@ test('白名单外的 service+action 返回 403 且不转发', async () => {
   assert.strictEqual(calls.length, 0);
 });
 
-test('首轮白名单仅含 7 个纯展示接口，且全部匿名', () => {
+test('展示类白名单：8 个匿名只读接口，shopList/shopType 声明参数白名单', () => {
   const anon = Object.entries(WHITELIST).filter(([, r]) => r.auth === 'anonymous').map(([k]) => k).sort();
   assert.deepStrictEqual(anon, [
-    'article:alist', 'article:detail', 'article:type', 'waimai:food', 'waimai:foodType', 'waimai:shopList', 'waimai:storeDetail',
+    'article:alist', 'article:detail', 'article:type', 'waimai:food', 'waimai:foodType',
+    'waimai:shopList', 'waimai:shopType', 'waimai:storeDetail',
   ]);
   const member = Object.entries(WHITELIST).filter(([, r]) => r.auth === 'member').map(([k]) => k).sort();
   assert.deepStrictEqual(member, [
@@ -33,7 +34,39 @@ test('首轮白名单仅含 7 个纯展示接口，且全部匿名', () => {
   ]);
   assert.strictEqual(WHITELIST['article:orderDetail'], undefined);
   for (const [k, r] of Object.entries(WHITELIST)) if (r.auth === 'member') assert.ok(Array.isArray(r.params), `${k} 必须声明参数白名单`);
+  // 首页搜索开始透传 keywords，必须走白名单；同时挡住三个注入面
+  assert.ok(Array.isArray(WHITELIST['waimai:shopList'].params), 'shopList 必须声明参数白名单');
+  for (const bad of ['ids', 'lng', 'lat', 'cityid', 'u']) {
+    assert.ok(!WHITELIST['waimai:shopList'].params.includes(bad), `shopList 不得透传 ${bad}`);
+  }
   assert.strictEqual(WHITELIST['waimai:deal'].idempotent, true);
+});
+
+test('shopList 只透传搜索/分页/筛选参数，注入面参数被丢弃', async () => {
+  const { p, calls } = proxyWith();
+  const r = await p.handle({
+    service: 'waimai', action: 'shopList',
+    query: { page: '2', pageSize: '20', keywords: '鸡排', orderby: '2', typeid: '7', ids: '1,2,3', lng: '121', lat: '31', cityid: '5', u: '9' },
+  });
+  assert.strictEqual(r.status, 200);
+  const url = new URL(calls[0].url);
+  assert.strictEqual(url.searchParams.get('page'), '2');
+  assert.strictEqual(url.searchParams.get('pageSize'), '20');
+  assert.strictEqual(url.searchParams.get('keywords'), '鸡排');
+  assert.strictEqual(url.searchParams.get('orderby'), '2');
+  assert.strictEqual(url.searchParams.get('typeid'), '7');
+  for (const bad of ['ids', 'lng', 'lat', 'cityid', 'u']) {
+    assert.strictEqual(url.searchParams.get(bad), null, `${bad} 不得转发`);
+  }
+});
+
+test('shopType 匿名可读，只透传 nav', async () => {
+  const { p, calls } = proxyWith();
+  const r = await p.handle({ service: 'waimai', action: 'shopType', query: { nav: '1', userkey: 'x' } });
+  assert.strictEqual(r.status, 200);
+  const url = new URL(calls[0].url);
+  assert.strictEqual(url.searchParams.get('nav'), '1');
+  assert.strictEqual(url.searchParams.get('userkey'), null);
 });
 
 test('身份与旁路参数被剥离，不带客户端 Cookie，强制 platform_name=tma', async () => {
