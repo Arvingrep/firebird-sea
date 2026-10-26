@@ -84,6 +84,12 @@
       name: firebird-storage-secret
       key: resend-key
       optional: true
+- name: GOOGLE_MAPS_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: firebird-storage-secret
+      key: google-maps-api-key
+      optional: true
 {{- end -}}
 
 {{- /* init 容器：播种 data/ 与配置 PVC 三方同步（脚本来自 ConfigMap firebird-init-<site>） */ -}}
