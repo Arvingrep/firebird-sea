@@ -36,6 +36,19 @@ for stmt in statements:
             break
     if is_valid:
         converted = stmt_strip.replace("`hn_", "`huoniao_")
+
+        # 合并表（MRG_MyISAM）补 UNION：上游 hawaiihub 的 `hn_waimai_order_all` 等合并表
+        # 定义里只有 ENGINE=MRG_MyISAM，缺 INSERT_METHOD/UNION。原样灌库会得到一张
+        # 「成员表列表为空」的合并表 —— 所有 SELECT 恒返回 0 行且不报错（静默空集）。
+        # 2026-10 的「下单后看不到订单」事故就是这么来的，且连带取消订单/支付回调/
+        # 商家后台打印/3 个订单 cron 全部静默失效，canary 与生产两库同时损坏。
+        # 这里在抽取阶段补齐：成员表即去掉 `_all` 后缀的基础表（分表为空时的正确形态）。
+        m = re.match(r'CREATE TABLE `hn_([A-Za-z0-9_]+)_all`', stmt_strip)
+        if m and "ENGINE=MRG_MyISAM" in converted and "UNION=" not in converted:
+            base = m.group(1)
+            converted += " INSERT_METHOD=LAST UNION=(`huoniao_%s`)" % base
+            print(f"  patched MRG merge table: huoniao_{base}_all -> UNION=(huoniao_{base})")
+
         extracted.append(converted + ";")
 
 print(f"Extracted {len(extracted)} statements.")

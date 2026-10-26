@@ -5,7 +5,7 @@ import { showToast } from 'vant';
 import { fb, t } from '../services';
 import { listRows } from '../lib/fbClient.js';
 import { useCartStore } from '../stores/cart';
-import { buildDealParams, ValidationError } from '../lib/checkout.js';
+import { buildDealParams, parseDealResult, PAY_TYPE_COD, ValidationError } from '../lib/checkout.js';
 import { formatPhp } from '../lib/cart.js';
 import AppIcon from '../components/AppIcon.vue';
 
@@ -33,9 +33,22 @@ onMounted(async () => {
 async function submit() {
   submitting.value = true;
   try {
-    const params = buildDealParams({ shopId: cart.shopId as string, lines: cart.items, addressId: addressId.value, note: note.value });
+    const params = buildDealParams({
+      shopId: cart.shopId as string,
+      lines: cart.items,
+      addressId: addressId.value,
+      note: note.value,
+      payType: PAY_TYPE_COD,
+    });
     const info = await fb.post('waimai', 'deal', params, { idempotencyKey });
-    result.value = { ordernum: typeof info === 'string' ? info : info?.ordernum };
+    const parsed = parseDealResult(info);
+    // 上游对「店铺不支持货到付款 / 超出货到付款限额」会在建单前直接拒绝（state=200），
+    // 走到这里说明订单已创建；needOnline 仅作防御（本 app 无收银台，无法完成在线支付）。
+    if (parsed.needOnline) {
+      showToast(t('checkout.needOnline'));
+      return;
+    }
+    result.value = { ordernum: parsed.ordernum };
     cart.clear();
     showToast(t('checkout.success'));
   } catch (e: any) {
@@ -59,8 +72,10 @@ async function submit() {
       <div class="state">
         <div class="emoji">🎉</div>
         <p class="msg">{{ t('checkout.success') }}</p>
-        <p v-if="result.ordernum" class="meta" style="margin-bottom: 18px">{{ t('orders.number') }} {{ result.ordernum }}</p>
-        <button class="btn btn--primary" @click="router.replace({ name: 'orders' })">{{ t('nav.orders') }}</button>
+        <p v-if="result.ordernum" class="meta">{{ t('orders.number') }} {{ result.ordernum }}</p>
+        <p class="meta" style="margin-bottom: 18px">{{ t('checkout.codSubmitted') }}</p>
+        <button class="btn btn--primary" style="width: 100%" @click="router.replace({ name: 'orders' })">{{ t('checkout.viewOrder') }}</button>
+        <button class="btn btn--soft" style="width: 100%; margin-top: 10px" @click="router.replace({ name: 'home' })">{{ t('checkout.keepShopping') }}</button>
       </div>
     </template>
 

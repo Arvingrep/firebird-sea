@@ -5,7 +5,13 @@ export class ValidationError extends Error {
   constructor(code) { super(code); this.code = code; }
 }
 
-export function buildDealParams({ shopId, lines, addressId, note = '' }) {
+// paytype 必须显式传：上游 `$paytype = (int)$this->param['paytype']`，缺省取 0 会被当成
+// 「在线支付」处理（落到 createPayForm 分支），订单停在 state=0，30 分钟后被
+// include/cron/waimai_updateOrderState.php 判为「订单超时未支付」并取消。
+// 1 = 货到付款（本 app 唯一支持的支付方式）。
+export const PAY_TYPE_COD = '1';
+
+export function buildDealParams({ shopId, lines, addressId, note = '', payType = PAY_TYPE_COD }) {
   if (!lines || lines.length === 0) throw new ValidationError('CART_EMPTY');
   if (!addressId) throw new ValidationError('ADDRESS_REQUIRED');
   const content = lines.map((l) => {
@@ -13,6 +19,8 @@ export function buildDealParams({ shopId, lines, addressId, note = '' }) {
     if (!Number.isInteger(qty) || qty <= 0) throw new ValidationError('QTY_INVALID');
     return { id: String(l.id), count: qty };
   });
+  const pt = String(payType);
+  if (!/^[0-9]{1,2}$/.test(pt)) throw new ValidationError('PAYTYPE_INVALID');
   return {
     shop: String(shopId),
     address: String(addressId),
@@ -20,7 +28,29 @@ export function buildDealParams({ shopId, lines, addressId, note = '' }) {
     preset: '[]',
     peitype: '0',
     note: String(note).slice(0, 200),
+    paytype: pt,
   };
+}
+
+// deal 的返回形态分流（对齐 webroot/templates/waimai/touch/skin2/js/waimai_order.js:1198-1217）：
+//   'delivery|<ordernum>' → 货到付款下单成功（服务端已收口为已支付）
+//   'ok|<url>' / 'peerpay|<url>' → 零元单 / 代付，需要跳转
+//   '<ordernum>'           → 纯订单号
+//   { ordernum, orderurl } → 在线支付表单（本 app 无收银台，视为需网页支付）
+export function parseDealResult(info) {
+  if (info && typeof info === 'object') {
+    return { ordernum: info.ordernum ? String(info.ordernum) : '', needOnline: true };
+  }
+  const s = typeof info === 'string' ? info.trim() : '';
+  if (!s) return { ordernum: '', needOnline: false };
+  const i = s.indexOf('|');
+  if (i > 0) {
+    const prefix = s.slice(0, i);
+    const rest = s.slice(i + 1);
+    if (prefix === 'delivery') return { ordernum: rest, needOnline: false };
+    return { ordernum: '', needOnline: true, redirect: rest };
+  }
+  return { ordernum: s, needOnline: false };
 }
 
 // 地址表单：人名、电话、详细地址必填；电话只允许数字、+、空格、短横线

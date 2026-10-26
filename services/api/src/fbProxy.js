@@ -108,6 +108,8 @@ function createFbProxy({
   timeoutMs = 8000, idempotencyStore = null, allowWrite = null,
 }) {
   const idemStore = idempotencyStore || createMemoryIdempotencyStore({ ttlSeconds: idempotencyTtlSeconds, now });
+  // 空订单列表告警的采样槽（`<mid>:<小时序号>`），同一会员每小时只告警一次
+  let emptyOrderWarnSlot = null;
   for (const [name, rule] of Object.entries(whitelist)) {
     if (rule.idempotent && rule.auth !== 'member') throw new Error(`白名单 ${name}: idempotent 规则必须 auth=member`);
   }
@@ -176,12 +178,12 @@ function createFbProxy({
     }
 
     // 对上游发起一次调用；Cookie 只可能是服务端为该会员注入的凭证，客户端 Cookie 从不进入此函数
-    async function callUpstream(svc, act, params, post) {
+    async function callUpstream(svc, act, params, post, extraHeaders = null) {
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries({ ...(post ? {} : params), service: svc, action: act, platform_name: 'tma' })) {
         (Array.isArray(v) ? v : [v]).forEach((x) => qs.append(k, x));
       }
-      const init = { method: post ? 'POST' : 'GET', headers: { Accept: 'application/json' } };
+      const init = { method: post ? 'POST' : 'GET', headers: { Accept: 'application/json', ...(extraHeaders || {}) } };
       if (cookie) init.headers.Cookie = cookie;
       let url = `${upstreamBase}?${qs.toString()}`;
       if (post) {
@@ -223,6 +225,58 @@ function createFbProxy({
 
     // 仅保留确认成功（火鸟 state=100）的响应，失败释放占位，客户端可用同一键重试
     const ok = json.state === 100;
+
+    // ── 货到付款收口 ───────────────────────────────────────────────────────
+    // 上游 deal() 对 paytype=1 只返回字符串 "delivery|<ordernum>" 并早返回
+    // （waimai.class.php:3686），此时订单仍是 state=0（未支付）。若不收口，30 分钟后
+    // include/cron/waimai_updateOrderState.php 会把它判为「订单超时未支付」并置 state=6 取消
+    // —— 用户看到的就是「下单后订单凭空变成已取消」。
+    // H5 老框架靠下单后跳收银台、由用户点确认触发 pay() 完成收口；TMA 没有收银台，
+    // 因此在代理层紧接着用同一会员凭证调用 pay(paytype=delivery)，由 pay() → paySuccess()
+    // 把 state 推到 2（已支付/待接单）。
+    // 安全性：pay() 的订单查询限定 `uid = <当前会员> AND state = 0`（waimai.class.php:3952），
+    // 且 ordernum 取自本次 deal 的返回值，只会作用于刚创建的这笔订单。
+    // 注意：pay() 在 paytype=delivery 且 !isMobile() 时会 header('location') 后 die（:4240），
+    // 所以必须带移动端 UA，否则拿到的是空响应而非 JSON。
+    if (ok && service === 'waimai' && action === 'deal' && typeof json.info === 'string') {
+      const cod = /^delivery\|(.+)$/.exec(json.info.trim());
+      if (cod) {
+        const ordernum = cod[1];
+        try {
+          const settled = await callUpstream(
+            'waimai', 'pay', { ordernum, paytype: 'delivery' }, true,
+            { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148' },
+          );
+          if (!settled || settled.state !== 100) {
+            console.warn(JSON.stringify({ evt: 'cod_settle_failed', ordernum, upstreamState: settled && settled.state }));
+          }
+        } catch (e) {
+          console.error(JSON.stringify({ evt: 'cod_settle_error', ordernum, msg: String((e && e.message) || e) }));
+        }
+        // 无论收口成败都对客户端只暴露订单号，避免 "delivery|xxx" 污染 UI
+        json.info = ordernum;
+      }
+    }
+
+    // ── 静默空表采样告警 ───────────────────────────────────────────────────
+    // huoniao_waimai_order_all（MRG_MyISAM 合并表）UNION 成员缺失时，订单列表恒返回
+    // {state:100, pageInfo.totalCount:0, list:[]} —— 与「新用户确实没有订单」无法区分，
+    // 曾静默数月。这里按会员维度每小时最多告警一次：留痕但不刷屏，也不阻断请求。
+    if (ok && service === 'waimai' && action === 'order' && claims) {
+      const pi = json.info && typeof json.info === 'object' ? json.info.pageInfo : null;
+      const total = pi ? Number(pi.totalCount) : NaN;
+      if (total === 0 && Number(clientParams.page || 1) <= 1) {
+        const slot = `${claims.mid}:${Math.floor(now() / 3600000)}`;
+        if (slot !== emptyOrderWarnSlot) {
+          emptyOrderWarnSlot = slot;
+          console.warn(JSON.stringify({
+            evt: 'order_list_empty', mid: claims.mid,
+            hint: '若该会员确有历史订单：SHOW CREATE TABLE huoniao_waimai_order_all 检查是否含 UNION=',
+          }));
+        }
+      }
+    }
+
     if (idemKey) {
       if (ok) await idemStore.finish(idemKey, json);
       else await idemStore.abort(idemKey);
