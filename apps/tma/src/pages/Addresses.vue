@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useRoute } from 'vue-router';
 import { showConfirmDialog, showToast, showLoadingToast, closeToast } from 'vant';
 import { fb, authClient, i18n } from '../services';
 import { getTgUser, getStartParam, openExternal } from '../telegram';
@@ -11,6 +12,7 @@ interface Form {
 }
 
 const t = (k: string, v?: Record<string, unknown>) => i18n.t(k, v);
+const route = useRoute();
 const list = ref<Address[]>([]);
 const loading = ref(true);
 const editing = ref(false);
@@ -114,20 +116,17 @@ async function remove(a: Address) {
   } catch (err: any) { if (err && err.message) showToast(/reopen/i.test(err.message) ? t('auth.reopen') : err.message); }
 }
 
-// —— 分享：生成一次性 token 的深链（接收方点开可直接保存为自己的地址）——
+// —— 分享：只分享「位置」，不含姓名/电话（接收方用自己的 Telegram 身份下单）——
 async function share(a: Address) {
   sheet.value = false;
   if (sharing.value) return;
   sharing.value = true;
   showLoadingToast({ message: t('address.sharing'), forbidClick: true, duration: 0 });
   try {
-    // 快照由客户端上传：后端只负责存储与发 token，无需持会员凭证回查上游
     const r = await authClient.request('/addr/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        person: a.person,
-        tel: a.tel,
         street: mainLine(a),
         address: a.address,
         lat: a.lat,
@@ -137,6 +136,7 @@ async function share(a: Address) {
     });
     const data = await r.json();
     if (!r.ok || !data?.success) throw new Error(data?.error?.message || 'share failed');
+    // 深链优先（接收方点开直达小程序）；bot 用户名未就绪时退化为「地址文本 + 本站链接」
     const url = data.data.url || location.origin + '/tma/';
     const text = t('address.shareText', { addr: mainLine(a) });
     openExternal(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
@@ -148,22 +148,34 @@ async function share(a: Address) {
   }
 }
 
-// —— 收到别人分享的地址（深链 startapp=addr_<token>）——
+// —— 收到别人分享的地址 ——
+// 深链进入时 router 会带上 ?share=<token>（见 lib/startParam.js 白名单）；直接落在本页时再看 start_param 兜底。
 async function consumeSharedAddress() {
-  const param = getStartParam();
-  const m = /^addr_([A-Za-z0-9]{8,64})$/.exec(String(param || ''));
-  if (!m) return;
+  const fromQuery = String(route.query.share || '');
+  const fromParam = /^addr_([0-9a-f]{32})$/.exec(String(getStartParam() || ''));
+  const token = /^[0-9a-f]{32}$/.test(fromQuery) ? fromQuery : (fromParam ? fromParam[1] : '');
+  if (!token) return;
   const seenKey = 'fbs_addr_share_seen';
   // 同一条分享链接只询问一次：用户拒绝后再次切页/刷新不再打扰
-  try { if (sessionStorage.getItem(seenKey) === m[1]) return; sessionStorage.setItem(seenKey, m[1]); } catch { /* 隐私模式无 storage */ }
+  try { if (sessionStorage.getItem(seenKey) === token) return; sessionStorage.setItem(seenKey, token); } catch { /* 隐私模式无 storage */ }
   try {
-    const r = await authClient.request(`/addr/shared/${m[1]}`);
+    const r = await authClient.request(`/addr/shared/${token}`);
     if (!r.ok) return;
     const data = await r.json();
     const a = data?.data;
     if (!a) return;
     try { await showConfirmDialog({ title: t('address.sharedTitle'), message: t('address.sharedAsk', { addr: mainLine(a) }) }); } catch { return; }
-    await fb.post('waimai', 'operAddress', { person: a.person, tel: a.tel, street: a.street, address: a.address, lat: a.lat, lng: a.lng, areaCode: a.areaCode || AREA_CODE, default: 0 });
+    // 只接受「位置」，收货人与联系方式一律用接收方自己的 Telegram 身份，避免采信对方上传的内容
+    await fb.post('waimai', 'operAddress', {
+      person: selfName.value,
+      tel: contactValue(),
+      street: a.street,
+      address: a.address,
+      lat: a.lat,
+      lng: a.lng,
+      areaCode: a.areaCode || AREA_CODE,
+      default: 0,
+    });
     await load();
     showToast(t('address.sharedSaved'));
   } catch { /* 链接过期或网络异常：静默忽略，不打断主流程 */ }
@@ -251,7 +263,7 @@ onMounted(async () => { await load(); consumeSharedAddress(); });
 
     <!-- 表单 -->
     <van-popup v-model:show="editing" position="bottom" round :style="{ maxHeight: '92vh' }" @opened="onPopupOpened">
-      <div ref="popupWrap" class="addr-sheet">
+      <div class="addr-sheet">
         <div class="sheet-head">
           <span class="sheet-title">{{ form.id ? t('address.editTitle') : t('address.addTitle') }}</span>
           <button class="sheet-x" :aria-label="t('common.cancel')" @click="editing = false">✕</button>

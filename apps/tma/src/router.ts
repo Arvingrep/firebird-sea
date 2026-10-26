@@ -25,7 +25,7 @@ router.beforeEach((to) => {
   if (startHandled) return true;
   startHandled = true;
   const target = parseStartParam(getStartParam());
-  return target && to.name === 'home' ? { name: target.name, params: target.params } : true;
+  return target && to.name === 'home' ? target : true;
 });
 
 export default router;

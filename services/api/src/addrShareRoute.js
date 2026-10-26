@@ -6,10 +6,12 @@ const express = require('express');
 const crypto = require('crypto');
 const { sqlStr } = require('./memberMap');
 
-const LIMITS = { person: 80, tel: 60, street: 300, address: 400, areaCode: 8, coord: 24 };
+const LIMITS = { street: 300, address: 400, areaCode: 8, coord: 24 };
 const TOKEN_RE = /^[0-9a-f]{32}$/;
-// 每个会员保留的有效分享条数上限：GET 是公开接口，长期堆积等于长期暴露姓名/电话/坐标
+// 每个会员保留的有效分享条数上限：GET 是公开接口，长期堆积等于长期暴露地址与坐标
 const MAX_PER_UID = 20;
+// 过期清理按进程节流：每次创建都清会多一次 mariadb 子进程（QA 第 2 轮 minor）
+const PURGE_INTERVAL_SECONDS = 600;
 
 // 单行化 + 截断：防止快照里带换行/制表符破坏 TSV 读取，也防止超长内容撑库
 const clip = (v, n) => String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').trim().slice(0, n);
@@ -26,6 +28,7 @@ function createAddrShareRouter({
   const router = express.Router();
   let botUsername = null;
   let botTriedAt = 0;
+  let lastPurge = 0;
 
   // bot 用户名只用于拼 t.me 深链：启动后按需拉一次并缓存，失败 2 分钟内不重试（不影响其他接口）
   async function resolveBotUsername() {
@@ -51,9 +54,9 @@ function createAddrShareRouter({
       return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Please reopen the Mini App from Telegram' } });
     }
     const b = req.body || {};
+    // 只接收「位置」：收货人与联系方式由接收方用自己的 Telegram 身份生成，
+    // 避免分享者在客户端伪造他人姓名/电话被采信（QA 第 2 轮 minor）。
     const payload = {
-      person: clip(b.person, LIMITS.person),
-      tel: clip(b.tel, LIMITS.tel),
       street: clip(b.street, LIMITS.street),
       address: clip(b.address, LIMITS.address),
       lat: clip(b.lat, LIMITS.coord),
@@ -69,8 +72,12 @@ function createAddrShareRouter({
     }
     const token = crypto.randomBytes(16).toString('hex');
     const exp = now() + ttlSeconds;
+    // 过期清理按进程节流（默认 10 分钟一次），失败不影响正常创建
+    if (now() - lastPurge >= PURGE_INTERVAL_SECONDS) {
+      lastPurge = now();
+      try { await conn.query(`DELETE FROM fbs_addr_share WHERE expires_at <= ${now()}`); } catch (e) { /* 清理失败不阻断 */ }
+    }
     try {
-      await conn.query(`DELETE FROM fbs_addr_share WHERE expires_at <= ${now()}`);
       await conn.query(
         `INSERT INTO fbs_addr_share (token, uid, payload, created_at, expires_at) VALUES ` +
         `(${sqlStr(token)}, ${mid}, ${sqlStr(JSON.stringify(payload))}, ${now()}, ${exp})`
