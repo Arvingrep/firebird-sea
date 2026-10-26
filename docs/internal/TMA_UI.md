@@ -185,3 +185,20 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **反查只用主地址**（E2E 发现）：查询串曾拼上 `address`（含补充项），Google 对
   「Robinsons Place Manila，Level 3 near cinema」返回 `partial_match=true` → 被精度门槛拒绝 → 仍存不下。
   现改为「`street` + 分站城市名」→ 失败再试 `street` 单串；补充项/备注只影响展示，不参与 geocode。
+
+## 视觉系统 v2（上）：设计令牌 + 应用外壳 + 首页（2026-10-26）
+
+- **设计令牌重写**（style.css）：暖米底 `#F7F6F4`、大圆角（14/18/22/28）、双层柔和阴影、
+  品牌渐变 `#FF9A4A→#EE3C08`、价格红 `--price`、金星级 `--gold`；暗色主题只换表面并提亮一档。
+- **自绘组件**：AppIcon 内联 SVG 图标库（stroke 跟随 currentColor，不依赖字体——线上 webview
+  出现过字体加载失败变空方块）；自绘底部 tabbar（毛玻璃 + 激活品牌 pill + 购物车角标）。
+- **首页重做**：渐变头部（定位 + 按时段问候 + 语言切换）→ 白色悬浮搜索框（本地过滤商家/菜品）→
+  三枚服务亮点 → 品类 pills（取自商家 typename）→ 排序 pills（评分/销量/起送，客户端排序）→
+  图片优先商家卡（16:9 封面 + 营业中/送达时长玻璃角标 + 封面店名叠字 + ★评分/月售/起送/配送费 + 优惠 tag）。
+- **配套接口**：`waimai::shopList` 本 PR 已透出 `star`、`sale`（SQL 本就查出，仅补两行输出；
+  star 以 `round(...,1)` 归一，sale 强转 int）。
+- **过渡策略**：门禁限制单 PR 增量 ≤1200 行，本次先上设计系统 + 外壳 + 首页；旧页面类
+  （fbs-card/order-card/cart-line 等）以「兼容类 + 令牌别名」临时保留，其余页面重构在系列下一个 PR。
+- **截图验收**：vite build → 预览目录注入 mock fetch（固定数据 + 假 Telegram WebApp）→
+  puppeteer-core 以 390×844@2x 截图检查。注意 macOS headless `--window-size` 实际最小视口约 470px，
+  CLI 截图不可信，必须用 CDP 设备模拟。
