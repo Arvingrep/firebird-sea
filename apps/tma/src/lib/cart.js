@@ -61,6 +61,9 @@ export function createCart(options = {}) {
       v: 1,
       shopId,
       shop: shopMeta,
+      // seenMeta 必须一起落盘：多标签页 / 前后台切换会 reload，若它只活在内存里，
+      // "A 店车 + 逛过 B 店" 这条状态过一夜就丢了（QA 171 轮 2 major）。
+      seen: seenMeta,
       lines: [...lines.values()].map((l) => ({ id: l.id, title: l.title, priceCents: l.priceCents, qty: l.qty, pic: l.pic })),
     };
   }
@@ -70,12 +73,25 @@ export function createCart(options = {}) {
     try { storage.setItem(key, JSON.stringify(snapshot())); } catch { /* 配额满/隐私模式：降级为仅内存 */ }
   }
 
-  // 恢复时逐字段校验：localStorage 是用户可写的，任何一条脏数据都不能让页面白屏。
-  function hydrate(raw) {
-    lines.clear(); shopId = null; shopMeta = null; seenMeta = null;
+  // 单条门槛校验。expectId 给出时要求 id 一致（防把别人的起送价挂到这家店上）
+  function readMeta(v, expectId) {
+    if (!v || typeof v !== 'object') return null;
+    const id = v.id === undefined || v.id === null ? '' : String(v.id);
+    if (!id) return null;
+    if (expectId !== undefined && id !== String(expectId)) return null;
+    const mc = toCentsStrict(v.minOrderCents);
+    // ts 缺失按"刚刚"算（本地快照刚加载，先信它），时效兜底交给 TTL + 进页面刷新
+    const ts = Number.isFinite(v.ts) && v.ts > 0 ? v.ts : nowFn();
+    return { id, name: typeof v.name === 'string' ? v.name : '', minOrderCents: mc === null ? 0 : mc, ts };
+  }
+
+  // 纯解析：**不碰任何内存状态**。返回 null 表示快照不可用，调用方保持现状。
+  // 这一条是 QA 171 轮 2 major 的核心——旧实现在解析前就 lines.clear()，
+  // 于是每次 reload（storage 事件 / visibilitychange）都会把 seenMeta 抹掉。
+  function parseSnapshot(raw) {
     let data;
-    try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return false; }
-    if (!data || data.v !== 1 || !Array.isArray(data.lines)) return false;
+    try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return null; }
+    if (!data || data.v !== 1 || !Array.isArray(data.lines)) return null;
     const rows = [];
     for (const l of data.lines) {
       if (!l || typeof l.id !== 'string' || !l.id) continue;
@@ -85,20 +101,29 @@ export function createCart(options = {}) {
       if (!Number.isInteger(l.qty) || l.qty <= 0 || l.qty > MAX_QTY) continue;
       rows.push({ id: l.id, title: l.title, priceCents: pc, qty: l.qty, pic: typeof l.pic === 'string' && l.pic.startsWith('https://') ? l.pic : null });
     }
-    if (!rows.length) return false;
+    // 有一行都没解析出来、但原始行非空 → 整份快照不可信
+    if (data.lines.length > 0 && rows.length === 0) return null;
     const sid = typeof data.shopId === 'string' && data.shopId ? data.shopId : null;
-    if (!sid) return false; // 有商品无店铺 → 不可信的残缺快照
-    rows.forEach((r) => lines.set(r.id, r));
-    shopId = sid;
-    const s = data.shop;
-    if (s && typeof s === 'object' && String(s.id) === sid) {
-      const mc = toCentsStrict(s.minOrderCents);
-      // 快照里的 ts 只用于判断"这份门槛有多旧"；缺失时按当前时间算（刚加载，先信它），
-      // 真正的时效兜底由 Cart/Checkout 进页面刷新 storeDetail 完成。
-      const ts = Number.isFinite(s.ts) && s.ts > 0 ? s.ts : nowFn();
-      shopMeta = { id: sid, name: typeof s.name === 'string' ? s.name : '', minOrderCents: mc === null ? 0 : mc, ts };
-      seenMeta = shopMeta;
-    }
+    // 车与店铺必须一致：有菜必有店、有店必有菜。两者都空是合法的「空车快照」，
+    // 要能同步"另一个标签页清空了车"，但不能顺手擦掉门槛。
+    if (sid && rows.length === 0) return null;
+    if (!sid && rows.length > 0) return null;
+
+    const shop = sid ? readMeta(data.shop, sid) : null;
+    // 空车时 data.shop 里留着的门槛挪进 seen，再加菜时 bindMeta 能接回来
+    const seen = readMeta(data.seen) || (sid ? shop : readMeta(data.shop)) || null;
+    return { shopId: sid, rows, meta: shop, seen };
+  }
+
+  // 恢复时逐字段校验：localStorage 是用户可写的，任何一条脏数据都不能让页面白屏。
+  function hydrate(raw) {
+    const snap = parseSnapshot(raw);
+    if (!snap) return false; // 不可信 → 保持内存现状，绝不清空用户正在操作的购物车
+    lines.clear();
+    snap.rows.forEach((r) => lines.set(r.id, r));
+    shopId = snap.shopId;
+    shopMeta = snap.meta;
+    seenMeta = snap.seen;
     return true;
   }
 
@@ -151,7 +176,8 @@ export function createCart(options = {}) {
       const mc = toCentsStrict(meta && meta.minOrderCents);
       const row = { id, name: meta && typeof meta.name === 'string' ? meta.name : '', minOrderCents: mc === null ? 0 : mc, ts: nowFn() };
       seenMeta = row;
-      if (shopId !== null && shopId !== id) return false;
+      // 车属于别的店：只把门槛记进 seenMeta（并落盘——否则一次 reload 就丢），不绑定
+      if (shopId !== null && shopId !== id) { persist(); return false; }
       shopMeta = row;
       persist();
       return true;
@@ -174,16 +200,19 @@ export function createCart(options = {}) {
     canPlaceOrder() { return api.canCheckout() && api.meetsMinimum(); },
     serialize() { return JSON.stringify(snapshot()); },
     hydrate,
-    // 多标签页/多 WebView 同步用。存储里没有快照 ≠ 车该被清空，
-    // 所以只在真有快照时才覆盖内存状态，否则保持现状返回 false。
+    // 多实例同步用。返回 false = 没有可用快照（含 getItem 抛异常）→ 内存状态原封不动。
+    // 返回 true = 已把内存整体替换成快照内容（可能是"空车"，那是另一标签页清空了车）。
     reload() {
       if (!storage) return false;
-      const raw = storage.getItem(key);
+      let raw;
+      try { raw = storage.getItem(key); } catch { return false; }
       if (raw === null) return false;
       return hydrate(raw);
     },
   };
-  if (storage) hydrate(storage.getItem(key));
+  if (storage) {
+    try { hydrate(storage.getItem(key)); } catch { /* 存储不可读：按空车启动 */ }
+  }
   return api;
 }
 

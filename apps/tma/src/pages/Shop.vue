@@ -72,6 +72,9 @@ async function load() {
 }
 
 async function addFood(f: FoodItem) {
+  // 每次加购都用手里这份 storeDetail 补写一次门槛：用户可能在店铺页停留超过 TTL，
+  // 或者换店时上一次 setShopMeta 被拒，这里是最可靠的补写点（幂等、无额外请求）。
+  cart.setShopMeta(props.id, { name: info.value.shopname || '', minOrderCents: Math.round(Number(info.value.basicprice || 0) * 100) });
   if (cart.add(props.id, f) === 'needs-switch') {
     try {
       await showConfirmDialog({ title: t('cart.switchShopTitle'), message: t('cart.switchShopMsg') });

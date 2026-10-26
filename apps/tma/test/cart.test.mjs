@@ -272,19 +272,91 @@ test('起送价：刷新店铺信息后续期', () => {
   assert.strictEqual(c.minOrderCents(), 500);
 });
 
-test('reload：存储里没有快照时保持内存现状，不误清空', () => {
+test('reload：脏数据 / 无快照都不动内存，绝不清空正在操作的购物车', () => {
   const s = memStorage();
   const c = createCart({ storage: s });
   c.add(1, food(1));
-  s.setItem('fbcart:v1', '');  // 空串 → 脏数据
+
+  s.setItem('fbcart:v1', '{');            // 坏 JSON
   assert.strictEqual(c.reload(), false);
-  // 脏数据不可信 → 按设计清空
-  assert.strictEqual(c.count(), 0);
+  assert.strictEqual(c.count(), 1);       // 脏数据 → 保持现状
+
+  s.setItem('fbcart:v1', '{"v":9}');      // 版本不符
+  assert.strictEqual(c.reload(), false);
+  assert.strictEqual(c.count(), 1);
+
+  s.removeItem('fbcart:v1');              // 压根没有快照
+  assert.strictEqual(c.reload(), false);
+  assert.strictEqual(c.count(), 1);
 
   const c2 = createCart({ storage: null });
   c2.add(1, food(1));
   assert.strictEqual(c2.reload(), false);  // 无 storage
-  assert.strictEqual(c2.count(), 1);       // 车还在
+  assert.strictEqual(c2.count(), 1);
+});
+
+// —— QA 171 轮 2 major：reload 不能把 seenMeta 抹掉，否则上一轮的修复被一次前后台切换打回原形 ——
+
+test('reload 保留门槛：减到 0 → 切后台回来 → 再加菜仍然拦', () => {
+  const s = memStorage();
+  const c = createCart({ storage: s });
+  c.setShopMeta(1, { name: 'A', minOrderCents: 500 });
+  c.add(1, food(1, '2.00'));
+  c.setQty(1, 0);                          // 空车快照落盘，shop 里留着 A 的门槛
+
+  assert.strictEqual(c.reload(), true);    // visibilitychange / storage 事件
+  assert.strictEqual(c.count(), 0);
+  c.add(1, food(1, '2.00'));               // 同一页再加回来
+  assert.strictEqual(c.minOrderCents(), 500);
+  assert.strictEqual(c.canPlaceOrder(), false);
+});
+
+test('reload 保留 seenMeta：A 店车 + 逛过 B 店 → 切后台回来 → 换店取 B 门槛', () => {
+  const s = memStorage();
+  const c = createCart({ storage: s });
+  c.setShopMeta(1, { minOrderCents: 100 });
+  c.add(1, food(1, '1.00'));
+  assert.strictEqual(c.setShopMeta(2, { name: 'B', minOrderCents: 900 }), false); // 只写 seenMeta
+
+  assert.strictEqual(c.reload(), true);    // 切后台再回来
+  c.switchShop(2, food(9, '1.00'));
+  assert.strictEqual(c.shopId, '2');
+  assert.strictEqual(c.minOrderCents(), 900);
+  assert.strictEqual(c.canPlaceOrder(), false);
+});
+
+test('另一标签页清空车 → reload 同步清空（空车快照是合法快照）', () => {
+  const s = memStorage();
+  const a = createCart({ storage: s });
+  a.setShopMeta(1, { minOrderCents: 500 });
+  a.add(1, food(1, '2.00'));
+
+  const b = createCart({ storage: s });
+  assert.strictEqual(b.count(), 1);
+
+  a.clear();
+  assert.strictEqual(b.reload(), true);
+  assert.strictEqual(b.count(), 0);
+  assert.strictEqual(b.shopId, null);
+  // 车空了但门槛还在：b 再加同一家店仍然按 500 拦
+  b.add(1, food(1, '2.00'));
+  assert.strictEqual(b.minOrderCents(), 500);
+});
+
+test('一致性守卫：有店无菜 / 有菜无店 的残缺快照一律拒收', () => {
+  const s = memStorage();
+  const c = createCart({ storage: s });
+  c.add(1, food(1));
+
+  s.setItem('fbcart:v1', JSON.stringify({ v: 1, shopId: '3', lines: [] }));
+  assert.strictEqual(c.reload(), false);
+  assert.strictEqual(c.count(), 1);        // 未被动过
+
+  s.setItem('fbcart:v1', JSON.stringify({
+    v: 1, shopId: null, lines: [{ id: '1', title: 'x', priceCents: 100, qty: 1 }],
+  }));
+  assert.strictEqual(c.reload(), false);
+  assert.strictEqual(c.count(), 1);
 });
 
 test('多标签页：另一方写入后 reload 能看到最新车', () => {
