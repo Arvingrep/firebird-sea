@@ -59,9 +59,15 @@ const dec = (id: string | number, qty: number) => cart.setQty(id, Math.max(0, qt
       <div class="card card--pad" style="margin-top: 14px">
         <div class="bill">
           <div class="row"><span>{{ t('cart.subtotal') }}</span><b>{{ formatPhp(cart.totalCents) }}</b></div>
+          <div v-if="cart.minOrderCents > 0" class="row">
+            <span>{{ t('cart.minOrder') }}</span><b>{{ formatPhp(cart.minOrderCents) }}</b>
+          </div>
           <div class="row"><span>{{ t('checkout.payMethod') }}</span><b>{{ t('checkout.codPay') }}</b></div>
           <div class="row total"><span>{{ t('cart.total') }}</span><b>{{ formatPhp(cart.totalCents) }}</b></div>
         </div>
+        <p v-if="cart.shortfallCents > 0" class="hint hint--warn">
+          {{ t('cart.belowMin', { v: formatPhp(cart.shortfallCents) }) }}
+        </p>
       </div>
 
       <div class="cartbar">
@@ -71,10 +77,12 @@ const dec = (id: string | number, qty: number) => cart.setQty(id, Math.max(0, qt
         </div>
         <div class="sum">
           <b>{{ formatPhp(cart.totalCents) }}</b>
-          <span>{{ t('cart.countN', { n: cart.count }) }}</span>
+          <span v-if="cart.shortfallCents > 0" class="short">{{ t('cart.belowMin', { v: formatPhp(cart.shortfallCents) }) }}</span>
+          <span v-else>{{ t('cart.countN', { n: cart.count }) }}</span>
         </div>
-        <button class="go" :disabled="!cart.canCheckout" @click="router.push({ name: 'checkout' })">
-          {{ t('cart.checkout') }}<AppIcon name="chevron-right" :size="15" :stroke="2.4" />
+        <button class="go" :disabled="!cart.canPlaceOrder" @click="router.push({ name: 'checkout' })">
+          {{ cart.shortfallCents > 0 ? t('cart.shortBy', { v: formatPhp(cart.shortfallCents) }) : t('cart.checkout') }}
+          <AppIcon v-if="!cart.shortfallCents" name="chevron-right" :size="15" :stroke="2.4" />
         </button>
       </div>
     </template>

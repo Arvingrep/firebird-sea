@@ -362,3 +362,68 @@ handler/action 与参数均已在 `services/api/src/fbProxy.js` 白名单内。
 - **确认收货**：H5 有 `sure_btn`，但上游**没有用户侧确认收货的 action**（状态由 cron 与商家后台
   驱动）。做出来就是点了没反应的死按钮，故只提供「联系商家」入口。
 - **再来一单**：H5 里该按钮的四处实现**全部被 HTML 注释掉**，实际不存在的功能，不算缺口。
+
+---
+
+## 购物车：持久化与起送价（2026-10-26）
+
+### 为什么改
+
+用户在旧版里踩了两脚坑，两脚都是**下单前的漏斗漏点**：
+
+1. **刷新即丢**：购物车只活在 Pinia 内存里。Telegram 里切出去回条消息、系统回收 WebView，
+   回来购物车就空了——而用户往往已经挑了半天菜。
+2. **填完地址才知金额不足**：起送价（`storeDetail` 的 `basicprice`）只在店铺页脚显示文案，
+   不参与任何校验。用户可以一路点到结算页、选完地址、点提交，才被上游 `deal` 拒掉。
+
+### 落地方式
+
+**纯逻辑层**（`lib/cart.js`，node:test 可直接覆盖，不依赖浏览器）：
+
+| 能力 | 接口 | 说明 |
+|---|---|---|
+| 持久化 | `createCart({ storage })` | 默认用 `safeStorage()`（探测 `localStorage` 可写），不可用时退化为纯内存 |
+| 快照 | `serialize()` / `hydrate(raw)` | 版本号 `v:1`；格式不兼容整体丢弃，绝不半解析 |
+| 起送价 | `minOrderCents()` / `shortfallCents()` / `meetsMinimum()` | 差额按"分"算，天然无浮点误差 |
+| 结算闸门 | `canPlaceOrder()` | `canCheckout() ∩ meetsMinimum()`；`canCheckout()` 语义保持不变（只管车本身合不合法） |
+
+**店铺元信息绑定**：`shopMeta = { id, name, minOrderCents }` 带店铺 id。
+`setShopMeta()` 在购物车属于**别的店**时直接返回 `false` 拒绝写入；`add()` 换店时旧 meta 自动失效。
+否则会出现"用 A 店的起送价卡 B 店的单"这种最恶心的误拦。
+
+**校验策略是"未知不拦"**：起送价缺失、换店后未加载、快照过期，`minOrderCents()` 一律按 0。
+宁可让上游兜底拒绝，也不要在前端用猜出来的门槛拦住能成立的订单。
+
+### 存储格式（`localStorage['fbcart:v1']`）
+
+```json
+{ "v": 1, "shopId": "12", "shop": { "id": "12", "name": "店名", "minOrderCents": 30000 },
+  "lines": [{ "id": "88", "title": "菜名", "priceCents": 1250, "qty": 2, "pic": "https://…" }] }
+```
+
+恢复时**逐行校验**：`id` 非空字符串、`title` 是字符串、`priceCents` 为有限非负数、
+`qty` 为 `1..99` 的整数、`pic` 必须是 `https://` 开头（其余降级为 `null`）。
+坏行丢弃、好行保留；整份不可信（JSON 损坏 / 版本不符 / 有商品无 `shopId`）则清空。
+`localStorage` 是用户可写域，任何脏数据都不允许让页面白屏。
+
+### UI 落点
+
+| 页面 | 行为 |
+|---|---|
+| `Shop.vue` | `load()` 成功后写入 `shopMeta`（起送价来自 `basicprice`）；悬浮结算条在未达标时按钮禁用，显示"还差 ₱X"，`.sum` 副标题用金色 `--gold` 强调 |
+| `Cart.vue` | 账单增加「起送价」一行 + 未达标时的 `hint--warn` 提示；结算按钮改用 `canPlaceOrder` |
+| `Checkout.vue` | 按钮同样改 `canPlaceOrder`；`submit()` 前置防御——差额 > 0 时不发请求，直接提示差多少 |
+| `style.css` | 新增 `.cartbar .sum span.short`（金色）、`.hint--warn`（品牌色） |
+
+### 刻意不做的
+
+- **不设购物车过期**：菜品下架/改价由上游 `deal` 校验，前端存久了最多是"提交时被拒"，
+  比"回来发现车空了"体验好。真要做清理，应该等上游提供菜品状态批量查询。
+- **不做跨设备同步**：`waimai` 没有服务端购物车接口，只能本地存。
+
+### 已知取舍
+
+`localStorage` 是**设备级**的，不区分 Telegram 账号。同一台设备换账号登录会看到上一个人的购物车。
+可接受的理由：车内容只有菜名与单价，不含个人信息；下单所需的地址走 `getMemberAddress`（按 uid 服务端查），
+不会被"继承"。若后续要彻底隔离，应在 `auth` 成功后把 `uid` 拼进存储键（`fbcart:v1:<uid>`），
+但这会让"未登录浏览的购物车"在登录后丢失，属于产品决策，暂不做。
