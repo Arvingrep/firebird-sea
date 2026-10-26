@@ -32,7 +32,11 @@ function badgeOf(key: string) {
   return counts.value.comment;
 }
 
+// 请求序号：快速切 Tab 时先发的慢请求可能后返回，若不加序号会覆盖当前 Tab 的列表与计数
+let loadToken = 0;
+
 async function load() {
+  const token = ++loadToken;
   loading.value = true;
   failed.value = false;
   try {
@@ -44,6 +48,7 @@ async function load() {
       params.iscomment = '0';
     }
     const info = await fb.get('waimai', 'order', params);
+    if (token !== loadToken) return;   // 已被更新的请求取代，丢弃这次结果
     orders.value = Array.isArray(info?.list) ? info.list : [];
     const pi: any = (info && info.pageInfo) || {};
     counts.value = {
@@ -51,7 +56,11 @@ async function load() {
       pending: Number(pi.state0 || 0),
       comment: Number(pi.noiscomment || 0),
     };
-  } catch { failed.value = true; } finally { loading.value = false; }
+  } catch {
+    if (token === loadToken) failed.value = true;
+  } finally {
+    if (token === loadToken) loading.value = false;
+  }
 }
 
 function switchTab(k: string) {

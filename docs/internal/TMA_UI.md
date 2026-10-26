@@ -299,3 +299,66 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
    索引数、collation、数据可见性，再动真表。
 3. **前端「看起来对」不等于「参数传对了」**：UI 写「货到付款」但参数没传，是最难发现的一类 bug
    —— 界面对、接口不报错、状态悄悄错。
+
+## 订单模块对齐 H5（2026-10-26）
+
+参照 H5 老框架 `webroot/templates/member/touch/` 补齐订单列表与详情。**接口零改动** —— 依赖的
+handler/action 与参数均已在 `services/api/src/fbProxy.js` 白名单内。
+
+### 订单列表分组 Tab（`pages/Orders.vue`）
+
+对齐 `js/order-waimai.js:46-59`，三组：
+
+| Tab | 请求参数 | 计数来源 |
+|---|---|---|
+| 全部 | `{page,pageSize}` | `pageInfo.totalCount` |
+| 待付款 | `{page,pageSize,state:'0'}` | `pageInfo.state0` |
+| 待评价 | `{page,pageSize,state:'1',iscomment:'0'}` | `pageInfo.noiscomment` |
+
+**`pageInfo` 计数字段的约定（关键，别用错）：**
+
+`waimai::order()` 是**先算各项计数、再追加 `state` 过滤**（`waimai.class.php:5919-5943`）。因此：
+
+- `state0` / `state1` / `state2` / `state3` / `noiscomment` / `yesiscomment` **始终是全量值**，
+  不随当前请求的 `state` 参数变化 —— 可以放心用于 Tab 角标
+- `totalCount` **会随 `state` 参数变化**（只统计当前筛选结果）—— 所以前端只在「全部」Tab 下
+  用它更新 `counts.all`，否则切到「待付款」后「全部」的角标会缩水成待付款数
+
+`waimai:order` 白名单参数：`page` / `pageSize` / `state` / `iscomment`。
+
+### 订单详情（`pages/OrderDetail.vue`）
+
+字段全部按上游 `orderDetail()` 真实返回核实（`waimai.class.php:6152-6381`）：
+
+| 区块 | 依赖字段 |
+|---|---|
+| 状态头 | `shopname` `state` `ordernum` `qcma`（取餐码）`failed`（失败原因） |
+| 商品 | `food[]`（`title` / `count`） |
+| 账单 | `priceinfo[]`（`type` / `amount`）、`paytype`（上游已是格式化文案）、`amount` |
+| 配送信息 | `person` `tel` `address` `peisongname` `peisongphone` |
+| 订单进度 | `pubdate` `paydate` `confirmdate` `peidate` `okdate` |
+| 其他 | `note` `preset` `shoptel` |
+
+时间字段是**秒级 unix 时间戳**；`paydate = -1` 表示货到付款（不是真实时间点），前端跳过该节点。
+`priceinfo` 第 0 项被上游塞入 `type='pointprice'` 的伪元素，渲染时需跳过。
+
+### 订单状态映射（`lib/checkout.js` 的 `ORDER_STATE`）
+
+| state | key | 中文 | English |
+|---|---|---|---|
+| 0 | pending | 待付款 | Awaiting payment |
+| 1 | done | 已完成 | Completed |
+| 2 | paid | 待接单 | Awaiting acceptance |
+| 3 | preparing | 备餐中 | Preparing |
+| 5 | delivering | 配送中 | Delivering |
+| 6 | cancelled | 已取消 | Cancelled |
+| 其他 | **unknown** | 处理中 | Processing |
+
+**未收录的状态不猜语义**：历史实现把未知状态兜底成 `pending`（待付款），会误导用户。
+现在统一兜底为 `unknown`（处理中），i18n key 为 `state.unknown`。
+
+### 刻意不做的功能
+
+- **确认收货**：H5 有 `sure_btn`，但上游**没有用户侧确认收货的 action**（状态由 cron 与商家后台
+  驱动）。做出来就是点了没反应的死按钮，故只提供「联系商家」入口。
+- **再来一单**：H5 里该按钮的四处实现**全部被 HTML 注释掉**，实际不存在的功能，不算缺口。

@@ -49,6 +49,29 @@ const priceLines = computed(() => {
 });
 const telHref = (p: any) => 'tel:' + String(p || '').replace(/[^\d+]/g, '');
 const money = (v: any) => '₱' + Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+
+// 上游 priceinfo.type 与 paytype 是中文原文（火鸟不分语言），做常见项映射，未命中回退原文
+const FEE_TYPE_MAP: Record<string, string> = {
+  '配送费': 'order.fee.delivery',
+  '打包费': 'order.fee.packing',
+  '餐盒费': 'order.fee.packing',
+  '服务费': 'order.fee.service',
+  '优惠': 'order.fee.discount',
+  '满减': 'order.fee.discount',
+  '新客立减': 'order.fee.discount',
+  '积分抵扣': 'order.fee.point',
+};
+const feeLabel = (type: any) => {
+  const s = String(type || '');
+  const key = FEE_TYPE_MAP[s];
+  return key ? t(key) : s;
+};
+const payLabel = (p: any) => {
+  const s = String(p || '');
+  if (!s) return '';
+  if (/货到付款|delivery/i.test(s)) return t('checkout.codPay');
+  return s;
+};
 async function cancel() {
   try {
     await showConfirmDialog({ message: t('orders.cancelConfirm') });
@@ -101,9 +124,9 @@ onMounted(load);
       <div class="card card--pad" style="margin-top: 14px">
         <div class="bill">
           <div v-for="(p, i) in priceLines" :key="i" class="row">
-            <span>{{ p.type }}</span><b>{{ money(p.amount) }}</b>
+            <span>{{ feeLabel(p.type) }}</span><b>{{ money(p.amount) }}</b>
           </div>
-          <div v-if="order.paytype" class="row"><span>{{ t('checkout.payMethod') }}</span><b>{{ order.paytype }}</b></div>
+          <div v-if="order.paytype" class="row"><span>{{ t('checkout.payMethod') }}</span><b>{{ payLabel(order.paytype) }}</b></div>
           <div class="row total"><span>{{ t('orders.amount') }}</span><b>{{ money(order.amount) }}</b></div>
         </div>
       </div>
