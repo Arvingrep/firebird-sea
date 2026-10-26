@@ -91,3 +91,25 @@ npm run build      # 产物
 - **地址卡**：左侧 📍 图标底座 + 默认地址描边标签。
 - **i18n**：`t()` 支持 `{n}` 插值；新增 home.hero*、cart.countN、address.defaultTag（中英）。
 - 纯展示层改动，数据接口不变；三件套验证通过（tsc/32 单测/build）。
+
+### 地址保存失败的真实根因：接口直连缺默认分站（2026-10-26 修）
+
+Google key 打通后保存地址仍回「保存失败！」，从 PHP 的 SQL 错误日志（`log/errorsql/<date>.log`）抓到铁证：
+
+```
+INSERT INTO `huoniao_waimai_address` (...) VALUES ('7', '', 'E2E验证', ...)
+MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column 'cityid'
+```
+
+- **成因**：`waimai::operAddress` 在 Geocoding 反查不到分站时会兜底 `$siteCityInfo['cityid']`；而 `$siteCityInfo` 只在 `index.php`（网页入口）里赋值，`include/ajax.php` 仅当带 `siteCityInfo` cookie 或 `cityid` 参数时才解析。TMA/App 直连接口两者都没有 → `$siteCityInfo` 为空 → `cityid` 写成空串 → 严格模式 MySQL 直接 1366 报错。
+- **修复**：`include/ajax.php` 在原有解析后补默认分站兜底（`empty($siteCityInfo)` 时 `checkDefaultCity()`，按需 include `siteConfig.class.php`）。行为等价网页端首次访问落到默认分站；不改动任何业务 SQL。
+- **验证**：签名 initData 端到端 —— 登录 200 → 保存地址 200（`cityid=10000` 马尼拉）→ 回读命中 → 删除成功，PASS。
+- **排障方法沉淀**：接口返回「保存失败！」这类笼统文案时，先读 `log/errorsql/<date>.log`（dsql 会把失败 SQL + PDO 错误 + 调用栈全部落盘），比逐层猜参数快一个数量级。
+
+### Google Maps key 换到自控项目（2026-10-26）
+
+- 原 key 继承自老站配置缓存，所属 GCP 项目不可控且未开结算 → `REQUEST_DENIED: You must enable Billing`。
+- 现统一改到自有项目 `fh580-70533`（已开结算「随用随付」），用 gcloud 启用 API 并新建受限 key：
+  - 启用：`geocoding-backend.googleapis.com`、`maps-backend.googleapis.com`（Maps JavaScript API）；`places-backend.googleapis.com` 原已启用。
+  - key：`firebird-tma-maps`，仅允许上述三个 API（无 referrer/IP 限制）；同时写入 k8s secret `firebird-storage-secret/google-maps-api-key` 与 GitHub secret `GOOGLE_MAPS_API_KEY`。
+  - 失效/轮换：`gcloud services api-keys list --project fh580-70533` 找到 key → 新建并重复上面两步写入即可；前端 key 是构建期注入，必须重新构建镜像。
