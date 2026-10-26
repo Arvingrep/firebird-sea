@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { buildDealParams, parseDealResult, validateAddress, isCancellable, ValidationError } from '../src/lib/checkout.js';
+import { buildDealParams, parseDealResult, validateAddress, isCancellable, cancelReason, PAY_TIMEOUT_MINUTES, ValidationError } from '../src/lib/checkout.js';
 
 const lines = [{ id: 5, qty: 2, priceCents: 100, title: 'x' }];
 
@@ -62,4 +62,28 @@ test('parseDealResult：纯订单号 / 零元单 / 代付 / 在线支付表单',
   assert.strictEqual(parseDealResult({ ordernum: 'N1', orderurl: 'u' }).needOnline, true);
   assert.deepStrictEqual(parseDealResult(null), { ordernum: '', needOnline: false });
   assert.deepStrictEqual(parseDealResult(''), { ordernum: '', needOnline: false });
+});
+
+test('取消原因：系统超时与用户主动要能区分，空值不渲染', () => {
+  // cron 写的原文（waimai_updateOrderState.php:46）
+  assert.deepStrictEqual(cancelReason({ failed: '订单超时未支付' }), { raw: '订单超时未支付', auto: true });
+  // 用户主动取消（waimai.class.php:5253）——不能标成系统取消，否则等于甩锅给系统
+  assert.deepStrictEqual(cancelReason({ failed: '用户取消订单' }), { raw: '用户取消订单', auto: false });
+  // 老数据里的旧文案（同文件 :45 被注释掉的那行）仍要认成系统取消
+  assert.strictEqual(cancelReason({ failed: '半小时内未支付，系统自动取消！2026-10-01 10:00:00' }).auto, true);
+});
+
+test('取消原因：没有原因、字段缺失、非字符串一律返回 null', () => {
+  assert.strictEqual(cancelReason(null), null);
+  assert.strictEqual(cancelReason({}), null);
+  assert.strictEqual(cancelReason({ failed: '' }), null);
+  assert.strictEqual(cancelReason({ failed: '   ' }), null);
+  assert.strictEqual(cancelReason({ failed: null }), null);
+  assert.strictEqual(cancelReason({ failed: 0 }), null);
+  // 未取消的订单即使有历史残留文本也照样返回，交由调用方按 state 决定是否展示
+  assert.strictEqual(cancelReason({ failed: ' 订单超时未支付 ' }).raw, '订单超时未支付');
+});
+
+test('未支付超时窗口与 cron 的 1800 秒一致', () => {
+  assert.strictEqual(PAY_TIMEOUT_MINUTES, 30);
 });
