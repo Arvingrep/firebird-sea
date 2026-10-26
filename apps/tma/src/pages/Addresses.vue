@@ -136,9 +136,11 @@ async function share(a: Address) {
     });
     const data = await r.json();
     if (!r.ok || !data?.success) throw new Error(data?.error?.message || 'share failed');
-    // 深链优先（接收方点开直达小程序）；bot 用户名未就绪时退化为「地址文本 + 本站链接」
+    // 深链优先（接收方点开直达小程序）；bot 用户名未就绪时退化为「地址文本 + 本站链接」。
+    // 文本里带完整地址（含门牌/补充），即使对方打不开深链也能照着填。
     const url = data.data.url || location.origin + '/tma/';
-    const text = t('address.shareText', { addr: mainLine(a) });
+    const full = [mainLine(a), extraLine(a)].filter(Boolean).join('，');
+    const text = t('address.shareText', { addr: full });
     openExternal(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
   } catch (err: any) {
     showToast(/reopen/i.test(err?.message || '') ? t('auth.reopen') : t('address.shareFail'));

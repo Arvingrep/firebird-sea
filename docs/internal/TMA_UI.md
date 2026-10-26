@@ -149,3 +149,8 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **前置条件**：bot 需在 BotFather 配置 Main Mini App，`t.me/<bot>?startapp=` 才能直接拉起小程序；否则链接只会打开 bot 聊天（此时仍可把地址文本发给对方手工录入）。当前 bot：`@fbird_men_bot`。
 - **⚠️ cliConn 的 `-N -B` 转义陷阱（QA 第 1 轮 major）**：`services/api/src/migrate.js` 的 `cliConn` 用 `mariadb -N -B` 批处理模式，**输出里的反斜杠会被再次转义**。`payload` 是 JSON，地址里只要有 `"`（如 `5'10"`）或 `\`，直接 `SELECT payload` 读回就会变成 `\"` / `\\`，`JSON.parse` 失败或内容变形。故读取统一走 `SELECT HEX(payload)`，Node 端 `Buffer.from(hex,'hex')` 还原。**任何经 cliConn 存取自由文本（JSON/HTML/含引号的串）都必须走 HEX 或 base64，不能直接查原始列。**
 - 单测：`services/api/test/addr-share-route.test.js`（12 例：鉴权/入参裁剪/换行清理/反斜杠转义/每 uid 上限/HEX 往返含 `"` `\`/非法 token/过期/损坏/限流/降级）。
+
+### 可观测性与分享兜底（2026-10-26 收尾）
+
+- **登录异常必须留日志**：`server.js` 的 `/auth/telegram` catch 原先静默返回 `502 LOGIN_FAILED`，线上排查时日志全空，只能进容器逐层复现。现补一行 `console.error`，**只打错误消息、不打 initData**（initData 是可复用凭证，进日志等于二次泄漏）。
+- **分享文本带完整地址**：`t.me/share/url` 的 text 由「主地址」改为「主地址，门牌/楼层/单元」，深链在对方客户端打不开时仍可照着文本手工录入。

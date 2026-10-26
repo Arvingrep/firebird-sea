@@ -129,6 +129,9 @@ router.post('/auth/telegram', async (req, res) => {
     const r = await auth.loginService.login(req.body && req.body.initData);
     res.status(r.status).json(r.body);
   } catch (err) {
+    // 只记消息不记 initData（含可复用凭证），避免日志成为二次泄漏面；
+    // 没有这行时线上表现为 502 + 空日志，只能逐层进容器复现（2026-10-26 排障实录）
+    console.error('[auth/telegram] login failed:', String((err && err.message) || err).slice(0, 300));
     res.status(502).json({ success: false, error: { code: 'LOGIN_FAILED', message: 'Login temporarily unavailable' } });
   }
 });
