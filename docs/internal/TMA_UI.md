@@ -137,8 +137,13 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 
 **5. 分享地址（代下单）**
 - 新表 `fbs_addr_share`（migration `003_addr_share.sql`）：`token CHAR(32) PK / uid / payload(JSON 快照) / created_at / expires_at`，7 天过期，过期即不可读。
-- `POST /tg-api/addr/share`（需 Bearer 令牌，10 次/分）：客户端上传地址快照 → 返回 `{ token, url }`；`url = https://t.me/<bot>?startapp=addr_<token>`，bot 用户名由服务端调 `getMe` 缓存获取（未就绪时 `url=null`，前端降级为纯文本分享）。
-- `GET /tg-api/addr/shared/:token`（公开，60 次/分）：仅凭 token 返回快照，不含 uid；token 非法格式直接 404 且不触库。
+- `POST /tg-api/addr/share`（需 Bearer 令牌）：客户端上传地址快照 → 返回 `{ token, url }`；`url = https://t.me/<bot>?startapp=addr_<token>`，bot 用户名由服务端调 `getMe` 缓存获取（未就绪时 `url=null`，前端降级为纯文本分享）。
+  - 限流：`TMA_SHARE_MAX`，默认 **10 次/分**（按 IP，`createLimiter`）。
+  - 每个会员最多保留 **20 条**有效分享（新分享写入后按 `created_at DESC, token DESC` 裁掉更早的），避免公开接口长期堆积个人信息。
+- `GET /tg-api/addr/shared/:token`（公开，凭 token）：仅返回地址快照，不含 uid；token 非法格式直接 404 且不触库。
+  - 限流：`TMA_SHARE_READ_MAX`，默认 **60 次/分**（按 IP）。
+  - **隐私取舍**：该接口不校验登录，任何拿到 token 的人都能读到姓名/电话/坐标；因此 token 为 32 位随机 hex（不可枚举）、7 天过期、单会员 20 条上限。若后续要更严，可改为「首次领取后失效」。
 - 接收方打开深链时，前端识别 `start_param = addr_<token>` → 弹窗确认 → 调 `operAddress` 存为自己的地址（同一条链接只询问一次，`sessionStorage` 去重）。
-- **前置条件**：bot 需在 BotFather 配置 Main Mini App，`t.me/<bot>?startapp=` 才能直接拉起小程序；否则链接只会打开 bot 聊天（此时仍可把地址文本发给对方手工录入）。
-- 单测：`services/api/test/addr-share-route.test.js`（10 例，覆盖鉴权/入参裁剪/快照读写/非法 token/过期/限流/降级）。
+- **前置条件**：bot 需在 BotFather 配置 Main Mini App，`t.me/<bot>?startapp=` 才能直接拉起小程序；否则链接只会打开 bot 聊天（此时仍可把地址文本发给对方手工录入）。当前 bot：`@fbird_men_bot`。
+- **⚠️ cliConn 的 `-N -B` 转义陷阱（QA 第 1 轮 major）**：`services/api/src/migrate.js` 的 `cliConn` 用 `mariadb -N -B` 批处理模式，**输出里的反斜杠会被再次转义**。`payload` 是 JSON，地址里只要有 `"`（如 `5'10"`）或 `\`，直接 `SELECT payload` 读回就会变成 `\"` / `\\`，`JSON.parse` 失败或内容变形。故读取统一走 `SELECT HEX(payload)`，Node 端 `Buffer.from(hex,'hex')` 还原。**任何经 cliConn 存取自由文本（JSON/HTML/含引号的串）都必须走 HEX 或 base64，不能直接查原始列。**
+- 单测：`services/api/test/addr-share-route.test.js`（12 例：鉴权/入参裁剪/换行清理/反斜杠转义/每 uid 上限/HEX 往返含 `"` `\`/非法 token/过期/损坏/限流/降级）。

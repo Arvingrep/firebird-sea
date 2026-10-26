@@ -12,7 +12,7 @@ function startApp({ validToken = true, mid = 4242, db, botToken = '', shareMax =
   const calls = [];
   const store = db || (async (sql) => {
     calls.push(sql);
-    if (sql.includes('SELECT payload')) return JSON.stringify({ person: 'Alex', street: 'A', lat: '1', lng: '2' });
+    if (sql.includes('HEX(payload)')) return Buffer.from(JSON.stringify({ person: 'Alex', street: 'A', lat: '1', lng: '2' }), 'utf8').toString('hex');
     return '';
   });
   const app = express();
@@ -99,6 +99,34 @@ test('分享：超长与换行内容被裁剪成单行', async () => {
     const insert = calls.find((s) => s.includes('INSERT INTO fbs_addr_share'));
     assert.ok(!insert.includes('\\n'), '不应写入换行');
     assert.ok(insert.length < 1200, '街道应被截断到 300 字符内');
+  } finally { server.close(); }
+});
+
+test('分享：写入时反斜杠被转义，并限制每个会员保留 20 条', async () => {
+  const { server, port, calls } = await startApp({});
+  try {
+    const r = await req(port, '/tg-api/addr/share', {
+      method: 'POST', auth: 'Bearer good',
+      body: { street: 'Tower\\A "North"', lat: '1', lng: '2' },
+    });
+    assert.strictEqual(r.status, 200);
+    const insert = calls.find((s) => s.includes('INSERT INTO fbs_addr_share'));
+    assert.ok(insert.includes('\\\\'), '反斜杠应被 sqlStr 双写转义');
+    const cap = calls.find((s) => s.includes('ORDER BY created_at DESC'));
+    assert.ok(cap && cap.includes('LIMIT 20'), '应限制每个 uid 的有效分享条数');
+  } finally { server.close(); }
+});
+
+test('读取：含双引号/反斜杠的地址经 HEX 往返后内容完全一致', async () => {
+  // QA 第 1 轮 major 回归：cliConn 是 `mariadb -N -B`，直接 SELECT payload 会被再转义，
+  // 含 " 或 \ 的 JSON 读回即坏。这里模拟真实返回的 HEX 文本，断言解析结果与写入值逐字相等。
+  const tricky = { person: 'O"Brien\\Lee', tel: '@obrien', street: '5\'10" Tower\\A', address: '5\'10" Tower\\A，Unit 3', lat: '21.2', lng: '-157.8', areaCode: '1' };
+  const hex = Buffer.from(JSON.stringify(tricky), 'utf8').toString('hex');
+  const { server, port } = await startApp({ db: async (sql) => (sql.includes('HEX(payload)') ? hex : '') });
+  try {
+    const r = await req(port, `/tg-api/addr/shared/${VALID_TOKEN}`);
+    assert.strictEqual(r.status, 200);
+    assert.deepStrictEqual(r.json.data, tricky);
   } finally { server.close(); }
 });
 

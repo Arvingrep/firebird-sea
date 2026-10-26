@@ -8,6 +8,8 @@ const { sqlStr } = require('./memberMap');
 
 const LIMITS = { person: 80, tel: 60, street: 300, address: 400, areaCode: 8, coord: 24 };
 const TOKEN_RE = /^[0-9a-f]{32}$/;
+// 每个会员保留的有效分享条数上限：GET 是公开接口，长期堆积等于长期暴露姓名/电话/坐标
+const MAX_PER_UID = 20;
 
 // 单行化 + 截断：防止快照里带换行/制表符破坏 TSV 读取，也防止超长内容撑库
 const clip = (v, n) => String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').trim().slice(0, n);
@@ -73,6 +75,11 @@ function createAddrShareRouter({
         `INSERT INTO fbs_addr_share (token, uid, payload, created_at, expires_at) VALUES ` +
         `(${sqlStr(token)}, ${mid}, ${sqlStr(JSON.stringify(payload))}, ${now()}, ${exp})`
       );
+      // 只保留该会员最近 MAX_PER_UID 条（派生表绕开 MySQL「DELETE 子查询不能引用同表」限制）
+      await conn.query(
+        `DELETE FROM fbs_addr_share WHERE uid = ${mid} AND token NOT IN (` +
+        `SELECT token FROM (SELECT token FROM fbs_addr_share WHERE uid = ${mid} ORDER BY created_at DESC, token DESC LIMIT ${MAX_PER_UID}) AS keep)`
+      );
     } catch (e) {
       return res.status(502).json({ success: false, error: { code: 'STORE_FAILED', message: 'Please retry' } });
     }
@@ -97,14 +104,20 @@ function createAddrShareRouter({
     if (!TOKEN_RE.test(tk)) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
     let out;
     try {
-      out = await conn.query(`SELECT payload FROM fbs_addr_share WHERE token = ${sqlStr(tk)} AND expires_at > ${now()}`);
+      // 必须用 HEX 取回：cliConn 走 `mariadb -N -B`，批处理模式会把输出里的反斜杠再次转义，
+      // 直接 SELECT payload 时含 " 或 \ 的 JSON 会变成 \" / \\ 导致解析失败（QA 第 1 轮 major）。
+      out = await conn.query(`SELECT HEX(payload) FROM fbs_addr_share WHERE token = ${sqlStr(tk)} AND expires_at > ${now()}`);
     } catch (e) {
       return res.status(502).json({ success: false, error: { code: 'LOOKUP_FAILED' } });
     }
-    const line = String(out || '').trim();
-    if (!line) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
+    const hex = String(out || '').trim();
+    if (!hex) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND' } });
     let data;
-    try { data = JSON.parse(line); } catch (e) { return res.status(502).json({ success: false, error: { code: 'CORRUPT' } }); }
+    try {
+      data = JSON.parse(Buffer.from(hex, 'hex').toString('utf8'));
+    } catch (e) {
+      return res.status(502).json({ success: false, error: { code: 'CORRUPT' } });
+    }
     res.json({ success: true, data });
   });
 
