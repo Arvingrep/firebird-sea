@@ -33,6 +33,12 @@ function watchAddressManualEdit() {
 async function save() {
   errors.value = validateAddress(form.value);
   if (Object.keys(errors.value).length) return;
+  // 上游 waimai.class.php:2109 强制要求 lng/lat（「请选择地图坐标！」）——无坐标的手输地址会被上游拒绝，
+  // 必须引导用户通过地图联想选点；纯手输在当前上游契约下不可用（TMA 老版 touch 前端同样是地图选点）
+  if (!form.value.lat || !form.value.lng) {
+    showToast(MAPS_KEY ? t('address.needMap') : t('address.needMapNoKey'));
+    return;
+  }
   try {
     await fb.post('waimai', 'operAddress', { id: form.value.id, person: form.value.person, tel: form.value.tel, address: form.value.address, street: form.value.address, lat: form.value.lat, lng: form.value.lng });
     editing.value = false;
