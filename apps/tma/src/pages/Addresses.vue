@@ -78,10 +78,8 @@ async function save() {
   if (!contactValue()) e.tel = 'REQUIRED';
   errors.value = e;
   if (Object.keys(e).length) return;
-  if (!form.value.lat || !form.value.lng) {
-    showToast(MAPS_KEY ? t('address.needMap') : t('address.needMapNoKey'));
-    return;
-  }
+  // 坐标不再由前端强制提供：没选中联想项时服务端会按地址文本反查（waimai::operAddress）。
+  // 旧逻辑在这里 return，导致「前端没拿到 Maps key → 永远存不了地址」（2026-10-26 线上事故）。
   const street = String(form.value.street).trim();
   const tail = [form.value.extra, form.value.note].map((s) => String(s || '').trim()).filter(Boolean).join('；');
   const address = tail ? `${street}，${tail}` : street;
@@ -101,7 +99,10 @@ async function save() {
     await load();
     showToast(t('address.saved'));
   } catch (err: any) {
-    showToast(/reopen/i.test(err?.message || '') ? t('auth.reopen') : (err?.message || 'Error'));
+    const msg = String(err?.message || '');
+    if (/reopen/i.test(msg)) showToast(t('auth.reopen'));
+    else if (/地址解析|地图坐标/.test(msg)) showToast(t('address.locateFailed'));
+    else showToast(msg || 'Error');
   }
 }
 

@@ -2069,6 +2069,60 @@ class waimai
 
 
     /**
+     * 地址文本 → 经纬度（Google Geocoding）
+     * 供「前端只提交地址、不提交坐标」的场景兜底，key 用服务端注入的 $cfg_map_google。
+     * 只在能拿到「足够精确」的结果时返回坐标：status 必须为 OK，且不接受
+     * partial_match / location_type=APPROXIMATE（只命中城市或街道级别），
+     * 否则返回空数组由调用方报错——宁可让用户补全地址，也不把错坐标写进库
+     * （错坐标会连带影响配送范围、距离运费与骑手导航）。
+     */
+    private function geocodeAddressByText($query)
+    {
+        global $cfg_map_google;
+        $query = trim(preg_replace('/\s+/u', ' ', (string)$query));
+        if ($query === '' || empty($cfg_map_google)) {
+            return array();
+        }
+        // key 只放在请求 URL 里，不写日志、不回传前端
+        $url = 'https://maps.googleapis.com/maps/api/geocode/json?address=' . rawurlencode($query)
+             . '&language=zh-CN&key=' . $cfg_map_google;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT        => 6,
+        ));
+        $raw = curl_exec($ch);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if (!$raw) {
+            error_log('[operAddress] geocode transport failed: ' . ($curlErr ? $curlErr : 'empty response'));
+            return array();
+        }
+        $json = json_decode($raw, true);
+        $status = isset($json['status']) ? $json['status'] : 'UNKNOWN';
+        if ($status !== 'OK' || empty($json['results'][0]['geometry']['location'])) {
+            // 只记状态与错误信息（不含 key、不含完整 URL）
+            $errMsg = isset($json['error_message']) ? $json['error_message'] : '';
+            error_log('[operAddress] geocode failed: status=' . $status . ' msg=' . $errMsg);
+            return array();
+        }
+        $hit = $json['results'][0];
+        $loc = $hit['geometry']['location'];
+        $locType = isset($hit['geometry']['location_type']) ? $hit['geometry']['location_type'] : '';
+        if (!empty($hit['partial_match']) || $locType === 'APPROXIMATE') {
+            error_log('[operAddress] geocode imprecise: type=' . $locType . ' partial=' . (empty($hit['partial_match']) ? '0' : '1'));
+            return array();
+        }
+        return array(
+            'lat'       => $loc['lat'],
+            'lng'       => $loc['lng'],
+            'formatted' => isset($hit['formatted_address']) ? $hit['formatted_address'] : '',
+        );
+    }
+
+    /**
      * 添加/修改地址
      */
     public function operAddress()
@@ -2106,8 +2160,32 @@ class waimai
             return array ("state" => 200, "info" => '请选择街道/小区/建筑！');
         }
 
+        // 坐标缺失时服务端按地址文本反查（Google Geocoding）。
+        // TMA 表单已改为「只填地址」，不再依赖前端 Google Places 取坐标：
+        // 前端没拿到 key / Places 加载失败时，旧逻辑会因坐标为空把保存彻底卡死（2026-10-26 线上）。
+        if ((empty($lng) || empty($lat)) && trim($street . ' ' . $address) !== '') {
+            // 带上分站城市名：TMA 用户常只写「街道 + 门牌」，单靠街道名可能被解析到别的国家
+            $geoQuery = trim($street . ' ' . $address);
+            $cityName = '';
+            if (!empty($siteCityInfo['name'])) {
+                $cityName = $siteCityInfo['name'];
+            } elseif (!empty($siteCityInfo['typename'])) {
+                $cityName = $siteCityInfo['typename'];
+            }
+            if ($cityName) {
+                $geoQuery .= ' ' . $cityName;
+            }
+            $geo = $this->geocodeAddressByText($geoQuery);
+            if (!empty($geo['lat']) && !empty($geo['lng'])) {
+                $lat = $geo['lat'];
+                $lng = $geo['lng'];
+            }
+        }
+
         if (empty($lng) || empty($lat)) {
-            return array ("state" => 200, "info" => '请选择地图坐标！');
+            // 解析不出就报错，让用户补全地址：不做「分站中心点」兜底，
+            // 错误坐标会污染配送范围、距离运费与骑手导航，比存不下更糟。
+            return array ("state" => 200, "info" => '地址解析失败，请填写更完整的地址！');
         }
 
         if (empty($address)) {

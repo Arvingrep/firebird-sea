@@ -166,3 +166,19 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - 资讯页首屏：三个分类长期为 0 篇（本地新闻/国际新闻/华人动态），默认分类为空导致一进页面就是空白 →
   News.vue 首次加载后若当前分类为空，用 `pageSize=1` 依次探测其它分类并自动切到第一个有文章的分类（只做一次，探测失败静默跳过）；
   用户手动点空分类时不干预，正常显示「暂无资讯」。
+
+## 地址保存改为「服务端按地址反查坐标」（2026-10-26 线上事故修复）
+
+- **事故**：新版地址表单只让用户填地址，坐标依赖前端 Google Places 选中联想项；而 canary 线上包的
+  `VITE_GOOGLE_MAPS_API_KEY` 未生效（打 bundle 验证：无 `AIzaSy`、无 `maps.googleapis.com`，Maps 代码被摇树删掉），
+  于是 `lat/lng` 永远为空 → `save()` 直接 return → **地址一条都存不了**（用户侧表现为「连地址保全都搞不定」）。
+- **修复（前端）**：`Addresses.vue::save` 删除「无坐标就拦截」的硬校验；坐标交给服务端。
+- **修复（后端）**：`waimai::operAddress` 在 lng/lat 为空时调用新增私有方法 `geocodeAddressByText()`：
+  Google Geocoding（服务端 key `$cfg_map_google`，pod 内实测 `status=OK`），查询串带上分站城市名
+  `$siteCityInfo['name']`，避免只写街道名被解析到别的国家。
+- **精度门槛（QA 打回后收紧）**：只接受 `status=OK` 且 `location_type != APPROXIMATE`、`partial_match` 为假的结果；
+  **解析失败直接报错让用户补全，不做「分站中心点」兜底**——错坐标会污染配送范围、距离运费与骑手导航，比存不下更糟。
+  失败只 `error_log` 记 status/error_message（不含 key 与完整 URL）。
+- **契约**：TMA 写地址只保证 `person/tel/street/address/areaCode`；`lat/lng` 为可选，缺失由服务端解析。
+- **教训**：前端能用 ≠ 线上能用。凡是「构建期注入的 key」，必须对**线上 bundle** 做一次实际存在性校验
+  （grep `AIzaSy` / SDK URL），不能只信 CI 里的 `--build-arg`。
