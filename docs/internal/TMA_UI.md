@@ -175,7 +175,10 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **修复（前端）**：`Addresses.vue::save` 删除「无坐标就拦截」的硬校验；坐标交给服务端。
 - **修复（后端）**：`waimai::operAddress` 在 lng/lat 为空时调用新增私有方法 `geocodeAddressByText()`：
   Google Geocoding（服务端 key `$cfg_map_google`，pod 内实测 `status=OK`），查询串带上分站城市名
-  `$siteCityInfo['typename']`，避免只写街道名被解析到别的国家；仍失败则退到分站中心点，保证「能存能下单」。
+  `$siteCityInfo['name']`，避免只写街道名被解析到别的国家。
+- **精度门槛（QA 打回后收紧）**：只接受 `status=OK` 且 `location_type != APPROXIMATE`、`partial_match` 为假的结果；
+  **解析失败直接报错让用户补全，不做「分站中心点」兜底**——错坐标会污染配送范围、距离运费与骑手导航，比存不下更糟。
+  失败只 `error_log` 记 status/error_message（不含 key 与完整 URL）。
 - **契约**：TMA 写地址只保证 `person/tel/street/address/areaCode`；`lat/lng` 为可选，缺失由服务端解析。
 - **教训**：前端能用 ≠ 线上能用。凡是「构建期注入的 key」，必须对**线上 bundle** 做一次实际存在性校验
   （grep `AIzaSy` / SDK URL），不能只信 CI 里的 `--build-arg`。
