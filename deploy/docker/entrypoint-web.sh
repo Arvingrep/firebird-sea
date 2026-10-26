@@ -54,6 +54,12 @@ fi
 if [ -n "$RESEND_KEY" ] && [ -f "$SITECONFIG_FILE" ]; then
     sed -i "s|\\\$cfg_mailPass = .*|\\\$cfg_mailPass = '${RESEND_KEY}';|" "$SITECONFIG_FILE"
 fi
+# Google 地图 Key 注入 siteConfig（$cfg_map_google）。注意：不能依赖 PHP getenv()——
+# FPM worker 的 getenv() 只查 FastCGI 请求参数表，不读进程 environ（clear_env=no 保留的
+# 进程变量只出现在 $_SERVER）。启动时以 env 为准直接写入配置文件（与 GCS/RESEND 同模式）。
+if [ -n "$GOOGLE_MAPS_API_KEY" ] && [ -f "$SITECONFIG_FILE" ]; then
+    sed -i "s|\\\$cfg_map_google = .*|\\\$cfg_map_google = '${GOOGLE_MAPS_API_KEY}';|" "$SITECONFIG_FILE"
+fi
 
 # 如果挂载了声明式 ConfigMap 配置注入目录 (/etc/firebird-configs)，启动时自动同步至 include/config 并赋予写权限
 if [ -d "/etc/firebird-configs" ] && [ -n "$(ls -A /etc/firebird-configs 2>/dev/null)" ]; then

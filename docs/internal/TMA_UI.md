@@ -75,4 +75,5 @@ npm run build      # 产物
 ### 站点配置层（PR #151，2026-10-26）
 
 - 上游保存地址前的 Geocoding 反查分站用 `$cfg_map_google`（`webroot/include/config/siteConfig.inc.php`）——原为空串导致保存回「You must use an API key」。现改 `getenv('GOOGLE_MAPS_API_KEY')`，经 `_helpers.tpl` 公共 env 注入（secret `firebird-storage-secret/google-maps-api-key`，optional：未配置时维持空串、行为同前）。
+- **⚠️ FPM getenv() 陷阱（PR #152 后实测发现并修复，entrypoint 注入兜底）**：Deployment env / secret / 镜像内文件全部正确、`clear_env = no` 已配，但线上仍报缺 key。容器内探针（经 nginx→fpm 真实链路）证实：`$_SERVER['GOOGLE_MAPS_API_KEY']` 有值，而 `getenv('GOOGLE_MAPS_API_KEY')` 为空——**FPM SAPI 下 `getenv()` 只查 FastCGI 请求参数表，不读进程 environ**（`clear_env=no` 保留的进程变量只进 `$_SERVER`）。修复：`entrypoint-web.sh` 启动时用 sed 把 env 值直接写入 `siteConfig.inc.php` 的 `$cfg_map_google`（与 GCS_KEY/RESEND_KEY 同模式），不再依赖 PHP getenv。教训：容器内 `kubectl exec env` 验证 ≠ FPM worker 视角，env 注入类修复必须经真实 web 请求探针终验。
 - **Geocoding 用的是服务端 key，与前端联想 key 可为同一个**，但 Google 侧限制策略不同：前端 key 加 HTTP referrer 限制，服务端 key 加 IP 限制（GKE 出口 NAT IP）并仅启用 Geocoding API。
