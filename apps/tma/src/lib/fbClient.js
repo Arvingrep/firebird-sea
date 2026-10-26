@@ -15,6 +15,9 @@ const newKey = () => {
   return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
 };
 
+// 火鸟「空数据」文案（多语言站点下仍以中文原文返回；只匹配空态语义，避免吞掉真实错误）
+const EMPTY_RE = /暂无数据|没有数据|暂无内容|暂无信息/;
+
 // authClient：{ request(path, init) → Response }，来自 createAuthClient；anonymous 为无需令牌的 fetch
 export function createFbClient({ authClient, anonymousFetch, baseUrl = '/tg-api/fb', platform = 'tma' }) {
   function buildPath(service, action, params) {
@@ -35,10 +38,11 @@ export function createFbClient({ authClient, anonymousFetch, baseUrl = '/tg-api/
     try { json = await res.json(); } catch (e) { throw new FbError('BAD_RESPONSE', 'Invalid response', res.status); }
     if (!res.ok) throw new FbError(json?.error?.code || 'HTTP_ERROR', json?.error?.message || `HTTP ${res.status}`, res.status);
     if (json.state !== 100) {
-      // 火鸟列表接口惯例：空数据返回 state=200 + "暂无数据"，属正常空态而非错误
-      //（调用方对 null 均已做 Array.isArray/info?.list 兜底 → 渲染为 van-empty）
+      // 火鸟列表接口惯例：空数据是 handler 返回 state=200 + "暂无数据"，网关 handlers::getHandle
+      // 会把它归一成外层 state=101（与真实错误同状态码，只能靠文案区分）。
+      // 空态返回 null，交由调用方的 Array.isArray / info?.list 兜底渲染 van-empty。
       const msg = typeof json.info === 'string' ? json.info : '';
-      if (json.state === 200 && msg.includes('暂无数据')) return null;
+      if ((json.state === 101 || json.state === 200) && EMPTY_RE.test(msg)) return null;
       throw new FbError('UPSTREAM_STATE', String(json.info || 'Request failed'), json.state);
     }
     return json.info;

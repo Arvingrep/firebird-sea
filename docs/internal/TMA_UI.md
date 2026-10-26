@@ -157,6 +157,9 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 
 ## 火鸟「空数据」惯例 → TMA 空态处理（2026-10-26）
 
-- 上游列表接口（article::alist / waimai::order 等）空数据返回 `state=200, info:"暂无数据！"`，不是错误。
-- fbClient.unwrap 对该惯例返回 null（其他 state=200 仍抛错）；调用方均以 `Array.isArray(x) ? x : []` / `info?.list` 兜底 → 页面渲染 van-empty。
+- 上游列表接口（article::alist / waimai::order 等）空数据在 handler 层是 `state=200, info:"暂无数据！"`；
+  网关 `handlers::getHandle`（api/handlers/handlers.class.php:68）把 200/101 统一归一成**外层 `state=101`**，与真实错误同状态码，只能靠文案区分。
+- fbClient.unwrap 对 `state 101/200` + 空态文案（暂无数据/没有数据/暂无内容/暂无信息）返回 null，其余 101 仍抛错；
+  调用方均以 `Array.isArray(x) ? x : []` / `info?.list` 兜底 → 页面渲染 van-empty。
+- **教训**：判断上游契约必须打真实接口（`/tg-api/fb/article/alist?typeid=2` → state 101），不要只读 handler 源码里的 return。
 - 修复动机：资讯页 国际新闻/本地新闻/华人动态 三分类在 canary 库文章数为 0，此前整页显示「加载失败，请重试」，误导为服务故障。线上分类数据（2026-10-26 查证）：综合资讯 6 篇，其余 0 篇。
