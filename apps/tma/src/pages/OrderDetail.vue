@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { showConfirmDialog, showToast } from 'vant';
 import { fb, t } from '../services';
-import { ORDER_STATE, isCancellable } from '../lib/checkout.js';
+import { ORDER_STATE, isCancellable, cancelReason } from '../lib/checkout.js';
 import { buildDeliveryView, shouldShowMap, shouldTrack } from '../lib/delivery.js';
 import AppIcon from '../components/AppIcon.vue';
 import DeliveryMap from '../components/DeliveryMap.vue';
@@ -26,6 +26,7 @@ async function load() {
 }
 const stateKey = (s: number | string) => (ORDER_STATE as Record<string, string>)[String(s)] || 'unknown';
 const label = (s: number | string) => t(`state.${stateKey(s)}`);
+const cancelInfo = computed(() => cancelReason(order.value));
 
 /* ---- 配送地图 ---- */
 const deliveryView = computed(() => buildDeliveryView(order.value, pathRaw.value));
@@ -156,7 +157,18 @@ onMounted(load);
         </div>
         <p class="meta" style="margin: 8px 0 0">#{{ order.ordernum }}</p>
         <p v-if="order.qcma" class="meta" style="margin: 4px 0 0">{{ t('order.pickupCode') }} <b>{{ order.qcma }}</b></p>
-        <p v-if="order.failed" class="meta" style="margin: 4px 0 0; color: var(--brand)">{{ order.failed }}</p>
+        <p v-if="Number(order.state) === 0" class="hint hint--warn" style="margin: 8px 0 0">{{ t('orders.payTimeout') }}</p>
+
+        <!-- 取消原因：上游写在 failed 字段。只显示一行小字时用户会以为是自己点的，
+             所以系统超时这类要单独说清「不是你取消的」，并给出 30 分钟规则。 -->
+        <div v-if="cancelInfo" class="notice" :class="{ 'notice--auto': cancelInfo.auto }">
+          <span class="notice__ico"><AppIcon name="info" :size="16" /></span>
+          <div class="grow">
+            <b>{{ cancelInfo.auto ? t('orders.autoCancelled') : t('orders.cancelReason') }}</b>
+            <p class="notice__raw">{{ cancelInfo.raw }}</p>
+            <p v-if="cancelInfo.auto" class="notice__hint">{{ t('orders.autoCancelledHint') }}</p>
+          </div>
+        </div>
       </div>
 
       <!-- 配送地图（商家已接单之后才有意义） -->

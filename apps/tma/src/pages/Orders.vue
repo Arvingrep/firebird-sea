@@ -129,6 +129,8 @@ onMounted(load);
           <span class="num">#{{ o.ordernum }}</span>
           <span class="amt">₱{{ Number(o.amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}</span>
         </div>
+        <!-- 取消原因：只给徽章不给原因时，用户会以为是自己误操作取消的 -->
+        <p v-if="o.failed" class="reason">{{ o.failed }}</p>
         <div v-if="isCancellable(o.state)" class="acts">
           <button class="btn btn--ghost" @click.stop="cancel(o)">{{ t('orders.cancel') }}</button>
           <button class="btn btn--dark" @click.stop="router.push({ name: 'order-detail', params: { id: o.id } })">
