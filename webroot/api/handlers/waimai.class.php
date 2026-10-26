@@ -2071,6 +2071,43 @@ class waimai
     /**
      * 添加/修改地址
      */
+    /**
+     * 地址文本 → 经纬度（Google Geocoding）
+     * 供「前端只提交地址、不提交坐标」的场景兜底，key 用服务端注入的 $cfg_map_google。
+     * 失败/无 key 返回空数组，调用方自行决定降级策略。
+     */
+    private function geocodeAddressByText($query)
+    {
+        global $cfg_map_google;
+        $query = trim(preg_replace('/\s+/u', ' ', (string)$query));
+        if ($query === '' || empty($cfg_map_google)) {
+            return array();
+        }
+        $url = 'https://maps.googleapis.com/maps/api/geocode/json?address=' . rawurlencode($query)
+             . '&language=zh-CN&key=' . $cfg_map_google;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT        => 6,
+        ));
+        $raw = curl_exec($ch);
+        curl_close($ch);
+        if (!$raw) {
+            return array();
+        }
+        $json = json_decode($raw, true);
+        if (empty($json['results'][0]['geometry']['location'])) {
+            return array();
+        }
+        $loc = $json['results'][0]['geometry']['location'];
+        return array(
+            'lat'       => $loc['lat'],
+            'lng'       => $loc['lng'],
+            'formatted' => isset($json['results'][0]['formatted_address']) ? $json['results'][0]['formatted_address'] : '',
+        );
+    }
+
     public function operAddress()
     {
         global $dsql;
@@ -2106,8 +2143,30 @@ class waimai
             return array ("state" => 200, "info" => '请选择街道/小区/建筑！');
         }
 
+        // 坐标缺失时服务端按地址文本反查（Google Geocoding）。
+        // TMA 表单已改为「只填地址」，不再依赖前端 Google Places 取坐标：
+        // 前端没拿到 key / Places 加载失败时，旧逻辑会因坐标为空把保存彻底卡死（2026-10-26 线上）。
+        if ((empty($lng) || empty($lat)) && trim($street . ' ' . $address) !== '') {
+            // 带上分站城市名：TMA 用户常只写「街道 + 门牌」，单靠街道名可能被解析到别的国家
+            $geoQuery = trim($street . ' ' . $address);
+            if (!empty($siteCityInfo['typename'])) {
+                $geoQuery .= ' ' . $siteCityInfo['typename'];
+            }
+            $geo = $this->geocodeAddressByText($geoQuery);
+            if (!empty($geo['lat']) && !empty($geo['lng'])) {
+                $lat = $geo['lat'];
+                $lng = $geo['lng'];
+            }
+        }
+
         if (empty($lng) || empty($lat)) {
-            return array ("state" => 200, "info" => '请选择地图坐标！');
+            // 仍解析不出：退到当前分站中心点，保证地址能存、能下单（分站由 cityid 决定）
+            if (!empty($siteCityInfo['lng']) && !empty($siteCityInfo['lat'])) {
+                $lng = $siteCityInfo['lng'];
+                $lat = $siteCityInfo['lat'];
+            } else {
+                return array ("state" => 200, "info" => '地址解析失败，请填写更完整的地址！');
+            }
         }
 
         if (empty($address)) {
