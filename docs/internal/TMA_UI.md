@@ -163,3 +163,6 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
   调用方均以 `Array.isArray(x) ? x : []` / `info?.list` 兜底 → 页面渲染 van-empty。
 - **教训**：判断上游契约必须打真实接口（`/tg-api/fb/article/alist?typeid=2` → state 101），不要只读 handler 源码里的 return。
 - 修复动机：资讯页 国际新闻/本地新闻/华人动态 三分类在 canary 库文章数为 0，此前整页显示「加载失败，请重试」，误导为服务故障。线上分类数据（2026-10-26 查证）：综合资讯 6 篇，其余 0 篇。
+- 资讯页首屏：三个分类长期为 0 篇（本地新闻/国际新闻/华人动态），默认分类为空导致一进页面就是空白 →
+  News.vue 首次加载后若当前分类为空，用 `pageSize=1` 依次探测其它分类并自动切到第一个有文章的分类（只做一次，探测失败静默跳过）；
+  用户手动点空分类时不干预，正常显示「暂无资讯」。

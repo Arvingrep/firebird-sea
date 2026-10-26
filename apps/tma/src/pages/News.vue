@@ -35,12 +35,25 @@ async function loadList(reset: boolean) {
   }
 }
 
+// 首次进入时默认分类可能没有内容（如本地新闻为空）：探测一次，自动切到第一个有文章的分类，
+// 避免用户一进资讯页看到空白；用户之后手动切回空分类时不做任何干预。
+async function pickFirstNonEmpty() {
+  for (let i = 0; i < cats.value.length; i += 1) {
+    if (i === active.value) continue;
+    try {
+      const info = await fb.get('article', 'alist', { page: 1, pageSize: 1, typeid: cats.value[i].id }, { anonymous: true });
+      if (Array.isArray(info?.list) && info.list.length > 0) { active.value = i; return; }
+    } catch { /* 探测失败就跳过这个分类 */ }
+  }
+}
+
 onMounted(async () => {
   try {
     const info = await fb.get('article', 'type', {}, { anonymous: true });
     cats.value = Array.isArray(info) ? info : [];
   } catch { /* 分类失败时仍展示全部资讯 */ }
   await loadList(true);
+  if (!failed.value && list.value.length === 0) await pickFirstNonEmpty();
 });
 watch(active, () => loadList(true));
 const date = (v?: number | string) => (v ? new Date(Number(v) * 1000).toLocaleDateString('zh-CN') : '');
