@@ -64,6 +64,14 @@ export function validateAddress(a) {
   return errors;
 }
 
-export const ORDER_STATE = { 0: 'pending', 1: 'done', 2: 'paid', 3: 'preparing', 5: 'delivering', 6: 'cancelled' };
+// 状态值以 waimai.class.php 的写入点为准：
+//   2 = 支付成功待接单（4408）
+//   3 = 商家接单（qiangdan 之前即此态；骑手被取消也退回 3，8672）
+//   4 = 骑手接单（qiangdan()，8112）
+//   5 = 骑手取货出发/配送中（peisong() 的取货分支，8280）
+//   1 = 已送达完成（peisong() 的送达分支，8378）
+//   6 = 已取消（5251/5253）
+// 4 之前漏了，会显示成「处理中」，而它恰好是骑手在路上的主干状态。
+export const ORDER_STATE = { 0: 'pending', 1: 'done', 2: 'paid', 3: 'preparing', 4: 'accepted', 5: 'delivering', 6: 'cancelled' };
 // 可取消状态以火鸟现有规则为准（cancelOrder 对 state 0 与 2 处理）
 export const isCancellable = (state) => Number(state) === 0 || Number(state) === 2;

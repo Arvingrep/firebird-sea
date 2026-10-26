@@ -17,6 +17,9 @@ const newKey = () => {
 
 // 火鸟「空数据」文案（多语言站点下仍以中文原文返回；只匹配空态语义，避免吞掉真实错误）
 const EMPTY_RE = /暂无数据|没有数据|暂无内容|暂无信息|暂未添加/;
+// 网关 handlers::getHandle 的兜底：handler 返回空了（''/null/false/空数组）就给这个。
+// 典型场景：getCourierLocation 在骑手还没上报轨迹时返回空串。语义同样是"没数据"。
+const NO_DATA_RE = /^no data!?$/i;
 
 // 火鸟 handler 返回形状不统一：多数列表返回 {pageInfo, list}（shopList/order/alist），
 // 但 getMemberAddress 等老接口直接 return 裸数组（老 H5 读 data.info 即数组）。
@@ -52,6 +55,8 @@ export function createFbClient({ authClient, anonymousFetch, baseUrl = '/tg-api/
       // 空态返回 null，交由调用方的 Array.isArray / info?.list 兜底渲染 van-empty。
       const msg = typeof json.info === 'string' ? json.info : '';
       if ((json.state === 101 || json.state === 200) && EMPTY_RE.test(msg)) return null;
+      // 102 = handler 返回了空值（取不到数据的另一种表达），同样是空态而非错误
+      if (json.state === 102 && NO_DATA_RE.test(msg)) return null;
       throw new FbError('UPSTREAM_STATE', String(json.info || 'Request failed'), json.state);
     }
     return json.info;

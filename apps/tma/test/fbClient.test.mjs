@@ -87,3 +87,19 @@ test('listRows：上游空态文案「暂未添加地址」经 unwrap 归为 nul
   assert.strictEqual(info, null);
   assert.deepStrictEqual(listRows(info), []);
 });
+
+test('网关 102 "No data!"（handler 返回空值）归为 null 而非抛错', async () => {
+  // handlers::getHandle 的兜底：handler 返回 ''/null/false/[] 时给 state=102。
+  // 骑手还没上报轨迹的 getCourierLocation 就走这条。
+  const { fb } = make({ auth: async () => res(200, { state: 102, info: 'No data!' }) });
+  assert.strictEqual(await fb.get('waimai', 'getCourierLocation', { orderid: 1 }), null);
+  // 其他 102 文案仍视为异常，避免把真实故障当空态吞掉
+  const { fb: fb2 } = make({ auth: async () => res(200, { state: 102, info: 'db error' }) });
+  await assert.rejects(() => fb2.get('waimai', 'getCourierLocation', { orderid: 1 }), (e) => e instanceof FbError && e.state === 102);
+});
+
+test('getCourierLocation 成功时 info 是裸字符串（"lng,lat;…"）', async () => {
+  const { fb } = make({ auth: async () => res(200, { state: 100, info: '120.98,14.59;120.97,14.60' }) });
+  const raw = await fb.get('waimai', 'getCourierLocation', { orderid: 7 });
+  assert.strictEqual(raw, '120.98,14.59;120.97,14.60');
+});
