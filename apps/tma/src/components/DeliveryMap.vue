@@ -5,7 +5,7 @@ import { t } from '../services';
 // 配送轨迹图。不用 Google Static Maps（项目未开通该 API、且要按次计费），
 // 自己把经纬度投影到 SVG 上画：零依赖、无配额、离线可渲染。
 // 投影逻辑全在 lib/geo.js + lib/delivery.js（纯函数，有单测），这里只负责画。
-const props = defineProps<{ view: any; live?: boolean; stale?: boolean }>();
+const props = defineProps<{ view: any; live?: boolean }>();
 
 const showRoute = computed(() => {
   const m = props.view?.marks || {};
@@ -21,7 +21,12 @@ const showRoute = computed(() => {
     </div>
 
     <div class="dmap__canvas">
-      <svg :viewBox="`0 0 ${view.width} ${view.height}`" preserveAspectRatio="xMidYMid meet" role="img">
+      <svg
+        :viewBox="`0 0 ${view.width} ${view.height}`"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        :aria-label="t('order.map.title')"
+      >
         <!-- 商家 → 收货点：还没有骑手轨迹时给一条虚线示意路线 -->
         <line
           v-if="showRoute"

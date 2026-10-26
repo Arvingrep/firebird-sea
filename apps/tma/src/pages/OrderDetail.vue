@@ -36,13 +36,19 @@ const isTracking = computed(() => shouldTrack(order.value && order.value.state))
 // 上游该接口对空轨迹返回 state=102 "No data!"，fbClient 已归一成 null，这里静默跳过。
 const POLL_MS = 30000;
 let timer: ReturnType<typeof setInterval> | null = null;
+let inflight = false;
 
 async function pollCourier() {
+  // 弱网下上一次请求可能还没回来，再发一次只会堆请求；跳过这一轮即可
+  if (inflight) return;
+  inflight = true;
   try {
     const raw = await fb.get('waimai', 'getCourierLocation', { orderid: props.id });
     if (typeof raw === 'string' && raw) pathRaw.value = raw;
   } catch {
     // 位置刷新失败不打扰用户：下一轮自动重试，界面保留上一次的位置
+  } finally {
+    inflight = false;
   }
 }
 function stopPoll() {
