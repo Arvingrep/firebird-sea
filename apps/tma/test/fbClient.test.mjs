@@ -23,17 +23,20 @@ test('匿名读：拼 service/action 并追加 platform_name=tma，返回 info',
 });
 
 test('火鸟 state != 100 抛 FbError 并携带信息', async () => {
-  const { fb } = make({ anon: () => res(200, { state: 101, info: '没有数据' }) });
-  await assert.rejects(() => fb.get('waimai', 'food', {}, { anonymous: true }), (e) => e instanceof FbError && e.state === 101 && e.message === '没有数据');
+  const { fb } = make({ anon: () => res(200, { state: 101, info: '请求错误，请重试！' }) });
+  await assert.rejects(() => fb.get('waimai', 'food', {}, { anonymous: true }), (e) => e instanceof FbError && e.state === 101 && e.message === '请求错误，请重试！');
 });
 
-test('火鸟空数据惯例：state=200 + 暂无数据 返回 null 而非抛错', async () => {
-  const { fb } = make({ anon: () => res(200, { state: 200, info: '暂无数据！' }) });
-  const info = await fb.get('article', 'alist', { typeid: 2 }, { anonymous: true });
-  assert.strictEqual(info, null);
-  // 其他 state=200 错误仍抛出（如「格式错误」）
-  const { fb: fb2 } = make({ anon: () => res(200, { state: 200, info: '格式错误！' }) });
-  await assert.rejects(() => fb2.get('article', 'alist', {}, { anonymous: true }), (e) => e instanceof FbError && e.state === 200);
+test('火鸟空数据惯例返回 null 而非抛错（真实响应 state=101）', async () => {
+  // 线上实测：article/alist 空分类 → {state:101, info:"暂无数据！"}（handlers::getHandle 把 handler 的 200 归一成 101）
+  const { fb } = make({ anon: () => res(200, { state: 101, info: '暂无数据！' }) });
+  assert.strictEqual(await fb.get('article', 'alist', { typeid: 2 }, { anonymous: true }), null);
+  // handler 直出的 200 形态同样兼容
+  const { fb: fb2 } = make({ anon: () => res(200, { state: 200, info: '暂无数据！' }) });
+  assert.strictEqual(await fb2.get('article', 'alist', { typeid: 3 }, { anonymous: true }), null);
+  // 其他 101 文案仍抛出
+  const { fb: fb3 } = make({ anon: () => res(200, { state: 101, info: '请先登录' }) });
+  await assert.rejects(() => fb3.get('waimai', 'order', {}, { anonymous: true }), (e) => e instanceof FbError && e.state === 101);
 });
 
 test('403 / 429 / 409 映射为稳定错误码', async () => {
