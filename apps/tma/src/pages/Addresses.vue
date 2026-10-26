@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { showConfirmDialog, showToast, showLoadingToast, closeToast } from 'vant';
 import { fb, authClient, i18n } from '../services';
 import { getTgUser, getStartParam, openExternal } from '../telegram';
+import AppIcon from '../components/AppIcon.vue';
 
 interface Address { id: string; person: string; tel: string; street?: string; address: string; lat?: string; lng?: string; areaCode?: string; default?: number }
 interface Form {
@@ -13,6 +14,7 @@ interface Form {
 
 const t = (k: string, v?: Record<string, unknown>) => i18n.t(k, v);
 const route = useRoute();
+const router = useRouter();
 const list = ref<Address[]>([]);
 const loading = ref(true);
 const editing = ref(false);
@@ -31,7 +33,7 @@ const selfName = computed(() => {
 const selfHandle = computed(() => (tgUser?.username ? '@' + tgUser.username : ''));
 const avatar = computed(() => tgUser?.photo_url || '');
 
-// 美国区号：上游 areaCode 缺省会写死 86（中国），与本站实际地区不符
+// 菲律宾区号：上游 areaCode 缺省会写死 86（中国），与本站实际地区不符
 const AREA_CODE = '1';
 
 async function load() {
@@ -61,7 +63,7 @@ function openForm(a?: Address) {
   editing.value = true;
 }
 
-// 上游 waimai.class.php 强制 person / tel / street / lat / lng；tel 允许用 Telegram 身份占位
+// 上游 waimai.class.php 强制 person / tel / street；tel 允许用 Telegram 身份占位
 function contactValue(): string {
   const typed = String(form.value.tel || '').trim();
   if (typed) return typed;
@@ -196,7 +198,7 @@ function loadMapsScript(): Promise<void> {
   return new Promise((resolve, reject) => {
     if ((window as any).google?.maps?.places) return resolve();
     const s = document.createElement('script');
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}&libraries=places&language=zh-CN&region=US`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}&libraries=places&language=zh-CN&region=PH`;
     s.async = true;
     s.onload = () => resolve();
     s.onerror = () => reject(new Error('maps script failed'));
@@ -242,26 +244,36 @@ onMounted(async () => { await load(); consumeSharedAddress(); });
 
 <template>
   <div class="page">
-    <van-loading v-if="loading" vertical>{{ t('common.loading') }}</van-loading>
+    <div class="nav">
+      <button class="icon-btn" @click="router.back()"><AppIcon name="chevron-left" :size="19" /></button>
+      <span class="title">{{ t('address.title') }}</span>
+      <button class="icon-btn" @click="openForm()"><AppIcon name="plus" :size="18" :stroke="2.2" /></button>
+    </div>
+
+    <div v-if="loading" class="state"><van-loading vertical>{{ t('common.loading') }}</van-loading></div>
+
+    <div v-else-if="list.length === 0" class="state">
+      <div class="emoji">📍</div>
+      <p class="msg">{{ t('address.empty') }}</p>
+      <button class="btn btn--primary" @click="openForm()">{{ t('address.add') }}</button>
+    </div>
+
     <template v-else>
-      <van-empty v-if="list.length === 0" :description="t('address.empty')" />
-      <div v-for="a in list" :key="a.id" class="fbs-card addr-card">
-        <div class="icon" aria-hidden="true">📍</div>
-        <div class="addr-main">
-          <div class="addr-line1">
-            <span class="addr-who">{{ a.person === selfName ? t('address.me') : a.person }}</span>
-            <span v-if="a.default" class="addr-def">{{ t('address.defaultTag') }}</span>
+      <article v-for="a in list" :key="a.id" class="card addr">
+        <span class="lead"><AppIcon name="pin" :size="18" /></span>
+        <div class="body">
+          <div class="l1">
+            {{ mainLine(a) }}
+            <span v-if="a.default" class="tag">{{ t('address.defaultTag') }}</span>
           </div>
-          <div class="addr-line2">{{ mainLine(a) }}</div>
-          <div v-if="extraLine(a)" class="addr-line3">{{ extraLine(a) }}</div>
-          <div class="addr-line4">
-            <span v-if="/^[0-9+\- ]{6,20}$/.test(String(a.tel || ''))">📞 {{ a.tel }}</span>
-            <span v-else>💬 {{ t('address.viaTelegram') }}</span>
+          <div v-if="extraLine(a)" class="l2">{{ extraLine(a) }}</div>
+          <div class="l3">
+            <span v-if="/^[0-9+\- ]{6,20}$/.test(String(a.tel || ''))"><AppIcon name="phone" :size="12" /> {{ a.tel }}</span>
+            <span v-else><AppIcon name="phone" :size="12" /> {{ t('address.viaTelegram') }}</span>
           </div>
         </div>
-        <button class="addr-more" :aria-label="t('address.more')" @click="openSheet(a)">⋯</button>
-      </div>
-      <van-button block round type="primary" class="addr-add" @click="openForm()">＋ {{ t('address.add') }}</van-button>
+        <button class="more" :aria-label="t('address.more')" @click="openSheet(a)">⋯</button>
+      </article>
     </template>
 
     <!-- 表单 -->
@@ -269,18 +281,17 @@ onMounted(async () => { await load(); consumeSharedAddress(); });
       <div class="addr-sheet">
         <div class="sheet-head">
           <span class="sheet-title">{{ form.id ? t('address.editTitle') : t('address.addTitle') }}</span>
-          <button class="sheet-x" :aria-label="t('common.cancel')" @click="editing = false">✕</button>
+          <button class="sheet-x" :aria-label="t('common.cancel')" @click="editing = false"><AppIcon name="close" :size="18" /></button>
         </div>
 
         <div class="sheet-body">
-          <!-- 送到哪里 -->
           <div class="fld">
             <div class="fld-label">
               {{ t('address.whereLabel') }}
               <span v-if="form.lat && form.lng" class="fld-pin">✓ {{ t('address.pinned') }}</span>
             </div>
             <div class="fld-search" :class="{ 'is-error': errors.street }">
-              <span class="fld-ico" aria-hidden="true">🔍</span>
+              <AppIcon name="search" :size="17" />
               <input
                 ref="addrInputEl"
                 class="fld-input"
@@ -304,17 +315,16 @@ onMounted(async () => { await load(); consumeSharedAddress(); });
             <input v-model="form.note" class="fld-input fld-plain" :placeholder="t('address.notePh')" maxlength="100" />
           </div>
 
-          <!-- 你是谁 / 怎么联系 -->
           <div class="fld">
             <div class="fld-label">{{ t('address.whoLabel') }}</div>
             <div class="who-card">
               <img v-if="avatar" class="who-avatar" :src="avatar" alt="" />
-              <div v-else class="who-avatar who-avatar-ph" aria-hidden="true">👤</div>
+              <div v-else class="who-avatar who-avatar-ph"><AppIcon name="user" :size="18" /></div>
               <div class="who-info">
                 <div class="who-name">{{ selfName }}</div>
                 <div class="who-sub">{{ selfHandle || t('address.me') }} · {{ t('address.viaTelegram') }}</div>
               </div>
-              <span class="who-ok" aria-hidden="true">✓</span>
+              <span class="who-ok"><AppIcon name="check" :size="16" :stroke="2.6" /></span>
             </div>
             <div class="fld-hint">{{ t('address.viaTelegramHint') }}</div>
           </div>
@@ -325,64 +335,81 @@ onMounted(async () => { await load(); consumeSharedAddress(); });
             <div v-if="errors.tel" class="fld-err">{{ errText('tel') }}</div>
           </div>
 
-          <label class="fld-switch">
+          <button class="fld-switch" @click="form.default = form.default ? 0 : 1">
             <span>{{ t('address.setDefault') }}</span>
-            <van-switch :model-value="!!form.default" size="22px" @update:model-value="(v: boolean) => (form.default = v ? 1 : 0)" />
-          </label>
+            <span class="switch" :class="{ 'is-on': !!form.default }"><i /></span>
+          </button>
         </div>
 
         <div class="sheet-foot">
-          <van-button block round type="primary" @click="save">{{ t('address.save') }}</van-button>
+          <button class="btn btn--primary" style="width: 100%" @click="save">{{ t('address.save') }}</button>
         </div>
       </div>
     </van-popup>
 
-    <van-action-sheet
-      v-model:show="sheet"
-      :actions="[
-        { name: t('address.share'), key: 'share', icon: 'share-o' },
-        { name: t('address.edit'), key: 'edit', icon: 'edit' },
-        { name: t('address.delete'), key: 'delete', icon: 'delete-o', color: '#ee4d4d' },
-      ]"
-      :cancel-text="t('common.cancel')"
-      close-on-click-action
-      @select="(act: any) => { if (!current) return; if (act.key === 'share') share(current); else if (act.key === 'edit') { sheet = false; openForm(current); } else remove(current); }"
-    />
+    <!-- 地址操作 -->
+    <van-popup v-model:show="sheet" position="bottom" round>
+      <div class="act-sheet">
+        <button class="act" @click="current && share(current)">
+          <AppIcon name="share" :size="19" />{{ t('address.share') }}
+        </button>
+        <button class="act" @click="sheet = false; current && openForm(current)">
+          <AppIcon name="edit" :size="19" />{{ t('address.edit') }}
+        </button>
+        <button class="act act--danger" @click="current && remove(current)">
+          <AppIcon name="trash" :size="19" />{{ t('address.delete') }}
+        </button>
+        <button class="act act--cancel" @click="sheet = false">{{ t('common.cancel') }}</button>
+      </div>
+    </van-popup>
   </div>
 </template>
 
 <style scoped>
+.addr { display: flex; gap: 12px; padding: 15px 16px; align-items: flex-start; }
+.addr + .addr { margin-top: 10px; }
+.addr .lead { flex: none; width: 34px; height: 34px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: var(--brand-soft); color: var(--brand); }
+.addr .body { flex: 1; min-width: 0; }
+.addr .l1 { font-size: 15.5px; font-weight: 700; line-height: 1.35; display: flex; align-items: center; gap: 7px; }
+.addr .l2 { font-size: 13px; color: var(--ink-2); margin-top: 3px; }
+.addr .l3 { font-size: 12px; color: var(--ink-3); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+.addr .more { flex: none; color: var(--ink-3); font-size: 20px; line-height: 1; padding: 0 2px; }
+
 .addr-sheet { display: flex; flex-direction: column; max-height: 92vh; }
-.sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 8px; }
-.sheet-title { font-size: 17px; font-weight: 600; }
-.sheet-x { border: 0; background: transparent; font-size: 16px; color: var(--tg-hint); padding: 4px 6px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 6px; }
+.sheet-title { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.sheet-x { color: var(--ink-3); display: flex; }
 .sheet-body { flex: 1; overflow-y: auto; padding: 4px 18px 8px; }
 .sheet-foot { padding: 10px 18px calc(14px + env(safe-area-inset-bottom)); }
 
 .fld { margin-top: 16px; }
-.fld-label { font-size: 13px; color: var(--tg-hint); margin-bottom: 7px; display: flex; align-items: center; gap: 8px; }
-.fld-pin { font-size: 11px; color: var(--fbs-success); background: rgba(46, 189, 133, 0.12); padding: 1px 7px; border-radius: 20px; }
-.fld-search { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 14px; border-radius: 14px; background: var(--tg-secondary-bg); border: 1px solid transparent; }
-.fld-search.is-error { border-color: #ee4d4d; }
-.fld-ico { font-size: 15px; opacity: 0.7; }
-.fld-input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--tg-text); font-size: 15px; outline: none; }
-.fld-plain { height: 46px; padding: 0 14px; border-radius: 14px; background: var(--tg-secondary-bg); border: 1px solid transparent; }
-.fld-plain:focus { border-color: var(--fbs-brand); }
-.fld-hint { font-size: 12px; color: var(--tg-hint); margin-top: 7px; line-height: 1.45; }
-.fld-err { font-size: 12px; color: #ee4d4d; margin-top: 6px; }
-.fld-switch { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; font-size: 15px; }
+.fld-label { font-size: 13px; color: var(--ink-2); font-weight: 600; margin-bottom: 7px; display: flex; align-items: center; gap: 8px; }
+.fld-pin { font-size: 11px; color: #0e9f5d; background: rgba(18, 183, 106, 0.12); padding: 1px 8px; border-radius: 20px; font-weight: 600; }
+.fld-search { display: flex; align-items: center; gap: 9px; height: 50px; padding: 0 14px; border-radius: 14px; background: var(--surface-2); border: 1.5px solid transparent; color: var(--ink-3); }
+.fld-search.is-error { border-color: var(--danger); }
+.fld-input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--ink); font-size: 15px; outline: none; font-family: inherit; }
+.fld-plain { height: 48px; padding: 0 14px; border-radius: 14px; background: var(--surface-2); border: 1.5px solid transparent; }
+.fld-plain:focus { border-color: var(--brand); }
+.fld-hint { font-size: 12px; color: var(--ink-3); margin-top: 7px; line-height: 1.45; }
+.fld-err { font-size: 12px; color: var(--danger); margin-top: 6px; }
 
-.who-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--tg-secondary-bg); border: 1px solid rgba(46, 189, 133, 0.35); }
+.fld-switch { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 22px; font-size: 15px; font-weight: 500; padding: 0; }
+.switch { width: 46px; height: 28px; border-radius: 999px; background: var(--line-2); position: relative; transition: background 0.18s ease; flex: none; }
+.switch i { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.18s ease; }
+.switch.is-on { background: var(--brand); }
+.switch.is-on i { transform: translateX(18px); }
+
+.who-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); box-shadow: inset 0 0 0 1.5px rgba(18, 183, 106, 0.4); }
 .who-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; }
-.who-avatar-ph { display: flex; align-items: center; justify-content: center; font-size: 19px; background: var(--fbs-line); }
+.who-avatar-ph { display: flex; align-items: center; justify-content: center; background: var(--line); color: var(--ink-2); }
 .who-info { flex: 1; min-width: 0; }
-.who-name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.who-sub { font-size: 12px; color: var(--tg-hint); margin-top: 2px; }
-.who-ok { color: var(--fbs-success); font-size: 15px; font-weight: 700; }
+.who-name { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who-sub { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.who-ok { color: #0e9f5d; display: flex; }
 
-.addr-add { margin-top: 4px; }
-.addr-more { flex: none; border: 0; background: transparent; color: var(--tg-hint); font-size: 20px; line-height: 1; padding: 4px 2px 10px 8px; }
-.addr-line3 { font-size: 13px; color: var(--tg-text); margin-top: 3px; opacity: 0.9; }
-.addr-line4 { font-size: 12px; color: var(--tg-hint); margin-top: 5px; }
-.addr-who { font-size: 14px; font-weight: 600; }
+.act-sheet { padding: 8px 12px calc(12px + env(safe-area-inset-bottom)); }
+.act { display: flex; align-items: center; gap: 12px; width: 100%; padding: 15px 12px; font-size: 15.5px; font-weight: 500; color: var(--ink); border-radius: 14px; }
+.act:active { background: var(--surface-2); }
+.act--danger { color: var(--danger); }
+.act--cancel { justify-content: center; margin-top: 6px; color: var(--ink-3); font-size: 15px; }
 </style>

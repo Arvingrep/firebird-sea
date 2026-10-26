@@ -202,3 +202,15 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **截图验收**：vite build → 预览目录注入 mock fetch（固定数据 + 假 Telegram WebApp）→
   puppeteer-core 以 390×844@2x 截图检查。注意 macOS headless `--window-size` 实际最小视口约 470px，
   CLI 截图不可信，必须用 CDP 设备模拟。
+
+## 视觉系统 v2（下）：全页面收尾（2026-10-26）
+
+- **全页面迁移到 v2 类**：Shop/Cart/Checkout/Orders/Profile/News/NewsDetail/OrderDetail/Addresses
+  全部重写为 v2 设计语言（店铺 sheet + 菜品行步进器 + 深色悬浮结算条 + 账单卡 + 订单 chip +
+  me-hero 渐变头 + 资讯卡 + 地址自绘开关/操作面板）。
+- **隐藏 bug 顺手修**：Addresses 的 `van-switch`/`van-action-sheet` 此前从未在 main.ts 注册
+  （「设为默认地址」开关实际不渲染），本次以自绘 `.switch`/`.act-sheet` 替换，不再依赖注册。
+- **main.ts 缩减**：Vant 只注册 `Loading/Field/Popup`；主包 197kB→155kB（gzip 76→62kB）。
+- **兼容层清理**：删除 style.css 中「过渡别名 + 旧页面兼容类」（-208 行），全 app 统一 v2 令牌。
+- **地址页保留**：Places 联想 / 分享深链（share token）逻辑不动，仅重排版式；region 仍为 PH。
+- **验收**：tsc ✅ / npm test 35/35 ✅ / vite build ✅；页面代码与此前 v2 分支截图验收版本一致。

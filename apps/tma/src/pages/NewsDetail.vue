@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { fb, i18n } from '../services';
+import { useRouter } from 'vue-router';
+import { fb, t } from '../services';
 import { sanitizeHtml } from '../lib/safeHtml.js';
 import SafeContent from '../components/SafeContent';
+import AppIcon from '../components/AppIcon.vue';
 
 const props = defineProps<{ id: string }>();
-const t = (k: string) => i18n.t(k);
+const router = useRouter();
 const title = ref('');
 const meta = ref('');
 const nodes = ref<any[]>([]);
@@ -22,7 +24,7 @@ async function load() {
     meta.value = [d?.source, date].filter(Boolean).join(' · ');
     const parse = (html: string) => new DOMParser().parseFromString(html, 'text/html');
     nodes.value = sanitizeHtml(String(d?.body || ''), parse);
-  } catch (e) {
+  } catch {
     failed.value = true;
   } finally {
     loading.value = false;
@@ -33,14 +35,22 @@ onMounted(load);
 
 <template>
   <div class="page">
-    <van-loading v-if="loading" vertical>{{ t('common.loading') }}</van-loading>
-    <div v-else-if="failed">
-      <p class="hint">{{ t('news.loadFailed') }}</p>
-      <van-button size="small" @click="load">{{ t('common.retry') }}</van-button>
+    <div class="nav">
+      <button class="icon-btn" @click="router.back()"><AppIcon name="chevron-left" :size="19" /></button>
+      <span class="title">{{ t('nav.news') }}</span>
     </div>
-    <article v-else>
+
+    <div v-if="loading" class="state"><van-loading vertical>{{ t('common.loading') }}</van-loading></div>
+
+    <div v-else-if="failed" class="state">
+      <div class="emoji">📭</div>
+      <p class="msg">{{ t('news.loadFailed') }}</p>
+      <button class="btn btn--primary" @click="load">{{ t('common.retry') }}</button>
+    </div>
+
+    <article v-else class="article">
       <h2>{{ title }}</h2>
-      <p class="hint">{{ meta }}</p>
+      <p class="meta">{{ meta }}</p>
       <SafeContent :nodes="nodes" />
     </article>
   </div>
