@@ -224,3 +224,78 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **修复**：fbClient 导出 `listRows(info)`（裸数组 / `{list}` / null 三态归一），Addresses /
   Checkout / Profile 三处统一改用；EMPTY_RE 补「暂未添加」空态文案。
 - **教训**：接火鸟老接口前先对照 touch 模板的老 JS 确认 info 形状，不要假设都是 `{list}` 包装。
+
+## 事故：下单后看不到订单（2026-10-26）—— 两个独立根因
+
+用户报「下单后没有看到订单」。排查后发现**两个互相独立的缺陷**，必须都修才算闭环。
+
+### 根因 1（数据层，静默）：`waimai_order_all` 合并表 UNION 成员列表为空
+
+`huoniao_waimai_order_all` 是 MySQL `MRG_MyISAM` 合并表，但 DDL 里没有 `UNION=` 子句
+（物理上 `.MRG` 文件 0 字节，对照 `public_comment_all` 是 43 字节）。合并表本身不存数据，
+成员列表为空 ⇒ **所有 `SELECT ... FROM waimai_order_all` 恒返回 0 行**，且 SQL 不报错、
+接口照样返回 `state=100` + 空列表 —— 故障完全静默。
+
+- **排除项**（逐条验证过）：下单落库正常（基础表有真实订单）、接口形状 `{pageInfo,list}`
+  与 H5 老框架一致、SQL WHERE 无误、前端读法正确。**H5 老框架同样读不到订单** —— 证明
+  与 TMA 前端无关，是老框架一直存在的故障被 TMA 暴露出来。
+- **缺陷来源**：上游 hawaiihub 导出的 `hn_waimai_order_all` 本身就缺 `INSERT_METHOD/UNION`，
+  经 `scripts/extract_waimai_tables.py` 原样灌进 canary 与生产两库。
+- **爆炸半径**：`waimai.class.php` 内 55 处引用、全仓 42 个 PHP 文件 —— 订单列表、取消订单、
+  支付回调写订单状态（`miniReturnPay.php`）、商家后台/打印（`common.func.php`）、
+  3 个订单 cron 全部静默失效。
+- **修复**（已在 canary + 生产各执行一次）：
+  ```sql
+  DROP TABLE IF EXISTS `huoniao_waimai_order_all`;
+  CREATE TABLE `huoniao_waimai_order_all` LIKE `huoniao_waimai_order`;
+  ALTER TABLE `huoniao_waimai_order_all` ENGINE=MRG_MyISAM;
+  ALTER TABLE `huoniao_waimai_order_all` UNION=(`huoniao_waimai_order`);
+  ```
+  三个要点：① `ENGINE=` 与 `UNION=` **必须拆成两条 ALTER**（`UNION=` 只对已是 MRG 的表生效）；
+  ② 必须 `CREATE TABLE ... LIKE` 重建，不能原地加 UNION —— 旧合并表 `fids` 列 collation 是
+  `utf8mb4_0900_ai_ci`，基础表是 `utf8mb3_general_ci`，MRG 要求成员列定义一致会被拒；
+  ③ LIKE 会连列定义与 29 个索引一并复制。
+
+### 根因 2（代码层）：货到付款只做了 UI，`paytype` 没传
+
+`lib/checkout.js` 的 `buildDealParams` 不传 `paytype`，上游 `$paytype = (int)$this->param['paytype']`
+取到 **0**，被当成「在线支付」：
+
+1. `waimai.class.php:3525` 的 `if ($paytype == 1)`（货到付款）不成立
+2. 落到 `:3827` 的 `createPayForm` 在线支付分支
+3. 订单 INSERT 时 state 硬编码为 `'0'`（`:3625`）
+4. 30 分钟后 `include/cron/waimai_updateOrderState.php` 把 `state=0` 改为 `state=6`「订单超时未支付」
+
+**用户看到的就是：下单成功 → 半小时后订单变成已取消。**
+
+- **修复（服务端收口）**：TMA 没有收银台（H5 靠下单后跳收银台、由用户点确认触发 `pay()`），
+  所以在 `services/api/src/fbProxy.js` 里，`deal` 返回 `delivery|<ordernum>` 时紧接着用同一
+  会员凭证调用 `pay(paytype=delivery)`，由 `pay() → paySuccess()` 把 state 推到 2。
+  - 安全性：`pay()` 的订单查询限定 `uid = <当前会员> AND state = 0`（`:3952`），且 ordernum
+    取自本次 deal 返回值，只会作用于刚创建的那笔订单；`waimai:pay` **不进**对外白名单。
+  - 坑：`pay()` 在 `paytype=delivery && !isMobile()` 时 `header('location')` 后 `die`（`:4240`），
+    所以服务端调用必须带移动端 UA，否则拿不到 JSON。
+  - 收口失败不阻塞下单（订单已创建），但记 `cod_settle_failed` 告警。
+- **前端**：`buildDealParams` 显式传 `paytype`；`parseDealResult` 按
+  `delivery|` / `ok|` / `peerpay|` / 纯订单号 / 在线表单 五种形态分流，避免把
+  `"delivery|xxx"` 整个当订单号显示。
+- **兜底**：`waimai_updateOrderState.php` 的超时规则加 `AND paytype != '1'` —— 货到付款没有
+  「未支付超时」语义，即使收口失败也不该被取消（宁可停在待付款，也不能凭空消失）。
+
+### 防复发
+
+- `scripts/fix-waimai-merge-table.sh`：可审计修复脚本（`--dry-run`、执行后自动双重验证）
+- `webroot/include/cron/waimai_checkMergeTable.php`：每 30 分钟扫描全库 `MRG_MyISAM` 表，
+  缺 `UNION=` 则调 `SubTableAsync::run()` 自愈（与 `dsql.class.php` 自愈分支同一路径）
+- `scripts/extract_waimai_tables.py`：抽取阶段给缺 UNION 的合并表定义自动补齐，堵住源头
+- `fbProxy.js`：`waimai:order` 返回 `totalCount=0` 时按会员每小时采样告警一次
+  （与「新用户确实没订单」无法区分，故只采样留痕、不阻断）
+
+### 教训
+
+1. **静默空集比报错危险得多**：`state=100` + 空列表看起来完全正常，日志一声不吭，能瞒几个月。
+   接上游接口时，「查到了但 0 条」和「查询路径本身坏了」必须能区分。
+2. **改数据层前先在同类表上演练**：修生产前先在 canary 用临时表名跑一遍 DDL，验证列定义、
+   索引数、collation、数据可见性，再动真表。
+3. **前端「看起来对」不等于「参数传对了」**：UI 写「货到付款」但参数没传，是最难发现的一类 bug
+   —— 界面对、接口不报错、状态悄悄错。

@@ -139,3 +139,70 @@ test('规则级 params 白名单：未列出的参数（含 userid/store）不�
   assert.strictEqual(new URLSearchParams(seen[1].body).has('userid'), false);
   assert.strictEqual(new URLSearchParams(seen[1].body).get('page'), '2');
 });
+
+// ── 货到付款收口（2026-10「下单后订单被 cron 判超时取消」事故回归）──────────────
+// 上游 deal() 对 paytype=1 只返回字符串 "delivery|<ordernum>" 并早返回
+// （waimai.class.php:3686），订单此时仍是 state=0。若不收口，
+// include/cron/waimai_updateOrderState.php 会在 30 分钟后把它判为「订单超时未支付」。
+test('货到付款收口：deal 返回 delivery|<ordernum> 时补调 pay，且只对客户端暴露订单号', async () => {
+  const wl = { 'waimai:deal': { auth: 'member', idempotent: true } };
+  const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init });
+    if (calls.length === 1) return okJson({ state: 100, info: 'delivery|ORD1' });
+    return okJson({ state: 100, info: 'http://x/orderdetail' });
+  };
+  const p = createFbProxy({ upstreamBase: 'http://php/a', fetchImpl, tokens, whitelist: wl, credentialProvider: async () => 'c=1' });
+  const h = { authorization: `Bearer ${token}`, 'idempotency-key': 'cod-key-1234' };
+  const r = await p.handle({ service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: h });
+
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.info, 'ORD1', '前端不应看到 "delivery|" 前缀');
+  assert.strictEqual(calls.length, 2, '应补一次 pay 调用');
+  assert.match(calls[1].url, /action=pay/);
+  assert.match(String(calls[1].init.body), /paytype=delivery/);
+  assert.match(String(calls[1].init.body), /ordernum=ORD1/);
+  // pay() 在 paytype=delivery 且 !isMobile() 时 header('location') 后 die，必须带移动端 UA
+  assert.match(String(calls[1].init.headers['User-Agent']), /Mobile/);
+
+  // 幂等重放：返回的也必须是已归一化的订单号，且不再转发
+  const r2 = await p.handle({ service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: h });
+  assert.strictEqual(r2.replayed, true);
+  assert.strictEqual(r2.body.info, 'ORD1');
+  assert.strictEqual(calls.length, 2);
+});
+
+test('货到付款收口失败不阻塞下单：仍返回订单号（订单已创建）', async () => {
+  const wl = { 'waimai:deal': { auth: 'member', idempotent: true } };
+  const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init });
+    if (calls.length === 1) return okJson({ state: 100, info: 'delivery|ORD2' });
+    return okJson({ state: 200, info: '订单不存在或已支付' });
+  };
+  const warned = [];
+  const origWarn = console.warn;
+  console.warn = (m) => warned.push(String(m));
+  try {
+    const p = createFbProxy({ upstreamBase: 'http://php/a', fetchImpl, tokens, whitelist: wl, credentialProvider: async () => 'c=1' });
+    const r = await p.handle({ service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'cod-key-5678' } });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.body.info, 'ORD2');
+    assert.ok(warned.some((w) => w.includes('cod_settle_failed')), '收口失败必须留痕');
+  } finally {
+    console.warn = origWarn;
+  }
+});
+
+test('非货到付款返回（在线支付表单）不触发收口', async () => {
+  const wl = { 'waimai:deal': { auth: 'member', idempotent: true } };
+  const { token } = tokens.issue({ tgId: 1, memberId: 5 });
+  const calls = [];
+  const fetchImpl = async (url, init) => { calls.push({ url, init }); return okJson({ state: 100, info: { ordernum: 'O1', orderurl: 'u' } }); };
+  const p = createFbProxy({ upstreamBase: 'http://php/a', fetchImpl, tokens, whitelist: wl, credentialProvider: async () => 'c=1' });
+  const r = await p.handle({ service: 'waimai', action: 'deal', method: 'POST', body: {}, headers: { authorization: `Bearer ${token}`, 'idempotency-key': 'cod-key-9999' } });
+  assert.deepStrictEqual(r.body.info, { ordernum: 'O1', orderurl: 'u' });
+  assert.strictEqual(calls.length, 1);
+});
