@@ -45,7 +45,22 @@ export function buildDeliveryView(order, rawPath, opts = {}) {
     if (courier) marks.push({ role: 'courier', p: courier });
   }
 
-  const projected = visible ? project([...marks.map((m) => m.p), ...trail], size) : { pts: [], ...size };
+  const all = [...marks.map((m) => m.p), ...trail];
+
+  // 第一遍按默认画布投影，量出内容实际占的高度；
+  // 宽画布 + 近乎正方形的路线会上下大片留白（等比缩放必然如此），
+  // 所以按内容纵横比收缩画布高度（限定在 [MIN_H, MAX_H]），再投第二遍。
+  const MIN_H = 118;
+  const MAX_H = 210;
+  let projected = project(all, size);
+  if (projected.pts.length) {
+    const ys = projected.pts.map((p) => p.y);
+    const usedH = Math.max(...ys) - Math.min(...ys) + size.pad * 2;
+    const finalH = Math.round(Math.min(MAX_H, Math.max(MIN_H, usedH)));
+    if (Math.abs(finalH - size.height) > 6) {
+      projected = project(all, { ...size, height: finalH });
+    }
+  }
   const at = (role) => {
     const i = marks.findIndex((m) => m.role === role);
     return i < 0 ? null : projected.pts[i] || null;

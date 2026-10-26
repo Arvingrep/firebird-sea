@@ -110,3 +110,26 @@ test('navUrl 指向收货点', () => {
   assert.ok(buildDeliveryView(ORDER).navUrl.includes('destination=14.6095,120.9742'));
   assert.strictEqual(buildDeliveryView({}).navUrl, '');
 });
+
+test('画布高度自适应内容纵横比：横向路线的卡片更矮，纵向路线受上限约束', () => {
+  // 横向路线（纬度几乎不变）：内容只占一小条高度，画布应收窄，但不能低于 118
+  const flat = buildDeliveryView({
+    coordX: 14.6000, coordY: 120.9700,
+    lat: 14.6002, lng: 120.9842,
+    peisongpath: '120.9700,14.6000;120.9770,14.6001;120.9842,14.6002',
+  });
+  assert.ok(flat.height < 168, `横向路线画布应变矮，实际 ${flat.height}`);
+  assert.ok(flat.height >= 118, `不能低于 MIN_H，实际 ${flat.height}`);
+
+  // 纵向路线（经度几乎不变）：高度被 MAX_H 兜住
+  const tall = buildDeliveryView({
+    coordX: 14.5700, coordY: 120.9842,
+    lat: 14.6400, lng: 120.9842,
+    peisongpath: '120.9842,14.5700;120.9842,14.6050;120.9842,14.6400',
+  });
+  assert.ok(tall.height <= 210, `不能超过 MAX_H，实际 ${tall.height}`);
+  // 投影点仍全部落在画布内
+  for (const p of [tall.marks.shop, tall.marks.dest, tall.marks.courier]) {
+    assert.ok(p.x >= 0 && p.x <= tall.width && p.y >= 0 && p.y <= tall.height);
+  }
+});
