@@ -30,8 +30,11 @@ test('展示类白名单：8 个匿名只读接口，shopList/shopType 声明参
   ]);
   const member = Object.entries(WHITELIST).filter(([, r]) => r.auth === 'member').map(([k]) => k).sort();
   assert.deepStrictEqual(member, [
-    'waimai:cancelOrder', 'waimai:deal', 'waimai:delAddress', 'waimai:getMemberAddress', 'waimai:operAddress', 'waimai:order', 'waimai:orderDetail',
+    'waimai:cancelOrder', 'waimai:deal', 'waimai:delAddress', 'waimai:getCourierLocation',
+    'waimai:getMemberAddress', 'waimai:operAddress', 'waimai:order', 'waimai:orderDetail',
   ]);
+  // 轨迹接口上游只按 orderid 查、无归属条件，必须靠预检兜住
+  assert.deepStrictEqual(WHITELIST['waimai:getCourierLocation'].ownershipPrecheck, { action: 'orderDetail', idParam: 'orderid' });
   assert.strictEqual(WHITELIST['article:orderDetail'], undefined);
   for (const [k, r] of Object.entries(WHITELIST)) if (r.auth === 'member') assert.ok(Array.isArray(r.params), `${k} 必须声明参数白名单`);
   // 首页搜索开始透传 keywords，必须走白名单；同时挡住三个注入面

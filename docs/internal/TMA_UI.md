@@ -561,3 +561,88 @@ LEFT JOIN `#@__waimai_list` f ON f.`sid` = s.`id` ... GROUP BY s.`id`
 
 单测锁定了这三条（`fb-proxy.test.js`「shopList 只透传搜索/分页/筛选参数」），
 以后想加回来必须改测试，跑不掉。
+
+## 订单详情：配送地图（2026-10-26）
+
+### 为什么不用地图服务
+
+配置里 `cfg_map=1`（google）且 `cfg_map_google` 有 key，但 **Static Maps API 未在项目上开通**，
+实测返回 403 `This API is not activated on your API project`。临时开通要绑结算账号，
+且每次请求计费——订单详情是高频页面，不适合按次付费。
+
+所以改为**自绘 SVG**：把商家 / 收货点 / 骑手轨迹的经纬度等比投影到 320×168 的画布上。
+零依赖、无配额、离线可渲染，「导航」按钮走 `google.com/maps/dir/?api=1&destination=…`
+深链唤起系统地图 App（不需要 key，也不需要嵌入任何 SDK）。
+
+代价是没有底图（街道/建筑），只有点和线。对「骑手离我还有多远」这个问题够用，
+真要认路就点导航。
+
+### 上游字段的四个坑（全部实读源码确认）
+
+1. **`coordX` 是纬度，`coordY` 是经度** —— 名字是反的。
+   - `webroot/templates/courier/detail.html:20` → `{"lng": coordY, "lat": coordX}`
+   - `courier/js/map.js:708` → `new google.maps.LatLng(coordX, coordY)`（LatLng 纬度在前）
+   - `waimai.class.php:504` 的 SQL 距离公式把 `s.coordX` 放在纬度项
+
+   传反了**不会报错**，只会让点被 `isValidLat` 丢掉、地图整块空白。这是最难查的一类。
+
+2. **`peisongpath` 是 `"lng,lat;lng,lat;…"`**，顺序与上面相反
+   （`waimai.class.php:9151` 用 `$lng . "," . $lat` 拼）。
+
+3. **`juli` / `julishop` 字段不可信**：`orderDetail` 用
+   `getDistance($coordX, $coordY, $lat, $lng)` 算，而 `getDistance` 的签名是
+   `($lng1, $lat1, $lng2, $lat2)`（`webroot/include/common.func.php:8687`）——经纬传反了。
+   距离一律自己用 haversine 算。
+
+4. **商家接单之后才有坐标意义**：`coordX/coordY` 为空（或 `0,0`）的老店铺很多，
+   这类订单不画图（`buildDeliveryView().visible === false`），不显示空图占位。
+
+### 订单状态值（对齐写入点，不是猜的）
+
+| state | 含义 | 写入位置 |
+|---|---|---|
+| 0 | 待付款 | `deal()` |
+| 2 | 已支付待接单 | `waimai.class.php:4408` |
+| 3 | 商家已接单 | 骑手取消也退回 3（`:8672`） |
+| 4 | 骑手已接单 | `qiangdan()`（`:8112`） |
+| 5 | 配送中（已取货） | `peisong()` 取货分支（`:8280`） |
+| 1 | 已完成（已送达） | `peisong()` 送达分支（`:8378`） |
+| 6 | 已取消 | `:5251` / `:5253` |
+
+`ORDER_STATE` 之前漏了 4，导致**骑手在路上的主干状态显示成「处理中」**。已补
+`4: 'accepted'` → 「骑手已接单」。
+
+### 展示与轮询
+
+- **画图**：state 3 / 4 / 5（对齐 H5 `member/touch/js/order-waimai.js:296-320`，
+  这三档都带 `.map_show`）。
+- **轮询**：state 4 / 5，间隔 30s，页面隐藏时停表（`visibilitychange`），
+  离开页面 `onUnmounted` 清定时器。走 `getCourierLocation`（只查 `peisongpath` 一列）
+  而不是 `orderDetail`（后者要跑十几条 SQL、还反序列化菜品）。
+- **首次渲染不额外请求**：`orderDetail` 本身已返回 `lng`/`lat`/`coordX`/`coordY`/`peisongpath`，
+  够画第一帧；轮询只负责增量刷新。
+
+### 空轨迹的两种表达
+
+`getCourierLocation` 在骑手还没上报轨迹时，handler 返回空串 →
+网关 `handlers::getHandle` 兜底成 `state=102` + `"No data!"`。
+`fbClient.unwrap()` 把这个组合也归一成 `null`（与「暂无数据」同等语义），
+调用方不必为「字段还没值」写 try/catch。其他 102 文案仍抛错，避免把真故障当空态吞掉。
+
+### 纯逻辑与测试
+
+| 文件 | 职责 | 测试 |
+|---|---|---|
+| `src/lib/geo.js` | 单点校验、haversine、轨迹解析（合并 <8m 重复点，上限 500）、`simplify`、等比投影（经度按 `cos(纬度)` 压缩）、`formatDistance`、`navUrl` | `test/geo.test.mjs` |
+| `src/lib/delivery.js` | 订单 → 视图模型：三个标记的投影坐标、折线、全程/剩余距离、是否可见、是否该轮询 | `test/delivery.test.mjs` |
+| `src/components/DeliveryMap.vue` | 只负责画。SVG 内**不放文字**（i18n 长度会溢出），标注放到底部图例 | — |
+
+`package.json` 的 `test` 脚本之前漏了 `geo.test.mjs`（文件在、CI 不跑），已补上并加入 `delivery.test.mjs`。
+
+### 两个已知取舍
+
+- **剩余距离是直线距离**，不是路网距离。骑手隔着一条河时数字会偏乐观。
+  要做真实路线得接 Directions API（同样按次计费），暂不接。
+- **`project()` 每次都对全部点重算包围盒**，所以骑手一动，整张图的缩放会跟着变，
+  视觉上点会「跳」。轨迹点少时（<20）几乎看不出来；如果以后觉得晃，
+  可以改成固定包围盒（用商家→收货点的框）再让骑手点在图内移动。

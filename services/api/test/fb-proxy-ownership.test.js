@@ -15,7 +15,7 @@ const VALID_OC = JSON.stringify([{ id: '5', count: 1 }]);
 
 function fakeFirebird() {
   const addresses = { 1: { id: 1, uid: A, person: 'A' }, 2: { id: 2, uid: B, person: 'B-secret' } };
-  const orders = { 10: { id: 10, uid: A, ordernum: 'OA' }, 20: { id: 20, uid: B, ordernum: 'OB-secret', state: 0 } };
+  const orders = { 10: { id: 10, uid: A, ordernum: 'OA', path: '120.1,14.1;120.2,14.2' }, 20: { id: 20, uid: B, ordernum: 'OB-secret', state: 0, path: 'SECRET_PATH' } };
   const log = { requests: [], mutations: [] };
   const NOLOGIN = { state: 200, info: '未登录或登录超时！' };
 
@@ -28,7 +28,8 @@ function fakeFirebird() {
     const m = /login_user=(\d+)/.exec(cookie);
     const uid = m ? Number(m[1]) : null;
     const courier = /(^|;\s*)courier=/.test(cookie); // 旁路：骑手 Cookie 可匿名读订单详情
-    const id = Number(p.id);
+    // getCourierLocation 用 orderid，其余用 id
+    const id = Number(p.id || p.orderid);
     let out;
     switch (p.action) {
       case 'getAddressDetail':
@@ -59,6 +60,10 @@ function fakeFirebird() {
       case 'orderDetail':
         if (uid === null && !courier) { out = { state: 200, info: '请先登录！' }; break; }
         out = orders[id] && (courier || orders[id].uid === uid) ? { state: 100, info: orders[id] } : { state: 200, info: '订单不存在' };
+        break;
+      case 'getCourierLocation':
+        // 真实 handler：SELECT peisongpath WHERE id = $id —— 不校验登录、不校验归属
+        out = { state: 100, info: (orders[id] && orders[id].path) || '' };
         break;
       case 'cancelOrder':
         if (uid === null) { out = { state: 200, info: '登录超时，请重新登录！' }; break; }
@@ -214,6 +219,40 @@ test('deal：使用 B 的地址 ID 下单 → 404，不创建订单；价格类�
   const ok = await proxy.handle({ ...base, body: { shop: '1', address: '1', order_content: VALID_OC } });
   assert.strictEqual(ok.status, 200);
   assert.deepStrictEqual(fx.log.mutations, [['deal', 1]]);
+});
+
+test('getCourierLocation：A 查 B 的轨迹 → 404，不含轨迹数据', async () => {
+  const { call } = setup();
+  const r = await call('getCourierLocation', { query: { orderid: '20' } });
+  assert.strictEqual(r.status, 404);
+  assert.strictEqual(leaks(r, 'SECRET_PATH'), false);
+});
+
+test('getCourierLocation：查自己的订单可读轨迹；不存在的订单号同样 404', async () => {
+  const { call, fx } = setup();
+  const ok = await call('getCourierLocation', { query: { orderid: '10' } });
+  assert.strictEqual(ok.status, 200);
+  assert.strictEqual(ok.body.info, '120.1,14.1;120.2,14.2');
+  // 预检一次 + 正式一次
+  assert.deepStrictEqual(fx.log.requests.map((x) => x.action), ['orderDetail', 'getCourierLocation']);
+
+  const missing = await call('getCourierLocation', { query: { orderid: '999' } });
+  assert.strictEqual(missing.status, 404);
+});
+
+test('getCourierLocation：预检不通过就不转发（上游不会被调用第二次）', async () => {
+  const { call, fx } = setup();
+  await call('getCourierLocation', { query: { orderid: '20' } });
+  assert.deepStrictEqual(fx.log.requests.map((x) => x.action), ['orderDetail']);
+});
+
+test('getCourierLocation：orderid 之外的参数被丢弃，伪造 uid 无效', async () => {
+  const { call, fx } = setup();
+  await call('getCourierLocation', { query: { orderid: '10', uid: '200', userid: '200' } });
+  const hit = fx.log.requests.find((x) => x.action === 'getCourierLocation');
+  assert.strictEqual(hit.params.orderid, '10');
+  assert.strictEqual(hit.params.uid, undefined);
+  assert.strictEqual(hit.params.userid, undefined);
 });
 
 test('orderDetail 骑手旁路：客户端 Cookie/courier 参数不会被转发，匿名路径拿不到数据', async () => {

@@ -52,6 +52,16 @@ const WHITELIST = Object.freeze({
   },
   'waimai:order': { auth: 'member', params: ['page', 'pageSize', 'state', 'iscomment'] },
   'waimai:orderDetail': { auth: 'member', params: ['id'], denyStatus: 404 },
+  // 骑手轨迹：上游 getCourierLocation 连登录都不校验，纯按 orderid 查 peisongpath
+  // （waimai.class.php:6650，`WHERE id = $id` 没有任何归属条件），任何人换个 id 就能看别人的配送轨迹。
+  // 先借 orderDetail 做归属预检——它自己的 SQL 是 `WHERE id = $id AND uid = $userid`，
+  // 读不到即视为无权，按 404 处理且不转发。
+  'waimai:getCourierLocation': {
+    auth: 'member',
+    params: ['orderid'],
+    denyStatus: 404,
+    ownershipPrecheck: { action: 'orderDetail', idParam: 'orderid' },
+  },
   'waimai:cancelOrder': { auth: 'member', write: true, params: ['id'], denyStatus: 404 },
 });
 

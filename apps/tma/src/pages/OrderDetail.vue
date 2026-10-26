@@ -1,26 +1,68 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { showConfirmDialog, showToast } from 'vant';
 import { fb, t } from '../services';
 import { ORDER_STATE, isCancellable } from '../lib/checkout.js';
+import { buildDeliveryView, shouldShowMap, shouldTrack } from '../lib/delivery.js';
 import AppIcon from '../components/AppIcon.vue';
+import DeliveryMap from '../components/DeliveryMap.vue';
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
 const order = ref<any>(null);
 const loading = ref(true);
 const notFound = ref(false);
+// 轮询到的最新轨迹；null 表示"用 orderDetail 里带的那份"
+const pathRaw = ref<string | null>(null);
 
 async function load() {
   loading.value = true;
   notFound.value = false;
+  pathRaw.value = null;
   try {
     order.value = await fb.get('waimai', 'orderDetail', { id: props.id });
   } catch { notFound.value = true; } finally { loading.value = false; }
 }
 const stateKey = (s: number | string) => (ORDER_STATE as Record<string, string>)[String(s)] || 'unknown';
 const label = (s: number | string) => t(`state.${stateKey(s)}`);
+
+/* ---- 配送地图 ---- */
+const deliveryView = computed(() => buildDeliveryView(order.value, pathRaw.value));
+const showMap = computed(() => shouldShowMap(order.value && order.value.state));
+const isTracking = computed(() => shouldTrack(order.value && order.value.state));
+
+// 骑手位置轮询：走 getCourierLocation（只查 peisongpath 一列，比 orderDetail 轻得多）。
+// 上游该接口对空轨迹返回 state=102 "No data!"，fbClient 已归一成 null，这里静默跳过。
+const POLL_MS = 30000;
+let timer: ReturnType<typeof setInterval> | null = null;
+
+async function pollCourier() {
+  try {
+    const raw = await fb.get('waimai', 'getCourierLocation', { orderid: props.id });
+    if (typeof raw === 'string' && raw) pathRaw.value = raw;
+  } catch {
+    // 位置刷新失败不打扰用户：下一轮自动重试，界面保留上一次的位置
+  }
+}
+function stopPoll() {
+  if (timer) { clearInterval(timer); timer = null; }
+}
+function syncPoll() {
+  // 页面在后台时不轮询：既省流量也避免 webview 被系统降频后定时器堆积
+  const on = isTracking.value && typeof document !== 'undefined' && document.visibilityState === 'visible';
+  if (on && !timer) {
+    pollCourier();
+    timer = setInterval(pollCourier, POLL_MS);
+  } else if (!on) {
+    stopPoll();
+  }
+}
+watch([isTracking, () => props.id], syncPoll);
+const onVisible = () => syncPoll();
+onMounted(() => { document.addEventListener('visibilitychange', onVisible); });
+onUnmounted(() => { stopPoll(); document.removeEventListener('visibilitychange', onVisible); });
+
 
 // 时间戳格式化（上游返回的是秒级 unix 时间；paydate = -1 表示货到付款，不是真实时间）
 const fmtTime = (ts: any) => {
@@ -110,6 +152,9 @@ onMounted(load);
         <p v-if="order.qcma" class="meta" style="margin: 4px 0 0">{{ t('order.pickupCode') }} <b>{{ order.qcma }}</b></p>
         <p v-if="order.failed" class="meta" style="margin: 4px 0 0; color: var(--brand)">{{ order.failed }}</p>
       </div>
+
+      <!-- 配送地图（商家已接单之后才有意义） -->
+      <DeliveryMap v-if="showMap" :view="deliveryView" :live="isTracking" style="margin-top: 14px" />
 
       <!-- 商品 -->
       <div class="section-head" style="margin-top: 16px"><h2 class="h2">{{ t('checkout.items') }}</h2></div>
