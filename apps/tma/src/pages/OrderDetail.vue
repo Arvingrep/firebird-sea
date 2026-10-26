@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showConfirmDialog, showToast } from 'vant';
 import { fb, t } from '../services';
@@ -19,8 +19,36 @@ async function load() {
     order.value = await fb.get('waimai', 'orderDetail', { id: props.id });
   } catch { notFound.value = true; } finally { loading.value = false; }
 }
-const stateKey = (s: number | string) => (ORDER_STATE as Record<string, string>)[String(s)] || 'pending';
+const stateKey = (s: number | string) => (ORDER_STATE as Record<string, string>)[String(s)] || 'unknown';
 const label = (s: number | string) => t(`state.${stateKey(s)}`);
+
+// 时间戳格式化（上游返回的是秒级 unix 时间；paydate = -1 表示货到付款，不是真实时间）
+const fmtTime = (ts: any) => {
+  const n = Number(ts);
+  if (!n || n <= 0) return '';
+  const d = new Date(n * 1000);
+  const p = (x: number) => String(x).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+// 时间线节点（对齐 H5 orderdetail-waimai.html 的下单/支付/接单/配送/送达）
+const timeline = computed(() => {
+  const o = order.value || {};
+  return [
+    { key: 'placed', ts: o.pubdate },
+    { key: 'paid', ts: o.paydate },
+    { key: 'confirmed', ts: o.confirmdate },
+    { key: 'delivering', ts: o.peidate },
+    { key: 'delivered', ts: o.okdate },
+  ].map((x) => ({ ...x, text: fmtTime(x.ts) })).filter((x) => !!x.text);
+});
+// 优惠/费用明细（上游把 pointprice 塞进第 0 项且 type 改成了字符串，跳过）
+const priceLines = computed(() => {
+  const arr = (order.value && order.value.priceinfo) || [];
+  if (!Array.isArray(arr)) return [];
+  return arr.filter((x: any) => x && x.type && String(x.type) !== 'pointprice' && Number(x.amount) !== 0);
+});
+const telHref = (p: any) => 'tel:' + String(p || '').replace(/[^\d+]/g, '');
+const money = (v: any) => '₱' + Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
 async function cancel() {
   try {
     await showConfirmDialog({ message: t('orders.cancelConfirm') });
@@ -47,6 +75,7 @@ onMounted(load);
     </div>
 
     <template v-else-if="order">
+      <!-- 状态头 -->
       <div class="card card--pad">
         <div style="display: flex; align-items: center; justify-content: space-between">
           <span class="h2">{{ order.shopname || t('orders.title') }}</span>
@@ -55,24 +84,81 @@ onMounted(load);
           </span>
         </div>
         <p class="meta" style="margin: 8px 0 0">#{{ order.ordernum }}</p>
+        <p v-if="order.qcma" class="meta" style="margin: 4px 0 0">{{ t('order.pickupCode') }} <b>{{ order.qcma }}</b></p>
+        <p v-if="order.failed" class="meta" style="margin: 4px 0 0; color: var(--brand)">{{ order.failed }}</p>
       </div>
 
-      <div class="list" style="margin-top: 14px">
-        <div v-for="(f, i) in (order.food || order.foodlist || [])" :key="i" class="row">
-          <span class="grow">{{ f.title }}</span>
+      <!-- 商品 -->
+      <div class="section-head" style="margin-top: 16px"><h2 class="h2">{{ t('checkout.items') }}</h2></div>
+      <div class="list">
+        <div v-for="(f, i) in (order.food || [])" :key="i" class="row">
+          <span class="grow">{{ f.title || f.name || ('#' + f.id) }}</span>
           <span class="val">× {{ f.count }}</span>
         </div>
       </div>
 
+      <!-- 账单 -->
       <div class="card card--pad" style="margin-top: 14px">
         <div class="bill">
-          <div class="row total"><span>{{ t('orders.amount') }}</span><b>₱{{ Number(order.amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}</b></div>
+          <div v-for="(p, i) in priceLines" :key="i" class="row">
+            <span>{{ p.type }}</span><b>{{ money(p.amount) }}</b>
+          </div>
+          <div v-if="order.paytype" class="row"><span>{{ t('checkout.payMethod') }}</span><b>{{ order.paytype }}</b></div>
+          <div class="row total"><span>{{ t('orders.amount') }}</span><b>{{ money(order.amount) }}</b></div>
         </div>
       </div>
 
-      <button v-if="isCancellable(order.state)" class="btn btn--ghost" style="width: 100%; margin-top: 16px" @click="cancel">
-        {{ t('orders.cancel') }}
-      </button>
+      <!-- 配送信息 -->
+      <div class="section-head" style="margin-top: 16px"><h2 class="h2">{{ t('order.delivery') }}</h2></div>
+      <div class="list">
+        <div class="row">
+          <span class="lead"><AppIcon name="pin" :size="17" /></span>
+          <span class="grow">
+            <span style="display: block; font-weight: 600">{{ order.person }}</span>
+            <span class="meta">{{ order.address }}</span>
+          </span>
+        </div>
+        <a v-if="order.tel" class="row" :href="telHref(order.tel)">
+          <span class="lead"><AppIcon name="phone" :size="17" /></span>
+          <span class="grow">{{ order.tel }}</span>
+          <AppIcon name="chevron-right" :size="14" />
+        </a>
+        <a v-if="order.peisongname || order.peisongphone" class="row" :href="telHref(order.peisongphone)">
+          <span class="lead"><AppIcon name="bag" :size="17" /></span>
+          <span class="grow">
+            <span style="display: block; font-weight: 600">{{ order.peisongname || t('order.courier') }}</span>
+            <span class="meta">{{ order.peisongphone }}</span>
+          </span>
+          <AppIcon v-if="order.peisongphone" name="phone" :size="15" />
+        </a>
+      </div>
+
+      <!-- 时间线 -->
+      <template v-if="timeline.length">
+        <div class="section-head" style="margin-top: 16px"><h2 class="h2">{{ t('order.timeline') }}</h2></div>
+        <div class="card card--pad">
+          <div v-for="tl in timeline" :key="tl.key" class="row">
+            <span>{{ t('order.t.' + tl.key) }}</span>
+            <span class="meta" style="font-variant-numeric: tabular-nums">{{ tl.text }}</span>
+          </div>
+        </div>
+      </template>
+
+      <!-- 备注 / 餐具 -->
+      <div v-if="order.note || (order.preset && order.preset.length)" class="card card--pad" style="margin-top: 14px">
+        <div v-if="order.note" class="row">
+          <span>{{ t('checkout.note') }}</span><b style="font-weight: 600">{{ order.note }}</b>
+        </div>
+        <div v-if="order.preset && order.preset.length" class="row">
+          <span>{{ t('order.preset') }}</span><b style="font-weight: 600">{{ order.preset.join(' / ') }}</b>
+        </div>
+      </div>
+
+      <!-- 操作 -->
+      <div style="display: flex; gap: 10px; margin-top: 16px">
+        <a v-if="order.shoptel" class="btn btn--soft" style="flex: 1" :href="telHref(order.shoptel)">{{ t('order.contactShop') }}</a>
+        <button v-if="isCancellable(order.state)" class="btn btn--ghost" style="flex: 1" @click="cancel">{{ t('orders.cancel') }}</button>
+      </div>
     </template>
   </div>
 </template>
