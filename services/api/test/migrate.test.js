@@ -34,9 +34,9 @@ function fakeConn() {
 // AC1: 空库迁移创建 AD-5 全部表及关键约束（SQL 文本层；真实库见集成测试）
 test('AC1: migration creates all AD-5 tables', async () => {
   const conn = fakeConn();
-  assert.deepEqual(await migrate(conn), ['001_fbs_tables.sql', '002_tma_shared_state.sql']);
+  assert.deepEqual(await migrate(conn), ['001_fbs_tables.sql', '002_tma_shared_state.sql', '003_addr_share.sql']);
   const sql = conn.executed.join('\n');
-  for (const t of [...TABLES, 'fbs_token_revoked', 'fbs_idem', 'fbs_replay']) assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${t} \\(`), `missing ${t}`);
+  for (const t of [...TABLES, 'fbs_token_revoked', 'fbs_idem', 'fbs_replay', 'fbs_addr_share']) assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${t} \\(`), `missing ${t}`);
 });
 
 test('AC1: chain_tx unique (txid,event_index); charge holds_tail + tail unique; role shop_id not null', () => {

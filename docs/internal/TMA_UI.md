@@ -113,3 +113,39 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
   - 启用：`geocoding-backend.googleapis.com`、`maps-backend.googleapis.com`（Maps JavaScript API）；`places-backend.googleapis.com` 原已启用。
   - key：`firebird-tma-maps`，仅允许上述三个 API（无 referrer/IP 限制）；同时写入 k8s secret `firebird-storage-secret/google-maps-api-key` 与 GitHub secret `GOOGLE_MAPS_API_KEY`。
   - 失效/轮换：`gcloud services api-keys list --project fh580-70533` 找到 key → 新建并重复上面两步写入即可；前端 key 是构建期注入，必须重新构建镜像。
+
+### 地址表单重做：收货人 = Telegram 身份 + 补充项 + 分享链接（2026-10-26）
+
+用户反馈「为什么要写联系人、写电话？联系人就是 Telegram 的，通话就用 Telegram 通话」，并指出地址缺补充项、需要分享链接。重做要点：
+
+**1. 不再让用户手填联系人**
+- 收货人取自 `Telegram.WebApp.initDataUnsafe.user`（`getTgUser()`），表单里以只读身份卡展示（头像 + 昵称 + `@username` + 「通过 Telegram 联系」）。
+- 上游 `waimai::operAddress` 仍强制 `person` 非空，值由 TG 资料自动生成（`first_name last_name`），不再要求用户输入。
+
+**2. 电话默认走 Telegram**
+- 未填手机号时 `tel` 写入 `@username`（表字段 varchar(100)，足够）；没有 username 时退化为 `tg:<tg_id>`。
+- 保留「备用手机号（可选）」——骑手/商家需要直接拨打时使用，填写才校验格式；不填也能保存。
+- 地址卡按 tel 形态展示：纯数字显示 📞，Telegram 标识显示 💬 通过 Telegram 联系。
+
+**3. 地址补充项（上游表无独立字段，用既有两字段分层承载）**
+- `street` = 主地址（Google 联想结果）；`address` = `主地址，门牌/楼层/单元；给骑手的说明`。
+- 编辑时按「address 是否以 street 开头」反解补充项（`splitExtra`），回填到输入框，避免二次编辑出现重复文本。
+- 上游下单读取两字段时均能拿到可读地址（street 是主地址，address 是完整地址）。
+
+**4. areaCode 修正**
+- 上游 `areaCode` 缺省写死 86（中国）。TMA 原先未传 → 全部地址区号被记为 86。现按本站实际地区传 `1`（美国）。
+
+**5. 分享地址（代下单）**
+- 新表 `fbs_addr_share`（migration `003_addr_share.sql`）：`token CHAR(32) PK / uid / payload(JSON 快照) / created_at / expires_at`，7 天过期，过期即不可读。
+- `POST /tg-api/addr/share`（需 Bearer 令牌）：客户端上传**位置**（`street`/`address`/`lat`/`lng`/`areaCode`，**不含姓名与电话**）→ 返回 `{ token, url }`；`url = https://t.me/<bot>?startapp=addr_<token>`，bot 用户名由服务端调 `getMe` 缓存获取（未就绪时 `url=null`，前端降级为纯文本分享）。
+  - 限流：`TMA_SHARE_MAX`，默认 **10 次/分**（按 IP，`createLimiter`）。
+  - 每个会员最多保留 **20 条**有效分享（新分享写入后按 `created_at DESC, token DESC` 裁掉更早的），避免公开接口长期堆积个人信息。
+  - 过期清理按进程节流 `PURGE_INTERVAL_SECONDS = 600`（每 10 分钟一次），失败不阻断创建——避免每次分享多起一个 mariadb 子进程。
+- `GET /tg-api/addr/shared/:token`（公开，凭 token）：仅返回位置快照，不含 uid；token 非法格式直接 404 且不触库。
+  - 限流：`TMA_SHARE_READ_MAX`，默认 **60 次/分**（按 IP）。
+  - **隐私取舍**：分享只传「位置」，收货人与联系电话由**接收方用自己的 Telegram 身份**生成（不采信分享方上传的内容）；token 为 32 位随机 hex（不可枚举）、7 天过期、单会员 20 条上限。若后续要更严，可改为「首次领取后失效」。
+- **深链路由（QA 第 2 轮 major）**：`startapp` 参数必须进 `apps/tma/src/lib/startParam.js` 白名单才会被路由。曾因只认 `shop_<id>` 导致接收方落在首页、地址页根本没挂载，分享整条链路失效。现白名单含 `^addr_([0-9a-f]{32})$` → `{ name: 'addresses', query: { share: <token> } }`，地址页优先读 `route.query.share`，`start_param` 仅作兜底（直接落在本页时）。
+- 接收方确认后调 `operAddress` 存为自己的地址（同一条链接只询问一次，`sessionStorage` 去重）。
+- **前置条件**：bot 需在 BotFather 配置 Main Mini App，`t.me/<bot>?startapp=` 才能直接拉起小程序；否则链接只会打开 bot 聊天（此时仍可把地址文本发给对方手工录入）。当前 bot：`@fbird_men_bot`。
+- **⚠️ cliConn 的 `-N -B` 转义陷阱（QA 第 1 轮 major）**：`services/api/src/migrate.js` 的 `cliConn` 用 `mariadb -N -B` 批处理模式，**输出里的反斜杠会被再次转义**。`payload` 是 JSON，地址里只要有 `"`（如 `5'10"`）或 `\`，直接 `SELECT payload` 读回就会变成 `\"` / `\\`，`JSON.parse` 失败或内容变形。故读取统一走 `SELECT HEX(payload)`，Node 端 `Buffer.from(hex,'hex')` 还原。**任何经 cliConn 存取自由文本（JSON/HTML/含引号的串）都必须走 HEX 或 base64，不能直接查原始列。**
+- 单测：`services/api/test/addr-share-route.test.js`（12 例：鉴权/入参裁剪/换行清理/反斜杠转义/每 uid 上限/HEX 往返含 `"` `\`/非法 token/过期/损坏/限流/降级）。
