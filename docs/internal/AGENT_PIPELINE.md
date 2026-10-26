@@ -127,6 +127,43 @@ Issue 标题含 `[story:<key>]`（或正文 `<!-- bmad-story: KEY -->`）时，d
 - `services/api` 与 `scripts/test-api-db.sh` 入库前，verify-task 的 6、7 步自动跳过。
 - `bmad-sprint-writeback.yml`：agent PR 合并且标题含 `[story:<key>]` → 开 `bmad/sprint-done-<N-M>-pr<PR>` 分支与 PR，仅改 `sprint-status.yaml`（不直推 main）；回写 PR 由人合并。标题经 env 传入，不拼进脚本。
 
+## 5d. API 契约同步（门禁第 10 项，2026-10-26）
+
+**要解决的问题**：Docs-as-Code 只要求「改了业务代码就在 `docs/` 里动点东西」，动哪一篇不管。
+加一条路由、顺手往别的文档里补一行，门禁照样绿——OpenAPI 可以落后几个月没人发现。
+这跟合并表那次「静默空集」是同一类错：**看起来通过了，实际没验证到**。
+
+**做法**：把「文档」收窄成机器可读的契约——`docs/api/openapi.yaml`，两个方向都查。
+
+| 方向 | 判定 | 为什么必须查 |
+| :--- | :--- | :--- |
+| 代码有、spec 没写 | FAIL | 接口没文档，调用方无从下手 |
+| spec 写了、代码没有 | FAIL | 比缺文档更坏：调用方会照着写不存在的接口 |
+
+**触发条件**（`scripts/agent/gates.sh` 第 10 项）：
+
+- 只要碰到 API 面（`services/api/src/{server,fbProxy,*Route}.js` 或 `docs/api/openapi.yaml`），
+  就跑 `scripts/api-contract-check.js` 做双向比对；
+- 只有改了**路由实现**时，才额外要求同一 PR 里带上 `services/api/test/` 的测试与 `openapi.yaml` 更新。
+
+区分这两层是有意的：只改文档写错了也该拦，但不该逼人「改个错别字也补一条测试」。
+
+**实现上的三个约束**：
+
+1. **零依赖**：`Zero-Dep` 门禁不允许引 yaml 库，所以是受缩进约束的行解析
+   （路径键缩进 2、方法键缩进 4、`x-fb-actions` 条目缩进 2）。写 spec 时别用 Tab、别改缩进。
+2. **fire-and-forget 路由别漏**：上游代理是 `router.all('/fb/:service/:action')`，
+   单看路径看不出/api 面。所以额外把 `fbProxy.js` 的 `WHITELIST` 动作与 spec 的
+   `x-fb-actions` 对齐——加白名单动作等于加接口，必须同时进契约。
+3. **fail-closed**：新写一个含 `router.xxx(` 的文件但没登记挂载前缀，直接 FAIL
+   （`ROUTE_SOURCES` 在检查器里）。宁可让人改一行，也不让新路由静默漏检。
+
+检查器自身有 7 条单测（`services/api/test/api-contract.test.js`），门禁自测另加 4 个用例
+（`scripts/test-gates.sh`：不带测试 / 一致放行 / spec 多写 / spec 没跟）。**检查器错了会给出假绿**，
+所以它自己也要被测——这条不省略。
+
+手写 spec 时可以用 `node scripts/api-contract-check.js --print` 打出代码侧当前的路由与白名单动作。
+
 ## 6. 运维
 
 ```bash

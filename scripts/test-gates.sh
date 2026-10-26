@@ -124,6 +124,45 @@ out="$(GATE_REPO_DIR=/tmp/nope-xyz bash "$ROOT/scripts/agent/gates.sh" origin/ma
 if [ "$rc" = "1" ] && concl_bol "$out"; then
   echo "✅ 仓库目录不可用出口的结论行在行首"
 else echo "❌ 仓库目录不可用出口未在行首给结论（rc=${rc}）"; printf '%s\n' "$out" | tail -6; FAIL=1; fi
+# --- gates.sh 第 10 项：API 契约同步 ---
+# 三种失效模式都要挡住：①改了路由不带测试 ②带了测试但 OpenAPI 没跟 ③OpenAPI 写成与代码不一致。
+# 夹具要自包含：门禁在 $T 里跑，而检查器是 `node scripts/api-contract-check.js`（相对 cwd），
+# 所以把真脚本拷进夹具，并造最小 services/api/src + docs/api。
+reset
+mkdir -p scripts services/api/src services/api/test docs/api
+cp "$ROOT/scripts/api-contract-check.js" scripts/
+printf "router.get('/health', h);\n" > services/api/src/server.js
+printf '' > services/api/src/addrShareRoute.js
+printf '' > services/api/test/.gitkeep   # git 不追踪空目录，reset 后 test/ 会消失
+printf 'openapi: 3.0.3\npaths:\n  /tg-api/health:\n    get:\n      summary: x\n' > docs/api/openapi.yaml
+git add -A; git commit -qm api-fixture
+git update-ref refs/remotes/origin/main HEAD   # 夹具进基线，后面 reset 才回得到
+
+reset
+printf "router.get('/health', h);\nrouter.get('/new', h);\n" > services/api/src/server.js
+printf 'openapi: 3.0.3\npaths:\n  /tg-api/health:\n    get:\n      summary: x\n  /tg-api/new:\n    get:\n      summary: y\n' > docs/api/openapi.yaml
+git commit -qam d
+case_ "改路由+同步 OpenAPI 但没带测试 → FAIL" 1 0
+
+reset
+printf "router.get('/health', h);\nrouter.get('/new', h);\n" > services/api/src/server.js
+printf 'openapi: 3.0.3\npaths:\n  /tg-api/health:\n    get:\n      summary: x\n  /tg-api/new:\n    get:\n      summary: y\n' > docs/api/openapi.yaml
+printf "require('node:test')('x', () => {});\n" > services/api/test/new.test.js
+git add -A; git commit -qm d
+case_ "改路由+测试+OpenAPI 且契约一致 → 放行" 0 0
+
+reset
+printf 'openapi: 3.0.3\npaths:\n  /tg-api/health:\n    get:\n      summary: x\n  /tg-api/ghost:\n    get:\n      summary: 描述了不存在的接口\n' > docs/api/openapi.yaml
+git commit -qam d
+case_ "OpenAPI 写了代码里没有的接口 → FAIL" 1 0
+
+reset
+mkdir -p services/api/test
+printf "router.get('/health', h);\nrouter.get('/new', h);\n" > services/api/src/server.js
+printf "require('node:test')('x', () => {});\n" > services/api/test/new.test.js
+git add -A; git commit -qm d
+case_ "改路由+带测试但 OpenAPI 未更新 → FAIL" 1 0
+
 # --- story.sh：Story key 解析（dev.sh 注入规格/预检依赖它）---
 source "$ROOT/scripts/agent/story.sh"
 eq() { if [ "$2" = "$3" ]; then echo "✅ $1"; else echo "❌ $1（期望「$3」实际「$2」）"; FAIL=1; fi; }

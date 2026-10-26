@@ -6,6 +6,19 @@
 - `services/payment-listener` 计划调用 `${API_BASE_URL}/tg-api/payment/chain-match`（回调尚未启用，见 GATEWAY_SPIKE.md）。
 - 前端/TMA 调用旧 `/api/...` 的地方需改到 `/tg-api/...`（本仓库内目前无调用方）。
 
+## 契约文件（`docs/api/openapi.yaml`）
+
+对外接口的机器可读契约。**改路由必须同步改它**，否则确定性门禁第 10 项直接 FAIL：
+
+```bash
+node scripts/api-contract-check.js          # 双向比对：代码路由 ↔ spec；白名单动作 ↔ x-fb-actions
+node scripts/api-contract-check.js --print   # 打印代码侧当前路由，手写 spec 时对照用
+```
+
+两个方向都会拦：代码有 spec 没写（缺文档）、spec 写了代码没有（文档描述不存在的接口）。
+上游代理那条 `router.all('/fb/:service/:action')` 的**真实接口面是 `fbProxy.js` 的 `WHITELIST` 动作**，
+所以白名单与 spec 的 `x-fb-actions` 也要求一致。设计取舍见 `AGENT_PIPELINE.md` 第 5d 节。
+
 ## 生产启动自检（`services/api/src/config.js`）
 `NODE_ENV=production` 时，缺少 `TELEGRAM_BOT_TOKEN` / `TRON_MASTER_RECEIVE_ADDRESS`、使用 `DEMO_*` 演示令牌、或收款地址为占位符/非 Tron 地址，进程启动即抛错退出并列出全部问题。`/tg-api/payment/mock-webhook` 仅在非生产环境注册。
 
