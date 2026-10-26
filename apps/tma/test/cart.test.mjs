@@ -100,7 +100,10 @@ test('持久化：新实例从同一存储恢复商品、数量、店铺与起�
   assert.strictEqual(b.shopId, '7');
   assert.strictEqual(b.count(), 3);
   assert.strictEqual(b.totalCents(), 3000);
-  assert.deepStrictEqual(b.shopMeta, { id: '7', name: 'A 店', minOrderCents: 500 });
+  assert.strictEqual(b.shopMeta.id, '7');
+  assert.strictEqual(b.shopMeta.name, 'A 店');
+  assert.strictEqual(b.shopMeta.minOrderCents, 500);
+  assert.ok(Number.isFinite(b.shopMeta.ts) && b.shopMeta.ts > 0, 'ts 用于判断门槛新鲜度');
   assert.strictEqual(b.items()[0].title, 'F1');
 });
 
@@ -179,21 +182,58 @@ test('起送价：未达门槛时禁止下单，并算出差额', () => {
   assert.strictEqual(c.canPlaceOrder(), true);
 });
 
-test('起送价：未知（无 meta / 换店）一律按 0 处理，不拦人', () => {
+test('起送价：未知（无 meta）一律按 0 处理，不拦人', () => {
   const c = createCart({ storage: null });
   c.add(1, food(1, '1.00'));
   assert.strictEqual(c.minOrderCents(), 0);
   assert.strictEqual(c.canPlaceOrder(), true);
+});
 
-  // 逛 B 店时把起送价写到属于 A 店的车上 —— 必须被拒绝，且不污染 A 的门槛
-  c.setShopMeta(1, { minOrderCents: 100 });
-  assert.strictEqual(c.setShopMeta(2, { minOrderCents: 99999 }), false);
-  assert.strictEqual(c.minOrderCents(), 100);
+// —— QA 171 轮 1 major：清空/切店后起送价静默变 0（两条常见路径）——
 
-  // 换店加菜后旧 meta 自动失效（B 店起送价此时未知 → 不拦）
-  c.switchShop(2, food(9, '1.00'));
+test('起送价：把最后一份减到 0 再重新加菜，门槛仍然有效', () => {
+  const c = createCart({ storage: null });
+  c.setShopMeta(1, { name: 'A', minOrderCents: 500 });
+  c.add(1, food(1, '2.00'));
+  assert.strictEqual(c.shortfallCents(), 300);
+
+  c.setQty(1, 0);                       // 店铺页点减号减到 0
+  assert.strictEqual(c.shopId, null);
+  assert.strictEqual(c.minOrderCents(), 0); // 车空着，谈不上门槛
+
+  c.add(1, food(1, '2.00'));            // 同一页立刻又加回来
+  assert.strictEqual(c.shopId, '1');
+  assert.strictEqual(c.minOrderCents(), 500);
+  assert.strictEqual(c.shortfallCents(), 300);
+  assert.strictEqual(c.canPlaceOrder(), false);
+});
+
+test('起送价：清空购物车后在同一家店加菜，门槛仍然有效', () => {
+  const c = createCart({ storage: null });
+  c.setShopMeta(1, { minOrderCents: 500 });
+  c.add(1, food(1, '2.00'));
+  c.clear();
   assert.strictEqual(c.minOrderCents(), 0);
-  assert.strictEqual(c.canPlaceOrder(), true);
+  c.add(1, food(1, '2.00'));
+  assert.strictEqual(c.minOrderCents(), 500);
+});
+
+test('起送价：逛 B 店被拒不污染 A 门槛，确认切店后取 B 的门槛', () => {
+  const c = createCart({ storage: null });
+  c.setShopMeta(1, { name: 'A', minOrderCents: 100 });
+  c.add(1, food(1, '1.00'));
+
+  // 车属于 A，B 店的 setShopMeta 不能绑上去，但必须记住
+  assert.strictEqual(c.setShopMeta(2, { name: 'B', minOrderCents: 900 }), false);
+  assert.strictEqual(c.minOrderCents(), 100);
+  assert.strictEqual(c.shopMeta.name, 'A');
+
+  // 用户确认换店 → 起送价立刻取 B 店的值（而不是退化成 0 放行）
+  c.switchShop(2, food(9, '1.00'));
+  assert.strictEqual(c.shopId, '2');
+  assert.strictEqual(c.minOrderCents(), 900);
+  assert.strictEqual(c.shortfallCents(), 800);
+  assert.strictEqual(c.canPlaceOrder(), false);
 });
 
 test('起送价：门槛为 0 视同无门槛', () => {
@@ -202,4 +242,61 @@ test('起送价：门槛为 0 视同无门槛', () => {
   c.add(1, food(1, '0.10'));
   assert.strictEqual(c.shortfallCents(), 0);
   assert.strictEqual(c.canPlaceOrder(), true);
+});
+
+// —— QA 171 轮 1 minor：快照会过期，旧门槛不能永久卡人 ——
+
+test('起送价：快照超过 TTL 按未知处理（不拦人）', () => {
+  let clock = 1_000_000;
+  const c = createCart({ storage: null, now: () => clock, ttlMs: 60_000 });
+  c.setShopMeta(1, { minOrderCents: 500 });
+  c.add(1, food(1, '1.00'));
+  assert.strictEqual(c.minOrderCents(), 500);
+
+  clock += 59_000;
+  assert.strictEqual(c.minOrderCents(), 500);   // 未过期
+
+  clock += 2_000;
+  assert.strictEqual(c.minOrderCents(), 0);     // 过期 → 未知 → 放行
+  assert.strictEqual(c.canPlaceOrder(), true);
+});
+
+test('起送价：刷新店铺信息后续期', () => {
+  let clock = 1_000_000;
+  const c = createCart({ storage: null, now: () => clock, ttlMs: 60_000 });
+  c.setShopMeta(1, { minOrderCents: 500 });
+  c.add(1, food(1, '1.00'));
+  clock += 61_000;
+  assert.strictEqual(c.minOrderCents(), 0);
+  c.setShopMeta(1, { minOrderCents: 500 });     // 进店/购物车页刷新
+  assert.strictEqual(c.minOrderCents(), 500);
+});
+
+test('reload：存储里没有快照时保持内存现状，不误清空', () => {
+  const s = memStorage();
+  const c = createCart({ storage: s });
+  c.add(1, food(1));
+  s.setItem('fbcart:v1', '');  // 空串 → 脏数据
+  assert.strictEqual(c.reload(), false);
+  // 脏数据不可信 → 按设计清空
+  assert.strictEqual(c.count(), 0);
+
+  const c2 = createCart({ storage: null });
+  c2.add(1, food(1));
+  assert.strictEqual(c2.reload(), false);  // 无 storage
+  assert.strictEqual(c2.count(), 1);       // 车还在
+});
+
+test('多标签页：另一方写入后 reload 能看到最新车', () => {
+  const s = memStorage();
+  const a = createCart({ storage: s });
+  a.setShopMeta(1, { minOrderCents: 500 });
+  a.add(1, food(1, '2.00'));
+
+  const b = createCart({ storage: s });   // 另一个 WebView
+  assert.strictEqual(b.count(), 1);
+  a.add(1, food(1, '2.00'));
+  assert.strictEqual(b.count(), 1);       // 还没同步
+  assert.strictEqual(b.reload(), true);
+  assert.strictEqual(b.count(), 2);       // 同步后一致
 });

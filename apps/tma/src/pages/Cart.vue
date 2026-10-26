@@ -1,13 +1,27 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showConfirmDialog } from 'vant';
-import { t } from '../services';
+import { fb, t } from '../services';
 import { useCartStore } from '../stores/cart';
 import { formatPhp } from '../lib/cart.js';
 import AppIcon from '../components/AppIcon.vue';
 
 const cart = useCartStore();
 const router = useRouter();
+
+// 起送价是本地快照，商家可能已经调过：进购物车时静默刷新一次，
+// 失败就用快照（并由 cart 里的 TTL 兜底为"未知不拦"）。
+onMounted(async () => {
+  if (!cart.shopId) return;
+  try {
+    const si = await fb.get('waimai', 'storeDetail', { id: cart.shopId }, { anonymous: true });
+    cart.setShopMeta(cart.shopId as string, {
+      name: si?.shopname || '',
+      minOrderCents: Math.round(Number(si?.basicprice || 0) * 100),
+    });
+  } catch { /* 用快照 */ }
+});
 
 async function clearCart() {
   try {

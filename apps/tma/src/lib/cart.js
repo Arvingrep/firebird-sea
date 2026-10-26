@@ -14,6 +14,8 @@ function toThumb(pics) {
 // 持久化键。带版本号：格式一旦不兼容就整体丢弃，绝不半解析。
 const CART_KEY = 'fbcart:v1';
 const MAX_QTY = 99;
+// 起送价快照的有效期：超过就按"未知"处理（不拦人），避免商家调低门槛后用户被旧值卡死
+const META_TTL_MS = 30 * 60 * 1000;
 
 // localStorage 并不总是可用：Telegram 内嵌 WebView 的隐私模式、配额写满、
 // 某些客户端禁用存储都会让 setItem 抛异常。探测一次，不可用就退化为纯内存。
@@ -37,11 +39,22 @@ const toCentsStrict = (v) => {
 export function createCart(options = {}) {
   const storage = 'storage' in options ? options.storage : safeStorage();
   const key = options.key || CART_KEY;
+  const nowFn = typeof options.now === 'function' ? options.now : () => Date.now();
+  const ttlMs = Number.isFinite(options.ttlMs) ? options.ttlMs : META_TTL_MS;
   let shopId = null;
   // 店铺元信息：起送价只在「购物车属于这家店」时才有意义，故带上 id 绑定。
-  // 用户逛 A 店时写入、去 B 店加菜时必须自动失效，否则会拿 A 的起送价卡 B 的单。
-  let shopMeta = null; // { id, name, minOrderCents }
+  let shopMeta = null; // { id, name, minOrderCents, ts } —— 当前车绑定的那家店
+  // 「最近一次见到的店铺」：用户逛 B 店时车还在 A 店，setShopMeta(B) 不能绑到车上，
+  // 但也不能丢——等他确认换店 / 把车清空再加菜时，起送价必须还能拿到。
+  // 没有这一层，切店和"减到 0 再加菜"两条常见路径的起送价会静默变成 0（QA 171 轮 1 major）。
+  let seenMeta = null;
   const lines = new Map(); // foodId -> { id, title, priceCents, qty }
+
+  // 车归属切到 id 时，尽量复用已知起送价：先看当前绑定，再看最近见到的
+  function bindMeta(id) {
+    if (shopMeta && shopMeta.id === id) return;
+    shopMeta = seenMeta && seenMeta.id === id ? seenMeta : { id, name: '', minOrderCents: 0, ts: nowFn() };
+  }
 
   function snapshot() {
     return {
@@ -59,7 +72,7 @@ export function createCart(options = {}) {
 
   // 恢复时逐字段校验：localStorage 是用户可写的，任何一条脏数据都不能让页面白屏。
   function hydrate(raw) {
-    lines.clear(); shopId = null; shopMeta = null;
+    lines.clear(); shopId = null; shopMeta = null; seenMeta = null;
     let data;
     try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return false; }
     if (!data || data.v !== 1 || !Array.isArray(data.lines)) return false;
@@ -80,7 +93,11 @@ export function createCart(options = {}) {
     const s = data.shop;
     if (s && typeof s === 'object' && String(s.id) === sid) {
       const mc = toCentsStrict(s.minOrderCents);
-      shopMeta = { id: sid, name: typeof s.name === 'string' ? s.name : '', minOrderCents: mc === null ? 0 : mc };
+      // 快照里的 ts 只用于判断"这份门槛有多旧"；缺失时按当前时间算（刚加载，先信它），
+      // 真正的时效兜底由 Cart/Checkout 进页面刷新 storeDetail 完成。
+      const ts = Number.isFinite(s.ts) && s.ts > 0 ? s.ts : nowFn();
+      shopMeta = { id: sid, name: typeof s.name === 'string' ? s.name : '', minOrderCents: mc === null ? 0 : mc, ts };
+      seenMeta = shopMeta;
     }
     return true;
   }
@@ -98,7 +115,7 @@ export function createCart(options = {}) {
       const priceCents = toCents(food.price);
       if (!Number.isFinite(priceCents) || priceCents < 0) throw new Error('invalid price');
       shopId = String(shop);
-      if (!shopMeta || shopMeta.id !== shopId) shopMeta = { id: shopId, name: '', minOrderCents: 0 };
+      bindMeta(shopId);
       const cur = lines.get(String(food.id));
       // 上限与 hydrate/setQty 保持一致（99）：避免出现"刷新前 120 份、刷新后变 99 份"的静默截断
       if (cur) cur.qty = Math.min(cur.qty + 1, MAX_QTY);
@@ -120,24 +137,31 @@ export function createCart(options = {}) {
       if (!l) return;
       if (!Number.isInteger(qty) || qty <= 0) lines.delete(String(foodId));
       else l.qty = Math.min(qty, MAX_QTY);
-      if (lines.size === 0) { shopId = null; shopMeta = null; }
+      // 车空了只解绑 shopId，不动 shopMeta/seenMeta：用户在店铺页把最后一份减到 0
+      // 再重新加菜是极常见的操作，此时起送价必须还在（不能退化成 0）
+      if (lines.size === 0) shopId = null;
       persist();
     },
     remove(foodId) { api.setQty(foodId, 0); },
-    clear() { lines.clear(); shopId = null; shopMeta = null; persist(); },
-    // 写入店铺信息（起送价/店名）。仅在购物车为空或属于同一家店时接受，
-    // 避免"逛 A 店顺手把起送价写到 B 店的购物车上"。
+    clear() { lines.clear(); shopId = null; persist(); },
+    // 写入店铺信息（起送价/店名）。车空着或就属于这家店 → 直接绑定；
+    // 车属于别的店 → 只记进 seenMeta，等他确认切店或清空再加菜时自动生效。
     setShopMeta(shop, meta) {
       const id = String(shop);
-      if (shopId !== null && shopId !== id) return false;
       const mc = toCentsStrict(meta && meta.minOrderCents);
-      shopMeta = { id, name: meta && typeof meta.name === 'string' ? meta.name : '', minOrderCents: mc === null ? 0 : mc };
+      const row = { id, name: meta && typeof meta.name === 'string' ? meta.name : '', minOrderCents: mc === null ? 0 : mc, ts: nowFn() };
+      seenMeta = row;
+      if (shopId !== null && shopId !== id) return false;
+      shopMeta = row;
       persist();
       return true;
     },
-    // 起送价只在购物车归属匹配时生效；未知一律按 0（不拦人）
+    // 起送价只在购物车归属匹配时生效；未知或已过期一律按 0（不拦人）
     minOrderCents() {
       if (!shopId || !shopMeta || shopMeta.id !== shopId) return 0;
+      // 门槛是本地快照，商家可能已调价：过期就当未知交给上游兜底，
+      // 免得用户拿着旧的高门槛被永久卡住（QA 171 轮 1 minor）
+      if (ttlMs > 0 && nowFn() - (shopMeta.ts || 0) > ttlMs) return 0;
       return shopMeta.minOrderCents || 0;
     },
     shortfallCents() { return Math.max(0, api.minOrderCents() - api.totalCents()); },
@@ -150,7 +174,14 @@ export function createCart(options = {}) {
     canPlaceOrder() { return api.canCheckout() && api.meetsMinimum(); },
     serialize() { return JSON.stringify(snapshot()); },
     hydrate,
-    reload() { return hydrate(storage ? storage.getItem(key) : null); },
+    // 多标签页/多 WebView 同步用。存储里没有快照 ≠ 车该被清空，
+    // 所以只在真有快照时才覆盖内存状态，否则保持现状返回 false。
+    reload() {
+      if (!storage) return false;
+      const raw = storage.getItem(key);
+      if (raw === null) return false;
+      return hydrate(raw);
+    },
   };
   if (storage) hydrate(storage.getItem(key));
   return api;

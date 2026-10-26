@@ -33,6 +33,14 @@ export const useCartStore = defineStore('cart', () => {
   function setShopMeta(shop: string | number, meta: ShopMeta) { const r = cart.setShopMeta(shop, meta); bump(); return r; }
   function clear() { cart.clear(); bump(); }
 
+  // 多标签页 / 多 WebView 同步：别处改了车就重读一次快照。
+  // reload() 在存储里没有快照时返回 false 且保持内存现状，不会误清空当前车。
+  if (typeof window !== 'undefined') {
+    const sync = () => { if (cart.reload()) bump(); };
+    window.addEventListener('storage', (e: StorageEvent) => { if (!e.key || e.key === 'fbcart:v1') sync(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+  }
+
   return {
     items, count, totalCents, shopId, shopMeta, canCheckout, canPlaceOrder,
     minOrderCents, shortfallCents,

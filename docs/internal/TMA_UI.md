@@ -387,11 +387,29 @@ handler/action 与参数均已在 `services/api/src/fbProxy.js` 白名单内。
 | 起送价 | `minOrderCents()` / `shortfallCents()` / `meetsMinimum()` | 差额按"分"算，天然无浮点误差 |
 | 结算闸门 | `canPlaceOrder()` | `canCheckout() ∩ meetsMinimum()`；`canCheckout()` 语义保持不变（只管车本身合不合法） |
 
-**店铺元信息绑定**：`shopMeta = { id, name, minOrderCents }` 带店铺 id。
-`setShopMeta()` 在购物车属于**别的店**时直接返回 `false` 拒绝写入；`add()` 换店时旧 meta 自动失效。
-否则会出现"用 A 店的起送价卡 B 店的单"这种最恶心的误拦。
+**店铺元信息是两层结构**（QA 171 轮 1 major 的修复核心）：
 
-**校验策略是"未知不拦"**：起送价缺失、换店后未加载、快照过期，`minOrderCents()` 一律按 0。
+| 变量 | 含义 | 生命周期 |
+|---|---|---|
+| `shopMeta = {id,name,minOrderCents,ts}` | 当前车**绑定**的那家店的起送价 | 车归属变化时跟着换 |
+| `seenMeta`（不落盘） | **最近一次见到的**店铺（可能是别的店） | `setShopMeta()` 每次都更新 |
+
+`setShopMeta()` 在车属于别的店时返回 `false` 且**不绑定**，但一定写进 `seenMeta`。等用户确认换店
+（`switchShop`）或把车清空再加菜时，`add()` 会调 `bindMeta()`：先看当前 `shopMeta`，再看 `seenMeta`，
+命中就把门槛接回来。
+
+没有这一层会出两个静默 bug——两条都是极常见的操作路径，且结果是"门槛变 0 → 直接放行"：
+
+1. 用户在店铺页把最后一份**减到 0 再重新加菜**（`setQty` 会把 `shopId` 置空）；
+2. 用户在 B 店确认**换店**加菜（B 店的 `setShopMeta` 在 `load()` 时先于 `switchShop` 执行，被拒绝后没人补写）。
+
+因此 `setQty` / `clear()` **只解绑 `shopId`，不再清 `shopMeta`**。
+
+**门槛有时效**：`minOrderCents()` 在 `now - ts > 30min` 时返回 0（当未知处理）。
+商家调低起送价后，用户不该被一份旧快照永久卡住——宁可交给上游 `deal` 兜底拒绝。
+`Cart` / `Checkout` 进页面时还会静默拉一次 `storeDetail` 刷新 `basicprice`，本地快照只是兜底。
+
+**未知一律不拦**：起送价缺失、换店后未加载、快照过期，`minOrderCents()` 都是 0。
 宁可让上游兜底拒绝，也不要在前端用猜出来的门槛拦住能成立的订单。
 
 ### 存储格式（`localStorage['fbcart:v1']`）
@@ -411,9 +429,17 @@ handler/action 与参数均已在 `services/api/src/fbProxy.js` 白名单内。
 | 页面 | 行为 |
 |---|---|
 | `Shop.vue` | `load()` 成功后写入 `shopMeta`（起送价来自 `basicprice`）；悬浮结算条在未达标时按钮禁用，显示"还差 ₱X"，`.sum` 副标题用金色 `--gold` 强调 |
-| `Cart.vue` | 账单增加「起送价」一行 + 未达标时的 `hint--warn` 提示；结算按钮改用 `canPlaceOrder` |
-| `Checkout.vue` | 按钮同样改 `canPlaceOrder`；`submit()` 前置防御——差额 > 0 时不发请求，直接提示差多少 |
+| `Cart.vue` | 进页面静默刷新 `storeDetail`；账单增加「起送价」一行 + 未达标时的 `hint--warn` 提示；结算按钮改用 `canPlaceOrder` |
+| `Checkout.vue` | 同样进页面刷新起送价；按钮改 `canPlaceOrder`；`submit()` 前置防御——差额 > 0 时不发请求，直接提示差多少 |
 | `style.css` | 新增 `.cartbar .sum span.short`（金色）、`.hint--warn`（品牌色） |
+
+### 多标签页 / 多 WebView
+
+`persist()` 是整份覆盖写，两个实例会互相盖。`stores/cart.ts` 监听 `storage` 事件与
+`visibilitychange`（回到前台时）调 `cart.reload()` 并 `bump()` 重新渲染。
+
+`reload()` **在存储里没有快照时返回 `false` 且保持内存现状**——"没存过"不等于"车该被清空"。
+脏数据（有快照但不可解析）才按设计清空。
 
 ### 刻意不做的
 
@@ -427,3 +453,8 @@ handler/action 与参数均已在 `services/api/src/fbProxy.js` 白名单内。
 可接受的理由：车内容只有菜名与单价，不含个人信息；下单所需的地址走 `getMemberAddress`（按 uid 服务端查），
 不会被"继承"。若后续要彻底隔离，应在 `auth` 成功后把 `uid` 拼进存储键（`fbcart:v1:<uid>`），
 但这会让"未登录浏览的购物车"在登录后丢失，属于产品决策，暂不做。
+
+### 存储格式补充
+
+`shop` 字段多了一个 `ts`（毫秒时间戳），用于判断门槛新鲜度。快照里没有 `ts` 时按"刚刷新"处理
+（`hydrate` 时打上当前时间），真正的时效保证由 `Cart`/`Checkout` 进页面刷新完成。

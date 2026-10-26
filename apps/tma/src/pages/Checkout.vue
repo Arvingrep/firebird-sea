@@ -23,6 +23,15 @@ const result = ref<{ ordernum?: string } | null>(null);
 const canSubmit = computed(() => cart.canPlaceOrder && !!addressId.value && !submitting.value);
 
 onMounted(async () => {
+  // 起送价快照可能已过期（商家调价 / 长时间停留）：进结算页刷新一次，避免拿旧门槛拦住能成立的订单
+  if (cart.shopId) {
+    fb.get('waimai', 'storeDetail', { id: cart.shopId }, { anonymous: true })
+      .then((si) => cart.setShopMeta(cart.shopId as string, {
+        name: si?.shopname || '',
+        minOrderCents: Math.round(Number(si?.basicprice || 0) * 100),
+      }))
+      .catch(() => { /* 用快照，TTL 兜底 */ });
+  }
   try {
     const info = await fb.get('waimai', 'getMemberAddress', {});
     addresses.value = listRows(info);
