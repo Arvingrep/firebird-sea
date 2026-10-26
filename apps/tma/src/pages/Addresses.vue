@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { showConfirmDialog, showToast, showLoadingToast, closeToast } from 'vant';
 import { fb, authClient, i18n } from '../services';
+import { listRows } from '../lib/fbClient.js';
 import { getTgUser, getStartParam, openExternal } from '../telegram';
 import AppIcon from '../components/AppIcon.vue';
 
@@ -40,7 +41,7 @@ async function load() {
   loading.value = true;
   try {
     const info = await fb.get('waimai', 'getMemberAddress', {});
-    list.value = Array.isArray(info?.list) ? info.list : [];
+    list.value = listRows(info);
   } catch { list.value = []; } finally { loading.value = false; }
 }
 

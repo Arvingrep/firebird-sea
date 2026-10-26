@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { showToast } from 'vant';
 import { fb, i18n, t, toggleLang } from '../services';
+import { listRows } from '../lib/fbClient.js';
 import { useCartStore } from '../stores/cart';
 import { getTgUser } from '../telegram';
 import AppIcon from '../components/AppIcon.vue';
@@ -25,7 +26,7 @@ onMounted(async () => {
   } catch { orderCount.value = null; }
   try {
     const info = await fb.get('waimai', 'getMemberAddress', {});
-    addrCount.value = Array.isArray(info?.list) ? info.list.length : 0;
+    addrCount.value = listRows(info).length;
   } catch { addrCount.value = null; }
 });
 
