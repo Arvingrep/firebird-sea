@@ -16,7 +16,16 @@ const newKey = () => {
 };
 
 // 火鸟「空数据」文案（多语言站点下仍以中文原文返回；只匹配空态语义，避免吞掉真实错误）
-const EMPTY_RE = /暂无数据|没有数据|暂无内容|暂无信息/;
+const EMPTY_RE = /暂无数据|没有数据|暂无内容|暂无信息|暂未添加/;
+
+// 火鸟 handler 返回形状不统一：多数列表返回 {pageInfo, list}（shopList/order/alist），
+// 但 getMemberAddress 等老接口直接 return 裸数组（老 H5 读 data.info 即数组）。
+// 统一在这里归一，调用方不再各自猜测。
+export function listRows(info) {
+  if (Array.isArray(info)) return info;
+  if (Array.isArray(info?.list)) return info.list;
+  return [];
+}
 
 // authClient：{ request(path, init) → Response }，来自 createAuthClient；anonymous 为无需令牌的 fetch
 export function createFbClient({ authClient, anonymousFetch, baseUrl = '/tg-api/fb', platform = 'tma' }) {

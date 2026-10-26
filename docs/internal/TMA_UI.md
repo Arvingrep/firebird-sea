@@ -214,3 +214,13 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **兼容层清理**：删除 style.css 中「过渡别名 + 旧页面兼容类」（-208 行），全 app 统一 v2 令牌。
 - **地址页保留**：Places 联想 / 分享深链（share token）逻辑不动，仅重排版式；region 仍为 PH。
 - **验收**：tsc ✅ / npm test 35/35 ✅ / vite build ✅；页面代码与此前 v2 分支截图验收版本一致。
+
+## 地址列表读不出（2026-10-26 线上事故）
+
+- **症状**：保存地址成功（库里有行，uid/cityid/坐标齐全），但地址页/结账页/我的-统计全部显示无地址。
+- **根因**：火鸟 handler 返回形状不统一——`getMemberAddress` 直接 `return $list`（老 H5 读
+  `data.info` 即数组），而 TMA 三个页面都在读 `info?.list`，永远 undefined。对照
+  `webroot/templates/waimai/touch/skin2/js/addressPaotui.js:174`（`var list = data.info`）实锤。
+- **修复**：fbClient 导出 `listRows(info)`（裸数组 / `{list}` / null 三态归一），Addresses /
+  Checkout / Profile 三处统一改用；EMPTY_RE 补「暂未添加」空态文案。
+- **教训**：接火鸟老接口前先对照 touch 模板的老 JS 确认 info 形状，不要假设都是 `{list}` 包装。

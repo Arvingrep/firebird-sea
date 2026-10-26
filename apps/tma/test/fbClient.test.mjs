@@ -60,3 +60,30 @@ test('非 JSON 响应抛 BAD_RESPONSE', async () => {
   const { fb } = make({ anon: () => ({ ok: true, status: 200, json: async () => { throw new Error('x'); } }) });
   await assert.rejects(() => fb.get('a', 'b', {}, { anonymous: true }), (e) => e.code === 'BAD_RESPONSE');
 });
+
+// —— listRows：火鸟 handler 返回形状归一（getMemberAddress 裸数组 vs order/shopList 的 {list}）——
+import { listRows } from '../src/lib/fbClient.js';
+
+test('listRows：裸数组原样返回（getMemberAddress 形状）', () => {
+  const rows = [{ id: '15', street: 'Ayala' }];
+  assert.deepStrictEqual(listRows(rows), rows);
+});
+
+test('listRows：{list} 包装形状取 list（order/shopList/alist 形状）', () => {
+  const rows = [{ id: '1' }];
+  assert.deepStrictEqual(listRows({ pageInfo: {}, list: rows }), rows);
+});
+
+test('listRows：null/undefined/缺 list 的对象一律空数组', () => {
+  assert.deepStrictEqual(listRows(null), []);
+  assert.deepStrictEqual(listRows(undefined), []);
+  assert.deepStrictEqual(listRows({}), []);
+  assert.deepStrictEqual(listRows({ pageInfo: {} }), []);
+});
+
+test('listRows：上游空态文案「暂未添加地址」经 unwrap 归为 null 后落空数组', async () => {
+  const { fb } = make({ auth: async () => res(200, { state: 101, info: '暂未添加地址' }) });
+  const info = await fb.get('waimai', 'getMemberAddress', {});
+  assert.strictEqual(info, null);
+  assert.deepStrictEqual(listRows(info), []);
+});

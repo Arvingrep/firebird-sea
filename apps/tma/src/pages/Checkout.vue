@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showToast } from 'vant';
 import { fb, t } from '../services';
+import { listRows } from '../lib/fbClient.js';
 import { useCartStore } from '../stores/cart';
 import { buildDealParams, ValidationError } from '../lib/checkout.js';
 import { formatPhp } from '../lib/cart.js';
@@ -24,7 +25,7 @@ const canSubmit = computed(() => cart.canCheckout && !!addressId.value && !submi
 onMounted(async () => {
   try {
     const info = await fb.get('waimai', 'getMemberAddress', {});
-    addresses.value = Array.isArray(info?.list) ? info.list : [];
+    addresses.value = listRows(info);
     if (addresses.value.length) addressId.value = String(addresses.value[0].id);
   } catch { addresses.value = []; }
 });
