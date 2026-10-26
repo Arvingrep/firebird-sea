@@ -1,0 +1,295 @@
+openapi: 3.0.3
+info:
+  title: Firebird SEA Core API
+  version: 1.0.0
+  description: |
+    服务端网关（services/api）对外的全部 HTTP 接口。
+
+    这份文件是**机器校验的契约**：`scripts/api-contract-check.js` 会双向比对
+    `services/api/src` 里的 `router.*` 声明与本文件，任何一边多出条目都会让 CI 门禁失败。
+    因此改路由必须改这里，不能只改代码或只改别的文档。
+
+    书写约束（检查器是零依赖的行解析，不引 YAML 库）：
+    - 路径键缩进 2 空格，方法键缩进 4 空格，不得用 Tab；
+    - 方法只认 get/post/put/patch/delete；
+    - `x-fb-actions` 的条目缩进 2 空格，形如 `- 'waimai:shopList'`。
+
+    不在本契约范围内：`app.*` 级别的静态资源与健康检查（`/tma/*` 前端产物）、
+    CORS/JSON 中间件。它们不是对外 API。
+servers:
+  - url: https://canary.fbird.men
+    description: 验收环境
+  - url: https://manila.fbird.men
+    description: 生产环境（马尼拉）
+paths:
+  /tg-api/health:
+    get:
+      summary: 健康检查
+      description: 无鉴权、无外部依赖，用于探针与人工确认部署。
+      responses:
+        '200':
+          description: 服务在线
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: online }
+                  timestamp: { type: string, format: date-time }
+                  service: { type: string, example: Firebird-SEA-Core-API }
+                  region: { type: string }
+  /tg-api/auth/tg-verify:
+    post:
+      summary: 校验 Telegram initData（旧版）
+      description: 仅用于本地联调与回归；正式登录走 /tg-api/auth/telegram。限流 30 次/分钟/IP。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string, description: Telegram WebApp initData 原始串 }
+      responses:
+        '200': { description: 校验通过，返回用户资料 }
+        '400': { description: 缺少 initData }
+        '429': { description: 触发限流 }
+  /tg-api/auth/telegram:
+    post:
+      summary: Telegram Mini App 登录
+      description: 校验 initData 后签发访问令牌。失败日志只记消息不记 initData，避免凭证二次泄漏。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string }
+      responses:
+        '200': { description: 登录成功，返回令牌 }
+        '401': { description: initData 无效或过期 }
+        '503': { description: 鉴权模块未配置（AUTH_NOT_CONFIGURED） }
+        '502': { description: 登录服务暂不可用（LOGIN_FAILED） }
+  /tg-api/auth/logout:
+    post:
+      summary: 注销当前令牌
+      description: 从 Authorization 头取 Bearer 令牌并加入吊销表。
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: 已吊销 }
+        '401': { description: 无令牌或已失效 }
+        '503': { description: 鉴权模块未配置 }
+  /tg-api/services:
+    get:
+      summary: 四大核心模块元数据
+      description: 首页/服务入口所需的静态元数据（美食外卖、跑腿等）。无鉴权。
+      responses:
+        '200':
+          description: 模块列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: array, items: { type: object } }
+  /tg-api/fb/{service}/{action}:
+    post:
+      summary: 火鸟上游白名单代理（写）
+      description: |
+        转发到上游 `ajax.php`。**默认拒绝**：只有 `x-fb-actions` 列出的动作可调用；
+        参数按动作白名单过滤，身份类参数（uid/token 等）在代理层剥离，写接口额外做幂等与限流。
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema: { type: string, example: waimai }
+        - name: action
+          in: path
+          required: true
+          schema: { type: string, example: shopList }
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: 上游返回（空态由客户端归一成 null） }
+        '403': { description: 动作不在白名单 }
+        '404': { description: 动作未登记或目标不存在 }
+        '429': { description: 写接口限流 }
+        '502': { description: 上游不可用或返回非法数据 }
+    get:
+      summary: 火鸟上游白名单代理（读）
+      description: 与 POST 同一路径，服务端 `router.all` 接收任意方法；读动作按匿名/会员分别鉴权。
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema: { type: string }
+        - name: action
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 上游返回 }
+        '403': { description: 动作不在白名单 }
+  /tg-api/payment/create-charge:
+    post:
+      summary: 创建 USDT 收款单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, amountUsdt]
+              properties:
+                orderId: { type: string }
+                amountUsdt: { type: number, minimum: 0, exclusiveMinimum: true }
+                network: { type: string, default: TRC-20 }
+      responses:
+        '200': { description: 收款单已创建 }
+        '400': { description: orderId 缺失或金额非法 }
+  /tg-api/checkout:
+    post:
+      summary: 收银台下单（读服务端订单金额 + 归属校验 + 尾数分配）
+      description: |
+        金额与归属一律服务端读取，客户端只提交订单号。落库 `fbs_charge`。
+        需 Telegram initData（`x-telegram-init-data` 头或 body.initData）证明调用者身份，
+        ordernum 必须属于该用户，防止替他人买单/越权读金额。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ordernum]
+              properties:
+                ordernum: { type: string }
+                idempotencyKey: { type: string, description: 同一键重复提交返回同一结果 }
+      responses:
+        '200': { description: 收银台数据（金额、尾数、汇率） }
+        '400': { description: 参数缺失 }
+        '401': { description: initData 无效 }
+        '404': { description: 订单不存在或不属于当前用户 }
+        '429': { description: 下单过于频繁 }
+  /tg-api/payment/status/{chargeId}:
+    get:
+      summary: 轮询收款单状态
+      parameters:
+        - name: chargeId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 收款单当前状态 }
+        '404': { description: 收款单不存在 }
+  /tg-api/rates/coins-ph:
+    get:
+      summary: Coins.ph 行情（价格 + 五档盘口）
+      parameters:
+        - name: symbol
+          in: query
+          required: false
+          schema: { type: string, default: USDTPHP }
+      responses:
+        '200': { description: 行情数据 }
+        '500': { description: 上游行情不可用 }
+  /tg-api/rates/convert:
+    get:
+      summary: 菲律宾比索兑 USDT 换算
+      parameters:
+        - name: php
+          in: query
+          required: true
+          schema: { type: number, minimum: 0, exclusiveMinimum: true }
+      responses:
+        '200': { description: 换算结果 }
+        '400': { description: php 缺失或非正数 }
+        '500': { description: 上游换算不可用 }
+  /tg-api/wallet/coins-ph/balance:
+    get:
+      summary: Coins.ph 账户余额（HMAC 私有接口）
+      responses:
+        '200': { description: 余额 }
+        '500': { description: 上游不可用或签名失败 }
+  /tg-api/call-test:
+    post:
+      summary: 语音呼叫连通性自测
+      description: 校验 initData 后向 CALL_TEST_URL 发起呼叫，失败原生重试 2 次（间隔 3s）。串行执行，同一时刻只允许一个。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string }
+                to: { type: string }
+                message: { type: string }
+      responses:
+        '200': { description: 呼叫成功 }
+        '401': { description: initData 无效 }
+        '429': { description: 已有测试在执行（CALL_TEST_BUSY） }
+        '502': { description: 呼叫失败（CALL_TEST_FAILED） }
+        '503': { description: 未配置 CALL_TEST_URL }
+  /tg-api/addr/share:
+    post:
+      summary: 生成地址分享链接（代下单）
+      description: 只接收收货**位置**；收货人姓名与电话由接收方用自己的 Telegram 身份生成，避免伪造他人信息被采信。限流 10 次/分钟/IP。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                street: { type: string }
+                city: { type: string }
+                note: { type: string }
+      responses:
+        '200': { description: 一次性 token 与 t.me 深链 }
+        '401': { description: 未登录 }
+        '429': { description: 限流 }
+  /tg-api/addr/shared/{token}:
+    get:
+      summary: 凭 token 读取地址快照
+      description: 公开读取（不校验登录），只返回地址快照、不含 uid 等归属信息。限流 60 次/分钟/IP。
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string, description: 一次性 token，过期即失效 }
+      responses:
+        '200': { description: 地址快照 }
+        '404': { description: token 非法 / 过期 / 已使用 }
+        '429': { description: 限流 }
+        '502': { description: 查询失败（LOOKUP_FAILED） }
+x-fb-actions:
+  - 'waimai:shopList'
+  - 'waimai:shopType'
+  - 'waimai:storeDetail'
+  - 'waimai:food'
+  - 'waimai:foodType'
+  - 'waimai:getMemberAddress'
+  - 'waimai:operAddress'
+  - 'waimai:delAddress'
+  - 'waimai:deal'
+  - 'waimai:order'
+  - 'waimai:orderDetail'
+  - 'waimai:getCourierLocation'
+  - 'waimai:cancelOrder'
+  - 'article:type'
+  - 'article:alist'
+  - 'article:detail'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: `/tg-api/auth/telegram` 签发的访问令牌，放在 Authorization 头。

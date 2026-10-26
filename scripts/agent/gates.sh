@@ -143,6 +143,33 @@ elif printf '%s\n' "$CHANGED" | grep -q '^deploy/helm/'; then
   [ -z "$HF" ] && row "Helm 多站点渲染" "✅ PASS" || row "Helm 多站点渲染" "❌ FAIL" "$HF"
 fi
 
+# 10. API 契约同步
+#     docs-as-code（第 3 项）只要求「改了代码就动 docs/」，动哪一篇不管——加一条路由、
+#     随手往别的文档里写一行，门禁照样绿，而 OpenAPI 悄悄落后。这里把范围收窄到 API 面：
+#       ① 代码路由 / fbProxy 白名单动作 ↔ docs/api/openapi.yaml 双向一致（脚本负责，两个方向都查）；
+#       ② 改了路由实现，必须同一 PR 带 services/api/test/ 下的测试与 openapi.yaml 更新。
+#     ①在只要碰到 API 面时都跑（改错文档也要拦住），②只在改实现时要求。
+API_ROUTE_IMPL="$(printf '%s\n' "$CHANGED" | grep -E '^services/api/src/(server|fbProxy|[A-Za-z]+Route)\.js$' || true)"
+API_FACE="$(printf '%s\n' "$API_ROUTE_IMPL" ; printf '%s\n' "$CHANGED" | grep -E '^docs/api/openapi\.yaml$' || true)"
+if [ -z "$API_FACE" ]; then
+  row "API 契约同步" "✅ PASS" "未触及 API 面"
+else
+  CONTRACT_OUT="$(node scripts/api-contract-check.js 2>&1)"; CONTRACT_RC=$?
+  MISS=""
+  if [ -n "$API_ROUTE_IMPL" ]; then
+    printf '%s\n' "$CHANGED" | grep -qE '^services/api/test/' || MISS+="缺测试文件；"
+    printf '%s\n' "$CHANGED" | grep -qE '^docs/api/openapi\.yaml$' || MISS+="缺 OpenAPI 更新；"
+  fi
+  if [ "$CONTRACT_RC" -ne 0 ]; then
+    MISS+="契约不一致；"
+    CONTRACT_OUT="$(printf '%s' "$CONTRACT_OUT" | grep -E '^✗' | head -n2 | tr '\n' ' ')"
+  else
+    CONTRACT_OUT=""
+  fi
+  if [ -z "$MISS" ]; then row "API 契约同步" "✅ PASS" "路由/白名单与 openapi.yaml 一致"
+  else row "API 契约同步" "❌ FAIL" "${MISS}${CONTRACT_OUT}"; fi
+fi
+
 echo "### 🔒 确定性门禁（${RANGE}）"
 echo
 echo "| 检查项 | 结果 | 说明 |"
