@@ -34,7 +34,13 @@ export function createFbClient({ authClient, anonymousFetch, baseUrl = '/tg-api/
     let json;
     try { json = await res.json(); } catch (e) { throw new FbError('BAD_RESPONSE', 'Invalid response', res.status); }
     if (!res.ok) throw new FbError(json?.error?.code || 'HTTP_ERROR', json?.error?.message || `HTTP ${res.status}`, res.status);
-    if (json.state !== 100) throw new FbError('UPSTREAM_STATE', String(json.info || 'Request failed'), json.state);
+    if (json.state !== 100) {
+      // 火鸟列表接口惯例：空数据返回 state=200 + "暂无数据"，属正常空态而非错误
+      //（调用方对 null 均已做 Array.isArray/info?.list 兜底 → 渲染为 van-empty）
+      const msg = typeof json.info === 'string' ? json.info : '';
+      if (json.state === 200 && msg.includes('暂无数据')) return null;
+      throw new FbError('UPSTREAM_STATE', String(json.info || 'Request failed'), json.state);
+    }
     return json.info;
   }
 

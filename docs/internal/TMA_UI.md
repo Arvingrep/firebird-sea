@@ -154,3 +154,9 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 
 - **登录异常必须留日志**：`server.js` 的 `/auth/telegram` catch 原先静默返回 `502 LOGIN_FAILED`，线上排查时日志全空，只能进容器逐层复现。现补一行 `console.error`，**只打错误消息、不打 initData**（initData 是可复用凭证，进日志等于二次泄漏）。
 - **分享文本带完整地址**：`t.me/share/url` 的 text 由「主地址」改为「主地址，门牌/楼层/单元」，深链在对方客户端打不开时仍可照着文本手工录入。
+
+## 火鸟「空数据」惯例 → TMA 空态处理（2026-10-26）
+
+- 上游列表接口（article::alist / waimai::order 等）空数据返回 `state=200, info:"暂无数据！"`，不是错误。
+- fbClient.unwrap 对该惯例返回 null（其他 state=200 仍抛错）；调用方均以 `Array.isArray(x) ? x : []` / `info?.list` 兜底 → 页面渲染 van-empty。
+- 修复动机：资讯页 国际新闻/本地新闻/华人动态 三分类在 canary 库文章数为 0，此前整页显示「加载失败，请重试」，误导为服务故障。线上分类数据（2026-10-26 查证）：综合资讯 6 篇，其余 0 篇。

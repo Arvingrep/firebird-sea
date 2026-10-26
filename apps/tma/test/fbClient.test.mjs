@@ -27,6 +27,15 @@ test('火鸟 state != 100 抛 FbError 并携带信息', async () => {
   await assert.rejects(() => fb.get('waimai', 'food', {}, { anonymous: true }), (e) => e instanceof FbError && e.state === 101 && e.message === '没有数据');
 });
 
+test('火鸟空数据惯例：state=200 + 暂无数据 返回 null 而非抛错', async () => {
+  const { fb } = make({ anon: () => res(200, { state: 200, info: '暂无数据！' }) });
+  const info = await fb.get('article', 'alist', { typeid: 2 }, { anonymous: true });
+  assert.strictEqual(info, null);
+  // 其他 state=200 错误仍抛出（如「格式错误」）
+  const { fb: fb2 } = make({ anon: () => res(200, { state: 200, info: '格式错误！' }) });
+  await assert.rejects(() => fb2.get('article', 'alist', {}, { anonymous: true }), (e) => e instanceof FbError && e.state === 200);
+});
+
 test('403 / 429 / 409 映射为稳定错误码', async () => {
   for (const [status, code] of [[403, 'NOT_ALLOWED'], [429, 'RATE_LIMITED'], [409, 'IN_PROGRESS']]) {
     const { fb } = make({ anon: () => res(status, {}) });
