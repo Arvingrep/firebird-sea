@@ -2163,19 +2163,23 @@ class waimai
         // 坐标缺失时服务端按地址文本反查（Google Geocoding）。
         // TMA 表单已改为「只填地址」，不再依赖前端 Google Places 取坐标：
         // 前端没拿到 key / Places 加载失败时，旧逻辑会因坐标为空把保存彻底卡死（2026-10-26 线上）。
-        if ((empty($lng) || empty($lat)) && trim($street . ' ' . $address) !== '') {
-            // 带上分站城市名：TMA 用户常只写「街道 + 门牌」，单靠街道名可能被解析到别的国家
-            $geoQuery = trim($street . ' ' . $address);
+        if ((empty($lng) || empty($lat)) && trim($street) !== '') {
+            // 只用主地址（street）做反查：补充项/备注是「3 楼靠影院」这类噪音，
+            // 带上去 Google 会返回 partial_match=true，按精度门槛会被判失败。
             $cityName = '';
             if (!empty($siteCityInfo['name'])) {
                 $cityName = $siteCityInfo['name'];
             } elseif (!empty($siteCityInfo['typename'])) {
                 $cityName = $siteCityInfo['typename'];
             }
+            $geo = array();
             if ($cityName) {
-                $geoQuery .= ' ' . $cityName;
+                // 先带分站城市名：TMA 用户常只写「街道 + 门牌」，单靠街道名可能被解析到别的国家
+                $geo = $this->geocodeAddressByText(trim($street) . ' ' . $cityName);
             }
-            $geo = $this->geocodeAddressByText($geoQuery);
+            if (empty($geo['lat']) && empty($geo['lng'])) {
+                $geo = $this->geocodeAddressByText(trim($street));
+            }
             if (!empty($geo['lat']) && !empty($geo['lng'])) {
                 $lat = $geo['lat'];
                 $lng = $geo['lng'];

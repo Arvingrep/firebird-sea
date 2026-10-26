@@ -182,3 +182,6 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **契约**：TMA 写地址只保证 `person/tel/street/address/areaCode`；`lat/lng` 为可选，缺失由服务端解析。
 - **教训**：前端能用 ≠ 线上能用。凡是「构建期注入的 key」，必须对**线上 bundle** 做一次实际存在性校验
   （grep `AIzaSy` / SDK URL），不能只信 CI 里的 `--build-arg`。
+- **反查只用主地址**（E2E 发现）：查询串曾拼上 `address`（含补充项），Google 对
+  「Robinsons Place Manila，Level 3 near cinema」返回 `partial_match=true` → 被精度门槛拒绝 → 仍存不下。
+  现改为「`street` + 分站城市名」→ 失败再试 `street` 单串；补充项/备注只影响展示，不参与 geocode。
