@@ -22,6 +22,10 @@ async function clearCart() {
     <van-empty v-if="cart.items.length === 0" :description="t('cart.empty')" />
     <template v-else>
       <div class="fbs-card">
+        <div class="cart-head">
+          <span>{{ t('cart.title') }}</span>
+          <span class="n">{{ t('cart.countN', { n: cart.items.reduce((a, l) => a + l.qty, 0) }) }}</span>
+        </div>
         <div v-for="l in cart.items" :key="l.id" class="cart-line">
           <img v-if="l.pic" :src="l.pic" class="cart-pic" alt="" loading="lazy" @error="(e: Event) => { (e.target as HTMLImageElement).style.display = 'none'; }" />
           <div v-else class="cart-pic cart-pic-empty" aria-hidden="true">🍜</div>

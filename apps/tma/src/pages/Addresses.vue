@@ -4,7 +4,7 @@ import { showConfirmDialog, showToast } from 'vant';
 import { fb, i18n } from '../services';
 import { validateAddress } from '../lib/checkout.js';
 
-interface Address { id: string; person: string; tel: string; address: string; lat?: string; lng?: string }
+interface Address { id: string; person: string; tel: string; address: string; lat?: string; lng?: string; default?: number }
 const t = (k: string) => i18n.t(k);
 const list = ref<Address[]>([]);
 const loading = ref(true);
@@ -118,8 +118,12 @@ onMounted(load);
     <template v-else>
       <van-empty v-if="list.length === 0" :description="t('address.empty')" />
       <div v-for="a in list" :key="a.id" class="fbs-card addr-card">
+        <div class="icon" aria-hidden="true">📍</div>
         <div class="addr-main">
-          <div class="addr-line1">{{ a.person }} · {{ a.tel }}</div>
+          <div class="addr-line1">
+            <span>{{ a.person }} · {{ a.tel }}</span>
+            <span v-if="a.default" class="addr-def">{{ t('address.defaultTag') }}</span>
+          </div>
           <div class="addr-line2">{{ a.address }}</div>
         </div>
         <div class="addr-ops">
@@ -144,10 +148,5 @@ onMounted(load);
 </template>
 
 <style scoped>
-.addr-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 10px; }
-.addr-main { flex: 1; min-width: 0; }
-.addr-line1 { font-size: 15px; font-weight: 600; }
-.addr-line2 { font-size: 13px; color: var(--tg-hint); margin-top: 4px; word-break: break-all; }
-.addr-ops { display: flex; flex-direction: column; gap: 6px; }
-.addr-tip { font-size: 12px; color: var(--tg-hint); padding: 0 16px 8px; }
+/* 地址卡样式已提升至全局 style.css（.addr-card/.addr-def/.icon），此处不再重复 */
 </style>

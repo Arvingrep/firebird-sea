@@ -21,6 +21,12 @@ const MESSAGES = {
     'cart.checkout': '去下单',
     'cart.clearConfirm': '确定清空购物车？',
     'shop.section': '附近商家',
+    'home.heroHi': '饿了就点',
+    'home.heroTitle': '美食外卖 · 檀香山',
+    'home.heroPoint1': '华人商家',
+    'home.heroPoint2': '准时送达',
+    'cart.countN': '共 {n} 件',
+    'address.defaultTag': '默认',
     'nav.news': '资讯',
     'news.empty': '暂无资讯',
     'news.loadFailed': '加载失败，请重试',
@@ -101,6 +107,12 @@ const MESSAGES = {
     'cart.checkout': 'Checkout',
     'cart.clearConfirm': 'Clear the cart?',
     'shop.section': 'Restaurants near you',
+    'home.heroHi': 'Hungry? Order now',
+    'home.heroTitle': 'Food Delivery · Honolulu',
+    'home.heroPoint1': 'Chinese restaurants',
+    'home.heroPoint2': 'On-time delivery',
+    'cart.countN': '{n} items',
+    'address.defaultTag': 'Default',
     'nav.news': 'News',
     'news.empty': 'No articles yet',
     'news.loadFailed': 'Failed to load. Please retry',
@@ -167,7 +179,11 @@ export function createI18n(initial = 'zh') {
   return {
     get lang() { return lang; },
     setLang(l) { if (l in MESSAGES) lang = l; },
-    t(key) { return MESSAGES[lang][key] ?? MESSAGES.zh[key] ?? key; },
+    t(key, vars) {
+      let s = MESSAGES[lang][key] ?? MESSAGES.zh[key] ?? key;
+      if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
+      return s;
+    },
   };
 }
 
