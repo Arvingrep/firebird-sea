@@ -195,7 +195,8 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
 - **首页重做**：渐变头部（定位 + 按时段问候 + 语言切换）→ 白色悬浮搜索框（本地过滤商家/菜品）→
   三枚服务亮点 → 品类 pills（取自商家 typename）→ 排序 pills（评分/销量/起送，客户端排序）→
   图片优先商家卡（16:9 封面 + 营业中/送达时长玻璃角标 + 封面店名叠字 + ★评分/月售/起送/配送费 + 优惠 tag）。
-- **配套接口**：`waimai::shopList` 需透出 `star`、`sale`（SQL 已查出，仅未输出）——随本系列下一个 PR 提交。
+- **配套接口**：`waimai::shopList` 本 PR 已透出 `star`、`sale`（SQL 本就查出，仅补两行输出；
+  star 以 `round(...,1)` 归一，sale 强转 int）。
 - **过渡策略**：门禁限制单 PR 增量 ≤1200 行，本次先上设计系统 + 外壳 + 首页；旧页面类
   （fbs-card/order-card/cart-line 等）以「兼容类 + 令牌别名」临时保留，其余页面重构在系列下一个 PR。
 - **截图验收**：vite build → 预览目录注入 mock fetch（固定数据 + 假 Telegram WebApp）→

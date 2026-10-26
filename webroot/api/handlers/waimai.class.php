@@ -860,6 +860,8 @@ class waimai
             $list[$key]['promotionsStr'] = $promotionsStr;
 
             $list[$key]['pic'] = $value['shop_banner'] ? getFilePath(explode(",", $value['shop_banner'])[0]) : getFilePath('/static/images/shop.png');  //图片
+            $list[$key]['star'] = $value['star'] !== null ? round((float)$value['star'], 1) : null;   //评分（前端排序/星级徽标用）
+            $list[$key]['sale'] = (int)($value['sale'] ?? 0);                                         //月售（前端排序/销量展示用）
 
 
             //关键字搜索商品

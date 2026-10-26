@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { showToast } from 'vant';
-import { i18n } from '../services';
+import { i18n, t, toggleLang } from '../services';
 import { getTgUser } from '../telegram';
 
 const router = useRouter();
-const t = (k: string) => { void lang.value; return i18n.t(k); };
-const lang = ref(i18n.lang);
-function toggleLang() { i18n.setLang(i18n.lang === 'zh' ? 'en' : 'zh'); lang.value = i18n.lang; }
 
 const tgUser = getTgUser();
 const name = computed(() => tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') : '');
