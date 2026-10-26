@@ -20,9 +20,18 @@ const submitting = ref(false);
 const idempotencyKey = fb.newKey();
 const result = ref<{ ordernum?: string } | null>(null);
 
-const canSubmit = computed(() => cart.canCheckout && !!addressId.value && !submitting.value);
+const canSubmit = computed(() => cart.canPlaceOrder && !!addressId.value && !submitting.value);
 
 onMounted(async () => {
+  // 起送价快照可能已过期（商家调价 / 长时间停留）：进结算页刷新一次，避免拿旧门槛拦住能成立的订单
+  if (cart.shopId) {
+    fb.get('waimai', 'storeDetail', { id: cart.shopId }, { anonymous: true })
+      .then((si) => cart.setShopMeta(cart.shopId as string, {
+        name: si?.shopname || '',
+        minOrderCents: Math.round(Number(si?.basicprice || 0) * 100),
+      }))
+      .catch(() => { /* 用快照，TTL 兜底 */ });
+  }
   try {
     const info = await fb.get('waimai', 'getMemberAddress', {});
     addresses.value = listRows(info);
@@ -31,6 +40,12 @@ onMounted(async () => {
 });
 
 async function submit() {
+  // 防御：起送价可能在浏览过程中被店铺后台改高，或本地快照过期——上游会直接拒单，
+  // 与其等建单失败再报错，不如在发请求前就说清楚差多少。
+  if (cart.shortfallCents > 0) {
+    showToast(t('cart.belowMin', { v: formatPhp(cart.shortfallCents) }));
+    return;
+  }
   submitting.value = true;
   try {
     const params = buildDealParams({
@@ -139,6 +154,9 @@ async function submit() {
       <div class="card card--pad" style="margin-top: 14px">
         <div class="bill">
           <div class="row"><span>{{ t('cart.subtotal') }}</span><b>{{ formatPhp(cart.totalCents) }}</b></div>
+          <div v-if="cart.minOrderCents > 0" class="row">
+            <span>{{ t('cart.minOrder') }}</span><b>{{ formatPhp(cart.minOrderCents) }}</b>
+          </div>
           <div class="row"><span>{{ t('checkout.payMethod') }}</span><b>{{ t('checkout.codPay') }}</b></div>
           <div class="row total"><span>{{ t('cart.total') }}</span><b>{{ formatPhp(cart.totalCents) }}</b></div>
         </div>

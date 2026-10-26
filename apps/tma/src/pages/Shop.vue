@@ -62,6 +62,8 @@ async function load() {
     info.value = si || {};
     types.value = Array.isArray(tp) ? tp : [];
     foods.value = Array.isArray(fd) ? fd : [];
+    // 起送价随购物车落盘：离开店铺页 / 刷新后，购物车与结算页仍能判断"够不够起送"
+    cart.setShopMeta(props.id, { name: info.value.shopname || '', minOrderCents: Math.round(Number(info.value.basicprice || 0) * 100) });
   } catch {
     failed.value = true;
   } finally {
@@ -70,6 +72,9 @@ async function load() {
 }
 
 async function addFood(f: FoodItem) {
+  // 每次加购都用手里这份 storeDetail 补写一次门槛：用户可能在店铺页停留超过 TTL，
+  // 或者换店时上一次 setShopMeta 被拒，这里是最可靠的补写点（幂等、无额外请求）。
+  cart.setShopMeta(props.id, { name: info.value.shopname || '', minOrderCents: Math.round(Number(info.value.basicprice || 0) * 100) });
   if (cart.add(props.id, f) === 'needs-switch') {
     try {
       await showConfirmDialog({ title: t('cart.switchShopTitle'), message: t('cart.switchShopMsg') });
@@ -169,9 +174,13 @@ onMounted(load);
         </div>
         <div class="sum">
           <b>{{ money(cart.totalCents / 100) }}</b>
-          <span>{{ t('cart.minOrderHint', { v: php(info.basicprice) }) }}</span>
+          <span v-if="cart.shortfallCents > 0" class="short">{{ t('cart.belowMin', { v: php(cart.shortfallCents / 100) }) }}</span>
+          <span v-else>{{ t('cart.minOrderHint', { v: php(info.basicprice) }) }}</span>
         </div>
-        <button class="go" @click="router.push({ name: 'cart' })">{{ t('cart.checkout') }}<AppIcon name="chevron-right" :size="15" :stroke="2.4" /></button>
+        <button class="go" :disabled="cart.shortfallCents > 0" @click="router.push({ name: 'cart' })">
+          {{ cart.shortfallCents > 0 ? t('cart.shortBy', { v: php(cart.shortfallCents / 100) }) : t('cart.checkout') }}
+          <AppIcon v-if="!cart.shortfallCents" name="chevron-right" :size="15" :stroke="2.4" />
+        </button>
       </div>
     </template>
   </div>

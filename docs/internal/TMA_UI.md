@@ -362,3 +362,115 @@ handler/action 与参数均已在 `services/api/src/fbProxy.js` 白名单内。
 - **确认收货**：H5 有 `sure_btn`，但上游**没有用户侧确认收货的 action**（状态由 cron 与商家后台
   驱动）。做出来就是点了没反应的死按钮，故只提供「联系商家」入口。
 - **再来一单**：H5 里该按钮的四处实现**全部被 HTML 注释掉**，实际不存在的功能，不算缺口。
+
+---
+
+## 购物车：持久化与起送价（2026-10-26）
+
+### 为什么改
+
+用户在旧版里踩了两脚坑，两脚都是**下单前的漏斗漏点**：
+
+1. **刷新即丢**：购物车只活在 Pinia 内存里。Telegram 里切出去回条消息、系统回收 WebView，
+   回来购物车就空了——而用户往往已经挑了半天菜。
+2. **填完地址才知金额不足**：起送价（`storeDetail` 的 `basicprice`）只在店铺页脚显示文案，
+   不参与任何校验。用户可以一路点到结算页、选完地址、点提交，才被上游 `deal` 拒掉。
+
+### 落地方式
+
+**纯逻辑层**（`lib/cart.js`，node:test 可直接覆盖，不依赖浏览器）：
+
+| 能力 | 接口 | 说明 |
+|---|---|---|
+| 持久化 | `createCart({ storage })` | 默认用 `safeStorage()`（探测 `localStorage` 可写），不可用时退化为纯内存 |
+| 快照 | `serialize()` / `hydrate(raw)` | 版本号 `v:1`；格式不兼容整体丢弃，绝不半解析 |
+| 起送价 | `minOrderCents()` / `shortfallCents()` / `meetsMinimum()` | 差额按"分"算，天然无浮点误差 |
+| 结算闸门 | `canPlaceOrder()` | `canCheckout() ∩ meetsMinimum()`；`canCheckout()` 语义保持不变（只管车本身合不合法） |
+
+**店铺元信息是两层结构**（QA 171 轮 1 major 的修复核心）：
+
+| 变量 | 含义 | 生命周期 |
+|---|---|---|
+| `shopMeta = {id,name,minOrderCents,ts}` | 当前车**绑定**的那家店的起送价 | 车归属变化时跟着换 |
+| `seenMeta`（同结构） | **最近一次见到的**店铺（可能是别的店） | `setShopMeta()` 每次都更新，**随快照落盘** |
+
+`seenMeta` 必须落盘：`storage` 事件与 `visibilitychange` 都会触发 `reload()`，只存内存的话
+"A 店车 + 逛过 B 店"这条状态过一夜就没了（QA 171 轮 2 major）。
+
+`setShopMeta()` 在车属于别的店时返回 `false` 且**不绑定**，但一定写进 `seenMeta`。等用户确认换店
+（`switchShop`）或把车清空再加菜时，`add()` 会调 `bindMeta()`：先看当前 `shopMeta`，再看 `seenMeta`，
+命中就把门槛接回来。
+
+没有这一层会出两个静默 bug——两条都是极常见的操作路径，且结果是"门槛变 0 → 直接放行"：
+
+1. 用户在店铺页把最后一份**减到 0 再重新加菜**（`setQty` 会把 `shopId` 置空）；
+2. 用户在 B 店确认**换店**加菜（B 店的 `setShopMeta` 在 `load()` 时先于 `switchShop` 执行，被拒绝后没人补写）。
+
+因此 `setQty` / `clear()` **只解绑 `shopId`，不再清 `shopMeta`**。
+
+**门槛有时效**：`minOrderCents()` 在 `now - ts > 30min` 时返回 0（当未知处理）。
+商家调低起送价后，用户不该被一份旧快照永久卡住——宁可交给上游 `deal` 兜底拒绝。
+`Cart` / `Checkout` 进页面时还会静默拉一次 `storeDetail` 刷新 `basicprice`，本地快照只是兜底。
+
+**未知一律不拦**：起送价缺失、换店后未加载、快照过期，`minOrderCents()` 都是 0。
+宁可让上游兜底拒绝，也不要在前端用猜出来的门槛拦住能成立的订单。
+
+### 存储格式（`localStorage['fbcart:v1']`）
+
+```json
+{ "v": 1,
+  "shopId": "12",
+  "shop": { "id": "12", "name": "店名", "minOrderCents": 30000, "ts": 1793023056926 },
+  "seen": { "id": "15", "name": "另一家店", "minOrderCents": 15000, "ts": 1793023056900 },
+  "lines": [{ "id": "88", "title": "菜名", "priceCents": 1250, "qty": 2, "pic": "https://…" }] }
+```
+
+- `ts` 是毫秒时间戳，用于判断门槛新鲜度（缺失按"刚刚"算）
+- `seen` 是"最近见到的店铺"，可能不是车上这家
+- 空车快照合法：`shopId` 为 `null` 且 `lines` 为 `[]`，此时 `shop` 里留着的门槛会挪进 `seen`
+
+恢复时**逐行校验**：`id` 非空字符串、`title` 是字符串、`priceCents` 为有限非负数、
+`qty` 为 `1..99` 的整数、`pic` 必须是 `https://` 开头（其余降级为 `null`）。
+坏行丢弃、好行保留。
+
+**一致性守卫**（整份拒收，内存不动）：JSON 损坏 / 版本不符 / 有原始行但一行都解析不出来 /
+"有店无菜" / "有菜无店"。`localStorage` 是用户可写域，脏数据既不能让页面白屏，
+也不该把用户正在操作的购物车清空。
+
+### UI 落点
+
+| 页面 | 行为 |
+|---|---|
+| `Shop.vue` | `load()` 成功后写入 `shopMeta`；**每次加购也补写一次**（幂等，用手里这份 `storeDetail`），彻底消除"停留超过 TTL / 换店时被拒"的盲区；悬浮结算条在未达标时按钮禁用，显示"还差 ₱X"，`.sum` 副标题用金色 `--gold` 强调 |
+| `Cart.vue` | 进页面静默刷新 `storeDetail`；账单增加「起送价」一行 + 未达标时的 `hint--warn` 提示；结算按钮改用 `canPlaceOrder` |
+| `Checkout.vue` | 同样进页面刷新起送价；按钮改 `canPlaceOrder`；`submit()` 前置防御——差额 > 0 时不发请求，直接提示差多少 |
+| `style.css` | 新增 `.cartbar .sum span.short`（金色）、`.hint--warn`（品牌色） |
+
+### 多标签页 / 多 WebView
+
+`persist()` 是整份覆盖写，两个实例会互相盖。`stores/cart.ts` 监听 `storage` 事件与
+`visibilitychange`（回到前台时）调 `cart.reload()`，返回 `true` 就 `bump()` 重新渲染。
+
+`reload()` 的语义**只有两种**：
+
+| 返回 | 含义 | 内存 |
+|---|---|---|
+| `true` | 拿到并应用了一份合法快照（**可能是空车**——另一标签页清空了车） | 整体替换 |
+| `false` | 没有快照（键不存在）或快照不可信（脏数据 / 版本不符 / 一致性守卫不通过） | **原封不动** |
+
+关键实现约束：`parseSnapshot()` 是纯解析，**先解析到临时结构、成功后才替换内存**。
+旧实现在解析前就 `lines.clear(); seenMeta = null`，于是每次前后台切换都会把前一节说的
+`seenMeta` 抹掉，"减到 0 再加菜""换店"两条路径上的起送价又变回 0（QA 171 轮 2 major）。
+
+### 刻意不做的
+
+- **不设购物车过期**：菜品下架/改价由上游 `deal` 校验，前端存久了最多是"提交时被拒"，
+  比"回来发现车空了"体验好。真要做清理，应该等上游提供菜品状态批量查询。
+- **不做跨设备同步**：`waimai` 没有服务端购物车接口，只能本地存。
+
+### 已知取舍
+
+`localStorage` 是**设备级**的，不区分 Telegram 账号。同一台设备换账号登录会看到上一个人的购物车。
+可接受的理由：车内容只有菜名与单价，不含个人信息；下单所需的地址走 `getMemberAddress`（按 uid 服务端查），
+不会被"继承"。若后续要彻底隔离，应在 `auth` 成功后把 `uid` 拼进存储键（`fbcart:v1:<uid>`），
+但这会让"未登录浏览的购物车"在登录后丢失，属于产品决策，暂不做。
