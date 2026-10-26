@@ -474,3 +474,90 @@ handler/action 与参数均已在 `services/api/src/fbProxy.js` 白名单内。
 可接受的理由：车内容只有菜名与单价，不含个人信息；下单所需的地址走 `getMemberAddress`（按 uid 服务端查），
 不会被"继承"。若后续要彻底隔离，应在 `auth` 成功后把 `uid` 拼进存储键（`fbcart:v1:<uid>`），
 但这会让"未登录浏览的购物车"在登录后丢失，属于产品决策，暂不做。
+
+---
+
+## 首页：服务端搜索、分页与搜索历史（2026-10-26）
+
+### 为什么改
+
+旧版首页只请求 `shopList page=1 pageSize=20`，然后**在前端**做筛选/排序/搜索。三个后果：
+
+1. **只能搜到前 20 家店**——第 21 家起的店再怎么搜都出不来。
+2. **搜不到菜品**——前端只匹配 `shopname` / `description` / `typename`，而上游 `keywords` 是会
+   `LEFT JOIN waimai_list` 连菜品标题一起搜的。
+3. **排序只排当前页**——"销量最好"实际上只是在 20 家里排，不是全量。
+
+### 上游的三个坑（都实测确认过）
+
+**① 带 `keywords` 时 `totalCount` 不可信**
+
+`waimai::shopList` 在有 `keywords` 走的是这段（`waimai.class.php:600` 附近）：
+
+```sql
+SELECT count(s.`id`) totalCount FROM `#@__waimai_shop` s
+LEFT JOIN `#@__waimai_list` f ON f.`sid` = s.`id` ... GROUP BY s.`id`
+```
+
+`GROUP BY` 会把结果拆成多行，而 `$dsql->getOne()` 只取**第一行**——拿到的是"这家店匹配了几道菜"，
+不是店铺数。一家店有 3 道菜命中就报 3，用户看到"共 3 家"其实只有 1 家。
+
+**所以"还有没有下一页"一律按本次返回条数判断**（`rows.length >= PAGE_SIZE`），绝不看 `totalCount`；
+搜索态下也不展示"共 N 家"，改用已加载条数。
+
+**② 无结果返回的是 `state=200` + `"暂无数据！"`，不是空列表**
+
+`fbClient.unwrap()` 已经用 `EMPTY_RE` 把这类响应归一成 `null`，调用方按空数组处理即可。
+不要再在页面里写 `try/catch` 猜错误——那会把"没搜到"显示成"加载失败"。
+
+**③ `orderby` 是可用的服务端排序**
+
+| 值 | 含义 |
+|---|---|
+| 0 | 默认（下单状态 → 营业状态 → 预定 → 自定义序号） |
+| 2 | 销量 |
+| 3 | 起送价 |
+| 5 | 评分 |
+| 1 / 4 / 6 | 距离 / 评论数 / 配送时长（需要 `lng`/`lat` 或不常用，前端未接） |
+
+前端 `SortKey` → `ORDERBY` 映射在 `Home.vue` 顶部；排序必须走服务端，否则只排到当前页。
+
+### 前端结构
+
+| 能力 | 实现 |
+|---|---|
+| 分页 | `PAGE_SIZE=20`；底部「加载更多」按钮，`hasMore` 由返回条数推导 |
+| 搜索 | 输入 350ms 防抖 → `keyword` → `fetchPage(1)`；回车/点历史走 `commitSearch()` |
+| 竞态 | `reqToken` 自增，响应回来时 token 不匹配就丢弃（快速改关键词/切分类时必需） |
+| 分类 | `waimai:shopType` 取分类列表，过滤掉 `paotui=1`（跑腿不是外卖店），`typeid` 服务端筛选 |
+| 排序 | 服务端 `orderby`，`watch([sort, activeCat])` 触发重查 |
+| 历史 | `lib/searchHistory.js`，键 `fbsearch:v1`，最多 8 条，只在**回车 / 点历史项**时记录 |
+
+**为什么防抖不记历史**：每次输入都记会把 `鸡` `鸡排` `鸡排饭` 三条半截词塞满历史。
+只有用户"确认搜了"（回车）或点了某条历史，才算一次真实意图。
+
+### 搜索历史的存储
+
+```json
+["鸡排饭", "奶茶"]
+```
+
+纯字符串数组，`normalize()` 会折叠空白、去控制字符、截到 40 字符；空串不记录。
+恢复时去重（大小写不敏感）、截到 `limit`。脏数据（非数组 / 含非字符串项）逐项丢弃，
+整份不可解析就当空历史——**绝不抛异常**，index 页不能因为这个白屏。
+
+### 白名单变更（`services/api/src/fbProxy.js`）
+
+| 接口 | 变更 | 原因 |
+|---|---|---|
+| `waimai:shopList` | 新增 `params` 白名单 | 开始透传 `keywords`；同时收口三个注入面 |
+| `waimai:shopType` | **新增**（anonymous 只读） | 首页分类列表；返回纯展示字段 |
+
+`shopList` 白名单**刻意排除**三个参数：
+
+- `ids`——上游直接拼进 `AND s.id in ($ids)`，最典型的注入面；
+- `lng` / `lat`——拼进 SQL 的数学表达式（`ROUND(6378.138 * 2 * ASIN(...))`），未强转；
+- `cityid`——由 `getCityId()` 内部处理，不需要客户端传。
+
+单测锁定了这三条（`fb-proxy.test.js`「shopList 只透传搜索/分页/筛选参数」），
+以后想加回来必须改测试，跑不掉。
