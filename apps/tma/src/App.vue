@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useCartStore } from './stores/cart';
-import { t } from './services';
+import { t, langRef } from './services';
 import AppIcon from './components/AppIcon.vue';
 
 const cart = useCartStore();
@@ -21,7 +21,7 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
 
 <template>
   <div class="app">
-    <router-view />
+    <router-view :key="langRef" />
     <nav class="tabbar">
       <router-link v-for="it in tabs" :key="it.to" :to="it.to" class="tab" :class="{ 'is-active': isActive(it.to) }">
         <span class="ic"><AppIcon :name="it.icon" :size="22" :stroke="isActive(it.to) ? 2 : 1.8" /></span>

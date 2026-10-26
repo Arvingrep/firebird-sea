@@ -75,8 +75,8 @@ onMounted(load);
         <button class="hero-lang" @click="toggleLang">{{ t('lang.switch') }}</button>
       </div>
       <h1 class="hero-title">{{ greeting }}<br /><em>{{ t('home.ask') }}</em></h1>
-      <div class="hero-sub">
-        <span>{{ t('home.subShopN', { n: shops.length || 3 }) }}</span>
+      <div class="hero-sub" v-if="shops.length">
+        <span>{{ t('home.subShopN', { n: shops.length }) }}</span>
         <i />
         <span>{{ t('home.subPoint') }}</span>
       </div>
