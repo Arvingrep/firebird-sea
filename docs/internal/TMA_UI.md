@@ -71,3 +71,8 @@ npm run build      # 产物
 ### 第 4 轮（接口实测发现，2026-10-26）
 
 - 上游 `waimai.class.php:2109` **强制要求 lng/lat**（「请选择地图坐标！」）——地址不带坐标根本存不进去。这就是地址必须做地图选点的根本原因（老 touch 版同为地图选点）。前端保存前校验坐标，缺失时引导用户点选联想候选；无 key 降级场景给出明确提示。签名 initData 实测：无坐标保存被上游拒 → 与前端新校验行为闭环。
+
+### 站点配置层（PR #151，2026-10-26）
+
+- 上游保存地址前的 Geocoding 反查分站用 `$cfg_map_google`（`webroot/include/config/siteConfig.inc.php`）——原为空串导致保存回「You must use an API key」。现改 `getenv('GOOGLE_MAPS_API_KEY')`，经 `_helpers.tpl` 公共 env 注入（secret `firebird-storage-secret/google-maps-api-key`，optional：未配置时维持空串、行为同前）。
+- **Geocoding 用的是服务端 key，与前端联想 key 可为同一个**，但 Google 侧限制策略不同：前端 key 加 HTTP referrer 限制，服务端 key 加 IP 限制（GKE 出口 NAT IP）并仅启用 Geocoding API。
