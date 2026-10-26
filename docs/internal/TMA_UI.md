@@ -79,3 +79,15 @@ npm run build      # 产物
 - **额外发现的空 secret**：`firebird-storage-secret` 的 `google-maps-api-key` 曾被 patch 成空值（PR #152 后容器 env_len=0 的真因），已从老站配置缓存取回站点 key 重新注入；线上 DB siteConfig 的 `map_key`/`map_server_key` 均为空，站点 Google key 目前只靠该 secret 供给。
 - **🔒 当前唯一阻塞：Google Billing（owner 操作）**：key 注入链路已全通，保存地址时 Geocoding 真实发出，Google 回「You must enable Billing on the Google Cloud Project」。上游 `operAddress` 强制 geocoding（失败直接拒绝保存），无绕过参数。需在 Google Cloud Console 为该项目开启结算（Geocoding 有免费月额度，开结算不等于必付费），或换用已开结算项目的 key。
 - **Geocoding 用的是服务端 key，与前端联想 key 可为同一个**，但 Google 侧限制策略不同：前端 key 加 HTTP referrer 限制，服务端 key 加 IP 限制（GKE 出口 NAT IP）并仅启用 Geocoding API。
+
+### 视觉升级二轮：参照老 H5（touch/skin2）设计语言（2026-10-26）
+
+用户反馈 TMA 页面「太简单很丑」，要求参照老 H5 外卖模板。提取 touch/skin2 的设计要点并移植（保持 TG 暗色适配）：
+
+- **品牌渐变 CTA**：主按钮统一样式（135° 红橙渐变 + 投影）；价格/金额新增 `--fbs-price` 红色强调令牌（暗色提亮一档）。
+- **首页**：新增品牌渐变 hero 横幅（饿了就点 / 美食外卖·檀香山 / 华人商家·准时送达）；商家卡升级——92px 大图、品类 chip + 营业状态徽标、起送/配送费红色强调、右侧「进店」箭头。
+- **购物车**：卡片头部（标题 + 件数），价格大号红字，合计行浅底强调。
+- **订单**：状态改为圆角 chip（进行中品牌色/完成绿/取消灰），金额红色加粗。
+- **地址卡**：左侧 📍 图标底座 + 默认地址描边标签。
+- **i18n**：`t()` 支持 `{n}` 插值；新增 home.hero*、cart.countN、address.defaultTag（中英）。
+- 纯展示层改动，数据接口不变；三件套验证通过（tsc/32 单测/build）。
