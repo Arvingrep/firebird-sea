@@ -113,3 +113,32 @@ MSG: SQLSTATE[HY000]: General error: 1366 Incorrect integer value: '' for column
   - 启用：`geocoding-backend.googleapis.com`、`maps-backend.googleapis.com`（Maps JavaScript API）；`places-backend.googleapis.com` 原已启用。
   - key：`firebird-tma-maps`，仅允许上述三个 API（无 referrer/IP 限制）；同时写入 k8s secret `firebird-storage-secret/google-maps-api-key` 与 GitHub secret `GOOGLE_MAPS_API_KEY`。
   - 失效/轮换：`gcloud services api-keys list --project fh580-70533` 找到 key → 新建并重复上面两步写入即可；前端 key 是构建期注入，必须重新构建镜像。
+
+### 地址表单重做：收货人 = Telegram 身份 + 补充项 + 分享链接（2026-10-26）
+
+用户反馈「为什么要写联系人、写电话？联系人就是 Telegram 的，通话就用 Telegram 通话」，并指出地址缺补充项、需要分享链接。重做要点：
+
+**1. 不再让用户手填联系人**
+- 收货人取自 `Telegram.WebApp.initDataUnsafe.user`（`getTgUser()`），表单里以只读身份卡展示（头像 + 昵称 + `@username` + 「通过 Telegram 联系」）。
+- 上游 `waimai::operAddress` 仍强制 `person` 非空，值由 TG 资料自动生成（`first_name last_name`），不再要求用户输入。
+
+**2. 电话默认走 Telegram**
+- 未填手机号时 `tel` 写入 `@username`（表字段 varchar(100)，足够）；没有 username 时退化为 `tg:<tg_id>`。
+- 保留「备用手机号（可选）」——骑手/商家需要直接拨打时使用，填写才校验格式；不填也能保存。
+- 地址卡按 tel 形态展示：纯数字显示 📞，Telegram 标识显示 💬 通过 Telegram 联系。
+
+**3. 地址补充项（上游表无独立字段，用既有两字段分层承载）**
+- `street` = 主地址（Google 联想结果）；`address` = `主地址，门牌/楼层/单元；给骑手的说明`。
+- 编辑时按「address 是否以 street 开头」反解补充项（`splitExtra`），回填到输入框，避免二次编辑出现重复文本。
+- 上游下单读取两字段时均能拿到可读地址（street 是主地址，address 是完整地址）。
+
+**4. areaCode 修正**
+- 上游 `areaCode` 缺省写死 86（中国）。TMA 原先未传 → 全部地址区号被记为 86。现按本站实际地区传 `1`（美国）。
+
+**5. 分享地址（代下单）**
+- 新表 `fbs_addr_share`（migration `003_addr_share.sql`）：`token CHAR(32) PK / uid / payload(JSON 快照) / created_at / expires_at`，7 天过期，过期即不可读。
+- `POST /tg-api/addr/share`（需 Bearer 令牌，10 次/分）：客户端上传地址快照 → 返回 `{ token, url }`；`url = https://t.me/<bot>?startapp=addr_<token>`，bot 用户名由服务端调 `getMe` 缓存获取（未就绪时 `url=null`，前端降级为纯文本分享）。
+- `GET /tg-api/addr/shared/:token`（公开，60 次/分）：仅凭 token 返回快照，不含 uid；token 非法格式直接 404 且不触库。
+- 接收方打开深链时，前端识别 `start_param = addr_<token>` → 弹窗确认 → 调 `operAddress` 存为自己的地址（同一条链接只询问一次，`sessionStorage` 去重）。
+- **前置条件**：bot 需在 BotFather 配置 Main Mini App，`t.me/<bot>?startapp=` 才能直接拉起小程序；否则链接只会打开 bot 聊天（此时仍可把地址文本发给对方手工录入）。
+- 单测：`services/api/test/addr-share-route.test.js`（10 例，覆盖鉴权/入参裁剪/快照读写/非法 token/过期/限流/降级）。

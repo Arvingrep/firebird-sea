@@ -18,6 +18,7 @@ const { createMemberMap } = require('./memberMap');
 const { createLoginService } = require('./loginService');
 const gatewayClient = require('./gatewayClient');
 const { createFbProxy } = require('./fbProxy');
+const { createAddrShareRouter } = require('./addrShareRoute');
 const { createCredentialProvider } = require('./credentialProvider');
 const { createRevocationStore, createReplayCounter, createIdempotencyStore } = require('./sharedState');
 
@@ -169,6 +170,18 @@ if (fbUpstream) {
     });
     res.status(r.status).json(r.body);
   });
+}
+
+// 2e. 地址分享（代下单）：生成 t.me 深链凭一次性 token 传递地址快照。
+// 创建需登录令牌（限流更紧）；读取凭 token 公开（限流放宽），不暴露 uid。
+if (auth) {
+  router.use('/addr', createAddrShareRouter({
+    conn: cliConn(),
+    tokens: auth.tokens,
+    botToken: BOT_TOKEN,
+    allowCreate: createLimiter({ max: Number(process.env.TMA_SHARE_MAX || 10), windowSeconds: 60 }),
+    allowRead: createLimiter({ max: Number(process.env.TMA_SHARE_READ_MAX || 60), windowSeconds: 60 }),
+  }));
 }
 
 // 2d. TMA 静态资源（T3.4）：同域 /tma/ 由 api 托管构建产物，不新增部署单元（AD-16）。仅在目录存在时挂载。
