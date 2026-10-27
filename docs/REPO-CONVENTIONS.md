@@ -79,8 +79,31 @@
 | 同步冲突副本：`xxx 2.md`、`xxx (1).py`、`xxx conflicted copy` | `repo-hygiene.sh` |
 | 临时目录：`.agent-runs/`、`backup_configs/`、`node_modules/`、`downloads/`、`.n8nac/` | `repo-hygiene.sh` |
 | 新增文件 > 5MB | `repo-hygiene.sh`（存量火鸟模板资产不追溯） |
-| 明文密钥 / token | `ci-verify.yml` 密钥门禁 |
+| 明文密钥 / token（增量 + 全仓 + 存量欠债三层） | `scripts/agent/gates.sh`（确定性门禁） |
 | n8n 工作流改了但没更新 `REGISTRY.md` | 人工 + Review |
+
+### 密钥欠债单
+
+「全仓扫到私钥就 FAIL」上线时仓库里已有一批存量密钥，硬堵会让所有 PR 变红、逼人加 `--no-verify`。所以留一个**带到期日的欠债单** `.agents/secret-scan-allow.txt`：
+
+```
+# 空格分隔，一行一笔
+<仓库相对路径>  <到期日 YYYY-MM-DD>  <原因 / 跟踪项>
+```
+
+规则是硬的：**到期日一过，门禁立刻 FAIL**；日期解析失败按「已过期」处理（宁严勿松）。这不是白名单，是还款计划 —— 加进去只是把「已泄漏」变成「已登记泄漏」，不算修好。
+
+### ⚠️ job 名 = 分支保护的必过检查名
+
+`ci-verify.yml` 里的 job `name` 同时就是分支保护 `required_status_checks` 里的字符串。改名会导致那个必过检查**永不上报**，所有 PR 变 `BLOCKED`，而 checks 页面全绿、看不出原因。
+
+改 job 名前先查、改完同步：
+
+```bash
+gh api repos/Arvingrep/firebird-sea/branches/main/protection/required_status_checks --jq '.contexts'
+```
+
+同理，凡是「配置里写死的名字」都要当心：这类漂移 workflow 里看不见、PR 上也没提示，只有 `gh pr view --json mergeStateStatus` 能暴露。
 
 ---
 
