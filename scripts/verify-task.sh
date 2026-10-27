@@ -87,7 +87,15 @@ done
 #     结果是：TMA 编译不过或测试挂了，PR 门禁全绿，合并后才炸 —— 而且正好炸在最想推的模块上。
 if [ -f apps/tma/package.json ]; then
     if [ ! -d apps/tma/node_modules ]; then
-        (cd apps/tma && npm ci --no-audit --no-fund >/dev/null 2>&1) || { echo "❌ [FAIL] apps/tma 依赖安装失败（npm ci）"; exit 1; }
+        # --workspaces=false 是必需的：根 package.json 声明了 workspaces: ['apps/*','services/*']，
+        # 在 apps/tma 子目录直接跑 npm ci 会把根当成 workspace root，而根没有 lockfile →
+        # 报 EUSAGE「找不到 package-lock.json」，同时 .npmrc 被当作 workspace config 忽略。
+        # 这与第 6 项 services 测试用的是同一写法。
+        if ! (cd apps/tma && npm ci --workspaces=false --no-audit --no-fund >/dev/null 2>&1); then
+            echo "❌ [FAIL] apps/tma 依赖安装失败（npm ci）；末尾日志："
+            (cd apps/tma && npm ci --workspaces=false --no-audit --no-fund 2>&1 | tail -15)
+            exit 1
+        fi
     fi
     if (cd apps/tma && npm run typecheck >/dev/null 2>&1); then echo "  ✅ apps/tma 类型检查 [通过]"
     else echo "❌ [FAIL] apps/tma 类型检查失败："; (cd apps/tma && npm run typecheck 2>&1 | tail -15); exit 1; fi

@@ -53,20 +53,32 @@ docker run -d --name "$CONTAINER" \
   -e "MYSQL_DATABASE=$DB_NAME" \
   "$IMAGE" >/dev/null || { echo "❌ 容器启动失败"; exit 1; }
 
-# 等就绪：mysqladmin ping 比固定 sleep 可靠
+# 等就绪：必须用**真实认证**探测，不能用 mysqladmin ping。
+#
+# 为什么：mysqld 首次初始化时会先起一个临时的 skip-networking 实例（root 尚无密码），
+# 此时 `mysqladmin ping` 会返回成功 —— 它只判断 server 是否存活，**不看认证结果**。
+# 于是脚本在初始化还没结束时就往下跑，紧接着的连接被拒：
+#   ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: YES)
+# 这是「探测条件比被测条件弱」的典型症状，且只在刚好撞上初始化窗口时复现（偶发假阳性），
+# 比稳定失败更危险：本地过、CI 挂，看起来像环境抖动。
+#
+# 探针改成一条 SELECT，同时验证三件事：server 起来了 / 密码对 / MYSQL_DATABASE 已创建。
+if [ "${DB_TEST_DEBUG:-0}" = "1" ]; then echo "  [debug] root pass=$DB_ROOT_PASS db=$DB_NAME"; fi
+probe() {
+  docker exec "$CONTAINER" mysql -uroot -p"$DB_ROOT_PASS" -N -e \
+    "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='$DB_NAME';" 2>/dev/null | grep -qx 1
+}
 READY=0
 for _ in $(seq 1 60); do
-  if docker exec "$CONTAINER" mysqladmin ping -uroot -p"$DB_ROOT_PASS" --silent >/dev/null 2>&1; then
-    READY=1; break
-  fi
+  if probe; then READY=1; break; fi
   sleep 2
 done
 if [ "$READY" -ne 1 ]; then
-  echo "❌ MySQL 60s 内未就绪，末尾日志："
+  echo "❌ MySQL 120s 内未就绪（探针：root 认证 + 目标库存在），末尾日志："
   docker logs --tail 20 "$CONTAINER" 2>&1
   exit 1
 fi
-echo "  ✅ MySQL 就绪"
+echo "  ✅ MySQL 就绪（root 认证通过，库 $DB_NAME 已创建）"
 
 sql() { docker exec -i "$CONTAINER" mysql -uroot -p"$DB_ROOT_PASS" "$DB_NAME" "$@"; }
 
