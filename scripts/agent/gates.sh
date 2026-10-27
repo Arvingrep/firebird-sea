@@ -109,8 +109,47 @@ fi
 [ -z "$NEWDEP" ] && row "Zero-Dep" "✅ PASS" || row "Zero-Dep" "❌ FAIL" "新增依赖未登记 .agents/approved-deps.txt: $(echo "$NEWDEP" | tr -s ' ' | head -c 160)"
 
 # 6. 密钥/助记词泄漏（资金安全禁区）
-LEAK="$(git diff "$RANGE" | grep -E '^\+' | grep -iE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|"private_key"|mnemonic|seed phrase|TRONGRID_API_KEY=[A-Za-z0-9]{8,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}' || true)"
-[ -z "$LEAK" ] && row "无密钥泄漏" "✅ PASS" || row "无密钥泄漏" "❌ FAIL" "疑似私钥/Token 进入 diff"
+#    6a 增量：本分支新增行
+#    6b 存量：全仓已跟踪文件兜底
+# 为什么必须有 6b：diff 扫描只在「有人新加」时报警，**已经躺在仓库里的永远扫不到**。
+# 2026-10-27 审计实证：deploy/k8s-mail-server.yaml 里的 Telegram bot token 与 RSA 私钥、
+# webroot/api/payment/wxpay/cert/ 下 4 份微信支付商户私钥，全都长期存活且门禁一直是绿的。
+SECRET_RE='BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|"private_key"|mnemonic|seed phrase|TRONGRID_API_KEY=[A-Za-z0-9]{8,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}'
+LEAK="$(git diff "$RANGE" | grep -E '^\+' | grep -iE "$SECRET_RE" || true)"
+[ -z "$LEAK" ] && row "无密钥泄漏（增量）" "✅ PASS" || row "无密钥泄漏（增量）" "❌ FAIL" "疑似私钥/Token 进入 diff"
+
+# 存量扫描用更严的正则：只认「行首（允许缩进）的真实 PEM 头」，
+# 避免把生成 PEM 的代码模板（$res = "-----BEGIN RSA PRIVATE KEY-----\n"）误判为泄漏。
+STOCK_RE='^[[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|"private_key"[[:space:]]*:|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}|TRONGRID_API_KEY=[A-Za-z0-9]{8,}'
+ALLOW_F=".agents/secret-scan-allow.txt"
+NOW_EPOCH="$(date +%s)"
+STOCK_NEW=""; STOCK_DEBT=""; STOCK_EXPIRED=""; STOCK_N=0
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  STOCK_N=$((STOCK_N+1))
+  line="$(grep -m1 -F -- "$f" "$ALLOW_F" 2>/dev/null || true)"
+  if [ -z "$line" ]; then STOCK_NEW+="$f "; continue; fi
+  # 白名单格式：<路径> <到期日 YYYY-MM-DD> <原因>
+  exp="$(printf '%s' "$line" | awk '{print $2}')"
+  exp_epoch="$(date -j -f "%Y-%m-%d" "$exp" +%s 2>/dev/null || date -d "$exp" +%s 2>/dev/null || echo 0)"
+  # 到期日解析失败按 0（已过期）处理：宁严勿松
+  if [ "${exp_epoch:-0}" -lt "$NOW_EPOCH" ]; then STOCK_EXPIRED+="${f}(${exp}) "
+  else STOCK_DEBT+="${f}→${exp} "; fi
+done <<< "$(git grep -lIE "$STOCK_RE" -- . 2>/dev/null | sort -u)"
+
+if [ -z "$STOCK_NEW" ]; then
+  row "无密钥入库（全仓）" "✅ PASS" "扫描 $(git ls-files | wc -l | tr -d ' ') 个已跟踪文件"
+else
+  row "无密钥入库（全仓）" "❌ FAIL" "未登记的密钥文件：$(printf '%s' "$STOCK_NEW" | head -c 200)"
+fi
+# 白名单不是遮羞布：登记项必须在到期日前完成轮换，过期即 FAIL。
+if [ -n "$STOCK_EXPIRED" ]; then
+  row "密钥存量欠债" "❌ FAIL" "白名单已过期，必须完成轮换或重新评估：$(printf '%s' "$STOCK_EXPIRED" | head -c 200)"
+elif [ -n "$STOCK_DEBT" ]; then
+  row "密钥存量欠债" "⚠️ WARN" "已登记待轮换（到期即 FAIL）：$(printf '%s' "$STOCK_DEBT" | head -c 200)"
+else
+  row "密钥存量欠债" "✅ PASS" "无欠债"
+fi
 
 # 7. 调试残留
 DEBUG="$(git diff "$RANGE" -- '*.php' '*.js' '*.ts' '*.vue' ':(exclude)scripts/**' | grep -E '^\+' | grep -E '\b(var_dump|print_r|console\.log|debugger)\b' || true)"

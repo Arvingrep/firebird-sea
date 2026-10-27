@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firebird-mail
+  labels:
+    app: firebird-mail
+    app.kubernetes.io/part-of: firebird-sea
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: firebird-mail
+  template:
+    metadata:
+      labels:
+        app: firebird-mail
+    spec:
+      containers:
+        - name: mail-relay
+          image: node:20-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["node", "/app/server.js"]
+          env:
+            # ── 凭据一律来自 Secret，仓库内不出现明文 ──────────────────
+            # firebird-mail-secrets 由 `kubectl create secret generic` 创建，
+            # 不进 Git（见本目录 secret.yaml.example 与 README.md 轮换流程）。
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: firebird-mail-secrets
+                  key: telegram-bot-token
+            - name: TELEGRAM_ADMIN_CHAT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: firebird-mail-secrets
+                  key: telegram-chat-id
+                  optional: true
+            - name: SMTP_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: firebird-mail-secrets
+                  key: smtp-pass
+            # 非凭据配置保持明文可审计
+            - name: SMTP_USERS
+              value: "firebird,noreply@fbird.men,admin"
+            # TLS 私钥挂载在独立目录（不能与 ConfigMap 的 /app 目录重叠做 subPath）
+            - name: TLS_KEY_PATH
+              value: "/tls/key.pem"
+            - name: TLS_CERT_PATH
+              value: "/app/cert.pem"
+          ports:
+            - containerPort: 587
+              name: smtp-sub
+            - containerPort: 465
+              name: smtps
+            - containerPort: 25
+              name: smtp-plain
+          readinessProbe:
+            tcpSocket:
+              port: smtp-sub
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: smtp-sub
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 4
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+            requests:
+              cpu: 20m
+              memory: 32Mi
+          volumeMounts:
+            - name: config
+              mountPath: /app
+            # TLS 私钥独立挂载到 /tls，避免与 ConfigMap 的 /app 挂载点冲突
+            - name: tls-key
+              mountPath: /tls
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: firebird-mail-config
+        - name: tls-key
+          secret:
+            secretName: firebird-mail-tls
+            defaultMode: 0400
