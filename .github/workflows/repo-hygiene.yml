@@ -1,0 +1,30 @@
+name: Repo Hygiene
+
+# 仓库卫生守门：拦住同步冲突副本、临时产物目录、超限大文件。
+# 与 ci-verify.yml（业务门禁）互不干扰——这条只关心「仓库有没有被弄脏」。
+#
+# 本地自查：bash scripts/repo-hygiene.sh            （全仓）
+#          bash scripts/repo-hygiene.sh --diff origin/main
+# 规则说明：docs/REPO-CONVENTIONS.md
+
+on:
+  pull_request:
+    branches: [main, canary]
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: 🧹 仓库卫生
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 检查新增 / 修改文件
+        run: |
+          BASE="${{ github.base_ref }}"
+          git fetch --no-tags origin "$BASE:refs/remotes/origin/$BASE" 2>/dev/null || true
+          bash scripts/repo-hygiene.sh --diff "origin/$BASE"
