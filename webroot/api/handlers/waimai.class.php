@@ -6805,6 +6805,12 @@ class waimai
         $areaCode    = (int)$this->param['areaCode'];
         $code        = (int)$this->param['code'];
         $vertcode    = (int)$this->param['vertcode'];
+        $regtype     = trim($this->param['regtype']);
+
+        // 邮箱注册通道（菲律宾站 SMS 未接入，regtype=email 走邮件验证码流程）
+        if ($regtype == 'email') {
+            return $this->courierRegByEmail();
+        }
 
         $ip       = GetIP();
         $ipaddr   = getIpAddr($ip);
@@ -6931,6 +6937,190 @@ class waimai
             return array ('state' => 200, 'info' => '注册失败！请联系系统管理员');
         }
 
+    }
+
+    /**
+     * 配送员注册 —— 发送邮箱验证码
+     * 菲律宾站 SMS 通道未接入（courierReg 原手机验证码流程不可用），新增邮件验证码注册通道
+     */
+    public function courierSendEmailCode()
+    {
+        global $dsql;
+        $email = trim($this->param['email']);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return array('state' => 200, 'info' => '请填写正确的邮箱地址');
+        }
+        $email = addslashes($email);
+        $ip    = GetIP();
+
+        // 60 秒内同邮箱重复发送拦截
+        $sql = $dsql->SetQuery("SELECT `id`, `pubdate` FROM `#@__site_messagelog` WHERE `type` = 'email' AND `lei` = 'courier_reg' AND `user` = '$email' ORDER BY `id` DESC LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if ($ret && (time() - (int)$ret[0]['pubdate']) < 60) {
+            return array('state' => 200, 'info' => '发送太频繁，请 1 分钟后再试');
+        }
+
+        // 已注册拦截（邮箱即用户名）
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `username` = '$email' LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if ($ret) {
+            return array('state' => 200, 'info' => '该邮箱已注册过骑手账号，请直接登录');
+        }
+
+        $code  = sprintf("%06d", mt_rand(0, 999999));
+        $title = '骑手注册验证码';
+        $body  = "您的骑手注册验证码是：<b>" . $code . "</b>，10 分钟内有效。如非本人操作请忽略本邮件。";
+
+        $err = sendmail($email, $title, $body);
+        if (!empty($err)) {
+            return array('state' => 200, 'info' => '邮件发送失败，请稍后再试');
+        }
+
+        // sendmail() 内部已按 lei='' 记录一次发送日志；此处另存一条带验证码的记录供注册校验（lei=courier_reg）
+        messageLog("email", "courier_reg", $email, $title, $body, 0, 0, $code);
+        return array('state' => 100, 'info' => '验证码已发送，请查收邮件（注意垃圾箱）');
+    }
+
+    /**
+     * 配送员邮箱注册（courierReg regtype=email 时进入）
+     * 参数：email / username(姓名) / password / vertcode(邮件验证码) / phone(选填) / cityid
+     */
+    public function courierRegByEmail()
+    {
+        global $dsql;
+        $email    = trim($this->param['email']);
+        $name     = trim($this->param['username']);
+        $password = (string)$this->param['password'];
+        $vcode    = trim($this->param['vertcode']);
+        $phone    = trim($this->param['phone']);
+        $cityid   = (int)$this->param['cityid'];
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return array('state' => 200, 'info' => '请填写正确的邮箱地址');
+        }
+        if (empty($name) || $name == "undefined") {
+            return array('state' => 200, 'info' => '请填写姓名');
+        }
+        if (strlen($password) < 6) {
+            return array('state' => 200, 'info' => '请设置至少 6 位的登录密码');
+        }
+        if ($vcode == '') {
+            return array('state' => 200, 'info' => '请填写邮箱验证码');
+        }
+        if (empty($cityid)) {
+            return array('state' => 200, 'info' => '请选择城市！');
+        }
+
+        $email_ = addslashes($email);
+        $name_  = cn_substrR(addslashes($name), 10);
+        $pwd_   = addslashes($password);
+        $phone_ = preg_replace('/[^0-9+]/', '', $phone);
+
+        // 校验验证码：type=email + lei=courier_reg，10 分钟内有效，一次性使用
+        $sql = $dsql->SetQuery("SELECT `id`, `code`, `pubdate` FROM `#@__site_messagelog` WHERE `type` = 'email' AND `lei` = 'courier_reg' AND `user` = '$email_' ORDER BY `id` DESC LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if (!$ret) {
+            return array('state' => 200, 'info' => '验证码输入错误，请重试！');
+        }
+        if ((time() - (int)$ret[0]['pubdate']) > 600) {
+            return array('state' => 200, 'info' => '验证码已过期，请重新获取');
+        }
+        if (strcasecmp(trim($vcode), trim($ret[0]['code'])) !== 0) {
+            return array('state' => 200, 'info' => '验证码输入错误，请重试！');
+        }
+        // 验证通过，销毁验证码防重放
+        $dsql->dsqlOper("DELETE FROM `#@__site_messagelog` WHERE `id` = " . (int)$ret[0]['id'], "update");
+
+        // 唯一性校验
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `username` = '$email_' LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if ($ret) {
+            return array('state' => 200, 'info' => '该邮箱已注册过骑手账号，请直接登录');
+        }
+        if ($phone_ != '') {
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `phone` = '$phone_' LIMIT 1");
+            $ret = $dsql->dsqlOper($sql, "results");
+            if ($ret) {
+                return array('state' => 200, 'info' => '该手机号已被其他骑手使用');
+            }
+        }
+
+        $time = time();
+        $sql  = $dsql->SetQuery("INSERT INTO `#@__waimai_courier` (`username`, `name`, `password`, `phone`, `cityid`, `status`, `state`, `regtime`) VALUES ('$email_', '$name_', '$pwd_', '$phone_', '$cityid', 1, 0, '$time')");
+        $ret  = $dsql->dsqlOper($sql, "update");
+        if ($ret != "ok") {
+            return array('state' => 200, 'info' => '注册失败！请联系系统管理员');
+        }
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `username` = '$email_' ORDER BY `id` DESC LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        $did = $ret ? (int)$ret[0]['id'] : 0;
+        return array('state' => 100, 'info' => '注册成功！', 'did' => $did);
+    }
+
+    /**
+     * 配送员 Telegram 注册（供 n8n 调度桥服务间调用，token 鉴权）
+     * Telegram 消息本身即身份验证（bot 收到消息说明 chatid 真实），PHP 侧以桥接 token 防公网滥用
+     * 参数：token / chatid / name(姓名) / password / phone(选填) / cityid(选填，默认 10000 与现有店铺同城市)
+     */
+    public function courierRegTg()
+    {
+        global $dsql;
+        $cfgfile = HUONIAOINC . "/config/fbird.inc.php";
+        if (!file_exists($cfgfile)) {
+            return array('state' => 200, 'info' => '桥接配置缺失');
+        }
+        include $cfgfile;
+        if (!isset($fb_bridge_token) || $fb_bridge_token == '' || $this->param['token'] !== $fb_bridge_token) {
+            return array('state' => 200, 'info' => '无权调用');
+        }
+
+        $chatid   = trim($this->param['chatid']);
+        $name     = trim($this->param['name']);
+        $password = (string)$this->param['password'];
+        $phone    = trim($this->param['phone']);
+        $cityid   = (int)$this->param['cityid'];
+        if ($cityid <= 0) $cityid = 10000;
+
+        if (!preg_match('/^-?\d{4,20}$/', $chatid)) {
+            return array('state' => 200, 'info' => 'chatid 不合法');
+        }
+        if (empty($name)) {
+            return array('state' => 200, 'info' => '请提供姓名：/reg 姓名 密码 [手机号]');
+        }
+        if (strlen($password) < 6) {
+            return array('state' => 200, 'info' => '密码至少 6 位：/reg 姓名 密码 [手机号]');
+        }
+
+        $digits_ = preg_replace('/[^0-9]/', '', $chatid);
+        $username_ = 'tg' . $digits_;
+        $name_   = cn_substrR(addslashes($name), 10);
+        $pwd_    = addslashes($password);
+        $phone_  = preg_replace('/[^0-9+]/', '', $phone);
+
+        // 幂等：同一 Telegram 重复注册直接返回已有骑手 id（便于重新绑定）
+        $sql = $dsql->SetQuery("SELECT `id`, `status` FROM `#@__waimai_courier` WHERE `username` = '$username_' LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if ($ret) {
+            return array('state' => 100, 'info' => '该 Telegram 已注册过骑手账号，已直接返回', 'did' => (int)$ret[0]['id']);
+        }
+        if ($phone_ != '') {
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `phone` = '$phone_' LIMIT 1");
+            $ret = $dsql->dsqlOper($sql, "results");
+            if ($ret) {
+                return array('state' => 200, 'info' => '该手机号已被其他骑手使用');
+            }
+        }
+
+        $time = time();
+        $sql  = $dsql->SetQuery("INSERT INTO `#@__waimai_courier` (`username`, `name`, `password`, `phone`, `cityid`, `status`, `state`, `regtime`) VALUES ('$username_', '$name_', '$pwd_', '$phone_', '$cityid', 1, 0, '$time')");
+        $ret  = $dsql->dsqlOper($sql, "update");
+        if ($ret != "ok") {
+            return array('state' => 200, 'info' => '注册失败！请联系系统管理员');
+        }
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `username` = '$username_' ORDER BY `id` DESC LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        $did = $ret ? (int)$ret[0]['id'] : 0;
+        return array('state' => 100, 'info' => '注册成功！', 'did' => $did);
     }
 
     /**
