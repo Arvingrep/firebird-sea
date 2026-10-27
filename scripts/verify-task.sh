@@ -29,17 +29,31 @@ for dir in webroot docs .agents; do
 done
 echo "  ✅ 核心架构目录完整性 [通过]"
 
-# 3. Docs as Code 强制联动卡点 (检查 Git 暂存区或工作区)
+# 3. Docs as Code 强制联动卡点
+#
+# 判定「本次交付改了哪些文件」。注意这里必须取**工作树变更 ∪ 相对基线的提交**：
+#   - 只看 git status：CI 里 checkout 后工作树是干净的 → 两边都是 0 → else 分支 →
+#     永远打印「Docs-as-Code 规范对齐 [通过]」。这是一条从不检查的检查项，
+#     和本次评审要修的「恒绿假门禁」是同一个毛病。
+#   - 只看 diff：本地提交前工作树是脏的，diff 还没有内容，本该拦的拦不住。
+# 未跟踪文件（?? 项）不计入 —— 它们不属于本次交付，否则本地几个无关的 .ts/.json
+# 就会误报「改了代码没同步文档」。
+BASE_REF="${VERIFY_BASE:-origin/main}"
+CHANGED="$(
+    { git status --porcelain --untracked-files=no | cut -c4-
+      git diff --name-only "$BASE_REF"...HEAD 2>/dev/null
+    } | sed 's/^.* -> //' | sed '/^$/d' | sort -u
+)"
 CODE_CHANGED=0
 DOCS_CHANGED=0
 
 # 检查是否有代码变动 (PHP, JS, TS, HTML)
-if git status --porcelain | grep -E '\.(php|js|ts|html|vue|json)' | grep -v 'package' &>/dev/null; then
+if printf '%s\n' "$CHANGED" | grep -E '\.(php|js|ts|html|vue|json)' | grep -v 'package' | grep -q .; then
     CODE_CHANGED=1
 fi
 
 # 检查 docs 目录是否变动
-if git status --porcelain | grep -E 'docs/' &>/dev/null; then
+if printf '%s\n' "$CHANGED" | grep -qE '^docs/'; then
     DOCS_CHANGED=1
 fi
 
