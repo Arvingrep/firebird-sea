@@ -79,6 +79,6 @@ Never write `n8nac-config.json`, `~/.n8n-manager`, or n8n-manager secret files b
 
 1. **目录职责、新增文件放哪、入库红线、多 Agent 分区规则** —— 全在那份文件里，逐条照做
 2. **n8n 工作流改动必须同步更新** [`automation/n8n/REGISTRY.md`](automation/n8n/REGISTRY.md)（唯一真相源，实例与仓库必须一致）
-3. **提交前必跑**：`bash scripts/repo-hygiene.sh` + `bash scripts/gates.sh`
+3. **提交前必跑**：`bash scripts/repo-hygiene.sh` + `bash scripts/agent/gates.sh`
 4. **禁止**在仓库根目录新增文件；**禁止**重建已下线目录（BMAD 体系 / `services/tg-bot` / 自建 agent 派单）
 5. **跨区改动必须拆 PR**：一个 PR 只动一个区（前端 / PHP / 自动化 / 服务 / 部署 / 文档），`deploy/` 与 `.github/` 为全局串行锁

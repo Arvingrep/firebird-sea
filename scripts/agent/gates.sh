@@ -76,7 +76,7 @@ if [ -n "$CHANGED" ]; then row "非空交付" "✅ PASS" "$(printf '%s\n' "$CHAN
 else row "非空交付" "❌ FAIL" "相对 ${BASE} 无改动"; fi
 
 # 2. 增量控制（防臃肿）
-ADDED="$(git diff --numstat "$RANGE" -- . ':(exclude)docs/**' ':(exclude).agents/**' ':(exclude)_bmad-output/**' ':(exclude)_bmad/**' ':(exclude).claude/skills/bmad-*/**' ':(exclude)**/package-lock.json' \
+ADDED="$(git diff --numstat "$RANGE" -- . ':(exclude)docs/**' ':(exclude).agents/**' ':(exclude)**/package-lock.json' \
          | awk '$1 != "-" {a+=$1} END{print a+0}')"
 if [ "$ADDED" -le "$MAX_ADDED" ]; then row "增量 ≤ ${MAX_ADDED} 行" "✅ PASS" "+${ADDED}"
 else row "增量 ≤ ${MAX_ADDED} 行" "❌ FAIL" "+${ADDED}，拆小或精简"; fi
@@ -114,7 +114,9 @@ fi
 # 为什么必须有 6b：diff 扫描只在「有人新加」时报警，**已经躺在仓库里的永远扫不到**。
 # 2026-10-27 审计实证：deploy/k8s-mail-server.yaml 里的 Telegram bot token 与 RSA 私钥、
 # webroot/api/payment/wxpay/cert/ 下 4 份微信支付商户私钥，全都长期存活且门禁一直是绿的。
-SECRET_RE='BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|"private_key"|mnemonic|seed phrase|TRONGRID_API_KEY=[A-Za-z0-9]{8,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}'
+# 增量与存量共用同一套锚定正则：只认「行首（允许缩进）的真实 PEM 头」，
+# 否则模板占位符（<REPLACE_ME...>）和生成 PEM 的代码（$res = "-----BEGIN ... \n"）都会被误判。
+SECRET_RE='^[+[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|^[+[:space:]]*"private_key"[[:space:]]*:|mnemonic|seed phrase|TRONGRID_API_KEY=[A-Za-z0-9]{8,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}'
 LEAK="$(git diff "$RANGE" | grep -E '^\+' | grep -iE "$SECRET_RE" || true)"
 [ -z "$LEAK" ] && row "无密钥泄漏（增量）" "✅ PASS" || row "无密钥泄漏（增量）" "❌ FAIL" "疑似私钥/Token 进入 diff"
 
@@ -152,7 +154,9 @@ else
 fi
 
 # 7. 调试残留
-DEBUG="$(git diff "$RANGE" -- '*.php' '*.js' '*.ts' '*.vue' ':(exclude)scripts/**' | grep -E '^\+' | grep -E '\b(var_dump|print_r|console\.log|debugger)\b' || true)"
+# deploy/ 下的 .js 是服务端运行时（如 mail-relay/server.js），启动日志是功能的一部分，
+# 不是忘记删的调试语句；要拦的调试残留只针对业务代码。
+DEBUG="$(git diff "$RANGE" -- '*.php' '*.js' '*.ts' '*.vue' ':(exclude)scripts/**' ':(exclude)deploy/**' | grep -E '^\+' | grep -E '\b(var_dump|print_r|console\.log|debugger)\b' || true)"
 [ -z "$DEBUG" ] && row "无调试残留" "✅ PASS" || row "无调试残留" "❌ FAIL" "$(echo "$DEBUG" | head -n1 | head -c 120)"
 
 # 8. 改动文件语法

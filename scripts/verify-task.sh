@@ -19,7 +19,9 @@ fi
 echo "  ✅ 官方商业授权证书 [通过]"
 
 # 2. 检查关键目录
-for dir in webroot docs .agents/tasks; do
+# .agents/tasks 已随 BMAD 体系下线（2026-10-27），目录不存在是预期状态；
+# 这里只要求 .agents 本身在（RULES.md / secret-scan-allow.txt 等仍在用）。
+for dir in webroot docs .agents; do
     if [ ! -d "$dir" ]; then
         echo "❌ [FAIL] 缺失关键架构目录: $dir"
         exit 1
@@ -59,9 +61,14 @@ if command -v php &>/dev/null; then
     fi
 fi
 
-# 5. 流程脚本自测（BMAD 建单/回写、测试先行运行器、门禁）：快、纯本地
-for t in "node --test scripts/bmad/bmad.test.js scripts/bmad/sync.test.js" "node --test scripts/makefile.test.js" "bash scripts/acceptance/selftest.sh" "bash scripts/test-gates.sh"; do
-    f="${t##* }"; [ -e "$f" ] || continue   # 显式列出测试文件：Node 20 对目录参数会把目录下所有 .js 当测试跑
+# 5. 流程脚本自测（门禁自测 + Makefile 自测）：快、纯本地
+#    曾经这里列过 4 项，其中 2 项（scripts/bmad/*.test.js、scripts/acceptance/selftest.sh）
+#    指向已下线的 BMAD 体系。判定用 `f="${t##* }"; [ -e "$f" ] || continue` 取「最后一个词」，
+#    拿到的是不存在的 scripts/bmad/sync.test.js → 静默 continue，**永久失效且不留任何提示**。
+#    现在改为：列在这里的脚本必须存在，不存在就 FAIL —— 假绿比红危险。
+for t in "node --test scripts/makefile.test.js" "bash scripts/test-gates.sh"; do
+    f="${t##* }"   # 显式列出测试文件：Node 20 对目录参数会把目录下所有 .js 当测试跑
+    [ -e "$f" ] || { echo "❌ [FAIL] 自测脚本不存在：$f（列在 verify-task.sh 里就必须能被找到）"; exit 1; }
     if $t >/dev/null 2>&1; then echo "  ✅ $t [通过]"; else echo "❌ [FAIL] $t"; $t 2>&1 | tail -15; exit 1; fi
 done
 
@@ -73,6 +80,22 @@ for svc in services/api services/payment-listener services/news-sync; do
         else echo "❌ [FAIL] $svc 单元测试，请运行 (cd $svc && npm test) 查看详情"; exit 1; fi
     fi
 done
+
+# 6.2 TMA（Telegram Mini App）前端：类型检查 + 单元测试 + 构建
+#     这是整套门禁此前最大的缺口：apps/tma 有 9 个测试文件（101 个用例）、typecheck 与 vite build，
+#     但 verify-task.sh 只跑 services/ 下三个服务，TMA 的构建要等 merge 之后由 Dockerfile.api 触发。
+#     结果是：TMA 编译不过或测试挂了，PR 门禁全绿，合并后才炸 —— 而且正好炸在最想推的模块上。
+if [ -f apps/tma/package.json ]; then
+    if [ ! -d apps/tma/node_modules ]; then
+        (cd apps/tma && npm ci --no-audit --no-fund >/dev/null 2>&1) || { echo "❌ [FAIL] apps/tma 依赖安装失败（npm ci）"; exit 1; }
+    fi
+    if (cd apps/tma && npm run typecheck >/dev/null 2>&1); then echo "  ✅ apps/tma 类型检查 [通过]"
+    else echo "❌ [FAIL] apps/tma 类型检查失败："; (cd apps/tma && npm run typecheck 2>&1 | tail -15); exit 1; fi
+    if (cd apps/tma && npm test >/dev/null 2>&1); then echo "  ✅ apps/tma 单元测试 [通过]"
+    else echo "❌ [FAIL] apps/tma 单元测试失败，请运行 (cd apps/tma && npm test) 查看详情"; exit 1; fi
+    if (cd apps/tma && npm run build >/dev/null 2>&1); then echo "  ✅ apps/tma 构建 [通过]"
+    else echo "❌ [FAIL] apps/tma 构建失败："; (cd apps/tma && npm run build 2>&1 | tail -15); exit 1; fi
+fi
 
 # 6.5 Story 6.3 完整链路替身验收(采集→去重→发布→重试→告警,零外部依赖,断言在脚本内);不存在则跳过
 if [ -f services/news-sync/e2e-local.sh ]; then

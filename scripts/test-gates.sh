@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gates.sh / story.sh 自测：Zero-Dep 批准清单 / 受保护路径 / _bmad-output 不计行 / Story key 解析。在临时仓库里造 base+分支，不碰当前仓库。
+# gates.sh 自测：Zero-Dep 批准清单 / 受保护路径 / _bmad-output 不计行。在临时仓库里造 base+分支，不碰当前仓库。
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
@@ -163,30 +163,4 @@ printf "require('node:test')('x', () => {});\n" > services/api/test/new.test.js
 git add -A; git commit -qm d
 case_ "改路由+带测试但 OpenAPI 未更新 → FAIL" 1 0
 
-# --- story.sh：Story key 解析（dev.sh 注入规格/预检依赖它）---
-source "$ROOT/scripts/agent/story.sh"
-eq() { if [ "$2" = "$3" ]; then echo "✅ $1"; else echo "❌ $1（期望「$3」实际「$2」）"; FAIL=1; fi; }
-eq "标题 [story:key] 解析（含中文）" "$(story_key 'feat [story:1-7-计划任务-cronjob] x' '')" "1-7-计划任务-cronjob"
-eq "正文标记兜底" "$(story_key '普通' 'a <!-- bmad-story: 2-1-foo --> b')" "2-1-foo"
-eq "无标记 → 空" "$(story_key '普通' '无')" ""
-eq "story_id 取前两段数字" "$(story_id '1-7-计划任务-cronjob')|$(story_id 2.4)" "1-7|2-4"
-# --- story_id 的 T 前缀语义（0b976062「改左匹配」的护栏）---
-# 该提交修的是「数字前出现过 t/T 时整条不匹配」：旧正则 ^[^0-9Tt]* 会被 [story:T1-1] / Story 1.1 / task 1-1 整条打空。
-# 下面八条把修复前后的边界都钉住。分界点是「t 是不是独立前缀」：test1-2 / next2-3 里的 t 属于单词（前面紧邻字母），
-# 应解析成普通 Story，不能被误判成 T Story —— 这正是 head 末字符判定（*[!a-zA-Z][Tt]）与「凡带 t 就当 T」的分野。
-eq "story_id 大小写归一 t1.1 → T1-1" "$(story_id 't1.1')" "T1-1"
-eq "story_id 已是 T1-1 保持原样" "$(story_id 'T1-1')" "T1-1"
-eq "story_id 小数写法 T2.10 → T2-10" "$(story_id 'T2.10')" "T2-10"
-eq "story_id 标题前缀 [story:T1-1] → T1-1" "$(story_id '[story:T1-1]')" "T1-1"
-eq "story_id 句子前缀 Story 1.1 → 1-1" "$(story_id 'Story 1.1')" "1-1"
-eq "story_id 句子前缀 task 1-1 → 1-1" "$(story_id 'task 1-1')" "1-1"
-eq "story_id 词内 t 不算前缀 test1-2 → 1-2" "$(story_id 'test1-2')" "1-2"
-eq "story_id 词内 t 不算前缀 next2-3 → 2-3（旧实现会误判成 T2-3）" "$(story_id 'next2-3')" "2-3"
-# 〔契约〕不是 B2 的回归用例：对 49d83449 无判别力（那版同样返回 T1-1），
-# 但对 aeb9c5cc（T 支持尚不存在那版）是 1-1，因此能拦住「T 支持被整体回退」。
-# 具体拦截场景：把 *[!a-zA-Z][Tt]) 改成 *[[:punct:]][Tt]) 这类「看起来更规范」的重构，
-# 会让 故事T1-1 静默变 1-1 并跑到 epic 1 story 1 的验收路径上——其余断言全绿，看不出来（已实测）。
-# 说「无判别力」必须指明对哪两个 commit，否则这个词会被当成绝对判断而删掉本条。
-eq "story_id CJK 前导仍按分隔符处理 故事T1-1 → T1-1〔契约〕" "$(story_id '故事T1-1')" "T1-1"
-eq "story_spec 无规格不报错" "$(cd "$T" && story_spec HEAD 9-9; echo "rc=$?")" "rc=0"
 exit $FAIL

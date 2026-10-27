@@ -40,7 +40,11 @@
 
 | 东西 | 下线时间 | 原因 |
 |---|---|---|
-| `_bmad/`、`_bmad-output/`、BMAD 技能包、`bmad-*` workflow | 2026-10-27 | 流程已沉淀成真实代码，脚手架无用 |
+| `_bmad/`、`_bmad-output/`、BMAD 技能包（`.claude/skills/bmad-*` 29 个）、`bmad-*` workflow | 2026-10-27 | 流程已沉淀成真实代码，脚手架无用 |
+| `scripts/acceptance/`、`acceptance-runner.sh`、`agent/{dev,story}.sh`、`agent-run.sh` | 2026-10-27 | 施工侧 Agent 已下线；Story 验收体系依赖的脚本已不存在 |
+| `scripts/deploy-release.sh`（`make release`） | 2026-10-27 | 「假发布」：只 helm template + 打印成功卡片，不 apply、不推镜像、不触发 ArgoCD |
+| `scripts/mcp-acceptance-test.js`（`make test-mcp`） | 2026-10-27 | 断言的是已停用的 4 个废弃工作流必须 active，逻辑与现状相反，必然失败 |
+| `services/tg-bot/`、6 个断链 n8n 工作流 | 2026-10-27 | 目标系统均不存在 |
 | `agent-dev.yml`、`dispatch-task.js`、`hermes-accept.sh` | 2026-10-27 | 单线串行，已被多 Agent 直接开发取代 |
 | `services/tg-bot/` | 2026-10-27 | 三处全断（调已删脚本 + webhook 不存在 + 生产未部署） |
 | `tg_photo_menu_to_json` / `usdt_payment_alert` / `sentry_error_to_tg_ai_alert` / `tg_voice_to_linear_spec` / `arvino_github_issue_to_run` / `tg_to_github_issues_project` | 2026-10-27 | 目标系统均不存在，见 `automation/n8n/REGISTRY.md` |
@@ -109,7 +113,7 @@
 
 ```bash
 bash scripts/repo-hygiene.sh          # 仓库卫生（新增文件是否合规）
-bash scripts/gates.sh                 # 业务门禁（diff / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
+bash scripts/agent/gates.sh           # 业务门禁（diff / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
 bash scripts/test-gates.sh            # 门禁自测（改了 scripts/ 或 .github/ 时必跑）
 node scripts/api-contract-check.js    # 改了 PHP 接口时必跑
 ```

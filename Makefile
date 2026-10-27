@@ -1,4 +1,4 @@
-.PHONY: local-accept gates agent-qa help setup up down restart logs ps clean download-package extract-package verify backlog accept test-coins clean-bloat dev-check release test-k8s test-mcp hygiene
+.PHONY: local-accept gates agent-qa help setup up down restart logs ps clean download-package extract-package verify test-coins clean-bloat dev-check test-k8s hygiene
 
 # gates 的对比基线：跟随「目标分支」（PR 要合进去的那条），而不是当前分支自己的上游。
 # 用上游 @{u} 是错的：agent/*、chore/* 的上游就是它自己，push 完 git diff @{u}...HEAD 恒空 → 又是假 FAIL。
@@ -16,20 +16,16 @@ help:
 	@echo "=========================================================="
 	@echo "  make agent-qa         - 独立 QA Agent 验收 PR (例: make agent-qa PR=34)"
 	@echo "  make gates            - 对目标分支（AGENT_BASE_BRANCH，填裸分支名，默认 origin/main）跑门禁；GATE_BASE 覆盖；本目标不自动 fetch，落后时请先手动 git fetch"
-	@echo "  make test-mcp         - ⚡ 验证 n8n MCP Server 协议及 4 核心工作流端到端状态"
 	@echo "  make setup            - 初始化基地目录与环境检查"
 	@echo "  make up               - 启动 LEMP + Redis + n8n 容器集群"
 	@echo "  make down             - 停止容器集群"
 	@echo "  make logs             - 查看所有容器实时日志"
 	@echo "  make dev-check        - [分工2] 编码施工防臃肿门禁 (Zero-Dep & 代码脱水)"
 	@echo "  make verify           - 运行一人团队代码与 Docs-as-Code 校验卡点"
-	@echo "  make accept           - [分工3] 启动独立验收智能体 (Agent 2) 验收 (例: make accept TASK=TASK-001)"
-	@echo "  make release          - [分工4] 经独立验收通过后一键发布至 GKE 并自动归档 (例: make release TASK=TASK-001 SITE=manila)"
 	@echo "  make hygiene          - 🧹 仓库卫生检查（副本/临时目录/大文件，CI 同款）"
 	@echo "  make test-k8s         - 测试 GKE Helm Chart 语法与多站点模板渲染"
 	@echo "  make clean-bloat      - 执行工程体系脱水剪枝，清理临时备份、大日志与悬挂镜像"
 	@echo "  make test-coins       - 测试 Coins.ph 官方行情深度与 HMAC-SHA256 鉴权引擎"
-	@echo "  make backlog          - 查看当前任务看板状态"
 	@echo "  make download-package - 执行第 1 步：从官方源下载旗舰版安装包"
 	@echo "  make extract-package  - 解压源码至 webroot 并注入商业授权证书"
 	@echo "=========================================================="
@@ -57,9 +53,6 @@ verify:
 	@chmod +x scripts/verify-task.sh
 	@./scripts/verify-task.sh
 
-accept:
-	@bash scripts/acceptance-runner.sh $(TASK)
-
 gates:
 	@bash scripts/agent/gates.sh $(GATE_BASE)
 
@@ -74,9 +67,6 @@ agent-qa:
 
 test-coins:
 	@node scripts/test-coins-ph.js
-
-backlog:
-	@cat .agents/tasks/BACKLOG.md
 
 download-package:
 	@mkdir -p downloads
@@ -95,10 +85,6 @@ dev-check:
 	@chmod +x scripts/dev-check.sh
 	@./scripts/dev-check.sh
 
-release:
-	@chmod +x scripts/deploy-release.sh
-	@./scripts/deploy-release.sh $(TASK) $(SITE)
-
 clean-bloat:
 	@chmod +x scripts/clean-bloat.sh
 	@./scripts/clean-bloat.sh
@@ -109,7 +95,3 @@ clean-bloat:
 test-k8s:
 	@chmod +x scripts/test-helm.sh
 	@./scripts/test-helm.sh
-
-test-mcp:
-	@chmod +x scripts/mcp-acceptance-test.js
-	@node scripts/mcp-acceptance-test.js

@@ -4,7 +4,7 @@
 #   REJECTED → 评论缺陷清单 + issue 重新打 agent:dev（触发 Dev Agent 返工，最多 AGENT_MAX_ATTEMPTS 次）
 # 独立性：默认用与 Dev Agent 不同厂商的模型（codex），只读沙箱，不能改代码。
 # 用法：scripts/agent/qa.sh <pr-number>
-# 环境：GH_TOKEN（PAT）、AGENT_AUTO_MERGE（默认 1）、N8N_AGENT_EVENT_WEBHOOK（可选）
+# 环境：GH_TOKEN（PAT）、AGENT_AUTO_MERGE（默认 0，需显式设 1 才自动合并）、N8N_AGENT_EVENT_WEBHOOK（可选）
 #       GATES_JOB_RESULT   托管 runner 上 gates job 的结论，必须为 success 才可能 ACCEPTED
 #                          （本地手动运行时需显式设置，否则一律打回）
 #       QA_AGENT_CMD       可选覆盖，按 shell 语法解析，末尾须接受「输出文件」参数
@@ -15,7 +15,7 @@ self_copy qa.sh "$@"
 cd "$ROOT_DIR"
 
 PR="${1:?用法: qa.sh <pr-number>}"
-AUTO_MERGE="${AGENT_AUTO_MERGE:-1}"
+AUTO_MERGE="${AGENT_AUTO_MERGE:-0}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 # issue 是否已被 dev.sh 打上 agent:blocked（返工上限用尽）。
@@ -159,8 +159,6 @@ gh pr comment "$PR" -R "$REPO" -F "$TMP/comment.md" >/dev/null
 
 if [ "$VERDICT" = "ACCEPTED" ]; then
   set_label "$PR" "qa:accepted" "qa:rejected" "agent:qa"
-  bmad_stage "https://github.com/${REPO}/pull/${PR}" ready-to-release
-  [ -n "$ISSUE" ] && bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" ready-to-release
   if [ "$AUTO_MERGE" = "1" ]; then
     # --match-head-commit：防止验收后有人又推了未验收的提交
     MERGE_OK=0
@@ -180,8 +178,6 @@ if [ "$VERDICT" = "ACCEPTED" ]; then
   fi
 else
   set_label "$PR" "qa:rejected" "qa:accepted" "agent:qa"
-  bmad_stage "https://github.com/${REPO}/pull/${PR}" in-qa
-  [ -n "$ISSUE" ] && bmad_stage "https://github.com/${REPO}/issues/${ISSUE}" in-progress
   notify qa_rejected "PR #${PR} 第 ${ATTEMPT} 轮被 QA 打回" "$ISSUE" "$PR"
   # 打回 => issue 重新进入 agent:dev，触发 Dev Agent 返工（dev.sh 内部有次数上限）。
   # 但 dev.sh 达上限后已给 issue 打上 agent:blocked；此时若仍重打 agent:dev，下一轮 QA 又会把 Dev 拉起来，
