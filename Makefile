@@ -1,4 +1,4 @@
-.PHONY: local-accept gates agent-qa help setup up down restart logs ps clean download-package extract-package verify backlog accept test-coins clean-bloat dev-check release tg-bot test-tg test-k8s test-mcp
+.PHONY: local-accept gates agent-qa help setup up down restart logs ps clean download-package extract-package verify backlog accept test-coins clean-bloat dev-check release test-k8s test-mcp hygiene
 
 # gates 的对比基线：跟随「目标分支」（PR 要合进去的那条），而不是当前分支自己的上游。
 # 用上游 @{u} 是错的：agent/*、chore/* 的上游就是它自己，push 完 git diff @{u}...HEAD 恒空 → 又是假 FAIL。
@@ -18,15 +18,14 @@ help:
 	@echo "  make gates            - 对目标分支（AGENT_BASE_BRANCH，填裸分支名，默认 origin/main）跑门禁；GATE_BASE 覆盖；本目标不自动 fetch，落后时请先手动 git fetch"
 	@echo "  make test-mcp         - ⚡ 验证 n8n MCP Server 协议及 4 核心工作流端到端状态"
 	@echo "  make setup            - 初始化基地目录与环境检查"
-	@echo "  make up               - 启动 LEMP + Redis + n8n + TG-Bot 容器集群"
+	@echo "  make up               - 启动 LEMP + Redis + n8n 容器集群"
 	@echo "  make down             - 停止容器集群"
 	@echo "  make logs             - 查看所有容器实时日志"
 	@echo "  make dev-check        - [分工2] 编码施工防臃肿门禁 (Zero-Dep & 代码脱水)"
 	@echo "  make verify           - 运行一人团队代码与 Docs-as-Code 校验卡点"
 	@echo "  make accept           - [分工3] 启动独立验收智能体 (Agent 2) 验收 (例: make accept TASK=TASK-001)"
 	@echo "  make release          - [分工4] 经独立验收通过后一键发布至 GKE 并自动归档 (例: make release TASK=TASK-001 SITE=manila)"
-	@echo "  make tg-bot           - 本地启动 Telegram 前哨调度服务 (端口 3001)"
-	@echo "  make test-tg          - 测试 Telegram 前哨服务 Webhook 与卡片接口"
+	@echo "  make hygiene          - 🧹 仓库卫生检查（副本/临时目录/大文件，CI 同款）"
 	@echo "  make test-k8s         - 测试 GKE Helm Chart 语法与多站点模板渲染"
 	@echo "  make clean-bloat      - 执行工程体系脱水剪枝，清理临时备份、大日志与悬挂镜像"
 	@echo "  make test-coins       - 测试 Coins.ph 官方行情深度与 HMAC-SHA256 鉴权引擎"
@@ -63,6 +62,9 @@ accept:
 
 gates:
 	@bash scripts/agent/gates.sh $(GATE_BASE)
+
+hygiene:
+	@bash scripts/repo-hygiene.sh
 
 local-accept:
 	@bash scripts/local-accept.sh
@@ -101,11 +103,8 @@ clean-bloat:
 	@chmod +x scripts/clean-bloat.sh
 	@./scripts/clean-bloat.sh
 
-tg-bot:
-	@node services/tg-bot/src/server.js
-
-test-tg:
-	@node services/tg-bot/src/test.js
+# tg-bot / test-tg 已于 2026-10-27 下线（services/tg-bot 三处全断）。
+# 骑手与配送已由 n8n 派单链承担：automation/n8n/workflows/tg_dispatch_courier_flow.json
 
 test-k8s:
 	@chmod +x scripts/test-helm.sh

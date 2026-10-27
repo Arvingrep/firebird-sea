@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Firebird 全量价值审计 · 自动化工具逐项核查</title>
+<style>
+:root{
+  --bg:#0b0d10; --card:#14171c; --card2:#191d23; --line:#23272f;
+  --ink:#e9ecf0; --ink2:#98a2ae; --ink3:#69727e;
+  --brand:#ff6b2c; --red:#ff5f56; --orange:#ff9f43; --yellow:#f5c451; --green:#35c88a; --blue:#4a9eff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;padding:0 0 60px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 26px}
+header{padding:46px 0 30px;border-bottom:1px solid var(--line);margin-bottom:34px}
+.eyebrow{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--brand);font-weight:700;margin-bottom:12px}
+h1{font-size:31px;line-height:1.24;font-weight:700;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--brand)}
+.lead{color:var(--ink2);margin-top:14px;font-size:15px;max-width:820px}
+
+.verdict{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:12px;padding:20px 22px;margin:26px 0 0}
+.verdict h3{font-size:15px;margin-bottom:10px;font-weight:650}
+.verdict p{color:var(--ink2);font-size:13.5px;line-height:1.75}
+.verdict b{color:var(--ink)}
+.verdict .hi{color:var(--green);font-weight:600}
+.verdict .lo{color:var(--red);font-weight:600}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:11px;margin-top:24px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:15px 16px}
+.stat b{display:block;font-size:25px;font-weight:700;letter-spacing:-.02em}
+.stat span{font-size:11.5px;color:var(--ink3);display:block;margin-top:3px;line-height:1.4}
+.stat.g b{color:var(--green)} .stat.r b{color:var(--red)} .stat.y b{color:var(--yellow)} .stat.b b{color:var(--blue)}
+
+section{margin-bottom:42px}
+.sec-head{display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap}
+.sec-head h2{font-size:19px;font-weight:660;letter-spacing:-.01em}
+.sec-head .cnt{font-size:11.5px;color:var(--ink3);border:1px solid var(--line);padding:1px 8px;border-radius:20px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.d-g{background:var(--green)}.d-r{background:var(--red)}.d-y{background:var(--yellow)}.d-b{background:var(--blue)}
+.sec-note{color:var(--ink3);font-size:13px;margin:7px 0 16px;padding-left:18px;line-height:1.6}
+
+.tbl{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+.row{display:grid;grid-template-columns:210px 1fr 130px;gap:14px;padding:13px 18px;border-top:1px solid var(--line);align-items:start}
+.row:first-child{border-top:none}
+.row.head{background:var(--card2);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);padding:9px 18px}
+.row:hover:not(.head){background:#171b21}
+.nm{font-weight:620;font-size:13px;word-break:break-all}
+.nm code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--ink2);font-weight:400}
+.dsc{font-size:12.5px;color:var(--ink2);line-height:1.6}
+.dsc b{color:var(--ink);font-weight:600}
+.ev{font-size:11px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace;margin-top:4px;word-break:break-all;line-height:1.5}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.b-live{background:rgba(53,200,138,.14);color:var(--green)}
+.b-dead{background:rgba(255,95,86,.14);color:var(--red)}
+.b-half{background:rgba(255,159,67,.14);color:var(--orange)}
+.b-idle{background:rgba(245,196,81,.14);color:var(--yellow)}
+.b-core{background:rgba(74,158,255,.14);color:var(--blue)}
+
+.callout{border-radius:11px;padding:16px 18px;margin:14px 0 0;font-size:13px;line-height:1.7;color:var(--ink2)}
+.callout.warn{background:rgba(255,95,86,.06);border:1px solid rgba(255,95,86,.26)}
+.callout.warn b{color:var(--red)}
+.callout.info{background:rgba(74,158,255,.05);border:1px solid rgba(74,158,255,.22)}
+.callout.info b{color:var(--blue)}
+.callout p+p{margin-top:8px}
+
+ol.fix{margin:14px 0 0 0;padding:0;list-style:none;counter-reset:f}
+ol.fix li{counter-increment:f;position:relative;padding:12px 0 12px 46px;border-top:1px solid var(--line);font-size:13px;color:var(--ink2);line-height:1.65}
+ol.fix li:first-child{border-top:none}
+ol.fix li::before{
+  content:counter(f);position:absolute;left:0;top:13px;width:24px;height:24px;border-radius:7px;
+  background:var(--card2);border:1px solid var(--line);color:var(--ink3);
+  font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+ol.fix li b{color:var(--ink)}
+ol.fix li .p0{color:var(--red);font-weight:700;font-size:11px;margin-right:6px}
+ol.fix li .p1{color:var(--orange);font-weight:700;font-size:11px;margin-right:6px}
+ol.fix li .p2{color:var(--yellow);font-weight:700;font-size:11px;margin-right:6px}
+ol.fix li code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--blue);background:rgba(74,158,255,.08);padding:1px 5px;border-radius:4px}
+
+footer{color:var(--ink3);font-size:12px;text-align:center;padding:36px 0 0;line-height:1.9;border-top:1px solid var(--line);margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Full Value Audit · 2026-10-27</div>
+  <h1>全量价值审计：<em>哪些是资产，哪些是化石</em></h1>
+  <p class="lead">
+    逐目录、逐文件核查存在价值。判据不看「写了多少行」，只问三件事：<b>谁在用它、它还在不在链路上、删了会不会有人痛</b>。
+  </p>
+
+  <div class="verdict">
+    <h3>一句话结论</h3>
+    <p>
+      这套系统里<span class="hi">真正在支撑业务的是 4 件事</span>：外卖派单链、发版通知、资讯供料、TG 客户端后端。
+      而<span class="lo">「AI 一人团队」时代留下的 6 项自动化已全部断链</span>——它们的目标服务不存在、凭据是占位符、或依赖的脚本已被删除。
+      <b>业务价值已经和那套叙事脱钩了。</b>
+    </p>
+  </div>
+
+  <div class="stats">
+    <div class="stat g"><b>4</b><span>在跑且必要</span></div>
+    <div class="stat y"><b>3</b><span>半截工程 / 待接线</span></div>
+    <div class="stat r"><b>6</b><span>已断链，可下线</span></div>
+    <div class="stat b"><b>10</b><span>CI 真依赖的脚本</span></div>
+  </div>
+</header>
+
+<!-- ========== 1 自动化 ========== -->
+<section>
+  <div class="sec-head"><span class="dot d-g"></span><h2>一、n8n 工作流</h2><span class="cnt">9 个业务流</span></div>
+  <p class="sec-note">按「上游谁在打这个 webhook / 代码里谁在调它」判定真实状态，不看文件里的 active 字段（仓库快照与线上已漂移）。</p>
+  <div class="tbl">
+    <div class="row head"><div>工作流</div><div>做什么 / 判定依据</div><div>状态</div></div>
+
+    <div class="row">
+      <div class="nm"><span class="badge b-core">核心</span><br>tg_dispatch_courier_flow<br><code>37 节点</code></div>
+      <div class="dsc">骑手 TG 桥：<b>/bind /reg /orders</b>、抢单/取货/送达回调，外加每分钟轮询抢单池做派单差集。8 个 HTTP 节点全部打到 <code>include/ajax.php</code>，对端 PHP 接口齐全（<code>waimai.class.php:7065</code> / <code>:7130</code>）。
+        <div class="ev">唯一还在被业务日更修改的工作流 · 外卖闭环唯一通路</div></div>
+      <div><span class="badge b-live">在跑 · 保留</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm"><span class="badge b-core">核心</span><br>agent_pipeline_events_to_tg<br><code>3 节点</code></div>
+      <div class="dsc">接收「镜像已推 / 已部署 / 部署失败」事件，格式化成卡片推 TG。<b>名字是 AI 团队时代留的，但 CI 和 ArgoCD 都还指着它</b>。
+        <div class="ev">ci-gke.yml:147 · scripts/agent/lib.sh:54 · job-notify-deployed.yaml:30</div></div>
+      <div><span class="badge b-live">在跑 · 保留</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm"><span class="badge b-core">核心</span><br>news_sync_schedule<br><code>3 节点</code></div>
+      <div class="dsc">每 6 小时拉 RSS → <code>services/news-sync</code> 去重/发布/失败告警。<b>这是资讯模块唯一的自动供料链</b>，对应 <code>apps/tma/src/pages/News.vue</code>。
+        <div class="ev">⚠ 依赖 n8n 容器内 /news-sync 挂载，该挂载不在版本控制里 → 换镜像就 MODULE_NOT_FOUND</div></div>
+      <div><span class="badge b-live">在跑 · 保留+修</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">tg_to_github_issues_project<br><code>13 节点</code></div>
+      <div class="dsc">个人 TG 语音/文字 → AI 脱水成 Spec → 建 GitHub Issue + 加入 Project 看板。<b>建 Issue 可用，Project 那两步已随 BMAD 一起失效。</b>
+        <div class="ev">3b/3c 节点硬编码 Project ID · agent:dev 标签无承接方</div></div>
+      <div><span class="badge b-half">半可用 · 改造</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">arvino_github_issue_to_run<br><code>5 节点</code></div>
+      <div class="dsc">转发 GitHub issue 到 <code>arvino-orchestrator</code>。<b>该服务属于另一个产品线，本仓库不提供也无法验证</b>；凭据 id 还是占位符 <code>REPLACE_N8N_HEADER_AUTH_CREDENTIAL_ID</code>。
+        <div class="ev">落地即 401 · 全仓库无 arvino 代码或部署</div></div>
+      <div><span class="badge b-dead">断链 · 废弃</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">tg_voice_to_linear_spec<br><code>5 节点</code></div>
+      <div class="dsc">TG 语音 → 建 Linear issue。<b>与上面那个完全同构，且 Linear 从未被采用</b>。
+        <div class="ev">全仓库无 Linear 使用痕迹，仅文档里一句设想</div></div>
+      <div><span class="badge b-dead">停摆 · 废弃</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">sentry_error_to_tg_ai_alert<br><code>4 节点</code></div>
+      <div class="dsc">Sentry webhook → AI 提炼根因 → 推 TG。<b>仓库里没有任何 Sentry SDK/DSN</b>，没有任何发送方，是个永久空转的 webhook。
+        <div class="ev">grep sentry 只命中自身与文档</div></div>
+      <div><span class="badge b-dead">断链 · 废弃</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">usdt_payment_alert<br><code>4 节点</code></div>
+      <div class="dsc">收支付 webhook 推到账/超时通知。<b>零流量</b>：<code>services/payment-listener</code> 只写库不回调；且逻辑是「非 PAID 一律当超时」——没有定时器却在文案里声称 15 分钟窗口。
+        <div class="ev">错误语义比没有更容易误导排障</div></div>
+      <div><span class="badge b-dead">断链 · 废弃</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">tg_photo_menu_to_json<br><code>10 节点</code></div>
+      <div class="dsc">商家发菜单照片 → AI 结构化 → POST 到 <code>delivery-backend</code>。<b>该后端在本仓库和 Helm 里都不存在</b>，商户映射表是空的，文件本身还没进 git。
+        <div class="ev">未落地的产品构想</div></div>
+      <div><span class="badge b-dead">断链 · 废弃</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 2 services ========== -->
+<section>
+  <div class="sec-head"><span class="dot d-b"></span><h2>二、Node 服务</h2><span class="cnt">4 个</span></div>
+  <p class="sec-note">判据：Helm 里有没有 deployment、谁在调用、测试是否真跑。</p>
+  <div class="tbl">
+    <div class="row head"><div>服务</div><div>职责 / 证据</div><div>状态</div></div>
+
+    <div class="row">
+      <div class="nm"><span class="badge b-core">主干</span><br>services/api<br><code>40 js · 20 测试</code></div>
+      <div class="dsc"><b>TG 客户端全部读写的入口</b>：initData 验签、火鸟白名单代理、USDT 收银台、地址、还托管 TMA 静态产物。<code>/tg-api/health</code> 实测 200，<code>/auth/telegram</code> 正确回 401。
+        <div class="ev">deployment-api.yaml · values.yaml enabled:true 副本 2 · 40 个测试文件</div></div>
+      <div><span class="badge b-live">在跑 · 保留</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">services/news-sync<br><code>11 js</code></div>
+      <div class="dsc">RSS → 清洗 → URL 哈希去重 → 门户发布 → 3 次退避重试 → 失败告警。<b>资讯模块的供料源</b>，逻辑与测试质量都不错。
+        <div class="ev">唯一调用方是 n8n 容器内 require；deploy/ 下无 deployment</div></div>
+      <div><span class="badge b-live">在跑 · 保留+修</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">services/payment-listener<br><code>4 js</code></div>
+      <div class="dsc">每 10 秒轮询 TronGrid 抓 USDT-TRC20 转入，写流水表与游标。<b>设计正确的「写流水」半边，但对账那半边没实现</b>，Helm 里 <code>paymentListener.enabled: false</code>。
+        <div class="ev">services/api 里没有任何读取 fbs_chain_tx 的代码 · GATEWAY_SPIKE.md 明说回调是占位</div></div>
+      <div><span class="badge b-idle">半截 · 暂不启用</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">services/tg-bot<br><code>2 js</code></div>
+      <div class="dsc"><b>三处全断</b>：① 核心派单调 <code>dispatch-task.js</code>——该脚本今天已删；② 备用 webhook <code>tg-input</code> 不存在；③ 生产 Helm 里根本没部署。测试还是假绿（异常也回 200）。
+        <div class="ev">其「开发者指令台」职能已被 Issue 化 + 骑手桥取代</div></div>
+      <div><span class="badge b-dead">断链 · 废弃</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 3 工具链 ========== -->
+<section>
+  <div class="sec-head"><span class="dot d-b"></span><h2>三、开发工具链</h2><span class="cnt">40 脚本 · 2 条 CI · 23 target</span></div>
+  <p class="sec-note">好消息：<b>Makefile 没有任何 target 指向不存在的文件</b>。坏消息：有 4 处「静默降级」在偷偷丢覆盖率。</p>
+
+  <div class="tbl">
+    <div class="row head"><div>组件</div><div>价值判定</div><div>状态</div></div>
+
+    <div class="row">
+      <div class="nm">agent/gates.sh<br><code>确定性门禁</code></div>
+      <div class="dsc">无 LLM 的硬门禁：受保护路径、增量 ≤1200 行、垃圾文件、公司依赖、密钥泄漏、调试残留、Helm 多站点、API 契约同步。<b>整条流水线最核心的一个脚本</b>，被 CI、Makefile、qa.sh、test-gates.sh 四处调用。
+        <div class="ev">ci-verify.yml:32 · Makefile:65 · 删了门禁全空</div></div>
+      <div><span class="badge b-core">核心 · 保留</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">verify-task.sh<br><code>质检卡点</code></div>
+      <div class="dsc">授权文件、PHP 语法、Node 单测、DB 集成测试。<b>三处静默跳过</b>：<code>:63</code> 仍列 <code>scripts/bmad/*</code>（今天已删）→ continue 不报错；<code>:94</code> 依赖不存在的 <code>test-api-db.sh</code> → DB 测试永不执行，但 CI job 名还写着「数据库集成测试」。
+        <div class="ev">覆盖率在悄悄流失，没人会发现</div></div>
+      <div><span class="badge b-half">必修</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">agent/lib.sh<br><code>公共库</code></div>
+      <div class="dsc"><code>bmad_stage</code> 函数指向今天已删的 <code>github-sync.js</code>，<b>7 处调用每次必失败</b>（被 <code>|| log</code> 兜住，只留噪声）。<code>notify</code>/<code>self_copy</code>/<code>redact</code> 仍是 CI 依赖。
+        <div class="ev">lib.sh:87 · 调用点 dev.sh:50,218,219 · qa.sh:162,163,183,184</div></div>
+      <div><span class="badge b-half">必修</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">qa.sh / acceptance/ / test-gates.sh<br><code>测试与验收</code></div>
+      <div class="dsc">独立 QA Agent（跑门禁 + 红队审 diff + 合并判定）、Story 用例运行器、门禁自测。<b>CI 的 QA 与 Story 门禁直接依赖</b>，都健康。
+        <div class="ev">ci-verify.yml:43,96 · 本地手跑 qa.sh 恒 REJECTED 是设计不是 bug</div></div>
+      <div><span class="badge b-live">保留</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">mail-relay-server.js<br><code>SMTP 中继</code></div>
+      <div class="dsc"><b>已被 k8s 里的内联版取代</b>，而且线上版功能更全（多监听 25/465 + SSL）。仓库这份是旧副本，SSL 段还是空壳。
+        <div class="ev">deploy/k8s-mail-server.yaml:56 内联 server.js 才是真在跑的</div></div>
+      <div><span class="badge b-dead">废弃</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">dev-check.sh<br><code>早期门禁</code></div>
+      <div class="dsc">4 项检查里 3 项只 WARN 不 FAIL，实际只有「垃圾文件」能拦。判据阈值写 1200，提示文案却写「超过 200 行」。<b>已被 gates.sh 完全覆盖且更严格</b>。
+        <div class="ev">留着会让人以为跑过两道门禁</div></div>
+      <div><span class="badge b-dead">废弃</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">deploy-release.sh<br><code>make release</code></div>
+      <div class="dsc"><b>名不副实</b>：只做 <code>helm template</code> 到 /tmp，没有任何 kubectl apply 或镜像推进。真正的发布是 CI 推 GAR → ArgoCD Image Updater。前置验收报告只剩 1 份历史文件。
+        <div class="ev">容易让人以为 make release 会上线</div></div>
+      <div><span class="badge b-dead">废弃或改名</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">agent-run.sh / acceptance-runner.sh<br><code>旧 TASK 派单</code></div>
+      <div class="dsc">读 <code>.agents/tasks/TASK-*.md</code> → 跑无头 agent → 开 PR → 验收。上游 TASK 体系已停，只剩 <code>TASK-014</code> 一个 spec。<b>同一代停摆链路</b>。
+        <div class="ev">默认 agent 命令依赖存在性检查，写法本身可疑</div></div>
+      <div><span class="badge b-dead">废弃</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">seed_business.py<br><code>种子脚本</code></div>
+      <div class="dsc">硬编码读 <code>db_default.txt</code> 第 96–237 行拼 INSERT，输出只到 /tmp 不落库。<b>源文件一改行号就错位，无法复现</b>。
+        <div class="ev">一次性取数脚本</div></div>
+      <div><span class="badge b-dead">废弃</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">local-accept.sh<br><code>本地验收</code></div>
+      <div class="dsc">与 GKE 同构地在本地起全套镜像跑冒烟。<b>唯一能在本地复现线上镜像的地方</b>。小瑕疵：checks 里用 <code>md5sum</code>，干净 macOS 上会恒 FAIL。
+        <div class="ev">local-accept-checks.sh:13 缺 md5 -q 兜底</div></div>
+      <div><span class="badge b-live">保留+修</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">两条 CI<br><code>ci-verify / ci-gke</code></div>
+      <div class="dsc">门禁三连 + 四镜像推送 + 发版通知，逻辑自洽。<b>关键设计要保住</b>：canary 只推 <code>canary</code>/<code>canary-short</code>，绝不推 40 位 SHA，避免未验收镜像滚进生产。
+        <div class="ev">残留：paths-ignore 里还有已删的 _bmad-output、apps/bmad-dashboard（无害）</div></div>
+      <div><span class="badge b-live">健康</span></div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <p><b>删除即红（CI 真依赖）的 10 个文件：</b></p>
+    <p><code>agent/gates.sh</code> · <code>api-contract-check.js</code> · <code>test-helm.sh</code> · <code>acceptance/run.sh</code> · <code>acceptance/selftest.sh</code> · <code>acceptance/story-1-7.sh</code> · <code>verify-task.sh</code> · <code>makefile.test.js</code> · <code>test-gates.sh</code> · <code>agent/{qa,lib}.sh</code></p>
+    <p><b>发布链路不经过任何脚本</b>：CI 推镜像 → ArgoCD 追 SHAtag → 滚 pod。这就是为什么 <code>deploy-release.sh</code> 可以安全退役。</p>
+  </div>
+</section>
+
+<!-- ========== 4 站点与部署 ========== -->
+<section>
+  <div class="sec-head"><span class="dot d-g"></span><h2>四、业务本体与部署</h2><span class="cnt">1.0G + 244K</span></div>
+  <div class="tbl">
+    <div class="row head"><div>位置</div><div>判定</div><div>状态</div></div>
+
+    <div class="row">
+      <div class="nm">webroot/<br><code>1.0 GB</code></div>
+      <div class="dsc">网站本体。<b>templates 422M</b>（火鸟自带多套模板）、<b>install 279M</b>（安装向导与默认数据）、<b>static 234M</b>（1.3 万张图）、include 71M、admin 23M、api 22M。
+        <div class="ev">外卖/骑手/商家/资讯全部业务逻辑在 api/ 与 include/；templates_c 3.7M 是编译缓存（已 gitignore）</div></div>
+      <div><span class="badge b-core">核心 · 勿动</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">webroot/install<br><code>279 MB</code></div>
+      <div class="dsc">安装向导 + 默认数据库脚本。<b>线上不需要已安装的站点再跑向导</b>，但 <code>db_structure.txt</code> / <code>db_default.txt</code> 被 <code>init-firebird-db.php</code> 依赖，不能整目录删。
+        <div class="ev">建议：保留两个 txt，其余安装包资源可移出运行时镜像</div></div>
+      <div><span class="badge b-idle">待优化</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">apps/tma<br><code>Vue Mini App</code></div>
+      <div class="dsc">10 个页面——首页、店铺、购物车、结算、地址、订单、订单详情、资讯、资讯详情、我的。<b>正好只覆盖「外卖 + 资讯」</b>，没有房产/招聘/二手。
+        <div class="ev">路由表 router.ts 可核对，无多余模块</div></div>
+      <div><span class="badge b-core">核心 · 勿动</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">deploy/<br><code>helm + docker + dev</code></div>
+      <div class="dsc">Helm Chart（含 API deployment、IngressRoute、PostSync 通知 Job）、4 个 Dockerfile、本地开发 nginx。<b>整条上线链路</b>。
+        <div class="ev">IngressRoute 定义 /tg-api 前缀路由，实测生效</div></div>
+      <div><span class="badge b-core">核心 · 勿动</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">backup_configs<br><code>7.2 MB</code></div>
+      <div class="dsc">56 个 .tgz + 30 个 .php + 16 个 .so，从线上 pod 拉下来的配置与扩展备份。<b>未入 git</b>，有回滚价值但不该混在代码库。
+        <div class="ev">建议移到仓库外单独存档，或放进 docs/archive</div></div>
+      <div><span class="badge b-idle">移出</span></div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <p><b>⚠ 发现一处安全风险（不在本次清理范围，但要告诉你）</b></p>
+    <p><code>deploy/k8s-mail-server.yaml:273-281</code> 里<b>明文写着 Telegram bot token 与 SMTP 密码</b>，并且这个文件是入库的。建议改成 Secret 引用，并轮换一次凭据。</p>
+  </div>
+</section>
+
+<!-- ========== 5 文档 ========== -->
+<section>
+  <div class="sec-head"><span class="dot d-y"></span><h2>五、文档</h2><span class="cnt">35 份 md</span></div>
+  <p class="sec-note">文档分三类：还在指导操作的、记录事故的、描述已停用流程的。第三类会误导人。</p>
+  <div class="tbl">
+    <div class="row head"><div>文档</div><div>判定</div><div>状态</div></div>
+
+    <div class="row">
+      <div class="nm">courier-registration.md<br>merchant/telegram-channel-operations.md<br>api/openapi.yaml</div>
+      <div class="dsc">骑手注册通道口径、商家频道运营、API 契约。<b>今天都还在更新</b>，openapi.yaml 是 CI 门禁的比对基准。
+        <div class="ev">2026-10-26 / 10-27 更新</div></div>
+      <div><span class="badge b-core">在用</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">TMA_UI.md · CHECKOUT.md<br>API_ROUTING_AND_CONFIG.md · RELEASE_FLOW.md<br>TEST_FIRST.md · NODE_TESTING.md · LOCAL_ACCEPT.md</div>
+      <div class="dsc">TG 客户端 UI、结算、路由配置、发布流程、测试规范。<b>与当前代码对得上</b>，是接手必需。
+        <div class="ev">10-20 ~ 10-26 更新</div></div>
+      <div><span class="badge b-core">在用</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">ARCHITECTURE.md · CODEBASE_STRUCTURE.md<br>REPO_MAP.md · WRITABLE_STATE.md</div>
+      <div class="dsc">仓库总览类。<b>内容已过期</b>：REPO_MAP 仍把 bmad-dashboard、dispatch-task.js、github-sync.js 列为在用；ARCHITECTURE 还提 Linear。
+        <div class="ev">10-08 / 10-10 / 10-16 之后未更新</div></div>
+      <div><span class="badge b-half">需更新</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">T6.1_IDOR_AUDIT.md<br>GATEWAY_SPIKE.md · CHAIN_LISTENER.md<br>PAYMENT_PLUGIN_SPEC.md · WAIMAI_PLUGIN_SPEC.md</div>
+      <div class="dsc">安全审计、支付网关调研、链上监听、插件规格。<b>有长期参考价值</b>，属技术决策依据。
+        <div class="ev">10-11 ~ 10-18</div></div>
+      <div><span class="badge b-live">存档保留</span></div>
+    </div>
+
+    <div class="row">
+      <div class="nm">patches/bmad-project-sync/README.md<br>OPENHANDS_CANVAS_POC.md<br>evidence/story-6.3/</div>
+      <div class="dsc">BMAD 补丁说明、OpenHands 画布验证、Story 6.3 的验收证据。<b>都是已停流程的遗留</b>，证据文件已无对应流程可查。
+        <div class="ev">随 BMAD 一起归档</div></div>
+      <div><span class="badge b-dead">归档</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 6 修复清单 ========== -->
+<section>
+  <div class="sec-head"><span class="dot d-r"></span><h2>六、这次审计挖出的真实缺陷</h2><span class="cnt">按优先级</span></div>
+  <p class="sec-note">不是清理问题，是会咬人的问题。建议按顺序修。</p>
+
+  <ol class="fix">
+    <li><span class="p0">P0</span><b>派单链硬编码 canary 域名</b>：<code>tg_dispatch_courier_flow</code> 的 8 个 HTTP 节点全写死 <code>canary.fbird.men</code>，<b>生产 manila 的订单永远进不了抢单池</b>。这是上线前必须改的。</li>
+    <li><span class="p0">P0</span><b>骑手桥 webhook 没有鉴权</b>：<code>fb-courier-bridge</code> 节点未配 authentication（同项目的 agent-event 节点用了 headerAuth），<b>任何人都能伪造 Telegram update 冒充任意骑手绑定</b>。</li>
+    <li><span class="p0">P0</span><b>n8n 静态数据存在被覆盖风险</b>：绑定表与回调 token 存在 n8n staticData，而仓库里 <code>n8nac-config.json</code> 配了 requireSyncBack，<b>一次 push 就能把线上 token 覆盖成空串</b>，<code>/reg</code> 全挂。</li>
+    <li><span class="p1">P1</span><b>verify-task.sh 静默丢覆盖率</b>：<code>:63</code> 列着已删的 <code>scripts/bmad/*</code>、<code>:94</code> 依赖不存在的 <code>test-api-db.sh</code>，两处都被 <code>|| continue</code> 吞掉，<b>DB 集成测试其实从没跑过</b>。</li>
+    <li><span class="p1">P1</span><b>lib.sh 的 bmad_stage 已断</b>：7 处调用每次都失败，只留日志噪声。删函数 + 删调用点即可。</li>
+    <li><span class="p1">P1</span><b>k8s-mail-server.yaml 明文凭据</b>：TG bot token 与 SMTP 密码直接写在入库的 yaml 里，建议改 Secret + 轮换。</li>
+    <li><span class="p1">P1</span><b>资讯供料的挂载不在版本控制</b>：<code>news_sync_schedule</code> 从 n8n 容器内 <code>require('/news-sync/...')</code>，这个挂载没写进 GitOps，<b>换镜像就断</b>。</li>
+    <li><span class="p2">P2</span><b>README 与看板文档断链</b>：README 仍教 <code>make agent-dev</code>（target 已删），<code>BACKLOG.md</code> 仍称由 dispatch-task.js 自动维护。</li>
+    <li><span class="p2">P2</span><b>生成器与 JSON 双源漂移</b>：<code>gen_tg_dispatch_courier_flow.py</code> 生成同一份工作流，改 JSON 不改 py 就会在下一次生成时被覆盖。</li>
+    <li><span class="p2">P2</span><b>local-accept 在干净 macOS 上会假红</b>：checks 第 13 行用 <code>md5sum</code>，缺 <code>md5 -q</code> 兜底。</li>
+  </ol>
+</section>
+
+<footer>
+  审计方式：代码引用追踪（CI / Makefile / Helm / 跨服务 grep）+ 线上探针实测 + git 活跃度<br>
+  已完成清理：PR #183（45 个冲突副本 + 270MB 安装包 + 两套自建流水线），归档在 docs/archive/
+</footer>
+
+</div>
+</body>
+</html>
