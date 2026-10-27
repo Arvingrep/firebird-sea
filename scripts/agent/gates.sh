@@ -117,7 +117,9 @@ fi
 # 增量与存量共用同一套锚定正则：只认「行首（允许缩进）的真实 PEM 头」，
 # 否则模板占位符（<REPLACE_ME...>）和生成 PEM 的代码（$res = "-----BEGIN ... \n"）都会被误判。
 SECRET_RE='^[+[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|^[+[:space:]]*"private_key"[[:space:]]*:|mnemonic|seed phrase|TRONGRID_API_KEY=[A-Za-z0-9]{8,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}'
-LEAK="$(git diff "$RANGE" | grep -E '^\+' | grep -iE "$SECRET_RE" || true)"
+# 排除本文件自身：检测器的正则字面量里必然写着 mnemonic / private_key 等模式词，
+# 不排除就会「门禁检出门禁自己在说密钥」，每轮都假 FAIL。
+LEAK="$(git diff "$RANGE" -- . ':(exclude)scripts/agent/gates.sh' | grep -E '^\+' | grep -iE "$SECRET_RE" || true)"
 [ -z "$LEAK" ] && row "无密钥泄漏（增量）" "✅ PASS" || row "无密钥泄漏（增量）" "❌ FAIL" "疑似私钥/Token 进入 diff"
 
 # 存量扫描用更严的正则：只认「行首（允许缩进）的真实 PEM 头」，
@@ -148,7 +150,9 @@ fi
 if [ -n "$STOCK_EXPIRED" ]; then
   row "密钥存量欠债" "❌ FAIL" "白名单已过期，必须完成轮换或重新评估：$(printf '%s' "$STOCK_EXPIRED" | head -c 200)"
 elif [ -n "$STOCK_DEBT" ]; then
-  row "密钥存量欠债" "⚠️ WARN" "已登记待轮换（到期即 FAIL）：$(printf '%s' "$STOCK_DEBT" | head -c 200)"
+  DEBT_N=$(printf '%s' "$STOCK_DEBT" | wc -w | tr -d ' ')
+  EARLIEST=$(printf '%s' "$STOCK_DEBT" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sort | head -1)
+  row "密钥存量欠债" "⚠️ WARN" "${DEBT_N} 项待轮换，最早到期 ${EARLIEST}（到期即 FAIL；清单见 .agents/secret-scan-allow.txt）"
 else
   row "密钥存量欠债" "✅ PASS" "无欠债"
 fi
