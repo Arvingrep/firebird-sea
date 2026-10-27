@@ -40,7 +40,11 @@
 
 | 东西 | 下线时间 | 原因 |
 |---|---|---|
-| `_bmad/`、`_bmad-output/`、BMAD 技能包、`bmad-*` workflow | 2026-10-27 | 流程已沉淀成真实代码，脚手架无用 |
+| `_bmad/`、`_bmad-output/`、BMAD 技能包（`.claude/skills/bmad-*` 29 个）、`bmad-*` workflow | 2026-10-27 | 流程已沉淀成真实代码，脚手架无用 |
+| `scripts/acceptance/`、`acceptance-runner.sh`、`agent/{dev,story}.sh`、`agent-run.sh` | 2026-10-27 | 施工侧 Agent 已下线；Story 验收体系依赖的脚本已不存在 |
+| `scripts/deploy-release.sh`（`make release`） | 2026-10-27 | 「假发布」：只 helm template + 打印成功卡片，不 apply、不推镜像、不触发 ArgoCD |
+| `scripts/mcp-acceptance-test.js`（`make test-mcp`） | 2026-10-27 | 断言的是已停用的 4 个废弃工作流必须 active，逻辑与现状相反，必然失败 |
+| `services/tg-bot/`、6 个断链 n8n 工作流 | 2026-10-27 | 目标系统均不存在 |
 | `agent-dev.yml`、`dispatch-task.js`、`hermes-accept.sh` | 2026-10-27 | 单线串行，已被多 Agent 直接开发取代 |
 | `services/tg-bot/` | 2026-10-27 | 三处全断（调已删脚本 + webhook 不存在 + 生产未部署） |
 | `tg_photo_menu_to_json` / `usdt_payment_alert` / `sentry_error_to_tg_ai_alert` / `tg_voice_to_linear_spec` / `arvino_github_issue_to_run` / `tg_to_github_issues_project` | 2026-10-27 | 目标系统均不存在，见 `automation/n8n/REGISTRY.md` |
@@ -75,8 +79,31 @@
 | 同步冲突副本：`xxx 2.md`、`xxx (1).py`、`xxx conflicted copy` | `repo-hygiene.sh` |
 | 临时目录：`.agent-runs/`、`backup_configs/`、`node_modules/`、`downloads/`、`.n8nac/` | `repo-hygiene.sh` |
 | 新增文件 > 5MB | `repo-hygiene.sh`（存量火鸟模板资产不追溯） |
-| 明文密钥 / token | `ci-verify.yml` 密钥门禁 |
+| 明文密钥 / token（增量 + 全仓 + 存量欠债三层） | `scripts/agent/gates.sh`（确定性门禁） |
 | n8n 工作流改了但没更新 `REGISTRY.md` | 人工 + Review |
+
+### 密钥欠债单
+
+「全仓扫到私钥就 FAIL」上线时仓库里已有一批存量密钥，硬堵会让所有 PR 变红、逼人加 `--no-verify`。所以留一个**带到期日的欠债单** `.agents/secret-scan-allow.txt`：
+
+```
+# 空格分隔，一行一笔
+<仓库相对路径>  <到期日 YYYY-MM-DD>  <原因 / 跟踪项>
+```
+
+规则是硬的：**到期日一过，门禁立刻 FAIL**；日期解析失败按「已过期」处理（宁严勿松）。这不是白名单，是还款计划 —— 加进去只是把「已泄漏」变成「已登记泄漏」，不算修好。
+
+### ⚠️ job 名 = 分支保护的必过检查名
+
+`ci-verify.yml` 里的 job `name` 同时就是分支保护 `required_status_checks` 里的字符串。改名会导致那个必过检查**永不上报**，所有 PR 变 `BLOCKED`，而 checks 页面全绿、看不出原因。
+
+改 job 名前先查、改完同步：
+
+```bash
+gh api repos/Arvingrep/firebird-sea/branches/main/protection/required_status_checks --jq '.contexts'
+```
+
+同理，凡是「配置里写死的名字」都要当心：这类漂移 workflow 里看不见、PR 上也没提示，只有 `gh pr view --json mergeStateStatus` 能暴露。
 
 ---
 
@@ -109,7 +136,7 @@
 
 ```bash
 bash scripts/repo-hygiene.sh          # 仓库卫生（新增文件是否合规）
-bash scripts/gates.sh                 # 业务门禁（diff / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
+bash scripts/agent/gates.sh           # 业务门禁（diff / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
 bash scripts/test-gates.sh            # 门禁自测（改了 scripts/ 或 .github/ 时必跑）
 node scripts/api-contract-check.js    # 改了 PHP 接口时必跑
 ```

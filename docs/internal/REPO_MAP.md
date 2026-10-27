@@ -38,9 +38,7 @@ firebird-sea/
 |---|---|
 | `services/api` | Node API：登录验签、收银台、汇率、（后续）对账与网关调用。路由前缀 `/tg-api` |
 | `services/payment-listener` | 链上 USDT 监听器（独立部署，副本数 1） |
-| `services/tg-bot` | Telegram 指挥机器人（开发者用，不是面向顾客的） |
-| `apps/tma` | Telegram Mini App 前端（目前只有 `package.json`） |
-| `apps/bmad-dashboard` | 任务看板的静态页面 |
+| `apps/tma` | Telegram Mini App 前端（Vue3 + Vite，10 个页面；9 个测试文件 / 101 用例，已接入 CI） |
 
 ### 3. 部署：`deploy/`
 | 目录 | 用途 | 谁用 |
@@ -48,7 +46,8 @@ firebird-sea/
 | `deploy/docker/` | **线上**镜像：`Dockerfile.web`、`Dockerfile.api`、`entrypoint-web.sh` | CI 构建、`make local-accept` |
 | `deploy/helm/` | **线上**站点编排（manila、cebu、canary 的 values） | ArgoCD |
 | `deploy/dev/` | **本地开发**用的 PHP 镜像与 nginx 配置 | 根目录 `docker-compose.yml` |
-| `deploy/k8s-mail-server.yaml` | 邮件中继的清单 | 手工应用 |
+| `deploy/mail-relay/` | 邮件中继（kustomize，凭据走 Secret） | ArgoCD `firebird-mail` |
+| `deploy/argocd/` | ArgoCD Application 定义（bootstrap 用） | 手工 apply 一次后由 ArgoCD 自管 |
 
 > 以前根目录的 `docker/` 现在是 `deploy/dev/`。它和 `deploy/docker/` 不同：本地开发环境不能用来验收，验收用 `make local-accept`。
 
@@ -75,11 +74,12 @@ firebird-sea/
 ## `scripts/` 速查（不挪位置，避免破坏 CI 与文档引用）
 | 类别 | 脚本 |
 |---|---|
-| 门禁与验收 | `agent/gates.sh`、`verify-task.sh`、`acceptance-runner.sh`、`test-helm.sh`、`dev-check.sh` |
+| 门禁与验收 | `agent/gates.sh`、`verify-task.sh`、`test-api-db.sh`、`test-gates.sh`、`test-helm.sh`、`dev-check.sh`、`repo-hygiene.sh` |
 | 安装与初始化 | `setup-base.sh`、`setup-n8n.sh`、`init-firebird-db.php`、`seed_*.py` |
-| 任务与看板 | `dispatch-task.js`、`bmad-spec-gen.js`、`github-sync.js`、`deploy-release.sh`、`clean-bloat.sh` |
-| 智能体与 MCP | `agent-run.sh`、`agent/*`、`hermes-accept.sh`、`mcp-*.js` |
-| 其他 | `test-coins-ph.js`、`mail-relay-server.js` |
+| 运维与清理 | `clean-bloat.sh`、`sync-config-from-pod.sh` |
+| 智能体 | `agent/{gates,lib,qa,setup-runner}.sh`（施工侧 dev/story 已于 2026-10-27 下线） |
+| 数据与种子 | `seed_*.py`、`init-firebird-db.php`、`sync_canary_modules.php` |
+| 其他 | `test-coins-ph.js`、`api-contract-check.js` |
 
 ## 三条规则
 1. **线上与本地分开**：`deploy/docker`、`deploy/helm` 是线上；`deploy/dev`、`docker-compose.yml` 是本地开发。
