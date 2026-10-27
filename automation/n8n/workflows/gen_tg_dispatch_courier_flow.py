@@ -98,7 +98,9 @@ if (cb && cb.message) {
     else out.route = 'help';
   }
 }
+out.eventToken = (($getWorkflowStaticData('global') || {}).config || {}).eventToken || '';
 return [{ json: out }];"""
+# eventToken 在 Code 节点里取（HTTP 节点表达式取不到 staticData），供 courierRegTg 服务间鉴权
 
 HELPERS = r"""function asBody(x) {
   // httpRequest responseFormat=text 会把响应包成 {data: "..."}；先解包再解析
@@ -289,7 +291,7 @@ nodes.append({"parameters": {
             {"name": "action", "value": "courierRegTg"}]},
         "sendBody": True, "contentType": "form-urlencoded",
         "bodyParameters": {"parameters": [
-            {"name": "token", "value": "={{ $getWorkflowStaticData('global').config.eventToken || '' }}"},
+            {"name": "token", "value": "={{ $json.eventToken || '' }}"},
             {"name": "chatid", "value": "={{ $json.chatId }}"},
             {"name": "name", "value": "={{ $json.name }}"},
             {"name": "password", "value": "={{ $json.password }}"},
