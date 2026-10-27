@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firebird 仓库功能盘点 · 取舍决策表</title>
+<style>
+:root{
+  --bg:#0d0f12; --card:#15181d; --card2:#1a1e24; --line:#252a32;
+  --ink:#e9ecf0; --ink2:#9aa4b0; --ink3:#6b7480;
+  --brand:#ff6b2c; --red:#ff5f56; --orange:#ff9f43; --yellow:#f5c451; --green:#35c88a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+  padding:0 0 96px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+/* header */
+header{padding:48px 0 28px;border-bottom:1px solid var(--line);margin-bottom:32px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);font-weight:600;margin-bottom:12px}
+h1{font-size:30px;line-height:1.25;font-weight:700;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--brand)}
+.lead{color:var(--ink2);margin-top:12px;font-size:15px;max-width:760px}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:28px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.stat b{display:block;font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+.stat span{font-size:12px;color:var(--ink3);display:block;margin-top:4px}
+.stat.red b{color:var(--red)} .stat.orange b{color:var(--orange)}
+.stat.yellow b{color:var(--yellow)} .stat.green b{color:var(--green)}
+
+/* section */
+section{margin-bottom:40px}
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.sec-head h2{font-size:19px;font-weight:650;letter-spacing:-.01em}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.d-red{background:var(--red)} .d-orange{background:var(--orange)}
+.d-yellow{background:var(--yellow)} .d-green{background:var(--green)}
+.sec-note{color:var(--ink3);font-size:13px;margin:6px 0 16px;padding-left:21px}
+
+/* table */
+.tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:grid;grid-template-columns:38px 1fr 150px 118px;gap:12px;align-items:start;
+  padding:14px 18px;border-top:1px solid var(--line)}
+.row:first-child{border-top:none}
+.row.head{background:var(--card2);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:10px 18px}
+.row:hover:not(.head){background:#181c22}
+.row.checked{background:#1b2320}
+.row.checked .name{color:var(--green)}
+input[type=checkbox]{
+  appearance:none;width:18px;height:18px;border:1.5px solid #3a424d;border-radius:5px;
+  cursor:pointer;margin-top:3px;position:relative;flex:none;background:transparent;transition:.15s}
+input[type=checkbox]:hover{border-color:var(--brand)}
+input[type=checkbox]:checked{background:var(--brand);border-color:var(--brand)}
+input[type=checkbox]:checked::after{
+  content:"";position:absolute;left:5px;top:1.5px;width:5px;height:10px;
+  border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.name{font-weight:600;font-size:13.5px;word-break:break-all}
+.path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--ink3);
+  margin-top:3px;word-break:break-all}
+.desc{font-size:12.5px;color:var(--ink2);margin-top:5px;line-height:1.55}
+.tag{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:5px;margin-right:5px;
+  vertical-align:1px;font-weight:600}
+.t-keep{background:rgba(53,200,138,.14);color:var(--green)}
+.t-arch{background:rgba(245,196,81,.14);color:var(--yellow)}
+.t-del{background:rgba(255,95,86,.14);color:var(--red)}
+.t-ask{background:rgba(255,159,67,.14);color:var(--orange)}
+.meta{font-size:11.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.meta b{display:block;color:var(--ink2);font-weight:600;font-size:12px}
+.why{font-size:11.5px;color:var(--ink3);line-height:1.5}
+.why b{color:var(--orange);font-weight:600}
+
+/* callout */
+.callout{background:rgba(255,107,44,.07);border:1px solid rgba(255,107,44,.28);
+  border-radius:12px;padding:16px 18px;margin:16px 0 0;font-size:13px;color:var(--ink2);line-height:1.65}
+.callout b{color:var(--brand)}
+.callout.warn{background:rgba(245,196,81,.06);border-color:rgba(245,196,81,.25)}
+.callout.warn b{color:var(--yellow)}
+
+/* footer bar */
+.bar{
+  position:fixed;left:0;right:0;bottom:0;background:rgba(16,19,24,.94);
+  backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:14px 0;z-index:10}
+.bar-in{max-width:1120px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.bar-txt{font-size:13px;color:var(--ink2)}
+.bar-txt b{color:var(--ink);font-size:15px}
+.bar-txt .rel{color:var(--green);font-weight:600}
+button{
+  font:inherit;font-size:13px;font-weight:600;border-radius:9px;padding:9px 16px;
+  border:1px solid var(--line);background:var(--card2);color:var(--ink);cursor:pointer;transition:.15s}
+button:hover{border-color:#3a424d;background:#22272f}
+button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+button.primary:hover{background:#ff7d45}
+.spacer{flex:1}
+footer{color:var(--ink3);font-size:12px;text-align:center;padding:40px 0 0;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Repo Inventory · 2026-10-27</div>
+  <h1>火鸟仓库功能盘点：<em>哪些留，哪些砍</em></h1>
+  <p class="lead">
+    按「决策优先级」从砍到留排列。每项都标了最后活跃时间和判定依据，勾选你要处理的，底部会算出能释放多少空间并生成清单。
+  </p>
+  <div class="stats">
+    <div class="stat red"><b>45</b><span>重复副本文件（0 风险可删）</span></div>
+    <div class="stat orange"><b>2 套</b><span>已停摆的自建 AI 开发流水线</span></div>
+    <div class="stat yellow"><b>5 项</b><span>待定，取决于下一步走哪条路</span></div>
+    <div class="stat green"><b>9 项</b><span>业务核心，必须保留</span></div>
+  </div>
+</header>
+
+<!-- ============ 一 ============ -->
+<section>
+  <div class="sec-head"><span class="dot d-red"></span><h2>一、纯垃圾 · 同步冲突副本</h2></div>
+  <p class="sec-note">同一文件被云盘同步工具复制成 <code>xxx 2</code>、<code>xxx 3</code>…，共 45 份。删掉零影响，只是减少认知噪音。</p>
+  <div class="tbl">
+    <div class="row head"><div></div><div>对象</div><div>数量 / 体积</div><div>处理</div></div>
+
+    <div class="row" data-name="根目录 AGENTS / n8nac-config 副本" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>根目录配置副本</div>
+        <div class="path">AGENTS 2.md / 3.md / 4.md、n8nac-config 2.json ~ 12.json</div>
+        <div class="desc">AGENTS.md 与 n8nac-config.json 的多份复制品。正本 <code>AGENTS.md</code>、<code>n8nac-config.json</code> 保留。</div></div>
+      <div class="meta"><b>14 个文件</b>约 12 KB</div>
+      <div class="why">同步工具冲突产物，无任何引用</div>
+    </div>
+
+    <div class="row" data-name="scripts/makefile.test 副本" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>makefile.test 副本</div>
+        <div class="path">scripts/makefile.test 2.js ~ 17.js</div>
+        <div class="desc">同一测试脚本的 16 份复制。正本 <code>scripts/makefile.test.js</code> 保留。</div></div>
+      <div class="meta"><b>16 个文件</b>约 30 KB</div>
+      <div class="why">副本之间内容一致，保留正本即可</div>
+    </div>
+
+    <div class="row" data-name="n8n-architect agent 副本" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>n8n-architect 智能体副本</div>
+        <div class="path">.github/agents/n8n-architect.agent 2.md ~ 8.md</div>
+        <div class="desc">同一个 n8n 架构师 agent 定义被复制 8 份。正本 <code>n8n-architect.agent.md</code> 保留（写 n8n 工作流时有用）。</div></div>
+      <div class="meta"><b>7 个文件</b>约 60 KB</div>
+      <div class="why">只保留 1 份正本，其余无用</div>
+    </div>
+
+    <div class="row" data-name="n8n workflows tsconfig / d.ts 副本" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>n8n 工程配置副本</div>
+        <div class="path">automation/n8n/workflows/tsconfig 2~6.json、n8n-workflows.d 2~4.ts</div>
+        <div class="desc">TypeScript 配置与类型声明的复制品。正本 tsconfig.json / n8n-workflows.d.ts 保留。</div></div>
+      <div class="meta"><b>8 个文件</b>约 20 KB</div>
+      <div class="why">n8nac 生成物，副本无意义</div>
+    </div>
+
+    <div class="row" data-name="Python 缓存" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>Python 字节码缓存</div>
+        <div class="path">scripts/__pycache__/</div>
+        <div class="desc">运行 Python 脚本产生的临时缓存，应加入 .gitignore。</div></div>
+      <div class="meta"><b>目录</b>可自动重建</div>
+      <div class="why">构建产物，不该入版本库</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 二 ============ -->
+<section>
+  <div class="sec-head"><span class="dot d-red"></span><h2>二、废弃产物 · 删了省空间</h2></div>
+  <p class="sec-note">已经完成使命或已被替代的东西，保留只占体积。</p>
+  <div class="tbl">
+    <div class="row head"><div></div><div>对象</div><div>体积</div><div>处理</div></div>
+
+    <div class="row" data-name="downloads/huoniao_install.zip 火鸟安装包" data-size="270">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>火鸟安装包</div>
+        <div class="path">downloads/huoniao_install.zip</div>
+        <div class="desc">283 MB 的原始安装包，早已解压进 <code>webroot/</code> 并在线上运行。已写在 .gitignore。<b>整个仓库最大的单个体积项。</b></div></div>
+      <div class="meta"><b>270 MB</b>单文件</div>
+      <div class="why">源码已在 webroot，安装包无保留价值</div>
+    </div>
+
+    <div class="row" data-name="apps/bmad-dashboard BMAD 看板" data-size="1">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>BMAD 看板应用</div>
+        <div class="path">apps/bmad-dashboard/</div>
+        <div class="desc">静态 HTML 看板 + board-data.json。<b>最后提交 10-10，停了 17 天。</b>已被 WorkBuddy 的任务列表取代。</div></div>
+      <div class="meta"><b>约 1 MB</b>停摆 17 天</div>
+      <div class="why">看板数据早已过期，且功能重复</div>
+    </div>
+
+    <div class="row" data-name="backup_configs 配置备份" data-size="7">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-arch">移出仓库</span>线上配置备份</div>
+        <div class="path">backup_configs/</div>
+        <div class="desc">56 个 .tgz、30 个 .php、16 个 .so —— 线上 pull 下来的配置与扩展备份。<b>未纳入 git。</b>建议移到仓库外单独存档。</div></div>
+      <div class="meta"><b>7.2 MB</b>125 个文件</div>
+      <div class="why">有回滚价值，但不该混在代码库里</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 三 ============ -->
+<section>
+  <div class="sec-head"><span class="dot d-orange"></span><h2>三、过时 · 自建 AI 开发流水线</h2></div>
+  <p class="sec-note">
+    你问的重点。这两套是用来「让 AI 自动完成开发」的，都建立在「用 GitHub Issue / Project 当任务总线 + 脚本派单」的思路。现在有了多 Agent 并行的开发团队，任务编排在会话里直接完成，这套脚手架的维护成本已经大于收益。
+  </p>
+
+  <div class="callout warn">
+    <b>先划清一条线：</b><code>scripts/verify-task.sh</code>、<code>api-contract-check.js</code>、<code>test-gates.sh</code> <b>不能删</b>——它们被 CI 引用，是当前部署前的门禁检查。过时的是「派单/排期/看板同步」那一层，不是质量门禁。
+  </div>
+
+  <div class="tbl" style="margin-top:16px">
+    <div class="row head"><div></div><div>对象</div><div>最后活跃</div><div>处理</div></div>
+
+    <div class="row" data-name="_bmad BMAD 方法论核心" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-arch">归档</span>BMAD 方法论框架</div>
+        <div class="path">_bmad/ （bmm / core / render / scripts / config）</div>
+        <div class="desc">一整套「PRD → 故事 → 冲刺 → 实现」的方法论脚手架，含模板、脚本、渲染器。160 KB。</div></div>
+      <div class="meta"><b>10-16</b>停 11 天</div>
+      <div class="why">方法论本身没错，但<b>靠文档驱动排期</b>这件事已被会话内的任务编排取代</div>
+    </div>
+
+    <div class="row" data-name="_bmad-output BMAD 产物" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-arch">归档</span>BMAD 规划与实现产物</div>
+        <div class="path">_bmad-output/planning-artifacts、implementation-artifacts</div>
+        <div class="desc">按 BMAD 流程生成的规划稿与实现记录，124 KB。<b>里面可能有当时的需求描述，建议先扫一眼再归档。</b></div></div>
+      <div class="meta"><b>10-23</b>停 4 天</div>
+      <div class="why">产物有史料价值，流程本身已停用</div>
+    </div>
+
+    <div class="row" data-name="BMAD 技能包" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>BMAD 技能包</div>
+        <div class="path">.agents/skills/bmad-prd/、bmad-customize/ 等</div>
+        <div class="desc">给 AI 用的 PRD 生成、规格校验技能，带模板与校验清单。</div></div>
+      <div class="meta"><b>随 BMAD 停用</b></div>
+      <div class="why">依赖 _bmad 才能跑，一起下线</div>
+    </div>
+
+    <div class="row" data-name="BMAD 三条 GitHub 自动化" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>BMAD 自动化工作流</div>
+        <div class="path">.github/workflows/bmad-approve.yml、bmad-sprint-writeback.yml、bmad-project-sync.yml</div>
+        <div class="desc">审批、冲刺回写、项目看板同步三条流水线。<b>保留 ci-gke.yml、ci-verify.yml 两条真正的构建门禁。</b></div></div>
+      <div class="meta"><b>3 条 workflow</b></div>
+      <div class="why">没内容在跑，触发只会失败或空转</div>
+    </div>
+
+    <div class="row" data-name="BMAD 规格生成与 GitHub 同步脚本" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>BMAD 生成/同步脚本</div>
+        <div class="path">scripts/bmad-spec-gen.js、scripts/github-sync.js</div>
+        <div class="desc">规格生成器与 GitHub Project 同步器。只被上面那三条已停用的 workflow 和 Makefile 引用。</div></div>
+      <div class="meta"><b>2 个脚本</b></div>
+      <div class="why">随 workflow 一起下线</div>
+    </div>
+
+    <div class="row" data-name="自建 agent 派单流水线" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-del">删</span>自建 Agent 派单与验收</div>
+        <div class="path">.github/workflows/agent-dev.yml、scripts/agent-run.sh、scripts/dispatch-task.js、scripts/hermes-accept.sh</div>
+        <div class="desc">「派任务给 AI → 自动开发 → 自动验收」的自建流水线。<b>这正是现在多 Agent 开发团队直接覆盖的能力</b>，而且自建版是单线串行、无法并行。</div></div>
+      <div class="meta"><b>1 workflow + 3 脚本</b></div>
+      <div class="why">能力重复且更弱，维护它是纯成本</div>
+    </div>
+
+    <div class="row" data-name="BMAD 相关文档" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-arch">归档</span>BMAD 与 Agent 流水线文档</div>
+        <div class="path">docs/internal/BMAD_SETUP.md、BMAD_BOARD.md、BMAD_PIPELINE.md、BMAD_ROADMAP_SCHEDULE.md、BMAD_AUTOMATION_PIPELINE_ARCHITECTURE.md、AGENT_PIPELINE.md</div>
+        <div class="desc">6 份描述已停用流程的文档。</div></div>
+      <div class="meta"><b>6 份 md</b></div>
+      <div class="why">留着会误导后来的人以为还在用</div>
+    </div>
+
+    <div class="row" data-name=".agents 派单目录" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-ask">部分保留</span>.agents 工作目录</div>
+        <div class="path">.agents/tasks/、.agents/RULES.md、.agents/ACCEPTANCE_GATE.md、.agents/prompts/</div>
+        <div class="desc">派单任务卡与验收规则。<b>但其中 <code>prompts/dispatch-courier-telegram-flow.md</code> 和 <code>payment-state-machine.md</code> 是真实的业务架构文档，要单独留下。</b></div></div>
+      <div class="meta"><b>混合内容</b></div>
+      <div class="why">先挑出业务文档，剩下的再归档</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 四 ============ -->
+<section>
+  <div class="sec-head"><span class="dot d-yellow"></span><h2>四、待定 · 取决于你下一步走哪条路</h2></div>
+  <p class="sec-note">这些不是垃圾，但现在用不上。你定了方向我再决定删还是留。</p>
+  <div class="tbl">
+    <div class="row head"><div></div><div>对象</div><div>最后活跃</div><div>判断</div></div>
+
+    <div class="row" data-name="services/news-sync 资讯同步服务" data-size="1">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-ask">待定</span>资讯同步服务</div>
+        <div class="path">services/news-sync/</div>
+        <div class="desc">把门户文章同步到外卖端的服务，带 e2e 测试。<b>你要上「资讯模块」，这个可能直接复活。</b>但目前 canary 库资讯数据是 0 条。</div></div>
+      <div class="meta"><b>10-10</b>停 17 天</div>
+      <div class="why">资讯上线就靠它，先别删</div>
+    </div>
+
+    <div class="row" data-name="services/payment-listener 链上支付监听" data-size="1">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-ask">待定</span>链上支付监听</div>
+        <div class="path">services/payment-listener/</div>
+        <div class="desc">USDT/链上转账的到账监听 + 流水账本。<b>外卖只做货到付款（COD）的话，这套暂时用不上。</b></div></div>
+      <div class="meta"><b>10-17</b>停 10 天</div>
+      <div class="why">与外卖 MVP 无关，但不影响留着</div>
+    </div>
+
+    <div class="row" data-name="services/tg-bot 自建 TG bot" data-size="1">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-ask">待确认</span>自建 TG Bot 服务</div>
+        <div class="path">services/tg-bot/</div>
+        <div class="desc">Node 版 bot 服务。<b>但线上 bot 的 webhook 实际指向 n8n</b>（<code>n8n.k8shome.com/webhook/...</code>），这个服务疑似已被 n8n 方案替代、未在运行。</div></div>
+      <div class="meta"><b>10-09</b>停 18 天</div>
+      <div class="why">需要确认线上是否还调用它，否则可删</div>
+    </div>
+
+    <div class="row" data-name="ph-tg-delivery 菲律宾调研" data-size="0">
+      <input type="checkbox" checked>
+      <div><div class="name"><span class="tag t-arch">归档</span>菲律宾市场调研包</div>
+        <div class="path">ph-tg-delivery/（技术调研报告、产品路线图、用户故事、菜单解析原型）</div>
+        <div class="desc">4 份 HTML 报告 + menu_parser.py。调研结论（Xendit 分账、Lalamove 物流、合规路径）已过决策期，<b>但里面有些判断以后还会用</b>。</div></div>
+      <div class="meta"><b>100 KB</b>未入 git</div>
+      <div class="why">归档到 docs/archive 或移出仓库</div>
+    </div>
+
+    <div class="row" data-name="license 授权文件" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-keep">留</span>授权文件</div>
+        <div class="path">license/</div>
+        <div class="desc">火鸟框架的授权验证代码，站点运行依赖。</div></div>
+      <div class="meta"><b>4 KB</b></div>
+      <div class="why">删了站点可能跑不起来</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 五 ============ -->
+<section>
+  <div class="sec-head"><span class="dot d-green"></span><h2>五、核心资产 · 别碰</h2></div>
+  <p class="sec-note">业务本体与部署链路，今天都还在更新。</p>
+  <div class="tbl">
+    <div class="row head"><div></div><div>对象</div><div>体积 / 活跃</div><div>作用</div></div>
+
+    <div class="row" data-name="webroot 火鸟主站" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-keep">核心</span>火鸟主站</div>
+        <div class="path">webroot/</div>
+        <div class="desc">H5 站、管理后台、PHP API、模板与 1.3 万张静态图。外卖下单、骑手、商家、资讯的<b>全部真实业务逻辑</b>都在这里。</div></div>
+      <div class="meta"><b>1.0 GB</b>今天活跃</div>
+      <div class="why">整个业务的根，任何清理都要绕开</div>
+    </div>
+
+    <div class="row" data-name="apps/tma Telegram 客户端" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-keep">核心</span>Telegram 客户端</div>
+        <div class="path">apps/tma/</div>
+        <div class="desc">Vue Mini App，10 个页面正好只覆盖<b>外卖 + 资讯 + 订单/购物车/我的</b>，没有房产招聘二手等多余模块。就是你要的那个「TG 客户端」。</div></div>
+      <div class="meta"><b>今天活跃</b></div>
+      <div class="why">这条产品线的唯一前端</div>
+    </div>
+
+    <div class="row" data-name="services/api Node API 与迁移" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-keep">核心</span>Node API 层</div>
+        <div class="path">services/api/（src、migrations、test）</div>
+        <div class="desc">TG 客户端走 <code>/tg-api</code>，这一层做 Telegram initData 鉴权、令牌换发、上游转发。</div></div>
+      <div class="meta"><b>10-26</b>活跃</div>
+      <div class="why">TG 客户端能不能登录全靠它</div>
+    </div>
+
+    <div class="row" data-name="deploy 部署链路" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-keep">核心</span>部署与编排</div>
+        <div class="path">deploy/（k8s yaml、nginx、证书、entrypoint）</div>
+        <div class="desc">你说的「DevOps 自动部署文档」就是这套。包括 FPM worker 环境变量那条踩坑修复。</div></div>
+      <div class="meta"><b>244 KB</b>10-26</div>
+      <div class="why">上线就靠它，动一下全站挂</div>
+    </div>
+
+    <div class="row" data-name="automation/n8n 业务自动化" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-keep">核心</span>业务自动化</div>
+        <div class="path">automation/n8n/workflows/</div>
+        <div class="desc">骑手派单链（37 节点）、资讯同步、Sentry 告警、TG 事件桥、菜单图片解析。<b>这些是业务在跑的东西，不是开发脚手架。</b></div></div>
+      <div class="meta"><b>212 KB</b>今天活跃</div>
+      <div class="why">派单通知链已经验收过真实送达</div>
+    </div>
+
+    <div class="row" data-name="CI 门禁与契约测试" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-keep">核心</span>CI 构建与门禁</div>
+        <div class="path">.github/workflows/ci-gke.yml、ci-verify.yml、scripts/verify-task.sh、api-contract-check.js、test-gates.sh、docs/api/openapi.yaml</div>
+        <div class="desc">构建镜像 → 推 GAR → ArgoCD 滚动；改 API 必须同步契约。<b>和上面那套过时的派单流水线不是一回事，这个要留。</b></div></div>
+      <div class="meta"><b>今天在用</b></div>
+      <div class="why">删了就没法安全发布</div>
+    </div>
+
+    <div class="row" data-name="业务文档" data-size="0">
+      <input type="checkbox">
+      <div><div class="name"><span class="tag t-keep">核心</span>业务与架构文档</div>
+        <div class="path">docs/（courier-registration.md、merchant/、internal/ARCHITECTURE.md、CHECKOUT.md、LOCALIZATION_PH.md 等）</div>
+        <div class="desc">骑手注册通道、商家频道、结算、菲律宾本地化口径。<b>只挑掉 BMAD_* 与 AGENT_PIPELINE 那 6 份即可。</b></div></div>
+      <div class="meta"><b>352 KB</b>今天活跃</div>
+      <div class="why">新人接手和口径对齐的依据</div>
+    </div>
+  </div>
+</section>
+
+<div class="callout">
+  <b>一句话结论：</b>仓库里真正「过时该砍」的是两套自建 AI 开发流水线（BMAD 那套 7 项 + 自建 Agent 派单 4 项），加上 45 个同步冲突副本和一个 270 MB 的旧安装包。<b>业务本体（webroot / apps/tma / services/api / deploy / automation / CI）全部在今天还在更新，一条都不能删。</b>
+</div>
+
+<footer>
+  统计口径：git 最后提交时间 · 目录体积 · 引用关系扫描（CI / Makefile / package.json）<br>
+  生成于 2026-10-27 · 勾选后点右下角复制清单发给我，我按你的选择执行
+</footer>
+
+</div>
+
+<div class="bar">
+  <div class="bar-in">
+    <div class="bar-txt">已勾选 <b id="cnt">0</b> 项 · 可释放 <span class="rel" id="rel">0 MB</span></div>
+    <div class="spacer"></div>
+    <button id="copy" class="primary">复制勾选清单</button>
+    <button id="reset">重置</button>
+  </div>
+</div>
+
+<script>
+const rows = [...document.querySelectorAll('.row:not(.head)')];
+const boxes = rows.map(r => r.querySelector('input[type=checkbox]')).filter(Boolean);
+const cntEl = document.getElementById('cnt');
+const relEl = document.getElementById('rel');
+
+function update(){
+  let n = 0, size = 0;
+  boxes.forEach(b => {
+    const row = b.closest('.row');
+    row.classList.toggle('checked', b.checked);
+    if (b.checked) { n++; size += Number(row.dataset.size || 0); }
+  });
+  cntEl.textContent = n;
+  relEl.textContent = size >= 1024 ? (size/1024).toFixed(1) + ' GB' : size + ' MB';
+}
+
+boxes.forEach(b => b.addEventListener('change', update));
+update();
+
+document.getElementById('reset').addEventListener('click', () => {
+  boxes.forEach(b => b.checked = false);
+  update();
+});
+
+document.getElementById('copy').addEventListener('click', async () => {
+  const picked = rows.filter(r => r.querySelector('input[type=checkbox]')?.checked)
+                     .map(r => '· ' + r.dataset.name);
+  const text = '我要处理以下项目：\n' + picked.join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById('copy');
+    const old = btn.textContent;
+    btn.textContent = '已复制 ✓';
+    setTimeout(() => btn.textContent = old, 1600);
+  } catch {
+    alert(text);
+  }
+});
+</script>
+</body>
+</html>
