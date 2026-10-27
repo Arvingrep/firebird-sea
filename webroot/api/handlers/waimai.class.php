@@ -7124,6 +7124,92 @@ class waimai
     }
 
     /**
+     * 骑手 H5 快捷登录：签发一次性登录令牌（供 n8n 调度桥推送 TG 卡片时携带，
+     * 骑手点击即免密进入 H5 工作台；令牌 HMAC 签名 + 10 分钟有效，无状态）
+     * */
+    public function courierQlToken()
+    {
+        global $dsql;
+        $cfgfile = HUONIAOINC . "/config/fbird.inc.php";
+        if (!file_exists($cfgfile)) {
+            return array('state' => 200, 'info' => '桥接配置缺失');
+        }
+        include $cfgfile;
+        if (!isset($fb_bridge_token) || $fb_bridge_token == '' || $this->param['token'] !== $fb_bridge_token) {
+            return array('state' => 200, 'info' => '无权调用');
+        }
+
+        $did    = (int)$this->param['did'];
+        $chatid = trim($this->param['chatid']);
+        $target = trim($this->param['target']) != '' ? trim($this->param['target']) : 'index';
+        $oid    = (int)$this->param['oid'];
+
+        // 定位骑手：优先 did，否则按 tg<chatid> 用户名反查
+        if ($did > 0) {
+            $where = "`id` = '$did'";
+        } elseif (preg_match('/^-?\d{4,20}$/', $chatid)) {
+            $where = "`username` = 'tg" . preg_replace('/[^0-9]/', '', $chatid) . "'";
+        } else {
+            return array('state' => 200, 'info' => '缺少骑手标识');
+        }
+        $sql = $dsql->SetQuery("SELECT `id`, `status`, `quit` FROM `#@__waimai_courier` WHERE $where LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if (!$ret || (int)$ret[0]['quit'] == 1 || (int)$ret[0]['status'] != 1) {
+            return array('state' => 200, 'info' => '骑手不存在或状态不可用');
+        }
+        $did = (int)$ret[0]['id'];
+
+        if (!in_array($target, array('index', 'history', 'detail'))) $target = 'index';
+        $exp  = time() + 600;
+        $raw  = $did . '.' . $exp . '.' . $target . '.' . $oid;
+        $b64  = rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+        $sig  = hash_hmac('sha256', $b64, $fb_bridge_token);
+        global $cfg_secureAccess, $cfg_basehost;
+        $url = $cfg_secureAccess . $cfg_basehost . "/ql.html?token=" . $b64 . '.' . $sig;
+        return array('state' => 100, 'info' => 'ok', 'url' => $url, 'did' => $did);
+    }
+
+    /**
+     * 骑手 H5 快捷登录：校验令牌并种骑手 cookie（浏览器直接访问，无需桥接 token）
+     * */
+    public function courierQl()
+    {
+        global $dsql;
+        $cfgfile = HUONIAOINC . "/config/fbird.inc.php";
+        if (!file_exists($cfgfile)) {
+            return array('state' => 200, 'info' => '桥接配置缺失');
+        }
+        include $cfgfile;
+        $token = trim($this->param['token']);
+        if ($fb_bridge_token == '' || !preg_match('/^([A-Za-z0-9\-_]+)\.([0-9a-f]{64})$/', $token, $m)) {
+            return array('state' => 200, 'info' => '令牌不合法');
+        }
+        $sig = hash_hmac('sha256', $m[1], $fb_bridge_token);
+        if (!hash_equals($sig, $m[2])) {
+            return array('state' => 200, 'info' => '令牌校验失败');
+        }
+        $raw = base64_decode(strtr($m[1], '-_', '+/'));
+        $p   = explode('.', $raw);
+        if (count($p) != 4 || !preg_match('/^\d+$/', $p[0]) || !preg_match('/^\d+$/', $p[1]) || (int)$p[1] < time()) {
+            return array('state' => 200, 'info' => '令牌已过期，请从 Telegram 重新获取');
+        }
+        $did    = (int)$p[0];
+        $target = in_array($p[2], array('index', 'history', 'detail')) ? $p[2] : 'index';
+        $oid    = (int)$p[3];
+
+        $sql = $dsql->SetQuery("SELECT `id`, `status`, `quit` FROM `#@__waimai_courier` WHERE `id` = '$did' LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if (!$ret || (int)$ret[0]['quit'] == 1 || (int)$ret[0]['status'] != 1) {
+            return array('state' => 200, 'info' => '骑手不存在或状态不可用');
+        }
+
+        PutCookie("courier", $did, 24 * 60 * 60 * 7, "/");
+        $tpl = array('index' => 'index', 'history' => 'history', 'detail' => 'detail');
+        $jump = "/?service=waimai&do=courier&template=" . $tpl[$target] . ($target == 'detail' && $oid > 0 ? '&id=' . $oid : '');
+        return array('state' => 100, 'info' => '登录成功', 'did' => $did, 'jump' => $jump);
+    }
+
+    /**
      * 配送员修改密码
      * */
     public function courierEditpwsphone()
