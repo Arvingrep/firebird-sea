@@ -420,7 +420,7 @@ workflow = {
 
 path = "automation/n8n/workflows/tg_dispatch_courier_flow.json"
 with open(path, "w", encoding="utf-8") as f:
-    json.dump(workflow, f, ensure_ascii=False, indent=2)
+    json.dump(workflow, f, ensure_ascii=False, separators=(",", ":"))  # 单行紧凑格式，与仓库其他工作流一致
 
 # 校验：JSON 合法、连接引用完整、表达式括号配对、代码节点过 node --check
 d = json.load(open(path, encoding="utf-8"))
