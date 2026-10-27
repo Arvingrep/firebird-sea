@@ -283,29 +283,28 @@ const bindings = sd.bindings || {};
 return Object.entries(bindings).map(([chatId, b]) => ({ json: { chatId: Number(chatId), did: b.did } }));"""
 
 MYDIFF_JS = HELPERS + r"""// 轮询各骑手进行中订单（state=4,5），与 pushed 差集后输出新任务（含签发快捷登录令牌所需参数）
+// 注意：courierOrderList 列表行不含 peisongid，与「展开全部绑定」按 item 顺序一一配对（HTTP 逐项执行）
 const sd = $getWorkflowStaticData('global');
 const cfg = sd.config || {};
 sd.pushed = sd.pushed || {};
 const now = Date.now();
 for (const [k, v] of Object.entries(sd.pushed)) { if (now - v > 3 * 86400000) delete sd.pushed[k]; }
-const bindByDid = {};
-for (const [chatId, b] of Object.entries(sd.bindings || {})) bindByDid[String(b.did)] = Number(chatId);
+const srcs = $('展开全部绑定').all();
+const ins = $input.all();
 const items = [];
-for (const it of $input.all()) {
-  const r = asBody(it.json);
+for (let i = 0; i < ins.length; i++) {
+  const src = (srcs[i] || {}).json || {};
+  const r = asBody(ins[i].json);
   for (const o of rowsOf(r)) {
     if (!o || o.id == null || sd.pushed['a' + o.id]) continue;
-    const did = String(o.peisongid || '');
-    const chatId = bindByDid[did];
-    if (!chatId) continue;
     sd.pushed['a' + o.id] = now;
-    items.push({ json: { chatId, did: Number(did), oid: o.id, eventToken: cfg.eventToken || '' } });
+    items.push({ json: { chatId: src.chatId, did: Number(src.did), oid: o.id, eventToken: cfg.eventToken || '' } });
   }
 }
 return items;"""
 
 TASK_CARD_JS = HELPERS + r"""// 签发一键进入 H5 的快捷登录链接（courierQlToken，10 分钟有效），组装任务卡
-const src = $input.item.json;
+const src = $('新任务差集').item.json;
 const r = asBody($json);
 if (!(r && r.state === 100 && r.url)) return [];
 return [{ json: {
