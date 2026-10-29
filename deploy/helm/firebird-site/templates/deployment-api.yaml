@@ -46,6 +46,17 @@ spec:
               value: "{{ .Values.tma.trustProxyHops | default 1 }}"
             - name: CORS_ORIGINS
               value: "{{ range $i, $h := .Values.ingress.hosts }}{{ if $i }},{{ end }}https://{{ $h.host }}{{ end }}"
+            {{- /* 登录桥（TAPD 0002）：明文配置，无密钥。缺任一变量桥端点即 503（fail-closed）。
+                   forceSecure 用 hasKey 判定，因为 | default 会把显式 false 当空值而误取 true。 */}}
+            {{- $bridge := .Values.tma.bridge | default dict }}
+            - name: TMA_BRIDGE_COOKIE_DOMAIN
+              value: "{{ $bridge.cookieDomain | default (index .Values.ingress.hosts 0).host }}"
+            - name: TMA_BRIDGE_COOKIE_MAX_AGE
+              value: "{{ $bridge.cookieMaxAge | default 86400 }}"
+            - name: TMA_BRIDGE_TARGET_DEFAULT
+              value: "{{ $bridge.targetDefault | default "/" }}"
+            - name: TMA_BRIDGE_FORCE_SECURE
+              value: "{{ if hasKey $bridge "forceSecure" }}{{ $bridge.forceSecure }}{{ else }}true{{ end }}"
             - name: DB_HOST
               value: "{{ .Values.database.host }}"
             - name: DB_PORT

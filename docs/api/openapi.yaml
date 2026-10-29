@@ -83,6 +83,43 @@ paths:
         '200': { description: 已吊销 }
         '401': { description: 无令牌或已失效 }
         '503': { description: 鉴权模块未配置 }
+  /tg-api/auth/bridge:
+    get:
+      summary: 登录桥落地页（TAPD 0002）
+      description: |
+        Telegram 内打开的内联 HTML：加载 telegram-web-app.js，取 `Telegram.WebApp.initData`
+        后以真实表单 POST（非 fetch）提交到本路径，字段 `initData`，另带隐藏字段 `to`（目标页）。
+        无 initData（非 TG 环境）显示提示不提交。响应自带 CSP（script-src 限自身与 telegram.org + nonce、
+        frame-ancestors 限 Telegram 域）与 `Cache-Control: no-store`。配置缺失返回 503。
+      responses:
+        '200': { description: 落地页 HTML }
+        '503': { description: 登录桥未配置（BRIDGE_NOT_CONFIGURED） }
+    post:
+      summary: 登录桥端点：验签 → issue_session → Set-Cookie + 302
+      description: |
+        `application/x-www-form-urlencoded`，字段 `initData`、`to`（可选）。复用登录编排（验签/限频/
+        防重放/会员查建/审计）取得 memberId，经网关 `issue_session` 换火鸟进程内签发的会话凭证
+        （如 `HN_login_user=<base64>`），`302` 跳站内目标页并下发该 Cookie
+        （`Path=/; Domain=TMA_BRIDGE_COOKIE_DOMAIN; Max-Age=86400; SameSite=Lax[; Secure]`，无 HttpOnly）。
+        `Location` 只允许站内相对路径（以单个 `/` 开头，拒 `//`、`/\`、`\`、协议、`@`、控制字符，≤200 字符），
+        否则回落 `TMA_BRIDGE_TARGET_DEFAULT`（默认 `/`）。不返回 Node 自签 token。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string, description: Telegram WebApp initData 原始串 }
+                to: { type: string, description: 站内相对路径目标页，可选 }
+      responses:
+        '302': { description: 登录成功，Set-Cookie + Location 跳站内目标页 }
+        '403': { description: 来源闸门拒绝（CROSS_SITE_BLOCKED）：Origin 非本站 / Sec-Fetch-Site cross-site / 两者全缺 fail-closed，无 Cookie 无 302 }
+        '401': { description: initData 无效或过期（HTML 错误页，无 Cookie） }
+        '429': { description: 限频或同一 initData 重放超限（HTML 错误页，无 Cookie） }
+        '502': { description: 网关/凭证签发失败（BRIDGE_FAILED，无 Cookie） }
+        '503': { description: 登录桥未配置（BRIDGE_NOT_CONFIGURED） }
   /tg-api/services:
     get:
       summary: 四大核心模块元数据

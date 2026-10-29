@@ -91,3 +91,42 @@ TMA → `POST /tg-api/auth/telegram {initData}` → Node 验签 → 限频/防�
 - **订单**：`Orders` 页（`waimai/order`）列表与取消，`OrderDetail` 页（`waimai/orderDetail`）详情；可取消状态为火鸟 state 0 与 2（`cancelOrder` 现有规则）。归属失败统一表现为「订单不存在或无权查看」。
 - **校验**：`apps/tma/src/lib/checkout.js` 提供下单参数构造与地址校验，测试在 `apps/tma/test/checkout.test.mjs`。
 - **晋升门槛**：canary 真机走通 下单 → 取消 → 地址增删改 后才允许提晋升 PR。
+
+## 入口桥（TAPD 0002，2026-10-29）
+
+「第五端 = 火鸟 H5 站内」的 TG 入口：Telegram 内打开落地页 → 表单 POST → 拿到火鸟 Cookie 后 302 进 H5。与方案 P 的关系：SPA（`/tma`）的 Bearer 路径**保持不动**，本桥只服务火鸟 H5 站内页；「浏览器不接触火鸟 Cookie」的结论不适用于本端——H5 本就靠 `HN_login_user` Cookie 判定登录态（见上文「火鸟校验路径」事实：PHP 与站点 JS 均读写该 Cookie），桥正是把该 Cookie 安全送达 H5 的唯一入口。
+
+### 路由契约
+| 路径 | 说明 |
+|---|---|
+| `GET /tg-api/auth/bridge` | 落地页（api 进程内联 HTML，无静态目录）。加载 `https://telegram.org/js/telegram-web-app.js`，取 `window.Telegram.WebApp.initData` 后以**真实表单 POST**（非 fetch，导航式提交才会跟随 302 + Set-Cookie）提交到桥端点，字段 `initData`（另带隐藏字段 `to`，来源为 query `to`）。无 initData（非 TG 环境）显示「请从 Telegram 内打开」，不提交。响应自带 CSP（`/tg-api` 无全局 CSP 中间件）：`script-src 'self' https://telegram.org 'nonce-…'`（内联脚本用一次性 nonce）、`frame-ancestors https://web.telegram.org https://*.telegram.org`，否则 TG 内嵌白屏。 |
+| `POST /tg-api/auth/bridge` | 桥端点，`application/x-www-form-urlencoded`，字段 `initData`、`to`（可选）。**先过来源闸门（登录 CSRF 防护，三级判定）**：① `Origin` 存在 → 必须属于本站集合（由 `TMA_BRIDGE_COOKIE_DOMAIN` 根域 + www 与请求 Host 推导；Host 仅在其为本域/子域时收录）；② `Origin` 缺失且 `Sec-Fetch-Site` 存在 → `cross-site` 拒、其余放行；③ 两者都缺失（iOS ≤16.3 的 TG WebView 同源 form POST 可能不发 Origin，且无 Sec-Fetch-Site）→ **Referer 兜底**：Referer 的 host 属本站集合则放行，否则 403。Referer 兜底不削弱 B-1：攻击者可抹 Referer 但抹不掉 Origin（跨源 POST 在所有现代浏览器必带 Origin，会被 ①先拦）。所有拒绝分支 403 `CROSS_SITE_BLOCKED`（无 Set-Cookie、无 302）并记结构化日志 `bridge_blocked`（reason 枚举 + host + 来源头存在性，不含 initData/凭证）。通过后流程严格为：验签+限频+防重放+会员查建+审计（复用 `loginService.login`，不重写）→ `credentialProvider(memberId)` 走网关 `issue_session` 换凭证（火鸟进程内签发，如 `HN_login_user=<base64>`）→ `302` + `Set-Cookie`。loginService 非 200（401/429）按原状态码回 HTML 错误页（含 `{code,message}` 文案），**不 302、不下发 Cookie**；网关/凭证异常 502。响应均带 `Cache-Control: no-store`、`Referrer-Policy: no-referrer`、`X-Content-Type-Options: nosniff`。503 页只回通用「服务暂未配置」文案，缺失项清单只进启动日志（不向公网暴露环境变量名）。`TMA_BRIDGE_FORCE_SECURE=false` 且 `TMA_ENV=prod` 时启动打 WARN（行为不变）。凭证值不进日志、错误信息或 HTML；不返回 Node 自签 token（loginService 的 token 字段丢弃，不调 `tokens.issue`）。 |
+
+### Cookie 属性与理由
+`Set-Cookie: <name>=<value>; Path=/; Domain=<TMA_BRIDGE_COOKIE_DOMAIN>; Max-Age=<86400 默认>; SameSite=Lax[; Secure]`
+- **Name/Value**：以网关 `issue_session` 返回为准（`HN_login_user=<base64>`），Node 不重签、不改写；写入前正则兜底防头注入。
+- **HttpOnly 不设**：火鸟原生 `PutCookie` 对 `login_user` 即非 HttpOnly，H5 多处 JS 需要读该 Cookie；设了会让「已登录」页面被 JS 判为未登录，不额外「加固」。
+- **SameSite=Lax**：TG WebView 内打开 H5 属第三方上下文，但 302 之后的顶级导航会携带 Lax Cookie，覆盖「打开即登录、刷新不掉」的验收路径。
+- **Secure**：默认由 `TMA_BRIDGE_FORCE_SECURE`（默认 true）**强制追加**，不依赖代理链路配置正确（评审 M-1：无 HttpOnly 的长会话凭证不允许静默裸奔）；仅显式 `TMA_BRIDGE_FORCE_SECURE=false`（本地 http 调试）才按 `req.secure` 判定（配置 `TRUST_PROXY_HOPS` 后取 `X-Forwarded-Proto`）。
+- **Max-Age 默认 86400**：保证刷新不掉登录；H5 站内 JS 对该 Cookie 本就长期读写。**需与火鸟后台 `$cfg_onlinetime`（小时）×3600 对齐**：桥长于火鸟会话时，H5 JS 判「已登录」而 PHP 侧已失效（接口 401）；部署前核对后台配置并设 `TMA_BRIDGE_COOKIE_MAX_AGE`（KNOWN_ISSUES）。
+
+### 目标页白名单（防开放重定向）
+`Location` 只允许站内相对路径：必须以单个 `/` 开头、不得以 `//` 或 `/\` 开头、不得含 `\`、不得含协议（`://`）或 `@`、不得含控制字符、长度 ≤ 200；目标来自表单/查询字段 `to`，任一规则不命中或未提供时回落 `TMA_BRIDGE_TARGET_DEFAULT`（默认 `/`）。拒绝 302 外域。
+
+### 新增环境变量（服务端）
+| 变量 | 必填 | 说明 |
+|---|---|---|
+| `TMA_BRIDGE_COOKIE_DOMAIN` | 是 | Set-Cookie 的 Domain，须等于火鸟后台 `$cfg_cookieDomain`（如 `fbird.men`）；同时是来源闸门的允许域（根域 + www + 请求 Host） |
+| `TMA_BRIDGE_COOKIE_MAX_AGE` | 否 | Cookie Max-Age 秒数，默认 86400；**需与火鸟 `$cfg_onlinetime`×3600 对齐** |
+| `TMA_BRIDGE_FORCE_SECURE` | 否 | 默认 true 强制 Set-Cookie 带 Secure；显式 `false` 仅供本地 http 调试按 `req.secure` 判定 |
+| `TMA_BRIDGE_TARGET_DEFAULT` | 否 | 白名单校验失败/未提供时的回落目标，默认 `/` |
+
+`BOT_TOKEN`、`FBS_GATEWAY_*`、`TMA_BRIDGE_COOKIE_DOMAIN` 任一缺失（或 Domain 格式非法）时，两个端点均返回 503（`BRIDGE_NOT_CONFIGURED`，页面只显示通用「服务暂未配置」文案，缺失清单进启动日志），不崩进程、不影响其他路由。
+
+### 遗留项（KNOWN_ISSUES）
+- **`TMA_BRIDGE_COOKIE_MAX_AGE` 需与火鸟后台 `$cfg_onlinetime`（小时）×3600 对齐**：当前默认 86400（24h）是假设值，canary 前须读取后台实际 `$cfg_onlinetime` 后显式设置；不做自动读取（需改火鸟代码，超出本任务范围）。桥长于会话时长会造成「JS 判已登录、PHP 接口 401」的错位。
+- **来源闸门依赖浏览器发送 `Origin` / `Sec-Fetch-Site` 头**：已加第三级 Referer 兜底（iOS ≤16.3 老 WebView 不再永久 403）；仅当 Origin、Sec-Fetch-Site、Referer 三者全缺时仍 fail-closed 403。灰度期以 `bridge_blocked` 结构化日志（reason 枚举）观察 403 率，真机矩阵需覆盖 iOS 15/16.3/16.4+/Android/Desktop/TG Web。
+- **Helm 已注入（2026-10-29 补齐）**：`deploy/helm/firebird-site/templates/deployment-api.yaml` 在 `tma.enabled=true` 时注入上述四个变量，取值来自 `values.yaml → tma.bridge`（`cookieDomain` 留空时回落 `ingress.hosts[0]`）。`values-canary.yaml` 显式设 `cookieDomain: fbird.men`（父域，canary/www 共用一份会话）、`forceSecure: true`；`values-manila/cebu` 未启用 tma，不注入。prod 晋升时须单独确认 `cookieDomain` 与 `$cfg_cookieDomain` 一致。
+- 火鸟 `PutCookie` 会额外种一份 `www.<domain>` 域的 Cookie（双域名兼容），桥只种一份根域 Cookie，理论上已覆盖 www 子域；canary 实测时留意。
+- `issue_session` 时间窗 15 秒，依赖 k8s 节点时钟同步（部署前提）。
+- `credentialProvider` 有 ≤120s 内存缓存：同一会员多设备/多次登录共享同一会话值，「踢下线」语义减弱（评审 i-4，可接受）。

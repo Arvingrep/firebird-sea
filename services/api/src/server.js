@@ -20,6 +20,7 @@ const gatewayClient = require('./gatewayClient');
 const { createFbProxy } = require('./fbProxy');
 const { createAddrShareRouter } = require('./addrShareRoute');
 const { createCredentialProvider } = require('./credentialProvider');
+const { createBridgeRoute } = require('./bridgeRoute');
 const { createRevocationStore, createReplayCounter, createIdempotencyStore } = require('./sharedState');
 
 assertProductionConfig();
@@ -399,6 +400,28 @@ router.post('/call-test', async (req, res) => {
     callTestBusy = false;
   }
 });
+
+// 2f. 登录桥（TAPD 0002）：TG 内打开 → 落地页表单 POST → 复用登录编排取 memberId →
+// 网关 issue_session 换火鸟会话凭证 → Set-Cookie + 302 站内跳转。
+// 挂在路由尾部：fb-proxy-ownership 的防回归测试把「fb 代理块 → 3. 东南亚」切片断言为
+// 不含 cookie 字样，桥天然要写 Set-Cookie，故置于该切片之后。
+// 配置不齐时由处理器内部返回 503，不影响其他路由；auth 为 null 时同理降级。
+const bridge = createBridgeRoute({
+  botToken: BOT_TOKEN,
+  loginService: auth ? auth.loginService : null,
+  credentialProvider: auth ? auth.credentialProvider : null,
+  cookieDomain: process.env.TMA_BRIDGE_COOKIE_DOMAIN,
+  maxAgeSeconds: Number(process.env.TMA_BRIDGE_COOKIE_MAX_AGE) || 86400,
+  // 默认强制 Secure（无 HttpOnly 的长会话凭证不允许因代理配置失误裸奔）；显式 'false' 仅供本地 http 调试
+  forceSecure: process.env.TMA_BRIDGE_FORCE_SECURE !== 'false',
+  defaultTarget: process.env.TMA_BRIDGE_TARGET_DEFAULT || '/',
+});
+// n-5 守卫：生产环境显式关闭强制 Secure 必须留痕，不能静默降级（行为不变，仅告警）
+if (process.env.TMA_BRIDGE_FORCE_SECURE === 'false' && process.env.TMA_ENV === 'prod') {
+  console.warn('[auth/bridge] 警告：TMA_BRIDGE_FORCE_SECURE=false 且 TMA_ENV=prod，Set-Cookie 将按 req.secure 判定，代理配置错误时凭证可能无 Secure 下发');
+}
+router.get('/auth/bridge', bridge.getLanding);
+router.post('/auth/bridge', bridge.postBridge);
 
 app.listen(PORT, () => {
   console.log(`🚀 Firebird SEA Core API is listening on port ${PORT}`);
