@@ -673,3 +673,36 @@ LEFT JOIN `#@__waimai_list` f ON f.`sid` = s.`id` ... GROUP BY s.`id`
 改成 state=1 已完成，并跑佣金结算（`getwaimai_staticmoney`）。对 TMA 意味着
 「商家一直不接单」的单会在 24 小时后静默变已完成——目前订单量小影响有限，
 等商家端做起来要回头处理。
+
+## 返回键与层级后退（2026-11-03 追加 · TAPD 0006）
+
+Telegram 右上角的原生返回键（`WebApp.BackButton`，**>= 6.1 才有**）此前完全没用，
+导致两个真实故障：①二级页里根本没有返回键，只能靠页面自绘；②从群里的
+`start_param` 深链**直达**二级页（如 shop）时，点自绘返回会 `router.back()` 到
+Mini App 之外，用户被直接弹出——P5「返回键逐级后退，不会一下退出」就是这条。
+
+现在的契约，改这块之前先读完：
+
+- **显隐跟随层级**：`App.vue` watch `route.name` → `setBackButtonVisible(isSecondaryRoute(name))`。
+  一级 tab（home/news/orders/cart/profile）与未知/兜底路由**隐藏**，其余**显示**。
+- **后退目标由纯函数算**（`lib/backButton.js: resolveBackTarget`），不在组件里各写一套：
+  - 应用内深度 > 0（用户确实点进来过）→ `router.back()`，走真实历史；
+  - 深度 = 0（深链直达 / `start_param` 重定向落在二级页）→ **replace 到父级**，
+    父级映射：`shop → home`、`news-detail → news`、`order-detail → orders`、
+    `checkout → cart`、`addresses → profile`；
+  - 一级页 → 不动作（TG 侧此时按钮已隐藏，这里是二重保险）。
+- **深度怎么算**：`router.afterEach` 读 `history.state.position` 的差值 + `replaced` 标记
+  分类 push(+1) / pop(-1，下限 0) / 首帧 reset(0)。**不要改用 `history.length`**——
+  Telegram WebView 会把外层宿主页算进栈长，`length` 从一开始就不准（走查记录见
+  `.agent-runs/2026-11-03/task-006/investigation-report.md`）。
+  vue-router `position`/`replaced` 的行为由 Verifier 在 `vue-router@5.4.0` 源码行号复核过。
+- **回调幂等**：`onBackButtonClick` 内部先 `offClick` 旧回调再 `onClick`（HMR／组件重复
+  挂载时否则会一次点击退多级）；`App.vue` 另加 300ms 节流兜住连点。
+- **老客户端降级**：`isBackButtonSupported()` 特性检测，6.1 以下或非 Telegram 环境
+  全部静默 no-op，页面自绘返回照旧可用（自绘按钮也改走同一个 `safeBack()`）。
+- **已知边界**：tab 互切也计深度——`back` 沿真实历史逐级回退，符合浏览器语义；
+  若产品要「tab 切换不计深度」需另行拍板，改 `router.ts` 的分类分支即可。
+  慢网下 `telegram-web-app.js` 迟于首帧就绪时，二级页返回键可能不出现，
+  出现即让 `initTelegram()` 完成后重放一次 `setBackButtonVisible`。
+
+真机回归清单见 `.agent-runs/2026-11-03/task-006/verification-report.md` D 段（5 步）。
