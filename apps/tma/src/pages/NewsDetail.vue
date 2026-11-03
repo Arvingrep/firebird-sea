@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { safeBack } from '../lib/backButton.js';
 import { fb, t } from '../services';
 import { sanitizeHtml } from '../lib/safeHtml.js';
 import SafeContent from '../components/SafeContent';
@@ -36,7 +37,7 @@ onMounted(load);
 <template>
   <div class="page">
     <div class="nav">
-      <button class="icon-btn" @click="router.back()"><AppIcon name="chevron-left" :size="19" /></button>
+      <button class="icon-btn" @click="safeBack(router)"><AppIcon name="chevron-left" :size="19" /></button>
       <span class="title">{{ t('nav.news') }}</span>
     </div>
 
