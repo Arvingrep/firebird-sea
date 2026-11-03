@@ -1,12 +1,31 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useCartStore } from './stores/cart';
 import { t, langRef } from './services';
+import { setBackButtonVisible, onBackButtonClick } from './telegram';
+import { isSecondaryRoute, safeBack } from './lib/backButton.js';
 import AppIcon from './components/AppIcon.vue';
 
 const cart = useCartStore();
 const route = useRoute();
+const router = useRouter();
+
+// TG 返回键显隐跟随层级：一级 tab 隐藏、二级页显示；未知/兜底路由一律隐藏。
+watch(
+  () => route.name,
+  (name) => setBackButtonVisible(isSecondaryRoute(name)),
+  { immediate: true },
+);
+
+// 全局唯一注册点（telegram.ts 内部保证幂等）；300ms 节流，连点只退一级。
+let lastBackAt = 0;
+onBackButtonClick(() => {
+  const now = Date.now();
+  if (now - lastBackAt < 300) return;
+  lastBackAt = now;
+  safeBack(router);
+});
 
 const tabs = computed(() => [
   { to: '/', icon: 'bag', label: t('nav.food') },

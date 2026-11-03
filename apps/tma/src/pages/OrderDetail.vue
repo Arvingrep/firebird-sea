@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { safeBack } from '../lib/backButton.js';
 import { showConfirmDialog, showToast } from 'vant';
 import { fb, t } from '../services';
 import { ORDER_STATE, isCancellable, cancelReason } from '../lib/checkout.js';
@@ -135,7 +136,7 @@ onMounted(load);
 <template>
   <div class="page">
     <div class="nav">
-      <button class="icon-btn" @click="router.back()"><AppIcon name="chevron-left" :size="19" /></button>
+      <button class="icon-btn" @click="safeBack(router)"><AppIcon name="chevron-left" :size="19" /></button>
       <span class="title">{{ t('orders.detail') }}</span>
     </div>
 

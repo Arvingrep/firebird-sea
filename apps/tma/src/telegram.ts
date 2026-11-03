@@ -1,6 +1,40 @@
 // Telegram WebApp 适配：ready/expand、主题（含暗色）、initData 与 start_param。
 // 非 Telegram 环境（浏览器直接打开）下返回空 initData，登录流会提示重新从 Telegram 打开。
+// BackButton（WebApp >= 6.1 才有）：低版本/非 TG 环境下这些方法不存在，调用前一律特性检测、静默降级。
+declare global {
+  interface TelegramWebApp {
+    BackButton?: {
+      show(): void;
+      hide(): void;
+      onClick(cb: () => void): void;
+      offClick(cb: () => void): void;
+    };
+  }
+}
+
 const tg = () => window.Telegram?.WebApp;
+
+export function isBackButtonSupported(): boolean {
+  const bb = tg()?.BackButton;
+  return typeof bb?.show === 'function' && typeof bb?.hide === 'function' && typeof bb?.onClick === 'function';
+}
+
+export function setBackButtonVisible(visible: boolean): void {
+  const bb = tg()?.BackButton;
+  if (typeof bb?.show !== 'function' || typeof bb?.hide !== 'function') return;
+  if (visible) bb.show();
+  else bb.hide();
+}
+
+// 全局只允许挂一个回调：重复调用（HMR / 组件重复挂载）先解绑旧回调再绑新的，防一次点击退多级。
+let backHandler: (() => void) | null = null;
+export function onBackButtonClick(cb: () => void): void {
+  const bb = tg()?.BackButton;
+  if (typeof bb?.onClick !== 'function') return;
+  if (backHandler && typeof bb.offClick === 'function') bb.offClick(backHandler);
+  backHandler = cb;
+  bb.onClick(cb);
+}
 
 export function initTelegram(): void {
   const app = tg();

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { safeBack } from '../lib/backButton.js';
 import { showToast } from 'vant';
 import { fb, t } from '../services';
 import { listRows } from '../lib/fbClient.js';
@@ -78,7 +79,7 @@ async function submit() {
 <template>
   <div class="page">
     <div class="nav">
-      <button class="icon-btn" @click="router.back()"><AppIcon name="chevron-left" :size="19" /></button>
+      <button class="icon-btn" @click="safeBack(router)"><AppIcon name="chevron-left" :size="19" /></button>
       <span class="title">{{ t('checkout.title') }}</span>
     </div>
 

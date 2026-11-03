@@ -5,6 +5,7 @@ import { showConfirmDialog, showToast, showLoadingToast, closeToast } from 'vant
 import { fb, authClient, i18n } from '../services';
 import { listRows } from '../lib/fbClient.js';
 import { getTgUser, getStartParam, openExternal } from '../telegram';
+import { safeBack } from '../lib/backButton.js';
 import AppIcon from '../components/AppIcon.vue';
 
 interface Address { id: string; person: string; tel: string; street?: string; address: string; lat?: string; lng?: string; areaCode?: string; default?: number }
@@ -246,7 +247,7 @@ onMounted(async () => { await load(); consumeSharedAddress(); });
 <template>
   <div class="page">
     <div class="nav">
-      <button class="icon-btn" @click="router.back()"><AppIcon name="chevron-left" :size="19" /></button>
+      <button class="icon-btn" @click="safeBack(router)"><AppIcon name="chevron-left" :size="19" /></button>
       <span class="title">{{ t('address.title') }}</span>
       <button class="icon-btn" @click="openForm()"><AppIcon name="plus" :size="18" :stroke="2.2" /></button>
     </div>

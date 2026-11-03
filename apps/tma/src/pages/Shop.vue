@@ -5,6 +5,7 @@ import { showConfirmDialog } from 'vant';
 import { fb, t } from '../services';
 import { useCartStore, type Food } from '../stores/cart';
 import { formatPhp } from '../lib/cart.js';
+import { safeBack } from '../lib/backButton.js';
 import AppIcon from '../components/AppIcon.vue';
 
 interface FoodItem extends Food { typeid: string | number; typeName?: string; descript?: string; formerprice?: string; sale?: number | string; unit?: string }
@@ -93,7 +94,7 @@ onMounted(load);
     <div class="shop-hero">
       <img v-if="cover" :src="cover" alt="" />
       <div class="nav">
-        <button class="icon-btn icon-btn--glass" @click="router.back()"><AppIcon name="chevron-left" :size="19" /></button>
+        <button class="icon-btn icon-btn--glass" @click="safeBack(router)"><AppIcon name="chevron-left" :size="19" /></button>
         <span class="spacer" />
       </div>
     </div>
