@@ -50,6 +50,12 @@ jobs:
   #     --jq '.contexts'                       # 看当前要求的名字
   # 这个漂移是隐形的：workflow 里看不到、PR 页面也不提示，只有 mergeStateStatus=BLOCKED 能暴露。
   verify-task:
+    # ⚠️ 这个 job 的 name 是 `main` 分支保护里的**必需检查上下文**，一个字都不能改：
+    #    gh api repos/Arvingrep/firebird-sea/branches/main/protection/required_status_checks --jq '.contexts'
+    #    → ["🔒 确定性门禁", "🧪 verify-task（流程自测 + Node 单测 + TMA 前端 + 数据库集成测试）"]
+    #    改名不会报错，只会让所有 PR 合进 main 时静默 BLOCKED（mergeStateStatus）。
+    #    所以下面「TMA 前端」这四个字虽然已经过时（apps/tma 2026-11-04 归档），也**只能留在 job 名里**，
+    #    要清理必须同时改分支保护规则，属于一次性运维动作，不在普通 PR 里做。
     name: 🧪 verify-task（流程自测 + Node 单测 + TMA 前端 + 数据库集成测试）
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -57,7 +63,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: scripts/verify-task.sh（含 apps/tma 类型检查/测试/构建；CI=true 时含真实 MySQL migration 测试）
+      - name: scripts/verify-task.sh（流程自测 + 服务单测；CI=true 时含真实 MySQL migration 测试）
         env:
           CI: "true"
         run: ./scripts/verify-task.sh

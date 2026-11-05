@@ -473,6 +473,18 @@ sed 's/AGENT_MAX_ATTEMPTS:-3/AGENT_MAX_ATTEMPTS:-9/' "$ROOT/scripts/agent/lib.sh
 if t02_ok "$T/lib-bad.sh"; then echo "❌ T-02 反例未红（默认 3→9 后检查器仍绿 = 失效）"; FAIL=1
 else echo "✅ T-02 反例：默认 3→9 → 检查器变红"; fi
 
+# --- C-06 Dockerfile 引用路径存在（#189 断引用的执行环）---
+# 这条不是「有没有写检查」，而是「删了目录之后有没有人发现」：#189 删 apps/tma，
+# Dockerfile.api 仍 COPY apps/tma/，当时门禁 14 项全绿、CI 4 个 job 全绿，只有 QA 靠人读出来的。
+reset; mkdir -p deploy services/api/src; printf 'FROM node:20 AS builder\nCOPY services/api/src ./src\nCOPY apps/gone/ ./gone\n' > deploy/Dockerfile.api; git add -A; git commit -qm d
+row_is "C-06 Dockerfile COPY 断引用 → FAIL" "Dockerfile 引用路径存在" 1 FAIL
+reset; mkdir -p deploy; printf 'FROM node:20 AS builder\nWORKDIR /app\nFROM node:20 AS runner\nCOPY --from=nope /x ./y\n' > deploy/Dockerfile.api; git add -A; git commit -qm d
+row_is "C-06 COPY --from 指向不存在的阶段 → FAIL" "Dockerfile 引用路径存在" 1 FAIL
+# 反例中的反例：多阶段构建的 --from 源路径是阶段内部绝对路径（/app/node_modules），
+# 不能拿宿主仓库校验。首版就在这里误判，canary 自己的 Dockerfile.api 被红了两项。
+reset; mkdir -p deploy services/api/src; printf 'FROM node:20 AS builder\nCOPY services/api/src ./src\nFROM node:20 AS runner\nCOPY --from=builder /app/src ./src\n' > deploy/Dockerfile.api; git add -A; git commit -qm d
+row_is "C-06 多阶段 COPY --from 不误伤 → 放行" "Dockerfile 引用路径存在" 0 PASS
+
 # --- S-02 存量欠债：key.pem + 未到期登记先固化进 base（此后所有用例都带 WARN 欠债，rc 不受影响）---
 # PEM 头同样运行时拼接，本文件不留完整私钥头字面量
 reset; mkdir -p srv; printf -- '-----BEGIN RSA %s KEY-----\nabc\n-----END RSA PRIVATE KEY-----\n' PRIVATE > srv/key.pem

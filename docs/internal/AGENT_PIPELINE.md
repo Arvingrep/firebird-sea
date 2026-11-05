@@ -89,8 +89,14 @@
 | C-03 | 改 `webroot/api/handlers/*.class.php` 的 public 方法 → 更新 `docs/api/openapi-waimai-article.yaml` | 👤（无机器校验） |
 | C-04 | 改 n8n 工作流 → 更新 `automation/n8n/REGISTRY.md` | 👤 |
 | C-05 | 改 `deploy/helm/**` → `helm lint` + 所有 `values-*.yaml` 渲染通过 | 🤖 `「Helm 多站点渲染」` |
+| C-06 | **动了 Dockerfile 或删/改任何被它引用的目录** → 全仓 Dockerfile 的 `COPY` 源路径必须存在，`COPY --from=` 必须指向已定义的构建阶段 | 🤖 `「Dockerfile 引用路径存在」第 12 项` |
 
 > ⚠️ C-01 的坑：`deploy/**/*.js` 也被算作「业务代码」（`deploy/` 不在排除列表里）。改部署侧 JS 同样要带 `docs/`。
+>
+> ⚠️ C-06 的来历（#189）：删掉 `apps/tma`，`deploy/docker/Dockerfile.api` 仍 `COPY apps/tma/ ./`。
+> 当时门禁 **14 项全绿**、CI **4 个 job 全绿**，唯一的拦截来自 QA 人工读 diff。
+> 原因很朴素：门禁只校验「diff 里的规范问题」，从不校验「引用的东西还在不在」。
+> 这类断引用的报错发生在 `docker build`，也就是**合并之后**——发现得最晚、回溯最贵（报错指着 COPY 行，不指着是谁删了目录）。
 
 ### 2.5 安全
 
@@ -297,6 +303,7 @@ bash scripts/test-gates.sh
 | M-11 | `package.json` 的 `verify:docs` 指向不存在的 `scripts/verify-docs.js` | `npm run verify:docs` 必挂 | 已知坏引用，别调它。用 `verify-task.sh` |
 | M-12 | `REGISTRY.md` 三条 P0 未修（canary 硬编码 / webhook 无鉴权 / `staticData` token 空串 + `requireSyncBack`） | 改 n8n 时一次 push 可能覆盖线上 token | **动 n8n 前先解**，否则不要自动改工作流 |
 | M-13 | 旧草案「控制器 + 定时接单」= 复活已下线的施工侧 Agent 派单 | 与 AGENTS.md 红线 4 直接冲突 | **不采纳**：无常驻调度器，接单由人发起（§4.1） |
+| M-14 | **删目录不改 Dockerfile**：`apps/tma` 删除后 `Dockerfile.api` 仍 `COPY apps/tma/ ./`，而门禁 14 项、CI 4 个 job 全绿 | 断引用只在 `docker build` 时炸，也就是**合并之后**；报错指着 COPY 行，不指着「是谁删了目录」 | **已修**：新增 C-06 门禁第 12 项，全仓 Dockerfile 的 `COPY` 源路径 + `--from` 阶段一并校验；并补 3 条用例（断路径必红 / 缺阶段必红 / 多阶段 `--from` 不得误伤）。同类隐患：`scripts/verify-task.sh` 里 `if [ -f apps/tma/package.json ]` 的守卫恒为假，静默跳过 —— 见 #200 |
 
 ---
 
