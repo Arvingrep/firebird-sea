@@ -1,6 +1,10 @@
 # TMA UI 规范（2026-10 重构）
 
-> 范围：`apps/tma/src`（Vue 3 + Vant 4）。本文档与代码同仓同改：动 UI 结构必须同步更新这里。
+> **⚠️ 前端已归档（2026-11-04）**：`apps/tma/` 已从仓库移除，本文描述的前端代码现在只存在于
+> `docs/archive/tma-legacy-2026-11-04.tar.gz`。文档保留作追溯与复活参考，**其中的路径不再可访问**。
+> 镜像侧也已收口：`Dockerfile.api` 不再构建 TMA，`/tma/` 返回 404。
+
+> 范围（历史）：`apps/tma/src`（Vue 3 + Vant 4）。
 
 ## 设计令牌（src/style.css）
 

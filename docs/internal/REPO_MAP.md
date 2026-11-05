@@ -33,12 +33,14 @@ firebird-sea/
 | `webroot/huoniao.so` | 商业加载器，被 `.gitignore` 排除，不在 git 里（构建可重现性问题见 `LOCAL_ACCEPT.md`） |
 | `webroot/data/` | 运行时目录，却有一批文件被跟踪；不要往里放我们的东西 |
 
-### 2. 我们自己的服务：`services/`、`apps/`
+### 2. 我们自己的服务：`services/`（原 `apps/` 已归档）
 | 目录 | 是什么 |
 |---|---|
 | `services/api` | Node API：登录验签、收银台、汇率、（后续）对账与网关调用。路由前缀 `/tg-api` |
 | `services/payment-listener` | 链上 USDT 监听器（独立部署，副本数 1） |
-| `apps/tma` | Telegram Mini App 前端（Vue3 + Vite，10 个页面；9 个测试文件 / 101 用例，已接入 CI） |
+> `apps/` 下当前**没有任何目录**。原 `apps/tma`（Telegram Mini App 前端，Vue3 + Vite，10 个页面 / 9 个测试文件 101 用例）
+> 已于 2026-11-04 归档：`docs/archive/tma-legacy-2026-11-04.tar.gz`，复活步骤见 `docs/internal/TMA-LEGACY-NOTES.md`。
+> `Dockerfile.api` 的 tma-build 阶段随之移除——镜像不再托管 `/tma/`，该路径返回 404（`server.js` 有 existsSync 守卫）。
 
 ### 3. 部署：`deploy/`
 | 目录 | 用途 | 谁用 |

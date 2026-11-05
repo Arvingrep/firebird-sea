@@ -1,5 +1,9 @@
 # TMA 登录桥接（Epic T2，方案 P）
 
+> **⚠️ 前端已归档（2026-11-04）**：`apps/tma/` 已从仓库移除，本文描述的前端代码现在只存在于
+> `docs/archive/tma-legacy-2026-11-04.tar.gz`。文档保留作追溯与复活参考，**其中的路径不再可访问**。
+> 镜像侧也已收口：`Dockerfile.api` 不再构建 TMA，`/tma/` 返回 404。
+
 依据：`_bmad-output/planning-artifacts/epics-tma-frontend.md` T2.1–T2.4；Spike 结论见 briefs/brief-tma-frontend-2026-10-12/spike-report.md（P 已在 canary 证实）。
 
 ## 流程
