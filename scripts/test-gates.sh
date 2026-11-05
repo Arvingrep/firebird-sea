@@ -350,4 +350,15 @@ printf '# 契约\n' > docs/api/README.md
 git add -A; git commit -qm d
 case_ "类外顶层函数不算接口 → 放行" 0 0
 
+# --- 门禁基线默认值：三处必须一致，且必须等于实际集成分支（canary）---
+# 为什么单列一条：#188 的 QA 指出 Makefile 与 gates.sh 的默认值各写一份，改一处漏一处就永远"看起来对齐"。
+# 更隐蔽的是三处一致地指向 main —— 一致地错，diff 恒为全仓，报告里每项都"有数"却没人用得着。
+# 所以判据不是"两边相等"，而是"三处都等于集成分支"。改错任何一处都必须变红。
+G_DEF="$(grep -oE 'GATE_BASE:-origin/[a-z]+' "$ROOT/scripts/agent/gates.sh" 2>/dev/null | head -1 | sed 's/^GATE_BASE:-//')"
+M_DEF="$(grep -E '^GATE_BASE' "$ROOT/Makefile" 2>/dev/null | grep -oE 'AGENT_BASE_BRANCH\),[a-z]+' | grep -oE '[a-z]+$')"
+L_DEF="$(grep -oE 'AGENT_BASE_BRANCH:-[a-z]+' "$ROOT/scripts/agent/lib.sh" 2>/dev/null | head -1 | grep -oE '[a-z]+$')"
+if [ "$G_DEF" = "origin/canary" ] && [ "$M_DEF" = "canary" ] && [ "$L_DEF" = "canary" ]; then
+  echo "✅ 门禁基线三处默认值一致，且等于集成分支 canary"
+else echo "❌ 门禁基线默认值不一致或未指向 canary：gates.sh=${G_DEF:-读不到} Makefile=origin/${M_DEF:-读不到} lib.sh=origin/${L_DEF:-读不到}（应同为 origin/canary）"; FAIL=1; fi
+
 exit $FAIL

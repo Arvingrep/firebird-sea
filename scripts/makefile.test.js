@@ -5,7 +5,7 @@
 // 一旦分支 push 过，`git diff @{u}...HEAD` 恒为空 → 门禁报「相对 X 无改动」的假 FAIL。
 // 触发条件从「本地 main 过期」变成了「已经推送」，而推送是正常流程，等于几乎必踩。
 // 故基线改为 origin/$(or $(AGENT_BASE_BRANCH),main)：
-//   - 默认 origin/main；
+//   - 默认 origin/canary（集成分支）；
 //   - AGENT_BASE_BRANCH=canary 时切到 origin/canary（启用 canary 的开关）；
 //   - GATE_BASE 可显式覆盖（命令行 > 同名 env）。
 //
@@ -13,8 +13,10 @@
 // 不碰当前仓库、不联网、不执行真实 gates.sh。本机无 make/git 时整组跳过。
 //
 // ⚠️ 判别性矩阵（别只看「全绿」就以为全覆盖了）——由反证实测得出，改任何一个 Makefile 基线实现后请重跑：
-//   用例 1/2/3/5：对「跟随上游 @{u}」版为红（如 cd4b045b、aeb9c5cc），对「硬编码 origin/main」版为**绿**
-//                （因为它们的期望值恰好就是 origin/main，硬编码版在默认路径上碰巧正确）
+//   用例 1/2/3/5：对「跟随上游 @{u}」版为红（如 cd4b045b、aeb9c5cc），对「硬编码默认值」版为**绿**
+//                （因为期望值就是硬编码的那个值，硬编码版在默认路径上碰巧正确）
+//   2026-11-05：默认基线由 origin/main 改为 origin/canary（main 已不是集成分支，PR 全合 canary），
+//                期望值随之更新；沙箱同时补了 origin/canary，否则测不到「目标分支是否真实存在」这一面。
 //   用例 4/6/7：  对「硬编码 origin/main」版为红，对「跟随上游」版为绿（覆盖语义两版都有）
 //   即：任意单条都不足以防回退，靠的是两组互补。这两组数字若不落到文件里，一年后没人能重建。
 //
@@ -55,6 +57,8 @@ function sandbox() {
   git('commit', '-qm', 'base');
   git('remote', 'add', 'origin', remote);
   git('push', '-q', '-u', 'origin', 'main');
+  // 默认基线已是集成分支 canary：沙箱必须真实存在 origin/canary，否则用例测的是「拼串对不对」而不是「目标分支在不在」
+  git('push', '-q', 'origin', 'main:canary');
 
   // feat/x：在 main 之上加一个 commit 并推送 → @{u} 与 HEAD 完全一致
   git('checkout', '-q', '-b', 'feat/x');
@@ -87,23 +91,23 @@ test.after(() => { if (box) fs.rmSync(box.dir, { recursive: true, force: true })
 
 // 核心回归：Ray 打回本设计的场景。已推送分支的上游 diff 为空，
 // 只有目标分支还留着差异；基线若跟随 @{u}，门禁必然误报「无改动」。
-test('make gates 已推送分支：上游 diff 为空但目标分支有差异，基线必须是 origin/main 而非 @{u}', { skip: SKIP }, () => {
+test('make gates 已推送分支：上游 diff 为空但目标分支有差异，基线必须是 origin/canary 而非 @{u}', { skip: SKIP }, () => {
   const b = get();
   execFileSync('git', ['checkout', '-q', 'feat/x'], { cwd: b.repo, stdio: 'ignore' });
   const diffOf = (ref) => execFileSync('git', ['diff', '--name-only', `${ref}...HEAD`], { cwd: b.repo, encoding: 'utf8' }).trim();
   // 前置条件先钉死，否则这条用例会在沙箱变化时悄悄失去意义
   assert.equal(diffOf('@{u}'), '', '前置条件不成立：feat/x 相对上游应当零改动（模拟已推送）');
-  assert.notEqual(diffOf('origin/main'), '', '前置条件不成立：feat/x 相对 origin/main 应当有改动');
-  assert.equal(runMake('feat/x'), 'GATES_BASE=origin/main');
+  assert.notEqual(diffOf('origin/canary'), '', '前置条件不成立：feat/x 相对 origin/canary 应当有改动');
+  assert.equal(runMake('feat/x'), 'GATES_BASE=origin/canary');
 });
 
-test('make gates 默认基线：分支有上游也不跟随 @{u}，仍取 origin/main', { skip: SKIP }, () => {
-  assert.equal(runMake('feat/x'), 'GATES_BASE=origin/main');
+test('make gates 默认基线：分支有上游也不跟随 @{u}，仍取 origin/canary', { skip: SKIP }, () => {
+  assert.equal(runMake('feat/x'), 'GATES_BASE=origin/canary');
 });
 
-test('make gates 无上游：基线仍是 origin/main（带 origin/ 前缀，不是裸 main）', { skip: SKIP }, () => {
+test('make gates 无上游：基线仍是 origin/canary（带 origin/ 前缀，不是裸 canary）', { skip: SKIP }, () => {
   // 旧设计在这里会回落成裸 main —— 这条用于拦住任何「重新引入 @{u} + or(...,main)」的写法
-  assert.equal(runMake('no-upstream'), 'GATES_BASE=origin/main');
+  assert.equal(runMake('no-upstream'), 'GATES_BASE=origin/canary');
 });
 
 test('make gates AGENT_BASE_BRANCH=canary：基线切到 origin/canary', { skip: SKIP }, () => {
@@ -112,9 +116,9 @@ test('make gates AGENT_BASE_BRANCH=canary：基线切到 origin/canary', { skip:
   assert.equal(runMake('feat/x', { env: { AGENT_BASE_BRANCH: 'canary' } }), 'GATES_BASE=origin/canary');
 });
 
-test('make gates AGENT_BASE_BRANCH 为空串：$(or ...) 回落 main，不产出残缺 ref「origin/」', { skip: SKIP }, () => {
+test('make gates AGENT_BASE_BRANCH 为空串：$(or ...) 回落 canary，不产出残缺 ref「origin/」', { skip: SKIP }, () => {
   // 拦 $(or) 被简化掉：若写成 origin/$(AGENT_BASE_BRANCH)，空值会得到 origin/ —— 一个不存在的 ref
-  assert.equal(runMake('feat/x', { env: { AGENT_BASE_BRANCH: '' } }), 'GATES_BASE=origin/main');
+  assert.equal(runMake('feat/x', { env: { AGENT_BASE_BRANCH: '' } }), 'GATES_BASE=origin/canary');
 });
 
 test('make gates GATE_BASE 命令行：优先于 AGENT_BASE_BRANCH，取 origin/foo', { skip: SKIP }, () => {

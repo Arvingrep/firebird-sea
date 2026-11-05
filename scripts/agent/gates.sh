@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 确定性门禁（无 LLM）：只看「本分支相对 base 的改动」，结果据实输出，不写死 PASS。
-# 用法：scripts/agent/gates.sh [base-ref]     （默认 origin/main）
+# 用法：scripts/agent/gates.sh [base-ref]     （默认 origin/canary = 集成分支）
 # 输出：stdout 为 Markdown 报告；任一 FAIL => 退出码 1。
 #       基线 ref 不可解析时只输出一行 FAIL 并退出 1（不跑任何 diff 检查，避免噪声与假 PASS）。
 # 阈值：GATE_MAX_ADDED（默认 1200，不含 docs/、.agents/、_bmad-output/、_bmad/、.claude/skills/bmad-*/ 规划产物）
@@ -27,9 +27,9 @@ EOF
   exit 1
 fi
 
-# 基线 ref：位置参数优先，其次 GATE_BASE 环境变量（Makefile:6 的帮助文案承诺了这个覆盖方式），最后默认 origin/main。
+# 基线 ref：位置参数优先，其次 GATE_BASE 环境变量（Makefile:7 的帮助文案承诺了这个覆盖方式），最后默认 origin/canary。
 # 本脚本其它开关（GATE_REPO_DIR / GATE_AGENT_BRANCH / GATE_MAX_ADDED / GATE_REQUIRE_TOOLS）都是 env，走位置参数是例外。
-BASE="${1:-${GATE_BASE:-origin/main}}"
+BASE="${1:-${GATE_BASE:-origin/canary}}"
 MAX_ADDED="${GATE_MAX_ADDED:-1200}"
 RANGE="${BASE}...HEAD"
 
