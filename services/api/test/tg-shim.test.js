@@ -314,3 +314,50 @@ test('rootDomain：频道子域算站内，避免把站内跳转扔进系统浏�
   assert.equal(rootDomain('a.fh580.com.ph'), 'fh580.com.ph');
   assert.equal(rootDomain('t.me'), 't.me');
 });
+
+// ---------------------------------------------------------------------------
+// 跨文件同源守卫：PHP service 白名单（webroot/include/tgWhitelist.inc.php）
+// 与 shim 的处理集（SERVICES）。
+//
+// 两份名单语义不同、不该相等，但交叠部分必须同源 —— 否则第三个 service 加进来时
+// 必有一边漏改，而漏改的表现是「静默不注入/静默放行」，跑普通测试不会红。
+//   PHP 允许集  = { waimai, article, travel, member, siteConfig }   允许访问
+//   shim 处理集 = { waimai, travel, courier, article }              会做页面适配
+//   交集        = { waimai, travel, article }                       两边都必须在
+//   只在 PHP    = { member, siteConfig }                            shim 不处理，正常
+//   只在 shim   = { courier }                                       PHP 侧是 do=courier，正常
+// ---------------------------------------------------------------------------
+
+test('白名单同源守卫：PHP 允许集与 shim 处理集的交叠关系', () => {
+  const fs = require('node:fs');
+  const php = fs.readFileSync(
+    path.join(__dirname, '../../../webroot/include/tgWhitelist.inc.php'),
+    'utf8'
+  );
+
+  // 从 fbsTgServiceAllowed() 里抽出 $allow = array(...) 的字符串字面量。
+  // PHP 侧若有人把数组改名/挪走，这里会拿到空集 → 下面的断言会红，而不是恒真。
+  const m = /\$allow\s*=\s*array\s*\(([^)]*)\)/.exec(php);
+  assert.ok(m, 'tgWhitelist.inc.php 里找不到 $allow 数组（函数结构变了？）');
+  const phpAllow = (m[1].match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
+  assert.ok(phpAllow.length > 0, '白名单解析结果为空');
+
+  const shimSet = new Set(Object.keys(shim.SERVICES));
+  const phpSet = new Set(phpAllow);
+
+  // 1) 交集必须精确等于这三个 —— 任何一边单方面增删都会红
+  const both = [...shimSet].filter((s) => phpSet.has(s)).sort();
+  assert.deepEqual(both, ['article', 'travel', 'waimai']);
+
+  // 2) article 双侧都在，但语义相反：PHP 放行访问（资讯页要能打开），
+  //    shim 命中即 return（D6，一行不碰）。这里只钉「双侧都在」，语义各自有测试钉。
+  assert.ok(shimSet.has('article') && phpSet.has('article'));
+
+  // 3) courier 只出现在 shim 侧；PHP 侧它是 do=courier，绝不能以 service 名进白名单
+  assert.ok(shimSet.has('courier'));
+  assert.ok(!phpSet.has('courier'), "PHP 白名单不应出现 'courier'（它是 do=courier，不是 service）");
+
+  // 4) member / siteConfig 只在 PHP 侧：shim 不做会员/站点页的适配，漏进 SERVICES 反而是错的
+  assert.ok(phpSet.has('member') && phpSet.has('siteConfig'));
+  assert.ok(!shimSet.has('member') && !shimSet.has('siteConfig'));
+});
