@@ -204,10 +204,14 @@
         //   .headshow.headbox{opacity:1}（detail.css:5）→ 变可见
         // 两者叠加，Telegram 里页面顶部就多出一条白底「‹ 订单详情」标题栏，与原生返回键并存，
         // 正是验收第 6 条要禁的画面。整条隐藏：
-        //   未完结态它本来透明，且 top:0 固定定位在 TG 里会被原生顶栏盖住、滚动显示的返回钮按不到；
-        //   完结态隐藏后内容自然上移 .88rem，不需要补留白。
+        //   未完结态它本来透明且 position:fixed 不占流（Vic 无头 Chrome 实测顶距隐藏前后都是 0）；
+        //   完结态隐藏后内容自然上移 .88rem，实测 .orderInfo 顶距落在 margin:.3rem 上，不贴边，
+        //   所以两种状态都不需要补留白。
+        //   隐藏返回键不会困人：shim 的 BackButton 在非首页会 show() 并接管 history.back()。
         detail: {
-          nav: ['.top_box > .headbox', '.page_detail .headbox'],
+          // 只放 .page_detail .headbox：detail.html 里没有 .top_box 节点，
+          // 别把别处抄来的选择器塞进来（Vic 复核指出过的死选择器）。
+          nav: ['.page_detail .headbox'],
           pendingConfirm: 'courier/detail.html 完结态（orderend+headshow）会露出流内标题栏，已按 .page_detail .headbox 整条隐藏'
         },
         // 整页是地图，没有顶栏（map.html 无 .top_box 节点）
