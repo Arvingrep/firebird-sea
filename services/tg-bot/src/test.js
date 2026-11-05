@@ -7,13 +7,16 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 
 const PORT = 3099;
+const APP_BASE_URL = 'https://fh580.net';
 const serverProcess = spawn('node', [path.join(__dirname, 'server.js')], {
-  env: { ...process.env, TG_BOT_PORT: String(PORT) },
+  env: { ...process.env, TG_BOT_PORT: String(PORT), TG_APP_BASE_URL: APP_BASE_URL },
   stdio: 'pipe'
 });
 
+// mock 模式（无 BOT_TOKEN）会把消息与 reply_markup 打到 stdout，测试据此断言按钮
+let serverStdout = '';
 serverProcess.stdout.on('data', data => {
-  // console.log(`[TG-BOT-TEST-STDOUT] ${data}`);
+  serverStdout += String(data);
 });
 
 function postJson(path, payload) {
@@ -77,6 +80,19 @@ async function run() {
     text: '🚀 *【测试上线通知】* GKE 部署完成！'
   });
   if (c.status !== 200) throw new Error('Send card failed');
+  console.log('   ✅ PASS');
+
+  console.log('🧪 测试 5: /start 带 web_app 入口按钮（顾客打开 TMA）');
+  serverStdout = '';
+  const s5 = await postJson('/webhook/telegram', {
+    message: { chat: { id: 12345, type: 'private' }, text: '/start', from: { first_name: 'Boss' } }
+  });
+  if (s5.status !== 200 || !s5.data.ok) throw new Error('Start command failed');
+  await new Promise(r => setTimeout(r, 200));
+  const expectedUrl = `${APP_BASE_URL}/tg/entry.php?role=customer`;
+  if (!serverStdout.includes(`"web_app":{"url":"${expectedUrl}"}`)) {
+    throw new Error(`/start 未生成 web_app 按钮，stdout=${serverStdout}`);
+  }
   console.log('   ✅ PASS');
 
   console.log('🎉 所有 Telegram Bot 基建测试全部 100% 通过！');

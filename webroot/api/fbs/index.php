@@ -2,10 +2,11 @@
 /**
  * 火鸟 · 网关动作层（Node ⇄ PHP 的唯一通道）
  *
- * 路由（三选一，均指向本文件）：
- *   1. POST /api/fbs/{action}                  ← gatewayClient.js 的拼法（baseUrl + '/' + action）
- *   2. POST /api/fbs/index.php?action={action}
- *   3. POST /api/fbs/index.php，JSON 体带 {"action": "..."} 字段
+ * 路由（Node 侧只用第 1 种）：
+ *   1. POST /api/fbs/index.php，JSON 体带 {"action": "...", "params": {...}}  ← gatewayClient.js 的拼法
+ *   2. POST /api/fbs/index.php?action={action}（冒烟/调试用）
+ *   3. POST /api/fbs/{action}（PATH_INFO 形态，仅本地 php -S 直跑时可用；nginx 的
+ *      `location ~ \.php$` 接不到这种无后缀路径，生产不可用）
  * 请求体：{"params": {...}} 或直接是动作入参对象（两种都收）。
  *
  * ----------------------------------------------------------------------------------------------
@@ -23,8 +24,9 @@
  *   403 MEMBER_CANCELLED             会员 is_cancellation == 1（已申请注销）
  *   404 UNKNOWN_ACTION               动作不在白名单
  *   405 METHOD_NOT_ALLOWED           非 POST
+ *   429 REPLAY_LIMITED               同一份 initData 在 TTL 窗口内签发次数超限
  *   500 CONFIG_MISSING / CONFIG_INVALID / MEMBER_CREATE_FAILED / DB_QUERY_FAILED / INTERNAL_ERROR
- *   500 DB_UNAVAILABLE               连不上库（Node 侧改判 503，见 services/api/src/tgLogin.js）
+ *   500 DB_UNAVAILABLE               连不上库 / 拿不到建号命名锁（Node 侧改判 503，见 services/api/src/tgLogin.js）
  *   503 GATEWAY_SECRET_NOT_CONFIGURED  本文件拿不到 FBS_GATEWAY_SECRET
  *
  * 【鉴权顺序（安全边界，不可调换）】
@@ -37,8 +39,10 @@
  * 动作：
  *   member_find_or_create  入参 tg_user_id(必填) / first_name / last_name / username
  *                          → data: {member_id, created}
- *   issue_session          入参 tg_user_id(必填)
+ *   issue_session          入参 tg_user_id(必填) / init_data_hash(必填) / first_name / last_name / username
  *                          → data: {member_id, created, set_cookies: [...]}
+ *                          init_data_hash = sha256(initData) 的 hex，仅用于防重放记账；
+ *                          **不要传 initData 原文**（里面有用户资料，没必要扩大暴露面）。
  *
  * set_cookies 是可直接 header('Set-Cookie: ...') 的完整头字符串，由 PHP 侧生成；
  * Node 不得重新拼装任何属性（domain/path/secure/SameSite/expires 都在这里定死），
@@ -208,6 +212,123 @@ function fbs_gateway_nickname(array $params)
     return implode(' ', $parts);
 }
 
+/** init_data_hash：Node 传 sha256(initData) 的 hex。只接受 64 位十六进制，其余一律当缺失。 */
+function fbs_gateway_parse_init_data_hash($value)
+{
+    if (!is_string($value)) return null;
+    $text = strtolower(trim($value));
+    return preg_match('/^[0-9a-f]{64}$/', $text) === 1 ? $text : null;
+}
+
+/* ============================== 站点配置（Cookie 属性）：读不到就失败 ============================== */
+
+/**
+ * 火鸟运行时配置文件。测试可 define('FBS_GATEWAY_SITE_CONFIG_FILE', ...) 指向夹具。
+ */
+function fbs_gateway_site_config_file()
+{
+    return defined('FBS_GATEWAY_SITE_CONFIG_FILE')
+        ? FBS_GATEWAY_SITE_CONFIG_FILE
+        : dirname(__DIR__, 2) . '/data/cache/config.php';
+}
+
+/**
+ * 读取与 Cookie 相关的站点配置。**读不到就报错，不回落到默认值。**
+ *
+ * 为什么不复用 bridge.php 的 fbs_bridge_load_site_config()：那个函数在文件缺失时静默回落成
+ * cookieDomain=''（host-only）。登录场景里这是最坏的一种失败——cookie 照发、HTTP 200、日志写
+ * 「登录成功」，但用户从 x.com 跳到 www.x.com 就变游客，没有任何信号。所以网关这条链路单独
+ * fail-closed：cookieDomain 没有在配置里定义过，就直接 500 CONFIG_MISSING。
+ *
+ * 只对 cookieDomain 做强制（它是跨域共享登录态的唯一依据）；cookiePath / onlinetime /
+ * httpSecureAccess 缺失时用火鸟默认值（siteConfig.inc.php:35-49），它们最多影响 Cookie 的
+ * 有效期与 secure 标记，不会造成「看起来登录成功」的静默错位。
+ *
+ * @return array [cfg|null, error|null]  error = ['code'=>..,'message'=>..]
+ */
+function fbs_gateway_load_site_config(array $context)
+{
+    if (array_key_exists('config', $context)) {
+        // 测试注入：只补齐缺省项，不做「文件是否存在」判断（注入本身就是显式覆盖）
+        if (!is_array($context['config'])) {
+            return array(null, array('code' => 'CONFIG_INVALID', 'message' => 'site config is not an array'));
+        }
+        $c = $context['config'];
+        return array(array(
+            'cookiePath'       => (isset($c['cookiePath']) && $c['cookiePath'] !== '') ? (string)$c['cookiePath'] : '/',
+            'cookieDomain'     => isset($c['cookieDomain']) ? (string)$c['cookieDomain'] : '',
+            'cookiePre'        => (isset($c['cookiePre']) && $c['cookiePre'] !== '') ? (string)$c['cookiePre'] : 'HN_',
+            'onlinetime'       => (isset($c['onlinetime']) && (int)$c['onlinetime'] > 0) ? (int)$c['onlinetime'] : 100,
+            'httpSecureAccess' => isset($c['httpSecureAccess']) ? (int)$c['httpSecureAccess'] : 1,
+        ), null);
+    }
+
+    $file = fbs_gateway_site_config_file();
+    if (!is_file($file) || !is_readable($file)) {
+        error_log('[fbs_gateway] site config missing/unreadable: ' . $file);
+        return array(null, array('code' => 'CONFIG_MISSING', 'message' => 'data/cache/config.php not found'));
+    }
+
+    $loaded = (static function ($__file) {
+        $cfg_cookiePath = $cfg_cookieDomain = $cfg_onlinetime = $cfg_httpSecureAccess = null;
+        include $__file;
+        return array(
+            'cookiePath'       => $cfg_cookiePath,
+            'cookieDomain'     => $cfg_cookieDomain,
+            'onlinetime'       => $cfg_onlinetime,
+            'httpSecureAccess' => $cfg_httpSecureAccess,
+        );
+    })($file);
+
+    if (!is_array($loaded) || !array_key_exists('cookieDomain', $loaded) || $loaded['cookieDomain'] === null) {
+        error_log('[fbs_gateway] site config does not define $cfg_cookieDomain: ' . $file);
+        return array(null, array('code' => 'CONFIG_MISSING', 'message' => 'cookieDomain is not configured'));
+    }
+
+    $cfg = array(
+        'cookiePath'       => (is_string($loaded['cookiePath']) && $loaded['cookiePath'] !== '') ? $loaded['cookiePath'] : '/',
+        'cookieDomain'     => (string)$loaded['cookieDomain'],
+        // 与 common.inc.php:86 一致：原生在加载配置后仍硬编码 $cfg_cookiePre='HN_'
+        'cookiePre'        => 'HN_',
+        'onlinetime'       => (is_numeric($loaded['onlinetime']) && (int)$loaded['onlinetime'] > 0) ? (int)$loaded['onlinetime'] : 100,
+        'httpSecureAccess' => ($loaded['httpSecureAccess'] !== null && $loaded['httpSecureAccess'] !== '')
+            ? (int)$loaded['httpSecureAccess'] : 1,
+    );
+
+    return array($cfg, null);
+}
+
+/* ============================== 防重放 ============================== */
+
+/**
+ * 记账并判断是否超限。放行返回 null，否则 ['code'=>..,'message'=>..]。
+ *
+ * 复用 bridge.php:198-248 的 fbs_bridge_replay_check()（不新增表、不新增存储）。
+ * 传入的是 sha256(initData) 的十六进制串，函数内部会再 hash 一次，因此键空间与
+ * bridge.php 直连路径（用的是 initData 原文）天然隔离，两条路径的配额不会互相挤占。
+ *
+ * @param string $initDataHash
+ * @param array  $context  可注入 replay_dir（测试用）
+ */
+function fbs_gateway_replay_guard($initDataHash, array $context)
+{
+    $dir = array_key_exists('replay_dir', $context) ? $context['replay_dir'] : null;
+    list($allowed, $count) = fbs_bridge_replay_check($initDataHash, $dir);
+
+    // count===0 只可能来自两条 fail-open 分支（目录不可写 / 拿不到 flock，见 bridge.php:211-213、241-243）。
+    // 保持 fail-open（登录可用性优先于该辅助防护），但必须留痕：否则重放防护静默关闭，没人知道。
+    if ($count === 0) {
+        error_log('[fbs_gateway] replay store unavailable, replay protection is OFF (fail-open)');
+        return null;
+    }
+
+    if (!$allowed) {
+        error_log('[fbs_gateway] replay limited: count=' . $count);
+        return array('code' => 'REPLAY_LIMITED', 'message' => 'too many logins with the same init data');
+    }
+    return null;
+}
+
 /* ============================== 会员：带注销态的门禁 ============================== */
 
 /**
@@ -251,6 +372,60 @@ function fbs_gateway_member_guard(array $row)
 }
 
 /**
+ * 拿建号命名锁（MySQL GET_LOCK）。返回 ['name'=>string|null, 'error'=>array|null]。
+ *
+ * 为什么需要：member.username 在火鸟库里只有普通索引、没有唯一约束（本步不改表结构），
+ * 并发首登会插出两行同 username 的会员；随后 fbs_gateway_lookup_member() 用 LIMIT 1，
+ * 可能稳定命中「另一行」——表现为同一 TG 用户看到自己另一个空账号的订单。
+ * GET_LOCK 是库级全局的，多 Pod 下同样有效（前提是连同一个库）。
+ *
+ * 非 MySQL 驱动（测试用 SQLite）没有 GET_LOCK，直接跳过：不影响被测逻辑，
+ * 锁本身靠 code review + 本机 mysql 容器验证。
+ *
+ * @return array ['name'=>string|null, 'error'=>array|null]
+ */
+function fbs_gateway_member_lock(PDO $pdo, $tgUserId, $timeoutSeconds = 3)
+{
+    try {
+        $driver = (string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    } catch (Throwable $e) {
+        $driver = '';
+    }
+    if ($driver !== 'mysql') {
+        return array('name' => null, 'error' => null);
+    }
+
+    $name = 'fbs_member_create_' . (int)$tgUserId; // 固定前缀 + 纯数字，长度远小于 MySQL 的 64 字符上限
+    try {
+        $stmt = $pdo->prepare('SELECT GET_LOCK(?, ?)');
+        $stmt->execute(array($name, (int)$timeoutSeconds));
+        $got = $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] GET_LOCK failed: ' . $e->getMessage());
+        return array('name' => null, 'error' => array('code' => 'DB_UNAVAILABLE', 'message' => 'member create lock unavailable'));
+    }
+
+    // GET_LOCK: 1=拿到，0=超时，NULL=出错。后两者一律按瞬态故障处理，让客户端稍后重试。
+    if ((int)$got !== 1) {
+        error_log('[fbs_gateway] GET_LOCK timeout for ' . $name);
+        return array('name' => null, 'error' => array('code' => 'DB_UNAVAILABLE', 'message' => 'member create lock timeout'));
+    }
+    return array('name' => $name, 'error' => null);
+}
+
+/** 释放命名锁。失败只记日志：会话结束/连接关闭时 MySQL 也会自动释放。 */
+function fbs_gateway_member_unlock(PDO $pdo, $name)
+{
+    if (!is_string($name) || $name === '') return;
+    try {
+        $stmt = $pdo->prepare('SELECT RELEASE_LOCK(?)');
+        $stmt->execute(array($name));
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] RELEASE_LOCK failed: ' . $e->getMessage());
+    }
+}
+
+/**
  * 查 / 建会员并过门禁。
  *
  * @return array [member|null, created(bool), error|null]
@@ -266,18 +441,35 @@ function fbs_gateway_resolve_member(PDO $pdo, $prefix, $tgUserId, array $meta)
         return array(array('id' => (int)$row['id'], 'password' => (string)$row['password']), false, null);
     }
 
-    // 不存在才交给 bridge 建号（它内部 INSERT 的字段集与火鸟第三方登录模板一致）
-    list($status, $member, $created, $error) = fbs_bridge_find_or_create_member($pdo, $prefix, $tgUserId, $meta);
-    if ($member === null) {
-        if ($error === 'member_disabled') {
-            return array(null, false, array('code' => 'MEMBER_DISABLED', 'message' => 'member is not active'));
+    // 首登：把「查 + 建」串行化（详见 fbs_gateway_member_lock 的说明）
+    $lock = fbs_gateway_member_lock($pdo, $tgUserId);
+    if ($lock['error'] !== null) return array(null, false, $lock['error']);
+
+    try {
+        // 拿到锁之后必须复查：先到的请求可能已经建好
+        list($row, $lookupError) = fbs_gateway_lookup_member($pdo, $prefix, $tgUserId);
+        if ($lookupError !== null) return array(null, false, $lookupError);
+        if ($row) {
+            $denied = fbs_gateway_member_guard($row);
+            if ($denied !== null) return array(null, false, $denied);
+            return array(array('id' => (int)$row['id'], 'password' => (string)$row['password']), false, null);
         }
-        if ($error === 'db_unavailable') {
-            return array(null, false, array('code' => 'DB_QUERY_FAILED', 'message' => 'member lookup failed'));
+
+        // 不存在才交给 bridge 建号（它内部 INSERT 的字段集与火鸟第三方登录模板一致）
+        list($status, $member, $created, $error) = fbs_bridge_find_or_create_member($pdo, $prefix, $tgUserId, $meta);
+        if ($member === null) {
+            if ($error === 'member_disabled') {
+                return array(null, false, array('code' => 'MEMBER_DISABLED', 'message' => 'member is not active'));
+            }
+            if ($error === 'db_unavailable') {
+                return array(null, false, array('code' => 'DB_QUERY_FAILED', 'message' => 'member lookup failed'));
+            }
+            return array(null, false, array('code' => 'MEMBER_CREATE_FAILED', 'message' => 'failed to create member'));
         }
-        return array(null, false, array('code' => 'MEMBER_CREATE_FAILED', 'message' => 'failed to create member'));
+        return array($member, (bool)$created, null);
+    } finally {
+        fbs_gateway_member_unlock($pdo, $lock['name']);
     }
-    return array($member, (bool)$created, null);
 }
 
 /* ============================== 标记 Cookie（HN_tg） ============================== */
@@ -364,6 +556,11 @@ function fbs_gateway_action_issue_session(array $params, array $context)
     if ($tgUserId === null) {
         return fbs_gateway_err(400, 'MISSING_PARAM', 'tg_user_id must be a positive integer');
     }
+    // 必填：没有它就无法记账，静默跳过等于把防重放关掉而没人知道
+    $initDataHash = fbs_gateway_parse_init_data_hash(isset($params['init_data_hash']) ? $params['init_data_hash'] : null);
+    if ($initDataHash === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'init_data_hash must be sha256 hex (64 chars)');
+    }
 
     list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
     if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
@@ -383,15 +580,21 @@ function fbs_gateway_action_issue_session(array $params, array $context)
         return fbs_gateway_err($http, $error['code'], $error['message']);
     }
 
+    // fail-closed：站点配置读不到就报错，不拿 cookieDomain='' 之类的默认值凑（见函数说明）
+    list($cfg, $cfgError) = fbs_gateway_load_site_config($context);
+    if ($cfgError !== null) {
+        return fbs_gateway_err(500, $cfgError['code'], $cfgError['message']);
+    }
+
+    // 记账放在「会员解析成功之后、签发 Cookie 之前」：
+    // 被禁用/已注销/建号失败/配置缺失这类失败路径都不消耗额度，用户修好后不会先撞上 429。
+    // （bridge.php 的直连入口是先记账再查库，那个顺序会把失败也计入，这里刻意不抄。）
+    $replayDenied = fbs_gateway_replay_guard($initDataHash, $context);
+    if ($replayDenied !== null) {
+        return fbs_gateway_err(429, $replayDenied['code'], $replayDenied['message']);
+    }
+
     $now = isset($context['now']) ? (int)$context['now'] : time();
-    $cfg = isset($context['config']) ? $context['config'] : fbs_bridge_load_site_config();
-    $cfg = array_merge(array(
-        'cookiePath'       => '/',
-        'cookieDomain'     => '',
-        'cookiePre'        => 'HN_',
-        'onlinetime'       => 100,
-        'httpSecureAccess' => 1,
-    ), is_array($cfg) ? $cfg : array());
 
     // 与原生 keepUser 一致：距上次在线超过 60s 才刷新 online（失败不影响登录态）
     try {

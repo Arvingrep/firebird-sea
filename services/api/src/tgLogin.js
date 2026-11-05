@@ -6,6 +6,10 @@
 //       → Node 验签（1 小时时效）→ 网关 member_find_or_create + issue_session
 //       → 把网关给的完整 Set-Cookie 原样透传 → 落地页跳 /
 //
+// 防重放：initData 在有效期内本身可以无限次重放（Telegram 不提供一次性 nonce），所以
+//   issue_session 会带上 sha256(initData) 让网关记账（bridge.php 的 5 次/2h 配额）。
+//   只传 hash，不传原文 —— 原文里有用户资料，没必要扩大暴露面。
+//
 // 设计取舍（为什么 Node 不自己拼 Cookie）：
 //   HN_login_user 的值是 base64(RenrenCrypt::php_encrypt("<id>&<password 列值>"))，是双重 base64
 //   且依赖火鸟运行时的 cookieDomain / httpSecureAccess / onlinetime。这些只在 PHP 侧有一份权威实现
@@ -17,8 +21,9 @@
 //   不要照抄 /auth/tg-verify（server.js:44-74）的字符串形 {success:false,error:'...'}——新近功能
 //   （checkout / call-test）一律对象形，顾客侧已依赖 /auth/tg-verify 的旧形状，故那条不动。
 
+const crypto = require('node:crypto');
+
 const LOGIN_MAX_AGE_SECONDS = 3600; // 登录用 1 小时；收银台仍走 telegramAuth 默认 24h
-const SAFE_TABLE_PREFIX = /^[A-Za-z0-9_]{1,32}$/;
 
 // 登录专属的 code → HTTP 码表。
 //
@@ -96,15 +101,36 @@ function gatewayFailureCode(err) {
   return 'GATEWAY_UNAVAILABLE'; // 连不上 / 返回非契约 HTML 等
 }
 
+// 拼进 SQL 的整数，先过 Number.isSafeInteger 再转字符串。
+//
+// 为什么不是 conn.execute(sql, params)：唯一的连接实现是 migrate.js:37-55 的 cliConn，
+// 它把 SQL 从 stdin 喂给 mariadb 命令行客户端，**没有 bind 参数通道**（对象上只有 query）。
+// 因此用等价保证：值必须是 Number 类型的正安全整数，转成文本后只可能是 [0-9]+，
+// 不含任何引号/空格/注释符 —— 拼接结果与参数化在注入面上等价。
+// 网关返回值也走这里：'来自内部' 不等于 '可信'（B1 就是网关侧表名/类型问题的前车之鉴）。
+function sqlInt(value, label) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${label} is not a positive safe integer`);
+  }
+  return String(value);
+}
+
 // fbs_member_map：tg_user_id ↔ 火鸟会员 id。收银台的归属校验读这张表。
+//
+// 表名**不带 DB_TABLE_PREFIX**：`fbs_*` 是我们自己的表，由 services/api/migrations/001_fbs_tables.sql:77
+// 以裸名创建，migrate.js 原样执行不做前缀替换；读方 payOrderRead.js:51 也是裸名。
+// DB_TABLE_PREFIX 只服务于火鸟原生表（member / pay_log）。曾误写成 `${prefix}fbs_member_map`，
+// 会让写入恒定 1146 失败 → 表永远为空 → 收银台 assertOwnership 恒 403（"能登录、不能下单"）。
+//
 // fail-open：写失败不阻断登录（登录态已由 cookie 建立），但必须留痕 —— 这是"登录成功但收银台 403"
 // 的唯一线索，所以既打结构化 error 日志（不含堆栈），又把 member_map_synced 带进响应体。
 // @return {boolean} 是否已同步（无连接对象时视为未接线，返回 true 以免误报）
-async function upsertMemberMap(conn, prefix, tgUserId, memberId) {
+async function upsertMemberMap(conn, tgUserId, memberId) {
   if (!conn) return true;
-  if (!SAFE_TABLE_PREFIX.test(prefix || '')) throw new Error('invalid table prefix');
+  const tg = sqlInt(tgUserId, 'tg_user_id');
+  const mid = sqlInt(memberId, 'member_id');
   const sql =
-    `INSERT INTO \`${prefix}fbs_member_map\` (tg_user_id, member_id) VALUES ('${tgUserId}', ${memberId}) ` +
+    `INSERT INTO \`fbs_member_map\` (tg_user_id, member_id) VALUES ('${tg}', ${mid}) ` +
     'ON DUPLICATE KEY UPDATE member_id = VALUES(member_id)';
   await conn().query(sql);
   return true;
@@ -113,7 +139,6 @@ async function upsertMemberMap(conn, prefix, tgUserId, memberId) {
 // deps：{ env, validateInitData, botToken, gateway, conn, now }，测试全部可注入。
 function createTgLoginRouter(deps) {
   const { env = process.env, validateInitData, botToken, gateway, conn, now = Date.now } = deps;
-  const tablePrefix = env.DB_TABLE_PREFIX || 'huoniao_';
 
   return async function telegramWebLogin(req, res) {
     const baseUrl = env.FBS_GATEWAY_URL;
@@ -153,6 +178,9 @@ function createTgLoginRouter(deps) {
       if (typeof auth.user[key] === 'string' && auth.user[key] !== '') params[key] = auth.user[key];
     }
 
+    // 只把 hash 交给网关记账，原文不出 Node（原文含用户资料，且网关不需要它）
+    const initDataHash = crypto.createHash('sha256').update(initData).digest('hex');
+
     let member;
     let session;
     try {
@@ -163,10 +191,15 @@ function createTgLoginRouter(deps) {
         return sendError(res, 'GATEWAY_UNAVAILABLE');
       }
 
-      session = await gateway.issueSession(cfg, { tg_user_id: tgUserId });
+      session = await gateway.issueSession(cfg, { tg_user_id: tgUserId, init_data_hash: initDataHash });
       if (!session || session.success !== true || !session.data
           || !Array.isArray(session.data.set_cookies) || session.data.set_cookies.length === 0) {
         logStderr('auth/telegram-web', 'issue_session 未返回 set_cookies');
+        return sendError(res, 'GATEWAY_UNAVAILABLE');
+      }
+      // member_id 会被写进 fbs_member_map，并原样回给前端：非正整数一律按契约违约处理
+      if (!Number.isSafeInteger(Number(session.data.member_id)) || Number(session.data.member_id) <= 0) {
+        logStderr('auth/telegram-web', 'issue_session 返回的 member_id 非法');
         return sendError(res, 'GATEWAY_UNAVAILABLE');
       }
     } catch (err) {
@@ -182,7 +215,7 @@ function createTgLoginRouter(deps) {
 
     let memberMapSynced = false;
     try {
-      memberMapSynced = (await upsertMemberMap(conn, tablePrefix, tgUserId, memberId)) === true;
+      memberMapSynced = (await upsertMemberMap(conn, tgUserId, memberId)) === true;
     } catch (err) {
       // 结构化留痕：不打堆栈、不带 SQL 全文
       process.stderr.write(`${JSON.stringify({

@@ -16,13 +16,18 @@ const PORT = parseInt(process.env.TG_BOT_PORT || '3001', 10);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/tg-input';
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || '';
+// 顾客站点的对外域名（如 https://fh580.net）。用于 /start 的 web_app 按钮。
+// 必须由环境变量给：不在运行时从火鸟配置推断（cron/CLI 下 $cfg_basehost 会落到 fbird.men）。
+const APP_BASE_URL = (process.env.TG_APP_BASE_URL || '').trim();
 
 const ROOT_DIR = path.resolve(__dirname, '../../..');
 
 // --- 1. 发送 Telegram 消息工具函数 ---
 function sendTelegramMessage(chatId, text, replyMarkup = null) {
   if (!BOT_TOKEN) {
-    console.log(`[TG-BOT:MOCK] 发送消息至 Chat ID ${chatId}: \n${text}`);
+    // mock 模式把 reply_markup 一起打出来：测试据此断言按钮（含 web_app）真的生成了
+    console.log(`[TG-BOT:MOCK] 发送消息至 Chat ID ${chatId}: \n${text}` +
+      (replyMarkup ? `\nmarkup=${JSON.stringify(replyMarkup)}` : ''));
     return Promise.resolve({ ok: true, mock: true });
   }
 
@@ -63,6 +68,19 @@ function sendTelegramMessage(chatId, text, replyMarkup = null) {
   });
 }
 
+// 顾客免密登录入口（Telegram Mini App）。域名来自 TG_APP_BASE_URL，未配置/非法返回 ''。
+// 必须是 https：Telegram 只接受 https 的 web_app URL，http 会让整条消息发送失败。
+function customerEntryUrl(base) {
+  const raw = String(base || '').trim().replace(/\/+$/, '');
+  if (raw === '') return '';
+  try {
+    if (new URL(raw).protocol !== 'https:') return '';
+  } catch (_) {
+    return '';
+  }
+  return `${raw}/tg/entry.php?role=customer`;
+}
+
 // --- 2. 核心消息处理器 ---
 async function handleIncomingMessage(msg) {
   const chatId = msg.chat?.id;
@@ -83,12 +101,18 @@ async function handleIncomingMessage(msg) {
 ━━━━━━━━━━━━━━━━━━━━
 💡 请直接在此发送任何需求，我将为您启动自动化闭环！
 `;
-    const markup = {
-      inline_keyboard: [
-        [{ text: '📋 查看 BMAD 看板', url: 'https://github.com/arvin/firebird-sea/projects' }],
-        [{ text: '📊 实时系统探针', callback_data: 'check_status' }]
-      ]
-    };
+    const rows = [];
+    // web_app 按钮只在私聊里合法：群里带上它会让整条 sendMessage 被 Telegram 拒绝
+    const isPrivate = !msg.chat?.type || msg.chat.type === 'private';
+    const entryUrl = customerEntryUrl(APP_BASE_URL);
+    if (entryUrl && isPrivate) {
+      rows.push([{ text: '🛒 打开商店', web_app: { url: entryUrl } }]);
+    } else if (!entryUrl) {
+      console.error('[TG-BOT] TG_APP_BASE_URL 未配置或不是 https，/start 缺少「打开商店」入口');
+    }
+    rows.push([{ text: '📋 查看 BMAD 看板', url: 'https://github.com/arvin/firebird-sea/projects' }]);
+    rows.push([{ text: '📊 实时系统探针', callback_data: 'check_status' }]);
+    const markup = { inline_keyboard: rows };
     return sendTelegramMessage(chatId, welcome, markup);
   }
 

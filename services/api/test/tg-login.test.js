@@ -1,7 +1,7 @@
 // Telegram 顾客免密登录桥路由测试：直接挂载 createTgLoginRouter，注入假验签与假网关（不连真库、不连真网关）。
 // 覆盖：对象形响应（success/data、success/error.code）/ 验签失败 401 / 过期 401（1 小时）/
 //       happy path 200 + Set-Cookie 原样透传 / 网关未配置 / 网关 success:false 的 code 透传与 HTTP 码映射 /
-//       role=courier 501 / fbs_member_map 幂等 upsert。
+//       role=courier 501 / 防重放只传 sha256 / 非法 member_id 502 / fbs_member_map 幂等 upsert（裸表名）。
 const test = require('node:test');
 const assert = require('node:assert');
 const http = require('node:http');
@@ -12,6 +12,7 @@ const { validateTelegramInitData } = require('../src/telegramAuth');
 
 const BOT_TOKEN = 'test-bot-token-not-a-secret';
 const nowSec = () => Math.floor(Date.now() / 1000);
+const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
 function signInitData(fields, token = BOT_TOKEN) {
   const check = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join('\n');
@@ -113,7 +114,10 @@ test('happy path：对象形成功体 + Set-Cookie 原样透传（不增不删�
     assert.deepStrictEqual(r.headers['set-cookie'], COOKIES, 'Set-Cookie 必须逐字节等于网关返回值');
     assert.strictEqual(gw.calls.member.length, 1);
     assert.strictEqual(gw.calls.session.length, 1);
-    assert.deepStrictEqual(gw.calls.session[0].params, { tg_user_id: 100200 }, 'issue_session 入参只允许 tg_user_id');
+    // 防重放：只传 initData 的 sha256，原文不出 Node
+    assert.deepStrictEqual(gw.calls.session[0].params, { tg_user_id: 100200, init_data_hash: sha256('good') },
+      'issue_session 入参只允许 tg_user_id + init_data_hash');
+    assert.ok(!JSON.stringify(gw.calls.session[0].params).includes('"good"'), '不得把 initData 原文传给网关');
     assert.strictEqual(gw.calls.member[0].params.first_name, 'M');
     assert.strictEqual(gw.calls.member[0].cfg.secret, 'gw-secret');
   } finally { server.close(); }
@@ -317,11 +321,40 @@ test('fbs_member_map 幂等 upsert：两次登录都执行 ON DUPLICATE KEY UPDA
     const mapSqls = db.sqls.filter((s) => s.includes('fbs_member_map'));
     assert.strictEqual(mapSqls.length, 2, '每次登录都要落一条 map 记录');
     for (const sql of mapSqls) {
-      assert.match(sql, /INSERT INTO `huoniao_fbs_member_map`/);
+      assert.match(sql, /INSERT INTO `fbs_member_map`/, 'fbs_* 是自有表，裸名，不带 DB_TABLE_PREFIX');
       assert.match(sql, /VALUES \('100200', 4242\)/);
       assert.match(sql, /ON DUPLICATE KEY UPDATE member_id = VALUES\(member_id\)/);
     }
   } finally { server.close(); }
+});
+
+test('fbs_member_map 表名不得带 DB_TABLE_PREFIX（回归 B1：带前缀会让写入恒 1146、收银台恒 403）', async () => {
+  const db = fakeDb();
+  const { server, port } = await startApp({ db, env: { DB_TABLE_PREFIX: 'huoniao_' } });
+  try {
+    const r = await post(port, { initData: 'good' });
+    assert.strictEqual(r.status, 200);
+    const mapSqls = db.sqls.filter((s) => s.includes('fbs_member_map'));
+    assert.ok(mapSqls.length > 0, '必须真的尝试写入');
+    for (const sql of mapSqls) {
+      assert.ok(sql.includes('INSERT INTO `fbs_member_map`'), `表名必须与 payOrderRead.js:51 一致：${sql}`);
+      assert.ok(!sql.includes('huoniao_fbs_member_map'), `不得出现任何前缀拼接：${sql}`);
+    }
+  } finally { server.close(); }
+});
+
+test('网关返回非法 member_id（非正整数）：502，不下发 Cookie、不写 map', async () => {
+  for (const bad of [0, -1, 'abc', null, 1.5]) {
+    const db = fakeDb();
+    const { server, port } = await startApp({ db, gateway: okGateway({ session: { member_id: bad } }) });
+    try {
+      const r = await post(port, { initData: 'good' });
+      assert.strictEqual(r.status, 502, `member_id=${JSON.stringify(bad)} 必须被拦住`);
+      assert.strictEqual(r.json.error.code, 'GATEWAY_UNAVAILABLE');
+      assert.strictEqual(r.headers['set-cookie'], undefined);
+      assert.strictEqual(db.sqls.length, 0);
+    } finally { server.close(); }
+  }
 });
 
 test('fbs_member_map 写失败不影响登录态（cookie 已下发），但响应体标记 member_map_synced=false', async () => {
