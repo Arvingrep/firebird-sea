@@ -352,6 +352,29 @@ list($allowed, $count) = fbs_bridge_replay_check(hash('sha256', $material), $REP
 check('G4b 与 bridge.php 直连路径键空间隔离（原文刷满不影响 hash 键）',
     $allowed === true && $count === 1, "allowed=" . var_export($allowed, true) . " count=$count");
 
+printf("\n==== G4c 失败路径零消耗（team-lead 指定场景：3 失败 + 5 成功 + 第 6 次 429）====\n");
+
+$mixedHash = init_hash('mixed');
+$pdoDis = make_pdo();
+$pdoDis->exec("INSERT INTO `huoniao_member` (`username`,`password`,`state`,`online`,`is_cancellation`) VALUES ('tg_7001','x',0,0,0)");
+$pdoEmpty = new PDO('sqlite::memory:');   // 没有 member 表 → DB_QUERY_FAILED
+
+$failCodes = array();
+list($code, $payload) = call_gw('issue_session', session_params(7001, $mixedHash), ctx($pdoDis));    $failCodes[] = $code; // 禁用
+list($code, $payload) = call_gw('issue_session', session_params(7002, $mixedHash), ctx($pdoEmpty));  $failCodes[] = $code; // DB 错
+list($code, $payload) = call_gw('issue_session', session_params(997, $mixedHash), ctx($pdoCancel));  $failCodes[] = $code; // 已注销
+check('G4c 先打 3 次必失败（禁用 / DB 错 / 已注销）→ 403,500,403',
+    $failCodes === array(403, 500, 403), json_encode($failCodes));
+
+$pdoGood = make_pdo();
+$codes = array();
+for ($i = 0; $i < 6; $i++) {
+    list($code, $payload) = call_gw('issue_session', session_params(7004, $mixedHash), ctx($pdoGood));
+    $codes[] = $code;
+}
+check('G4c 同一 hash 走成功路径：前 5 次 200、第 6 次才 429（前面 3 次失败一次都没扣额度）',
+    $codes === array(200, 200, 200, 200, 200, 429), json_encode($codes));
+
 printf("\n==== G5 异常不外泄 ====\n");
 
 list($code, $payload) = call_gw('issue_session', session_params(4242, init_hash('g5')), ctx(new PDO('sqlite::memory:')));
@@ -414,9 +437,12 @@ check('G7 配置里显式写了空 cookieDomain（火鸟允许的 host-only）�
 
 printf("\n==== G8 建号命名锁（S2）====\n");
 
-list($lockName, $lockErr) = fbs_gateway_member_lock($pdoCfg, 8888);
+// 注意：返回值是 ['name'=>..,'error'=>..] 字符串键，不能用 list() 取（list 只认 0/1，会恒得 null）
+$lockResult = fbs_gateway_member_lock($pdoCfg, 8888);
 check('G8 非 MySQL 驱动（SQLite 测试库）跳过 GET_LOCK，不误报 503',
-    $lockName === null && $lockErr === null, 'name=' . var_export($lockName, true));
+    array_key_exists('name', $lockResult) && $lockResult['name'] === null
+    && array_key_exists('error', $lockResult) && $lockResult['error'] === null,
+    json_encode($lockResult));
 
 // 同一 TG 用户反复走首登路径（SQLite 无并发能力，这里只验证复查逻辑不会重复建号）
 $pdoDup = make_pdo();

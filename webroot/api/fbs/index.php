@@ -410,6 +410,30 @@ function fbs_gateway_member_lock(PDO $pdo, $tgUserId, $timeoutSeconds = 3)
         error_log('[fbs_gateway] GET_LOCK timeout for ' . $name);
         return array('name' => null, 'error' => array('code' => 'DB_UNAVAILABLE', 'message' => 'member create lock timeout'));
     }
+
+    // 自证：锁必须由「本条连接」持有。
+    // GET_LOCK 是连接级的，在 A 连接取、B 连接放等于没加锁（锁会一直挂在 A 上直到 A 断开），
+    // 这种实现「并发跑起来也像是好的」，最难查。所以每次取锁后多问一句 IS_USED_LOCK 是不是自己：
+    // 将来若有人把这里改成连接池 / 每条语句一个连接，这一句会立刻失配 → 503，而不是静默变摆设。
+    try {
+        $stmt = $pdo->prepare('SELECT IS_USED_LOCK(?) AS holder, CONNECTION_ID() AS me');
+        $stmt->execute(array($name));
+        $holderRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] lock self-check failed: ' . $e->getMessage());
+        fbs_gateway_member_unlock($pdo, $name);
+        return array('name' => null, 'error' => array('code' => 'DB_UNAVAILABLE', 'message' => 'member create lock unavailable'));
+    }
+
+    $holder = $holderRow ? $holderRow['holder'] : null;
+    $me     = $holderRow ? $holderRow['me'] : null;
+    if ($holder === null || $me === null || (int)$holder !== (int)$me) {
+        error_log('[fbs_gateway] lock not held by this connection: holder=' . var_export($holder, true)
+            . ' me=' . var_export($me, true) . ' name=' . $name);
+        fbs_gateway_member_unlock($pdo, $name);
+        return array('name' => null, 'error' => array('code' => 'DB_UNAVAILABLE', 'message' => 'member create lock not held by this connection'));
+    }
+
     return array('name' => $name, 'error' => null);
 }
 
