@@ -108,6 +108,7 @@ test('happy path：对象形成功体 + Set-Cookie 原样透传（不增不删�
     assert.strictEqual(r.json.success, true);
     assert.strictEqual(r.json.data.member_id, 4242);
     assert.strictEqual(r.json.data.redirect, '/');
+    assert.strictEqual(r.json.data.member_map_synced, true);
     assert.strictEqual(r.json.error, undefined);
     assert.deepStrictEqual(r.headers['set-cookie'], COOKIES, 'Set-Cookie 必须逐字节等于网关返回值');
     assert.strictEqual(gw.calls.member.length, 1);
@@ -208,7 +209,7 @@ test('网关 success:false 的 code 原样透传，HTTP 码按登录专属表映
     [429, 'REPLAY_LIMITED', 429],
     [400, 'MISSING_PARAM', 400],
     [503, 'GATEWAY_SECRET_NOT_CONFIGURED', 500],
-    [500, 'DB_UNAVAILABLE', 503], // 有意改判
+    [500, 'DB_UNAVAILABLE', 503], // 有意改判：瞬态依赖故障，重试有效
     [500, 'DB_QUERY_FAILED', 500],
     [500, 'INTERNAL_ERROR', 500]
   ];
@@ -220,8 +221,53 @@ test('网关 success:false 的 code 原样透传，HTTP 码按登录专属表映
       assert.strictEqual(r.status, expectStatus, `${gwCode} → ${expectStatus}`);
       assert.strictEqual(r.json.success, false);
       assert.ok(!JSON.stringify(r.json).includes('gateway said so'), '不得把网关原文 message 透给前端');
+      if (expectStatus === 503) {
+        assert.strictEqual(r.headers['retry-after'], '60', '503 需带 Retry-After');
+      } else {
+        assert.strictEqual(r.headers['retry-after'], undefined);
+      }
     } finally { server.close(); }
   }
+});
+
+test('gatewayClient：POST 到 /api/fbs/index.php，action 在 body，签名可复算', async () => {
+  const gw = require('../src/gatewayClient');
+  const seen = {};
+  const server = http.createServer((req, res) => {
+    let data = '';
+    req.on('data', (c) => { data += c; });
+    req.on('end', () => {
+      seen.url = req.url;
+      seen.body = data;
+      seen.headers = req.headers;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: true, data: { member_id: 1, created: true } }));
+    });
+  });
+  await new Promise((r) => server.listen(0, r));
+  const port = server.address().port;
+  try {
+    const r = await gw.memberFindOrCreate({ baseUrl: `http://127.0.0.1:${port}`, secret: 's3cr3t' }, { tg_user_id: 42 });
+    assert.strictEqual(seen.url, '/api/fbs/index.php', '路径必须带 .php，否则会被火鸟前端控制器截走');
+    assert.deepStrictEqual(JSON.parse(seen.body), { action: 'member_find_or_create', params: { tg_user_id: 42 } });
+    assert.strictEqual(
+      seen.headers['x-fbs-signature'],
+      gw.sign('s3cr3t', seen.headers['x-fbs-timestamp'], 'member_find_or_create', seen.body)
+    );
+    assert.strictEqual(r.success, true);
+  } finally { server.close(); }
+
+  // baseUrl 误带路径也不会拼出双路径
+  const server2 = http.createServer((req, res) => {
+    seen.url2 = req.url;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ success: true, data: {} }));
+  });
+  await new Promise((r) => server2.listen(0, r));
+  try {
+    await gw.issueSession({ baseUrl: `http://127.0.0.1:${server2.address().port}/wrong/prefix`, secret: 's' }, { tg_user_id: 1 });
+    assert.strictEqual(seen.url2, '/api/fbs/index.php');
+  } finally { server2.close(); }
 });
 
 test('未识别码：透传 code 本身（动态），HTTP 落 500 而不是 503', async () => {
@@ -278,12 +324,14 @@ test('fbs_member_map 幂等 upsert：两次登录都执行 ON DUPLICATE KEY UPDA
   } finally { server.close(); }
 });
 
-test('fbs_member_map 写失败不影响登录态（cookie 已下发）', async () => {
+test('fbs_member_map 写失败不影响登录态（cookie 已下发），但响应体标记 member_map_synced=false', async () => {
   const db = { sqls: [], query: async () => { throw new Error('db down'); } };
   const { server, port } = await startApp({ db });
   try {
     const r = await post(port, { initData: 'good' });
     assert.strictEqual(r.status, 200);
     assert.deepStrictEqual(r.headers['set-cookie'], COOKIES);
+    assert.strictEqual(r.json.success, true);
+    assert.strictEqual(r.json.data.member_map_synced, false, '必须留下可定位的痕迹，不能静默吞掉');
   } finally { server.close(); }
 });

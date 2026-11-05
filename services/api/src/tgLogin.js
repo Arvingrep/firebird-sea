@@ -81,6 +81,9 @@ function messageForCode(code) {
 
 function sendError(res, code, message) {
   const status = statusForLoginCode(code);
+  // 503 是「重试有用」的瞬态故障：给 Retry-After 让客户端/网关有据可依。
+  // 落地页本身不自动重试（同一份 initData 每次重试都扣一次重放额度，见 entry.php 说明）。
+  if (status === 503) res.setHeader('Retry-After', '60');
   return res.status(status).json({ success: false, error: { code, message: message || messageForCode(code) } });
 }
 
@@ -94,14 +97,17 @@ function gatewayFailureCode(err) {
 }
 
 // fbs_member_map：tg_user_id ↔ 火鸟会员 id。收银台的归属校验读这张表。
-// 失败不阻断登录（登录态已由 cookie 建立），只落日志——该缺口在报告里登记。
+// fail-open：写失败不阻断登录（登录态已由 cookie 建立），但必须留痕 —— 这是"登录成功但收银台 403"
+// 的唯一线索，所以既打结构化 error 日志（不含堆栈），又把 member_map_synced 带进响应体。
+// @return {boolean} 是否已同步（无连接对象时视为未接线，返回 true 以免误报）
 async function upsertMemberMap(conn, prefix, tgUserId, memberId) {
-  if (!conn) return;
+  if (!conn) return true;
   if (!SAFE_TABLE_PREFIX.test(prefix || '')) throw new Error('invalid table prefix');
   const sql =
     `INSERT INTO \`${prefix}fbs_member_map\` (tg_user_id, member_id) VALUES ('${tgUserId}', ${memberId}) ` +
     'ON DUPLICATE KEY UPDATE member_id = VALUES(member_id)';
   await conn().query(sql);
+  return true;
 }
 
 // deps：{ env, validateInitData, botToken, gateway, conn, now }，测试全部可注入。
@@ -174,17 +180,26 @@ function createTgLoginRouter(deps) {
     // Cookie 原样透传：不增、不删、不改属性、不重新排序
     res.setHeader('Set-Cookie', session.data.set_cookies);
 
+    let memberMapSynced = false;
     try {
-      await upsertMemberMap(conn, tablePrefix, tgUserId, memberId);
+      memberMapSynced = (await upsertMemberMap(conn, tablePrefix, tgUserId, memberId)) === true;
     } catch (err) {
-      logStderr('auth/telegram-web', `fbs_member_map 写入失败 tg=${tgUserId} member=${memberId}: ${err && err.message}`);
+      // 结构化留痕：不打堆栈、不带 SQL 全文
+      process.stderr.write(`${JSON.stringify({
+        level: 'error',
+        route: 'auth/telegram-web',
+        event: 'member_map_sync_failed',
+        tg_user_id: tgUserId,
+        member_id: memberId,
+        reason: err && err.message
+      })}\n`);
     }
 
     // 200 + JSON 而不是 302：落地页用 fetch 调本接口，跨重定向的 Set-Cookie 在部分 WebView 上
     // 不被采纳（Safari/iOS WebView 差异），200 响应上的 Set-Cookie 一定生效；由落地页自行 location.replace。
     return res.status(200).json({
       success: true,
-      data: { member_id: memberId, redirect: '/', at: now() }
+      data: { member_id: memberId, redirect: '/', member_map_synced: memberMapSynced, at: now() }
     });
   };
 }

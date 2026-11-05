@@ -41,12 +41,8 @@ if ($role !== 'customer') $role = 'customer';
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   .title { font-size: 17px; font-weight: 600; margin: 0 0 8px; }
-  .desc { font-size: 14px; color: #6b7280; margin: 0; word-break: break-word; }
-  .btn {
-    display: inline-block; margin-top: 20px; padding: 10px 28px; border: 0; border-radius: 999px;
-    background: #2563eb; color: #fff; font-size: 15px; cursor: pointer;
-  }
-  .btn:active { opacity: .8; }
+  .desc { font-size: 14px; color: #6b7280; margin: 0 0 10px; word-break: break-word; }
+  .code { font-size: 12px; color: #9ca3af; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .hidden { display: none; }
 </style>
 </head>
@@ -59,8 +55,9 @@ if ($role !== 'customer') $role = 'customer';
   </div>
   <div id="error" class="hidden">
     <p class="title">登录失败</p>
-    <p class="desc" id="error-text">请稍后重试</p>
-    <button type="button" class="btn" id="retry">重试</button>
+    <p class="desc" id="error-text">请关闭本页面，在 Telegram 中重新打开</p>
+    <p class="desc" id="error-detail"></p>
+    <p class="code" id="error-code"></p>
   </div>
 </div>
 
@@ -71,12 +68,20 @@ if ($role !== 'customer') $role = 'customer';
   var loadingEl = document.getElementById('loading');
   var errorEl = document.getElementById('error');
   var errorTextEl = document.getElementById('error-text');
-  var retryEl = document.getElementById('retry');
+  var errorDetailEl = document.getElementById('error-detail');
+  var errorCodeEl = document.getElementById('error-code');
 
-  function fail(message) {
+  // 刻意不提供"重试"按钮：同一份 initData 每提交一次都会先扣一次重放额度
+  // （bridge.php:844 记账早于 :856 触碰数据库；429 时 :236-238 仍继续自增；阈值 5、TTL 7200s 非滑动），
+  // 5 次之内用户会被锁 2 小时。重开 TMA 会拿到新的 initData，不受配额影响。
+  function fail(guide, detail, code) {
     loadingEl.className = 'hidden';
     errorEl.className = '';
-    errorTextEl.textContent = message || '请稍后重试';
+    errorTextEl.textContent = guide || '请关闭本页面，在 Telegram 中重新打开';
+    errorDetailEl.textContent = detail || '';
+    errorDetailEl.className = detail ? 'desc' : 'desc hidden';
+    errorCodeEl.textContent = code ? ('错误码：' + code) : '';
+    errorCodeEl.className = code ? 'code' : 'code hidden';
   }
 
   var tg = window.Telegram && window.Telegram.WebApp;
@@ -89,7 +94,7 @@ if ($role !== 'customer') $role = 'customer';
     var initData = (tg && tg.initData) || '';
     if (!initData) {
       // 非 Telegram 环境（或 WebView 未注入）：initData 恒为空，直接给出可读提示
-      fail('请在 Telegram 内打开本页面');
+      fail('请在 Telegram 内打开本页面', '', '');
       return;
     }
 
@@ -108,20 +113,14 @@ if ($role !== 'customer') $role = 'customer';
           location.replace((data.data && data.data.redirect) || '/');
           return;
         }
-        var msg = data && data.error && data.error.message;
-        if (!msg) {
-          if (res.status === 401) msg = '登录信息已过期，请重新打开';
-          else if (res.status === 500 || res.status === 502) msg = '登录服务暂不可用，请稍后再试';
-          else msg = '登录失败（' + res.status + '）';
-        }
-        fail(msg);
+        var err = (data && data.error) || {};
+        fail('请关闭本页面，在 Telegram 中重新打开', err.message || '', err.code || ('HTTP_' + res.status));
       });
     }).catch(function () {
-      fail('网络异常，请检查网络后重试');
+      fail('网络异常，请关闭本页面后重新打开', '', 'NETWORK_ERROR');
     });
   }
 
-  retryEl.addEventListener('click', submit);
   submit();
 })();
 </script>

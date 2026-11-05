@@ -83,15 +83,28 @@ function fbs_gateway_err($httpCode, $code, $message)
 /* ============================== 签名 ============================== */
 
 /**
- * 读取网关密钥（只认环境变量；测试可经 $context['secret'] 注入）。
+ * 读取网关密钥。取值顺序：$_SERVER → getenv → ''（调用方据此返回 503）。
+ *
+ * 必须查 $_SERVER：FPM 默认 clear_env=on 时容器环境变量不进 getenv()，
+ * 但 nginx 的 fastcgi_param 会写进 $_SERVER —— 不查 $_SERVER 就等于注入不进去。
+ * ops 侧需在 PHP location 加 `fastcgi_param FBS_GATEWAY_SECRET <值>`（值来自 k8s Secret）。
+ * 密钥**不得**写进仓库任何文件 / data/cache/*，也不得出现在响应体或日志里。
  *
  * @return string 未配置返回 ''
  */
 function fbs_gateway_secret(array $context = array())
 {
     if (array_key_exists('secret', $context)) return (string)$context['secret'];
+
+    if (isset($_SERVER['FBS_GATEWAY_SECRET']) && is_string($_SERVER['FBS_GATEWAY_SECRET'])) {
+        $v = trim($_SERVER['FBS_GATEWAY_SECRET']);
+        if ($v !== '') return $v;
+    }
+
     $env = getenv('FBS_GATEWAY_SECRET');
-    return ($env === false) ? '' : trim($env);
+    if ($env !== false && trim($env) !== '') return trim($env);
+
+    return '';
 }
 
 /** 与 gatewayClient.js 的 sign() 同构：HMAC-SHA256 hex over "ts\naction\nbody" */

@@ -287,6 +287,45 @@ check('G5 空库（无 member 表）→ 结构化错误、无堆栈、无 DSN',
     && stripos($flat, 'Stack trace') === false && stripos($flat, 'sqlite') === false,
     "http=$code payload=" . $flat);
 
+printf("\n==== G6 入口形态：\$_SERVER 密钥兜底 / action 在 body ====\n");
+
+// 6.1 FPM clear_env=on 时 getenv 取不到，只有 nginx fastcgi_param 写进 $_SERVER
+putenv('FBS_GATEWAY_SECRET');            // 环境变量不存在
+$_SERVER['FBS_GATEWAY_SECRET'] = $SECRET; // 模拟 fastcgi_param
+list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo));
+check('G6 getenv 缺失但 $_SERVER 有值 → 正常放行（200）',
+    $code === 200 && $payload['success'] === true, "http=$code payload=" . json_encode($payload));
+
+// 两处都没有 → 503
+unset($_SERVER['FBS_GATEWAY_SECRET']);
+list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo));
+check('G6 $_SERVER 与 getenv 都没有 → 503 GATEWAY_SECRET_NOT_CONFIGURED',
+    $code === 503 && is_err($payload, 'GATEWAY_SECRET_NOT_CONFIGURED'), "http=$code payload=" . json_encode($payload));
+
+// 6.2 响应体与日志都不得带出密钥明文
+$_SERVER['FBS_GATEWAY_SECRET'] = $SECRET;
+list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo));
+check('G6 响应体不含密钥明文', strpos(json_encode($payload), $SECRET) === false);
+
+// 6.3 入口形态：POST /api/fbs/index.php，action 在 JSON body（gatewayClient 的实际拼法）
+$body = json_encode(array('action' => 'issue_session', 'params' => array('tg_user_id' => 777)), JSON_UNESCAPED_UNICODE);
+$action = fbs_gateway_resolve_action(array('REQUEST_URI' => '/api/fbs/index.php'), array(), $body);
+check('G6 REQUEST_URI=/api/fbs/index.php 时 action 从 body 还原', $action === 'issue_session', 'action=' . $action);
+
+list($code, $payload) = fbs_gateway_dispatch(
+    $action, $body, (string)$NOW, sig($SECRET, (string)$NOW, $action, $body), ctx($pdo)
+);
+check('G6 body 形态 {action,params} 可正常签发（params 取 json.params）',
+    $code === 200 && isset($payload['data']['set_cookies']) && count($payload['data']['set_cookies']) > 0,
+    "http=$code");
+
+// 6.4 带 .php 的 REQUEST_URI 不会被误判成动作名
+$action = fbs_gateway_resolve_action(array('REQUEST_URI' => '/api/fbs/index.php?action=member_find_or_create'), array('action' => 'member_find_or_create'), '{}');
+check('G6 ?action= 仍可用（兼容冒烟场景）', $action === 'member_find_or_create', 'action=' . $action);
+
+unset($_SERVER['FBS_GATEWAY_SECRET']);
+putenv('FBS_GATEWAY_SECRET=' . $SECRET);
+
 printf("\n==== 汇总 ====\n");
 printf("PASS=%d  FAIL=%d\n", $PASS, $FAIL);
 if ($FAIL > 0) {
