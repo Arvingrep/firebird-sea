@@ -299,6 +299,73 @@ else
   row "kubectl/ArgoCD 只读" "❌ FAIL" "集群写操作进入改动（仅 owner 应急可用）：$(printf '%s' "$K8S_WRITE" | head -n1 | head -c 120)"
 fi
 
+# 12. Dockerfile 引用路径存在（#189 断引用的机器执行点）
+#     #189 删了 apps/tma，Dockerfile.api 仍 `COPY apps/tma/ ./`：docker build 会在 COPY 处失败，
+#     而当时门禁 14 项全绿、CI 四个 job 也全绿——没有任何一处校验「Dockerfile 引用的路径还在不在」。
+#     这类断引用两个特点：①只有真构建才暴露，而构建发生在合并之后；②报错指着 COPY 行，
+#     不指向「谁删了目录」，回溯成本高。静态校验成本几乎为零，所以放在这里。
+#     顺带校验 `--from=<stage>`：删掉一个构建阶段、忘改下游 COPY，是同一类错误的另一半。
+#     **不设 owner 通道**：断引用对谁都是断的，能「应急放行」的只有策略，不包括事实。
+DOCKER_BAD=""
+while IFS= read -r df; do
+  [ -n "$df" ] && [ -f "$df" ] || continue
+  case "$df" in *vendor*|*node_modules*) continue;; esac
+  STAGES="$(grep -iE '^[[:space:]]*FROM[[:space:]]' "$df" 2>/dev/null | sed -nE 's/.*[[:space:]][Aa][Ss][[:space:]]+([A-Za-z0-9_.-]+).*/\1/p' | tr '[:upper:]' '[:lower:]' | tr '\n' ' ')"
+  ln=0
+  while IFS= read -r line; do
+    ln=$((ln + 1))
+    case "$line" in
+      [Cc][Oo][Pp][Yy][[:space:]]*) ;;
+      *) continue ;;
+    esac
+    # 续行与 JSON 数组形式跳过：续行需要跨行解析，JSON 形式的引号会打乱按空格切分
+    case "$line" in *\\|*'['*) continue ;; esac
+    set -- $line
+    shift
+    fromst=""; toks=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --from=*) fromst="${1#--from=}" ;;
+        --*) ;;
+        *) toks="$toks $1" ;;
+      esac
+      shift
+    done
+    [ -n "$toks" ] || continue
+    arr=($toks)
+    n=${#arr[@]}
+    if [ -n "$fromst" ]; then
+      # --from=<stage> 的源路径是该阶段内部的绝对路径（/app/node_modules），**不能**拿宿主仓库去校验；
+      # 这里只校验阶段名存在。反过来也必须提前 continue：否则 /app/node_modules 会被当成缺失的仓库路径，
+      # 把所有多阶段构建全判红（首版就踩了这个，canary 自己的 Dockerfile.api 被误判 2 项）。
+      low="$(printf '%s' "$fromst" | tr '[:upper:]' '[:lower:]')"
+      case " $STAGES " in
+        *" $low "*) ;;
+        *) DOCKER_BAD="${DOCKER_BAD}${df}:${ln} COPY --from=${fromst}（无此构建阶段）
+" ;;
+      esac
+      continue
+    fi
+    i=0
+    while [ $i -lt $((n - 1)) ]; do
+      s="${arr[$i]}"
+      i=$((i + 1))
+      case "$s" in
+        .|./|*'$'*) continue ;;
+      esac
+      hit=0
+      for m in $s; do [ -e "$m" ] && hit=1; done
+      [ "$hit" = 1 ] || DOCKER_BAD="${DOCKER_BAD}${df}:${ln} COPY ${s}（源路径不存在）
+"
+    done
+  done < "$df"
+done <<< "$(git ls-files '*Dockerfile*' '*dockerfile*' | grep -vE 'vendor|node_modules' | sort -u)"
+if [ -z "$DOCKER_BAD" ]; then
+  row "Dockerfile 引用路径存在" "✅ PASS"
+else
+  row "Dockerfile 引用路径存在" "❌ FAIL" "$(printf '%s' "$DOCKER_BAD" | head -n2 | tr '\n' '; ' | head -c 200)"
+fi
+
 echo "### 🔒 确定性门禁（${RANGE}）"
 echo
 echo "| 检查项 | 结果 | 说明 |"
