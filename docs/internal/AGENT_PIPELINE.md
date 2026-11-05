@@ -1,7 +1,10 @@
 # Agent 作业手册（AGENT PIPELINE）
 
 > **这是本仓库所有 AI Agent 的唯一入口。** 动手前读完这一页，你就不需要再去翻别的规范。
-> 版本：v1.1 · 2026-11-05 · 与 `RULES.md` §5.4、`gates.sh` 第 0 项保持一致。
+> 版本：v1.2 · 2026-11-05 · 与 `RULES.md` §5.4、`gates.sh` 第 0 项保持一致。
+> 规则表的**机器可读真相源**已独立成 `docs/agent/rules.yaml`（本文表格是给人读的叙述版）。
+> 两者不一致时以 `rules.yaml` 为准，并用 `make rules` 检查——它会告诉你哪条规则缺执行点、
+> 哪项门禁没有规则背书、哪个出处锚点已经指不到东西。
 > 修订：补 P-01b owner 通道（2026-11-05 生效）；全部门禁引用改「检查项名」，代码引用改 `文件#签名`——行号是位置坐标，文件一改就静默失效，签名是内容坐标。
 > 上一版（草案 v0.1）已作废，其「控制器 / 10 状态机 / 定时接单」设计**不予采纳**，原因见 §7。
 
@@ -41,6 +44,10 @@
 ## 2. 强制规则清单
 
 > 记号：**🤖** = 机器自动拦（你违反就会红）；**👤** = 人工 Review 守；**📄** = 仅约定（没人拦，靠你自觉）。
+>
+> **本节表格不是真相源。** 真相源是 `docs/agent/rules.yaml`——那里的每条 hard 规则都带两个可校验锚点
+> （`enforce: 文件#检查项名`、`test: 文件#用例名`），`make rules` 会核对它们是否真的存在。
+> 在下表加一行而不改 `rules.yaml`，等于加了一条没人证明的规则：`make rules` 会报「门禁项无背书」。
 
 ### 2.1 分支与 PR
 
@@ -263,10 +270,16 @@ TAPD(progressing)  ──认领，建 run 目录 + meta.json──────�
 ## 6. 提交前自检（照抄执行）
 
 ```bash
+# 0. 三把尺（只读、与 diff 无关、秒级；查的是「仓库自己讲的话前后一致不一致」）
+make check-rules          # = spec-lint + check-rings + check-anchors
+#   make lint     规范面自洽 9 项
+#   make rules    规则真相源：四环齐不齐 + gates.sh 每个检查项有没有规则背书 + src 锚点
+#   make anchors  文档里指向执行面的锚点还准不准
+
 # 1. 仓库卫生（新增文件是否合规）
 bash scripts/repo-hygiene.sh
 
-# 2. 确定性门禁（13 项：基线 + 受保护路径 + 0b 护栏 + 10 项内容检查；以报告实际行数为准）
+# 2. 确定性门禁（15 项检查 + 基线行；检查项清单以 `make rules` 的背书表为准）
 bash scripts/agent/gates.sh origin/canary
 
 # 3. 流程自测 + 单测 + DB（CI 必过项，本地慢）
@@ -343,5 +356,9 @@ bash scripts/test-gates.sh
 2. **执行** —— 机器拦（gates / verify-task / CI）还是谁在什么时机跑
 3. **检查** —— 怎么证明被遵守（可复现的证据：脚本输出、报告、PR diff）
 4. **收口** —— 终态文件（`final-summary.md` / `blocked-report.md`）+ 状态回写（plan.md / TAPD）
+
+**这四环现在有机器在读**：`docs/agent/rules.yaml` 用 `enforce` / `test` / `src` 三个锚点把
+「执行」「检查」「出处」写成可校验的引用，`make rules` 每次核对；缺任何一环就红。
+「收口」仍靠 `.agent-runs/` 的终态文件（`spec-lint.sh` S5 只能看到「有没有」，看不到「真不真」）。
 
 **立法**：今后新增任何规范条目必须四环齐全，缺环即机器化（改脚本 → §2 加行 → `test-gates.sh` 加用例）或删除该条目。历史遗留的 📄 纯自觉条目在每次触碰时按此标准改造。

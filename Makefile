@@ -1,4 +1,4 @@
-.PHONY: local-accept gates agent-qa help setup up down restart logs ps clean download-package extract-package verify test-coins clean-bloat dev-check test-k8s hygiene
+.PHONY: local-accept gates agent-qa help setup up down restart logs ps clean download-package extract-package verify test-coins clean-bloat dev-check test-k8s hygiene lint rules anchors check-rules
 
 # gates 的对比基线：跟随「目标分支」（PR 要合进去的那条），而不是当前分支自己的上游。
 # 用上游 @{u} 是错的：agent/*、chore/* 的上游就是它自己，push 完 git diff @{u}...HEAD 恒空 → 又是假 FAIL。
@@ -15,6 +15,7 @@ help:
 	@echo "🔥 火鸟模式东南亚（菲律宾）一人 AI 团队基地操作指令"
 	@echo "=========================================================="
 	@echo "  make agent-qa         - 独立 QA Agent 验收 PR (例: make agent-qa PR=34)"
+	@echo "  make check-rules      - 三把尺全跑：规范自洽 + 规则真相源(四环/背书/出处) + 锚点（只读，与 diff 无关）"
 	@echo "  make gates            - 对目标分支（AGENT_BASE_BRANCH，填裸分支名，默认 origin/canary）跑门禁；GATE_BASE 覆盖；本目标不自动 fetch，落后时请先手动 git fetch"
 	@echo "  make setup            - 初始化基地目录与环境检查"
 	@echo "  make up               - 启动 LEMP + Redis + n8n 容器集群"
@@ -55,6 +56,25 @@ verify:
 
 gates:
 	@bash scripts/agent/gates.sh $(GATE_BASE)
+
+# ── 三把尺：查的是「仓库自己讲的话前后一致不一致」，与 diff 无关，随时可跑 ──────────
+# gates 看「这次改动能不能合」，这三把尺看「规则、文档、用例、机器执行是不是同一套事实」。
+# 都不写文件、不改 git 状态，可以随意重复跑。
+#
+#   make lint   规范面自洽 9 项（文档内链 / 幽灵引用 / 基线唯一 / 权限对抗 / 死引用 / 自测退出码真实 …）
+#   make rules  规则真相源体检：docs/agent/rules.yaml 的四环齐不齐 + gates.sh 每个检查项
+#               有没有规则背书 + 每条规则的出处锚点还指不指得到东西
+#   make anchors 文档里指向执行面的锚点还准不准（行号式会飘，签名式不会）
+lint:
+	@bash scripts/agent/spec-lint.sh
+
+rules:
+	@node scripts/agent/check-rings.js
+
+anchors:
+	@node scripts/agent/check-anchors.js
+
+check-rules: lint rules anchors
 
 hygiene:
 	@bash scripts/repo-hygiene.sh
