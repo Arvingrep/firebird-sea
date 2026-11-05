@@ -361,4 +361,125 @@ if [ "$G_DEF" = "origin/canary" ] && [ "$M_DEF" = "canary" ] && [ "$L_DEF" = "ca
   echo "✅ 门禁基线三处默认值一致，且等于集成分支 canary"
 else echo "❌ 门禁基线默认值不一致或未指向 canary：gates.sh=${G_DEF:-读不到} Makefile=origin/${M_DEF:-读不到} lib.sh=origin/${L_DEF:-读不到}（应同为 origin/canary）"; FAIL=1; fi
 
+
+# =====================================================================
+# 检查环补全（rules.yaml 里 10 条「无故意违反必红用例」+ O-02 执行环）
+# 原则：每条 hard 规则至少一条「故意违反 → 指定检查项 FAIL」的用例；
+#       只断 rc=1 不够——那可能被别的检查项顶包（假红顶真绿），
+#       所以这里统一断「指定行的指定结果 + rc」，用 row_is 代替 case_。
+# =====================================================================
+assert_ok() { # assert_ok <名称> <命令…>：命令成功 → ✅；失败 → ❌ 计 FAIL（检查器型断言的统一出口）
+  local n="$1"; shift
+  if "$@"; then echo "✅ $n"; else echo "❌ $n"; FAIL=1; fi
+}
+row_is() { # row_is <名称> <检查项名> <期望rc> <期望标记 PASS|FAIL|WARN> [GATE_AGENT_BRANCH]
+  local out rc want
+  case "$4" in PASS) want='✅ PASS';; FAIL) want='❌ FAIL';; WARN) want='⚠️ WARN';; *) want="$4";; esac
+  out="$(GATE_REPO_DIR="$T" GATE_AGENT_BRANCH="${5:-0}" bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
+  if [ "$rc" = "$3" ] && printf '%s\n' "$out" | grep -qF "| $2 | $want"; then
+    echo "✅ $1"
+  else
+    echo "❌ $1（期望 rc=$3 且「$2」=${want}）"; printf '%s\n' "$out" | grep -E '^\| ' | head -20; FAIL=1
+  fi
+}
+
+# --- Q-04 非空交付 ---
+reset
+row_is "Q-04 相对基线无改动 → 非空交付 FAIL" "非空交付" 1 FAIL
+
+# --- C-01 Docs-as-Code：改业务代码必须同 PR 动 docs/ ---
+reset; mkdir -p app; printf '<?php\nreturn 1;\n' > app/svc.php; git add -A; git commit -qm d
+row_is "C-01 改业务代码不带 docs → FAIL" "Docs-as-Code" 1 FAIL
+reset; mkdir -p app docs; printf '<?php\nreturn 1;\n' > app/svc.php; printf '# svc\n' > docs/svc.md; git add -A; git commit -qm d
+row_is "C-01 改业务代码同 PR 更新 docs → 放行" "Docs-as-Code" 0 PASS
+
+# --- S-01 增量密钥 ---
+# 夹具在运行时拼接：本文件里不能出现完整的密钥字面量。
+# 原因（QA 第 2 轮 blocker）：QA 跑的是**基线版** gates.sh，分支上新加的排除对它无效；
+# 靠「排除文件」会让这个 PR 过不了自己的门禁，靠「拼接」则与门禁版本无关。
+reset; printf '%s=%s\n' 'TRONGRID_API_KEY' 'abcd1234efgh' > cfg.env; git add -A; git commit -qm d
+row_is "S-01 新增行含 TRONGRID_API_KEY → 增量泄漏 FAIL" "无密钥泄漏（增量）" 1 FAIL
+
+# --- Q-01 垃圾文件 ---
+reset; echo x > a.bak; git add -A; git commit -qm d
+row_is "Q-01 新增 .bak 垃圾文件 → FAIL" "无垃圾文件" 1 FAIL
+
+# --- Q-02 调试残留 + scripts/ 豁免 ---
+reset; mkdir -p app; printf '<?php\nvar_dump(1);\n' > app/svc.php; git add -A; git commit -qm d
+row_is "Q-02 业务代码 var_dump → FAIL" "无调试残留" 1 FAIL
+reset; mkdir -p scripts; printf 'console.log("boot");\n' > scripts/boot.js; git add -A; git commit -qm d
+row_is "Q-02 scripts/ 下 console.log 豁免 → 放行" "无调试残留" 0 PASS
+
+# --- Q-03 改动文件语法 ---
+reset; printf 'function broken( {\n' > bad.js; printf '{"a":\n' > bad.json; git add -A; git commit -qm d
+row_is "Q-03 语法错误的 .js/.json → FAIL" "改动文件语法" 1 FAIL
+
+# --- O-02 kubectl/ArgoCD 只读（配合 gates.sh 新第 11 项）---
+# 反例故意带参数：`kubectl -n prod delete` / `kubectl --context c apply` 是 QA 指出的绕过形态，
+# 只测单空格形态等于没测那条正则（旧实现正是「一个空格」）。
+reset; mkdir -p ops; printf '#!/bin/bash\nkubectl -n prod delete pod demo\nkubectl --context c apply -f .\n' > ops/cleanup.sh; git add -A; git commit -qm d
+row_is "O-02 kubectl 写操作 → FAIL" "kubectl/ArgoCD 只读" 1 FAIL
+reset; mkdir -p ops; printf '#!/bin/bash\nkubectl delete pod demo\n' > ops/cleanup.sh; git add -A; git commit -qm d
+out="$(GATE_REPO_DIR="$T" GATE_AGENT_BRANCH=1 GATE_OWNER_BRANCH=1 GATE_OWNER_APPROVED=1 bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
+if [ "$rc" = "0" ] && printf '%s\n' "$out" | grep -qF '| kubectl/ArgoCD 只读 | ⚠️ WARN'; then
+  echo "✅ O-02 owner 双信号应急写 → WARN 放行"
+else echo "❌ O-02 owner 应急未按 WARN 放行（rc=${rc}）"; printf '%s\n' "$out" | grep -E '^\| ' | head -20; FAIL=1; fi
+reset; mkdir -p ops; printf '#!/bin/bash\nkubectl -n prod get pods\nkubectl top node\nkubectl rollout status deploy/x\n' > ops/check.sh; git add -A; git commit -qm d
+row_is "O-02 kubectl 只读命令 → 放行" "kubectl/ArgoCD 只读" 0 PASS
+
+# --- C-05 Helm 多站点渲染（本机无 helm 时跳过，以 CI runner 为准）---
+if command -v helm >/dev/null; then
+  reset; mkdir -p deploy/helm/firebird-site/templates
+  printf 'apiVersion: v2\nname: firebird-site\nversion: 0.1.0\n' > deploy/helm/firebird-site/Chart.yaml
+  printf 'replicas: 1\n' > deploy/helm/firebird-site/values-a.yaml
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: x\n' > deploy/helm/firebird-site/templates/cm.yaml
+  git add -A; git commit -qm chart
+  git update-ref refs/remotes/origin/main HEAD   # 健康 chart 进基线
+  reset; printf 'site:\n  name: [unclosed\n' > deploy/helm/firebird-site/values-zz.yaml; git add -A; git commit -qm d
+  row_is "C-05 values 文件 YAML 损坏 → 渲染 FAIL" "Helm 多站点渲染" 1 FAIL
+  reset; printf 'replicas: 2\n' > deploy/helm/firebird-site/values-a.yaml; git commit -qam d
+  row_is "C-05 合法 chart 改动 → 放行" "Helm 多站点渲染" 0 PASS
+else
+  echo "⚠️ 本机无 helm，C-05 两条用例跳过（CI runner 以 gates 实跑为准）"
+fi
+
+# --- B-08 分支前缀触发门禁：workflow 白名单四前缀 × 两个 job（gates 与 agent-qa）都不能少 ---
+# 检查器本体：`startsWith(github.head_ref, '<前缀>')` 每个前缀至少出现 2 次。
+# 只 grep 文件存在是不够的——历史上真发生过「改 workflow 时顺手删了一个前缀」，门禁对那类分支静默失效。
+B08_FILE="$ROOT/.github/workflows/ci-verify.yml"
+b08_ok() {
+  local p
+  for p in 'agent/' 'arvino/' 'feature/' 'owner/'; do
+    [ "$(grep -c "startsWith(github.head_ref, '$p')" "$B08_FILE")" -ge 2 ] || return 1
+  done
+}
+assert_ok "B-08 四前缀在两个 job 均触发门禁" b08_ok
+# 故意违反必红：删掉 feature/ 的副本必须变红，否则这条断言是常绿摆设
+sed "s|startsWith(github.head_ref, 'feature/')||g" "$B08_FILE" > "$T/b08-bad.yml"
+B08_FILE="$T/b08-bad.yml"
+if b08_ok; then echo "❌ B-08 反例未红（删 feature/ 后检查器仍绿 = 失效）"; FAIL=1
+else echo "✅ B-08 反例：删掉 feature/ → 检查器变红"; fi
+B08_FILE="$ROOT/.github/workflows/ci-verify.yml"
+
+# --- T-02 返工上限：默认 3 + agent:blocked 机制 ---
+# 判据用整行字面量，防止「默认值 3 改成 9、用例只 grep 变量名」这种假绿。
+t02_ok() { grep -qF 'MAX_ATTEMPTS="${AGENT_MAX_ATTEMPTS:-3}"' "$1" && grep -q 'agent:blocked' "$1"; }
+assert_ok "T-02 返工上限默认 3 且有 agent:blocked 机制" t02_ok "$ROOT/scripts/agent/lib.sh"
+sed 's/AGENT_MAX_ATTEMPTS:-3/AGENT_MAX_ATTEMPTS:-9/' "$ROOT/scripts/agent/lib.sh" > "$T/lib-bad.sh"
+if t02_ok "$T/lib-bad.sh"; then echo "❌ T-02 反例未红（默认 3→9 后检查器仍绿 = 失效）"; FAIL=1
+else echo "✅ T-02 反例：默认 3→9 → 检查器变红"; fi
+
+# --- S-02 存量欠债：key.pem + 未到期登记先固化进 base（此后所有用例都带 WARN 欠债，rc 不受影响）---
+# PEM 头同样运行时拼接，本文件不留完整私钥头字面量
+reset; mkdir -p srv; printf -- '-----BEGIN RSA %s KEY-----\nabc\n-----END RSA PRIVATE KEY-----\n' PRIVATE > srv/key.pem
+printf 'srv/key.pem 2099-01-01 审计登记待轮换\n' >> .agents/secret-scan-allow.txt
+git add -A; git commit -qm key-fixture
+git update-ref refs/remotes/origin/main HEAD
+# 用覆盖写而不是 sed -i：-i '' 是 macOS/BSD 写法，GNU sed 会把 '' 当文件名（CI 上必炸）
+reset; printf 'srv/key.pem 2020-01-01 审计登记待轮换\n' > .agents/secret-scan-allow.txt; git commit -qam d
+row_is "S-02 白名单已过期 → 存量欠债 FAIL" "密钥存量欠债" 1 FAIL
+# 注意：空交付本身是非空交付 FAIL（rc=1），WARN 断言必须配一个真实提交才能拿到 rc=0
+reset; echo y >> a.txt; git commit -qam d
+row_is "S-02 白名单未到期 → WARN 放行" "密钥存量欠债" 0 WARN
+
 exit $FAIL
