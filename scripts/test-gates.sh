@@ -96,6 +96,23 @@ else echo "❌ 位置参数未优先于 GATE_BASE（rc=${rc}）"; printf '%s\n' 
 reset; mkdir -p scripts/acceptance; echo ':' > scripts/acceptance/story-1-1.sh; git add -A; git commit -qm t
 case_ "Agent 分支改 scripts/acceptance → FAIL" 1 1
 case_ "非 Agent 分支改 scripts/acceptance → 放行" 0 0
+# --- 受保护路径的 owner 通道（2026-11-05）：身份 ≠ 授权，授权 ≠ 身份 ---
+# 背景：此前 owner/ 与 agent/ 同权、无豁免分支，升级护栏的 PR 永远红 → 唯一出路是直推 canary，
+# 而直推没有 review 记录。三条用例锁住新判据，少一条就等于那个方向没人测：
+case_owner() { # case_owner <名称> <期望rc> <GATE_AGENT_BRANCH> <GATE_OWNER_BRANCH> <GATE_OWNER_APPROVED>
+  local out rc
+  out="$(GATE_REPO_DIR="$T" GATE_AGENT_BRANCH="$3" GATE_OWNER_BRANCH="$4" GATE_OWNER_APPROVED="$5" \
+         bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
+  if [ "$rc" = "$2" ]; then echo "✅ $1"; else echo "❌ ${1}（期望 ${2} 实际 ${rc}）"; printf '%s\n' "$out" | tail -20; FAIL=1; fi
+}
+reset; mkdir -p scripts/acceptance; echo ':' > scripts/acceptance/story-2-1.sh; git add -A; git commit -qm t
+case_owner "owner 分支 + owner-approved 标签改受保护路径 → 放行" 0 1 1 1
+out="$(GATE_REPO_DIR="$T" GATE_AGENT_BRANCH=1 GATE_OWNER_BRANCH=1 GATE_OWNER_APPROVED=1 bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"
+if printf '%s\n' "$out" | grep -q '受保护路径改动 | ⚠️ WARN'; then
+  echo "✅ owner 通道放行时报告记 WARN（不判 PASS，留痕）"
+else echo "❌ owner 通道放行未在报告留 WARN 痕迹（等于看起来像没动过护栏）"; printf '%s\n' "$out" | head -8; FAIL=1; fi
+case_owner "owner 分支缺 owner-approved 标签 → 仍 FAIL" 1 1 1 0
+case_owner "只有标签、分支不是 owner/ → 仍 FAIL（身份不可用标签替代）" 1 1 0 1
 reset; mkdir -p _bmad-output; seq 1 400 > _bmad-output/epics.md; git add -A; git commit -qm e
 case_ "_bmad-output 不计 1200 行增量" 0 0
 # --- 跨文件契约：gates.sh 的每条出口都必须在**行首**打 `**结论：`（qa.sh 侧为 03e07088）---
@@ -162,5 +179,175 @@ printf "router.get('/health', h);\nrouter.get('/new', h);\n" > services/api/src/
 printf "require('node:test')('x', () => {});\n" > services/api/test/new.test.js
 git add -A; git commit -qm d
 case_ "改路由+带测试但 OpenAPI 未更新 → FAIL" 1 0
+
+# --- gates.sh 第 10 项：PHP 接口契约（webroot/api/handlers ↔ openapi-waimai-article.yaml）---
+# 判据是**双向集合比对**，不是「改了 handler 就得改文档」：修 bug 不动接口签名是常见且正确的
+# 改动，若按「碰了文件就必须动文档」判，会把它误杀，人就会开始用 chore/ 前缀绕过整条门禁。
+# 夹具自包含：拷真检查器 + 造最小 handlers / spec / 台账。
+reset
+mkdir -p webroot/api/handlers docs/api .agents
+cp "$ROOT/scripts/api-contract-check-php.js" scripts/
+cat > webroot/api/handlers/demo.class.php <<'PHP'
+<?php
+class demo {
+    public function list() { return array("state" => 100); }
+    public function detail() { return array("state" => 100); }
+}
+PHP
+cat > docs/api/openapi-waimai-article.yaml <<'YML'
+openapi: 3.0.3
+paths:
+  /demo/list:
+    get:
+      summary: x
+  /demo/detail:
+    get:
+      summary: y
+YML
+printf '# 无欠债\n' > .agents/api-contract-debt.txt
+git add -A; git commit -qm php-fixture
+git update-ref refs/remotes/origin/main HEAD   # 夹具进基线，后面 reset 才回得到
+
+reset
+cat > webroot/api/handlers/demo.class.php <<'PHP'
+<?php
+class demo {
+    public function list() { return array("state" => 100); }
+    public function detail() { return array("state" => 100); }
+    public function brandNew() { return array("state" => 100); }
+}
+PHP
+printf '# 契约\n' > docs/api/README.md
+git add -A; git commit -qm d
+case_ "PHP 新增接口未补文档 → FAIL" 1 0
+
+reset
+cat > webroot/api/handlers/demo.class.php <<'PHP'
+<?php
+class demo {
+    public function list() { return array("state" => 100); }
+    public function detail() { return array("state" => 100); }
+    public function brandNew() { return array("state" => 100); }
+}
+PHP
+cat >> docs/api/openapi-waimai-article.yaml <<'YML'
+  /demo/brandNew:
+    get:
+      summary: z
+YML
+git commit -qam d
+case_ "PHP 新增接口并同步文档 → 放行" 0 0
+
+reset
+cat >> docs/api/openapi-waimai-article.yaml <<'YML'
+  /demo/ghost:
+    get:
+      summary: 描述了不存在的接口
+YML
+git commit -qam d
+case_ "PHP 文档写了代码里没有的接口 → FAIL" 1 0
+
+reset
+cat > webroot/api/handlers/fresh.class.php <<'PHP'
+<?php
+class fresh {
+    public function a() { return array("state" => 100); }
+}
+PHP
+printf '# 契约\n' > docs/api/README.md
+git add -A; git commit -qm d
+case_ "新增 handler 未登记欠债 → FAIL" 1 0
+
+reset
+cat > webroot/api/handlers/fresh.class.php <<'PHP'
+<?php
+class fresh {
+    public function a() { return array("state" => 100); }
+}
+PHP
+printf 'fresh 2099-12-31 新业务待补文档\n' >> .agents/api-contract-debt.txt
+# 新增的是业务 PHP 文件，会另外触发 Docs-as-Code（要求同 PR 动 docs/）——那是另一条门禁，
+# 这里补一个 docs 改动把它隔离掉，否则这条用例测的就不是契约台账了。
+printf '# 契约\n' > docs/api/README.md
+git add -A; git commit -qm d
+case_ "新增 handler 登记欠债且未到期 → 放行" 0 0
+
+# 下面两条针对检查器自己的漏报（QA 第 8 轮指出）。漏报比误报危险：接口被漏掉时门禁是绿的，
+# 没有人会去看一份通过的日志。
+reset
+cat > webroot/api/handlers/demo.class.php <<'PHP'
+<?php
+class demo {
+    public function list() { return array("state" => 100); }
+    public function detail() { return array("state" => 100); }
+    public static function ping() { return array("state" => 100); }
+}
+PHP
+printf '# 契约\n' > docs/api/README.md
+git add -A; git commit -qm d
+case_ "public static 方法也算接口（未补文档 → FAIL）" 1 0
+
+reset
+# `$re = "/*"` 这种字符串字面量里出现 `/*`：按正则整体剥注释，会从这里一路吃到**后面**那个
+# `*/`，把中间的方法一起吞掉。所以 detail 放在字符串与尾注释之间——被吞掉时它就成了
+# 「文档有、代码没有」，门禁反而报错；修好后应当放行。
+cat > webroot/api/handlers/demo.class.php <<'PHP'
+<?php
+class demo {
+    public function list() { $re = "/*"; return array("state" => 100); }
+    public function detail() { return array("state" => 100); }
+    /* 尾巴注释 */
+}
+PHP
+printf '# 契约\n' > docs/api/README.md
+git add -A; git commit -qm d
+case_ "字符串里的 /* 不吞掉中间的方法 → 放行" 0 0
+
+# PHP 里不写可见性 = public，分发器 `method_exists()` + `$obj->$action()` 能直接调。
+# article.class.php 的 getCommonList / rewardList 就是这种写法，此前被漏掉，
+# 导致「143 个接口零差异」的结论本身是错的（真实 145）。
+reset
+cat > webroot/api/handlers/demo.class.php <<'PHP'
+<?php
+class demo {
+    public function list() { return array("state" => 100); }
+    public function detail() { return array("state" => 100); }
+    function legacyNoModifier() { return array("state" => 100); }
+}
+PHP
+printf '# 契约\n' > docs/api/README.md
+git add -A; git commit -qm d
+case_ "不写可见性的方法也算接口（PHP 默认 public → FAIL）" 1 0
+
+# 反方向：放宽别放过头。private / protected 不该被当成接口，否则每个内部辅助函数
+# 都会被要求写进契约，人就会开始往台账里塞垃圾。
+reset
+cat > webroot/api/handlers/demo.class.php <<'PHP'
+<?php
+class demo {
+    public function list() { return array("state" => 100); }
+    public function detail() { return array("state" => 100); }
+    private function helperA() { return 1; }
+    protected function helperB() { return 2; }
+}
+PHP
+printf '# 契约\n' > docs/api/README.md
+git add -A; git commit -qm d
+case_ "private / protected 方法不算接口 → 放行" 0 0
+
+# 类外的顶层函数不是 action：分发器是 `new $service()` + `$obj->$action()`，类外函数调不到。
+# 若把它们算成接口，每个 handler 里的旧 shim 都会被要求写契约，人就会往台账里塞垃圾。
+reset
+cat > webroot/api/handlers/demo.class.php <<'PHP'
+<?php
+class demo {
+    public function list() { return array("state" => 100); }
+    public function detail() { return array("state" => 100); }
+}
+function legacyGlobal() { return 1; }
+PHP
+printf '# 契约\n' > docs/api/README.md
+git add -A; git commit -qm d
+case_ "类外顶层函数不算接口 → 放行" 0 0
 
 exit $FAIL

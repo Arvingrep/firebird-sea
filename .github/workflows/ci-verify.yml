@@ -24,6 +24,11 @@ jobs:
         env:
           GATE_REQUIRE_TOOLS: "1"
           GATE_AGENT_BRANCH: ${{ (startsWith(github.head_ref, 'agent/') || startsWith(github.head_ref, 'arvino/') || startsWith(github.head_ref, 'feature/') || startsWith(github.head_ref, 'owner/')) && '1' || '0' }}
+          # 受保护路径的 owner 通道：前缀 owner/ 与标签 owner-approved 两个信号同时成立才放行（见 gates.sh 第 0 项）。
+          # 标签由 owner 在 PR 上手动打。注意：pull_request 事件不含 labeled 类型，事后打标签**不会**触发复跑，
+          # 需要再 push 一次或重开 PR —— 所以正确顺序是「先打标签，再推送」。
+          GATE_OWNER_BRANCH: ${{ startsWith(github.head_ref, 'owner/') && '1' || '0' }}
+          GATE_OWNER_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'owner-approved') && '1' || '0' }}
           # canary → main 的晋升 PR 汇总了已逐个过门禁的改动，不再受「增量 ≤ 1200 行」限制（其余门禁照常）
           GATE_MAX_ADDED: ${{ (github.base_ref == 'main' && github.head_ref == 'canary') && '1000000' || '1200' }}
         run: |
@@ -81,6 +86,10 @@ jobs:
       # PR 的实际目标分支（canary 或 main）；脚本里所有 origin/main 均由它替换
       AGENT_BASE_BRANCH: ${{ github.base_ref }}
       AGENT_MAX_ATTEMPTS: ${{ vars.AGENT_MAX_ATTEMPTS || '3' }}
+      # 与 gates job 同一套 owner 通道判据：qa.sh 内部会用 base 的 gates.sh 再跑一遍门禁，
+      # 不传这两个变量，QA 就会得到与 gates job 相反的结论（gates 绿、QA 报「受保护路径 FAIL」→ 恒打回）。
+      GATE_OWNER_BRANCH: ${{ startsWith(github.head_ref, 'owner/') && '1' || '0' }}
+      GATE_OWNER_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'owner-approved') && '1' || '0' }}
       # 托管 runner 上 gates job 的结论（含 test-helm 等全部步骤），非 success 不得合并
       # verify-task 也必须 success，否则等同门禁失败（qa.sh 无需改动）
       GATES_JOB_RESULT: ${{ (needs.gates.result == 'success' && needs.verify-task.result == 'success') && 'success' || 'failure' }}

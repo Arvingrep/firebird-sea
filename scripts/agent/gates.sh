@@ -66,9 +66,43 @@ missing_tool() { # missing_tool <检查项> <工具>
 row "基线" "${BASE}" "$(git log -1 --format='%cs' "${BASE}")"
 
 # 0. 受保护路径：Agent 分支不得改动流水线与规范自身（含新增文件）
+#    通道（2026-11-05 新增）：owner/ 前缀分支 + PR 打 owner-approved 标签 → 记 WARN 放行。
+#    为什么要通道：护栏自己也要升级（修 gates.sh、加用例、收紧 workflow）。「谁碰谁错」的判据会让
+#    升级护栏的那次 PR 永远红，唯一出路只剩绕过（直推 canary）——绕过没有 review 记录，比放行更危险。
+#    为什么是两个条件：单靠分支前缀 → 谁都能建 owner/* 分支，等于没锁；单靠标签 → 打标签只需
+#    triage 及以上权限，而 agent 用的 PAT 到底有没有这个权限没人核实过（也不该把安全建立在「希望没有」上）。
+#    两条独立信号同时成立才放行，任何一条单独出现都还是 FAIL。
+#    只降级到 WARN 不改判 PASS：报告里必须看得见「这次动过护栏」。
 if [ "${GATE_AGENT_BRANCH:-0}" = "1" ]; then
   PROT="$(git diff --no-renames --name-only "${BASE}...HEAD" | grep -E '^(\.github|scripts/agent|scripts/acceptance|\.agents)/' || true)"
-  [ -z "$PROT" ] && row "受保护路径未改动" "✅ PASS" || row "受保护路径未改动" "❌ FAIL" "$(echo $PROT | head -c 160)"
+  if [ -z "$PROT" ]; then
+    row "受保护路径未改动" "✅ PASS"
+  elif [ "${GATE_OWNER_BRANCH:-0}" = "1" ] && [ "${GATE_OWNER_APPROVED:-0}" = "1" ]; then
+    row "受保护路径改动" "⚠️ WARN" "owner 授权放行：$(echo $PROT | head -c 120)"
+  else
+    row "受保护路径未改动" "❌ FAIL" "$(echo $PROT | head -c 160)"
+  fi
+fi
+
+# 0b. 护栏未削弱（影子期只 WARN；**2026-11-19 起改 FAIL**——那天把 "⚠️ WARN" 换成 "❌ FAIL" 即可）
+#     「顺手削弱护栏」是 agent 最自然的作弊路径：删用例、注释掉检查、命令尾部加 || true，都能让 CI 变绿。
+#     这里用最便宜的数量代理指标挡它：受保护路径的改动若让「检查条数 / 用例条数」比基线少，就报警。
+#     这是**弱信号**，已知漏法：把某条检查改成空操作（条数不变）、或新增无关行抵消删减。
+#     补强方向是逐行比对被删掉的 row/case_ 行；本期先挡住「数量变少」这类最常见的情形。
+#     基线里没有该文件时跳过：夹具仓库只造最小骨架，拿 0 当真值会造成假红。
+if [ -n "${PROT:-}" ]; then
+  guard_count() { # guard_count <ref> <file> <pattern>
+    git show "$1:$2" 2>/dev/null | grep -c "$3" || true
+  }
+  for spec in "scripts/agent/gates.sh|row \"" "scripts/test-gates.sh|case_ \""; do
+    gf="${spec%%|*}"; gp="${spec#*|}"
+    [ -n "$(git ls-tree "${BASE}" -- "${gf}")" ] || continue
+    gb="$(guard_count "${BASE}" "$gf" "$gp")"; gn="$(guard_count HEAD "$gf" "$gp")"
+    if [ "${gn:-0}" -lt "${gb:-0}" ]; then
+      row "护栏未削弱（${gf}）" "⚠️ WARN" "基线 ${gb:-0} 条 → 现在 ${gn:-0} 条"
+    fi
+  done
+  unset -f guard_count
 fi
 
 # 1. 非空交付
@@ -192,29 +226,52 @@ fi
 
 # 10. API 契约同步
 #     docs-as-code（第 3 项）只要求「改了代码就动 docs/」，动哪一篇不管——加一条路由、
-#     随手往别的文档里写一行，门禁照样绿，而 OpenAPI 悄悄落后。这里把范围收窄到 API 面：
-#       ① 代码路由 / fbProxy 白名单动作 ↔ docs/api/openapi.yaml 双向一致（脚本负责，两个方向都查）；
-#       ② 改了路由实现，必须同一 PR 带 services/api/test/ 下的测试与 openapi.yaml 更新。
-#     ①在只要碰到 API 面时都跑（改错文档也要拦住），②只在改实现时要求。
+#     随手往别的文档里写一行，门禁照样绿，而契约悄悄落后。这里把范围收窄到 API 面，
+#     并且**两份契约都要管**（此前只管 Node 那份，PHP 的 143 个接口在 README 里写着
+#     「❌ 纯文档，靠 Review」，等于没锁）：
+#       ① services/api 路由 / fbProxy 白名单动作 ↔ docs/api/openapi.yaml
+#       ② webroot/api/handlers/*.class.php 的 public 方法 ↔ docs/api/openapi-waimai-article.yaml
+#     判据是**双向集合比对**，不是「改了文件就得改文档」：改实现不动接口签名的修复类改动
+#     不该被这条门禁拦，只有接口集合真的变成才要求补文档。两个方向都查——
+#       代码有、文档缺 = 接口没文档（调用方不知道有这个接口）
+#       文档有、代码没有 = 文档描述了不存在的接口（比缺文档更坏，调用方照着写）
+#     尚未纳管的 service 走 .agents/api-contract-debt.txt 台账（带到期日），
+#     未登记或已到期即 FAIL，沿用第 8 项密钥欠债的同款口径。
 API_ROUTE_IMPL="$(printf '%s\n' "$CHANGED" | grep -E '^services/api/src/(server|fbProxy|[A-Za-z]+Route)\.js$' || true)"
-API_FACE="$(printf '%s\n' "$API_ROUTE_IMPL" ; printf '%s\n' "$CHANGED" | grep -E '^docs/api/openapi\.yaml$' || true)"
+API_PHP_IMPL="$(printf '%s\n' "$CHANGED" | grep -E '^webroot/api/handlers/[A-Za-z0-9_]+\.class\.php$' || true)"
+API_SPEC_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E '^docs/api/openapi(-waimai-article)?\.yaml$' || true)"
+# 直接拼接，不用 printf：空字符串 printf 出来是一个换行，会让 [ -z ] 恒假，
+# 于是「未触及 API 面」永远不成立、每次都要跑检查器（旧写法即如此，说明文字也跟着失真）。
+API_FACE="${API_ROUTE_IMPL}${API_PHP_IMPL}${API_SPEC_CHANGED}"
 if [ -z "$API_FACE" ]; then
   row "API 契约同步" "✅ PASS" "未触及 API 面"
 else
-  CONTRACT_OUT="$(node scripts/api-contract-check.js 2>&1)"; CONTRACT_RC=$?
-  MISS=""
-  if [ -n "$API_ROUTE_IMPL" ]; then
-    printf '%s\n' "$CHANGED" | grep -qE '^services/api/test/' || MISS+="缺测试文件；"
-    printf '%s\n' "$CHANGED" | grep -qE '^docs/api/openapi\.yaml$' || MISS+="缺 OpenAPI 更新；"
+  MISS=""; DEBT_NOTE=""
+  # ① Node 侧：只在相关文件或被改动时才跑，避免夹具里没有 services/api 时误报「契约缺失」
+  if [ -n "$API_ROUTE_IMPL" ] || printf '%s\n' "$API_SPEC_CHANGED" | grep -q '^docs/api/openapi\.yaml$'; then
+    if [ -f docs/api/openapi.yaml ]; then
+      NODE_OUT="$(node scripts/api-contract-check.js 2>&1)" || MISS+="Node 契约不一致：$(printf '%s' "$NODE_OUT" | grep -E '^✗' | head -n1)；"
+      if [ -n "$API_ROUTE_IMPL" ]; then
+        printf '%s\n' "$CHANGED" | grep -qE '^services/api/test/' || MISS+="缺测试文件；"
+        printf '%s\n' "$CHANGED" | grep -qE '^docs/api/openapi\.yaml$' || MISS+="缺 OpenAPI 更新；"
+      fi
+    elif [ -n "$API_ROUTE_IMPL" ]; then
+      MISS+="缺 docs/api/openapi.yaml；"
+    fi
   fi
-  if [ "$CONTRACT_RC" -ne 0 ]; then
-    MISS+="契约不一致；"
-    CONTRACT_OUT="$(printf '%s' "$CONTRACT_OUT" | grep -E '^✗' | head -n2 | tr '\n' ' ')"
-  else
-    CONTRACT_OUT=""
+  # ② PHP 侧：判据完全交给双向集合比对。这里**不加**「改了 handler 就必须改文档」——
+  #    修 bug 不动接口签名是常见且正确的改动，加那条会把它误杀。
+  if [ -n "$API_PHP_IMPL" ] || printf '%s\n' "$API_SPEC_CHANGED" | grep -q '^docs/api/openapi-waimai-article\.yaml$'; then
+    if [ -f docs/api/openapi-waimai-article.yaml ]; then
+      PHP_OUT="$(node scripts/api-contract-check-php.js 2>&1)" || MISS+="PHP 契约不一致：$(printf '%s' "$PHP_OUT" | grep -E '^✗' | head -n1)；"
+      printf '%s' "$PHP_OUT" | grep -q '欠债' && DEBT_NOTE="；$(printf '%s' "$PHP_OUT" | grep -m1 '欠债')"
+    elif [ -n "$API_PHP_IMPL" ]; then
+      MISS+="缺 PHP 接口文档 docs/api/openapi-waimai-article.yaml；"
+    fi
   fi
-  if [ -z "$MISS" ]; then row "API 契约同步" "✅ PASS" "路由/白名单与 openapi.yaml 一致"
-  else row "API 契约同步" "❌ FAIL" "${MISS}${CONTRACT_OUT}"; fi
+  if [ -n "$MISS" ]; then row "API 契约同步" "❌ FAIL" "$MISS"
+  elif [ -n "$DEBT_NOTE" ]; then row "API 契约同步" "⚠️ WARN" "契约一致${DEBT_NOTE}"
+  else row "API 契约同步" "✅ PASS" "实现与契约双向一致"; fi
 fi
 
 echo "### 🔒 确定性门禁（${RANGE}）"
