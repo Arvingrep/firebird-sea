@@ -151,12 +151,31 @@ gateway:
   secretRef: "firebird-api-secret"
   secretKey: "FBS_GATEWAY_SECRET"
 
-# tg-bot 不在本 chart 内（集群外工作负载，见 docker-compose.yml）。下面只是部署 tg-bot 时的
-# 取数来源，chart 不会把它渲染进任何 K8s 资源。
+# Telegram web_app 按钮的对外站点，同时是 chart 内 tg-bot 的 TG_APP_BASE_URL。
 tgApp:
   # /start 的「打开商店」web_app 按钮地址 = ${baseUrl}/tg/entry.php?role=customer。
   # 必须是 https（Telegram 只接受 https，否则整条 sendMessage 被拒）。留空则按钮不出、仅 stderr 告警。
+  # 取各站自己的 ingress.hosts 主域名（fh580.net 不属于本 chart，不要填它）。
   baseUrl: ""
+
+# ⑦ Telegram 前哨 Bot（长轮询 getUpdates）。默认关闭：同一个 bot token 只允许一个 poller，
+# 多站共用同一个 token 时只能在一个站点置 true，否则 getUpdates 会 409、机器人随机不响应。
+tgBot:
+  enabled: false
+  image:
+    repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-tg-bot"
+    tag: "latest"
+    pullPolicy: Always
+  # 随笔消息转发到 n8n 的 webhook（集群内直连）。镜像不含 scripts/ 与 .agents/，
+  # server.js 的"本地派单兜底"在集群内不可用，转发这条通道才是生效的那条。留空则跳过转发。
+  n8nWebhookUrl: "http://n8n.n8n.svc.cluster.local:5678/webhook/tg-input"
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 20m
+      memory: 32Mi
 
 # USDT 付款监听器（单实例 + Recreate）。镜像由 CI 构建（deploy/docker/Dockerfile.payment-listener）后再置 enabled: true
 paymentListener:

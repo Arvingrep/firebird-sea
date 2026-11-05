@@ -166,6 +166,13 @@ async function handleIncomingMessage(msg) {
         headers: { 'Content-Type': 'application/json' },
         timeout: 2000
       });
+      // 必须挂 'error'：没人监听时 ECONNREFUSED（n8n 未部署/不可达）会变成未捕获异常，
+      // 直接让整个 bot 进程退出（集群内实测：发第一条随笔就崩）。单纯记日志，不影响后面的本地兜底。
+      n8nReq.on('error', (e) => {
+        forwardedToN8n = false;
+        console.error('[TG-BOT] n8n 转发失败:', e.message);
+      });
+      n8nReq.on('timeout', () => n8nReq.destroy());
       n8nReq.write(n8nPayload);
       n8nReq.end();
       forwardedToN8n = true;

@@ -77,6 +77,8 @@ jobs:
           IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-php:${ROLLING}"
           API_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${PRIMARY}"
           API_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${ROLLING}"
+          TGBOT_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-tg-bot:${PRIMARY}"
+          TGBOT_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-tg-bot:${ROLLING}"
 
           # 4.1 检查/构建基础运行镜像 (firebird-base)
           # 注意：只在该 tag 不存在时才构建。修改 Dockerfile.base（加扩展/改 ini）后必须同步递增 tag 后缀
@@ -130,6 +132,15 @@ jobs:
             --cache-to type=gha,mode=max,scope=firebird-api \
             --cache-to type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:buildcache",mode=max \
             -t "$API_IMAGE_TAG" -t "$API_IMAGE_LATEST" -f deploy/docker/Dockerfile.api .
+
+          # 4.4 构建 Telegram 前哨 Bot 镜像（长轮询单实例，是否上线由 values.tgBot.enabled 决定）
+          echo "🚀 构建 tg-bot 镜像: $TGBOT_IMAGE_TAG ..."
+          docker buildx build --push \
+            --platform linux/amd64 \
+            --cache-from type=gha,scope=firebird-tg-bot \
+            --cache-from "$TGBOT_IMAGE_LATEST" \
+            --cache-to type=gha,mode=max,scope=firebird-tg-bot \
+            -t "$TGBOT_IMAGE_TAG" -t "$TGBOT_IMAGE_LATEST" -f deploy/docker/Dockerfile.tgbot .
 
 
   # 独立通知 job：任一前置 job 失败（含 test-and-verify 被跳过构建）都能发出告警

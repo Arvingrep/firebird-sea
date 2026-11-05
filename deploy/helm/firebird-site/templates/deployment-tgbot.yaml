@@ -1,0 +1,89 @@
+{{- if .Values.tgBot.enabled -}}
+{{- /*
+  Telegram 前哨 Bot（独立工作负载）
+
+  ## 模式：长轮询，不是 webhook —— 所以不建 Service / 不加入站路由
+  services/tg-bot/src/server.js:295-332：拿到 TELEGRAM_BOT_TOKEN 后先 deleteWebhook 再 getUpdates 长轮询。
+  容器里 3001 的 HTTP 服务只服务于本地 webhook 模拟与 /send-card 主动推送，且**没有鉴权**；
+  把 /send-card 暴露到公网等于给任何人一个"用我们的 bot 发消息"的接口。探针直连 Pod IP，不需要 Service。
+
+  ## 为什么 replicas 恒为 1 / 为什么 Recreate / 为什么不加 HPA
+  同一个 bot token 只允许一个消费者：第二个实例 getUpdates 必然 409
+  "Conflict: terminated by other getUpdates request"（server.js:313-316 会告警并 15s 重试），
+  线上表现是"机器人随机不响应"。因此：
+    - replicas 固定 1，不跟 replicaCount；本 chart 也不为它渲染 HPA（hpa.yaml 只针对 firebird-<site> / firebird-php-<site>）；
+    - strategy=Recreate：RollingUpdate 会在切换窗口里让新旧两个 Pod 同时轮询同一个 token；
+    - 多个站点共用同一个 token 时，只能在一个站点把 tgBot.enabled 置 true。
+*/ -}}
+{{- if not .Values.tgApp.baseUrl }}{{ fail "tgBot.enabled=true 需要 tgApp.baseUrl（https 对外域名，/start 的 web_app 按钮要用）" }}{{ end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firebird-tg-bot-{{ .Values.siteId }}
+  labels:
+    app: firebird-tg-bot
+    site: {{ .Values.siteId }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: firebird-tg-bot
+      site: {{ .Values.siteId }}
+  template:
+    metadata:
+      labels:
+        app: firebird-tg-bot
+        site: {{ .Values.siteId }}
+    spec:
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: tg-bot
+          image: "{{ .Values.tgBot.image.repository }}:{{ .Values.tgBot.image.tag }}"
+          imagePullPolicy: {{ .Values.tgBot.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: 3001
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: TG_BOT_PORT
+              value: "3001"
+            # /start 的「打开商店」按钮 = ${TG_APP_BASE_URL}/tg/entry.php?role=customer
+            # 必须是 https：Telegram 只接受 https，否则整条 sendMessage 被拒（server.js:73-82 会返回空串不出按钮）
+            - name: TG_APP_BASE_URL
+              value: {{ .Values.tgApp.baseUrl | quote }}
+            # 同一个 token 也是 api 侧校验 initData 用的密钥，复用 api 的 Secret（该 key 已由 deployment-api 强制要求，
+            # 缺失时 api 起不来，所以这里同样不设 optional —— 少一个 key 就少一个"能起但静默不工作"的形态）
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.secretRef | default "firebird-api-secret" }}
+                  key: TELEGRAM_BOT_TOKEN
+            {{- with .Values.tgBot.n8nWebhookUrl }}
+            # 随笔消息转发到 n8n（集群内直连）。镜像里没有 scripts/ 与 .agents/，
+            # 所以 server.js 的"本地派单兜底"在集群内不可用，转发才是这条链路的一等公民。
+            - name: N8N_WEBHOOK_URL
+              value: {{ . | quote }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # /health 只反映进程存活：Telegram 侧不可达时会一直重试，不该被 liveness 反复重启
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.tgBot.resources | nindent 12 }}
+{{- end }}
