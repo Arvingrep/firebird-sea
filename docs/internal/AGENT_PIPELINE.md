@@ -1,7 +1,8 @@
 # Agent 作业手册（AGENT PIPELINE）
 
 > **这是本仓库所有 AI Agent 的唯一入口。** 动手前读完这一页，你就不需要再去翻别的规范。
-> 版本：v1.0 · 2026-11-04 · 由 owner 确认后生效。
+> 版本：v1.1 · 2026-11-05 · 与 `RULES.md` §5.4、`gates.sh` 第 0 项保持一致。
+> 修订：补 P-01b owner 通道（2026-11-05 生效）；行号引用改检查项名（行号会漂，项名不会）。
 > 上一版（草案 v0.1）已作废，其「控制器 / 10 状态机 / 定时接单」设计**不予采纳**，原因见 §7。
 
 ---
@@ -50,9 +51,9 @@
 | B-03 | hotfix 可直接进 `main`，但合并后**必须回灌 canary** | 👤 | RULES §5.2 |
 | B-04 | PR 标题 `type(scope): 描述 (TAPD-{ID})`，type ∈ feat/fix/chore/docs/refactor/release | 📄 | REPO-CONVENTIONS §2.3 |
 | B-05 | 一个 PR 只动一个区（分区见 §3）。跨区 = 拆 PR，描述里写依赖顺序 | 👤 **（待机器化，见 §7-M10）** | REPO-CONVENTIONS §5.1 |
-| B-06 | **单 PR 增量 ≤ 1200 行**（`docs/`、`.agents/`、`package-lock.json` 不计）。`canary→main` 晋升 PR 豁免 | 🤖 | `gates.sh:78-82` |
+| B-06 | **单 PR 增量 ≤ 1200 行**（`docs/`、`.agents/`、`package-lock.json` 不计）。`canary→main` 晋升 PR 豁免 | 🤖 | `「增量 ≤ 1200 行」第 2 项` |
 | B-07 | 单次提交建议 ≤ 200 行 | 📄 | RULES §4.2 |
-| B-08 | **分支前缀决定是否触发 Agent 门禁**：只有 `agent/` `arvino/` `feature/` `owner/` 会跑 QA Agent 并锁受保护路径。用 `chore/` `fix/` `feat/` 则不会 | 🤖 | `ci-verify.yml:24,66` |
+| B-08 | **分支前缀决定是否触发 Agent 门禁**：只有 `agent/` `arvino/` `feature/` `owner/` 会跑 QA Agent 并锁受保护路径。用 `chore/` `fix/` `feat/` 则不会。**`owner/` 前缀只给 owner 用**：agent 借它取通道要同时满足 P-01b 的两个信号并留下标签记录，属越权留痕，不是许可 | 🤖 | `ci-verify.yml` 分支白名单（gates job 与 agent-qa job 各一处） |
 
 > ⚠️ **B-08 是真实口子，不是许可**（见 §7-M05）。注意 `feat/` 和 `feature/` 只差两个字母，**但只有 `feature/` 在名单里**；`RELEASE_FLOW.md` 推荐的恰恰是不触发的 `feat/`。用 `chore/` 或 `feat/` 开 PR 可以改 `.github/` 而不被拦——**不要利用它**，Agent 一律用 `agent/` 前缀（B-01）。
 
@@ -60,7 +61,10 @@
 
 | ID | 规则 | 执行 |
 |---|---|---|
-| P-01 | `.github/`、`scripts/agent/`、`scripts/acceptance/`、`.agents/` **只能 owner 改**，Agent 分支触碰即 FAIL | 🤖 `gates.sh:68-72` |
+| P-01 | `.github/`、`scripts/agent/`、`scripts/acceptance/`、`.agents/` **只能 owner 改**，Agent 分支触碰即 FAIL；`owner/` 前缀分支走 P-01b 通道 | 🤖 `「受保护路径未改动」第 0 项` |
+| P-01b | **owner 通道（2026-11-05 生效）**：分支前缀 `owner/` **且** PR 带 `owner-approved` 标签，两个信号同时成立 → 门禁记 `⚠️ WARN` 放行；缺任一个仍 FAIL。**操作顺序：先打标签再 push**（`pull_request` 事件不含 `labeled`，事后补标签不会复跑，只能再 push 或重开 PR） | 🤖 同上 |
+| P-01c | **这条通道只是流程标记，不是安全边界**：agent 用的 `AGENT_GH_TOKEN` 与 owner 是同一个账号，能建 `owner/*` 分支、能自己打标签。它买到的是「留痕可追责」，不是「防越权」。真正的隔离只能靠 GitHub Environment required reviewers 或凭证分离（跟踪项 #192） | 👤 |
+| P-01d | 0b「护栏未削弱」：统计 base 与本次 diff 里硬门禁条数的变化，减少即记 `⚠️ WARN`；**2026-11-19 起转 `❌ FAIL`**。拆一条门禁也算削弱——这条专门防「PR 里顺手把拦路的检查删了」 | 🤖 `「护栏未削弱」第 0b 项` |
 | P-02 | 重命名会被拆成「删除源 + 新增目标」（`--no-renames`），把受保护文件挪走同样算违规 | 🤖 |
 | P-03 | 改这些路径时不要想绕过：`gates.sh` 用 `main` 上的版本执行，改 PR 里的门禁本身无效 | 🤖 `qa.sh:58` |
 
@@ -68,7 +72,7 @@
 
 | ID | 规则 | 执行 |
 |---|---|---|
-| D-01 | **新增 npm/composer 依赖必须先在 `base` 分支登记**到 `.agents/approved-deps.txt`。同一个 PR 里自己登记**无效**（门禁读的是 base 分支上的文件） | 🤖 `gates.sh:100` |
+| D-01 | **新增 npm/composer 依赖必须先在 `base` 分支登记**到 `.agents/approved-deps.txt`。同一个 PR 里自己登记**无效**（门禁读的是 base 分支上的文件） | 🤖 `「Zero-Dep」第 5 项` |
 | D-02 | 登记格式 `<包名> <版本串>`，版本串须与 `package.json` **完全一致**（`^4.21.2` 和 `4.21.2` 是两回事） | 🤖 |
 | D-03 | 版本变化需重新登记一行 | 🤖 |
 | D-04 | 只有 owner 能改 `approved-deps.txt`；Agent 分支的改动会被丢弃 | 👤 |
@@ -80,11 +84,11 @@
 
 | ID | 规则 | 执行 |
 |---|---|---|
-| C-01 | 改了 `*.php/js/ts/vue/sql`（且不在 `scripts/`、`.github/`、`automation/` 下）→ **必须同 PR 改 `docs/`** | 🤖 `gates.sh:84-88` |
-| C-02 | 改 `services/api/src/{server,fbProxy,*Route}.js` → **必须带** `services/api/test/` 测试 + `docs/api/openapi.yaml` 更新，且契约双向一致 | 🤖 `gates.sh:193-218` |
+| C-01 | 改了 `*.php/js/ts/vue/sql`（且不在 `scripts/`、`.github/`、`automation/` 下）→ **必须同 PR 改 `docs/`** | 🤖 `「Docs-as-Code」第 3 项` |
+| C-02 | 改 `services/api/src/{server,fbProxy,*Route}.js` → **必须带** `services/api/test/` 测试 + `docs/api/openapi.yaml` 更新，且契约双向一致 | 🤖 `「API 契约同步」第 10 项` |
 | C-03 | 改 `webroot/api/handlers/*.class.php` 的 public 方法 → 更新 `docs/api/openapi-waimai-article.yaml` | 👤（无机器校验） |
 | C-04 | 改 n8n 工作流 → 更新 `automation/n8n/REGISTRY.md` | 👤 |
-| C-05 | 改 `deploy/helm/**` → `helm lint` + 所有 `values-*.yaml` 渲染通过 | 🤖 `gates.sh:181-191` |
+| C-05 | 改 `deploy/helm/**` → `helm lint` + 所有 `values-*.yaml` 渲染通过 | 🤖 `「Helm 多站点渲染」` |
 
 > ⚠️ C-01 的坑：`deploy/**/*.js` 也被算作「业务代码」（`deploy/` 不在排除列表里）。改部署侧 JS 同样要带 `docs/`。
 
@@ -92,7 +96,7 @@
 
 | ID | 规则 | 执行 |
 |---|---|---|
-| S-01 | 严禁私钥、助记词、`TRONGRID_API_KEY` 明文、TG bot token 入仓（增量 **和** 全仓都扫） | 🤖 `gates.sh:111-158` |
+| S-01 | 严禁私钥、助记词、`TRONGRID_API_KEY` 明文、TG bot token 入仓（增量 **和** 全仓都扫） | 🤖 `「无密钥泄漏（增量）」+「无密钥入库（全仓）」第 6 项` |
 | S-02 | 存量泄漏登记在 `.agents/secret-scan-allow.txt`，格式 `<路径> <到期日> <原因>`。**到期即 FAIL**，日期解析失败按已过期处理 | 🤖 |
 | S-03 | Secret 由 owner 一次性创建，Agent **不创建、不读取其值** | 👤 |
 | S-04 | 前端与 TMA 代码绝不出现助记词、私钥、有资金权限的 Key | 👤 |
@@ -102,10 +106,10 @@
 
 | ID | 规则 | 执行 |
 |---|---|---|
-| Q-01 | 无 `.bak` / `.tmp` / `.orig` / `test_*.php` | 🤖 `gates.sh:90-92` |
-| Q-02 | 无 `var_dump` / `print_r` / `console.log` / `debugger`（`scripts/`、`deploy/` 豁免） | 🤖 `gates.sh:160-164` |
-| Q-03 | 改动文件语法必须过：php / js / sh / json | 🤖 `gates.sh:166-179` |
-| Q-04 | 非空交付（相对 base 必须真有改动） | 🤖 `gates.sh:74-76` |
+| Q-01 | 无 `.bak` / `.tmp` / `.orig` / `test_*.php` | 🤖 `「无垃圾文件」第 4 项` |
+| Q-02 | 无 `var_dump` / `print_r` / `console.log` / `debugger`（`scripts/`、`deploy/` 豁免） | 🤖 `「无调试残留」` |
+| Q-03 | 改动文件语法必须过：php / js / sh / json | 🤖 `「改动文件语法」` |
+| Q-04 | 非空交付（相对 base 必须真有改动） | 🤖 `「非空交付」第 1 项` |
 | Q-05 | API 响应统一 `{ success, data?, error?: {code, message} }` | 👤 |
 | Q-06 | 受保护接口必须校验 Telegram `initData` 的 HMAC-SHA256，失败返回 401 | 👤 |
 | Q-07 | 金额必须显式区分 `PHP`（2 位小数）与 `USDT`（≤6 位小数） | 👤 |
@@ -118,7 +122,7 @@
 | H-02 | `.agent-runs/`、`backup_configs/`、`node_modules/`、`downloads/`、`.n8nac/` 不入库 | 🤖 |
 | H-03 | 新增文件 > 5MB 拦（存量火鸟资产豁免） | 🤖 |
 | H-04 | **禁止在仓库根目录新增文件**。根目录只允许 README / Makefile / docker-compose / AGENTS.md / package.json / .gitignore / .env.example | 👤 |
-| H-05 | 禁止重建已下线目录：BMAD 体系、`services/tg-bot`、`scripts/acceptance/`、`agent/{dev,story}.sh`、自建 agent 派单 | 👤 |
+| H-05 | 禁止重建已下线目录：BMAD 体系、`services/tg-bot`、`scripts/acceptance/`、`agent/{dev,story}.sh`、自建 agent 派单。注：`scripts/acceptance/` 虽已下线，仍在 P-01 受保护路径清单内——**下线的是它的内容，不是它的保护** | 👤 |
 
 ### 2.8 运维（GitOps）
 
@@ -256,7 +260,7 @@ TAPD(progressing)  ──认领，建 run 目录 + meta.json──────�
 # 1. 仓库卫生（新增文件是否合规）
 bash scripts/repo-hygiene.sh
 
-# 2. 确定性门禁（10 项）
+# 2. 确定性门禁（13 项：基线 + 受保护路径 + 0b 护栏 + 10 项内容检查；以报告实际行数为准）
 bash scripts/agent/gates.sh origin/canary
 
 # 3. 流程自测 + 单测 + DB（CI 必过项，本地慢）
@@ -286,7 +290,7 @@ bash scripts/test-gates.sh
 | M-04 | `REPO-CONVENTIONS.md` §2 仍把 `apps/tma/` 列为 A 区、归前端 Agent | 目录已归档（2026-11-04） | **已修**：分区表改为「A 站点页面 = `webroot/**`」 |
 | M-05 | 分支前缀白名单只有 `agent/ arvino/ feature/ owner/`，但 `RELEASE_FLOW.md` 推荐的开发分支是 `feat/*` | **`feat/` 不在名单里，`feature/` 才在**——一个字母之差，决定跑不跑 QA。用 `chore/` `fix/` `feat/` 开 PR 可绕过 QA 和受保护路径锁 | 已知缺陷。**Agent 一律用 `agent/` 前缀**（B-01），不要利用这个口子 |
 | M-06 | `.agents/RULES.md` 说增量排除「docs/、.agents/、_bmad-output/」，`gates.sh` 实际排除「docs/、.agents/、package-lock.json」 | `_bmad-output` 已下线，无影响；`package-lock.json` 是新增豁免 | 以 `gates.sh` 为准（B-06） |
-| M-07 | 7 处文档链接写 `AGENT_PIPELINE.md`（大写），而文件曾有段时间只存在于某台机器的工作区、且命名小写 | Linux/CI 上断链，macOS 不报错——「本机能打开」不等于仓库里有 | **已修**：文件按 `AGENT_PIPELINE.md` 入库，与 `docs/internal/` 其他文档（`RELEASE_FLOW.md`、`REPO_MAP.md`…）命名一致 |
+| M-07 | 文档引用的 `AGENT_PIPELINE.md` 曾只存在于某台机器的工作区（未入库），且命名大小写不一致 | Linux/CI 断链，macOS 不报错——「本机能打开」不等于仓库里有 | 已入库，**文件名以大写 `AGENT_PIPELINE.md` 为准**，链接一律用大写 |
 | M-08 | 旧草案 10 状态机 vs TAPD 3 状态 | TAPD 装不下 7 个中间状态 | **已砍**：TAPD 三态 + `meta.json` 细粒度（§4） |
 | M-09 | 旧草案 `.agent-runs/{日期}/task-NNN` 编号按日重置 | 编号跨日重名，与 TAPD 无映射 | **已改**：目录名用 `{TAPD-ID}-{slug}` |
 | M-10 | 旧草案「上线前置检查」三项（单区/登记同步/归档完整）无一有机器执行 | 写成「前置检查」会给人虚假安全感 | 降级为**人工 checklist**（B-05 / C-03 / C-04）。单区检查待加进 `gates.sh` |
