@@ -426,6 +426,10 @@ if [ "$rc" = "0" ] && printf '%s\n' "$out" | grep -qF '| kubectl/ArgoCD 只读 |
 else echo "❌ O-02 owner 应急未按 WARN 放行（rc=${rc}）"; printf '%s\n' "$out" | grep -E '^\| ' | head -20; FAIL=1; fi
 reset; mkdir -p ops; printf '#!/bin/bash\nkubectl -n prod get pods\nkubectl top node\nkubectl rollout status deploy/x\n' > ops/check.sh; git add -A; git commit -qm d
 row_is "O-02 kubectl 只读命令 → 放行" "kubectl/ArgoCD 只读" 0 PASS
+# 文档里描述写命令是操作指引，不是执行：deploy/ 的 NOTES/README 必然出现这类句子，
+# 判红等于逼人改措辞（误报比漏报更逼人绕路）——只扫可执行类文件才拦得住该拦的。
+reset; mkdir -p deploy; printf '# 运维说明\nkubectl create secret generic x --from-literal=a=b\n' > deploy/NOTES.md; git add -A; git commit -qm d
+row_is "O-02 文档里写 kubectl 写命令 → 不误伤" "kubectl/ArgoCD 只读" 0 PASS
 
 # --- C-05 Helm 多站点渲染（本机无 helm 时跳过，以 CI runner 为准）---
 if command -v helm >/dev/null; then
