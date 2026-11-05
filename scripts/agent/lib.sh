@@ -9,9 +9,9 @@ set -euo pipefail
 ROOT_DIR="${AGENT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 AGENT_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Agent 的基线/PR 目标分支：canary 验收流程下为 canary，默认 main（行为不变）。
+# Agent 的基线/PR 目标分支：默认 canary（= 实际集成分支，PR 基线也是它）；main 是生产，只经 canary 晋升。
 # 由 workflow 经 AGENT_BASE_BRANCH 注入；脚本里不再写死 origin/main。
-BASE_BRANCH="${AGENT_BASE_BRANCH:-main}"
+BASE_BRANCH="${AGENT_BASE_BRANCH:-canary}"
 # 容忍误填 origin/canary：底下每个消费点都自己拼 origin/ 前缀（dev.sh/qa.sh 的 origin/${BASE_BRANCH}、
 # Makefile 的 GATE_BASE），不归一就会拼出 origin/origin/canary —— 表现是 fetch 失败（set -e 下直接 die）
 # 或门禁报「相对 origin/origin/canary 无改动」，报错完全不指向「多写了前缀」。在此归一一次，四处一起受益。
