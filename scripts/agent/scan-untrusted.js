@@ -16,16 +16,23 @@
 //   · 排除本文件自身：检测器的正则里必然写着这些模式词，不排除会「每轮都检出一堆自己」。
 //     代价是攻击者若恰好改这个文件不会被自己抓到——但它属受保护路径，改动会被 gates 第 0 项拦。
 //
-// 用法：node scan-untrusted.js <diff 文件> [其它不可信文本文件…] [--md 输出.md]
+// 用法：node scan-untrusted.js <diff 文件> [其它不可信文本文件…] [--md 输出.md] [--md-strict 输出2.md]
+//   --md        含原文片段，给**人**看的（PR 评论）。片段来自不可信输入，绝不能进模型上下文当「受信区」。
+//   --md-strict 只留规则名与位置，给**模型**看的（放进取证围栏内）。
+//   为什么要分两份：给注入内容加围栏、又把注入的原文摘出来放到围栏外面当「扫描结果」，
+//   等于自己开了一条受信通道——攻击者只要构造一行「命中规则 + 后面夹带指令」，
+//   那段指令就会以「机器结论」的身份出现在围栏外。这是 PR #205 第 2 轮 QA 抓到的。" 
 // 输出：stdout 只有一个整数 = 命中总数（qa.sh 直接读）；扫描失败时以非 0 退出，由调用方按「未知」处理。
 'use strict';
 const fs = require('fs');
 
 const argv = process.argv.slice(2);
 let mdPath = '';
+let mdStrictPath = '';
 const files = [];
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--md') { mdPath = argv[++i] || ''; continue; }
+  if (argv[i] === '--md-strict') { mdStrictPath = argv[++i] || ''; continue; }
   files.push(argv[i]);
 }
 if (!files.length) {
@@ -104,8 +111,16 @@ for (const c of candidates) {
   }
 }
 
+const esc = (s) => String(s).replace(/\|/g, '\\|').replace(/`/g, "'").slice(0, 140);
+
+if (mdStrictPath) {
+  const lines = ['| 特征 | 位置 |', '| :--- | :--- |'];
+  for (const h of hits.slice(0, 20)) lines.push(`| ${esc(h.rule)} | \`${esc(h.where)}:${h.line}\` |`);
+  if (!hits.length) lines.push('| （无命中） | |');
+  fs.writeFileSync(mdStrictPath, lines.join('\n') + '\n');
+}
+
 if (mdPath) {
-  const esc = (s) => String(s).replace(/\|/g, '\\|').replace(/`/g, "'").slice(0, 140);
   const lines = [];
   lines.push('### 🔎 不可信输入扫描（指令注入）');
   lines.push('');

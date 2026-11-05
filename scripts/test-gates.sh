@@ -521,6 +521,20 @@ printf 'jobs:\n  a:\n    steps:\n      - uses: ./.github/actions/x\n      - uses
 git add -A; git commit -qm wf
 row_is "S-03 本地 action 与 docker:// 豁免" "Actions 引用已 pin" 0 PASS
 
+# 注释里的示例不能被当成引用：`# uses: actions/checkout@v4` 是文档，不是执行点。
+# 不加这条，第 13 项会把「注释里写了一个示例」判成供应链风险 —— 误报会训练人删注释而不是改问题。
+reset; mkdir -p .github/workflows
+printf 'jobs:\n  a:\n    steps:\n      # 升级示例：- uses: actions/checkout@v4\n      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262\n' > .github/workflows/x.yml
+git add -A; git commit -qm wf
+row_is "S-03 注释里的 uses 示例不误报" "Actions 引用已 pin" 0 PASS
+
+# 注释里的示例不能被当成引用：`# uses: actions/checkout@v4` 是文档，不是执行点。
+# 不加这条，第 13 项会把「注释里写了一个示例」判成供应链风险 —— 误报会训练人删注释而不是改问题。
+reset; mkdir -p .github/workflows
+printf 'jobs:\n  a:\n    steps:\n      # 升级示例：- uses: actions/checkout@v4\n      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262\n' > .github/workflows/x.yml
+git add -A; git commit -qm wf
+row_is "S-03 注释里的 uses 示例不误报" "Actions 引用已 pin" 0 PASS
+
 # --- 注入扫描器：qa.sh 的「不可信输入可见化」全靠它，它哑掉这层就没了 ---
 # 判据是「命中数」而不是「有没有输出」：扫描器返回 0 处也照常输出，用退出码断言等于没断言。
 mkdir -p "$T/scan"
@@ -537,6 +551,26 @@ printf 'diff --git a/scripts/agent/scan-untrusted.js b/scripts/agent/scan-untrus
 n_self="$(node "$ROOT/scripts/agent/scan-untrusted.js" "$T/scan/self.patch" 2>/dev/null)"
 if [ "$n_self" = "0" ]; then echo "✅ 注入扫描：排除检测器自身"
 else echo "❌ 注入扫描把检测器自身正则当命中（${n_self} 处）"; FAIL=1; fi
+
+# 给模型看的那份必须**不含原文片段**：片段由提交者控制，一旦出现在围栏外，
+# 攻击者就能借「机器扫描结论」的壳把自己的指令送进受信区（PR #205 第 2 轮 QA 的 minor 就是这个）。
+node "$ROOT/scripts/agent/scan-untrusted.js" "$T/scan/bad.patch" \
+  --md "$T/scan/human.md" --md-strict "$T/scan/model.md" >/dev/null 2>&1
+if grep -q 'ignore all previous' "$T/scan/model.md" 2>/dev/null; then
+  echo "❌ 给模型的扫描表里带了原文片段（受信通道）"; FAIL=1
+elif ! grep -q 'ignore all previous' "$T/scan/human.md" 2>/dev/null; then
+  echo "❌ 给人看的扫描表里没有原文片段（人看不到证据）"; FAIL=1
+else echo "✅ 扫描表分两份：模型只拿规则+位置，人拿原文"; fi
+
+# 给模型看的那份必须**不含原文片段**：片段由提交者控制，一旦出现在围栏外，
+# 攻击者就能借「机器扫描结论」的壳把自己的指令送进受信区（PR #205 第 2 轮 QA 的 minor 就是这个）。
+node "$ROOT/scripts/agent/scan-untrusted.js" "$T/scan/bad.patch" \
+  --md "$T/scan/human.md" --md-strict "$T/scan/model.md" >/dev/null 2>&1
+if grep -q 'ignore all previous' "$T/scan/model.md" 2>/dev/null; then
+  echo "❌ 给模型的扫描表里带了原文片段（受信通道）"; FAIL=1
+elif ! grep -q 'ignore all previous' "$T/scan/human.md" 2>/dev/null; then
+  echo "❌ 给人看的扫描表里没有原文片段（人看不到证据）"; FAIL=1
+else echo "✅ 扫描表分两份：模型只拿规则+位置，人拿原文"; fi
 
 # --- 规则真相源 ↔ 门禁项：门禁在白拦，必须有规则为它背书 ---
 # 为什么需要这条：#188 那轮照「命名规律」给方案表填了 9 个 enforce 签名
