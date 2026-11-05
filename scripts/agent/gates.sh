@@ -194,7 +194,9 @@ fi
 # 7. 调试残留
 # deploy/ 下的 .js 是服务端运行时（如 mail-relay/server.js），启动日志是功能的一部分，
 # 不是忘记删的调试语句；要拦的调试残留只针对业务代码。
-DEBUG="$(git diff "$RANGE" -- '*.php' '*.js' '*.ts' '*.vue' ':(exclude)scripts/**' ':(exclude)deploy/**' | grep -E '^\+' | grep -E '\b(var_dump|print_r|console\.log|debugger)\b' || true)"
+# 边界用 [A-Za-z0-9_] 手写而不用 \b：BSD grep（macOS）不支持 \b，本机上这条检查曾整体空转
+# （实测 `var_dump(1);` 匹配数为 0），只有 Linux CI 拦过——同一个门禁在两个平台判据不同。
+DEBUG="$(git diff "$RANGE" -- '*.php' '*.js' '*.ts' '*.vue' ':(exclude)scripts/**' ':(exclude)deploy/**' | grep -E '^\+' | grep -E '(^|[^A-Za-z0-9_])(var_dump|print_r|console\.log|debugger)([^A-Za-z0-9_]|$)' || true)"
 [ -z "$DEBUG" ] && row "无调试残留" "✅ PASS" || row "无调试残留" "❌ FAIL" "$(echo "$DEBUG" | head -n1 | head -c 120)"
 
 # 8. 改动文件语法
@@ -272,6 +274,23 @@ else
   if [ -n "$MISS" ]; then row "API 契约同步" "❌ FAIL" "$MISS"
   elif [ -n "$DEBT_NOTE" ]; then row "API 契约同步" "⚠️ WARN" "契约一致${DEBT_NOTE}"
   else row "API 契约同步" "✅ PASS" "实现与契约双向一致"; fi
+fi
+
+# 11. kubectl / ArgoCD 只读（O-02 的机器执行点）
+#     规则此前只写在文档里（hard 却无执行环，规则表里唯一「有人在文档说、没人机器拦」的一条）。
+#     扫的是本分支**新增行**里的集群写命令：get/describe/logs/events/top 等只读不拦；
+#     写操作 agent 分支 FAIL，owner 双信号应急 WARN（同第 0 项受保护路径的口径）。
+#     排除 gates.sh / test-gates.sh 自身：正则与用例夹具里必然写着写命令字面量，
+#     不排除就会「门禁检出门禁自己在说 kubectl delete」（同第 6 项密钥扫描排除自身的口径）。
+#     排除 docs/、.agents/：规则文档与台账描述禁令时必然引用写命令——拦的是「执行」，不是「提及」。
+K8S_WRITE_RE='kubectl (apply|delete|edit|patch|scale|autoscale|cordon|drain|taint|label|annotate|set|create|replace)([[:space:]]|$)|kubectl rollout (undo|restart|pause|resume)|argocd app (sync|delete|rollback)'
+K8S_WRITE="$(git diff "$RANGE" -- . ':(exclude)scripts/agent/gates.sh' ':(exclude)scripts/test-gates.sh' ':(exclude)docs/**' ':(exclude).agents/**' | grep -E '^\+' | grep -E "$K8S_WRITE_RE" || true)"
+if [ -z "$K8S_WRITE" ]; then
+  row "kubectl/ArgoCD 只读" "✅ PASS"
+elif [ "${GATE_OWNER_BRANCH:-0}" = "1" ] && [ "${GATE_OWNER_APPROVED:-0}" = "1" ]; then
+  row "kubectl/ArgoCD 只读" "⚠️ WARN" "owner 应急写操作放行：$(printf '%s' "$K8S_WRITE" | head -n1 | head -c 120)"
+else
+  row "kubectl/ArgoCD 只读" "❌ FAIL" "集群写操作进入改动（仅 owner 应急可用）：$(printf '%s' "$K8S_WRITE" | head -n1 | head -c 120)"
 fi
 
 echo "### 🔒 确定性门禁（${RANGE}）"
