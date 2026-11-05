@@ -25,7 +25,6 @@
 | 目录 | 职责 | 运行时 | 允许谁改 |
 |---|---|---|---|
 | `webroot/` | 火鸟 PHP 主站（H5 + 后台 + API） | k8s `zxem-gke-h5` | 后端 Agent |
-| `apps/tma/` | Telegram Mini App（Vue 3 + Vite） | 静态托管 `/tma/` | 前端 Agent |
 | `services/api/` | TG 客户端 API（WebApp Auth、结算） | k8s `/tg-api` | 后端 Agent |
 | `services/news-sync/` | 资讯抓取 / AI 去重 / 发布重试 | n8n 容器内挂载 | 后端 Agent |
 | `services/payment-listener/` | TRC-20 USDT 链上监听 | 独立容器（当前关闭） | 待定，改动前先问 |
@@ -35,6 +34,9 @@
 | `scripts/` | 门禁、部署、数据种子脚本 | 人 + CI | 按需，改动要跑 `test-gates.sh` |
 | `docs/` | 文档 + `archive/` 归档包 | 只有人看 | 任何人 |
 | `webroot/templates/`、`webroot/static/` | 火鸟历史模板与静态资产 | 站点 | **只读**，不新增 |
+
+> `apps/tma/` 不在上表内，是因为它已于 2026-11-04 归档（见下方「已下线」表）。
+> **表里没有的目录不等于可以新建**——新增顶层目录一律先提方案给 owner。
 
 ### 已下线，不要重新引入
 
@@ -49,6 +51,7 @@
 | `services/tg-bot/` | 2026-10-27 | 三处全断（调已删脚本 + webhook 不存在 + 生产未部署） |
 | `tg_photo_menu_to_json` / `usdt_payment_alert` / `sentry_error_to_tg_ai_alert` / `tg_voice_to_linear_spec` / `arvino_github_issue_to_run` / `tg_to_github_issues_project` | 2026-10-27 | 目标系统均不存在，见 `automation/n8n/REGISTRY.md` |
 | `backup_configs/`、`.agent-runs/`、`.n8nac/` | 2026-10-27 | 本地临时产物，已进 `.gitignore` |
+| `apps/tma/`（Telegram Mini App 前端） | 2026-11-04 | 业务方向已放弃；归档包 `docs/archive/tma-legacy-2026-11-04.tar.gz`，复活步骤见 `docs/internal/TMA-LEGACY-NOTES.md` |
 
 归档包在 `docs/archive/`，需要时解包即可，**不要重建目录**。
 
@@ -59,7 +62,7 @@
 ```
 新文件
 ├─ 是站点页面 / PHP 接口？        → webroot/ 对应子目录
-├─ 是 TG 前端页面 / 组件？         → apps/tma/src/pages|components/
+├─ 是 TG 前端页面 / 组件？         → 已归档（2026-11-04），先提方案给 owner，别按旧路径新建
 ├─ 是独立 Node 服务？              → services/<新服务名>/
 ├─ 是 n8n 工作流？                 → automation/n8n/workflows/ + 更新 REGISTRY.md
 ├─ 是部署清单？                    → deploy/
@@ -115,7 +118,7 @@ gh api repos/Arvingrep/firebird-sea/branches/main/protection/required_status_che
 
 | 区 | 路径 | 可并行的前提 |
 |---|---|---|
-| A 前端 | `apps/tma/**` | 独立，可随时并行 |
+| A 站点页面 | `webroot/**`（H5 页面 / 模板 / 静态资产） | 独立，可随时并行 |
 | B PHP 后端 | `webroot/api/**`、`webroot/include/config/**` | 独立，可随时并行 |
 | C 自动化 | `automation/n8n/**` | 独立，但同一工作流同一时间只能一个 Agent 改 |
 | D 服务 | `services/**` | 同服务内串行，跨服务并行 |

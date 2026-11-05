@@ -287,7 +287,7 @@ bash scripts/test-gates.sh
 | M-01 | **两套任务真相源**：GitHub Issue+label（`qa.sh`）vs TAPD story（旧草案） | 代码里在跑 Issue+label，草案要求 TAPD | TAPD 管**需求**，Issue/PR 管**交付**，`.agent-runs` 管**过程**，三者用 TAPD ID 串起来。不要试图统一成一套 |
 | M-02 | `qa.sh` 打回后给 issue 打 `agent:dev` 标签，指望 `dev.sh` 返工，但 **`dev.sh` 已于 2026-10-27 下线** | 打回后无人响应，issue 永久卡住 | QA 打回 = **人工接手**。要恢复自动返工必须先重建 `dev.sh` 并解 P-01 冲突 |
 | M-03 | `.agents/RULES.md` §4.3 要求「必须通过 Acceptance Agent 审查」，但 Acceptance 体系已整体下线 | 规则指向不存在的组件 | 以 `qa.sh`（独立 QA Agent）为准，Acceptance 条款作废 |
-| M-04 | `REPO-CONVENTIONS.md` §2 仍把 `apps/tma/` 列为 A 区、归前端 Agent | 目录已归档（2026-11-04） | **已修**：分区表改为「A 站点页面 = `webroot/**`」 |
+| M-04 | `REPO-CONVENTIONS.md` §2 仍把 `apps/tma/` 列为 A 区、归前端 Agent | 目录已归档（2026-11-04） | **本轮才修**：此前这里写着「已修」，但文件里实际没改（2026-11-05 复核发现）——已删目录职责表那一行、决策树改指归档、分区表改为「A 站点页面 = `webroot/**`」。**「已修」这两个字本身也需要被核对** |
 | M-05 | 分支前缀白名单只有 `agent/ arvino/ feature/ owner/`，但 `RELEASE_FLOW.md` 推荐的开发分支是 `feat/*` | **`feat/` 不在名单里，`feature/` 才在**——一个字母之差，决定跑不跑 QA。用 `chore/` `fix/` `feat/` 开 PR 可绕过 QA 和受保护路径锁 | 已知缺陷。**Agent 一律用 `agent/` 前缀**（B-01），不要利用这个口子 |
 | M-06 | `.agents/RULES.md` 说增量排除「docs/、.agents/、_bmad-output/」，`gates.sh` 实际排除「docs/、.agents/、package-lock.json」 | `_bmad-output` 已下线，无影响；`package-lock.json` 是新增豁免 | 以 `gates.sh` 为准（B-06） |
 | M-07 | 文档引用的 `AGENT_PIPELINE.md` 曾只存在于某台机器的工作区（未入库），且命名大小写不一致 | Linux/CI 断链，macOS 不报错——「本机能打开」不等于仓库里有 | 已入库，**文件名以大写 `AGENT_PIPELINE.md` 为准**，链接一律用大写 |

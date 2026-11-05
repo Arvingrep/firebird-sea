@@ -95,29 +95,14 @@ for svc in services/api services/payment-listener services/news-sync; do
     fi
 done
 
-# 6.2 TMA（Telegram Mini App）前端：类型检查 + 单元测试 + 构建
-#     这是整套门禁此前最大的缺口：apps/tma 有 9 个测试文件（101 个用例）、typecheck 与 vite build，
-#     但 verify-task.sh 只跑 services/ 下三个服务，TMA 的构建要等 merge 之后由 Dockerfile.api 触发。
-#     结果是：TMA 编译不过或测试挂了，PR 门禁全绿，合并后才炸 —— 而且正好炸在最想推的模块上。
-if [ -f apps/tma/package.json ]; then
-    if [ ! -d apps/tma/node_modules ]; then
-        # --workspaces=false 是必需的：根 package.json 声明了 workspaces: ['apps/*','services/*']，
-        # 在 apps/tma 子目录直接跑 npm ci 会把根当成 workspace root，而根没有 lockfile →
-        # 报 EUSAGE「找不到 package-lock.json」，同时 .npmrc 被当作 workspace config 忽略。
-        # 这与第 6 项 services 测试用的是同一写法。
-        if ! (cd apps/tma && npm ci --workspaces=false --no-audit --no-fund >/dev/null 2>&1); then
-            echo "❌ [FAIL] apps/tma 依赖安装失败（npm ci）；末尾日志："
-            (cd apps/tma && npm ci --workspaces=false --no-audit --no-fund 2>&1 | tail -15)
-            exit 1
-        fi
-    fi
-    if (cd apps/tma && npm run typecheck >/dev/null 2>&1); then echo "  ✅ apps/tma 类型检查 [通过]"
-    else echo "❌ [FAIL] apps/tma 类型检查失败："; (cd apps/tma && npm run typecheck 2>&1 | tail -15); exit 1; fi
-    if (cd apps/tma && npm test >/dev/null 2>&1); then echo "  ✅ apps/tma 单元测试 [通过]"
-    else echo "❌ [FAIL] apps/tma 单元测试失败，请运行 (cd apps/tma && npm test) 查看详情"; exit 1; fi
-    if (cd apps/tma && npm run build >/dev/null 2>&1); then echo "  ✅ apps/tma 构建 [通过]"
-    else echo "❌ [FAIL] apps/tma 构建失败："; (cd apps/tma && npm run build 2>&1 | tail -15); exit 1; fi
-fi
+# 6.2 TMA（Telegram Mini App）前端：已于 2026-11-04 整体归档，不再在此构建
+#     原段是 `if [ -f apps/tma/package.json ]; then ... typecheck / test / build ... fi`。
+#     apps/tma 删除后，这段的守卫恒为假 —— 它不会报错，只会**静默跳过**。
+#     这正是「检查存在 ≠ 检查有效」的经典形态：脚本里有 30 行 TMA 检查，
+#     日志里看不到任何一行，CI 却显示通过。所以这里不保留原段，改为留一条显式说明，
+#     让后来人一眼看出「TMA 构建为什么不在 verify-task 里」。
+#     前端构建产物不再随 api 镜像发布（见 deploy/docker/Dockerfile.api 注释）；
+#     归档包与复活步骤随归档 PR 一起入库（docs/archive/tma-legacy-*.tar.gz + TMA-LEGACY-NOTES.md）。
 
 # 6.5 Story 6.3 完整链路替身验收(采集→去重→发布→重试→告警,零外部依赖,断言在脚本内);不存在则跳过
 if [ -f services/news-sync/e2e-local.sh ]; then
