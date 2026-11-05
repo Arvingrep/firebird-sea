@@ -280,14 +280,17 @@ fi
 #     规则此前只写在文档里（hard 却无执行环，规则表里唯一「有人在文档说、没人机器拦」的一条）。
 #     扫的是本分支**新增行**里的集群写命令：get/describe/logs/events/top 等只读不拦；
 #     写操作 agent 分支 FAIL，owner 双信号应急 WARN（同第 0 项受保护路径的口径）。
-#     排除 gates.sh / test-gates.sh 自身：正则与用例夹具里必然写着写命令字面量，
-#     不排除就会「门禁检出门禁自己在说 kubectl delete」（同第 6 项密钥扫描排除自身的口径）。
-#     排除 docs/、.agents/：规则文档与台账描述禁令时必然引用写命令——拦的是「执行」，不是「提及」。
+#     只扫可执行类文件（.sh/.bash/.yml/.yaml/.js/.mjs/.ts/.php/.py）：文档里写「kubectl create secret ...」
+#     是操作指引，不是执行——deploy/ 下的 NOTES/README 必然出现这类句子，扫全文会把说明文档判红，
+#     而误报会逼人改措辞或走 owner 通道，比不拦更坏（QA 第 3 轮 minor）。
+#     排除 gates.sh / test-gates.sh 自身：正则与用例夹具里必然写着写命令字面量。
+#     **这是尽力而为的字面量拦截，不是安全边界**：换行连接（kubectl \ 换行 delete）、
+#     别名（k delete）、xargs 形态都能绕过。真正的约束在凭证与 RBAC 层，不在这条正则（QA 第 3 轮 minor）。
 # 允许 kubectl 与动词之间夹参数（-n prod / --context c / 双空格），否则 `kubectl -n prod delete pod x`
 # 直接绕过（QA 第 2 轮 major）。[^|;&]* 不跨命令分隔符，避免把 `kubectl get x | grep delete` 误判。
 # exec 也算写（能在容器里执行任意命令），argocd app set 同理。
 K8S_WRITE_RE='kubectl[^|;&]*[[:space:]](apply|delete|edit|patch|scale|autoscale|cordon|drain|taint|label|annotate|set|create|replace|exec)([[:space:]]|$)|kubectl[^|;&]*[[:space:]]rollout[[:space:]](undo|restart|pause|resume)([[:space:]]|$)|argocd[^|;&]*[[:space:]]app[[:space:]](sync|delete|rollback|set)([[:space:]]|$)'
-K8S_WRITE="$(git diff "$RANGE" -- . ':(exclude)scripts/agent/gates.sh' ':(exclude)scripts/test-gates.sh' ':(exclude)docs/**' ':(exclude).agents/**' | grep -E '^\+' | grep -E "$K8S_WRITE_RE" || true)"
+K8S_WRITE="$(git diff "$RANGE" -- '*.sh' '*.bash' '*.yml' '*.yaml' '*.js' '*.mjs' '*.ts' '*.php' '*.py' ':(exclude)scripts/agent/gates.sh' ':(exclude)scripts/test-gates.sh' | grep -E '^\+' | grep -E "$K8S_WRITE_RE" || true)"
 if [ -z "$K8S_WRITE" ]; then
   row "kubectl/ArgoCD 只读" "✅ PASS"
 elif [ "${GATE_OWNER_BRANCH:-0}" = "1" ] && [ "${GATE_OWNER_APPROVED:-0}" = "1" ]; then
