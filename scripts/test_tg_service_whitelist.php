@@ -229,23 +229,24 @@ if ($pos !== false) {
 
     check('能按大括号配对截出拦截块的完整范围', $block !== '', true);
 
+    // 后面所有断言都只看代码：注释里会出现同样的字样（比如注释解释了「不能用 301」
+    // 「$cfg_defaultindex 解析回同一个 service」），对着原文断言等于自己骗自己。
+    $blockCode = fbs_strip_comments($block);
+
     check('拦截块用的是"开关 && !白名单"的组合调用',
-        strpos($block, 'fbsTgServiceWhitelistEnabled() && !fbsTgServiceAllowed($service)') !== false,
+        strpos($blockCode, 'fbsTgServiceWhitelistEnabled() && !fbsTgServiceAllowed($service)') !== false,
         true);
 
     check('跳转带 from=tg_whitelist（运维可按日志计数）',
-        strpos($block, 'from=tg_whitelist') !== false,
+        strpos($blockCode, 'from=tg_whitelist') !== false,
         true);
 
     check('跳转走 header("location:…")',
-        strpos($block, 'header("location:"') !== false,
+        strpos($blockCode, 'header("location:"') !== false,
         true);
 
     // 302 是 PHP header("location:") 的默认值；写死 301 会被浏览器永久缓存，
     // 等哪天真要靠开关退回，用户本地照样照着旧缓存跳走，开关等于失效。
-    // 只看代码：注释里出现「301」是在解释这条规则，不能算违规。
-    $blockCode = fbs_strip_comments($block);
-
     check('跳转没有写死 301 状态码（注释不计）',
         strpos($blockCode, '301') === false,
         true);
@@ -255,9 +256,14 @@ if ($pos !== false) {
         strpos($blockCode, ', true,') === false,
         true);
 
-    // 默认首页指向被拦模块时的自跳自保护
-    check('拦截块含"默认首页自跳自"保护（$cfg_defaultindex 判断）',
-        strpos($block, '$cfg_defaultindex') !== false,
+    // 默认首页指向被拦模块时的自跳自保护。
+    // 断言具体表达式而不是「块里出现过 $cfg_defaultindex」——注释里也有这个词。
+    check('拦截块含"默认首页自跳自"保护（$cfg_defaultindex == $service）',
+        strpos($blockCode, '$cfg_defaultindex == $service') !== false,
+        true);
+
+    check('自跳自保护走的是 404 断开，不是再次跳转',
+        strpos($blockCode, '404') !== false,
         true);
 
     $stateCheckPos = strpos($source, '//验证模块状态');
