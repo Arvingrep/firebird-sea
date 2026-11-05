@@ -58,8 +58,11 @@
     disableVerticalSwipes: true
   };
 
-  // 旅游 7 个列表页：.contentBox{padding-top:.9rem} 是给 fixed 顶栏让位的。
-  // 其中 5 页另有 .screenBox{top:.9rem}（ticket/hotel/rentcar/grouptravel/visa）；
+  // 旅游 8 个列表页把顶栏改成 fixed（第 8 个是 video-detail，video-detail.css:68
+  // 也有 .header{position:fixed}）。其中 7 页要清 .contentBox 的留白；video-detail
+  // 没有 .contentBox、body 也没有 padding-top，fixed 顶栏不占流，隐藏后内容自然上移，
+  // 所以一行业务补丁都不需要。
+  // 7 页里 5 页另有 .screenBox{top:.9rem}（ticket/hotel/rentcar/grouptravel/visa）；
   // store/daytravel 的 DOM 里没有该节点，已逐个核对（store.html/daytravel.html 均 0 命中）。
   // 数值同样取自火鸟自己的 .huoniao_iOS 补偿（如 ticket.css:113-114）。
   var TRAVEL_LIST = {
@@ -217,7 +220,10 @@
     }
   }
 
-  // 只取第一个同名参数，与 PHP 侧 $_GET 语义一致
+  // 取第一个同名参数。注意这与 PHP 不一致：parse_str/$_GET 对重复键取**最后一个**
+  // （实测 php -r 'parse_str("a=1&a=2",$o)' → '2'）。此处刻意保持取第一个——
+  // 模板生成的正常 URL 不会有重复键，差异只影响人为构造的异常 URL；
+  // 取第一个意味着追加的重复参数无法改变页面判定，不会被用来绕过路由。
   function parseQuery(search) {
     var out = {};
     var raw = String(search || '');

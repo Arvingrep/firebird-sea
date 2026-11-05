@@ -181,7 +181,9 @@ test('旅游 index：相对定位顶栏，隐藏后内容自然上移', () => {
   assert.equal(plan.isHome, true);
 });
 
-test('旅游 video-detail 不是 fixed 顶栏页（报告把 css 行号记错了）', () => {
+test('旅游 video-detail：8 个 fixed 页之一，但无 .contentBox / 无 body padding，不需要任何补丁', () => {
+  // video-detail.css:68 也有 .header{position:fixed}（报告 §1.3.3 没记错，此前撤回的
+  // 是我方「css 里没有这条规则」的错误更正）；fixed 顶栏不占流，隐藏后内容自然上移。
   const plan = buildPlan({ service: 'travel', pathname: '/video-detail.html', search: '' });
   assert.deepEqual(plan.navSelectors, ['body > .header']);
   assert.deepEqual(plan.clearPadding, []);
