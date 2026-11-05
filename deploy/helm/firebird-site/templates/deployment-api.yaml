@@ -38,6 +38,17 @@ spec:
             - name: CALL_TEST_URL
               value: {{ . | quote }}
             {{- end }}
+            # Telegram 免密登录桥：Node → 集群内 nginx → /api/fbs/index.php（HMAC 签名，两侧同密钥）
+            # baseUrl 只到域名/端口：路径由 gatewayClient.js 固定拼，带路径会拼错（见该文件注释）
+            - name: FBS_GATEWAY_URL
+              value: {{ .Values.gateway.url | default (printf "http://firebird-%s:%v" .Values.siteId .Values.service.port) | quote }}
+            # optional：Secret 未建时 Pod 照常启动，该路由自身返回 500（不把登录桥故障放大成 CrashLoop）
+            - name: FBS_GATEWAY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.secretRef | default "firebird-api-secret" }}
+                  key: {{ .Values.gateway.secretKey | default "FBS_GATEWAY_SECRET" }}
+                  optional: true
             {{- range $name := list "TELEGRAM_BOT_TOKEN" "COINS_PH_API_KEY" "COINS_PH_API_SECRET" "TRON_MASTER_RECEIVE_ADDRESS" "TRONGRID_API_KEY" }}
             - name: {{ $name }}
               valueFrom:

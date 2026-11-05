@@ -3,13 +3,46 @@
  */
 
 const http = require('node:http');
-const { spawn } = require('node:child_process');
+const { spawn, execFileSync } = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 
 const PORT = 3099;
 const APP_BASE_URL = 'https://fh580.net';
+
+// 测试 3 会真跑 scripts/dispatch-task.js，而它会写 .agents/tasks 并 `git checkout -b feat/task-*`。
+// 直接在仓库里跑会污染工作区（已发生过一次 commit 落错分支）。这里把派单目录换成临时 git 仓库：
+// 脚本按自身 __dirname 推导 tasks 目录，所以复制一份到 <tmp>/scripts 就彻底隔离，
+// 同时仍然执行真实脚本（含建分支逻辑），不是把它桩掉。
+function makeIsolatedDispatchRoot() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fbs-tg-dispatch-'));
+  fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
+  fs.copyFileSync(
+    path.join(__dirname, '../../../scripts/dispatch-task.js'),
+    path.join(root, 'scripts', 'dispatch-task.js')
+  );
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
+  } catch (_) {
+    // 没有 git 也能跑：脚本自身会跳过建分支
+  }
+  return root;
+}
+
+const DISPATCH_ROOT = makeIsolatedDispatchRoot();
+
+function cleanup() {
+  fs.rmSync(DISPATCH_ROOT, { recursive: true, force: true });
+}
+
 const serverProcess = spawn('node', [path.join(__dirname, 'server.js')], {
-  env: { ...process.env, TG_BOT_PORT: String(PORT), TG_APP_BASE_URL: APP_BASE_URL },
+  env: {
+    ...process.env,
+    TG_BOT_PORT: String(PORT),
+    TG_APP_BASE_URL: APP_BASE_URL,
+    TG_DISPATCH_ROOT: DISPATCH_ROOT
+  },
   stdio: 'pipe'
 });
 
@@ -97,11 +130,13 @@ async function run() {
 
   console.log('🎉 所有 Telegram Bot 基建测试全部 100% 通过！');
   serverProcess.kill();
+  cleanup();
   process.exit(0);
 }
 
 run().catch(err => {
   console.error('❌ 测试失败:', err);
   serverProcess.kill();
+  cleanup();
   process.exit(1);
 });

@@ -21,6 +21,9 @@ const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || '';
 const APP_BASE_URL = (process.env.TG_APP_BASE_URL || '').trim();
 
 const ROOT_DIR = path.resolve(__dirname, '../../..');
+// 派单脚本的执行目录。测试注入一个临时 git 仓库：dispatch-task.js 会写 .agents/tasks 并
+// `git checkout -b feat/task-*`，在真实仓库里跑会把工作区切到别的分支（见 src/test.js）。
+const DISPATCH_ROOT = process.env.TG_DISPATCH_ROOT || ROOT_DIR;
 
 // --- 1. 发送 Telegram 消息工具函数 ---
 function sendTelegramMessage(chatId, text, replyMarkup = null) {
@@ -170,7 +173,7 @@ async function handleIncomingMessage(msg) {
 
     // 本地引擎兜底生成标准脱水 Spec
     const result = execSync(`node scripts/dispatch-task.js "${text.replace(/"/g, '\\"')}" WAIMAI HIGH`, {
-      cwd: ROOT_DIR,
+      cwd: DISPATCH_ROOT,
       encoding: 'utf-8'
     });
 

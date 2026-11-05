@@ -75,6 +75,19 @@
       name: firebird-storage-secret
       key: resend-key
       optional: true
+{{- if .Values.gateway.secretRef }}
+# TG 登录网关的 HMAC 密钥（api 侧同值）。PHP 读取顺序：$_SERVER['FBS_GATEWAY_SECRET'] → getenv()
+# （webroot/api/fbs/index.php:103-108）。两处能取到都依赖官方 php:*-fpm 镜像自带的
+# /usr/local/etc/php-fpm.d/docker.conf 里的 clear_env = no —— 若换基座镜像把 pool 改成 clear_env = yes，
+# worker 将看不到容器 env，网关会一律 503（不要把该文件改回清空环境）。
+# optional：Secret 未建时 Pod 照常启动，网关自身返回 503，不放大成 CrashLoop。
+- name: FBS_GATEWAY_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.gateway.secretRef }}
+      key: {{ .Values.gateway.secretKey | default "FBS_GATEWAY_SECRET" }}
+      optional: true
+{{- end }}
 {{- end -}}
 
 {{- /* init 容器：播种 data/ 与配置 PVC 三方同步（脚本来自 ConfigMap firebird-init-<site>） */ -}}

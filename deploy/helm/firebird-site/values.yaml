@@ -137,6 +137,27 @@ api:
       cpu: 50m
       memory: 64Mi
 
+# ⑥ Telegram 顾客免密登录接线：Node(api) → 集群内 nginx → PHP 网关 webroot/api/fbs/index.php
+# 密钥不进 Git、不进 ConfigMap（明文），只从 Secret 以 env 注入；api 与 php 两侧同值同 key（HMAC）。
+gateway:
+  # api 侧 FBS_GATEWAY_URL。必须直连 nginx Service，不要用对外域名：
+  # 外部经 Traefik 访问 /api/fbs 会被 ipAllowList 拒绝（middleware-deny-gateway.yaml，第一道防线）。
+  # 只到域名/端口，路径由 gatewayClient.js 固定拼 /api/fbs/index.php。
+  # 留空 → 渲染为 http://firebird-<siteId>:<service.port>（各站无需单独配置）。
+  url: ""
+  # 存密钥的 Secret 名 / key（api 与 php-fpm 共用）。Secret 缺失时：
+  #   api → /tg-api/auth/telegram-web 返回 500（登录桥不可用，进程照常启动）
+  #   php → /api/fbs/index.php 一律 503（fail-closed，没有"没配密钥就放行"的分支）
+  secretRef: "firebird-api-secret"
+  secretKey: "FBS_GATEWAY_SECRET"
+
+# tg-bot 不在本 chart 内（集群外工作负载，见 docker-compose.yml）。下面只是部署 tg-bot 时的
+# 取数来源，chart 不会把它渲染进任何 K8s 资源。
+tgApp:
+  # /start 的「打开商店」web_app 按钮地址 = ${baseUrl}/tg/entry.php?role=customer。
+  # 必须是 https（Telegram 只接受 https，否则整条 sendMessage 被拒）。留空则按钮不出、仅 stderr 告警。
+  baseUrl: ""
+
 # USDT 付款监听器（单实例 + Recreate）。镜像由 CI 构建（deploy/docker/Dockerfile.payment-listener）后再置 enabled: true
 paymentListener:
   enabled: false

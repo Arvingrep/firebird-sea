@@ -7,6 +7,16 @@ metadata:
     site: {{ .Values.siteId }}
 data:
   default.conf: |
+    # ---- Telegram Mini App (TMA) 注入开关 ----
+    # 只有请求带 HN_tg=1 标记 cookie（PHP 网关登录成功后种下；火鸟 cookie 前缀 HN_ 是硬编码的）才注入
+    # Telegram WebApp SDK 与站内 shim：无 cookie 时替换串与匹配串完全相同，等于原样输出。
+    # map 必须写在 server{} 之前（http 上下文）——本文件被 include 进 nginx.conf 的 http 块。
+    # 注入串里一个 $ 都不能有（nginx 单引号不阻止变量展开），也不能内联 JS。
+    map $cookie_HN_tg $fbs_tg_head {
+        default "</head>";
+        "1"     '<script src="https://telegram.org/js/telegram-web-app.js"></script><script src="/static/js/tg-shim.js?v=1"></script></head>';
+    }
+
     server {
         listen 80;
         server_name {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}localhost;
@@ -50,6 +60,12 @@ data:
             try_files $uri $uri/ /index.php?$args;
         }
 
+        # TG 登录入口短链（BotFather 菜单按钮 / bot 按钮用 /tg/entry?role=customer）
+        # 实际文件是 /tg/entry.php；rewrite 后重新匹配 location，落到下面通用 PHP location
+        location = /tg/entry {
+            rewrite ^ /tg/entry.php last;
+        }
+
         # 静态资源缓存加速
         location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|svg|woff2)$ {
             expires 30d;
@@ -72,6 +88,12 @@ data:
         # PHP-FPM 反向代理（拆分拓扑时指向 firebird-php-<site> Service）
         location ~ \.php$ {
             {{- include "firebird.nginxPhpBody" . | nindent 12 }}
+            # TMA 注入：只写在这里（/admin/ 的 location 复用同一个 helper，写进 helper 会双重注入）。
+            # 仅在 $fbs_tg_head 由 map 换成带 script 的串时生效；sub_filter_types 限定 text/html，
+            # 纯 JSON 接口不受影响。shim 带 ?v=：上面 *.js 有 30d expires，不带版本号升不上去。
+            sub_filter_once off;
+            sub_filter_types text/html;
+            sub_filter '</head>' $fbs_tg_head;
         }
 
         # 禁止访问敏感隐藏文件
