@@ -89,9 +89,14 @@ function fbs_gateway_err($httpCode, $code, $message)
 /**
  * 读取网关密钥。取值顺序：$_SERVER → getenv → ''（调用方据此返回 503）。
  *
- * 必须查 $_SERVER：FPM 默认 clear_env=on 时容器环境变量不进 getenv()，
- * 但 nginx 的 fastcgi_param 会写进 $_SERVER —— 不查 $_SERVER 就等于注入不进去。
- * ops 侧需在 PHP location 加 `fastcgi_param FBS_GATEWAY_SECRET <值>`（值来自 k8s Secret）。
+ * 部署侧的做法是把 Secret 挂成**容器环境变量**（helm 的 secretKeyRef，
+ * 见 deploy/helm/firebird-site/templates/_helpers.tpl:84-90），不是 fastcgi_param。
+ * 容器 env 能被 PHP 读到，靠的是官方 php:*-fpm 镜像自带的
+ * /usr/local/etc/php-fpm.d/docker.conf 里的 `clear_env = no`；
+ * 若换基座镜像把 pool 改成 `clear_env = yes`，worker 就看不到 env，网关会一律 503。
+ *
+ * 两个入口都保留：$_SERVER 覆盖 fastcgi_param / apache SetEnv / 测试注入，
+ * getenv() 覆盖纯容器 env —— 少查任何一个都会在某种部署形态下取不到值。
  * 密钥**不得**写进仓库任何文件 / data/cache/*，也不得出现在响应体或日志里。
  *
  * @return string 未配置返回 ''

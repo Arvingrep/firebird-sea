@@ -386,9 +386,11 @@ check('G5 空库（无 member 表）→ 结构化错误、无堆栈、无 DSN',
 
 printf("\n==== G6 入口形态：\$_SERVER 密钥兜底 / action 在 body ====\n");
 
-// 6.1 FPM clear_env=on 时 getenv 取不到，只有 nginx fastcgi_param 写进 $_SERVER
+// 6.1 只有 $_SERVER 有值时的兜底路径。生产走容器 env（helm secretKeyRef + php-fpm
+//     docker.conf 的 clear_env=no，env 同时进 getenv 与 $_SERVER）；但换基座/换接入方式
+//     （fastcgi_param、apache SetEnv、只注入 $_SERVER 的测试桩）时这条分支才是唯一来源。
 putenv('FBS_GATEWAY_SECRET');            // 环境变量不存在
-$_SERVER['FBS_GATEWAY_SECRET'] = $SECRET; // 模拟 fastcgi_param
+$_SERVER['FBS_GATEWAY_SECRET'] = $SECRET; // 只给 $_SERVER
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo));
 check('G6 getenv 缺失但 $_SERVER 有值 → 正常放行（200）',
     $code === 200 && $payload['success'] === true, "http=$code payload=" . json_encode($payload));
