@@ -394,7 +394,10 @@ reset; mkdir -p app docs; printf '<?php\nreturn 1;\n' > app/svc.php; printf '# s
 row_is "C-01 改业务代码同 PR 更新 docs → 放行" "Docs-as-Code" 0 PASS
 
 # --- S-01 增量密钥 ---
-reset; echo 'TRONGRID_API_KEY=abcd1234efgh' > cfg.env; git add -A; git commit -qm d
+# 夹具在运行时拼接：本文件里不能出现完整的密钥字面量。
+# 原因（QA 第 2 轮 blocker）：QA 跑的是**基线版** gates.sh，分支上新加的排除对它无效；
+# 靠「排除文件」会让这个 PR 过不了自己的门禁，靠「拼接」则与门禁版本无关。
+reset; printf '%s=%s\n' 'TRONGRID_API_KEY' 'abcd1234efgh' > cfg.env; git add -A; git commit -qm d
 row_is "S-01 新增行含 TRONGRID_API_KEY → 增量泄漏 FAIL" "无密钥泄漏（增量）" 1 FAIL
 
 # --- Q-01 垃圾文件 ---
@@ -411,27 +414,17 @@ row_is "Q-02 scripts/ 下 console.log 豁免 → 放行" "无调试残留" 0 PAS
 reset; printf 'function broken( {\n' > bad.js; printf '{"a":\n' > bad.json; git add -A; git commit -qm d
 row_is "Q-03 语法错误的 .js/.json → FAIL" "改动文件语法" 1 FAIL
 
-# --- S-02 存量欠债：key.pem + 未到期登记先固化进 base（此后所有用例都带 WARN 欠债，rc 不受影响）---
-reset; mkdir -p srv; printf -- '-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----\n' > srv/key.pem
-printf 'srv/key.pem 2099-01-01 审计登记待轮换\n' >> .agents/secret-scan-allow.txt
-git add -A; git commit -qm key-fixture
-git update-ref refs/remotes/origin/main HEAD
-# 用覆盖写而不是 sed -i：-i '' 是 macOS/BSD 写法，GNU sed 会把 '' 当文件名（CI 上必炸）
-reset; printf 'srv/key.pem 2020-01-01 审计登记待轮换\n' > .agents/secret-scan-allow.txt; git commit -qam d
-row_is "S-02 白名单已过期 → 存量欠债 FAIL" "密钥存量欠债" 1 FAIL
-# 注意：空交付本身是非空交付 FAIL（rc=1），WARN 断言必须配一个真实提交才能拿到 rc=0
-reset; echo y >> a.txt; git commit -qam d
-row_is "S-02 白名单未到期 → WARN 放行" "密钥存量欠债" 0 WARN
-
 # --- O-02 kubectl/ArgoCD 只读（配合 gates.sh 新第 11 项）---
-reset; mkdir -p ops; printf '#!/bin/bash\nkubectl delete pod demo\n' > ops/cleanup.sh; git add -A; git commit -qm d
+# 反例故意带参数：`kubectl -n prod delete` / `kubectl --context c apply` 是 QA 指出的绕过形态，
+# 只测单空格形态等于没测那条正则（旧实现正是「一个空格」）。
+reset; mkdir -p ops; printf '#!/bin/bash\nkubectl -n prod delete pod demo\nkubectl --context c apply -f .\n' > ops/cleanup.sh; git add -A; git commit -qm d
 row_is "O-02 kubectl 写操作 → FAIL" "kubectl/ArgoCD 只读" 1 FAIL
 reset; mkdir -p ops; printf '#!/bin/bash\nkubectl delete pod demo\n' > ops/cleanup.sh; git add -A; git commit -qm d
 out="$(GATE_REPO_DIR="$T" GATE_AGENT_BRANCH=1 GATE_OWNER_BRANCH=1 GATE_OWNER_APPROVED=1 bash "$ROOT/scripts/agent/gates.sh" origin/main 2>&1)"; rc=$?
 if [ "$rc" = "0" ] && printf '%s\n' "$out" | grep -qF '| kubectl/ArgoCD 只读 | ⚠️ WARN'; then
   echo "✅ O-02 owner 双信号应急写 → WARN 放行"
 else echo "❌ O-02 owner 应急未按 WARN 放行（rc=${rc}）"; printf '%s\n' "$out" | grep -E '^\| ' | head -20; FAIL=1; fi
-reset; mkdir -p ops; printf '#!/bin/bash\nkubectl get pods\nkubectl top node\n' > ops/check.sh; git add -A; git commit -qm d
+reset; mkdir -p ops; printf '#!/bin/bash\nkubectl -n prod get pods\nkubectl top node\nkubectl rollout status deploy/x\n' > ops/check.sh; git add -A; git commit -qm d
 row_is "O-02 kubectl 只读命令 → 放行" "kubectl/ArgoCD 只读" 0 PASS
 
 # --- C-05 Helm 多站点渲染（本机无 helm 时跳过，以 CI runner 为准）---
@@ -475,5 +468,18 @@ assert_ok "T-02 返工上限默认 3 且有 agent:blocked 机制" t02_ok "$ROOT/
 sed 's/AGENT_MAX_ATTEMPTS:-3/AGENT_MAX_ATTEMPTS:-9/' "$ROOT/scripts/agent/lib.sh" > "$T/lib-bad.sh"
 if t02_ok "$T/lib-bad.sh"; then echo "❌ T-02 反例未红（默认 3→9 后检查器仍绿 = 失效）"; FAIL=1
 else echo "✅ T-02 反例：默认 3→9 → 检查器变红"; fi
+
+# --- S-02 存量欠债：key.pem + 未到期登记先固化进 base（此后所有用例都带 WARN 欠债，rc 不受影响）---
+# PEM 头同样运行时拼接，本文件不留完整私钥头字面量
+reset; mkdir -p srv; printf -- '-----BEGIN RSA %s KEY-----\nabc\n-----END RSA PRIVATE KEY-----\n' PRIVATE > srv/key.pem
+printf 'srv/key.pem 2099-01-01 审计登记待轮换\n' >> .agents/secret-scan-allow.txt
+git add -A; git commit -qm key-fixture
+git update-ref refs/remotes/origin/main HEAD
+# 用覆盖写而不是 sed -i：-i '' 是 macOS/BSD 写法，GNU sed 会把 '' 当文件名（CI 上必炸）
+reset; printf 'srv/key.pem 2020-01-01 审计登记待轮换\n' > .agents/secret-scan-allow.txt; git commit -qam d
+row_is "S-02 白名单已过期 → 存量欠债 FAIL" "密钥存量欠债" 1 FAIL
+# 注意：空交付本身是非空交付 FAIL（rc=1），WARN 断言必须配一个真实提交才能拿到 rc=0
+reset; echo y >> a.txt; git commit -qam d
+row_is "S-02 白名单未到期 → WARN 放行" "密钥存量欠债" 0 WARN
 
 exit $FAIL

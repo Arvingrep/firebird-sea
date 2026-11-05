@@ -153,9 +153,7 @@ fi
 SECRET_RE='^[+[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|^[+[:space:]]*"private_key"[[:space:]]*:|mnemonic|seed phrase|TRONGRID_API_KEY=[A-Za-z0-9]{8,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}'
 # 排除本文件自身：检测器的正则字面量里必然写着 mnemonic / private_key 等模式词，
 # 不排除就会「门禁检出门禁自己在说密钥」，每轮都假 FAIL。
-# 同时排除 test-gates.sh：用例夹具里必然写着密钥字面量（造一个假私钥来验证扫描器会拦），
-# 不排除就会「扫描器检出扫描器的用例」——2026-11-05 补 S-01 用例时实测触发。
-LEAK="$(git diff "$RANGE" -- . ':(exclude)scripts/agent/gates.sh' ':(exclude)scripts/test-gates.sh' | grep -E '^\+' | grep -iE "$SECRET_RE" || true)"
+LEAK="$(git diff "$RANGE" -- . ':(exclude)scripts/agent/gates.sh' | grep -E '^\+' | grep -iE "$SECRET_RE" || true)"
 [ -z "$LEAK" ] && row "无密钥泄漏（增量）" "✅ PASS" || row "无密钥泄漏（增量）" "❌ FAIL" "疑似私钥/Token 进入 diff"
 
 # 存量扫描用更严的正则：只认「行首（允许缩进）的真实 PEM 头」，
@@ -175,7 +173,7 @@ while IFS= read -r f; do
   # 到期日解析失败按 0（已过期）处理：宁严勿松
   if [ "${exp_epoch:-0}" -lt "$NOW_EPOCH" ]; then STOCK_EXPIRED+="${f}(${exp}) "
   else STOCK_DEBT+="${f}→${exp} "; fi
-done <<< "$(git grep -lIE "$STOCK_RE" -- . ':(exclude)scripts/agent/gates.sh' ':(exclude)scripts/test-gates.sh' 2>/dev/null | sort -u)"
+done <<< "$(git grep -lIE "$STOCK_RE" -- . 2>/dev/null | sort -u)"
 
 if [ -z "$STOCK_NEW" ]; then
   row "无密钥入库（全仓）" "✅ PASS" "扫描 $(git ls-files | wc -l | tr -d ' ') 个已跟踪文件"
@@ -285,7 +283,10 @@ fi
 #     排除 gates.sh / test-gates.sh 自身：正则与用例夹具里必然写着写命令字面量，
 #     不排除就会「门禁检出门禁自己在说 kubectl delete」（同第 6 项密钥扫描排除自身的口径）。
 #     排除 docs/、.agents/：规则文档与台账描述禁令时必然引用写命令——拦的是「执行」，不是「提及」。
-K8S_WRITE_RE='kubectl (apply|delete|edit|patch|scale|autoscale|cordon|drain|taint|label|annotate|set|create|replace)([[:space:]]|$)|kubectl rollout (undo|restart|pause|resume)|argocd app (sync|delete|rollback)'
+# 允许 kubectl 与动词之间夹参数（-n prod / --context c / 双空格），否则 `kubectl -n prod delete pod x`
+# 直接绕过（QA 第 2 轮 major）。[^|;&]* 不跨命令分隔符，避免把 `kubectl get x | grep delete` 误判。
+# exec 也算写（能在容器里执行任意命令），argocd app set 同理。
+K8S_WRITE_RE='kubectl[^|;&]*[[:space:]](apply|delete|edit|patch|scale|autoscale|cordon|drain|taint|label|annotate|set|create|replace|exec)([[:space:]]|$)|kubectl[^|;&]*[[:space:]]rollout[[:space:]](undo|restart|pause|resume)([[:space:]]|$)|argocd[^|;&]*[[:space:]]app[[:space:]](sync|delete|rollback|set)([[:space:]]|$)'
 K8S_WRITE="$(git diff "$RANGE" -- . ':(exclude)scripts/agent/gates.sh' ':(exclude)scripts/test-gates.sh' ':(exclude)docs/**' ':(exclude).agents/**' | grep -E '^\+' | grep -E "$K8S_WRITE_RE" || true)"
 if [ -z "$K8S_WRITE" ]; then
   row "kubectl/ArgoCD 只读" "✅ PASS"
