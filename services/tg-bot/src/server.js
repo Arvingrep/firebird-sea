@@ -71,6 +71,40 @@ function sendTelegramMessage(chatId, text, replyMarkup = null) {
   });
 }
 
+// --- 1b. 转发随笔消息到 n8n（永不 reject，返回 Promise<boolean>）---------------------
+// 必须挂 'error'：没人监听时 ECONNREFUSED（n8n 未部署/不可达）会变成未捕获异常，直接让整个
+// bot 进程退出（集群内实测：发第一条随笔就崩）。调用方平时不等它（fire-and-forget），
+// 只有在"本地兜底不存在"的集群形态里才 await 拿结果决定回执文案。
+function forwardToN8n(msg) {
+  return new Promise((resolve) => {
+    try {
+      const payload = JSON.stringify({ message: msg });
+      const urlObj = new URL(N8N_WEBHOOK_URL);
+      const proto = urlObj.protocol === 'https:' ? https : http;
+      const req = proto.request(urlObj, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 2000
+      });
+      req.on('error', (e) => {
+        console.error('[TG-BOT] n8n 转发失败:', e.message);
+        resolve(false);
+      });
+      // timeout 只设置 socket 超时，不 destroy 的话请求会一直挂着
+      req.on('timeout', () => req.destroy());
+      req.on('response', (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300));
+      });
+      req.write(payload);
+      req.end();
+    } catch (e) {
+      console.error('[TG-BOT] n8n 转发失败:', e.message);
+      resolve(false);
+    }
+  });
+}
+
 // 顾客免密登录入口（Telegram Mini App）。域名来自 TG_APP_BASE_URL，未配置/非法返回 ''。
 // 必须是 https：Telegram 只接受 https 的 web_app URL，http 会让整条消息发送失败。
 function customerEntryUrl(base) {
@@ -155,30 +189,22 @@ async function handleIncomingMessage(msg) {
 
   // 常规输入 -> 触发需求脱水与派发闭环
   try {
-    // 优先尝试转发 n8n Webhook
-    let forwardedToN8n = false;
-    try {
-      const n8nPayload = JSON.stringify({ message: msg });
-      const n8nUrlObj = new URL(N8N_WEBHOOK_URL);
-      const reqProto = n8nUrlObj.protocol === 'https:' ? https : http;
-      const n8nReq = reqProto.request(n8nUrlObj, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 2000
-      });
-      // 必须挂 'error'：没人监听时 ECONNREFUSED（n8n 未部署/不可达）会变成未捕获异常，
-      // 直接让整个 bot 进程退出（集群内实测：发第一条随笔就崩）。单纯记日志，不影响后面的本地兜底。
-      n8nReq.on('error', (e) => {
-        forwardedToN8n = false;
-        console.error('[TG-BOT] n8n 转发失败:', e.message);
-      });
-      n8nReq.on('timeout', () => n8nReq.destroy());
-      n8nReq.write(n8nPayload);
-      n8nReq.end();
-      forwardedToN8n = true;
-    } catch (_) {}
+    // 转发 n8n（先发出去，不阻塞后面的本地兜底；只有集群里没有本地脚本时才 await 它的结果）
+    const n8nForwarded = forwardToN8n(msg);
 
-    // 本地引擎兜底生成标准脱水 Spec
+    // 本地引擎兜底生成标准脱水 Spec。
+    // 集群镜像只打包 services/tg-bot/src，没有仓库根的 scripts/ 与 .agents/ → 本地兜底不可用，
+    // 这里用 existsSync 判断"脚本不存在"并跳过。不要用 try/catch 吞 execSync 的异常：
+    // 那样真实的执行故障（语法错/权限/参数问题）也会被当成"脚本不存在"，把故障藏起来。
+    const dispatchScript = path.join(DISPATCH_ROOT, 'scripts', 'dispatch-task.js');
+    if (!fs.existsSync(dispatchScript)) {
+      // 只剩 n8n 一条通道，等它的结果再回执（最多 2s），避免把转发失败说成"已提交"
+      const forwarded = await n8nForwarded;
+      return sendTelegramMessage(chatId, forwarded
+        ? '📋 *【需求已提交 n8n 派单通道】*\n━━━━━━━━━━━━━━━━━━━━\n本地脱水在集群内不可用（镜像不含 scripts/），已交由 n8n 流水线处理。'
+        : '❌ *派单通道不可用*：本地脱水脚本缺失（集群镜像不含 scripts/），n8n 转发也未成功。请检查 N8N_WEBHOOK_URL。');
+    }
+
     const result = execSync(`node scripts/dispatch-task.js "${text.replace(/"/g, '\\"')}" WAIMAI HIGH`, {
       cwd: DISPATCH_ROOT,
       encoding: 'utf-8'

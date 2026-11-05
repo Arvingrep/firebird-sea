@@ -62,8 +62,9 @@ spec:
                   name: {{ .Values.api.secretRef | default "firebird-api-secret" }}
                   key: TELEGRAM_BOT_TOKEN
             {{- with .Values.tgBot.n8nWebhookUrl }}
-            # 随笔消息转发到 n8n（集群内直连）。镜像里没有 scripts/ 与 .agents/，
-            # 所以 server.js 的"本地派单兜底"在集群内不可用，转发才是这条链路的一等公民。
+            # 随笔消息转发到 n8n（集群内直连）。镜像里没有 scripts/ 与 .agents/，server.js 会检测到
+            # 本地派单脚本缺失、跳过本地兜底，只回执"已提交 n8n 派单通道" —— 所以这个地址必须可达，
+            # 否则用户会收到"派单通道不可用"。
             - name: N8N_WEBHOOK_URL
               value: {{ . | quote }}
             {{- end }}
