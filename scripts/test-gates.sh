@@ -498,4 +498,42 @@ row_is "S-02 白名单已过期 → 存量欠债 FAIL" "密钥存量欠债" 1 FA
 reset; echo y >> a.txt; git commit -qam d
 row_is "S-02 白名单未到期 → WARN 放行" "密钥存量欠债" 0 WARN
 
-exit $FAIL
+
+# --- 规则真相源 ↔ 门禁项：门禁在白拦，必须有规则为它背书 ---
+# 为什么需要这条：#188 那轮照「命名规律」给方案表填了 9 个 enforce 签名
+# （gates.sh#protected / #max_added / …），gates.sh 里一个都不存在。**指错的锚点比没有锚点更坏**——
+# 它看起来有人管。所以两个方向都要能抓：
+#   规则→门禁：写了签名但文件里没有（BAD_ENFORCE，抄错锚点）
+#   门禁→规则：门禁有个检查项，但没有任何规则指向它（白拦：坏了没人知道为什么它存在）
+if ! command -v node >/dev/null 2>&1; then
+  # 不能"跳过"：静默跳过就是 verify-task.sh 里那 30 行恒假守卫的翻版。缺工具是环境问题，要红。
+  echo "❌ 规则真相源体检缺少 node（环境缺失，不是跳过）"; FAIL=1
+else
+  out="$(node "$ROOT/scripts/agent/check-rings.js" "$ROOT" 2>&1)"; rc=$?
+  if [ "$rc" = 0 ] && printf '%s\n' "$out" | grep -q '无背书 0'; then
+    echo "✅ 规则真相源：四环 100% 且 gates.sh 每个检查项都有规则背书"
+  else
+    echo "❌ 规则真相源体检未通过（rc=${rc}）"
+    printf '%s\n' "$out" | grep -E '❌|无背书 [1-9]|坏执行|无用例' | head -8; FAIL=1
+  fi
+
+  # 反例 A（门禁→规则）：凭空多一项没人背书的检查，必须变红并点名
+  F2="$T/rules-fixture"; rm -rf "$F2"; mkdir -p "$F2/scripts/agent" "$F2/docs/agent"
+  cp "$ROOT/scripts/agent/gates.sh" "$F2/scripts/agent/gates.sh"
+  printf 'row "凭空多出来的检查项" "✅ PASS"\n' >> "$F2/scripts/agent/gates.sh"
+  cp "$ROOT/docs/agent/rules.yaml" "$F2/docs/agent/rules.yaml"
+  out="$(node "$ROOT/scripts/agent/check-rings.js" "$F2" 2>&1)"; rc=$?
+  if [ "$rc" = 1 ] && printf '%s\n' "$out" | grep -q '凭空多出来的检查项'; then
+    echo "✅ 反例：门禁多一项无人背书 → 体检变红并点名"
+  else echo "❌ 反例未红（多出的检查项没被抓住，rc=${rc}）"; printf '%s\n' "$out" | tail -4; FAIL=1; fi
+
+  # 反例 B（规则→门禁）：把 enforce 签名改成不存在的，必须变红且指出找不到哪个签名
+  F3="$T/rules-fixture-bad"; rm -rf "$F3"; mkdir -p "$F3/scripts/agent" "$F3/docs/agent"
+  cp "$ROOT/scripts/agent/gates.sh" "$F3/scripts/agent/gates.sh"
+  sed 's|gates.sh#无垃圾文件|gates.sh#这个检查项不存在|' "$ROOT/docs/agent/rules.yaml" > "$F3/docs/agent/rules.yaml"
+  out="$(node "$ROOT/scripts/agent/check-rings.js" "$F3" 2>&1)"; rc=$?
+  if [ "$rc" = 1 ] && printf '%s\n' "$out" | grep -q '这个检查项不存在'; then
+    echo "✅ 反例：enforce 指向不存在的检查项 → 体检变红并点名"
+  else echo "❌ 反例未红（编造的签名没被抓住，rc=${rc}）"; printf '%s\n' "$out" | tail -4; FAIL=1; fi
+fi
+

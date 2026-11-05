@@ -35,6 +35,23 @@ jobs:
           command -v php >/dev/null || { echo "runner 缺少 php"; exit 1; }
           set -o pipefail
           scripts/agent/gates.sh "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      # 三把尺：只读、与 diff 无关，查的是「仓库自己讲的话前后一致不一致」
+      # （规则真相源的四环 / 门禁项有没有规则背书 / 文档锚点还准不准）。
+      # **暂时不阻断**（continue-on-error）：这三把尺自己也在观察期——判据改过两次
+      # （S3 从「两边一致」改成「都等于集成分支」、锚点从行号改成签名），每次改判据都可能误伤。
+      # 现在挂在这里的唯一目的：让「规则漂移」在 PR 页面上看得见，而不是靠人想起来去跑。
+      # 转成必过检查的条件：连续两周零误报 + 本地 `make check-rules` 与 runner 结论一致。
+      - name: 规范自检（三把尺 · 报告不阻断）
+        continue-on-error: true
+        run: |
+          # 步骤名可以随便改，分支保护认的是 **job 名**（见下方 verify-task 注释）
+          set -o pipefail
+          rc=0
+          bash  scripts/agent/spec-lint.sh    | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
+          node  scripts/agent/check-rings.js  | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
+          node  scripts/agent/check-anchors.js | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
+          echo "三把尺退出码：$rc（非 0 只报警告，不阻断合并）"
+          exit $rc
       - name: Helm 多站点模板合成
         run: ./scripts/test-helm.sh
       # 注：原来这里还有一个「Story 验收用例（测试先行）」step，调 scripts/acceptance/run.sh。

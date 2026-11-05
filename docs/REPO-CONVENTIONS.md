@@ -33,6 +33,7 @@
 | `.github/` | CI 流水线 | GitHub Actions | 运维 Agent |
 | `scripts/` | 门禁、部署、数据种子脚本 | 人 + CI | 按需，改动要跑 `test-gates.sh` |
 | `docs/` | 文档 + `archive/` 归档包 | 只有人看 | 任何人 |
+| `docs/agent/` | **规则真相源**：`rules.yaml`（16 条 hard 规则的四环锚点）+ 三把尺说明 | CI 读（`make check-rules`） | owner（改动必须跑 `make check-rules` 且四环 100%） |
 | `webroot/templates/`、`webroot/static/` | 火鸟历史模板与静态资产 | 站点 | **只读**，不新增 |
 
 > `apps/tma/` 不在上表内，是因为它已于 2026-11-04 归档（见下方「已下线」表）。
