@@ -27,15 +27,15 @@ Run workspace commands from the current Git worktree root. Do not `cd` into the 
 
 ## Required Local Agent
 
-A VS Code and GitHub Copilot-compatible agent is generated here:
+`n8nac update-ai` 会在本地生成一份 VS Code / Copilot 兼容的 agent 定义，
+以及一份给「不读 workspace agent 的运行时」用的 skill 兜底。
 
-- `.github/agents/n8n-architect.agent.md`
+**这两份产物不随仓库提交**（每次按需生成，位置以命令输出为准），所以在本仓库里
+找不到它们不是缺陷——别去 `git ls-files` 里翻。
 
-A portable skill fallback is also generated for runtimes that do not read `.github/agents`:
-
-- `.agents/skills/n8n-architect/SKILL.md`
-
-If your agent runtime supports workspace agents, use the `.github/agents/*.agent.md` file. If it supports skills instead, load the skill file. Otherwise, treat these files as mandatory instructions.
+如果你的运行时支持 workspace agent / skill，先跑一次 `n8nac update-ai` 再加载；
+否则以 `AGENTS.md`、`.agents/RULES.md`、[`docs/internal/AGENT_PIPELINE.md`](docs/internal/AGENT_PIPELINE.md)
+三份文件为准。
 
 ---
 
