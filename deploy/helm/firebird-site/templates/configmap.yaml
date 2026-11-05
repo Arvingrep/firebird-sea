@@ -89,10 +89,17 @@ data:
         location ~ \.php$ {
             {{- include "firebird.nginxPhpBody" . | nindent 12 }}
             # TMA 注入：只写在这里（/admin/ 的 location 复用同一个 helper，写进 helper 会双重注入）。
-            # 仅在 $fbs_tg_head 由 map 换成带 script 的串时生效；sub_filter_types 限定 text/html，
-            # 纯 JSON 接口不受影响。shim 带 ?v=：上面 *.js 有 30d expires，不带版本号升不上去。
-            sub_filter_once off;
-            sub_filter_types text/html;
+            # 仅在 $fbs_tg_head 由 map 换成带 script 的串时生效；无 cookie 时替换串与匹配串相同，等于是原样输出。
+            # 不写 sub_filter_types：text/html 本就是默认值，重复声明只会换来一条 duplicate MIME type 告警。
+            # sub_filter_once 必须是 on：站内有 12 个模板的 HTML 里 </head> 出现不止一次（内嵌模板/注释），
+            #   off 会逐个替换，导致 telegram-web-app.js 与 tg-shim.js 被注入多遍、SDK 初始化两次。
+            # shim 带 ?v=：上面 *.js 有 30d expires，不带版本号升不上去；**改了 tg-shim.js 行为就必须升版本**。
+            # 副作用备忘：启用 sub_filter 后 nginx 必须把整个响应体收完才开始发（无法预知 Content-Length，
+            #   响应头会变成 Transfer-Encoding: chunked）。只影响本 location 下的 PHP 页面，
+            #   /tg-api 与派单的长连接走 Node，不经这里。
+            # configLock=false 的站点上 /admin/ 也会落到这个 location，但浏览器不带 HN_tg，
+            #   map 取 default 分支 → 注入串与匹配串相同 → 等于是空操作，行为差异仅此一点。
+            sub_filter_once on;
             sub_filter '</head>' $fbs_tg_head;
         }
 

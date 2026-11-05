@@ -88,6 +88,13 @@
       key: {{ .Values.gateway.secretKey | default "FBS_GATEWAY_SECRET" }}
       optional: true
 {{- end }}
+# TG 专用站点的 service 白名单总开关（webroot/index.php 的 fbsTgServiceWhitelistEnabled()）。
+# 默认 "1"：全站只放行 waimai / article / travel / member / siteConfig，其余 302 回首页。
+# 紧急退回把 values 的 tgApp.serviceWhitelist 改成 "0" 重启 php 即可，不需要重建镜像。
+# 取值语义：trim 转小写后命中 0|false|off|no 才关，其余（含未设置）一律视为开 —— 漏配时宁可收紧。
+# 与 FBS_GATEWAY_SECRET 同一前提：靠官方 php:*-fpm 镜像 docker.conf 的 clear_env = no 才读得到。
+- name: FBS_TG_SERVICE_WHITELIST
+  value: {{ .Values.tgApp.serviceWhitelist | default "1" | quote }}
 {{- end -}}
 
 {{- /* init 容器：播种 data/ 与配置 PVC 三方同步（脚本来自 ConfigMap firebird-init-<site>） */ -}}
