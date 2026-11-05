@@ -230,12 +230,26 @@ test('骑手 withdraw：另一套 .header-box > .header', () => {
   assert.deepEqual(plan.clearPadding, []);
 });
 
-test('骑手 detail / map / login：不动', () => {
-  for (const page of ['detail', 'map', 'login']) {
+test('骑手 map / login：不动', () => {
+  for (const page of ['map', 'login']) {
     const plan = buildPlan({ service: 'courier', pathname: '/', search: '?template=' + page });
     assert.deepEqual(plan.navSelectors, [], page);
     assert.deepEqual(plan.clearPadding, [], page);
   }
+});
+
+test('骑手 detail：必须隐藏 .page_detail .headbox（完结态会露出流内标题栏）', () => {
+  const plan = buildPlan({ service: 'courier', pathname: '/', search: '?template=detail' });
+
+  // detail.css:27 有 .page_detail.orderend .headbox{position:relative}，
+  // detail.css:5 有 .headshow.headbox{opacity:1}；detail.html:46/48 在订单完结时把两个 class 同时挂上，
+  // 于是标题栏变成「可见 + 占位」，与 Telegram 原生返回键并存。这条断言钉住它必须被隐藏。
+  assert.ok(plan.navSelectors.includes('.page_detail .headbox'), 'detail 的 .headbox 必须进 nav');
+
+  // 未完结态它是 position:fixed（不占位），完结态隐藏后内容自然上移，
+  // 两种状态都不需要补留白 —— 一旦有人给 detail 加了 clearPadding，说明判断被改坏了。
+  assert.deepEqual(plan.clearPadding, []);
+  assert.deepEqual(plan.fixedBarTop, []);
 });
 
 // ---------------------------------------------------------------------------

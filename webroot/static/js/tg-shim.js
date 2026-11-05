@@ -198,11 +198,17 @@
         setting: {},
         // 骑手侧唯一一套不同构的顶栏：.header-box > .header，流内（withdraw.css:3-4）
         withdraw: { nav: ['.header-box > .header'] },
-        // .headbox 默认 opacity:0（detail.css:4），滚动才出现，且里面是唯一的手动返回键；
-        // 隐藏收益为 0、误伤返回的风险非 0 → 不动，待确认。
+        // detail.css:4 的 .headbox 是 position:fixed;opacity:0（未完结订单滚动才淡出显示），
+        // 但 detail.html:46/48 在订单完结时会把 orderend 与 headshow 同时挂上：
+        //   .page_detail.orderend .headbox{position:relative}（detail.css:27）→ 回到文档流、占 .88rem
+        //   .headshow.headbox{opacity:1}（detail.css:5）→ 变可见
+        // 两者叠加，Telegram 里页面顶部就多出一条白底「‹ 订单详情」标题栏，与原生返回键并存，
+        // 正是验收第 6 条要禁的画面。整条隐藏：
+        //   未完结态它本来透明，且 top:0 固定定位在 TG 里会被原生顶栏盖住、滚动显示的返回钮按不到；
+        //   完结态隐藏后内容自然上移 .88rem，不需要补留白。
         detail: {
-          nav: [],
-          pendingConfirm: 'courier/detail.html .headbox 默认 opacity:0 且内含唯一返回键，报告未给结论'
+          nav: ['.top_box > .headbox', '.page_detail .headbox'],
+          pendingConfirm: 'courier/detail.html 完结态（orderend+headshow）会露出流内标题栏，已按 .page_detail .headbox 整条隐藏'
         },
         // 整页是地图，没有顶栏（map.html 无 .top_box 节点）
         map: { nav: [], disableVerticalSwipes: false },
@@ -600,7 +606,10 @@
       resolvePage: resolvePage,
       normalizePage: normalizePage,
       parseQuery: parseQuery,
-      rootDomain: rootDomain
+      rootDomain: rootDomain,
+      // 内部常量也导出：供「PHP service 白名单 ↔ shim 处理集」的跨文件同源守卫测试比对。
+      // 只在 Node 分支可达，浏览器路径零影响。
+      SERVICES: SERVICES
     };
     return;
   }

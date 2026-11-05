@@ -93,8 +93,15 @@
 # 紧急退回把 values 的 tgApp.serviceWhitelist 改成 "0" 重启 php 即可，不需要重建镜像。
 # 取值语义：trim 转小写后命中 0|false|off|no 才关，其余（含未设置）一律视为开 —— 漏配时宁可收紧。
 # 与 FBS_GATEWAY_SECRET 同一前提：靠官方 php:*-fpm 镜像 docker.conf 的 clear_env = no 才读得到。
+# 这里不能用 `| default "1"`：Sprig 的 default 把整数 0 当空值，values 里写成不带引号的
+# serviceWhitelist: 0 会被静默渲染成 "1" —— 运营以为关了、实际还开着，且没有任何可见差异。
+# 用 hasKey 显式判存在、printf "%v" 保值，0 就渲染成 "0"。
+{{- $whitelist := "1" }}
+{{- if and .Values.tgApp (hasKey .Values.tgApp "serviceWhitelist") }}
+{{- $whitelist = printf "%v" .Values.tgApp.serviceWhitelist }}
+{{- end }}
 - name: FBS_TG_SERVICE_WHITELIST
-  value: {{ .Values.tgApp.serviceWhitelist | default "1" | quote }}
+  value: {{ $whitelist | quote }}
 {{- end -}}
 
 {{- /* init 容器：播种 data/ 与配置 PVC 三方同步（脚本来自 ConfigMap firebird-init-<site>） */ -}}

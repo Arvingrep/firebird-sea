@@ -14,7 +14,7 @@ data:
     # 注入串里一个 $ 都不能有（nginx 单引号不阻止变量展开），也不能内联 JS。
     map $cookie_HN_tg $fbs_tg_head {
         default "</head>";
-        "1"     '<script src="https://telegram.org/js/telegram-web-app.js"></script><script src="/static/js/tg-shim.js?v=1"></script></head>';
+        "1"     '<script src="https://telegram.org/js/telegram-web-app.js"></script><script src="/static/js/tg-shim.js?v=2"></script></head>';
     }
 
     server {
@@ -79,7 +79,10 @@ data:
         location ~ ^/admin/.*\.php$ {
             {{- include "firebird.nginxPhpBody" . | nindent 12 }}
             sub_filter_once off;
-            sub_filter_types application/json text/html text/plain;
+            # text/html 不能列在这里：它是 sub_filter_types 的默认值，重复声明会让 nginx 在每个
+            # worker 启动时打 duplicate MIME type "text/html"，且被 canary 的 configLock 掩盖过一轮。
+            # sub_filter_types 是"追加"语义，不写 text/html 也照样过滤 HTML 响应。
+            sub_filter_types application/json text/plain;
             sub_filter '{{ .Values.configLock.matchJson | replace "\\" "\\\\" }}' '{{ .Values.configLock.messageJson | replace "\\" "\\\\" }}';
             sub_filter '{{ .Values.configLock.matchRaw }}' '{{ .Values.configLock.message }}';
         }
