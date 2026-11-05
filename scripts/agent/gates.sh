@@ -366,7 +366,48 @@ else
   row "Dockerfile 引用路径存在" "❌ FAIL" "$(printf '%s' "$DOCKER_BAD" | head -n2 | tr '\n' '; ' | head -c 200)"
 fi
 
+# 13. GitHub Actions 引用 pin 到提交 SHA（供应链执行环）
+#     依据（2026-11-05 对齐）：GitHub 官方 Secure use reference 与 SLSA 都要求第三方 action
+#     固定到 40 位提交 SHA。理由不是洁癖——`@v4` 是**可被上游重新指向的指针**，上游账号一旦被接管，
+#     下一次 CI 执行的就是攻击者的代码，而我们的 runner 上挂着 AGENT_GH_TOKEN。
+#     tag 与 branch 都可移动，只有提交 SHA 不可移动；这不是「更安全一点」，是把「可变引用」变成「不可变引用」。
+#     实测本仓 2026-11-05 有 10 处引用全是 `@vN`，等于把执行权交给 4 个可变远端指针。
+#     不设 owner 通道：供应链断了对谁都断，和 Dockerfile 那项同理。
+#     豁免：本地 action（`./path`）与 `docker://` 引用不受本规则约束（前者随仓库版本走，后者是镜像 digest 范畴）。
+#     与第 12 项一样，本项扫**全仓**而非只看 diff：存量引用也必须钉住，只看新增会永远留着旧的口子。
+UNPINNED=""
+while IFS= read -r wf; do
+  [ -n "$wf" ] && [ -f "$wf" ] || continue
+  refs="$(grep -hoE 'uses:[[:space:]]*[^[:space:]#]+' "$wf" 2>/dev/null \
+    | sed -E "s/^uses:[[:space:]]*//; s/^[\"']//; s/[\"']$//" \
+    | grep -vE '^(\./|docker://)' | grep -vE '@[0-9a-f]{40}$' || true)"
+  [ -n "$refs" ] || continue
+  while IFS= read -r r; do
+    [ -n "$r" ] && UNPINNED="${UNPINNED}${wf##*/}:${r} "
+  done <<< "$refs"
+done <<< "$(git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml' '.github/actions/**/action.yml' '.github/actions/**/action.yaml' 2>/dev/null | sort -u)"
+
+if [ -z "$UNPINNED" ]; then
+  row "Actions 引用已 pin" "✅ PASS"
+else
+  row "Actions 引用已 pin" "❌ FAIL" "未固定到提交 SHA（tag 可被上游重指）：$(printf '%s' "$UNPINNED" | head -c 200)"
+fi
+
 echo "### 🔒 确定性门禁（${RANGE}）"
+echo
+# 环境指纹：本脚本自称「确定性」，但 php/helm/node 版本不同就是两套判据——本仓库真实踩过
+# `\b` 在 BSD grep 不支持（本机恒空转、只有 Linux CI 拦过）、`sed -i ''` 在 GNU 上炸。
+# 把版本印在报告顶部（**不进表格**，以免变成又一个需要规则背书的检查项），
+# 「同输入同输出」这句话才有可复核的锚：跨机器结论不一致时，能先分清是代码变了还是工具变了。
+ver() { # ver <label> <cmd…>
+  local l="$1"; shift
+  if command -v "$1" >/dev/null 2>&1; then
+    printf '%s %s' "$l" "$("$@" 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+  else
+    printf '%s -' "$l"
+  fi
+}
+echo "> 环境：$(ver bash bash --version) · $(ver node node -v) · $(ver php php -v) · $(ver helm helm version) · $(ver git git --version) · $(uname -s)"
 echo
 echo "| 检查项 | 结果 | 说明 |"
 echo "| :--- | :--- | :--- |"

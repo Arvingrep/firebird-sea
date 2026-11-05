@@ -97,10 +97,15 @@
 | C-04 | 改 n8n 工作流 → 更新 `automation/n8n/REGISTRY.md` | 👤 |
 | C-05 | 改 `deploy/helm/**` → `helm lint` + 所有 `values-*.yaml` 渲染通过 | 🤖 `「Helm 多站点渲染」` |
 | C-06 | **动了 Dockerfile 或删/改任何被它引用的目录** → 全仓 Dockerfile 的 `COPY` 源路径必须存在，`COPY --from=` 必须指向已定义的构建阶段 | 🤖 `「Dockerfile 引用路径存在」第 12 项` |
+| C-07 | **改任何 workflow / composite action** → 所有 `uses:` 必须 pin 到 40 位提交 SHA（`@v4` 这类 tag 可被上游重指，等于把执行权交给一个可变指针） | 🤖 `「Actions 引用已 pin」第 13 项` |
 
 > ⚠️ C-01 的坑：`deploy/**/*.js` 也被算作「业务代码」（`deploy/` 不在排除列表里）。改部署侧 JS 同样要带 `docs/`。
 >
 > ⚠️ C-06 的来历（#189）：删掉 `apps/tma`，`deploy/docker/Dockerfile.api` 仍 `COPY apps/tma/ ./`。
+>
+> ⚠️ C-07 的来历（2026-11-05 SOTA 对齐）：本仓 10 处 action 引用此前全是 `@vN`，
+> 等于把执行权交给 4 个可变远端指针。GitHub 官方 Secure use reference 与 SLSA 都要求固定到提交 SHA；
+> 代价是升级要手动改（配 dependabot 才不痛）。本地 action（`./path`）与 `docker://` 不在约束内。
 > 当时门禁 **14 项全绿**、CI **4 个 job 全绿**，唯一的拦截来自 QA 人工读 diff。
 > 原因很朴素：门禁只校验「diff 里的规范问题」，从不校验「引用的东西还在不在」。
 > 这类断引用的报错发生在 `docker build`，也就是**合并之后**——发现得最晚、回溯最贵（报错指着 COPY 行，不指着是谁删了目录）。

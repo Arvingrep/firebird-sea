@@ -98,6 +98,17 @@ rules:
     surface3: none
     src: docs/internal/AGENT_PIPELINE.md#C-06
 
+  - id: C-07
+    # 为什么这条属于 hard 而不是 note：`@v4` 是**可被上游重新指向**的指针。上游账号被接管后，
+    # 下一次 CI 执行的就是攻击者的代码，而 runner 上挂着 AGENT_GH_TOKEN 与自托管 runner 的整台机器。
+    # 只有 40 位提交 SHA 不可移动 —— 这不是「更安全一点」，是把可变引用换成不可变引用。
+    rule: 所有 GitHub Actions 引用必须 pin 到 40 位提交 SHA（tag / 分支可被上游重指）
+    level: hard
+    enforce: scripts/agent/gates.sh#Actions 引用已 pin
+    test: scripts/test-gates.sh#S-03 Actions 引用用 tag（可被上游重指）→ FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#C-07
+
   - id: D-01
     rule: 新增 npm/composer 依赖必须先在 base 分支登记 .agents/approved-deps.txt，同 PR 自登记无效
     level: hard
