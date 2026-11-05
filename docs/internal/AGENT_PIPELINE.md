@@ -2,7 +2,7 @@
 
 > **这是本仓库所有 AI Agent 的唯一入口。** 动手前读完这一页，你就不需要再去翻别的规范。
 > 版本：v1.1 · 2026-11-05 · 与 `RULES.md` §5.4、`gates.sh` 第 0 项保持一致。
-> 修订：补 P-01b owner 通道（2026-11-05 生效）；行号引用改检查项名（行号会漂，项名不会）。
+> 修订：补 P-01b owner 通道（2026-11-05 生效）；全部门禁引用改「检查项名」，代码引用改 `文件#签名`——行号是位置坐标，文件一改就静默失效，签名是内容坐标。
 > 上一版（草案 v0.1）已作废，其「控制器 / 10 状态机 / 定时接单」设计**不予采纳**，原因见 §7。
 
 ---
@@ -66,7 +66,7 @@
 | P-01c | **这条通道只是流程标记，不是安全边界**：agent 用的 `AGENT_GH_TOKEN` 与 owner 是同一个账号，能建 `owner/*` 分支、能自己打标签。它买到的是「留痕可追责」，不是「防越权」。真正的隔离只能靠 GitHub Environment required reviewers 或凭证分离（跟踪项 #192） | 👤 |
 | P-01d | 0b「护栏未削弱」：统计 base 与本次 diff 里硬门禁条数的变化，减少即记 `⚠️ WARN`；**2026-11-19 起转 `❌ FAIL`**。拆一条门禁也算削弱——这条专门防「PR 里顺手把拦路的检查删了」 | 🤖 `「护栏未削弱」第 0b 项` |
 | P-02 | 重命名会被拆成「删除源 + 新增目标」（`--no-renames`），把受保护文件挪走同样算违规 | 🤖 |
-| P-03 | 改这些路径时不要想绕过：`gates.sh` 用 `main` 上的版本执行，改 PR 里的门禁本身无效 | 🤖 `qa.sh:58` |
+| P-03 | 改这些路径时不要想绕过：`gates.sh` 用 `main` 上的版本执行，改 PR 里的门禁本身无效 | 🤖 `qa.sh#GATE_REPO_DIR` |
 
 ### 2.3 依赖
 
@@ -100,7 +100,7 @@
 | S-02 | 存量泄漏登记在 `.agents/secret-scan-allow.txt`，格式 `<路径> <到期日> <原因>`。**到期即 FAIL**，日期解析失败按已过期处理 | 🤖 |
 | S-03 | Secret 由 owner 一次性创建，Agent **不创建、不读取其值** | 👤 |
 | S-04 | 前端与 TMA 代码绝不出现助记词、私钥、有资金权限的 Key | 👤 |
-| S-05 | 推送前脱敏：`qa.sh` 的 `redact()` 会自动处理 GitHub token / Bearer / PEM / TG token | 🤖 `lib.sh:31-40` |
+| S-05 | 推送前脱敏：`qa.sh` 的 `redact()` 会自动处理 GitHub token / Bearer / PEM / TG token | 🤖 `lib.sh#redact` |
 
 ### 2.6 代码质量
 
@@ -139,11 +139,11 @@
 
 | ID | 规则 | 执行 |
 |---|---|---|
-| T-01 | GitHub 上的 Agent 状态由 label 表达：`agent:dev` → `agent:qa` → `qa:accepted` / `qa:rejected` / `agent:blocked` | 🤖 `lib.sh:93-101` |
-| T-02 | 返工上限 `AGENT_MAX_ATTEMPTS`，默认 3。超限打 `agent:blocked`，**停止自动返工，等人** | 🤖 `lib.sh:45` |
-| T-03 | QA Agent 的脚本与规则**一律取自 base 分支**，不信 PR 里的版本 | 🤖 `qa.sh:14` `self_copy` |
-| T-04 | 拒绝 fork PR（自托管 runner 安全边界） | 🤖 `qa.sh:48` |
-| T-05 | QA 输出解析失败 → fail-closed 判 REJECTED | 🤖 `qa.sh:129-131` |
+| T-01 | GitHub 上的 Agent 状态由 label 表达：`agent:dev` → `agent:qa` → `qa:accepted` / `qa:rejected` / `agent:blocked` | 🤖 `lib.sh#ensure_labels` |
+| T-02 | 返工上限 `AGENT_MAX_ATTEMPTS`，默认 3。超限打 `agent:blocked`，**停止自动返工，等人** | 🤖 `lib.sh#AGENT_MAX_ATTEMPTS` |
+| T-03 | QA Agent 的脚本与规则**一律取自 base 分支**，不信 PR 里的版本 | 🤖 `lib.sh#self_copy`（base 副本） |
+| T-04 | 拒绝 fork PR（自托管 runner 安全边界） | 🤖 `qa.sh#isCrossRepository` |
+| T-05 | QA 输出解析失败 → fail-closed 判 REJECTED | 🤖 `qa.sh#fail-closed` |
 | T-06 | `AGENT_AUTO_MERGE` 默认 `0`：QA 通过也**等人工合并**。要自动合并须 owner 在仓库 Variables 显式设 1 | 🤖 |
 
 ---
