@@ -67,11 +67,6 @@
 
 require_once __DIR__ . '/renrencrypt.php';
 
-if (!defined('FBS_BRIDGE_TEST')) {
-    // 测试脚本 include 本文件前 define('FBS_BRIDGE_TEST', true) 可跳过 HTTP 入口
-    fbs_bridge_http_entry();
-}
-
 /* ============================== 配置 ============================== */
 
 /** 占位配置：部署时在此填入 Telegram Bot Token（优先级最低，见文件头说明） */
@@ -907,4 +902,12 @@ function fbs_bridge_http_entry()
     http_response_code($httpCode);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+// 入口必须放在文件末尾：此前它写在「配置」段之前，导致 FBS_BRIDGE_REPLAY_MAX / FBS_BRIDGE_REPLAY_TTL
+// 还没 define 就进了 fbs_bridge_replay_check()，未定义常量退化成字符串，比较恒真，
+// 直连入口对任何请求都返回 429，并因 warning 抢先输出污染 JSON。
+// 测试脚本 include 本文件前 define('FBS_BRIDGE_TEST', true) 仍可跳过 HTTP 入口。
+if (!defined('FBS_BRIDGE_TEST')) {
+    fbs_bridge_http_entry();
 }

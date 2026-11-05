@@ -7,9 +7,10 @@ const crypto = require('crypto');
  *
  * @param {string} initData - TMA 客户端通过 window.Telegram.WebApp.initData 传给后端的 raw 字符串
  * @param {string} botToken - Telegram Bot Token
+ * @param {{ maxAgeSeconds?: number }} [options] - maxAgeSeconds 覆盖 auth_date 有效期，默认 86400（24h，收银台既有行为）
  * @returns {{ valid: boolean, user?: any, error?: string }}
  */
-function validateTelegramInitData(initData, botToken) {
+function validateTelegramInitData(initData, botToken, options = {}) {
   if (!initData) {
     return { valid: false, error: 'Missing initData' };
   }
@@ -40,11 +41,12 @@ function validateTelegramInitData(initData, botToken) {
     return { valid: false, error: 'Hash mismatch: Potential tampering detected' };
   }
 
-  // 5. 检查时效性 (防重放攻击，默认允许24小时内)
+  // 5. 检查时效性（防重放攻击；默认 24 小时，登录桥传 1 小时）
+  const maxAgeSeconds = Number(options.maxAgeSeconds) > 0 ? Number(options.maxAgeSeconds) : 86400;
   const authDate = parseInt(params.get('auth_date') || '0', 10);
   const now = Math.floor(Date.now() / 1000);
-  if (now - authDate > 86400) {
-    return { valid: false, error: 'initData expired (older than 24 hours)' };
+  if (now - authDate > maxAgeSeconds) {
+    return { valid: false, error: `initData expired (older than ${maxAgeSeconds}s)` };
   }
 
   // 6. 解析已认证的用户信息

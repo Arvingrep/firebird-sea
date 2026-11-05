@@ -10,6 +10,8 @@ const {
 const { CoinsPhClient } = require('./coinsPhClient');
 const { runCallTest } = require('./callTest');
 const { createCheckoutRouter } = require('./checkoutRoute');
+const { createTgLoginRouter } = require('./tgLogin');
+const gatewayClient = require('./gatewayClient');
 const { coinsRateSource } = require('./checkout');
 const { cliConn } = require('./migrate');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
@@ -153,6 +155,16 @@ router.post('/checkout', createCheckoutRouter({
   validateInitData: validateTelegramInitData,
   botToken: BOT_TOKEN,
   coinsClient,
+}));
+
+// 4c. Telegram 顾客免密登录桥（方案甲：Node 中转 PHP 网关，种火鸟登录态）
+// 网关地址/密钥缺失时该路由自身返回 503（不阻断进程启动，生产自检必填项不含二者）。
+router.post('/auth/telegram-web', createTgLoginRouter({
+  env: process.env,
+  validateInitData: validateTelegramInitData,
+  botToken: BOT_TOKEN,
+  gateway: gatewayClient,
+  conn: cliConn,
 }));
 
 // 5. 轮询支付状态
