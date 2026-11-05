@@ -153,7 +153,9 @@ fi
 SECRET_RE='^[+[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|^[+[:space:]]*"private_key"[[:space:]]*:|mnemonic|seed phrase|TRONGRID_API_KEY=[A-Za-z0-9]{8,}|[0-9]{8,10}:AA[A-Za-z0-9_-]{30,}'
 # 排除本文件自身：检测器的正则字面量里必然写着 mnemonic / private_key 等模式词，
 # 不排除就会「门禁检出门禁自己在说密钥」，每轮都假 FAIL。
-LEAK="$(git diff "$RANGE" -- . ':(exclude)scripts/agent/gates.sh' | grep -E '^\+' | grep -iE "$SECRET_RE" || true)"
+# 同时排除 test-gates.sh：用例夹具里必然写着密钥字面量（造一个假私钥来验证扫描器会拦），
+# 不排除就会「扫描器检出扫描器的用例」——2026-11-05 补 S-01 用例时实测触发。
+LEAK="$(git diff "$RANGE" -- . ':(exclude)scripts/agent/gates.sh' ':(exclude)scripts/test-gates.sh' | grep -E '^\+' | grep -iE "$SECRET_RE" || true)"
 [ -z "$LEAK" ] && row "无密钥泄漏（增量）" "✅ PASS" || row "无密钥泄漏（增量）" "❌ FAIL" "疑似私钥/Token 进入 diff"
 
 # 存量扫描用更严的正则：只认「行首（允许缩进）的真实 PEM 头」，
@@ -173,7 +175,7 @@ while IFS= read -r f; do
   # 到期日解析失败按 0（已过期）处理：宁严勿松
   if [ "${exp_epoch:-0}" -lt "$NOW_EPOCH" ]; then STOCK_EXPIRED+="${f}(${exp}) "
   else STOCK_DEBT+="${f}→${exp} "; fi
-done <<< "$(git grep -lIE "$STOCK_RE" -- . 2>/dev/null | sort -u)"
+done <<< "$(git grep -lIE "$STOCK_RE" -- . ':(exclude)scripts/agent/gates.sh' ':(exclude)scripts/test-gates.sh' 2>/dev/null | sort -u)"
 
 if [ -z "$STOCK_NEW" ]; then
   row "无密钥入库（全仓）" "✅ PASS" "扫描 $(git ls-files | wc -l | tr -d ' ') 个已跟踪文件"
