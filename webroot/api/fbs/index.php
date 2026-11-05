@@ -8,26 +8,41 @@
  *   3. POST /api/fbs/index.php，JSON 体带 {"action": "..."} 字段
  * 请求体：{"params": {...}} 或直接是动作入参对象（两种都收）。
  *
- * 鉴权（安全边界，不可关闭）：
- *   X-Fbs-Timestamp : 秒级 Unix 时间戳
- *   X-Fbs-Signature : hex(HMAC-SHA256(secret, "timestamp\naction\nrawBody"))
- *   与 services/api/src/gatewayClient.js:6-8 的 sign() 完全一致。
- *   密钥只从环境变量 FBS_GATEWAY_SECRET 读取；未配置时一律 503，
- *   不存在"没配密钥就放行"的分支。
- *   时间窗 ±300s；签名用 hash_equals 常量时间比较。
+ * ----------------------------------------------------------------------------------------------
+ * 【响应形状：跟 Node 约定，不跟 bridge.php 的 PHP 约定】
+ *   成功 {"success": true,  "data": {...}}
+ *   失败 {"success": false, "error": {"code": "UPPER_SNAKE_CASE", "message": "..."}}
+ * 理由：本网关的唯一调用方是 Node（/tg/entry 只跟 /tg-api 说话，从不直连网关）。
+ * bridge.php 是独立直连入口、有自己的消费者，它的小写 snake + {code:0} 形状原样保留、
+ * 本文件不复用它的 HTTP 层，只复用它内部的纯函数。
+ *
+ * 错误码（大写 SNAKE，与 Node 侧同名）：
+ *   401 INVALID_SIGNATURE            签名缺失/不匹配/时间戳超窗（对外不区分，避免给探测者反馈）
+ *   400 MISSING_PARAM                入参缺失或格式非法
+ *   403 MEMBER_DISABLED              会员 state != 1
+ *   403 MEMBER_CANCELLED             会员 is_cancellation == 1（已申请注销）
+ *   404 UNKNOWN_ACTION               动作不在白名单
+ *   405 METHOD_NOT_ALLOWED           非 POST
+ *   500 CONFIG_MISSING / CONFIG_INVALID / MEMBER_CREATE_FAILED / DB_QUERY_FAILED / INTERNAL_ERROR
+ *   500 DB_UNAVAILABLE               连不上库（Node 侧改判 503，见 services/api/src/tgLogin.js）
+ *   503 GATEWAY_SECRET_NOT_CONFIGURED  本文件拿不到 FBS_GATEWAY_SECRET
+ *
+ * 【鉴权顺序（安全边界，不可调换）】
+ *   读 raw body → 验 X-Fbs-Timestamp / X-Fbs-Signature → 才 json_decode → 才判参数。
+ *   任何"先判参数再验签"的写法都会把参数校验变成未授权的探测面。
+ *   签名 = hex(HMAC-SHA256(secret, "timestamp\naction\nrawBody"))，与 gatewayClient.js 的 sign() 一致。
+ *   密钥只从环境变量 FBS_GATEWAY_SECRET 读取；未配置一律 503，不存在"没配密钥就放行"的分支。
+ *   时间窗 ±300s；hash_equals 常量时间比较。
  *
  * 动作：
  *   member_find_or_create  入参 tg_user_id(必填) / first_name / last_name / username
- *                          → {code:0, member_id, created}
+ *                          → data: {member_id, created}
  *   issue_session          入参 tg_user_id(必填)
- *                          → {code:0, member_id, set_cookies: [...]}
+ *                          → data: {member_id, created, set_cookies: [...]}
  *
  * set_cookies 是可直接 header('Set-Cookie: ...') 的完整头字符串，由 PHP 侧生成；
  * Node 不得重新拼装任何属性（domain/path/secure/SameSite/expires 都在这里定死），
  * 否则两侧一旦漂移就会出现"PHP 认账、浏览器不认账"的登录态错位。
- *
- * 错误码：401 签名/时间戳不合法；404 未知动作；400 入参缺失；403 会员被禁用；
- *        503 网关密钥未配置；500 内部错误（不输出堆栈）。
  */
 
 // bridge.php 末尾的 HTTP 入口靠这个常量短路：这里只要它的纯函数，不要它自己发响应。
@@ -46,6 +61,23 @@ if (!defined('FBS_GATEWAY_MARKER_TTL')) define('FBS_GATEWAY_MARKER_TTL', 30 * 86
 function fbs_gateway_actions()
 {
     return array('member_find_or_create', 'issue_session');
+}
+
+/* ============================== 响应封装 ============================== */
+
+/** 成功响应：[200, {"success":true,"data":{...}}] */
+function fbs_gateway_ok(array $data = array())
+{
+    return array(200, array('success' => true, 'data' => $data));
+}
+
+/** 失败响应：[httpCode, {"success":false,"error":{"code":..,"message":..}}] */
+function fbs_gateway_err($httpCode, $code, $message)
+{
+    return array($httpCode, array(
+        'success' => false,
+        'error'   => array('code' => $code, 'message' => $message),
+    ));
 }
 
 /* ============================== 签名 ============================== */
@@ -71,7 +103,10 @@ function fbs_gateway_sign($secret, $timestamp, $action, $body)
 /**
  * 校验签名与时间窗。
  *
- * @return array [ok(bool), httpCode(int), error(string)]
+ * 返回值里的 reason 只用于 error_log，**不进响应体**：对外一律 INVALID_SIGNATURE，
+ * 免得探测者靠"签名错"与"时间戳超窗"的差异反推时间同步状态。
+ *
+ * @return array [ok(bool), reason(string)]
  */
 function fbs_gateway_verify($secret, $timestamp, $signature, $action, $body, $now = null, $window = null)
 {
@@ -79,20 +114,20 @@ function fbs_gateway_verify($secret, $timestamp, $signature, $action, $body, $no
     if ($window === null) $window = FBS_GATEWAY_TIME_WINDOW;
 
     if (!is_string($timestamp) || !preg_match('/^\d{1,12}$/', $timestamp)) {
-        return array(false, 401, 'invalid_timestamp');
+        return array(false, 'timestamp_format');
     }
     if (!is_string($signature) || !preg_match('/^[0-9a-fA-F]{64}$/', $signature)) {
-        return array(false, 401, 'invalid_signature');
+        return array(false, 'signature_format');
     }
     if (abs($now - (int)$timestamp) > $window) {
-        return array(false, 401, 'stale_timestamp');
+        return array(false, 'timestamp_window');
     }
 
     $expected = fbs_gateway_sign($secret, $timestamp, $action, $body);
     if (!hash_equals($expected, strtolower($signature))) {
-        return array(false, 401, 'invalid_signature');
+        return array(false, 'signature_mismatch');
     }
-    return array(true, 0, '');
+    return array(true, '');
 }
 
 /* ============================== 数据库连接 ============================== */
@@ -100,7 +135,7 @@ function fbs_gateway_verify($secret, $timestamp, $signature, $action, $body, $no
 /**
  * 取 PDO 与表前缀。测试可注入 $context['pdo'] / $context['db_prefix']。
  *
- * @return array [PDO|null, string $prefix, array|null $error]
+ * @return array [PDO|null, string $prefix, array|null $error]  error = ['code'=>..,'message'=>..]
  */
 function fbs_gateway_connect(array $context)
 {
@@ -111,11 +146,15 @@ function fbs_gateway_connect(array $context)
 
     $dbinfo = isset($context['dbinfo']) ? $context['dbinfo'] : fbs_bridge_load_db_config();
     if (isset($dbinfo['error'])) {
-        return array(null, '', array('error' => $dbinfo['error'], 'message' => $dbinfo['message']));
+        // bridge.php 的 config_missing / config_invalid 是静态配置错误：对外 500
+        $code = ($dbinfo['error'] === 'config_missing') ? 'CONFIG_MISSING' : 'CONFIG_INVALID';
+        return array(null, '', array('code' => $code, 'message' => $dbinfo['message']));
     }
 
     list($pdo, $dbError) = fbs_bridge_db_connect($dbinfo);
-    if ($dbError !== null) return array(null, '', $dbError);
+    if ($dbError !== null) {
+        return array(null, '', array('code' => 'DB_UNAVAILABLE', 'message' => $dbError['message']));
+    }
 
     return array($pdo, $dbinfo['prefix'], null);
 }
@@ -156,15 +195,87 @@ function fbs_gateway_nickname(array $params)
     return implode(' ', $parts);
 }
 
+/* ============================== 会员：带注销态的门禁 ============================== */
+
+/**
+ * 按 username='tg_<id>' 查会员，**额外取 is_cancellation**。
+ *
+ * 火鸟原生 memberLoginCheck()（userLogin.class.php:552-561）有三道门槛：
+ *   state == 0 → -3；state == 2 → -4；is_cancellation == 1 → -5。
+ * bridge.php:485 的 SELECT 只取 id/password/state，499-501 只判 state，
+ * 所以「已申请注销的会员」能穿过直连桥。本文件不复用它那条 SELECT，自己取全字段再判。
+ *
+ * @return array [row|null, error|null]  error = ['code'=>..,'message'=>..]
+ */
+function fbs_gateway_lookup_member(PDO $pdo, $prefix, $tgUserId)
+{
+    $sql = 'SELECT `id`, `password`, `state`, `is_cancellation` FROM `' . $prefix . 'member` WHERE `username` = ? LIMIT 1';
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array(fbs_bridge_member_username($tgUserId)));
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] member select failed: ' . $e->getMessage());
+        return array(null, array('code' => 'DB_QUERY_FAILED', 'message' => 'member lookup failed'));
+    }
+    return array($row ? $row : null, null);
+}
+
+/**
+ * 会员状态门禁，口径对齐 userLogin::memberLoginCheck()。
+ *
+ * @return array|null null=放行，否则 ['code'=>..,'message'=>..]
+ */
+function fbs_gateway_member_guard(array $row)
+{
+    if ((int)$row['state'] !== 1) {
+        return array('code' => 'MEMBER_DISABLED', 'message' => 'member is not active');
+    }
+    if ((int)$row['is_cancellation'] === 1) {
+        return array('code' => 'MEMBER_CANCELLED', 'message' => 'member has requested cancellation');
+    }
+    return null;
+}
+
+/**
+ * 查 / 建会员并过门禁。
+ *
+ * @return array [member|null, created(bool), error|null]
+ */
+function fbs_gateway_resolve_member(PDO $pdo, $prefix, $tgUserId, array $meta)
+{
+    list($row, $lookupError) = fbs_gateway_lookup_member($pdo, $prefix, $tgUserId);
+    if ($lookupError !== null) return array(null, false, $lookupError);
+
+    if ($row) {
+        $denied = fbs_gateway_member_guard($row);
+        if ($denied !== null) return array(null, false, $denied);
+        return array(array('id' => (int)$row['id'], 'password' => (string)$row['password']), false, null);
+    }
+
+    // 不存在才交给 bridge 建号（它内部 INSERT 的字段集与火鸟第三方登录模板一致）
+    list($status, $member, $created, $error) = fbs_bridge_find_or_create_member($pdo, $prefix, $tgUserId, $meta);
+    if ($member === null) {
+        if ($error === 'member_disabled') {
+            return array(null, false, array('code' => 'MEMBER_DISABLED', 'message' => 'member is not active'));
+        }
+        if ($error === 'db_unavailable') {
+            return array(null, false, array('code' => 'DB_QUERY_FAILED', 'message' => 'member lookup failed'));
+        }
+        return array(null, false, array('code' => 'MEMBER_CREATE_FAILED', 'message' => 'failed to create member'));
+    }
+    return array($member, (bool)$created, null);
+}
+
 /* ============================== 标记 Cookie（HN_tg） ============================== */
 
 /**
  * 由已生成的 HN_login_user Set-Cookie 推出 HN_tg 标记 Cookie。
  *
- * 属性（path / domain / secure / SameSite）**逐字符复用**登录 Cookie 的那一段，
- * 不在这里另写一套取值：把首个 ';' 之后的部分整段搬过来，只替换 expires 与 Max-Age。
- * 这样即便将来火鸟改了 cookieDomain / httpSecureAccess，两条 Cookie 也不会漂移。
- * 域名补 www. 的第二份天然一起复制（它本来就是两条独立的头）。
+ * 属性（path / domain / secure / SameSite）**从登录 Cookie 的头里解析出来**再喂回
+ * fbs_bridge_cookie_header()，不在这里另写一套取值：即便将来火鸟改了 cookieDomain /
+ * httpSecureAccess，两条 Cookie 也不会漂移；域名补 www. 的第二份天然一起复制
+ * （它本来就是两条独立的头，逐条派生）。
  *
  * @param  array  $sessionCookies  fbs_bridge_build_session_cookies() 的返回值
  * @param  string $loginName       'HN_login_user'
@@ -178,7 +289,7 @@ function fbs_gateway_marker_cookies(array $sessionCookies, $loginName, $markerNa
     if ($ttlSeconds === null) $ttlSeconds = FBS_GATEWAY_MARKER_TTL;
     if ($now === null) $now = time();
 
-    $expires = gmdate('D, d M Y H:i:s', $now + $ttlSeconds) . ' GMT';
+    $expires = $now + $ttlSeconds;
     $markers = array();
 
     foreach ($sessionCookies as $header) {
@@ -188,15 +299,12 @@ function fbs_gateway_marker_cookies(array $sessionCookies, $loginName, $markerNa
         $semi = strpos($header, ';');
         $tail = ($semi === false) ? '' : substr($header, $semi);
 
-        // 换掉有效期两项，其余属性原样保留
-        $tail = preg_replace('/;\s*expires=[^;]*/', '; expires=' . $expires, $tail, 1);
-        if ($tail !== null && strpos($tail, 'Max-Age=') !== false) {
-            $tail = preg_replace('/;\s*Max-Age=\d+/', '; Max-Age=' . (int)$ttlSeconds, $tail, 1);
-        } elseif ($tail !== null) {
-            $tail .= '; Max-Age=' . (int)$ttlSeconds;
-        }
+        $path = preg_match('/;\s*path=([^;]*)/i', $tail, $m) ? trim($m[1]) : '';
+        $domain = preg_match('/;\s*domain=([^;]*)/i', $tail, $m) ? trim($m[1]) : '';
+        $secure = (bool)preg_match('/;\s*secure(\s*;|\s*$)/i', $tail);
+        $sameSite = preg_match('/;\s*SameSite=([^;]*)/i', $tail, $m) ? trim($m[1]) : '';
 
-        $markers[] = $markerName . '=1' . $tail;
+        $markers[] = fbs_bridge_cookie_header($markerName, '1', $expires, $now, $path, $domain, $secure, $sameSite);
     }
 
     return $markers;
@@ -209,15 +317,13 @@ function fbs_gateway_action_member_find_or_create(array $params, array $context)
 {
     $tgUserId = fbs_gateway_parse_tg_user_id(isset($params['tg_user_id']) ? $params['tg_user_id'] : null);
     if ($tgUserId === null) {
-        return array(400, array('code' => 400, 'error' => 'invalid_tg_user_id', 'message' => 'tg_user_id must be a positive integer'));
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'tg_user_id must be a positive integer');
     }
 
     list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
-    if ($dbError !== null) {
-        return array(500, array('code' => 500, 'error' => $dbError['error'], 'message' => $dbError['message']));
-    }
+    if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
     if (!fbs_gateway_valid_prefix($prefix)) {
-        return array(500, array('code' => 500, 'error' => 'config_invalid', 'message' => 'DB_PREFIX contains illegal characters'));
+        return fbs_gateway_err(500, 'CONFIG_INVALID', 'DB_PREFIX contains illegal characters');
     }
 
     $meta = array(
@@ -226,19 +332,13 @@ function fbs_gateway_action_member_find_or_create(array $params, array $context)
         'time'     => isset($context['now']) ? (int)$context['now'] : time(),
     );
 
-    list($status, $member, $created, $error) = fbs_bridge_find_or_create_member($pdo, $prefix, $tgUserId, $meta);
+    list($member, $created, $error) = fbs_gateway_resolve_member($pdo, $prefix, $tgUserId, $meta);
     if ($member === null) {
-        return array($status, array(
-            'code'    => $status,
-            'error'   => $error,
-            'message' => ($error === 'member_disabled')
-                ? 'member exists but is not active (state != 1)'
-                : 'member lookup failed',
-        ));
+        $http = ($error['code'] === 'MEMBER_DISABLED' || $error['code'] === 'MEMBER_CANCELLED') ? 403 : 500;
+        return fbs_gateway_err($http, $error['code'], $error['message']);
     }
 
-    return array(200, array(
-        'code'      => 0,
+    return fbs_gateway_ok(array(
         'member_id' => (int)$member['id'],
         'created'   => (bool)$created,
     ));
@@ -249,15 +349,13 @@ function fbs_gateway_action_issue_session(array $params, array $context)
 {
     $tgUserId = fbs_gateway_parse_tg_user_id(isset($params['tg_user_id']) ? $params['tg_user_id'] : null);
     if ($tgUserId === null) {
-        return array(400, array('code' => 400, 'error' => 'invalid_tg_user_id', 'message' => 'tg_user_id must be a positive integer'));
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'tg_user_id must be a positive integer');
     }
 
     list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
-    if ($dbError !== null) {
-        return array(500, array('code' => 500, 'error' => $dbError['error'], 'message' => $dbError['message']));
-    }
+    if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
     if (!fbs_gateway_valid_prefix($prefix)) {
-        return array(500, array('code' => 500, 'error' => 'config_invalid', 'message' => 'DB_PREFIX contains illegal characters'));
+        return fbs_gateway_err(500, 'CONFIG_INVALID', 'DB_PREFIX contains illegal characters');
     }
 
     $meta = array(
@@ -266,15 +364,10 @@ function fbs_gateway_action_issue_session(array $params, array $context)
         'time'     => isset($context['now']) ? (int)$context['now'] : time(),
     );
 
-    list($status, $member, $created, $error) = fbs_bridge_find_or_create_member($pdo, $prefix, $tgUserId, $meta);
+    list($member, $created, $error) = fbs_gateway_resolve_member($pdo, $prefix, $tgUserId, $meta);
     if ($member === null) {
-        return array($status, array(
-            'code'    => $status,
-            'error'   => $error,
-            'message' => ($error === 'member_disabled')
-                ? 'member exists but is not active (state != 1)'
-                : 'member lookup failed',
-        ));
+        $http = ($error['code'] === 'MEMBER_DISABLED' || $error['code'] === 'MEMBER_CANCELLED') ? 403 : 500;
+        return fbs_gateway_err($http, $error['code'], $error['message']);
     }
 
     $now = isset($context['now']) ? (int)$context['now'] : time();
@@ -291,20 +384,19 @@ function fbs_gateway_action_issue_session(array $params, array $context)
     try {
         $stmt = $pdo->prepare('UPDATE `' . $prefix . 'member` SET `online` = ? WHERE `id` = ? AND `online` < ?');
         $stmt->execute(array($now, (int)$member['id'], $now - 60));
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         error_log('[fbs_gateway] update online failed: ' . $e->getMessage());
     }
 
     $cookies = fbs_bridge_build_session_cookies((int)$member['id'], (string)$member['password'], $cfg, $now);
 
-    // HN_tg：属性逐字符复用 HN_login_user，仅有效期改为 30 天
+    // HN_tg：属性从 HN_login_user 头里解析后回喂 fbs_bridge_cookie_header()，仅有效期改为 30 天
     $cookies = array_merge(
         $cookies,
         fbs_gateway_marker_cookies($cookies, $cfg['cookiePre'] . 'login_user', $cfg['cookiePre'] . 'tg', FBS_GATEWAY_MARKER_TTL, $now)
     );
 
-    return array(200, array(
-        'code'        => 0,
+    return fbs_gateway_ok(array(
         'member_id'   => (int)$member['id'],
         'created'     => (bool)$created,
         'set_cookies' => array_values($cookies),
@@ -315,6 +407,8 @@ function fbs_gateway_action_issue_session(array $params, array $context)
 
 /**
  * 动作分发（不含 HTTP 细节，便于 CLI 断言）。
+ *
+ * 顺序不可调换：密钥 → 动作白名单 → 验签 → 解析 body → 校验入参 → 业务。
  *
  * @param  string $action    动作名
  * @param  string $rawBody   原始请求体（签名就是针对它算的，必须原样传入）
@@ -328,28 +422,30 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
     $secret = fbs_gateway_secret($context);
     if ($secret === '') {
         error_log('[fbs_gateway] FBS_GATEWAY_SECRET is not configured, refusing all requests');
-        return array(503, array('code' => 503, 'error' => 'gateway_not_configured', 'message' => 'gateway secret is not configured'));
+        return fbs_gateway_err(503, 'GATEWAY_SECRET_NOT_CONFIGURED', 'gateway secret is not configured');
     }
 
     $action = is_string($action) ? trim($action) : '';
     if ($action === '' || !in_array($action, fbs_gateway_actions(), true)) {
-        return array(404, array('code' => 404, 'error' => 'unknown_action', 'message' => 'unsupported gateway action'));
+        // 未知动作在 Node 侧是不可达路径（它只会调白名单里的两个），仍按契约返回结构化错误
+        return fbs_gateway_err(404, 'UNKNOWN_ACTION', 'unsupported gateway action');
     }
 
     $rawBody = is_string($rawBody) ? $rawBody : '';
     $now = isset($context['now']) ? (int)$context['now'] : time();
 
-    list($ok, $code, $error) = fbs_gateway_verify($secret, $timestamp, $signature, $action, $rawBody, $now);
+    // 验签在解析入参之前：未通过签名的输入不进入任何业务分支
+    list($ok, $reason) = fbs_gateway_verify($secret, $timestamp, $signature, $action, $rawBody, $now);
     if (!$ok) {
-        return array($code, array('code' => $code, 'error' => $error, 'message' => 'gateway signature verification failed'));
+        error_log('[fbs_gateway] signature rejected: ' . $reason . ' action=' . $action);
+        return fbs_gateway_err(401, 'INVALID_SIGNATURE', 'gateway signature verification failed');
     }
 
-    // 签名通过后才解析 body：未通过签名的输入不进入任何业务分支
     $params = array();
     if (trim($rawBody) !== '') {
         $json = json_decode($rawBody, true);
         if (!is_array($json)) {
-            return array(400, array('code' => 400, 'error' => 'invalid_body', 'message' => 'request body must be a JSON object'));
+            return fbs_gateway_err(400, 'MISSING_PARAM', 'request body must be a JSON object');
         }
         if (isset($json['params']) && is_array($json['params'])) {
             $params = $json['params'];
@@ -365,7 +461,7 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
     } catch (Throwable $e) {
         // 绝不把堆栈/DSN 回给调用方
         error_log('[fbs_gateway] action failed: ' . $action . ' :: ' . $e->getMessage());
-        return array(500, array('code' => 500, 'error' => 'internal_error', 'message' => 'gateway action failed'));
+        return fbs_gateway_err(500, 'INTERNAL_ERROR', 'gateway action failed');
     }
 }
 
@@ -401,7 +497,8 @@ function fbs_gateway_http_entry()
         header('Allow: POST');
         header('Content-Type: application/json; charset=utf-8');
         http_response_code(405);
-        echo json_encode(array('code' => 405, 'error' => 'method_not_allowed', 'message' => 'POST only'));
+        list(, $payload) = fbs_gateway_err(405, 'METHOD_NOT_ALLOWED', 'POST only');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
         exit;
     }
 

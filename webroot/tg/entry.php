@@ -103,14 +103,15 @@ if ($role !== 'customer') $role = 'customer';
       body: JSON.stringify({ initData: initData, role: ROLE })
     }).then(function (res) {
       return res.json().catch(function () { return null; }).then(function (data) {
-        if (res.ok && data && data.code === 0) {
-          location.replace((data && data.redirect) || '/');
+        // 接口契约（对象形）：{success:true,data:{redirect}} / {success:false,error:{code,message}}
+        if (res.ok && data && data.success === true) {
+          location.replace((data.data && data.data.redirect) || '/');
           return;
         }
         var msg = data && data.error && data.error.message;
         if (!msg) {
           if (res.status === 401) msg = '登录信息已过期，请重新打开';
-          else if (res.status === 503) msg = '登录服务暂不可用，请稍后再试';
+          else if (res.status === 500 || res.status === 502) msg = '登录服务暂不可用，请稍后再试';
           else msg = '登录失败（' + res.status + '）';
         }
         fail(msg);

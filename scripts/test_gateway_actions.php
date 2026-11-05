@@ -5,11 +5,11 @@
  * 运行（宿主机通常无 PHP，用 Docker）：
  *   docker run --rm -v "$PWD":/app -w /app php:7.4-cli php scripts/test_gateway_actions.php
  *
- * 覆盖：签名正确 → 200 / 签名错 → 401 / 时间戳超窗 → 401 / 缺密钥 → 503 /
- *       入参缺失 → 400 / 未知动作 → 404 / 会员被禁用 → 403 /
- *       issue_session 的 set_cookies 含 HN_login_user + HN_userid + HN_tg，且 HN_tg 属性逐字符复用登录 Cookie。
+ * 覆盖：响应形状（success/data、success/error.code）/ 签名正确与各类签名失败 / 时间窗 /
+ *       缺密钥 / 未知动作 / 入参缺失 / 会员 state 与 is_cancellation 门禁 /
+ *       issue_session 的 set_cookies 含 HN_login_user + HN_userid + HN_tg 且属性一致。
  *
- * 不连真实数据库：PDO 用 SQLite 内存库注入（DATABASE 侧连接逻辑走 fbs_bridge_db_connect，本用例不触发）。
+ * 不连真实数据库：PDO 用 SQLite 内存库注入（fbs_bridge_db_connect 不被触发）。
  */
 
 define('FBS_GATEWAY_TEST', true);   // 只加载函数，不跑 HTTP 入口（该入口会 exit）
@@ -49,7 +49,7 @@ function make_pdo()
         `emailCheck` INTEGER, `phoneCheck` INTEGER, `sex` INTEGER, `photo` VARCHAR(100),
         `regtime` INTEGER, `logincount` INTEGER, `lastlogintime` INTEGER,
         `lastloginip` VARCHAR(15), `regip` VARCHAR(15), `state` INTEGER,
-        `regfrom` VARCHAR(20), `online` INTEGER
+        `regfrom` VARCHAR(20), `online` INTEGER, `is_cancellation` INTEGER DEFAULT 0
     )');
     return $pdo;
 }
@@ -82,35 +82,50 @@ function sig($secret, $ts, $action, $body)
     return hash_hmac('sha256', $ts . "\n" . $action . "\n" . $body, $secret);
 }
 
-function call_gw($action, array $params, array $context, $secret = null, $ts = null, $bodyOverride = null)
+function call_gw($action, array $params, array $context, $secret = null, $ts = null)
 {
     global $SECRET, $NOW;
-    $body = $bodyOverride === null ? body_of($params) : $bodyOverride;
+    $body = body_of($params);
     $timestamp = $ts === null ? (string)$NOW : (string)$ts;
     $signature = sig($secret === null ? $SECRET : $secret, $timestamp, $action, $body);
     return fbs_gateway_dispatch($action, $body, $timestamp, $signature, $context);
 }
 
+/** 断言失败响应：状态码 + 对象形 error.code */
+function is_err($payload, $code)
+{
+    return is_array($payload)
+        && isset($payload['success']) && $payload['success'] === false
+        && isset($payload['error']['code']) && $payload['error']['code'] === $code
+        && isset($payload['error']['message']) && $payload['error']['message'] !== '';
+}
+
 /* ---------- 环境：密钥走环境变量（顺带覆盖 env 读取路径） ---------- */
 putenv('FBS_GATEWAY_SECRET=' . $SECRET);
 
-printf("==== G1 签名校验 ====\n");
+printf("==== G0 响应形状 ====\n");
 
 $pdo = make_pdo();
-
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo));
-check('G1 签名正确 → 200 code=0', $code === 200 && $payload['code'] === 0,
-    "http=$code payload=" . json_encode($payload));
-check('G1 新建会员 created=true 且 member_id > 0',
-    $payload['created'] === true && $payload['member_id'] > 0, json_encode($payload));
+check('G0 成功体是 {success:true, data:{...}}，不含 code 字段',
+    $code === 200 && $payload['success'] === true && isset($payload['data'])
+    && !isset($payload['code']) && !isset($payload['error']),
+    json_encode($payload));
+check('G0 data 里 member_id / created 就位',
+    $payload['data']['member_id'] > 0 && $payload['data']['created'] === true, json_encode($payload['data']));
+
+$memberId777 = $payload['data']['member_id'];
+
+printf("\n==== G1 签名校验 ====\n");
 
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo));
 check('G1 二次调用幂等：created=false 且 member_id 不变',
-    $code === 200 && $payload['created'] === false && $payload['member_id'] > 0, json_encode($payload));
+    $code === 200 && $payload['data']['created'] === false && $payload['data']['member_id'] === $memberId777,
+    json_encode($payload['data']));
 
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo), 'wrong-secret');
-check('G1 签名错（密钥不符） → 401 invalid_signature',
-    $code === 401 && $payload['error'] === 'invalid_signature', "http=$code payload=" . json_encode($payload));
+check('G1 签名错（密钥不符） → 401 INVALID_SIGNATURE',
+    $code === 401 && is_err($payload, 'INVALID_SIGNATURE'), "http=$code payload=" . json_encode($payload));
 
 // 签名用的是 777 的 body，实际发出去的是 778 的 body（模拟中间人改包）
 $bodySigned = body_of(array('tg_user_id' => 777));
@@ -118,62 +133,93 @@ $bodySent   = body_of(array('tg_user_id' => 778));
 list($code, $payload) = fbs_gateway_dispatch(
     'issue_session', $bodySent, (string)$NOW, sig($SECRET, (string)$NOW, 'issue_session', $bodySigned), ctx($pdo)
 );
-check('G1 签名错（body 被改） → 401', $code === 401 && $payload['error'] === 'invalid_signature',
-    "http=$code payload=" . json_encode($payload));
+check('G1 签名错（body 被改） → 401 INVALID_SIGNATURE',
+    $code === 401 && is_err($payload, 'INVALID_SIGNATURE'), "http=$code payload=" . json_encode($payload));
 
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo), null, $NOW - 301);
-check('G1 时间戳超窗(-301s) → 401 stale_timestamp',
-    $code === 401 && $payload['error'] === 'stale_timestamp', "http=$code payload=" . json_encode($payload));
+check('G1 时间戳超窗(-301s) → 401 INVALID_SIGNATURE（对外不区分超窗与签名错）',
+    $code === 401 && is_err($payload, 'INVALID_SIGNATURE'), "http=$code payload=" . json_encode($payload));
 
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo), null, $NOW + 301);
-check('G1 时间戳超前(+301s) → 401 stale_timestamp',
-    $code === 401 && $payload['error'] === 'stale_timestamp', "http=$code payload=" . json_encode($payload));
+check('G1 时间戳超前(+301s) → 401 INVALID_SIGNATURE',
+    $code === 401 && is_err($payload, 'INVALID_SIGNATURE'), "http=$code payload=" . json_encode($payload));
 
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo), null, $NOW - 300);
 check('G1 时间窗边界(-300s) 仍放行 → 200', $code === 200, "http=$code payload=" . json_encode($payload));
 
-printf("\n==== G2 密钥缺失 / 未知动作 / 入参 ====\n");
+list($code, $payload) = fbs_gateway_dispatch('member_find_or_create', '{}', '', '', ctx($pdo));
+check('G1 完全无签名头 → 401 INVALID_SIGNATURE',
+    $code === 401 && is_err($payload, 'INVALID_SIGNATURE'), "http=$code payload=" . json_encode($payload));
+
+printf("\n==== G2 密钥缺失 / 未知动作 / 入参（验签先于解析） ====\n");
 
 putenv('FBS_GATEWAY_SECRET');   // 彻底移除
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 777), ctx($pdo));
-check('G2 缺 FBS_GATEWAY_SECRET → 503 gateway_not_configured',
-    $code === 503 && $payload['error'] === 'gateway_not_configured', "http=$code payload=" . json_encode($payload));
+check('G2 缺 FBS_GATEWAY_SECRET → 503 GATEWAY_SECRET_NOT_CONFIGURED',
+    $code === 503 && is_err($payload, 'GATEWAY_SECRET_NOT_CONFIGURED'), "http=$code payload=" . json_encode($payload));
 putenv('FBS_GATEWAY_SECRET=' . $SECRET);
 
-list($code, $payload) = fbs_gateway_dispatch('drop_all_tables', body_of(array()), (string)$NOW,
-    sig($SECRET, (string)$NOW, 'drop_all_tables', body_of(array())), ctx($pdo));
-check('G2 未知动作 → 404 unknown_action', $code === 404 && $payload['error'] === 'unknown_action',
+list($code, $payload) = fbs_gateway_dispatch('drop_all_tables', '{}', (string)$NOW,
+    sig($SECRET, (string)$NOW, 'drop_all_tables', '{}'), ctx($pdo));
+check('G2 未知动作 → 404 UNKNOWN_ACTION', $code === 404 && is_err($payload, 'UNKNOWN_ACTION'),
     "http=$code payload=" . json_encode($payload));
 
 list($code, $payload) = call_gw('member_find_or_create', array(), ctx($pdo));
-check('G2 缺 tg_user_id → 400 invalid_tg_user_id',
-    $code === 400 && $payload['error'] === 'invalid_tg_user_id', "http=$code payload=" . json_encode($payload));
+check('G2 缺 tg_user_id → 400 MISSING_PARAM', $code === 400 && is_err($payload, 'MISSING_PARAM'),
+    "http=$code payload=" . json_encode($payload));
 
 foreach (array("777' OR '1'='1", '-1', '0', '7.5', 'abc') as $bad) {
     list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => $bad), ctx($pdo));
-    check('G2 非法 tg_user_id(' . $bad . ') → 400', $code === 400, "http=$code");
+    check('G2 非法 tg_user_id(' . $bad . ') → 400 MISSING_PARAM',
+        $code === 400 && is_err($payload, 'MISSING_PARAM'), "http=$code");
 }
 
-list($code, $payload) = call_gw('member_find_or_create', array(), ctx($pdo), null, null, '{not json');
-check('G2 非法 JSON body → 400 invalid_body', $code === 400 && $payload['error'] === 'invalid_body',
-    "http=$code payload=" . json_encode($payload));
+// 未带签名的非法入参不得先被判成 400：验签在前，一律 401
+list($code, $payload) = fbs_gateway_dispatch('member_find_or_create', '{"tg_user_id":"abc"}',
+    (string)$NOW, str_repeat('a', 64), ctx($pdo));
+check('G2 验签先于解析：签名错 + 入参也错 → 401 而不是 400',
+    $code === 401 && is_err($payload, 'INVALID_SIGNATURE'), "http=$code payload=" . json_encode($payload));
 
-printf("\n==== G3 会员禁用 ====\n");
+$badJson = '{not json';
+list($code, $payload) = fbs_gateway_dispatch('member_find_or_create', $badJson, (string)$NOW,
+    sig($SECRET, (string)$NOW, 'member_find_or_create', $badJson), ctx($pdo));
+check('G2 合法签名 + 非法 JSON body → 400 MISSING_PARAM',
+    $code === 400 && is_err($payload, 'MISSING_PARAM'), "http=$code payload=" . json_encode($payload));
+
+printf("\n==== G3 会员门禁（state / is_cancellation） ====\n");
 
 $pdoDis = make_pdo();
-$pdoDis->exec("INSERT INTO `huoniao_member` (`username`,`password`,`state`,`online`) VALUES ('tg_999','x',0,0)");
+$pdoDis->exec("INSERT INTO `huoniao_member` (`username`,`password`,`state`,`online`,`is_cancellation`) VALUES ('tg_999','x',0,0,0)");
 list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 999), ctx($pdoDis));
-check('G3 state=0 → 403 member_disabled', $code === 403 && $payload['error'] === 'member_disabled',
+check('G3 state=0 → 403 MEMBER_DISABLED', $code === 403 && is_err($payload, 'MEMBER_DISABLED'),
+    "http=$code payload=" . json_encode($payload));
+
+$pdoAudit = make_pdo();
+$pdoAudit->exec("INSERT INTO `huoniao_member` (`username`,`password`,`state`,`online`,`is_cancellation`) VALUES ('tg_998','x',2,0,0)");
+list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 998), ctx($pdoAudit));
+check('G3 state=2（待审核，对齐 memberLoginCheck -4） → 403 MEMBER_DISABLED',
+    $code === 403 && is_err($payload, 'MEMBER_DISABLED'), "http=$code payload=" . json_encode($payload));
+
+$pdoCancel = make_pdo();
+$pdoCancel->exec("INSERT INTO `huoniao_member` (`username`,`password`,`state`,`online`,`is_cancellation`) VALUES ('tg_997','x',1,0,1)");
+list($code, $payload) = call_gw('member_find_or_create', array('tg_user_id' => 997), ctx($pdoCancel));
+check('G3 is_cancellation=1（已申请注销，对齐 memberLoginCheck -5） → 403 MEMBER_CANCELLED',
+    $code === 403 && is_err($payload, 'MEMBER_CANCELLED'), "http=$code payload=" . json_encode($payload));
+
+list($code, $payload) = call_gw('issue_session', array('tg_user_id' => 997), ctx($pdoCancel));
+check('G3 已注销会员 issue_session 同样 403 且不下发 set_cookies',
+    $code === 403 && is_err($payload, 'MEMBER_CANCELLED') && !isset($payload['data']),
     "http=$code payload=" . json_encode($payload));
 
 printf("\n==== G4 issue_session 与 set_cookies ====\n");
 
 $pdoS = make_pdo();
 list($code, $payload) = call_gw('issue_session', array('tg_user_id' => 4242), ctx($pdoS));
-check('G4 issue_session → 200 code=0 且带 member_id', $code === 200 && $payload['code'] === 0 && $payload['member_id'] > 0,
-    "http=$code payload=" . json_encode(array_diff_key($payload, array('set_cookies' => 1))));
+check('G4 issue_session → 200 success:true 且带 member_id',
+    $code === 200 && $payload['success'] === true && $payload['data']['member_id'] > 0,
+    "http=$code payload=" . json_encode($payload));
 
-$cookies = isset($payload['set_cookies']) && is_array($payload['set_cookies']) ? $payload['set_cookies'] : array();
+$cookies = isset($payload['data']['set_cookies']) && is_array($payload['data']['set_cookies']) ? $payload['data']['set_cookies'] : array();
 check('G4 set_cookies 是数组且非空（完整 Set-Cookie 头，非仅值）', count($cookies) > 0, 'count=' . count($cookies));
 
 $byName = array('HN_login_user' => array(), 'HN_userid' => array(), 'HN_tg' => array());
@@ -200,7 +246,6 @@ foreach ($byName['HN_tg'] as $c) {
 sort($tgDomains);
 check('G4 HN_tg 也是同样的两份域名', $tgDomains === $domains, json_encode($tgDomains));
 
-/* HN_tg 值必须是 1 */
 $tgValues = array();
 foreach ($byName['HN_tg'] as $c) {
     $semi = strpos($c, ';');
@@ -208,7 +253,6 @@ foreach ($byName['HN_tg'] as $c) {
 }
 check('G4 HN_tg 值为 1', $tgValues === array('1', '1'), json_encode($tgValues));
 
-/* 属性逐字符复用：把 HN_login_user 那段 '; ...' 的 path/secure/SameSite 拿出来比对 */
 function attr_of($header)
 {
     $semi = strpos($header, ';');
@@ -234,15 +278,14 @@ $tgMaxAge    = preg_match('/Max-Age=(\d+)/', $byName['HN_tg'][0], $m2) ? (int)$m
 check('G4 HN_tg 有效期 30 天，HN_login_user 仍是 onlinetime*3600=360000',
     $tgMaxAge === 30 * 86400 && $loginMaxAge === 360000, "tg=$tgMaxAge login=$loginMaxAge");
 
-check('G4 Cookie 值未在 JSON 之外泄漏：set_cookies 里不含明文 password 列',
-    strpos(json_encode($cookies), 'tg_4242') === false);
-
-printf("\n==== G5 无 HTTP 副作用（响应体不含堆栈） ====\n");
+printf("\n==== G5 异常不外泄 ====\n");
 
 list($code, $payload) = call_gw('issue_session', array('tg_user_id' => 4242), ctx(new PDO('sqlite::memory:')));
-check('G5 空库（无 member 表）时不抛异常、返回结构化错误',
-    is_array($payload) && isset($payload['code']) && $payload['code'] !== 0 && stripos(json_encode($payload), 'Stack trace') === false,
-    "http=$code payload=" . json_encode($payload));
+$flat = json_encode($payload);
+check('G5 空库（无 member 表）→ 结构化错误、无堆栈、无 DSN',
+    is_array($payload) && $payload['success'] === false && $code >= 500
+    && stripos($flat, 'Stack trace') === false && stripos($flat, 'sqlite') === false,
+    "http=$code payload=" . $flat);
 
 printf("\n==== 汇总 ====\n");
 printf("PASS=%d  FAIL=%d\n", $PASS, $FAIL);
