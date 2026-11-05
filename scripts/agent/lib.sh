@@ -93,7 +93,8 @@ qa_reject_count() {
 ensure_labels() {
   local spec
   for spec in "agent:dev|1d76db|Dev Agent 认领施工" "agent:qa|fbca04|等待 QA Agent 独立验收" \
-              "qa:accepted|0e8a16|QA 通过（自动合并）" "qa:rejected|d93f0b|QA 打回" \
+              "qa:accepted|0e8a16|QA 通过（默认等人工合并）" "qa:rejected|d93f0b|QA 打回" \
+              "agent:injection-suspect|5319e7|不可信输入命中注入特征，禁止自动合并" \
               "agent:blocked|b60205|超过重试上限，需人工介入"; do
     IFS='|' read -r name color desc <<<"$spec"
     gh label create "$name" -R "$REPO" --color "$color" --description "$desc" >/dev/null 2>&1 || true

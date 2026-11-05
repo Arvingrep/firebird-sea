@@ -16,12 +16,27 @@ jobs:
     name: 🔒 确定性门禁
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # 判据从 base 取，不从 PR 取 —— "a gate the agent can edit is not a gate"（2026-11-05 SOTA 对齐）。
+      # 旧写法只检出 PR 的 merge ref，于是 `scripts/agent/gates.sh` 跑的是**被审查的那一份**：
+      # 受保护路径检查能兜住 agent 分支，但 owner 双信号会把它降级成 WARN、护栏未削弱那项也只是 WARN——
+      # 也就是说「改门禁让它全绿」这条路此前只在 WARN 层面被记录过一次。qa.sh 早就是取 base 的，gates job 不是。
+      # 顺序不能反：先检出 PR（默认路径），再把 base 检出到 gate-src/。actions/checkout 的 clean 只清自己那个
+      # path，第二个 checkout 不会冲掉第一个；gate-src/ 是未跟踪目录，不进 git diff / git ls-files，不污染判据。
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: gate-src
+          fetch-depth: 0
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
       - name: 门禁（分支 diff：增量 / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
         env:
+          # 判据来自 gate-src/，所以「被检查的仓库」必须显式指定，否则 gates.sh 会按
+          # 「脚本上两级」推导出 gate-src 自己 —— 那就是拿 base 和 base 比，症状是
+          # 「相对 origin/canary 无改动 ❌ FAIL」（本 PR 第一次跑就踩了，30 秒验证了判据确实换源了）。
+          GATE_REPO_DIR: ${{ github.workspace }}
           GATE_REQUIRE_TOOLS: "1"
           GATE_AGENT_BRANCH: ${{ (startsWith(github.head_ref, 'agent/') || startsWith(github.head_ref, 'arvino/') || startsWith(github.head_ref, 'feature/') || startsWith(github.head_ref, 'owner/')) && '1' || '0' }}
           # 受保护路径的 owner 通道：前缀 owner/ 与标签 owner-approved 两个信号同时成立才放行（见 gates.sh 第 0 项）。
@@ -34,7 +49,8 @@ jobs:
         run: |
           command -v php >/dev/null || { echo "runner 缺少 php"; exit 1; }
           set -o pipefail
-          scripts/agent/gates.sh "origin/${{ github.base_ref }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          bash "$GITHUB_WORKSPACE/gate-src/scripts/agent/gates.sh" "origin/${{ github.base_ref }}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
       # 三把尺：只读、与 diff 无关，查的是「仓库自己讲的话前后一致不一致」
       # （规则真相源的四环 / 门禁项有没有规则背书 / 文档锚点还准不准）。
       # **暂时不阻断**（continue-on-error）：这三把尺自己也在观察期——判据改过两次
@@ -45,11 +61,14 @@ jobs:
         continue-on-error: true
         run: |
           # 步骤名可以随便改，分支保护认的是 **job 名**（见下方 verify-task 注释）
+          # 脚本取自 gate-src（base），被检查的仓库显式传 $GITHUB_WORKSPACE（PR）：
+          # 尺子不能由被量的人提供，否则「改尺子」比「改代码」便宜。
           set -o pipefail
           rc=0
-          bash  scripts/agent/spec-lint.sh    | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
-          node  scripts/agent/check-rings.js  | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
-          node  scripts/agent/check-anchors.js | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
+          G="$GITHUB_WORKSPACE/gate-src/scripts/agent"; W="$GITHUB_WORKSPACE"
+          bash "$G/spec-lint.sh"    "$W" | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
+          node "$G/check-rings.js"  "$W" | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
+          node "$G/check-anchors.js" "$W" | tee -a "$GITHUB_STEP_SUMMARY" || rc=1
           echo "三把尺退出码：$rc（非 0 只报警告，不阻断合并）"
           exit $rc
       - name: Helm 多站点模板合成
@@ -77,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: scripts/verify-task.sh（流程自测 + 服务单测；CI=true 时含真实 MySQL migration 测试）
@@ -119,7 +138,7 @@ jobs:
     steps:
       # 检出 base（canary 或 main）而不是 PR：qa.sh / gates.sh / RULES 这些「裁判」必须来自 base 分支，
       # PR 代码由 qa.sh 自行检出为被审数据
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.base_ref }}
           fetch-depth: 0
