@@ -225,7 +225,10 @@ if (!fs.existsSync(GATES)) {
   };
   for (const n of names) {
     const bare = n.replace(/\$\{[^}]*\}/g, '').trim();
-    const hit = sigs.find((s) => bare.startsWith(s.sig) || s.sig.startsWith(bare));
+    // 只按「检查项名以签名开头」认（单向）。早期写成双向前缀，短签名（如「增量 ≤」
+    // 与「增量 ≤ 1200 行」）会双向互认，短的一方能把无关检查项也 claim 过来，
+    // 「无背书」检出率被悄悄削弱——这正是这条检查要防的那类削弱。
+    const hit = sigs.find((s) => bare.startsWith(s.sig));
     if (hit) claims.push({ name: n, id: hit.id });
     else {
       const why = exemptWhy(bare);

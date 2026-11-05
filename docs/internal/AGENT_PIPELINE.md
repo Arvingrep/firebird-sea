@@ -272,7 +272,7 @@ TAPD(progressing)  ──认领，建 run 目录 + meta.json──────�
 ```bash
 # 0. 三把尺（只读、与 diff 无关、秒级；查的是「仓库自己讲的话前后一致不一致」）
 make check-rules          # = spec-lint + check-rings + check-anchors
-#   make lint     规范面自洽 8 项
+#   make lint     规范面自洽 9 项
 #   make rules    规则真相源：四环齐不齐 + gates.sh 每个检查项有没有规则背书 + src 锚点
 #   make anchors  文档里指向执行面的锚点还准不准
 

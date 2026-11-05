@@ -537,3 +537,4 @@ else
   else echo "❌ 反例未红（编造的签名没被抓住，rc=${rc}）"; printf '%s\n' "$out" | tail -4; FAIL=1; fi
 fi
 
+exit $FAIL

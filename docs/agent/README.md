@@ -25,7 +25,7 @@
 | :--- | :--- | :--- |
 | `rules.yaml` | 规则唯一真相源。16 条 hard + 1 条 soft | `make rules` |
 | `../scripts/agent/check-rings.js` | 四环体检 + 门禁项背书 + 出处锚点 | `make rules` |
-| `../scripts/agent/spec-lint.sh` | 规范面自洽 8 项（内链/幽灵引用/基线/权限/死引用…） | `make lint` |
+| `../scripts/agent/spec-lint.sh` | 规范面自洽 9 项（内链/幽灵引用/基线/权限/死引用/自测退出码…） | `make lint` |
 | `../scripts/agent/check-anchors.js` | 手册里指向执行面的锚点还准不准 | `make anchors` |
 
 三个都**只读**：不写文件、不改 git 状态、不看 diff，可以随便重复跑。合起来一条命令：

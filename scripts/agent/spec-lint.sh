@@ -106,6 +106,19 @@ done
 if [ -z "$DEAD" ]; then row "S8 脚本无死引用" "✅ PASS" "脚本引用的 make 目标均存在"
 else row "S8 脚本无死引用" "❌ FAIL" "引用了不存在的目标：$DEAD"; fi
 
+# S9 自测退出码是真的：scripts/test-gates.sh 最后一个非空非注释行必须是 `exit $FAIL`。
+# 少了它，脚本以最后一条命令的状态退出（几乎恒 0），整套用例变成摆设：用例照打 ❌，
+# rc 却是 0，CI 一路绿。2026-11-05 真实发生——一次编辑把 exit 删掉，62 条用例全绿但退出码恒 0，
+# 本地「rc=0」是假的，最后是独立 QA 静态审查发现的。这条检查就是那次事故的护栏。
+LAST_LINE="$(grep -vE '^[[:space:]]*(#|$)' scripts/test-gates.sh 2>/dev/null | tail -1 | tr -d '[:space:]')"
+if [ "$LAST_LINE" = 'exit$FAIL' ]; then
+  row "S9 自测退出码真实" "✅ PASS" "test-gates.sh 以 exit \$FAIL 收尾，用例失败会真的返回 1"
+elif [ -z "$LAST_LINE" ]; then
+  row "S9 自测退出码真实" "❌ FAIL" "读不到 scripts/test-gates.sh，或文件为空"
+else
+  row "S9 自测退出码真实" "❌ FAIL" "最后一行是「${LAST_LINE}」而不是 exit \$FAIL —— 用例失败也不会返回 1，整套自测等于摆设"
+fi
+
 printf '| 检查 | 结果 | 说明 |\n|---|---|---|\n%s\n' "$ROWS"
 BR="$(git branch --show-current 2>/dev/null)"; [ -n "$BR" ] || BR="detached"
 echo "结论：$([ "$FAILS" -eq 0 ] && echo '全部通过' || echo "$FAILS 项 FAIL")（基线 $(git rev-parse --short HEAD) @ ${BR}）"
