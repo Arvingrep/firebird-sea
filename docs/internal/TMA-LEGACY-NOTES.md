@@ -42,17 +42,23 @@ Telegram Mini App 这条业务线已放弃。留着它的代价是实打实的�
 4. 恢复 `package.json` 的 `dev:tma`，并把 `build` 加回 `npm --prefix apps/tma run build`
 5. 重新跑 `bash scripts/test-gates.sh` 与 `bash scripts/agent/gates.sh origin/canary`
 
-## 遗留欠债（需要 owner 单独处理）
+## 遗留欠债
 
-`.agents/approved-deps.txt` 里 vue / vue-router / pinia / vant / @telegram-apps/sdk / @vitejs/plugin-vue / typescript / vite 这些条目仍标着「apps/tma」，实际已无使用者。
+### 已清（2026-11-05）
 
-**没在归档 PR 里改**，因为 Zero-Dep 门禁读的是 **base 分支**上的这份文件（D-01）：同一个 PR 里自己删登记，门禁会当作没发生。清理要单独提 PR，并且只能由 owner 做——该文件属受保护路径。
-
-### 另外两笔
-
-| 欠债 | 现状 | 处理 |
+| 欠债 | 怎么清的 | 为什么当时不能顺手做 |
 | :--- | :--- | :--- |
-| `deploy/helm/firebird-site/templates/ingressroute.yaml` 在 `tma.enabled` 为真时仍把 `PathPrefix(/tma)` 路由到 api | canary 的 values 里 `tma.enabled` 是真，而镜像里已无 `/app/tma` → 该路由指向 404 | 要么在 ingress 里去掉 `/tma` 路由（推荐，路由应当反映真实存在的服务），要么在 values 里关掉 `tma.enabled`。两者都要动 `deploy/`，可在下一个部署侧 PR 一起做 |
-| `.github/workflows/ci-verify.yml` 的 job 名与步骤名仍写「TMA 前端」「含 apps/tma 类型检查」 | job 名是 main 的必需检查上下文，不能改；步骤名由 #201 改 | 步骤名随 #201 合入解决；job 名作为长期欠债登记，清理需同时改分支保护规则 |
+| `deploy/helm/firebird-site/templates/ingressroute.yaml` 在 `tma.enabled` 为真时仍把 `PathPrefix(/tma)` 路由到 api | 本 PR：整条 Rule 删除。`tma.enabled` 保留——它还给 api 注入登录桥的环境变量（`deployment-api.yaml`），那部分后端逻辑仍在跑 | 与归档 PR 不同区（`deploy/` 是全局串行锁），拆开走 |
+| `.agents/approved-deps.txt` 里 vue / vue-router / pinia / vant / @telegram-apps/sdk / @vitejs/plugin-vue / typescript / vite 八条仍标「apps/tma」 | 单独 PR（`owner/tma-residue`）：八行全删，全仓 `package.json` 已验 0 处引用 | Zero-Dep 门禁读 **base 分支**的这份文件（D-01）：同 PR 里自己删登记，门禁会当作没发生 |
+
+删除 `/tma` 路由后的行为（`helm template -f values.yaml -f values-canary.yaml` 实测：渲染 975 行，
+`PathPrefix(`/tma`)` 出现 0 次）：`/tma/*` 落到「同 Host 兜底」规则，由站点自己返 404 页。
+对用户是等价的 404，区别在于**路由表不再声称存在一个已经不存在的服务**。
+
+### 仍未清（需要 owner 决策，不是能顺手改的）
+
+| 欠债 | 现状 | 为什么卡住 |
+| :--- | :--- | :--- |
+| `.github/workflows/ci-verify.yml` 的 **job 名**仍含「TMA 前端」 | 步骤名已由 #201 改干净，job 名保留 | job 名是 `main` 分支保护里的**必需检查上下文**。改名不会报错，只会让所有 PR 合进 `main` 时静默 `BLOCKED`（checks 全绿、merge 按钮灰）。清理必须「改 workflow」与「改分支保护」同一分钟内完成，属一次性运维动作 |
 
 > 归档包本身是 `git add -f` 入库的：`.gitignore` 第 8 行有 `*.tar.gz`。`docs/archive/` 下其他归档包（`tg-bot-2026-10-27.tar.gz` 等）同样是强制添加。新增归档包时别忘了 `-f`，否则 `git add` 静默跳过——文件在工作区里看得见、仓库里没有。
