@@ -1,28 +1,15 @@
-.PHONY: local-accept gates agent-qa help setup up down restart logs ps clean download-package extract-package verify test-coins clean-bloat dev-check test-k8s hygiene
+.PHONY: local-accept help setup up down restart logs ps clean download-package extract-package test-coins clean-bloat dev-check test-k8s
 
-# gates 的对比基线：跟随「目标分支」（PR 要合进去的那条），而不是当前分支自己的上游。
-# 用上游 @{u} 是错的：agent/*、chore/* 的上游就是它自己，push 完 git diff @{u}...HEAD 恒空 → 又是假 FAIL。
-# 目标分支由 AGENT_BASE_BRANCH 决定（与 lib.sh 同一个变量；默认 main，启用 canary 后设为 canary）；
-# 临时想比对别的 ref 用 GATE_BASE 覆盖（命令行 > 同名 env > AGENT_BASE_BRANCH）。
-# 注意 1：AGENT_BASE_BRANCH 应填**裸分支名**（canary，不是 origin/canary）；本文件与 lib.sh:14 都自行拼 origin/，
-#         lib.sh 已做归一，这里再 `$(patsubst origin/%,%,…)` 一次，裸名与带前缀两种写法都得到 origin/canary。
-# 注意 2：本目标**不 fetch**，比的是本地远端跟踪 ref。本地 origin/<分支> 落后于真实远端时，
-#         会把别人已合入的改动算进本次增量（可能虚高甚至误判 >1200 行）→ 门禁报错前先 git fetch。
-GATE_BASE ?= origin/$(patsubst origin/%,%,$(or $(AGENT_BASE_BRANCH),main))
 
 help:
 	@echo "=========================================================="
 	@echo "🔥 火鸟模式东南亚（菲律宾）一人 AI 团队基地操作指令"
 	@echo "=========================================================="
-	@echo "  make agent-qa         - 独立 QA Agent 验收 PR (例: make agent-qa PR=34)"
-	@echo "  make gates            - 对目标分支（AGENT_BASE_BRANCH，填裸分支名，默认 origin/main）跑门禁；GATE_BASE 覆盖；本目标不自动 fetch，落后时请先手动 git fetch"
 	@echo "  make setup            - 初始化基地目录与环境检查"
 	@echo "  make up               - 启动 LEMP + Redis + n8n 容器集群"
 	@echo "  make down             - 停止容器集群"
 	@echo "  make logs             - 查看所有容器实时日志"
 	@echo "  make dev-check        - [分工2] 编码施工防臃肿门禁 (Zero-Dep & 代码脱水)"
-	@echo "  make verify           - 运行一人团队代码与 Docs-as-Code 校验卡点"
-	@echo "  make hygiene          - 🧹 仓库卫生检查（副本/临时目录/大文件，CI 同款）"
 	@echo "  make test-k8s         - 测试 GKE Helm Chart 语法与多站点模板渲染"
 	@echo "  make clean-bloat      - 执行工程体系脱水剪枝，清理临时备份、大日志与悬挂镜像"
 	@echo "  make test-coins       - 测试 Coins.ph 官方行情深度与 HMAC-SHA256 鉴权引擎"
@@ -49,21 +36,8 @@ logs:
 ps:
 	docker compose ps
 
-verify:
-	@chmod +x scripts/verify-task.sh
-	@./scripts/verify-task.sh
-
-gates:
-	@bash scripts/agent/gates.sh $(GATE_BASE)
-
-hygiene:
-	@bash scripts/repo-hygiene.sh
-
 local-accept:
 	@bash scripts/local-accept.sh
-
-agent-qa:
-	@bash scripts/agent/qa.sh $(PR)
 
 test-coins:
 	@node scripts/test-coins-ph.js
