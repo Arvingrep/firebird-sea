@@ -357,6 +357,15 @@ test('网关返回非法 member_id（非正整数）：502，不下发 Cookie、
   }
 });
 
+test('登录时效不得超过网关的防重放计数窗口（跨端不变量）', () => {
+  // 7200 来自 webroot/api/fbs/bridge.php:79 的 FBS_BRIDGE_REPLAY_TTL：计数窗口从「首次成功使用」
+  // 起算，只有 登录时效 ≤ 窗口，同一份 initData 的整个可用期才落在同一个窗口里（5 次/份）。
+  // 调大 LOGIN_MAX_AGE_SECONDS 而不同步调大 PHP 侧 TTL，等于静默放宽重放额度。
+  const GATEWAY_REPLAY_TTL_SECONDS = 7200;
+  assert.ok(LOGIN_MAX_AGE_SECONDS <= GATEWAY_REPLAY_TTL_SECONDS,
+    `LOGIN_MAX_AGE_SECONDS=${LOGIN_MAX_AGE_SECONDS} 超过网关计数窗口 ${GATEWAY_REPLAY_TTL_SECONDS}s，需同步调大 FBS_BRIDGE_REPLAY_TTL`);
+});
+
 test('fbs_member_map 写失败不影响登录态（cookie 已下发），但响应体标记 member_map_synced=false', async () => {
   const db = { sqls: [], query: async () => { throw new Error('db down'); } };
   const { server, port } = await startApp({ db });

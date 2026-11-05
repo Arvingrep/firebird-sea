@@ -307,6 +307,15 @@ function fbs_gateway_load_site_config(array $context)
  * 传入的是 sha256(initData) 的十六进制串，函数内部会再 hash 一次，因此键空间与
  * bridge.php 直连路径（用的是 initData 原文）天然隔离，两条路径的配额不会互相挤占。
  *
+ * 【窗口不变量】计数窗口 TTL 取 bridge.php:79 的 FBS_BRIDGE_REPLAY_TTL = 7200s，
+ * 必须 ≥ Node 侧的登录时效 LOGIN_MAX_AGE_SECONDS = 3600s（services/api/src/tgLogin.js）。
+ * 因为 initData 从 auth_date 起最多只被接受 1 小时，而计数窗口从「首次成功使用」起算 2 小时，
+ * 首次使用必然晚于 auth_date，所以同一份 initData 的整个可用期都落在同一个计数窗口内，
+ * 「5 次/份」在登录链路上是严格成立的。
+ * ⚠ 若把 Node 的 LOGIN_MAX_AGE_SECONDS 调大到 ≥7200，必须同步调大这个 TTL，
+ *   否则 2 小时后计数清零，同一份 initData 可以再换 5 次 Cookie。
+ *   （tg-login.test.js 有一条断言把这条不变量钉住。）
+ *
  * @param string $initDataHash
  * @param array  $context  可注入 replay_dir（测试用）
  */

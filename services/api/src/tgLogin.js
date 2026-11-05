@@ -23,7 +23,11 @@
 
 const crypto = require('node:crypto');
 
-const LOGIN_MAX_AGE_SECONDS = 3600; // 登录用 1 小时；收银台仍走 telegramAuth 默认 24h
+// 登录用 1 小时；收银台仍走 telegramAuth 默认 24h。
+// ⚠ 这个值必须 ≤ 网关的防重放窗口 FBS_BRIDGE_REPLAY_TTL（bridge.php:79 = 7200s）：
+//   计数窗口从「首次成功使用 initData」起算，只有时效 ≤ 窗口，「5 次/份」才覆盖 initData 的
+//   整个可用期。调大这里会静默放宽重放额度，tg-login.test.js 有一条断言专门拦这个。
+const LOGIN_MAX_AGE_SECONDS = 3600;
 
 // 登录专属的 code → HTTP 码表。
 //
