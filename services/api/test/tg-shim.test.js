@@ -328,7 +328,7 @@ test('rootDomain：频道子域算站内，避免把站内跳转扔进系统浏�
 //   只在 shim   = { courier }                                       PHP 侧是 do=courier，正常
 // ---------------------------------------------------------------------------
 
-test('白名单同源守卫：PHP 允许集与 shim 处理集的交叠关系', () => {
+test('白名单同源守卫：shim 适配的 service 必须都在 PHP 白名单里', () => {
   const fs = require('node:fs');
   const php = fs.readFileSync(
     path.join(__dirname, '../../../webroot/include/tgWhitelist.inc.php'),
@@ -345,9 +345,15 @@ test('白名单同源守卫：PHP 允许集与 shim 处理集的交叠关系', (
   const shimSet = new Set(Object.keys(shim.SERVICES));
   const phpSet = new Set(phpAllow);
 
-  // 1) 交集必须精确等于这三个 —— 任何一边单方面增删都会红
-  const both = [...shimSet].filter((s) => phpSet.has(s)).sort();
-  assert.deepEqual(both, ['article', 'travel', 'waimai']);
+  // 1) 方向是单向的：shim 会适配的 service，必须都能被访问到。
+  //    否则就是「给一个根本打不开的页面做顶栏适配」，那段代码永远是死路径。
+  //    反过来不成立 —— PHP 侧允许 shim 不处理的 service 是正常的（member / siteConfig），
+  //    所以这里**不能**断言交集精确等于某个集合：那样将来只要放开一个模块
+  //    （比如把商家端重新对商家开放），这行测试就会红，而它红得毫无道理。
+  const shimServices = [...shimSet].filter((s) => s !== 'courier').sort();
+  for (const s of shimServices) {
+    assert.ok(phpSet.has(s), `shim 会适配 ${s}，但 PHP 白名单里没有它 → 该页面根本打不开`);
+  }
 
   // 2) article 双侧都在，但语义相反：PHP 放行访问（资讯页要能打开），
   //    shim 命中即 return（D6，一行不碰）。这里只钉「双侧都在」，语义各自有测试钉。
