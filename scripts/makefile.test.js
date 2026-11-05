@@ -4,10 +4,14 @@
 // 为什么：`agent/*`、`chore/*` 的上游就是它自己的远端。用 @{u} 做基线时，
 // 一旦分支 push 过，`git diff @{u}...HEAD` 恒为空 → 门禁报「相对 X 无改动」的假 FAIL。
 // 触发条件从「本地 main 过期」变成了「已经推送」，而推送是正常流程，等于几乎必踩。
-// 故基线改为 origin/$(or $(AGENT_BASE_BRANCH),main)：
-//   - 默认 origin/main；
-//   - AGENT_BASE_BRANCH=canary 时切到 origin/canary（启用 canary 的开关）；
+// 故基线改为 origin/$(or $(AGENT_BASE_BRANCH),canary)：
+//   - 默认 origin/canary（PR 目标是 canary，见 RULES B-02；与 scripts/agent/gates.sh:35 的默认值一致）；
+//   - AGENT_BASE_BRANCH=main 可切回 origin/main（晋升链 main ← canary 时用）；
 //   - GATE_BASE 可显式覆盖（命令行 > 同名 env）。
+//
+// ⚠️ 默认值曾是 main，2026-11-05 改为 canary：因为 gates.sh 默认 origin/canary，
+//    两边默认值不同 → `make gates` 比 main（增量 +1313）、`bash gates.sh` 直跑比 canary（+11），
+//    同一门禁两种结论。默认值只允许有一处定义，另一处必须跟它对齐。
 //
 // 做法：在临时仓库里复刻一个最小 make 环境（bare remote + 假 gates.sh 打印它收到的基线），
 // 不碰当前仓库、不联网、不执行真实 gates.sh。本机无 make/git 时整组跳过。
@@ -55,6 +59,10 @@ function sandbox() {
   git('commit', '-qm', 'base');
   git('remote', 'add', 'origin', remote);
   git('push', '-q', '-u', 'origin', 'main');
+  // 默认基线是 origin/canary（PR 目标分支），沙箱必须真的存在这个 ref，
+  // 否则用例 1 的前置断言会死在「unknown revision」而不是「基线选错了」——那是最糟的失败方式：
+  // 红给你看，但红的原因不是被测代码。
+  git('push', '-q', 'origin', 'main:canary');
 
   // feat/x：在 main 之上加一个 commit 并推送 → @{u} 与 HEAD 完全一致
   git('checkout', '-q', '-b', 'feat/x');
@@ -87,34 +95,34 @@ test.after(() => { if (box) fs.rmSync(box.dir, { recursive: true, force: true })
 
 // 核心回归：Ray 打回本设计的场景。已推送分支的上游 diff 为空，
 // 只有目标分支还留着差异；基线若跟随 @{u}，门禁必然误报「无改动」。
-test('make gates 已推送分支：上游 diff 为空但目标分支有差异，基线必须是 origin/main 而非 @{u}', { skip: SKIP }, () => {
+test('make gates 已推送分支：上游 diff 为空但目标分支有差异，基线必须是 origin/canary 而非 @{u}', { skip: SKIP }, () => {
   const b = get();
   execFileSync('git', ['checkout', '-q', 'feat/x'], { cwd: b.repo, stdio: 'ignore' });
   const diffOf = (ref) => execFileSync('git', ['diff', '--name-only', `${ref}...HEAD`], { cwd: b.repo, encoding: 'utf8' }).trim();
   // 前置条件先钉死，否则这条用例会在沙箱变化时悄悄失去意义
   assert.equal(diffOf('@{u}'), '', '前置条件不成立：feat/x 相对上游应当零改动（模拟已推送）');
-  assert.notEqual(diffOf('origin/main'), '', '前置条件不成立：feat/x 相对 origin/main 应当有改动');
-  assert.equal(runMake('feat/x'), 'GATES_BASE=origin/main');
+  assert.notEqual(diffOf('origin/canary'), '', '前置条件不成立：feat/x 相对 origin/canary 应当有改动');
+  assert.equal(runMake('feat/x'), 'GATES_BASE=origin/canary');
 });
 
-test('make gates 默认基线：分支有上游也不跟随 @{u}，仍取 origin/main', { skip: SKIP }, () => {
-  assert.equal(runMake('feat/x'), 'GATES_BASE=origin/main');
+test('make gates 默认基线：分支有上游也不跟随 @{u}，仍取 origin/canary', { skip: SKIP }, () => {
+  assert.equal(runMake('feat/x'), 'GATES_BASE=origin/canary');
 });
 
-test('make gates 无上游：基线仍是 origin/main（带 origin/ 前缀，不是裸 main）', { skip: SKIP }, () => {
-  // 旧设计在这里会回落成裸 main —— 这条用于拦住任何「重新引入 @{u} + or(...,main)」的写法
-  assert.equal(runMake('no-upstream'), 'GATES_BASE=origin/main');
+test('make gates 无上游：基线仍是 origin/canary（带 origin/ 前缀，不是裸 canary）', { skip: SKIP }, () => {
+  // 旧设计在这里会回落成裸分支名 —— 这条用于拦住任何「重新引入 @{u} + 裸名」的写法
+  assert.equal(runMake('no-upstream'), 'GATES_BASE=origin/canary');
 });
 
-test('make gates AGENT_BASE_BRANCH=canary：基线切到 origin/canary', { skip: SKIP }, () => {
-  // 这是「启用 canary」的开关；若失效，PR 目标分支是 canary 时门禁会拿 origin/main 比，
-  // 把 canary 独有的改动算成「多出来的」（或反过来漏检）
-  assert.equal(runMake('feat/x', { env: { AGENT_BASE_BRANCH: 'canary' } }), 'GATES_BASE=origin/canary');
+test('make gates AGENT_BASE_BRANCH=main：基线切到 origin/main（晋升链用）', { skip: SKIP }, () => {
+  // 默认值改成 canary 之后，这条是「不是硬编码」的唯一凭证：
+  // 若有人把 Makefile 写成写死 origin/canary，本条必红。
+  assert.equal(runMake('feat/x', { env: { AGENT_BASE_BRANCH: 'main' } }), 'GATES_BASE=origin/main');
 });
 
-test('make gates AGENT_BASE_BRANCH 为空串：$(or ...) 回落 main，不产出残缺 ref「origin/」', { skip: SKIP }, () => {
+test('make gates AGENT_BASE_BRANCH 为空串：$(or ...) 回落 canary，不产出残缺 ref「origin/」', { skip: SKIP }, () => {
   // 拦 $(or) 被简化掉：若写成 origin/$(AGENT_BASE_BRANCH)，空值会得到 origin/ —— 一个不存在的 ref
-  assert.equal(runMake('feat/x', { env: { AGENT_BASE_BRANCH: '' } }), 'GATES_BASE=origin/main');
+  assert.equal(runMake('feat/x', { env: { AGENT_BASE_BRANCH: '' } }), 'GATES_BASE=origin/canary');
 });
 
 test('make gates GATE_BASE 命令行：优先于 AGENT_BASE_BRANCH，取 origin/foo', { skip: SKIP }, () => {
