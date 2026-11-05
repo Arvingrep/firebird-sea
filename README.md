@@ -11,4 +11,4 @@
 | `kubectl --context mac-mini-orbstack -n argocd get imageupdater firebird-manila` | 查看 ArgoCD Image Updater 对 firebird-manila 的镜像更新状态 |
 | `argocd app history firebird-manila` | 查看 firebird-manila 应用的部署历史，用于确认版本或回滚 |
 
-完整说明见 [docs/internal/AGENT_PIPELINE.md](docs/internal/AGENT_PIPELINE.md)。
+完整说明见 [docs/internal/agent-pipeline.md](docs/internal/agent-pipeline.md)。
