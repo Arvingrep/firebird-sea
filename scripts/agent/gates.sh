@@ -378,7 +378,11 @@ fi
 UNPINNED=""
 while IFS= read -r wf; do
   [ -n "$wf" ] && [ -f "$wf" ] || continue
-  refs="$(grep -hoE 'uses:[[:space:]]*[^[:space:]#]+' "$wf" 2>/dev/null \
+  # 先剥注释再匹配：`# uses: actions/checkout@v4` 是注释里的示例，不是引用。
+  # 不剥会误报 FAIL，而误报的代价比漏报大——它训练人改措辞（把注释删掉）而不是改问题，
+  # 本仓在 O-02 上就吃过一次「文档写操作指引被判红」（PR #199 QA 第 3 轮 minor）。
+  refs="$(sed -E 's/#.*$//' "$wf" 2>/dev/null \
+    | grep -hoE 'uses:[[:space:]]*[^[:space:]]+' \
     | sed -E "s/^uses:[[:space:]]*//; s/^[\"']//; s/[\"']$//" \
     | grep -vE '^(\./|docker://)' | grep -vE '@[0-9a-f]{40}$' || true)"
   [ -n "$refs" ] || continue
