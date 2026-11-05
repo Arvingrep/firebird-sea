@@ -33,6 +33,10 @@ jobs:
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
       - name: 门禁（分支 diff：增量 / Docs-as-Code / Zero-Dep / 密钥 / 语法 / Helm）
         env:
+          # 判据来自 gate-src/，所以「被检查的仓库」必须显式指定，否则 gates.sh 会按
+          # 「脚本上两级」推导出 gate-src 自己 —— 那就是拿 base 和 base 比，症状是
+          # 「相对 origin/canary 无改动 ❌ FAIL」（本 PR 第一次跑就踩了，30 秒验证了判据确实换源了）。
+          GATE_REPO_DIR: ${{ github.workspace }}
           GATE_REQUIRE_TOOLS: "1"
           GATE_AGENT_BRANCH: ${{ (startsWith(github.head_ref, 'agent/') || startsWith(github.head_ref, 'arvino/') || startsWith(github.head_ref, 'feature/') || startsWith(github.head_ref, 'owner/')) && '1' || '0' }}
           # 受保护路径的 owner 通道：前缀 owner/ 与标签 owner-approved 两个信号同时成立才放行（见 gates.sh 第 0 项）。
