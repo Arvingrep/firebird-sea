@@ -1,42 +1,74 @@
 <?php
 /**
- * 服务白名单单元测试（webroot/index.php · 需求文档验收第 2 条）
+ * 服务白名单守卫单测（webroot/include/tgWhitelist.inc.php · 需求文档验收第 2 条）
  *
- * 为什么不 include index.php：它第一行就 require include/common.inc.php（要数据库、要
- * swoole_loader、要整个站点环境），单测起不来。所以这里从源码里把两个纯函数抽出来 eval，
- * 再跑判定矩阵。抽不到函数直接 exit 1 —— 不允许出现"没测到也算过"。
+ * 守卫被四个独立入口共用：index.php / website.php / special.php / wmsj（40 个 PHP）。
+ * 所以测试分三层：
+ *   1. 纯函数判定（白名单 / 开关 / 决策三档）
+ *   2. 守卫源码本身（header 后必须紧跟 die，不能写死 301）
+ *   3. 四个入口有没有真的引用守卫（防止将来有人把 include 删了却没人发现）
  *
  * 用法： php scripts/test_tg_service_whitelist.php
  * 输出： TAP 风格，末行 1..N；exit 0 = 全过，1 = 有失败。
  */
 
-$root      = dirname(__DIR__);
-$indexPath = $root . '/webroot/index.php';
+$root     = dirname(__DIR__);
+$incPath  = $root . '/webroot/include/tgWhitelist.inc.php';
 
-$source = @file_get_contents($indexPath);
-if ($source === false) {
-    fwrite(STDERR, "无法读取 {$indexPath}\n");
-    exit(1);
+// 守卫文件约定「include 时零副作用」：不输出、不 die、只定义函数。这里顺便验一遍。
+ob_start();
+require_once $incPath;
+$incOutput = ob_get_clean();
+
+$pass  = 0;
+$fail  = 0;
+$tests = 0;
+
+function check($desc, $actual, $expected)
+{
+    global $pass, $fail, $tests;
+    $tests++;
+    if ($actual === $expected) {
+        $pass++;
+        echo "ok {$tests} - {$desc}\n";
+    } else {
+        $fail++;
+        echo "not ok {$tests} - {$desc}\n";
+        echo '  # 期望 ' . var_export($expected, true) . '，实际 ' . var_export($actual, true) . "\n";
+    }
 }
 
 /**
- * 从 PHP 源码里抽出指定名字的顶层函数源码（含 function 关键字到配对的右大括号）。
- * 只用 token_get_all，不做正则匹配 —— 正则碰到注释里的 '}' 或字符串里的 '{' 会截断。
- *
- * @return string|null 抽不到返回 null
+ * 剥掉注释后再做字符串断言。
+ * 直接 strpos 会被注释里的字样骗到——比如注释写着「不能写死 301」，
+ * 断言"代码里没有 301"就会自己绊自己。这是本测试上一版真实踩过的坑。
  */
+function fbs_strip_comments($code)
+{
+    $out = '';
+    foreach (token_get_all("<?php\n" . $code) as $token) {
+        if (is_array($token)) {
+            if ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
+                continue;
+            }
+            $out .= $token[1];
+        } else {
+            $out .= $token;
+        }
+    }
+    return $out;
+}
+
+/** 从源码里抽出指定顶层函数（token 级大括号配对，不用正则） */
 function fbs_extract_function($source, $name)
 {
     $tokens = token_get_all($source);
     $total  = count($tokens);
 
     for ($i = 0; $i < $total; $i++) {
-        $token = $tokens[$i];
-        if (!is_array($token) || $token[0] !== T_FUNCTION) {
+        if (!is_array($tokens[$i]) || $tokens[$i][0] !== T_FUNCTION) {
             continue;
         }
-
-        // 跳过空白/注释，取函数名
         $j = $i + 1;
         while ($j < $total && is_array($tokens[$j])
             && in_array($tokens[$j][0], array(T_WHITESPACE, T_COMMENT, T_DOC_COMMENT), true)) {
@@ -70,206 +102,162 @@ function fbs_extract_function($source, $name)
     return null;
 }
 
-/**
- * 剥掉注释后再做字符串断言。
- * 直接 strpos 会被注释里的字样骗到——比如拦截块注释里写着「不能用 301」，
- * 断言"代码里没有 301"就会自己绊自己。用 token_get_all 只保留非注释 token。
- */
-function fbs_strip_comments($code)
-{
-    $out = '';
-    foreach (token_get_all("<?php\n" . $code) as $token) {
-        if (is_array($token)) {
-            if ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
-                continue;
-            }
-            $out .= $token[1];
-        } else {
-            $out .= $token;
-        }
-    }
-    return $out;
-}
-
-$pass  = 0;
-$fail  = 0;
-$tests = 0;
-
-function check($desc, $actual, $expected)
-{
-    global $pass, $fail, $tests;
-    $tests++;
-    if ($actual === $expected) {
-        $pass++;
-        echo "ok {$tests} - {$desc}\n";
-    } else {
-        $fail++;
-        echo "not ok {$tests} - {$desc}\n";
-        echo '  # 期望 ' . var_export($expected, true) . '，实际 ' . var_export($actual, true) . "\n";
-    }
-}
-
 // ---------------------------------------------------------------------------
-// 0. 抽取（抽不到就硬失败）
+// 0. 加载
 // ---------------------------------------------------------------------------
-$srcAllowed = fbs_extract_function($source, 'fbsTgServiceAllowed');
-$srcEnabled = fbs_extract_function($source, 'fbsTgServiceWhitelistEnabled');
+check('守卫文件 include 时零输出（约定：只定义函数）', $incOutput, '');
 
-if ($srcAllowed === null || $srcEnabled === null) {
-    fwrite(STDERR, "!! 从 webroot/index.php 抽取函数失败："
-        . 'fbsTgServiceAllowed=' . ($srcAllowed === null ? 'missing' : 'ok')
-        . ' fbsTgServiceWhitelistEnabled=' . ($srcEnabled === null ? 'missing' : 'ok') . "\n"
-        . "!! 函数可能被改名或搬走了，本测试无法进行（这不是跳过，是失败）\n");
-    exit(1);
-}
-
-eval($srcAllowed);
-eval($srcEnabled);
-
-check('两个函数都能从 index.php 抽出并成功定义',
-    function_exists('fbsTgServiceAllowed') && function_exists('fbsTgServiceWhitelistEnabled'),
+check('四个函数都已定义',
+    function_exists('fbsTgServiceAllowed')
+    && function_exists('fbsTgServiceWhitelistEnabled')
+    && function_exists('fbsTgServiceDecision')
+    && function_exists('fbsTgServiceGuard'),
     true);
 
 // ---------------------------------------------------------------------------
-// 1. 白名单判定：放行
+// 1. 白名单
 // ---------------------------------------------------------------------------
 foreach (array('waimai', 'article', 'travel', 'member', 'siteConfig') as $service) {
     check("放行 {$service}", fbsTgServiceAllowed($service), true);
 }
 
-// ---------------------------------------------------------------------------
-// 2. 白名单判定：拦截（含边界）
-// ---------------------------------------------------------------------------
 $blocked = array(
-    'business'    => '商家端，验收第 2 条点名的"其他模块"',
+    'business'    => '商家端',
+    'website'     => '自助建站（website.php 入口）',
+    'special'     => '专题（special.php 入口）',
     'shop'        => '商城模块',
     'video'       => '视频模块',
-    'website'     => '自助建站',
     'integral'    => '积分商城',
-    'settlement'  => '结算',
     'house'       => '房产模块',
-    ''            => '空字符串，$service 兜底前的异常态',
+    ''            => '空字符串',
     'Waimai'      => '大小写不同，必须严格匹配',
-    'waimai '     => '尾空格，不能被 trim 掉后放行',
-    '123'         => '纯数字，默认首页的自定义模块 id 已被前面的代码吃掉',
+    'waimai '     => '尾空格不能被放过',
+    '123'         => '纯数字',
     'waimai;drop' => '注入形态，不能因为前缀相同而放行',
-    'select'      => 'SQL 关键字',
 );
 
 foreach ($blocked as $service => $why) {
     check('拦截 ' . var_export($service, true) . "（{$why}）", fbsTgServiceAllowed($service), false);
 }
 
-check('拦截 null（(string)null 为空串）', fbsTgServiceAllowed(null), false);
-check('拦截整数 0（(string)0 为 "0"）', fbsTgServiceAllowed(0), false);
+check('拦截 null', fbsTgServiceAllowed(null), false);
+check('拦截整数 0', fbsTgServiceAllowed(0), false);
+check('拦截数组（不是标量）', fbsTgServiceAllowed(array('waimai')), false);
 
 // ---------------------------------------------------------------------------
-// 3. 总开关取值矩阵
+// 2. 开关取值矩阵
 // ---------------------------------------------------------------------------
 $switchCases = array(
-    // value => 期望「是否启用」
-    '未设置'  => array(null,   true),
-    '1'       => array('1',    true),
-    'true'    => array('true', true),
-    'yes'     => array('yes',  true),
-    '2'       => array('2',    true),
-    ''        => array('',     true),
-    '0'       => array('0',    false),
-    'false'   => array('false', false),
-    'OFF'     => array('OFF',  false),
-    'no'      => array('no',   false),
-    ' 0 '     => array(' 0 ',  false),
-    ' off '   => array(' off ', false),
+    '未设置' => array(null,    true),
+    '1'      => array('1',     true),
+    'yes'    => array('yes',   true),
+    '2'      => array('2',     true),
+    ''       => array('',      true),
+    '0'      => array('0',     false),
+    'false'  => array('false', false),
+    'OFF'    => array('OFF',   false),
+    'no'     => array('no',    false),
+    ' 0 '    => array(' 0 ',   false),
 );
 
 foreach ($switchCases as $label => $case) {
-    $value    = $case[0];
-    $expected = $case[1];
-
-    if ($value === null) {
+    if ($case[0] === null) {
         putenv('FBS_TG_SERVICE_WHITELIST');
     } else {
-        putenv('FBS_TG_SERVICE_WHITELIST=' . $value);
+        putenv('FBS_TG_SERVICE_WHITELIST=' . $case[0]);
     }
-
-    check("开关 = {$label} → " . ($expected ? '启用' : '关闭'),
-        fbsTgServiceWhitelistEnabled(), $expected);
+    check("开关 = {$label} → " . ($case[1] ? '启用' : '关闭'),
+        fbsTgServiceWhitelistEnabled(), $case[1]);
 }
-
 putenv('FBS_TG_SERVICE_WHITELIST');
 
 // ---------------------------------------------------------------------------
-// 4. 源码级断言：防止逻辑被重构掉、却没人发现调用点已经断了
+// 3. 决策三档：allow / home / notfound
 // ---------------------------------------------------------------------------
-$marker = '//Telegram 专用站点：只放行五个业务块';
-$pos    = strpos($source, $marker);
+$decisions = array(
+    // [service, defaultIndex, fromMarker, enabled] => 期望
+    '放行的 service 直接过'                    => array(array('waimai', '', '', true), 'allow'),
+    'member 放行（登录桥全链路靠它）'          => array(array('member', '', '', true), 'allow'),
+    '被拦 service → 回首页'                    => array(array('business', '', '', true), 'home'),
+    'website 入口被拦'                         => array(array('website', '', '', true), 'home'),
+    'special 入口被拦'                         => array(array('special', '', '', true), 'home'),
+    '空 service 被拦'                          => array(array('', '', '', true), 'home'),
+    '默认首页是别的放行模块 → 仍回首页'        => array(array('business', 'siteConfig', '', true), 'home'),
+    '默认首页与当前 service 相同 → 404'        => array(array('business', 'business', '', true), 'notfound'),
+    '默认首页是数字型自定义模块 → 404（防死循环）' => array(array('business', '3', '', true), 'notfound'),
+    '带 from=tg_whitelist 再来一次 → 404'      => array(array('business', '', 'tg_whitelist', true), 'notfound'),
+    '带别的 from 标记 → 正常回首页'            => array(array('business', '', 'index_395', true), 'home'),
+    '开关关闭 → 一律放行'                      => array(array('business', '', '', false), 'allow'),
+    '开关关闭时也不看 from'                    => array(array('business', '', 'tg_whitelist', false), 'allow'),
+    'from 是数组时不炸、按空处理'              => array(array('business', '', array('x'), true), 'home'),
+    'defaultIndex 为 null 不炸'                => array(array('business', null, '', true), 'home'),
+);
 
-check('index.php 里存在白名单拦截块的标记注释', $pos !== false, true);
+foreach ($decisions as $desc => $case) {
+    check($desc, call_user_func_array('fbsTgServiceDecision', $case[0]), $case[1]);
+}
 
-if ($pos !== false) {
-    // 按大括号配对截出拦截块的完整范围。不能用固定长度窗口——窗口会漂到后面的代码里，
-    // 把无关的 301 之类字样一起圈进来（这条断言第一版就是这么误报的）。
-    $block = '';
-    $depth = 0;
-    $started = false;
-    $len = strlen($source);
-    for ($i = $pos; $i < $len; $i++) {
-        $ch = $source[$i];
-        if ($ch === '{') {
-            $depth++;
-            $started = true;
-        } elseif ($ch === '}') {
-            $depth--;
-            if ($started && $depth === 0) {
-                $block = substr($source, $pos, $i - $pos + 1);
-                break;
-            }
-        }
+// ---------------------------------------------------------------------------
+// 4. 守卫源码：header 后必须紧跟 die；不能写死 301
+// ---------------------------------------------------------------------------
+$source = file_get_contents($incPath);
+check('能读到守卫文件源码', $source !== false, true);
+
+$guardSrc = fbs_extract_function($source, 'fbsTgServiceGuard');
+check('能从守卫文件里抽出 fbsTgServiceGuard', $guardSrc !== null, true);
+
+if ($guardSrc !== null) {
+    $guardCode = fbs_strip_comments($guardSrc);
+
+    // 按 header( 切开：每一段都是「该 header 的参数 + 到下一个 header 之前的代码」。
+    // 任何一段里没有 die/exit，就意味着那个 header 之后代码还在继续跑 ——
+    // 会出现「已经发了 302，却把被拦页面整页渲染出去」这种事故。
+    $segments = explode('header(', $guardCode);
+    $count    = count($segments) - 1;
+
+    check('守卫生成两个 header（回首页 302 与断开 404）', $count, 2);
+
+    for ($i = 1; $i <= $count; $i++) {
+        check("第 {$i} 个 header 之后紧跟 die/exit",
+            preg_match('/(^|[^a-zA-Z_])(die|exit)([^a-zA-Z_]|$)/', $segments[$i]) === 1,
+            true);
     }
 
-    check('能按大括号配对截出拦截块的完整范围', $block !== '', true);
+    check('跳转没有写死 301 状态码（注释不计）', strpos($guardCode, '301') === false, true);
+    check('跳转没有用三参形式写死状态码', strpos($guardCode, ', true,') === false, true);
+    check('跳转带 from=tg_whitelist（既是计数标记也是防循环标记）',
+        strpos($guardCode, 'from=tg_whitelist') !== false, true);
+}
 
-    // 后面所有断言都只看代码：注释里会出现同样的字样（比如注释解释了「不能用 301」
-    // 「$cfg_defaultindex 解析回同一个 service」），对着原文断言等于自己骗自己。
-    $blockCode = fbs_strip_comments($block);
+// is_numeric 在决策函数里，不在守卫里 —— 单独确认它没被删掉
+$decisionSrc = fbs_extract_function($source, 'fbsTgServiceDecision');
+check('决策函数含 is_numeric 判定（数字型默认首页的死循环保护）',
+    $decisionSrc !== null && strpos(fbs_strip_comments($decisionSrc), 'is_numeric') !== false, true);
 
-    check('拦截块用的是"开关 && !白名单"的组合调用',
-        strpos($blockCode, 'fbsTgServiceWhitelistEnabled() && !fbsTgServiceAllowed($service)') !== false,
-        true);
+check('决策函数含 from=tg_whitelist 的防循环标记判断',
+    $decisionSrc !== null && strpos(fbs_strip_comments($decisionSrc), 'tg_whitelist') !== false, true);
 
-    check('跳转带 from=tg_whitelist（运维可按日志计数）',
-        strpos($blockCode, 'from=tg_whitelist') !== false,
-        true);
+// ---------------------------------------------------------------------------
+// 5. 四个入口是否真的接上了守卫
+// ---------------------------------------------------------------------------
+$entries = array(
+    'webroot/index.php'               => '?service 与伪静态的总入口',
+    'webroot/website.php'             => '自助建站',
+    'webroot/special.php'             => '专题',
+    'webroot/wmsj/inc/config.inc.php' => '商家端 36 个页面的公共引导',
+    'webroot/wmsj/login.php'          => '商家端登录（不经 config.inc.php）',
+    'webroot/wmsj/exit.php'           => '商家端退出（不经 config.inc.php）',
+);
 
-    check('跳转走 header("location:…")',
-        strpos($blockCode, 'header("location:"') !== false,
-        true);
-
-    // 302 是 PHP header("location:") 的默认值；写死 301 会被浏览器永久缓存，
-    // 等哪天真要靠开关退回，用户本地照样照着旧缓存跳走，开关等于失效。
-    check('跳转没有写死 301 状态码（注释不计）',
-        strpos($blockCode, '301') === false,
-        true);
-
-    // header('location: …', true, 302) 这种三参形式同样是写死状态码，一并禁掉。
-    check('header("location:") 没有传第三个参数写死状态码',
-        strpos($blockCode, ', true,') === false,
-        true);
-
-    // 默认首页指向被拦模块时的自跳自保护。
-    // 断言具体表达式而不是「块里出现过 $cfg_defaultindex」——注释里也有这个词。
-    check('拦截块含"默认首页自跳自"保护（$cfg_defaultindex == $service）',
-        strpos($blockCode, '$cfg_defaultindex == $service') !== false,
-        true);
-
-    check('自跳自保护走的是 404 断开，不是再次跳转',
-        strpos($blockCode, '404') !== false,
-        true);
-
-    $stateCheckPos = strpos($source, '//验证模块状态');
-    check('拦截块在"验证模块状态"之后（$service 已定型）',
-        $stateCheckPos !== false && $stateCheckPos < $pos,
-        true);
+foreach ($entries as $relPath => $why) {
+    $full = $root . '/' . $relPath;
+    $code = @file_get_contents($full);
+    check("{$relPath} 存在（{$why}）", $code !== false, true);
+    if ($code === false) {
+        continue;
+    }
+    check("{$relPath} 引用了 tgWhitelist.inc.php", strpos($code, 'tgWhitelist.inc.php') !== false, true);
+    check("{$relPath} 调用了 fbsTgServiceGuard", strpos($code, 'fbsTgServiceGuard(') !== false, true);
 }
 
 // ---------------------------------------------------------------------------

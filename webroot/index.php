@@ -1,6 +1,8 @@
 <?php
 //系统核心配置文件
 require_once(dirname(__FILE__).'/include/common.inc.php');
+//TG 专用站点的 service 白名单守卫（与 website.php / special.php / wmsj/ 共用同一份实现）
+require_once(dirname(__FILE__).'/include/tgWhitelist.inc.php');
 
 //域名检测
 $httpHost  = $_SERVER['HTTP_HOST'];  //来访域名
@@ -19,32 +21,6 @@ $reqQuery = http_build_query($params);
 $reqUri = str_replace('?'.$_SERVER['QUERY_STRING'], '', $reqUri);
 $reqUri .= (!empty($reqQuery) ? '?' . $reqQuery : '');
 $reqUri = addslashes(strip_tags(trim(preg_replace('/(\'|\")/', '', $reqUri))));
-
-/**
- * Telegram 专用站点的 service 白名单（全站生效）。
- * 放行 = true。名单来自需求文档「五个业务块」：外卖(含跑腿、骑手端 do=courier)、资讯、旅游、会员、站点首页。
- * article 本期虽未做页面适配，但名单按文档保留，避免下一期再改一次。
- * 纯函数：不读全局、不读配置，便于 scripts/test_tg_service_whitelist.php 单独测。
- */
-function fbsTgServiceAllowed($service)
-{
-	$allow = array('waimai', 'article', 'travel', 'member', 'siteConfig');
-	return in_array((string)$service, $allow, true);
-}
-
-/**
- * 白名单总开关。默认开启（未配置即收紧）；FBS_TG_SERVICE_WHITELIST=0/false/off/no 关闭。
- * 取值语义：trim 后转小写，命中 0|false|off|no 才关，其余一律视为开。
- * 读的是容器 env —— 依赖官方 php:*-fpm 镜像自带 docker.conf 的 clear_env = no（与 FBS_GATEWAY_SECRET 同一前提）。
- */
-function fbsTgServiceWhitelistEnabled()
-{
-	$value = getenv('FBS_TG_SERVICE_WHITELIST');
-	if ($value === false || trim($value) === '') {
-		return true;
-	}
-	return !in_array(strtolower(trim($value)), array('0', 'false', 'off', 'no'), true);
-}
 
 $service = 'siteConfig';
 
@@ -761,16 +737,7 @@ if($service != "siteConfig" && $service != "member" && $service != "business"){
 }
 
 //Telegram 专用站点：只放行五个业务块，其余 service 一律回首页（需求文档验收第 2 条）
-if(fbsTgServiceWhitelistEnabled() && !fbsTgServiceAllowed($service)){
-	//默认首页本身若指向被拦模块，跳 "/" 会自跳自（$cfg_defaultindex 解析回同一个 service），改发 404 断开
-	if(!empty($cfg_defaultindex) && $cfg_defaultindex == $service){
-		header('HTTP/1.1 404 Not Found');
-		die;
-	}
-	//必须是 302（PHP header("location:") 默认），不能用 301——浏览器会永久缓存，开关退回后仍打不开
-	header("location:" . $cfg_secureAccess . $cfg_basehost . "/?from=tg_whitelist");
-	die;
-}
+fbsTgServiceGuard($service);
 
 //关闭PC端
 if(!isMobile() && $template != "mobile" && $cfg_pcState && $service != 'member' && $template != "protocol" && $template != "about" && $template != "help" && $template != "feedback" && $template != "help-detail" && $template != "notice" && $template != "notice-detail" && $template != "middlejump" && $template != "wmsj" && $template != "qishou"){

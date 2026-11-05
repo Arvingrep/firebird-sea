@@ -8,6 +8,9 @@
  * @link           https://www.ihuoniao.cn/
  */
 require_once(dirname(__FILE__).'/../include/common.inc.php');
+//TG 专用站点：商家端退出页也关掉（本页不经 inc/config.inc.php，单独加一道）
+require_once(dirname(__FILE__).'/../include/tgWhitelist.inc.php');
+fbsTgServiceGuard('business');
 require_once(HUONIAOINC.'/class/userLogin.class.php');
 $userLogin = new userLogin($dbo);
 $userLogin->exitMember();

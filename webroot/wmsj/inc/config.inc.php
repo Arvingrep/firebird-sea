@@ -8,6 +8,10 @@
  * @link           https://www.ihuoniao.cn/
  */
 require_once(HUONIAOADMIN.'../include/common.inc.php');
+//TG 专用站点：外卖商家端不在五个业务块内，整套 wmsj 关闭。
+//放在这里是因为 wmsj 下 36 个 PHP 都经本文件引导（login.php / exit.php 各自单独加了一道）。
+require_once(HUONIAOADMIN.'../include/tgWhitelist.inc.php');
+fbsTgServiceGuard('business');
 require_once(HUONIAOADMIN.'function/waimai.fun.php');
 $huoniaoTag->caching         = FALSE;                             //是否使用缓存，后台不需要开启
 $huoniaoTag->compile_dir     = HUONIAOROOT."/templates_c/admin";  //设置编译目录

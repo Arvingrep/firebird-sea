@@ -8,6 +8,9 @@
  * @link           http://www.huoniao.co/
  */
 require_once('./include/common.inc.php');
+//TG 专用站点：自助建站不在五个业务块内，整站关闭（?type=template 还能看草稿，必须堵在这里）
+require_once(dirname(__FILE__).'/include/tgWhitelist.inc.php');
+fbsTgServiceGuard('website');
 global $cfg_softname;
 global $cfg_basehost;
 global $cfg_secureAccess;

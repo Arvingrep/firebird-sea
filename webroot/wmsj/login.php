@@ -8,6 +8,9 @@
  * @link           https://www.ihuoniao.cn/
  */
 require_once(dirname(__FILE__).'/../include/common.inc.php');
+//TG 专用站点：商家端登录页也关掉（本页不经 inc/config.inc.php，单独加一道）
+require_once(dirname(__FILE__).'/../include/tgWhitelist.inc.php');
+fbsTgServiceGuard('business');
 $tpl = dirname(__FILE__)."/templates";
 $huoniaoTag->caching         = FALSE;
 $huoniaoTag->compile_dir  = HUONIAOROOT."/templates_c/admin";
