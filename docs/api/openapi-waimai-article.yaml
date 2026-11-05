@@ -5433,6 +5433,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
 
+  /article/getCommonList:
+    get:
+      tags: ["资讯 · 评论"]
+      summary: "评论子级列表（楼中楼）"
+      operationId: article_getCommonList
+      description: |
+        真实请求：`GET /include/ajax.php?service=article&action=getCommonList`
+
+        按评论 ID `fid` 拉取该条评论下的子级回复（仅 `ischeck=1` 已审核的）。
+        默认 `pageSize=99999`，即不分页时一次返回全部子级。
+
+        > 方法在源码里写作 `function getCommonList()`，**没有写可见性修饰符**——PHP 语义下
+        > 默认就是 public，分发器 `handlers::getHandle()` 用 `method_exists()` +
+        > `$obj->$action()` 动态调用，所以它确实是可外部调用的接口。
+      x-real-request: "GET /include/ajax.php?service=article&action=getCommonList"
+      x-source: "webroot/api/handlers/article.class.php:1539"
+      parameters:
+        - name: fid
+          in: query
+          required: true
+          description: 父级评论 ID（楼中楼的楼层 ID）
+          schema: { type: integer }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          required: false
+          schema: { type: integer, default: 99999 }
+      responses:
+        '200':
+          description: "统一 JSON 信封；成功时 info 为接口数据，失败见 state 码说明"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /article/rewardList:
+    get:
+      tags: ["资讯 · 互动"]
+      summary: "打赏记录"
+      operationId: article_rewardList
+      description: |
+        真实请求：`GET /include/ajax.php?service=article&action=rewardList`
+
+        按资讯 ID `aid` 返回该资讯的打赏记录（打赏人昵称、头像、金额、时间、用户主页 URL），
+        仅 `state=1` 的有效打赏。**不分页**，一次返回全部，`pageInfo` 里只有 `totalCount`。
+
+        > 与 `getCommonList` 一样，源码写作 `function rewardList()`，无可见性修饰符
+        > （PHP 默认 public），可经分发器直接调用。
+      x-real-request: "GET /include/ajax.php?service=article&action=rewardList"
+      x-source: "webroot/api/handlers/article.class.php:2413"
+      parameters:
+        - name: aid
+          in: query
+          required: true
+          description: 资讯（文章）ID
+          schema: { type: integer }
+      responses:
+        '200':
+          description: "统一 JSON 信封；成功时 info 为接口数据，失败见 state 码说明"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
 components:
   securitySchemes:
     memberCookie:

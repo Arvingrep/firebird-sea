@@ -77,3 +77,25 @@ feat/x ──PR──▶ canary ──(canary 环境验收)──PR──▶ mai
 - canary 与生产共用同一个 Redis 与 GCS 桶（数据库独立：`firebird_canary`）；验收时的会话 key 带站点前缀隔离，但缓存/附件路径未隔离。
 - 晋升是「重新构建」而非「重打 tag」：同一份源码在 main 上再构建一次，镜像 digest 与 canary 不同。需要严格不可变晋升时，改为 `docker buildx imagetools create` 重打 tag。
 - `main` 保护要求检查名称与 workflow job 名称一致；改 job 名称需同步改保护规则。
+
+## 8. 受保护路径的 owner 通道（2026-11-05 新增）
+
+`.github/`、`scripts/agent/`、`scripts/acceptance/`、`.agents/` 是受保护路径。此前 Agent 分支触碰即 FAIL 且**没有任何豁免**，导致「升级护栏」的改动（修 gates、加用例、收紧 workflow）永远无法通过门禁，唯一出路是本地改完直推 canary——直推没有 PR、没有 review、没有 CI 记录。
+
+现在开一条带留痕的通道：
+
+| 步骤 | 动作 | 谁做 |
+|---|---|---|
+| 1 | 分支用 `owner/<slug>` 前缀 | owner |
+| 2 | 在**推送之前**给 PR 打 `owner-approved` 标签（`pull_request` 事件不含 `labeled`，事后打标签不会触发复跑） | owner |
+| 3 | push → 门禁把「受保护路径」判为 `⚠️ WARN` 放行，其余检查照常 | 自动 |
+| 4 | owner 本人 review 后点合并 | owner |
+| 5 | 若同时让 gates.sh 的检查条数 / test-gates.sh 的用例条数**变少**，报告另打一条 `⚠️ WARN`（2026-11-19 起转 `FAIL`） | 自动 |
+
+**必须知道的局限**：这一条是**流程标记，不是安全边界**。当前 agent 使用的 `AGENT_GH_TOKEN` 是主人本人的 PAT（`repo` + `workflow`），因此它能建 `owner/*` 分支、能打标签、能改仓库变量——两个信号在同一个人手里。真正的强制只能靠「token 拿不到的权限」，见下方待办。
+
+**待办（按优先级）**：
+
+1. **环境双钥匙**：给受保护路径的改动挂一个 GitHub Environment（required reviewers），批准必须在网页上由人点，API/PAT 不能代点——这是当前唯一 token 伪造不了的机制。
+2. **凭证分离**：给 agent 单独一把 token，去掉 `workflow` 与 label 权限；在这之前，「标签是 owner 打的」无法证明。
+3. **gates job 的裁判脚本改为取自 base**：现在跑的是 PR 检出里的 gates.sh，等于被审对象自带裁判（agent-qa 侧已用 base 的副本，两侧不一致）。
