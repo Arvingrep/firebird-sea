@@ -103,6 +103,7 @@ class paypal {
     function get_code($order, $payment){
 
         loadPlug("payment");
+        $payment = $this->normalize($payment);
 
         $sn = isset($order['order_sn']) ? (string)$order['order_sn'] : '';
         if(!$this->validSn($sn)){
@@ -202,6 +203,7 @@ class paypal {
         if(!$payment){
             return false;
         }
+        $payment = $this->normalize($payment);
 
         // Webhook：PayPal 会带 PAYPAL-TRANSMISSION-SIG 头
         if(!empty($_SERVER['HTTP_PAYPAL_TRANSMISSION_SIG'])){
@@ -416,6 +418,16 @@ class paypal {
     /* ------------------------------------------------------------------ */
     /* PayPal REST 客户端                                                   */
     /* ------------------------------------------------------------------ */
+
+    /** 后台粘贴常带首尾空格/换行，凭证类字段统一去除，避免 PayPal 返回 invalid_client */
+    private function normalize($payment){
+        foreach(array('client_id', 'secret', 'webhook_id', 'env', 'type') as $k){
+            if(isset($payment[$k]) && is_string($payment[$k])){
+                $payment[$k] = trim($payment[$k]);
+            }
+        }
+        return $payment;
+    }
 
     private function envOf($payment){
         return (isset($payment['env']) && $payment['env'] === 'live') ? 'live' : 'sandbox';
@@ -707,9 +719,13 @@ class paypal {
     }
 
     private function fatal($msg){
+        global $cfg_secureAccess, $cfg_basehost;
+        $home = htmlspecialchars($cfg_secureAccess . $cfg_basehost, ENT_QUOTES, 'UTF-8');
         header('Content-Type: text/html; charset=utf-8');
+        // 返回键会重新请求下单地址再次报错，看起来像「返回不了」，所以给一个明确的出口
         echo '<!DOCTYPE html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-           . '<p style="font:16px/1.6 sans-serif;padding:24px">' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</p>';
+           . '<div style="font:16px/1.6 sans-serif;padding:24px"><p>' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</p>'
+           . '<p><a href="' . $home . '">Home / 返回首页</a></p></div>';
         die;
     }
 
