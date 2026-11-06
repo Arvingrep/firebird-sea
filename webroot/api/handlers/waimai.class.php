@@ -608,6 +608,17 @@ class waimai
         //总分页数
         $totalPage = ceil((int)$totalCount / (int)$pageSize);
 
+        // 坐标兜底：带坐标时上面的 100km 距离过滤把结果筛成 0，就降级为不带坐标的城市级查询。
+        // 触发场景是商家坐标缺失或录反（本表约定 coordX=纬度、coordY=经度，见 getCityname 调用），
+        // 数据问题不该让整个列表页/搜索结果页空白。去掉 lng/lat 后条件不再成立，不会递归第二次。
+        if ($totalCount == 0 && !empty($lng) && !empty($lat)) {
+            $paramBackup = $this->param;
+            unset($this->param['lng'], $this->param['lat']);
+            $fallback = $this->shopList();
+            $this->param = $paramBackup;
+            return $fallback;
+        }
+
         if ($totalCount == 0) {
             return array ("state" => 200, "info" => '暂无数据！');
         }
@@ -690,8 +701,9 @@ class waimai
             //营业状态
             $yingye               = $value['yingye'];
             $list[$key]['yingye'] = $value['ordervalid'] == 1 ? $yingye : 0;  //是否营业
-            $list[$key]['juli']   = $value['juli'] > 1000 ? sprintf("%.1f",
-                    $value['juli'] / 1000) . $langData['siteConfig'][13][62] : $value['juli'] . $langData['siteConfig'][13][22];  //距离   //公里  //米
+            //不含坐标的查询里 juli 为 null，此时输出空串，避免卡片上只剩一个「米」字
+            $list[$key]['juli']   = ($value['juli'] === null || $value['juli'] === '') ? '' : ($value['juli'] > 1000 ? sprintf("%.1f",
+                    $value['juli'] / 1000) . $langData['siteConfig'][13][62] : $value['juli'] . $langData['siteConfig'][13][22]);  //距离   //公里  //米
             
             
             //预定相关属性
