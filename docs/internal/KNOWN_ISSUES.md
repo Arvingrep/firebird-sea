@@ -345,3 +345,47 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://telegram.
 - `/tg/entry.php` 开始渲染任何用户可控内容（哪怕只是一个昵称）；或
 - 该页引入第三方脚本（统计、地图、支付 SDK）；或
 - 安全评审要求全站安全头统一。
+
+## KI-007 · 全站搜索（siteConfig siteSearch）依赖 ES，当前返回「es未开启」
+
+**现状（2026-11-06 canary 实测）**
+
+`GET /include/ajax.php?service=siteConfig&action=siteSearch&keyword=火锅`
+→ `{"state":101,"info":"es未开启"}`。页面能打开（移动端 200/119KB），但任何关键词都是空结果。
+
+**根因**
+
+全站搜索走 Elasticsearch，canary 集群未部署/未开启 ES。恢复需要运维侧起 ES，不是代码或配置开关。
+
+**当前规避**
+
+H5 首页搜索胶囊已改指外卖模块自带搜索（`/waimai/search.html` → `/waimai/slist.html`，实测有数据，
+`shopList&keywords=烤鸡` → state=100, totalCount=4），commit `8f44b6eb`。用户搜索意图九成是找吃的，此规避成立。
+
+**恢复条件**
+
+- 运维起 ES 并配置 `huoniao` 搜索索引后，评估是否把胶囊切回全站搜索或做双入口；
+- 在此之前不要把首页任何入口指回 `/siteSearch.html`。
+
+## KI-008 · `/siteSearch.html` 缺 PC 模板，桌面 UA 无 cookie 时 302 → /404.html
+
+**现状（2026-11-06 实测）**
+
+同一 URL 三种形态：
+- iPhone UA → 200（siteSearch_touch.html，119KB）
+- 桌面 UA + HN_tg=1 → 200
+- 桌面 UA 无 cookie → **302 → /404.html**
+
+**根因**
+
+`webroot/templates/siteConfig/` 下只有 `siteSearch_touch.html`，没有 PC 版 `siteSearch.html`。
+链路：`index.php:712` 设模板名 → `:1018` siteSearch 进特判 → `:1027` 只有 isMobile() 才改 `_touch` 后缀
+→ `:1441` file_exists 失败 → `:1737` `header("location:/404.html")`。CMS 既有缺口，改造前就存在。
+
+**影响面**
+
+PC 首页不渲染该入口（搜索胶囊只在 touch 模板），实际无用户可达路径。未修复，属低优先级。
+
+**修复建议（未实施）**
+
+若 KI-007 的 ES 起来后需要全站搜索，补一份 PC 版 `siteSearch.html` 模板即可闭合。
