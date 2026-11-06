@@ -422,6 +422,126 @@ test('源码约束：bind 路径 SQL 不允许拼接 phone（phone 只走网关�
   assert.ok(!sqls[0].includes('phone'), 'phone 不得进 SQL');
 });
 
+// ---- 修复轮 2 补测：归一逐字节契约 / 双维度限频 429 透传 / 白名单边界 / 无顶替护栏 ----
+
+// 15 组归一矩阵：Node 的 normalizePhone 与 PHP fbs_normalize_phone 必须逐字节一致，
+// 任何一侧单独改动都会让「同号一边能绑一边绑不上」。长度边界（9/10/11/12 位）一并钉死。
+test('normalizePhone：15 组输入逐字节对齐 PHP（含 9/10/11/12 位长度边界与纯字母）', () => {
+  const matrix = [
+    // 合法形态 → 归一结果
+    ['09171234567', '09171234567'],        // 本地标准写法
+    ['+639171234567', '09171234567'],      // E.164
+    ['+63 917 123 4567', '09171234567'],
+    ['+63 (917) 123-4567', '09171234567'], // +63 + 括号 + 横线
+    ['639171234567', '09171234567'],       // 无 + 的 63 前缀（12 位纯数字）
+    ['63-917-123-4567', '09171234567'],
+    ['0917-123-4567', '09171234567'],
+    ['0917 123 4567', '09171234567'],
+    ['(0917) 123 4567', '09171234567'],
+    ['0917.123.4567', '09171234567'],      // 点号分隔
+    ['  09171234567  ', '09171234567'],    // 首尾空白
+    ['0912345678', '0912345678'],          // 10 位历史存量
+    ['09123456789', '09123456789'],        // 11 位
+    // 边界外 / 非法形态 → null
+    ['091234567', null],                   // 9 位（比下限少 1）
+    ['091234567890', null],                // 12 位（比上限多 1）
+  ];
+  for (const [input, want] of matrix) {
+    assert.strictEqual(normalizePhone(input), want, `input=${JSON.stringify(input)}`);
+  }
+  // 纯字母单独断言：去分隔符后仍是字母，必须 null（防「把内部工号当手机号」混入）
+  assert.strictEqual(normalizePhone('abcdefghijk'), null);
+});
+
+// 双维度限频：计数底账在 PHP（fbs_bind_audit），Node 的职责是 429 原样透传且不签令牌。
+// 用脚本化网关模拟「tg 5/60s、phone 3/300s」两种维度到顶的时序，断言第 6 次/第 4 次的行为。
+function makeRateLimitedGateway({ tgMax = 5, phoneMax = 3 } = {}) {
+  const tgHits = new Map();
+  const phoneHits = new Map();
+  const calls = [];
+  return {
+    calls,
+    async riderBind(p) {
+      calls.push(p);
+      const tgCount = (tgHits.get(p.tg_user_id) || 0) + 1;
+      tgHits.set(p.tg_user_id, tgCount);
+      // 被限频的请求本身不计入计数（PHP 侧 WHERE result != 'rate_limited'）
+      if (tgCount > tgMax) return { state: 429, info: { code: 'BIND_RATE_LIMITED' } };
+      const phCount = (phoneHits.get(p.phone) || 0) + 1;
+      phoneHits.set(p.phone, phCount);
+      if (phCount > phoneMax) return { state: 429, info: { code: 'BIND_RATE_LIMITED' } };
+      return { state: 100, info: { courier_id: 9 } };
+    },
+    async riderQl() { return { state: 100, info: { courier_id: 9, url: WORKBENCH_URL } }; },
+  };
+}
+
+test('tg 维度 5/60s：第 6 次 → 429 BIND_RATE_LIMITED，无 302、不签令牌', async () => {
+  const gw = makeRateLimitedGateway({ tgMax: 5 });
+  const rider = createRiderRoute(makeDeps({ gateway: gw }));
+  const initData = signInitData(77);
+  for (let i = 1; i <= 5; i++) {
+    const res = makeRes();
+    await rider.postBind(makeReq({ body: { initData, phone: `091712345${i}` } }), res);
+    assert.strictEqual(res.statusCode, 302, `第 ${i} 次应放行`);
+  }
+  const res6 = makeRes();
+  await rider.postBind(makeReq({ body: { initData, phone: '09171234599' } }), res6);
+  assert.strictEqual(res6.statusCode, 429, '第 6 次必须被限频');
+  assert.match(res6.body, /BIND_RATE_LIMITED/);
+  assert.strictEqual(res6.redirectUrl, null);
+});
+
+test('phone 维度 3/300s：同一手机号第 4 次 → 429，且不重定向、不签令牌', async () => {
+  const gw = makeRateLimitedGateway({ phoneMax: 3 });
+  const rider = createRiderRoute(makeDeps({ gateway: gw }));
+  for (let i = 1; i <= 3; i++) {
+    const res = makeRes();
+    // 每次换 tg 用户绕开 tg 维度，只打 phone 维度
+    await rider.postBind(makeReq({ body: { initData: signInitData(100 + i), phone: '09171234567' } }), res);
+    assert.strictEqual(res.statusCode, 302, `第 ${i} 次应放行`);
+  }
+  const res4 = makeRes();
+  await rider.postBind(makeReq({ body: { initData: signInitData(104), phone: '0917 123 4567' } }), res4);
+  assert.strictEqual(res4.statusCode, 429, '同号（含归一后同形写法）第 4 次必须被限频');
+  assert.strictEqual(res4.redirectUrl, null);
+  assert.strictEqual(gw.calls.filter((c) => c.phone === '09171234567').length, 4, '归一后第 4 次仍应以同号触达网关并被限频');
+});
+
+test('302 白名单边界：空白名单仍拒 http / 子域不通过 / host 大小写不敏感', async () => {
+  // ① 白名单为空 = 不限制 host，但仍必须是 https
+  const gwHttp = makeGateway({ qlScript: { state: 100, info: { url: 'http://canary.fbird.men/ql.html?token=X' } } });
+  const r1 = makeRes();
+  await createRiderRoute(makeDeps({ gateway: gwHttp, allowedHosts: [] })).postBind(
+    makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r1);
+  assert.strictEqual(r1.statusCode, 502, '空白名单不等于放开 http');
+  assert.strictEqual(r1.redirectUrl, null);
+
+  // ② 白名单命中但为子域 → 必须拒绝（精确 host 匹配，不做后缀放行）
+  const gwSub = makeGateway({ qlScript: { state: 100, info: { url: 'https://evil.canary.fbird.men/ql.html?token=X' } } });
+  const r2 = makeRes();
+  await createRiderRoute(makeDeps({ gateway: gwSub, allowedHosts: ['canary.fbird.men'] })).postBind(
+    makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r2);
+  assert.strictEqual(r2.statusCode, 502, '子域不得后缀放行');
+  assert.strictEqual(r2.redirectUrl, null);
+
+  // ③ 大写的合法 host → 放行（URL 解析后 host 统一小写）
+  const gwUpper = makeGateway({ qlScript: { state: 100, info: { url: 'https://CANARY.FBIRD.MEN/ql.html?token=X' } } });
+  const r3 = makeRes();
+  await createRiderRoute(makeDeps({ gateway: gwUpper, allowedHosts: ['canary.fbird.men'] })).postBind(
+    makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r3);
+  assert.strictEqual(r3.statusCode, 302, '大写 host 应等价放行');
+  assert.strictEqual(r3.redirectUrl, 'https://CANARY.FBIRD.MEN/ql.html?token=X');
+});
+
+test('源码护栏（Ray）：rider 侧无 DELETE / REPLACE 顶替语句，也不写任何表', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/riderRoute.js'), 'utf8');
+  assert.ok(!/DELETE\s+FROM/i.test(src), 'B1 冲突语义不允许用 DELETE 顶替原绑定');
+  assert.ok(!/REPLACE\s+INTO/i.test(src), '不得用 REPLACE INTO 隐式顶替');
+  assert.ok(!/INSERT\s+INTO/i.test(src), '绑定写入只发生在 PHP 网关，Node 侧不得写表');
+  assert.ok(!/UPDATE\s+\w+\s+SET/i.test(src), 'Node 侧不得改 fbs_courier_map');
+});
+
 // ---- /rider/session ----
 
 test('session：已绑定 → {bound:true, courier_id, url}；未绑定 → {bound:false}', async () => {
