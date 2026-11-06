@@ -160,8 +160,12 @@ paths:
         必须为 `0` 开头 10–11 位），再交 PHP 网关查唯一可用骑手（quit != 1 且 status = 1）。
         绑定冲突**绝不静默顶替**：骑手已被他人绑定 → 409 `COURIER_ALREADY_BOUND`；当前 Telegram
         已绑其他骑手 → 409 `TG_ALREADY_BOUND`；同一对重复提交按幂等成功处理。PHP 侧另有按
-        `tg_user_id`（5 次/60 秒）与 `phone`（3 次/300 秒）的双维度限频（超限 429
-        `BIND_RATE_LIMITED`），每次尝试（成功/失败）均写 `fbs_bind_audit` 审计行。成功时签
+        `tg_user_id`（5 次/60 秒）、`phone`（3 次/300 秒）与来源 `ip`（20 次/300 秒）的三维度限频
+        （超限 429 `BIND_RATE_LIMITED`；被拒请求不计入额度），每次尝试（成功/冲突/限频/审计不可用）
+        均写 `fbs_bind_audit` 审计行；审计或限频计数不可用时 fail-closed 拒绝（503
+        `AUDIT_UNAVAILABLE`）。网关契约（canary 新形态）：成功 200 `{success:true,data}`，业务失败
+        非 2xx `{success:false,error:{code,message}}`，Node 侧由 gatewayClient reject 还原为
+        409/429/404/503。成功时签
         10 分钟一次性工作台直达 URL（`/ql.html?token=...`，落地种骑手 cookie 后 302 进
         `/?service=waimai&do=courier` 工作台）；302 目标还须落在 `CORS_ORIGINS` 域名白名单内。
         Node 不接触任何骑手凭证。Node 侧限频 10 次/分钟/IP。
@@ -181,9 +185,9 @@ paths:
         '401': { description: initData 无效或过期（INVALID_INIT_DATA，HTML 错误页） }
         '404': { description: 手机号未匹配骑手（COURIER_NOT_FOUND） }
         '409': { description: 绑定冲突（COURIER_ALREADY_BOUND / TG_ALREADY_BOUND，引导先解绑，不顶替原绑定） }
-        '429': { description: 限频（RATE_LIMITED / BIND_RATE_LIMITED：tg 5 次/60s、phone 3 次/300s、IP 10 次/60s） }
+        '429': { description: 限频（RATE_LIMITED / BIND_RATE_LIMITED：tg 5 次/60s、phone 3 次/300s、网关 ip 20 次/300s、Node 侧 IP 10 次/60s） }
         '502': { description: 网关失败（RIDER_FAILED） }
-        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED）或网关审计不可用 fail-closed（AUDIT_UNAVAILABLE） }
   /tg-api/rider/session:
     post:
       summary: 已绑定骑手换工作台直达 URL（T6，供 bot/n8n 侧对接）

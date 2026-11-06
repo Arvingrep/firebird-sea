@@ -54,11 +54,25 @@ function makeRes() {
 
 // ---- stub 工厂 ----
 
+// 模拟 canary gatewayClient 的非 2xx reject 形态：GATEWAY_HTTP_ERROR + status + payload
+function httpError(status, code, message = 'gateway error') {
+  const e = new Error(`网关返回 HTTP ${status}`);
+  e.code = 'GATEWAY_HTTP_ERROR';
+  e.status = status;
+  e.payload = { success: false, error: { code, message } };
+  return e;
+}
+
 function makeGateway({ bindScript, qlScript, bindCalls = [], qlCalls = [] } = {}) {
+  // stub 脚本可以是值（2xx 成功包络）或 Error（模拟 gatewayClient 非 2xx reject）
+  const settle = (script, fallback, p) => {
+    const out = typeof script === 'function' ? script(p) : (script || fallback);
+    return out instanceof Error ? Promise.reject(out) : out;
+  };
   return {
     bindCalls, qlCalls,
-    async riderBind(p) { bindCalls.push(p); return typeof bindScript === 'function' ? bindScript(p) : (bindScript || { state: 100, info: { courier_id: 9 } }); },
-    async riderQl(p) { qlCalls.push(p); return typeof qlScript === 'function' ? qlScript(p) : (qlScript || { state: 100, info: { courier_id: 9, url: WORKBENCH_URL } }); },
+    async riderBind(p) { bindCalls.push(p); return settle(bindScript, { success: true, data: { courier_id: 9 } }, p); },
+    async riderQl(p) { qlCalls.push(p); return settle(qlScript, { success: true, data: { courier_id: 9, url: WORKBENCH_URL } }, p); },
   };
 }
 
@@ -184,7 +198,7 @@ test('成功路径：+63 写法在进网关前已归一（M4 端到端）', asyn
 // ---- B1：冲突绝不静默顶替 ----
 
 test('B1 冲突：骑手已被别的 TG 绑定 → 409 COURIER_ALREADY_BOUND，无 302、不发令牌', async () => {
-  const gw = makeGateway({ bindScript: { state: 409, info: { code: 'COURIER_ALREADY_BOUND' } } });
+  const gw = makeGateway({ bindScript: httpError(409, 'COURIER_ALREADY_BOUND') });
   const rider = createRiderRoute(makeDeps({ gateway: gw }));
   const res = makeRes();
   await rider.postBind(makeReq({ body: { initData: signInitData(77), phone: '0912345678' } }), res);
@@ -195,7 +209,7 @@ test('B1 冲突：骑手已被别的 TG 绑定 → 409 COURIER_ALREADY_BOUND，�
 });
 
 test('B1 冲突：当前 TG 已绑别的骑手 → 409 TG_ALREADY_BOUND，无 302、不发令牌', async () => {
-  const gw = makeGateway({ bindScript: { state: 409, info: { code: 'TG_ALREADY_BOUND' } } });
+  const gw = makeGateway({ bindScript: httpError(409, 'TG_ALREADY_BOUND') });
   const rider = createRiderRoute(makeDeps({ gateway: gw }));
   const res = makeRes();
   await rider.postBind(makeReq({ body: { initData: signInitData(77), phone: '0912345678' } }), res);
@@ -207,10 +221,10 @@ test('B1 冲突：当前 TG 已绑别的骑手 → 409 TG_ALREADY_BOUND，无 30
 
 test('B1 冲突/失败文案一律不给「联系管理员」这类甩锅动作', async () => {
   const cases = [
-    ['COURIER_ALREADY_BOUND', { state: 409, info: { code: 'COURIER_ALREADY_BOUND' } }],
-    ['TG_ALREADY_BOUND', { state: 409, info: { code: 'TG_ALREADY_BOUND' } }],
-    ['BIND_RATE_LIMITED', { state: 429, info: { code: 'BIND_RATE_LIMITED' } }],
-    ['COURIER_NOT_FOUND', { state: 404, info: 'courier not found or unavailable' }],
+    ['COURIER_ALREADY_BOUND', httpError(409, 'COURIER_ALREADY_BOUND')],
+    ['TG_ALREADY_BOUND', httpError(409, 'TG_ALREADY_BOUND')],
+    ['BIND_RATE_LIMITED', httpError(429, 'BIND_RATE_LIMITED')],
+    ['COURIER_NOT_FOUND', httpError(404, 'COURIER_NOT_FOUND', 'courier not found or unavailable')],
   ];
   for (const [label, script] of cases) {
     const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: script }) }));
@@ -224,7 +238,7 @@ test('B1 冲突/失败文案一律不给「联系管理员」这类甩锅动作'
 
 test('B1 冲突文案：给用户可执行动作（自解绑）', async () => {
   for (const code of ['COURIER_ALREADY_BOUND', 'TG_ALREADY_BOUND']) {
-    const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: { state: 409, info: { code } } }) }));
+    const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: httpError(409, code) }) }));
     const res = makeRes();
     await rider.postBind(makeReq({ body: { initData: signInitData(77), phone: '0912345678' } }), res);
     assert.strictEqual(res.statusCode, 409, code);
@@ -233,7 +247,8 @@ test('B1 冲突文案：给用户可执行动作（自解绑）', async () => {
 });
 
 test('B1 冲突：网关未给已知 code 也要 409 兜底，不静默成功', async () => {
-  const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: { state: 409, info: {} } }) }));
+  const noCode = httpError(409, undefined, 'conflict');
+  const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: noCode }) }));
   const res = makeRes();
   await rider.postBind(makeReq({ body: { initData: signInitData(77), phone: '0912345678' } }), res);
   assert.strictEqual(res.statusCode, 409);
@@ -241,7 +256,7 @@ test('B1 冲突：网关未给已知 code 也要 409 兜底，不静默成功', 
 });
 
 test('B1 限频：网关 429（双维度限频）→ 429 BIND_RATE_LIMITED，无 302', async () => {
-  const gw = makeGateway({ bindScript: { state: 429, info: { code: 'BIND_RATE_LIMITED' } } });
+  const gw = makeGateway({ bindScript: httpError(429, 'BIND_RATE_LIMITED') });
   const rider = createRiderRoute(makeDeps({ gateway: gw }));
   const res = makeRes();
   await rider.postBind(makeReq({ body: { initData: signInitData(77), phone: '0912345678' } }), res);
@@ -252,7 +267,7 @@ test('B1 限频：网关 429（双维度限频）→ 429 BIND_RATE_LIMITED，无
 });
 
 test('手机号未匹配骑手（网关 404 语义）→ 404 COURIER_NOT_FOUND，无 302', async () => {
-  const gw = makeGateway({ bindScript: { state: 404, info: 'courier not found or unavailable' } });
+  const gw = makeGateway({ bindScript: httpError(404, 'COURIER_NOT_FOUND', 'courier not found or unavailable') });
   const rider = createRiderRoute(makeDeps({ gateway: gw }));
   const res = makeRes();
   await rider.postBind(makeReq({ body: { initData: signInitData(77), phone: '0912345678' } }), res);
@@ -262,14 +277,14 @@ test('手机号未匹配骑手（网关 404 语义）→ 404 COURIER_NOT_FOUND�
   assert.match(res.body, /未找到该手机号对应的骑手账号/);
 });
 
-test('rider_ql 返回非 https URL / 非 100 → 502，不重定向', async () => {
-  const bad1 = makeGateway({ qlScript: { state: 200, info: '骑手不存在或状态不可用' } });
+test('rider_ql 失败 / 返回非 https URL → 502，不重定向（ql 失败不还原状态码）', async () => {
+  const bad1 = makeGateway({ qlScript: httpError(404, 'COURIER_NOT_FOUND', '骑手不存在或状态不可用') });
   const r1 = makeRes();
   await createRiderRoute(makeDeps({ gateway: bad1 })).postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r1);
   assert.strictEqual(r1.statusCode, 502);
   assert.strictEqual(r1.redirectUrl, null);
 
-  const bad2 = makeGateway({ qlScript: { state: 100, info: { url: 'http://evil.example/ql' } } });
+  const bad2 = makeGateway({ qlScript: { success: true, data: { url: 'http://evil.example/ql' } } });
   const r2 = makeRes();
   await createRiderRoute(makeDeps({ gateway: bad2 })).postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r2);
   assert.strictEqual(r2.statusCode, 502);
@@ -277,7 +292,7 @@ test('rider_ql 返回非 https URL / 非 100 → 502，不重定向', async () =
 });
 
 test('302 目标域名白名单（m7）：https 但不在 CORS_ORIGINS 派生白名单内 → 502，不重定向', async () => {
-  const gw = makeGateway({ qlScript: { state: 100, info: { url: 'https://evil.example/ql?token=FAKE' } } });
+  const gw = makeGateway({ qlScript: { success: true, data: { url: 'https://evil.example/ql?token=FAKE' } } });
   const rider = createRiderRoute(makeDeps({ gateway: gw, allowedHosts: ['canary.fbird.men'] }));
   const res = makeRes();
   await rider.postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), res);
@@ -318,7 +333,7 @@ test('网关调用计数限频 → 429，不触达网关', async () => {
 });
 
 test('错误响应不回显 initData', async () => {
-  const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: { state: 500, info: 'boom' } }) }));
+  const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: httpError(500, 'INTERNAL_ERROR', 'boom') }) }));
   const initData = signInitData(1);
   const res = makeRes();
   await rider.postBind(makeReq({ body: { initData, phone: 'bad' } }), res);
@@ -377,8 +392,8 @@ test('同一对 (TG, 骑手) 重绑 = 幂等成功：两次均 302，网关收�
 test('换手机号重绑：Node 不拦（是换绑还是冲突由 PHP 判，跨骑手必然 409）', async () => {
   const gw = makeGateway({
     bindScript: (p) => (p.phone === '0987654321'
-      ? { state: 409, info: { code: 'TG_ALREADY_BOUND' } }
-      : { state: 100, info: { courier_id: 9 } }),
+      ? httpError(409, 'TG_ALREADY_BOUND')
+      : { success: true, data: { courier_id: 9 } }),
   });
   const rider = createRiderRoute(makeDeps({ gateway: gw }));
   const r1 = makeRes();
@@ -454,10 +469,12 @@ test('normalizePhone：15 组输入逐字节对齐 PHP（含 9/10/11/12 位长�
 });
 
 // 双维度限频：计数底账在 PHP（fbs_bind_audit），Node 的职责是 429 原样透传且不签令牌。
-// 用脚本化网关模拟「tg 5/60s、phone 3/300s」两种维度到顶的时序，断言第 6 次/第 4 次的行为。
-function makeRateLimitedGateway({ tgMax = 5, phoneMax = 3 } = {}) {
+// 用脚本化网关模拟「tg 5/60s、phone 3/300s、ip 20/300s（N5 新增维度）」到顶的时序，
+// 断言超限第 N 次的行为。被限频的请求本身不计入计数（PHP 侧 WHERE result != 'rate_limited'）。
+function makeRateLimitedGateway({ tgMax = 5, phoneMax = 3, ipMax = 20 } = {}) {
   const tgHits = new Map();
   const phoneHits = new Map();
+  const ipHits = new Map();
   const calls = [];
   return {
     calls,
@@ -465,14 +482,16 @@ function makeRateLimitedGateway({ tgMax = 5, phoneMax = 3 } = {}) {
       calls.push(p);
       const tgCount = (tgHits.get(p.tg_user_id) || 0) + 1;
       tgHits.set(p.tg_user_id, tgCount);
-      // 被限频的请求本身不计入计数（PHP 侧 WHERE result != 'rate_limited'）
-      if (tgCount > tgMax) return { state: 429, info: { code: 'BIND_RATE_LIMITED' } };
+      if (tgCount > tgMax) throw httpError(429, 'BIND_RATE_LIMITED');
       const phCount = (phoneHits.get(p.phone) || 0) + 1;
       phoneHits.set(p.phone, phCount);
-      if (phCount > phoneMax) return { state: 429, info: { code: 'BIND_RATE_LIMITED' } };
-      return { state: 100, info: { courier_id: 9 } };
+      if (phCount > phoneMax) throw httpError(429, 'BIND_RATE_LIMITED');
+      const ipCount = (ipHits.get(p.ip) || 0) + 1;
+      ipHits.set(p.ip, ipCount);
+      if (ipCount > ipMax) throw httpError(429, 'BIND_RATE_LIMITED');
+      return { success: true, data: { courier_id: 9 } };
     },
-    async riderQl() { return { state: 100, info: { courier_id: 9, url: WORKBENCH_URL } }; },
+    async riderQl() { return { success: true, data: { courier_id: 9, url: WORKBENCH_URL } }; },
   };
 }
 
@@ -508,9 +527,26 @@ test('phone 维度 3/300s：同一手机号第 4 次 → 429，且不重定向�
   assert.strictEqual(gw.calls.filter((c) => c.phone === '09171234567').length, 4, '归一后第 4 次仍应以同号触达网关并被限频');
 });
 
+// N5：ip 维度限频（20 次/300s，阈值与 PHP 侧一致）。同 IP 换 20 组不同 tg/phone 打满 ip 维度，
+// 第 21 次 → 429，证明慢速枚举换号也挡得住。
+test('ip 维度 20/300s：同 IP 第 21 次（换号换手机号）→ 429 BIND_RATE_LIMITED', async () => {
+  const gw = makeRateLimitedGateway({ tgMax: 100, phoneMax: 100, ipMax: 20 });
+  const rider = createRiderRoute(makeDeps({ gateway: gw }));
+  for (let i = 1; i <= 20; i++) {
+    const res = makeRes();
+    await rider.postBind(makeReq({ body: { initData: signInitData(200 + i), phone: `09171200${String(i).padStart(3, '0')}` }, ip: '5.6.7.8' }), res);
+    assert.strictEqual(res.statusCode, 302, `第 ${i} 次（换号换手机号）应放行`);
+  }
+  const res21 = makeRes();
+  await rider.postBind(makeReq({ body: { initData: signInitData(999), phone: '0917199999' }, ip: '5.6.7.8' }), res21);
+  assert.strictEqual(res21.statusCode, 429, '同 IP 第 21 次必须被限频（N5 防慢速枚举换号）');
+  assert.match(res21.body, /BIND_RATE_LIMITED/);
+  assert.strictEqual(res21.redirectUrl, null);
+});
+
 test('302 白名单边界：空白名单仍拒 http / 子域不通过 / host 大小写不敏感', async () => {
   // ① 白名单为空 = 不限制 host，但仍必须是 https
-  const gwHttp = makeGateway({ qlScript: { state: 100, info: { url: 'http://canary.fbird.men/ql.html?token=X' } } });
+  const gwHttp = makeGateway({ qlScript: { success: true, data: { url: 'http://canary.fbird.men/ql.html?token=X' } } });
   const r1 = makeRes();
   await createRiderRoute(makeDeps({ gateway: gwHttp, allowedHosts: [] })).postBind(
     makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r1);
@@ -518,7 +554,7 @@ test('302 白名单边界：空白名单仍拒 http / 子域不通过 / host 大
   assert.strictEqual(r1.redirectUrl, null);
 
   // ② 白名单命中但为子域 → 必须拒绝（精确 host 匹配，不做后缀放行）
-  const gwSub = makeGateway({ qlScript: { state: 100, info: { url: 'https://evil.canary.fbird.men/ql.html?token=X' } } });
+  const gwSub = makeGateway({ qlScript: { success: true, data: { url: 'https://evil.canary.fbird.men/ql.html?token=X' } } });
   const r2 = makeRes();
   await createRiderRoute(makeDeps({ gateway: gwSub, allowedHosts: ['canary.fbird.men'] })).postBind(
     makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r2);
@@ -526,7 +562,7 @@ test('302 白名单边界：空白名单仍拒 http / 子域不通过 / host 大
   assert.strictEqual(r2.redirectUrl, null);
 
   // ③ 大写的合法 host → 放行（URL 解析后 host 统一小写）
-  const gwUpper = makeGateway({ qlScript: { state: 100, info: { url: 'https://CANARY.FBIRD.MEN/ql.html?token=X' } } });
+  const gwUpper = makeGateway({ qlScript: { success: true, data: { url: 'https://CANARY.FBIRD.MEN/ql.html?token=X' } } });
   const r3 = makeRes();
   await createRiderRoute(makeDeps({ gateway: gwUpper, allowedHosts: ['canary.fbird.men'] })).postBind(
     makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r3);
@@ -595,11 +631,51 @@ test('m4：session 的 tg_user_id 走数字化拼接（只可能出现数字）�
 
 test('session：rider_ql 失败 → 502 JSON，无 URL 泄漏', async () => {
   const rider = createRiderRoute(makeDeps({
-    gateway: makeGateway({ qlScript: { state: 200, info: '骑手不存在或状态不可用' } }),
+    gateway: makeGateway({ qlScript: httpError(404, 'COURIER_NOT_FOUND', '骑手不存在或状态不可用') }),
     conn: makeConn({ rows: { [SESSION_SQL_77]: '9\n' } }),
   }));
   const res = makeRes();
   await rider.session(makeReq({ body: { initData: signInitData(77) } }), res);
   assert.strictEqual(res.statusCode, 502);
   assert.ok(!res.body.includes('ql.html'));
+});
+
+// ---- 移植轮补充：canary 网关新契约下的边界 ----
+
+test('网关超时（GATEWAY_TIMEOUT，无 status）→ 502 RIDER_FAILED，不误还原成业务码', async () => {
+  const timeoutErr = new Error('网关请求超时（8000ms）');
+  timeoutErr.code = 'GATEWAY_TIMEOUT';
+  const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: timeoutErr }) }));
+  const res = makeRes();
+  await rider.postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), res);
+  assert.strictEqual(res.statusCode, 502);
+  assert.match(res.body, /RIDER_FAILED/);
+  assert.strictEqual(res.redirectUrl, null);
+});
+
+test('网关 2xx 但 success:false（如未注册动作静默异常）→ 502，绝不静默成功', async () => {
+  const rider = createRiderRoute(makeDeps({
+    gateway: makeGateway({ bindScript: { success: false, error: { code: 'INTERNAL_ERROR', message: 'boom' } } }),
+  }));
+  const res = makeRes();
+  await rider.postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), res);
+  assert.strictEqual(res.statusCode, 502);
+  assert.strictEqual(res.redirectUrl, null);
+});
+
+test('网关审计不可用（N4 fail-closed 503 AUDIT_UNAVAILABLE）→ 503 原样透传，不降级成 502', async () => {
+  const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: httpError(503, 'AUDIT_UNAVAILABLE') }) }));
+  const res = makeRes();
+  await rider.postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), res);
+  assert.strictEqual(res.statusCode, 503);
+  assert.match(res.body, /AUDIT_UNAVAILABLE/);
+  assert.strictEqual(res.redirectUrl, null);
+});
+
+test('网关 5xx（无已知业务码）→ 502 RIDER_FAILED 兜底', async () => {
+  const rider = createRiderRoute(makeDeps({ gateway: makeGateway({ bindScript: httpError(500, 'INTERNAL_ERROR', 'boom') }) }));
+  const res = makeRes();
+  await rider.postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), res);
+  assert.strictEqual(res.statusCode, 502);
+  assert.match(res.body, /RIDER_FAILED/);
 });

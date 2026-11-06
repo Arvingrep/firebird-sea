@@ -123,6 +123,12 @@ function createRiderRoute({ botToken, validateInitData, gateway, conn, allow, al
 
   const hostWhitelist = new Set(allowedHosts.map((h) => String(h).toLowerCase()));
 
+  // N7：白名单为空 = 只校验 https 不校验域名（fail-open），dev 敞开是刻意的；
+  // 但 prod 下属于配置风险，warn 一行提醒补 CORS_ORIGINS。
+  if (hostWhitelist.size === 0 && (process.env.TMA_ENV === 'prod' || process.env.NODE_ENV === 'production')) {
+    console.warn('[rider] allowedHosts 为空且运行在 production：302 目标仅校验 https，不校验域名（fail-open）');
+  }
+
   // 302 目标校验（m7）：只接受 https，且 host 在 CORS_ORIGINS 推导出的白名单内（白名单为空时不限制 host）
   function isAllowedTarget(url) {
     let u;
@@ -153,6 +159,33 @@ function createRiderRoute({ botToken, validateInitData, gateway, conn, allow, al
     res.type('html').send(renderLandingPage({ nonce, postPath }));
   }
 
+  // canary 网关新契约（N1）：成功 200 返回 {success:true, data:{...}}；业务失败（409/429/404/503）
+  // 由 PHP 返回非 2xx，gatewayClient 统一 reject（GATEWAY_HTTP_ERROR + err.status +
+  // err.payload.error.code）。rider_bind 的差异化结果码在这里还原成 B1 的用户提示，
+  // 其余（超时/网络/5xx）一律 502 兜底。
+  function sendBindError(res, err) {
+    if (err && err.code === 'GATEWAY_HTTP_ERROR') {
+      const gerr = err.payload && err.payload.error;
+      if (err.status === 409) {
+        const code = (gerr && gerr.code) || 'BIND_CONFLICT';
+        return sendError(res, 409, code, CONFLICT_MESSAGES[code] || '该手机号或当前账号已存在绑定关系，请先解绑后再试。');
+      }
+      if (err.status === 429) {
+        return sendError(res, 429, 'BIND_RATE_LIMITED', '操作过于频繁，请稍后再试');
+      }
+      if (err.status === 404) {
+        return sendError(res, 404, 'COURIER_NOT_FOUND', '未找到该手机号对应的骑手账号。请确认号码与站点登记的骑手手机号一致后重试。');
+      }
+      if (err.status === 503) {
+        // 网关审计/限频底账不可用 fail-closed（AUDIT_UNAVAILABLE），原样透传保持信号不稀释
+        return sendError(res, 503, (gerr && gerr.code) || 'AUDIT_UNAVAILABLE', '服务暂时不可用，请稍后重试');
+      }
+    }
+    // 只记消息：err 与 req.body 可能携带 initData/手机号，不能整体进日志
+    console.error('[rider/bind] failed:', String((err && err.message) || err).slice(0, 300));
+    return sendError(res, 502, 'RIDER_FAILED', '服务暂时不可用，请稍后重试');
+  }
+
   async function postBind(req, res) {
     if (notConfigured) return sendError(res, 503, 'RIDER_NOT_CONFIGURED', '服务暂未配置，请稍后重试');
     if (allow && !allow(req.ip)) return sendError(res, 429, 'RATE_LIMITED', '操作过于频繁，请稍后再试');
@@ -162,25 +195,22 @@ function createRiderRoute({ botToken, validateInitData, gateway, conn, allow, al
     const phone = normalizePhone(req.body && req.body.phone);
     if (!phone) return sendError(res, 400, 'INVALID_PHONE', '手机号格式不正确。支持 09171234567 或 +639171234567 等写法。');
     try {
-      // 1) 绑定：PHP 按归一后手机号查唯一骑手 → 冲突检查（绝不静默顶替）→ 双维度限频 → 写审计
-      const bind = await gateway.riderBind({ tg_user_id: String(v.user.id), phone, ip: req.ip || '' });
-      if (bind && bind.state === 409) {
-        const code = (bind.info && bind.info.code) || 'BIND_CONFLICT';
-        return sendError(res, 409, code, CONFLICT_MESSAGES[code] || '该手机号或当前账号已存在绑定关系，请先解绑后再试。');
+      // 1) 绑定：PHP 按归一后手机号查唯一骑手 → 冲突检查（绝不静默顶替）→ 三维度限频 → 写审计
+      let bind;
+      try {
+        bind = await gateway.riderBind({ tg_user_id: String(v.user.id), phone, ip: req.ip || '' });
+      } catch (err) {
+        return sendBindError(res, err);
       }
-      if (bind && bind.state === 429) {
-        return sendError(res, 429, 'BIND_RATE_LIMITED', '操作过于频繁，请稍后再试');
-      }
-      if (bind && bind.state === 404) {
-        return sendError(res, 404, 'COURIER_NOT_FOUND', '未找到该手机号对应的骑手账号。请确认号码与站点登记的骑手手机号一致后重试。');
-      }
-      const courierId = bind && bind.state === 100 && bind.info && Number(bind.info.courier_id);
+      // 2xx 但 success:false 同样视为失败，绝不静默成功
+      const courierId = bind && bind.success === true && Number(bind.data && bind.data.courier_id);
       if (!Number.isSafeInteger(courierId) || courierId <= 0) {
         throw new Error('rider_bind failed');
       }
-      // 2) 换工作台直达 URL：PHP 签 10 分钟一次性令牌（ql.html 落地种骑手 cookie）
+      // 2) 换工作台直达 URL：PHP 签 10 分钟一次性令牌（ql.html 落地种骑手 cookie）。
+      //    ql 失败不再还原状态码（绑定已成立，用户态按网关故障 502 处理）
       const ql = await gateway.riderQl({ courier_id: courierId });
-      const url = ql && ql.state === 100 && ql.info && ql.info.url;
+      const url = ql && ql.success === true && ql.data && ql.data.url;
       if (typeof url !== 'string' || !isAllowedTarget(url)) {
         throw new Error('rider_ql returned invalid url');
       }
@@ -208,7 +238,7 @@ function createRiderRoute({ botToken, validateInitData, gateway, conn, allow, al
       const courierId = firstInt(await conn.query(`SELECT courier_id FROM fbs_courier_map WHERE tg_user_id = ${tgId} LIMIT 1`));
       if (!courierId) return res.json({ success: true, data: { bound: false } });
       const ql = await gateway.riderQl({ courier_id: courierId });
-      const url = ql && ql.state === 100 && ql.info && ql.info.url;
+      const url = ql && ql.success === true && ql.data && ql.data.url;
       if (typeof url !== 'string' || !isAllowedTarget(url)) throw new Error('rider_ql returned invalid url');
       return res.json({ success: true, data: { bound: true, courier_id: courierId, url } });
     } catch (err) {
