@@ -481,7 +481,25 @@ const dispatch = createDispatchRoute({
 });
 router.post('/internal/dispatch', dispatch.postDispatch);
 
-app.listen(PORT, () => {
+const httpServer = app.listen(PORT, () => {
   console.log(`🚀 Firebird SEA Core API is listening on port ${PORT}`);
   console.log(`📍 Serving Metro Manila (PHP & USDT Settlements)`);
+});
+
+// N3 优雅退出：202 = at-most-once（硬崩溃时在飞通知会丢、去重占位剩 1 天）。
+// RollingUpdate 发版必发 SIGTERM——不接线的话在飞 Telegram 发送会被直接杀死且去重位占满 1 天。
+// 先等在飞任务排空（上限 8s，给 pod terminationGracePeriod 留余量），再关 HTTP 监听退出。
+// 残余（超 8s 仍没发完的）靠带 event/order_id/courier_id 的日志定位补发。
+const SIGTERM_DRAIN_MS = 8000;
+process.on('SIGTERM', () => {
+  console.error('[server] SIGTERM received: draining in-flight dispatch tasks...'); // 生命周期事件走 stderr（门禁禁新增 stdout 日志）
+  Promise.race([
+    dispatch.drain(),
+    new Promise((resolve) => setTimeout(resolve, SIGTERM_DRAIN_MS)),
+  ]).then(() => {
+    console.error('[server] drain done (or timed out), closing server');
+    httpServer.close(() => process.exit(0));
+    // close 回调只在无连接时触发；兜底强制退出，防悬挂进程拖住滚动更新
+    setTimeout(() => process.exit(0), 2000).unref();
+  });
 });

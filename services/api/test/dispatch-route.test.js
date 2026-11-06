@@ -80,7 +80,7 @@ function makeRoute(overrides = {}) {
     secret: SECRET,
     botToken: BOT_TOKEN,
     conn: makeConn(),
-    gateway: { async riderNotifyUrl() { return { state: 100, info: { url: QL_URL } }; } },
+    gateway: { async riderNotifyUrl() { return { success: true, data: { url: QL_URL } }; } },
     sendMessage: async (payload) => { sent.push(payload); },
     wait: async (ms) => { waits.push(ms); },
     ...overrides,
@@ -199,7 +199,7 @@ test('M3：响应前已写入去重占位（并发副本/重复触发在响应�
 test('成功路径：查绑定 → rider_notify_url → sendMessage 带「查看订单」按钮', async () => {
   const gwCalls = [];
   const { route, sent } = makeRoute({
-    gateway: { async riderNotifyUrl(p) { gwCalls.push(p); return { state: 100, info: { url: QL_URL } }; } },
+    gateway: { async riderNotifyUrl(p) { gwCalls.push(p); return { success: true, data: { url: QL_URL } }; } },
   });
   const res = makeRes();
   await route.postDispatch(OK_REQ(), res);
@@ -232,7 +232,7 @@ test('四种事件文案区分', async () => {
 test('reclaim（订单被客服收回）→ 不带按钮、不调 rider_notify_url，文案为「无需继续配送」', async () => {
   const gwCalls = [];
   const { route, sent } = makeRoute({
-    gateway: { async riderNotifyUrl(p) { gwCalls.push(p); return { state: 100, info: { url: QL_URL } }; } },
+    gateway: { async riderNotifyUrl(p) { gwCalls.push(p); return { success: true, data: { url: QL_URL } }; } },
   });
   const res = makeRes();
   await route.postDispatch(makeReq({ event: 'reclaim', order_id: 1001, courier_id: 9 }), res);
@@ -254,10 +254,20 @@ test('网关 rider_notify_url 失败 → 降级发纯文本（无按钮），仍
   assert.strictEqual(sent[0].reply_markup, undefined);
 });
 
-test('rider_notify_url 返回 state≠100 或非 https → 降级纯文本，URL 不进消息', async () => {
+test('rider_notify_url 失败/异常包络 → 降级纯文本，URL 不进消息（canary 新契约）', async () => {
+  // gatewayClient 对非 2xx 统一 reject（GATEWAY_HTTP_ERROR + status + payload）
+  const httpReject = () => {
+    const e = new Error('网关返回 HTTP 404');
+    e.code = 'GATEWAY_HTTP_ERROR';
+    e.status = 404;
+    e.payload = { success: false, error: { code: 'COURIER_NOT_FOUND', message: 'courier not found' } };
+    return e;
+  };
   for (const [label, gw] of [
-    ['state 非 100', { async riderNotifyUrl() { return { state: 200, info: 'courier not found' }; } }],
-    ['url 非 https', { async riderNotifyUrl() { return { state: 100, info: { url: 'http://evil.example/ql' } }; } }],
+    ['reject（非 2xx）', { async riderNotifyUrl() { throw httpReject(); } }],
+    ['2xx 但 success:false', { async riderNotifyUrl() { return { success: false, error: { code: 'INTERNAL_ERROR', message: 'boom' } }; } }],
+    ['2xx 但 data 缺 url', { async riderNotifyUrl() { return { success: true, data: {} }; } }],
+    ['url 非 https', { async riderNotifyUrl() { return { success: true, data: { url: 'http://evil.example/ql' } }; } }],
   ]) {
     const { route, sent } = makeRoute({ gateway: gw });
     const res = makeRes();
@@ -493,7 +503,7 @@ test('reclaim 矩阵：同单改派 —— 原骑手收 reclaim（无按钮）�
   const gwCalls = [];
   const { route, sent } = makeRoute({
     conn,
-    gateway: { async riderNotifyUrl(p) { gwCalls.push(p); return { state: 100, info: { url: QL_URL } }; } },
+    gateway: { async riderNotifyUrl(p) { gwCalls.push(p); return { success: true, data: { url: QL_URL } }; } },
   });
 
   // ① 原骑手 9：订单被收回，只收到「无需继续配送」，不带查看订单按钮
@@ -569,4 +579,13 @@ test('源码约束：EVENTS 四种事件；去重键三元组；禁用 courier_p
   const iRes = src.indexOf('res.status(202)');
   const iTrack = src.indexOf('track(deliver(');
   assert.ok(iRes > 0 && iTrack > iRes, '必须先回 202 再启动投递（M3 收下即返回）');
+});
+
+// N3：SIGTERM 优雅退出接线（发版时在飞通知不被杀死、去重位不留 1 天孤位）
+test('源码约束（N3）：server.js 注册 SIGTERM → drain（8s 上限）→ close 退出', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/server.js'), 'utf8');
+  assert.match(src, /process\.on\('SIGTERM'/, '必须注册 SIGTERM 处理');
+  assert.match(src, /dispatch\.drain\(\)/, '退出前必须排空在飞投递任务');
+  assert.match(src, /SIGTERM_DRAIN_MS = 8000/, 'drain 必须有 8s 上限（给 terminationGracePeriod 留余量）');
+  assert.match(src, /httpServer\.close/, 'drain 后必须关闭 HTTP 监听再退出');
 });

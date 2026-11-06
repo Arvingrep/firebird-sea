@@ -154,12 +154,13 @@ function createDispatchRoute({
       }
 
       // 一次性工作台直达 URL（打开即该订单详情）；网关失败降级为无按钮纯文本。
+      // canary 新契约（N1）：成功 200 {success:true, data:{url}}；非 2xx 由 gatewayClient reject。
       // reclaim 是「订单已被收回」的通知，原骑手已无该订单，生成详情按钮只会误导 —— 不带按钮。
       let url = null;
       if (eventId !== 'reclaim') {
         try {
           const r = gateway ? await gateway.riderNotifyUrl({ order_id: oid, courier_id: cid }) : null;
-          if (r && r.state === 100 && r.info && typeof r.info.url === 'string' && /^https:\/\//.test(r.info.url)) url = r.info.url;
+          if (r && r.success === true && r.data && typeof r.data.url === 'string' && /^https:\/\//.test(r.data.url)) url = r.data.url;
         } catch (err) {
           console.error(`[internal/dispatch] rider_notify_url failed ${tag}:`, String((err && err.message) || err).slice(0, 200));
         }

@@ -222,7 +222,11 @@ paths:
         （改派给另一骑手）带按钮；`reclaim`（订单被客服收回，如改派第三方平台）不带按钮。
         去重 `fbs_dispatch_dedup`（键 = event + order_id + courier_id，TTL 1 天，语义等同
         Redis SETNX EX 86400——同单改派给另一位骑手不会被吞通知）。发送失败重试 1 次，
-        429 按其 `retry_after` 退避（上限 5s）。
+        429 按其 `retry_after` 退避（上限 5s）。因此本端点的投递保证是 **at-most-once**：
+        硬崩溃时在飞通知可能丢失（残余靠带 order_id 的日志定位补发）；进程收 SIGTERM
+        （RollingUpdate 发版）会先排空在飞任务（上限 8s）再退出（N3）。网关 `rider_notify_url`
+        走 canary 新契约：成功 200 `{success:true,data:{url}}`，失败由 gatewayClient reject
+        ——无论哪种失败都降级为无按钮纯文本继续投递。
       security: []
       requestBody:
         required: true
