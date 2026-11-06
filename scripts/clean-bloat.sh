@@ -15,15 +15,6 @@ echo "🧹 [2/4] 清理悬挂大日志文件 (*.log)..."
 find . -type f -name "*.log" -not -path "*/node_modules/*" -not -path "*/.git/*" -size +10M -delete || true
 
 echo "🧹 [3/4] 归档已完成的任务 Spec..."
-mkdir -p .agents/tasks/archive
-if [ -d ".agents/tasks/specs" ]; then
-  for spec in .agents/tasks/specs/*.md; do
-    if [ -f "$spec" ] && grep -qi "status: done" "$spec" 2>/dev/null; then
-      mv "$spec" .agents/tasks/archive/
-      echo "   📦 已归档已完成任务: $(basename "$spec")"
-    fi
-  done
-fi
 
 echo "🧹 [4/4] 检查并清理本地 Docker 悬挂镜像..."
 if command -v docker >/dev/null 2>&1; then
