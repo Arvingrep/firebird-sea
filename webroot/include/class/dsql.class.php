@@ -746,6 +746,16 @@ class dsql extends db_connect
             )
         ){
 
+            // AD-20（FBS 补丁，AD-14 最小改动）：跳过 FileDataCache 直接查库。
+            // 原因：本类是 FileDataCache 的唯一使用方，get() 不传 ttl（=0 永不过期），
+            // 且全仓库对 delete/clearAll 零调用、后台"清除缓存"不碰 file_data——多副本下
+            // 各 Pod 各持一份永久缓存，后台改 site_module/site_payment 等表后永不收敛
+            // （sweeper 只清本地文件，跨 Pod 无效）。开关打开后相关 SELECT 直查 DB，
+            // 一致性优先；DB 压力影响由 canary 实测评估（见验收口径，单请求增数次点查）。
+            if ((getenv('HN_DSQL_CACHE_SKIP') ?: ($_SERVER['HN_DSQL_CACHE_SKIP'] ?? '')) === '1') {
+                return $this->dsqlOper($sql, $type, $fetch, $table_name, $sensitive);
+            }
+
             // 初始化文件缓存（自定义缓存目录和默认过期时间）
             $fileDataCache = new FileDataCache();
 

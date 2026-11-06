@@ -42,6 +42,11 @@ fileCache:
     enabled: true
     maxAgeMinutes: 5
     intervalSeconds: 60
+  # AD-20：跳过 FileDataCache SQL 结果缓存（dsql.class.php::cache 内开关，HN_DSQL_CACHE_SKIP）。
+  # 原因：缓存 TTL=0 永不过期且全仓库无失效调用（delete/clearAll 零调用方），多副本下后台改
+  # site_module/site_payment 后各 Pod 永不收敛，sweeper 只清本地文件救不了跨 Pod。
+  # 打开后相关 SELECT 直查 DB：一致性恢复，代价是每请求数次配置表点查（canary 先行实测 DB 影响）。
+  queryBypass: false
 
 # ② 应用层内存缓存（$HN_memory：多语言包等）声明式指向 Redis。
 # 原先只能在后台"站点缓存"页保存，写进 dbinfo.inc.php，而 entrypoint 每次启动都会重写该文件 → 设置必丢。
