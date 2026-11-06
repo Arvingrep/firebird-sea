@@ -146,3 +146,16 @@ jobs:
             --cache-to type=gha,mode=max,scope=firebird-api-go \
             --cache-to type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api-go:buildcache",mode=max \
             -t "$API_GO_IMAGE_TAG" -t "$API_GO_IMAGE_LATEST" -f deploy/docker/Dockerfile.api-go .
+
+          # 4.5 构建 Telegram Bot 镜像。
+          # 曾经只在上面声明了 TGBOT_IMAGE_TAG 却从未构建 → tg-bot 代码改动永远上不了线
+          # （2026-11-06 实测：加了 /rider 命令、合并进 canary 后，rollout restart 拉到的
+          # 仍是 7 小时前的旧镜像，Pod 内 grep 新符号为 0）。tg-bot 无 npm 依赖，
+          # Dockerfile 只 COPY 源码，构建以秒计，因此每次 push 都构建、不设条件。
+          echo "🚀 构建 Telegram Bot 镜像: $TGBOT_IMAGE_TAG ..."
+          docker buildx build --push \
+            --platform linux/amd64 \
+            --cache-from type=gha,scope=firebird-tgbot \
+            --cache-from "$TGBOT_IMAGE_LATEST" \
+            --cache-to type=gha,mode=max,scope=firebird-tgbot \
+            -t "$TGBOT_IMAGE_TAG" -t "$TGBOT_IMAGE_LATEST" -f deploy/docker/Dockerfile.tgbot .
