@@ -128,7 +128,20 @@ new Vue({
 
 	},
 	mounted(){
-		
+
+		// Web 端（Telegram / 浏览器）没有原生 bridge：用 webgeo.js 的浏览器定位补上骑手坐标，
+		// 否则 ps_lnglat 恒为空、地图不显示骑手位置（AD-14 最小补丁，原生 App 不生效）
+		(function (vm) {
+			var sync = function () {
+				var wg = window.__webGeo;
+				if (wg && wg.lng !== '' && wg.lat !== '' && wg.lng != null && wg.lat != null) {
+					vm.ps_lnglat = {'lng': wg.lng, 'lat': wg.lat};
+				}
+			};
+			sync();
+			setInterval(sync, 5000);
+		})(this);
+
 		if(!this.order_finished && this.orderTop){
 			var tt = this;
 
