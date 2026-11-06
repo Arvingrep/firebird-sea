@@ -930,6 +930,8 @@ if ($action == "setCourier") {
                     $ret = $dsql->dsqlOper($sql, "update");
                     if ($ret == "ok") {
                         sendapppush($peisongid, "您有订单被其他骑手派送", "订单号：" . $shopname . $ordernumstore, "", "peisongordercancel");
+                        // T7：改派到第三方平台，原骑手被摘单 —— 发 reclaim（「已被客服收回，无需继续配送」，无按钮），失败不影响流程
+                        fb_tg_dispatch('reclaim', (int)$value, (int)$peisongid);
                     }
 
                 }
@@ -1144,11 +1146,20 @@ if ($action == "setCourier") {
                     global $cfg_secureAccess;
                     $url = $cfg_secureAccess . $cfg_basehost . '/index.php?service=waimai&do=courier&template=detail&id=' . $value;
                     sendapppush($courier, "您有新的配送订单", "订单号：" . $shopname . $ordernumstore, $url, "newfenpeiorder");
+                    // T7：Telegram 通知骑手（经集群内 Node 转发；改派时文案区分；失败不影响派单）
+                    fb_tg_dispatch($peisongid ? 'reassign' : 'new_order', (int)$value, (int)$courier);
                     // aliyunPush($courier, "您有新的配送订单", "订单号：".$shopname.$ordernumstore, "newfenpeiorder", $cfg_secureAccess.$cfg_basehost.'/index.php?service=waimai&do=courier&template=detail&id='.$value);
 
                     if ($peisongid) {
                         sendapppush($peisongid, "您有订单被其他骑手派送", "订单号：" . $shopname . $ordernumstore, "", "peisongordercancel");
                         // aliyunPush($peisongid, "您有订单被其他骑手派送", "订单号：".$shopname.$ordernumstore, "peisongordercancel");
+                        // T7：同平台改派时原骑手同样要收到 TG 通知（M5）——上面 1150 只通知了新骑手，
+                        // 原骑手在 H5 里看不到「这单不归你了」，会继续跑去取餐。reclaim 文案为
+                        // 「订单已被客服收回，无需继续配送」，不带查看订单按钮。
+                        // 同一个骑手（自己改派给自己）时不要再发 reclaim，否则一条 reassign + 一条 reclaim 自相矛盾。
+                        if ((int)$peisongid != (int)$courier) {
+                            fb_tg_dispatch('reclaim', (int)$value, (int)$peisongid);
+                        }
                     }
 
                     //消息通知用户

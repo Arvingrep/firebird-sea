@@ -27,6 +27,18 @@ spec:
     # 这条 route 留着只会把 /tma/* 转给 api 再返 404 —— 路由应当反映真实存在的服务，
     # 而不是记录一个曾经存在过的服务。`tma.enabled` 仍然有效：它还给 api 注入登录桥的环境变量。
     {{- if .Values.api.enabled }}
+    {{- if .Values.ingressRoute.denyGateway }}
+    # T7：内部派单通知只允许集群内调用。priority 必须高于下面的 /tg-api（100），否则通用路由
+    # 先接走请求，这道 middleware 等于不存在（同 AD-19 的 200 vs 通用路由）。
+    - kind: Rule
+      match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tg-api/internal`)
+      priority: 200
+      middlewares:
+        - name: firebird-deny-internal-{{ .Values.siteId }}
+      services:
+        - name: firebird-api-{{ .Values.siteId }}
+          port: {{ .Values.api.service.port | default 3000 }}
+    {{- end }}
     - kind: Rule
       match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tg-api`)
       priority: 100

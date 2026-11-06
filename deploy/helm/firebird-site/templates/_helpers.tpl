@@ -62,15 +62,9 @@
   value: "{{ .Values.siteId }}"
 - name: SITE_BASEHOST
   value: "{{ .Values.domain | default "fbird.men" }}"
-{{- if .Values.tma.enabled }}
-# TMA 网关验签密钥（只引用 secretName，值由运维在集群中创建；缺失时网关返回 503）
-- name: FBS_GATEWAY_SECRET
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.api.secretRef | default "firebird-api-secret" }}
-      key: FBS_GATEWAY_SECRET
-      optional: true
-{{- end }}
+# FBS_GATEWAY_SECRET 注入见下方 gateway.secretRef / gateway.secretKey 条目（canary 29334cf7 形态）。
+# 移植轮丢弃了旧分支里 api.secretRef 版的重复注入（N2）：否则同容器会出现两条同名 env，
+# 最后一个生效、来源不可审计。
 - name: GCS_KEY_ID
   valueFrom:
     secretKeyRef:

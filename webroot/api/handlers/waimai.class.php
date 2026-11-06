@@ -8400,6 +8400,8 @@ class waimai
             $sql  = $dsql->SetQuery("UPDATE `" . $dbname . "` SET `state` = 4, `peisongid` = $did, `peidate` = $date, `courier_pushed` = 1,`courierfencheng` = '$courierfencheng' WHERE `id` = $id AND `state` = 3");
             $ret  = $dsql->dsqlOper($sql, "update");
             if ($ret == "ok") {
+                // T7：抢单成功，Telegram 通知骑手（失败不影响抢单）
+                fb_tg_dispatch('grab', (int)$id, (int)$did);
                 // 通知会员
                 if ($dbname != "#@__paotui_order") {
                     $sql = $dsql->SetQuery("SELECT o.`uid`, o.`food`, o.`ordernumstore`, o.`amount`, o.`pubdate`, s.`shopname` FROM `" . $dbname . "` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`id` = $id");
