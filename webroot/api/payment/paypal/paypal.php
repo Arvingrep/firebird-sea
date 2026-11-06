@@ -103,6 +103,7 @@ class paypal {
     function get_code($order, $payment){
 
         loadPlug("payment");
+        $payment = $this->normalize($payment);
 
         $sn = isset($order['order_sn']) ? (string)$order['order_sn'] : '';
         if(!$this->validSn($sn)){
@@ -202,6 +203,7 @@ class paypal {
         if(!$payment){
             return false;
         }
+        $payment = $this->normalize($payment);
 
         // Webhook：PayPal 会带 PAYPAL-TRANSMISSION-SIG 头
         if(!empty($_SERVER['HTTP_PAYPAL_TRANSMISSION_SIG'])){
@@ -416,6 +418,16 @@ class paypal {
     /* ------------------------------------------------------------------ */
     /* PayPal REST 客户端                                                   */
     /* ------------------------------------------------------------------ */
+
+    /** 后台粘贴常带首尾空格/换行，凭证类字段统一去除，避免 PayPal 返回 invalid_client */
+    private function normalize($payment){
+        foreach(array('client_id', 'secret', 'webhook_id', 'env', 'type') as $k){
+            if(isset($payment[$k]) && is_string($payment[$k])){
+                $payment[$k] = trim($payment[$k]);
+            }
+        }
+        return $payment;
+    }
 
     private function envOf($payment){
         return (isset($payment['env']) && $payment['env'] === 'live') ? 'live' : 'sandbox';
