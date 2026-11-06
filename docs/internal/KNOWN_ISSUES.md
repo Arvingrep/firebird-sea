@@ -556,3 +556,46 @@ GET /include/ajax.php?service=travel&action=videoList&page=1&pageSize=10
 把提示改成 Vue 驱动而非 jQuery 直写：失败分支只置 `tt.address`（头部已有「定位失败」），
 页脚提示改由 `tt.loadText` 承载，或在 `getshopList` 的 `state!=100` / `error` 分支里设置——
 即「只有在真的没拿到数据时才说失败」。`list.js` 无需改。
+
+## KI-014 · `site_map = google` 但全站未加载 Google Maps JS SDK → 授予定位反而死页（`google is not defined`）
+
+**现象（2026-11-06，Vic 复测实测，375×812，定位权限 granted + 模拟坐标 14.5995,120.9842）**
+
+- `/waimai/index.html`：地址栏停「定位中...」、列表停「加载中」，`cardCount=0`，**永久不恢复**；
+- **定位被拒反而正常**（可看城市级 3 家商家）→ **授权比拒绝更糟**；
+- 控制台：`Uncaught ReferenceError: google is not defined at publicLocation.js:356:30`，
+  该行即 `var latlng = new google.maps.LatLng(lat, lng);`。
+
+**成因链**
+
+1. 页面里 `var site_map = "google"`（`/waimai/index.html` 服务端渲染约 890 行，来自公共尾部片段）；
+2. `HN_Location.init`（`static/js/publicLocation.js:31-61`）按 UA/协议/`site_map` 分流，
+   在 `isQQ` 已定义但为假等组合下会落到 `site_map == "google"` → 调 `this.googleMap()`；
+3. `googleMap()` 的 `navigator.geolocation.getCurrentPosition` 成功回调里**同步**使用
+   `google.maps.LatLng`，而全站模板**没有任何地方引入 maps.googleapis.com 的 SDK**
+   （全仓 grep `maps.googleapis` 只命中 ueditor 的 gmap 对话框，与前台无关）→ 抛 ReferenceError；
+4. 异常发生在 geolocation 回调内部，`HN_Location.init` 的 `func` 永不执行 →
+   调用方 `index.js` / `list.js` 的成功、失败**两个分支都不进**，页面停在初始态。
+
+**为何此前没被发现**
+
+㉘ 章的定位用例走的是「URL 带 `lng/lat`」，根本不进 `HN_Location`；本批 P0 才第一次跑通
+「真实授予定位」路径。
+
+**已做的处置（`c8007e3d`）**
+
+不改 `publicLocation.js`——它被全站 20+ 模板以 `?v={#$cfg_staticVersion#}` 引用，改内容同 URL
+会吃 30 天静态缓存，且爆点只在 waimai 两个入口被我们观察到。改为在**已版本化的**
+`waimai/touch/skin2/js/index.js` 与 `list.js` 里加 `HN_geoUnavailable(cb)` 守卫：
+`site_map=='google' && typeof google === 'undefined'` 时用 `navigator.geolocation` 直接取坐标
+（跳过逆地理，`address` 记「当前位置」）后回调，返回 `true` 表示已接管，调用方 `return`，
+不再进 `HN_Location.init`。
+
+**遗留**
+
+- 这是**止血**不是根治：SDK 缺失的真正原因是「配置指向 google 却没有加载器」，
+  要么补 SDK（需 key 与网络可达性评估），要么把 `site_map` 改成实际可用的地图服务；
+- 其余模块（跑腿/`local.html`/`slist.html` 等同样调 `HN_Location` 的页面）**未覆盖**，
+  同样会踩；根治需在 `publicLocation.js` 里加 `typeof google === 'undefined'` 兜底并统一升版本串；
+- 真机（TG iOS/Android WebView）是否触发未验证：若 `isQQ` 未定义则走 https 原生分支 `h5()`，
+  不碰 `googleMap`，可能不复现。**真机属待验项。**
