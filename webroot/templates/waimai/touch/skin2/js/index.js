@@ -137,7 +137,7 @@ new Vue({
   		var w = $(window).height();
   		var scroll = allh - w - 200;
       let param = ''
-  		if ($(window).scrollTop() >= scroll && !tt.isload && tt.lng != 0 && tt.lat != 0) {
+  		if ($(window).scrollTop() >= scroll && !tt.isload) {
         if(tt.orderby){
           param = '&orderby=' + tt.orderby
         }
@@ -365,16 +365,18 @@ new Vue({
       if(!param){
         param = '&orderby=0'
       }
-      $.ajax({
-        url: '/include/ajax.php?service=waimai&action=shopList'+param,
-        data: {
-            lng: tt.lng,
-            lat: tt.lat,
-    				// orderby: orderby,
-    				// yingye:1,
+      /* 无坐标时不带 lng/lat（初值是 0，真值判断即可跳过），交给后端走城市级查询 */
+      var postData = {
             page: tt.page,
             pageSize: 10
-        },
+      };
+      if(tt.lng && tt.lat){
+            postData.lng = tt.lng;
+            postData.lat = tt.lat;
+      }
+      $.ajax({
+        url: '/include/ajax.php?service=waimai&action=shopList'+param,
+        data: postData,
         type: 'get',
         dataType: 'json',
         success: function(data){
