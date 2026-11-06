@@ -133,6 +133,7 @@ Path / Domain / Expires / HttpOnly / Secure / SameSite 全部记下
 
 这一轮 6 PASS / 0 FAIL / 2 待运维，但验收过程中有 5 处「期望值写错、差点把正常判成
 FAIL」。全部是判据问题，不是代码问题。留档，避免下一轮复现。
+（8.6 是修复「桌面 TG 落 PC 模板」之后**新增**的判据，不属于上面这 5 处。）
 
 ### 8.1 顶栏去重（shim 注入）必须带 `Cookie: HN_tg=1`
 
@@ -221,6 +222,37 @@ DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD TRUST_PROXY_HOPS CORS_ORIGINS TMA_TO
 - 若按「集合差」口径（旧模板 + `tma.enabled=false` 的渲染 vs 新模板）会得到 9 ——
   两种数都对，但**报数必须带基线**（是"集合差"还是"模板行数差"），否则又是"两边都没错、结论相反"。
 
+### 8.6 桌面版 Telegram 也必须进 H5（2026-11-06 修复，判据两向）
+
+桌面版 Telegram 的 WebView 上报的是**桌面浏览器 UA**，`isMobile()`
+（`webroot/include/common.func.php:4292`）原先纯靠 UA 判定 → false →
+`webroot/index.php:1027` 的 `$template."_touch.html"` 分支不命中 → TG 用户落到 PC 模板
+（`topInfo w1200`）。修复：登录桥（`webroot/api/fbs`）成功后本来就会种
+`HN_tg=1`（30 天，域与登录 cookie 同取），`isMobile()` 现在**先认这个 cookie**
+（`common.func.php:4293`，守卫 `=== '1'`，只加一行，UA 正则一字未动）。
+
+- ❌ 错误判据（只测正向）：带 `HN_tg=1` 拿到 H5 就判过 —— 掩盖"全站都变 H5"的故障。
+- ✅ 正确判据：**四条同时成立**才过（同一桌面 UA 打两次，只差一条 cookie）：
+
+  ```bash
+  UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  # TG 用户（登录桥已种 cookie）→ H5
+  curl -s -A "$UA" -H 'Cookie: HN_tg=1' https://canary.fbird.men/ | grep -c 'name="viewport"'   # 期望 1
+  curl -s -A "$UA" -H 'Cookie: HN_tg=1' https://canary.fbird.men/ | grep -c 'topInfo w1200'      # 期望 0
+  # 普通桌面浏览器（无 cookie）→ 仍是 PC
+  curl -s -A "$UA"                 https://canary.fbird.men/ | grep -c 'name="viewport"'   # 期望 0
+  curl -s -A "$UA"                 https://canary.fbird.men/ | grep -c 'topInfo w1200'      # 期望 1
+  ```
+  `name="viewport"` 与 `topInfo w1200` 的模板出处：
+  `webroot/templates/siteConfig/touch/skin4/index.html` 与
+  `webroot/templates/siteConfig/top1.html:80`。
+- 顺带一条别再踩的坑：`isMobile()` 的正则**没有 `/i`**、主体已 `strtolower`，所以
+  `AppleWebKit`、`Windows\s+Phone`、`Nokia` 等大写词是**死词**。桌面 Chrome 的 UA 里
+  明明带 `AppleWebKit`，仍然判 false。别把它"修"成 `/i` —— 那会改变线上全站模板选择；
+  本次走的是 cookie 短路，不是改 UA 判定。
+- 值守卫：`HN_tg=0` 或任何非 `1` 的值都不触发（`isset` + `=== '1'`），
+  所以清 cookie / 覆写成 0 就能回到原判定，线上可随时回退。
+
 ## 九、已实测通过的线上基线（2026-11-06，下次拿它做对照）
 
 比读期望值可靠：下面全部是当天在 canary 上真实跑出来的数字。
@@ -233,6 +265,7 @@ DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD TRUST_PROXY_HOPS CORS_ORIGINS TMA_TO
 | 带 `Cookie: HN_tg=1` 的首页 | `telegram-web-app.js` = **1**、`tg-shim.js?v=2` = **1** | `sub_filter` 注入生效 |
 | 不带 cookie 的首页 | 两者 = **0** | 注入是 cookie 门控，非无条件 |
 | 2026-11-06 真机首登 | **500 `CONFIG_MISSING`**（用户点菜单按钮即复现） | 当时网关只认 `data/cache/config.php`；已修：三级取值 cache → `FBS_GATEWAY_COOKIE_DOMAIN` → 500。修后判据见 §0.2 |
+| 2026-11-06 桌面版 Telegram 点菜单按钮 | 落到 **PC 模板**（`topInfo w1200`、无 viewport） | `isMobile()` 当时纯 UA 判定，桌面 WebView 上报桌面 UA；本次修复：认 `HN_tg=1` 短路。判据见 §8.6 |
 | 被拦模块（如 `?service=shop`） | **302**，`Location` 带 `from=tg_whitelist` | 白名单守卫生效且可区分来源 |
 | `/shop?from=tg_whitelist` | **404** | 防止 302 回首页再解析成 302 的循环（守卫带豁免标记） |
 
