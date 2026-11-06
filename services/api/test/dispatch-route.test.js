@@ -454,6 +454,112 @@ test('配置缺失（secret/botToken/conn 空）→ 503 DISPATCH_NOT_CONFIGURED'
   assert.strictEqual(res.jsonBody.error.code, 'DISPATCH_NOT_CONFIGURED');
 });
 
+// ---- 修复轮 2 补测：reclaim/reassign 配对矩阵、reclaim 未绑定释放占位、429 重试再失败 ----
+
+// 每个骑手各自的 TG 绑定（原骑手 9 → TG_OLD，新骑手 10 → TG_NEW），用于验证「改派」两侧通知分开投递
+function makePerCourierConn(map = { 9: TG_USER, 10: 555000222 }) {
+  const dedupRows = new Set();
+  const calls = [];
+  return {
+    dedupRows, calls,
+    async query(sql) {
+      calls.push(sql);
+      let m;
+      if (sql.startsWith('INSERT INTO fbs_dispatch_dedup')) {
+        m = sql.match(/VALUES \('(\w+)', (\d+), (\d+)\)/);
+        const key = `${m[1]}:${m[2]}:${m[3]}`;
+        if (dedupRows.has(key)) throw new Error(`Duplicate entry '${key}' for key 'PRIMARY'`);
+        dedupRows.add(key);
+        return '';
+      }
+      if (sql.startsWith('DELETE FROM fbs_dispatch_dedup WHERE event')) {
+        m = sql.match(/event = '(\w+)' AND order_id = (\d+) AND courier_id = (\d+)/);
+        dedupRows.delete(`${m[1]}:${m[2]}:${m[3]}`);
+        return '';
+      }
+      if (sql.startsWith('DELETE FROM fbs_dispatch_dedup WHERE created_at')) return '';
+      if (sql.startsWith('SELECT tg_user_id FROM fbs_courier_map')) {
+        m = sql.match(/courier_id = (\d+)/);
+        const tg = map[m[1]];
+        return tg ? `${tg}\n` : '';
+      }
+      return '';
+    },
+  };
+}
+
+test('reclaim 矩阵：同单改派 —— 原骑手收 reclaim（无按钮），新骑手收 reassign（带按钮）', async () => {
+  const conn = makePerCourierConn({ 9: TG_USER, 10: 555000222 });
+  const gwCalls = [];
+  const { route, sent } = makeRoute({
+    conn,
+    gateway: { async riderNotifyUrl(p) { gwCalls.push(p); return { state: 100, info: { url: QL_URL } }; } },
+  });
+
+  // ① 原骑手 9：订单被收回，只收到「无需继续配送」，不带查看订单按钮
+  await route.postDispatch(makeReq({ event: 'reclaim', order_id: 1001, courier_id: 9 }), makeRes());
+  await route.drain();
+  assert.strictEqual(sent.length, 1);
+  assert.strictEqual(sent[0].chat_id, TG_USER, 'reclaim 必须发给原骑手');
+  assert.match(sent[0].text, /已被客服收回/);
+  assert.strictEqual(sent[0].reply_markup, undefined, '原骑手已无该单，不得带查看订单按钮');
+
+  // ② 新骑手 10：同一订单改派过来，收到带按钮的 reassign
+  await route.postDispatch(makeReq({ event: 'reassign', order_id: 1001, courier_id: 10 }), makeRes());
+  await route.drain();
+  assert.strictEqual(sent.length, 2);
+  assert.strictEqual(sent[1].chat_id, 555000222, 'reassign 必须发给新骑手');
+  assert.match(sent[1].text, /改派给您/);
+  assert.strictEqual(sent[1].reply_markup.inline_keyboard[0][0].text, '查看订单');
+  assert.strictEqual(sent[1].reply_markup.inline_keyboard[0][0].url, QL_URL);
+
+  // 两条通知各自独立占坑；只有 reassign 换 URL（reclaim 不该为已收回的单签直达 URL）
+  assert.deepStrictEqual(gwCalls, [{ order_id: 1001, courier_id: 10 }]);
+  assert.ok(conn.dedupRows.has('reclaim:1001:9'));
+  assert.ok(conn.dedupRows.has('reassign:1001:10'));
+});
+
+test('reclaim 给未绑定骑手 → 202 静默不发并释放占位（不让 reclaim 被永久吞掉）', async () => {
+  const conn = makeConn({ courierBound: false });
+  const { route, sent } = makeRoute({ conn });
+  const res = makeRes();
+  const logs = await captureErrors(async () => {
+    await route.postDispatch(makeReq({ event: 'reclaim', order_id: 1001, courier_id: 9 }), res);
+    await route.drain();
+  });
+  assert.strictEqual(res.statusCode, 202);
+  assert.strictEqual(sent.length, 0);
+  assert.match(logs, /event=reclaim/);
+  assert.strictEqual(conn.dedupRows.size, 0, '未投递必须释放占位');
+});
+
+test('429 退避后第二次仍 429 → 释放占位（允许 TTL 内同键重发），退避按 retry_after', async () => {
+  let n = 0;
+  const conn = makeConn();
+  const { route, waits } = makeRoute({
+    conn,
+    sendMessage: async () => {
+      n += 1;
+      const e = new Error('telegram HTTP 429');
+      e.httpStatus = 429;
+      e.retryAfter = 2;
+      e.snippet = '{"ok":false,"description":"Too Many Requests","parameters":{"retry_after":2}}';
+      throw e;
+    },
+  });
+  const res = makeRes();
+  const logs = await captureErrors(async () => {
+    await route.postDispatch(OK_REQ(), res);
+    await route.drain();
+  });
+  assert.strictEqual(res.statusCode, 202, '已返回的 202 不因异步失败改变');
+  assert.strictEqual(n, 2, '429 也必须重试一次');
+  assert.deepStrictEqual(waits, [2000], '退避取 retry_after=2s');
+  assert.match(logs, /sendMessage failed twice/);
+  assert.match(logs, /Too Many Requests/);
+  assert.strictEqual(conn.dedupRows.size, 0, '两次都失败必须释放占位');
+});
+
 // ---- 源码约束 ----
 
 test('源码约束：EVENTS 四种事件；去重键三元组；禁用 courier_pushed；响应先于发送', () => {
