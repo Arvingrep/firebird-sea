@@ -41,9 +41,20 @@ Node 侧 gatewayClient 统一 reject（`GATEWAY_HTTP_ERROR` + `err.status` + `er
 | 500 | `BIND_FAILED` | 写库失败（含并发双插撞唯一键，N6 落 `result=error` 审计） |
 | 503 | `AUDIT_UNAVAILABLE` | 审计/限频计数底账不可用，fail-closed 拒绝（N4，宁拒勿漏） |
 | 503 | `BRIDGE_CONFIG_MISSING` / `CONFIG_MISSING` | 读不到 `$fb_bridge_token` / 站点 basehost（rider_ql、rider_notify_url） |
+| 429 | `REPLAY_LIMITED` | 紧窗凭证动作（rider_ql / rider_notify_url）同一签名体 15s 内第二次请求（见下） |
 
-时间窗：canary 统一 ±300s（`FBS_GATEWAY_TIME_WINDOW`）。旧网关 rider 动作是 60s——与 canary
-issue_session（活凭证签发）同为 300s 口径，Node 侧 initData 验签的 1 小时窗口不变。
+时间窗按「是否返回活凭证」分两档（最终移植轮裁决）：
+
+- **紧窗 ±15s + 重放计数**：`issue_session` / `rider_ql` / `rider_notify_url`——三者每次成功都
+  签发活凭证（会话 cookie / ql token 600s），签名体被截获重放即重复取凭证。重放计数与
+  issue_session 同款文件账本（sha256 键 + flock），差异仅在阈值：凭证签发没有「多签一次有益」
+  的语义，**同一签名体只放行一次**，第二次同参请求 429 `REPLAY_LIMITED`（issue_session 保留
+  max=5 的登录防抖不变）。计数放在验签之后、业务动作之前，无需 DB，账本不可写 fail-open 留痕
+  （防重放是辅助防线，签名窗口本身兜底）。
+- **宽窗 ±300s**：`rider_bind`——幂等（同对重绑只刷新）+ 每次尝试落审计 + 不签任何令牌，
+  重放无攻击面，无需紧窗。
+
+旧网关 rider 动作的 60s 窗口作废；Node 侧 initData 验签的 1 小时窗口不变。
 
 ## 三、绑定规则（B1：冲突绝不静默顶替）
 

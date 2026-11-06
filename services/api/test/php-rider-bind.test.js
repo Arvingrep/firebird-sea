@@ -297,3 +297,73 @@ test('源码约束：三维度阈值/窗口写在网关内且只排除 rate_limi
   // N6：并发双插撞键也要落审计（result=error）
   assert.match(src, /'error'/, '最终失败分支必须落 result=error 审计行（N6）');
 });
+
+// ---- 窗口分类 + 紧窗重放计数（Ray 裁决，最终移植轮）----
+
+test('源码约束：紧窗档三动作走 FBS_GATEWAY_TIGHT_WINDOW，rider_bind 维持宽窗；重放账本阈值=1', () => {
+  const src = fs.readFileSync(GATEWAY, 'utf8');
+  assert.match(src, /in_array\(\$action, array\('issue_session', 'rider_ql', 'rider_notify_url'\), true\)/,
+    '紧窗档必须是 issue_session / rider_ql / rider_notify_url 三个凭证动作');
+  assert.match(src, /\? FBS_GATEWAY_TIGHT_WINDOW : FBS_GATEWAY_TIME_WINDOW/,
+    '分类一行：紧窗档 15s，其余 300s');
+  assert.match(src, /fbs_gateway_verify\(\$secret, \$timestamp, \$signature, \$action, \$rawBody, \$now, \$window\)/,
+    '分类窗口必须传进 verify 的 $window 参数');
+  assert.match(src, /if \(\$count > 1\)/, '紧窗重放账本阈值必须是 1：同一签名体只放行一次');
+  assert.match(src, /fbs_gateway_replay_once_guard\(\s*\$action \. ':' \. hash\('sha256', \$rawBody\)/,
+    '重放键必须是 action + sha256(签名体)，放验签之后、业务之前');
+});
+
+test('行为：rider_ql 15s 内同参重放被重放计数拦截（429 REPLAY_LIMITED）；紧窗/宽窗按动作分类生效', (t) => {
+  if (!hasDocker()) return t.skip('docker 不可用');
+  // dispatch 级行为测试需要加载整个 index.php（常量 + 函数 + 白名单），不能走单函数抽取；
+  // 用 canary test_gateway_actions.php 的同款模式：define('FBS_GATEWAY_TEST') 后 require。
+  const harness = `<?php
+error_reporting(E_ALL & ~E_DEPRECATED);
+define('FBS_GATEWAY_TEST', true);
+require '/app/webroot/api/fbs/index.php';
+
+$secret = 'test-secret-123';
+$ctx = array('secret' => $secret, 'replay_dir' => sys_get_temp_dir() . '/fbs-replay-' . getmypid());
+$body = '{"action":"rider_ql","params":{"courier_id":1}}';
+$ts = (string)time();
+$sig = fbs_gateway_sign($secret, $ts, 'rider_ql', $body);
+list($c1, $p1) = fbs_gateway_dispatch('rider_ql', $body, $ts, $sig, $ctx);
+list($c2, $p2) = fbs_gateway_dispatch('rider_ql', $body, $ts, $sig, $ctx);
+
+// 同一签名体换 courier_id：换键，不得被重放账本拦
+$bodyOther = '{"action":"rider_ql","params":{"courier_id":2}}';
+$sigOther = fbs_gateway_sign($secret, $ts, 'rider_ql', $bodyOther);
+list($cOther, $pOther) = fbs_gateway_dispatch('rider_ql', $bodyOther, $ts, $sigOther, $ctx);
+
+// 20 秒前的签名：rider_ql 紧窗应 401；rider_bind 宽窗不应 401
+$tsOld = (string)(time() - 20);
+$sigQlOld = fbs_gateway_sign($secret, $tsOld, 'rider_ql', $body);
+$sigBindOld = fbs_gateway_sign($secret, $tsOld, 'rider_bind', $body);
+list($cQlOld, $pQlOld) = fbs_gateway_dispatch('rider_ql', $body, $tsOld, $sigQlOld, $ctx);
+list($cBindOld, $pBindOld) = fbs_gateway_dispatch('rider_bind', $body, $tsOld, $sigBindOld, $ctx);
+
+$codeOf = function ($p) { return (isset($p['error']) && isset($p['error']['code'])) ? $p['error']['code'] : null; };
+echo json_encode(array(
+  'c1' => $c1, 'code1' => $codeOf($p1),
+  'c2' => $c2, 'code2' => $codeOf($p2),
+  'cOther' => $cOther, 'codeOther' => $codeOf($pOther),
+  'cQlOld' => $cQlOld, 'codeQlOld' => $codeOf($pQlOld),
+  'cBindOld' => $cBindOld, 'codeBindOld' => $codeOf($pBindOld),
+)), "\\n";
+`;
+  const r = spawnSync(
+    'docker',
+    ['run', '--rm', '-i', '-v', `${ROOT}:/app`, '-w', '/app', 'php:8.2-cli', 'php'],
+    { input: harness, encoding: 'utf8' },
+  );
+  assert.strictEqual(r.status, 0, `php harness 退出码 ${r.status}\nstdout: ${r.stdout}\nstderr: ${r.stderr}`);
+  const out = JSON.parse(r.stdout);
+
+  // 第 1 次请求放行进业务（harness 无 PDO/审计桩，业务层报 500 INTERNAL_ERROR，但绝不是重放拦截）
+  assert.notStrictEqual(out.c1, 429, '第一次同参请求不得被重放计数拦截');
+  assert.strictEqual(out.c2, 429, '15s 内第二次同参请求必须被重放计数拦截');
+  assert.strictEqual(out.code2, 'REPLAY_LIMITED', '重放拦截错误码必须是 REPLAY_LIMITED');
+  assert.notStrictEqual(out.cOther, 429, '不同参数（换 courier_id）是新键，不得被拦');
+  assert.strictEqual(out.cQlOld, 401, 'rider_ql 走紧窗：20 秒前的签名必须 401');
+  assert.notStrictEqual(out.cBindOld, 401, 'rider_bind 走宽窗：20 秒前的签名不得 401');
+});

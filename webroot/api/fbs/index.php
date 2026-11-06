@@ -75,6 +75,13 @@ require_once __DIR__ . '/bridge.php';
 /** 签名时间窗（秒） */
 if (!defined('FBS_GATEWAY_TIME_WINDOW')) define('FBS_GATEWAY_TIME_WINDOW', 300);
 
+/** 紧窗签名时间窗（秒）：返回活凭证的动作（issue_session / rider_ql / rider_notify_url）
+ *  收紧到 ±15s（窗口分类裁决见 dispatch 内注释与 docs/internal/RIDER_TG_HOOKS.md）。 */
+if (!defined('FBS_GATEWAY_TIGHT_WINDOW')) define('FBS_GATEWAY_TIGHT_WINDOW', 15);
+
+/** 紧窗凭证动作的重放账本 TTL（秒）：只需盖过 ±15s 紧窗，留余量覆盖时钟偏移 */
+if (!defined('FBS_GATEWAY_REPLAY_ONCE_TTL')) define('FBS_GATEWAY_REPLAY_ONCE_TTL', 120);
+
 /** 标记 Cookie 有效期：30 天（第 3 步 nginx 注入 tg-shim 的开关） */
 if (!defined('FBS_GATEWAY_MARKER_TTL')) define('FBS_GATEWAY_MARKER_TTL', 30 * 86400);
 
@@ -410,6 +417,100 @@ function fbs_gateway_replay_guard($initDataHash, array $context)
     if (!$allowed) {
         error_log('[fbs_gateway] replay limited: count=' . $count);
         return array('code' => 'REPLAY_LIMITED', 'message' => 'too many logins with the same init data');
+    }
+    return null;
+}
+
+/** 紧窗凭证动作（rider_ql / rider_notify_url）的重放账本：同一签名体最多放行一次。
+ *
+ * 与 bridge.php 的 fbs_bridge_replay_check() 同款机制（sha256 键 + flock + 计数过期清零），
+ * 差异仅在阈值：issue_session 的 FBS_BRIDGE_REPLAY_MAX=5 是登录防抖（同一 initData 允许
+ * 几秒内重试网络失败），凭证签发没有「多签一次有益」的语义——ql/notify_url 每次成功都
+ * 签发活凭证（ql token 600s），第二次同参请求一律拒绝。不直接复用 fbs_bridge_replay_check
+ * 是因为其阈值读全局常量 FBS_BRIDGE_REPLAY_MAX，改它会影响登录链路的 5 次语义。
+ *
+ * 键为 action + sha256(签名体)：签名体含时间戳，换时间戳即换键，合法重试永远是新键；
+ * TTL 只需盖过 ±15s 紧窗（超窗后签名 401 兜底，账本只是紧窗内的辅助防线）。
+ *
+ * 存储写失败 fail-open（口径同 bridge.php：防重放是限流性质的保护，签名窗口本身兜底），
+ * 留痕在 fbs_gateway_replay_once_guard()。
+ *
+ * @param string   $key 账本键（调用方保证含 action 前缀避免跨动作挤占）
+ * @param string|null $dir 测试注入
+ * @return array [allowed(bool), count(int)]，count===0 表示账本不可用（fail-open）
+ */
+function fbs_gateway_replay_once($key, $dir = null)
+{
+    if ($dir === null) {
+        $dir = defined('FBS_GATEWAY_REPLAY_DIR')
+            ? FBS_GATEWAY_REPLAY_DIR
+            : dirname(__DIR__, 2) . '/data/cache/fbs_bridge';
+    }
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+
+    $file = $dir . '/' . hash('sha256', (string)$key) . '.cnt';
+    $now  = time();
+
+    $fp = @fopen($file, 'c+');
+    if (!$fp) {
+        return array(true, 0);   // 存储不可用：fail-open，guard 层留痕
+    }
+
+    $allowed = true;
+    $count   = 0;
+    if (flock($fp, LOCK_EX)) {
+        $raw = stream_get_contents($fp);
+        $old = array(0, 0);
+        if ($raw !== false && $raw !== '') {
+            $parts = explode(' ', trim($raw));
+            if (count($parts) === 2 && is_numeric($parts[0]) && is_numeric($parts[1])) {
+                $old = array((int)$parts[0], (int)$parts[1]);
+            }
+        }
+        // 过期则清零重记
+        $count = ($old[1] > $now) ? $old[0] : 0;
+        $count++;
+        $expiry = ($old[1] > $now) ? $old[1] : $now + FBS_GATEWAY_REPLAY_ONCE_TTL;
+
+        if ($count > 1) {
+            $allowed = false;
+        }
+
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, $count . ' ' . $expiry);
+        fflush($fp);
+        flock($fp, LOCK_UN);
+    } else {
+        // 拿不到锁：fail-open
+        $allowed = true;
+        $count = 0;
+    }
+    fclose($fp);
+
+    return array($allowed, $count);
+}
+
+/**
+ * fbs_gateway_replay_once 的 guard 封装：放行返回 null，否则 ['code'=>..,'message'=>..]。
+ * fail-open 口径与 fbs_gateway_replay_guard() 完全一致（count===0 留痕）。
+ *
+ * @param string $key
+ * @param array  $context  可注入 replay_dir（测试用）
+ */
+function fbs_gateway_replay_once_guard($key, array $context)
+{
+    $dir = array_key_exists('replay_dir', $context) ? $context['replay_dir'] : null;
+    list($allowed, $count) = fbs_gateway_replay_once($key, $dir);
+
+    if ($count === 0) {
+        error_log('[fbs_gateway] replay store unavailable, replay protection is OFF (fail-open)');
+        return null;
+    }
+
+    if (!$allowed) {
+        error_log('[fbs_gateway] replay limited (tight window): count=' . $count);
+        return array('code' => 'REPLAY_LIMITED', 'message' => 'duplicate credential request within the tight window');
     }
     return null;
 }
@@ -1135,11 +1236,29 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
     $rawBody = is_string($rawBody) ? $rawBody : '';
     $now = isset($context['now']) ? (int)$context['now'] : time();
 
-    // 验签在解析入参之前：未通过签名的输入不进入任何业务分支
-    list($ok, $reason) = fbs_gateway_verify($secret, $timestamp, $signature, $action, $rawBody, $now);
+    // 窗口分类（Ray 裁决）：返回活凭证的动作（issue_session / rider_ql / rider_notify_url）
+    // 并入紧窗档 ±15s；rider_bind 幂等 + 审计 + 不签任何令牌，无重放收益，维持 ±300s 宽窗。
+    // 验签仍在解析入参之前：未通过签名的输入不进入任何业务分支。
+    $window = in_array($action, array('issue_session', 'rider_ql', 'rider_notify_url'), true)
+        ? FBS_GATEWAY_TIGHT_WINDOW : FBS_GATEWAY_TIME_WINDOW;
+    list($ok, $reason) = fbs_gateway_verify($secret, $timestamp, $signature, $action, $rawBody, $now, $window);
     if (!$ok) {
         error_log('[fbs_gateway] signature rejected: ' . $reason . ' action=' . $action);
         return fbs_gateway_err(401, 'INVALID_SIGNATURE', 'gateway signature verification failed');
+    }
+
+    // 紧窗凭证动作的重放计数（放在验签之后、业务动作之前）：rider_ql / rider_notify_url
+    // 每次成功都签发活凭证，同一签名体只放行一次。账本无需 DB，放在解码之前 fail-fast。
+    // issue_session 的重放计数在其自身动作内（initData 维度 max=5 防抖），rider_bind 幂等
+    // + 审计兜底，都不走这里。
+    if ($action === 'rider_ql' || $action === 'rider_notify_url') {
+        $replayDenied = fbs_gateway_replay_once_guard(
+            $action . ':' . hash('sha256', $rawBody),
+            $context
+        );
+        if ($replayDenied !== null) {
+            return fbs_gateway_err(429, $replayDenied['code'], $replayDenied['message']);
+        }
     }
 
     $params = array();
