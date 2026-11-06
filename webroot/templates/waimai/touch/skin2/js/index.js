@@ -265,6 +265,13 @@ new Vue({
         if (data == undefined || data.address == "" || data.name == "" || data.lat == "" || data.lng == "") {
             tt.address = langData['siteConfig'][27][136];
           // $('.posiChose span').html(langData['siteConfig'][27][136]);    /* 定位失败 */
+          /* 定位失败/被拒时也要放行请求：后端 shopList 支持无坐标的城市级查询，
+             否则整页没有商家（TG 内嵌 WebView 常拿不到定位权限）。此时不发坐标参数。
+             .loading 是列表底部文案位（不是遮罩），getshopList 成功后会改写，不会挡住列表。 */
+          if(!tt.isload){
+            tt.page = 1;
+            tt.getshopList();
+          }
           $('.loading').html(langData['siteConfig'][27][137]).show();    /* 定位失败，请重新刷新页面！ */
         }else{
           if(!tt.islocal){

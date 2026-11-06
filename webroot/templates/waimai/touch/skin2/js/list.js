@@ -223,6 +223,13 @@ $(function(){
 			if (data == undefined || data.address == "" || data.name == "" || data.lat == "" || data.lng == "") {
 				address = langData['siteConfig'][27][136];
 			  // $('.posiChose span').html(langData['siteConfig'][27][136]);    /* 定位失败 */
+			  /* 定位失败/被拒时也要放行请求：后端 shopList 支持无坐标的城市级查询，
+			     否则整页没有商家（TG 内嵌 WebView 常拿不到定位权限）。不放坐标参数。 */
+			  if(id!=0){
+				swiper1.slideTo($('.fenlei_box ul li[data-id="'+id+'"]').index())
+			  }else{
+				getlist();
+			  }
 			  $('.loading').html(langData['siteConfig'][27][137]).show();    /* 定位失败，请重新刷新页面！ */
 			}else{
 			  lat = data.lat;
@@ -368,7 +375,9 @@ $(function(){
     	if(cityid_link){
 			cityidParam = '&cityid=' + cityid_link
     	}
-    	if(!lat || !lng) return;
+    	/* 原为 if(!lat || !lng) return;（无坐标即早退，整页无商家）。
+    	   后端 shopList 已支持无坐标的城市级查询，改为放行：有坐标才带 lng/lat 参数。 */
+    	var hasGeo = (typeof lat !== 'undefined' && lat) && (typeof lng !== 'undefined' && lng);
 		var sx = '';
 		if(selecttype){
 			sx = '&'+selecttype;
@@ -384,15 +393,18 @@ $(function(){
 		}	
 		$('.ulbox.show .loading').remove();
 		$('.ulbox.show').append('<div class="loading">'+langData['siteConfig'][20][184]+'...</div>');   //加载中，请稍候
+		var postData = {
+			orderby: orderby,
+			page: page,
+			pageSize: 6
+		};
+		if(hasGeo){          /* 无坐标时不拼参数，交给后端走城市级查询 */
+			postData.lng = lng;
+			postData.lat = lat;
+		}
 		$.ajax({
             url: '/include/ajax.php?service=waimai&action=shopList&' + typeid + sx + cityidParam,
-            data: {
-                lng: lng,
-                lat: lat,
-				orderby: orderby,
-                page: page,
-                pageSize: 6
-            },
+            data: postData,
             type: 'get',
             dataType: 'json',
             success: function(data){

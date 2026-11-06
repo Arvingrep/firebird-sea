@@ -144,6 +144,8 @@ $(function(){
 
 									} else {
 										alert('Geocode was not successful for the following reason: ' + status);
+										/* 逆地理失败（配额/网络）也是失败出口，不能停在加载态 */
+										lat = ''; lng = ''; getlist();
 									}
 							});
 
@@ -390,11 +392,15 @@ $(function(){
 
 
                 }else{
+                    /* state≠100 也是终态：必须复位 shop_load，否则后续滚动分页永久不发请求 */
+                    shop_load = 0;
                     $('.ul_box .loading').html(data.info);
                 }
 
             },
             error: function(){
+                /* 网络错误同样要复位，否则一次抖动后下拉不再加载 */
+                shop_load = 0;
                 $('.ul_box.loading').html(langData['siteConfig'][20][227]);   /* 网络错误，加载失败！*/
             }
         })
