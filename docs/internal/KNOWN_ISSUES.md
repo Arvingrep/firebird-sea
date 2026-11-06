@@ -599,3 +599,20 @@ GET /include/ajax.php?service=travel&action=videoList&page=1&pageSize=10
   同样会踩；根治需在 `publicLocation.js` 里加 `typeof google === 'undefined'` 兜底并统一升版本串；
 - 真机（TG iOS/Android WebView）是否触发未验证：若 `isQQ` 未定义则走 https 原生分支 `h5()`，
   不碰 `googleMap`，可能不复现。**真机属待验项。**
+
+**KI-011 补充（2026-11-06 晚，`2a22ea50`）：同款缺陷在 `index.js` / `list.js` 也有，已一并修**
+
+原条目只写了 `slist.js`，实际是三个文件同一形态：
+
+| 文件 | 锁变量 | 复位点 | 漏复位路径 |
+|---|---|---|---|
+| `slist.js` | `shop_load` | success 的 `setTimeout` | `state≠100`、`error`（上一批已修） |
+| `index.js` | `tt.isload` | success 的 `state==100` 分支 | `state≠100`（`else` 只改 `loadText`）、`error`（空函数） |
+| `list.js` | `shop_load` | success 的 `setTimeout` | `state≠100`、`error` |
+
+实测证据（Vic，Fetch 阶段改写响应）：`index.html` 在 `page=2` 返回 `state=101` 后，
+`SCROLL_2/3/4` 全部无请求，`shopList` 请求总数停在 2；对照组 `slist` 同实验能连发到 `page=5`。
+现已全部补 `tt.isload = false` / `shop_load = 0`。
+
+**共性判据（写进验收清单）**：任何「置位锁 + 只在成功分支复位」的写法，异常路径必然漏；
+验收时必须跑「接口返非 100」与「网络错误」两条负向路径，只看成功路径查不出来。
