@@ -48,14 +48,22 @@
 </div>
 <script>
 (function () {
-  var token = new URLSearchParams(location.search).get('token') || '';
+  var qs = new URLSearchParams(location.search);
+  var token = qs.get('token') || '';
+  // 现场诊断：ql.html?token=xxx&debug=1 会把 webgeo=debug 带进工作台，
+  // 页面顶部显示定位状态条（定位来源 / 坐标 / 失败原因），用于排查真机取不到坐标。
+  var debug = qs.get('debug') === '1';
   fetch('/include/ajax.php?service=waimai&action=courierQl', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'token=' + encodeURIComponent(token)
   }).then(function (r) { return r.json(); }).then(function (d) {
     if (d && d.state === 100 && d.jump) {
-      location.replace(d.jump);
+      var jump = d.jump;
+      if (debug) {
+        jump += (jump.indexOf('?') > -1 ? '&' : '?') + 'webgeo=debug';
+      }
+      location.replace(jump);
     } else {
       fail((d && d.info) || '登录失败');
     }
