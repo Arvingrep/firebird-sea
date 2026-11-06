@@ -45,8 +45,9 @@ spec:
             # TMA 登录桥接与白名单代理（docs/internal/TMA_LOGIN_BRIDGE.md）。密钥只引用 secretName，值由运维创建
             - name: TMA_ENV
               value: "{{ .Values.tma.env | default .Values.siteId }}"
-            - name: FBS_GATEWAY_URL
-              value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/api/fbs/index.php"
+            {{- /* FBS_GATEWAY_URL 不在此重复定义：下方守卫外有一条 baseUrl 版本（gatewayClient.js 自己拼
+                   GATEWAY_PATH）。这里若再给一条带 /api/fbs/index.php 的，K8s 后写者胜、前者永远看不到，
+                   反而误导下一个人。*/}}
             - name: FB_UPSTREAM_URL
               value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/include/ajax.php"
             {{- /* 登录桥（TAPD 0002）：明文配置，无密钥。缺任一变量桥端点即 503（fail-closed）。
@@ -77,7 +78,9 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.database.passwordSecretRef | default "firebird-db-secret" }}
                   key: {{ .Values.database.passwordSecretKey | default "password" }}
-            {{- range $name := list "TMA_TOKEN_SECRET" "FBS_GATEWAY_SECRET" }}
+            # FBS_GATEWAY_SECRET 不放进这个 list：下面有专属条目（用 gateway.secretRef/gateway.secretKey，
+            # 可配置），两处并存时后者静默覆盖前者，且 secretName 不同时会让人误判取的是哪个。
+            {{- range $name := list "TMA_TOKEN_SECRET" }}
             - name: {{ $name }}
               valueFrom:
                 secretKeyRef:
