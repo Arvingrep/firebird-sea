@@ -1,4 +1,16 @@
 {{- if .Values.api.enabled -}}
+{{- /* 引擎选择：node = services/api，go = services/api-go。
+       拼错的值必须 fail 而不是 default "node"：静默回落会让「切到 Go」变成
+       「什么都没变」，灰度验证全绿而实际仍在跑旧实现。
+       两个镜像的 tag 也分开取，见 values.yaml api.goImage 的注释。 */ -}}
+{{- $engine := .Values.api.engine | default "node" -}}
+{{- if not (has $engine (list "node" "go")) -}}
+{{- fail (printf "api.engine 非法：%q（只允许 node / go）" $engine) -}}
+{{- end -}}
+{{- $apiImage := .Values.api.image -}}
+{{- if eq $engine "go" -}}
+{{- $apiImage = .Values.api.goImage | default dict -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,12 +32,16 @@ spec:
     spec:
       containers:
         - name: api
-          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
-          imagePullPolicy: {{ .Values.api.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ $apiImage.repository }}:{{ $apiImage.tag }}"
+          imagePullPolicy: {{ $apiImage.pullPolicy | default "IfNotPresent" }}
           ports:
             - containerPort: 3000
               name: http
+          # 引擎只影响镜像来源；下面所有 env 两套实现读的是同一批变量名
+          # （Go 版 main.go 逐个对齐了 server.js 的 process.env 清单）。
           env:
+            - name: API_ENGINE
+              value: "{{ $engine }}"
             - name: NODE_ENV
               value: "production"
             - name: PORT

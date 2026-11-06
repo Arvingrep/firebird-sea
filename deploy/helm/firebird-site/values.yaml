@@ -123,12 +123,23 @@ service:
   type: ClusterIP
   port: 80
 
-# 伴生 Node.js 扩展微服务 (firebird-api)
+# 伴生 API 微服务 (firebird-api)
 api:
   enabled: true
+  # 引擎选择：node = services/api（Node 版，当前生产在用）；go = services/api-go（Go 移植版）。
+  # 灰度路径：先在 values-canary.yaml 里覆盖成 go 验收，稳定后再改这里的默认值。
+  # 非法值由 templates/deployment-api.yaml 用 fail 拦下 —— 拼错就静默回落 node 的话，
+  # 「切引擎」会变成「什么都没变」，灰度看着成功而实际还在跑旧实现。
+  engine: node
   replicaCount: 2
   image:
     repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-api"
+    tag: "latest"
+    pullPolicy: Always
+  # Go 版镜像。单独一段而不是复用 image：两套镜像由 CI 分别构建推送，
+  # tag 可能不同步；混用会让「切引擎」顺带把版本也换掉，出问题时分不清是哪个变量导致的。
+  goImage:
+    repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-api-go"
     tag: "latest"
     pullPolicy: Always
   service:

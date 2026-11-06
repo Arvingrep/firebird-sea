@@ -1,0 +1,66 @@
+# ==============================================================================
+# 🔥 Firebird SEA Core API（Go 版）— services/api-go
+# ==============================================================================
+#
+# 与 Dockerfile.api（Node 版）是「同一份契约的两套实现」，镜像名不同、tag 策略相同。
+# 构建上下文必须是仓库根（`docker build -f deploy/docker/Dockerfile.api-go .`）。
+#
+# 为什么 CGO_ENABLED=0：纯 Go 的 net/mysql 实现不需要 libc，静态二进制可以直接塞进
+# 一个只有 ca-certificates 的 alpine，运行层从 ~50MB(Node) 降到 ~15MB，
+# 也顺手消掉「镜像里的 glibc/musl 与构建机不一致」这类偶发故障。
+
+# Stage 1: 编译（依赖层单独缓存）
+FROM golang:1.27-alpine AS builder
+
+WORKDIR /src
+
+ENV CGO_ENABLED=0 \
+    GOOS=linux \
+    GOFLAGS=-mod=readonly
+
+# 先只拷贝 go.mod / go.sum：源码改动不会让依赖层缓存失效，日常构建只重跑编译。
+# tools.go 也要在这一层拷进来 —— 它是 `//go:build tools` 的版本锁定文件，
+# 少了它 go mod download 可能因「没有引用」而跳过 mysql 驱动。
+COPY services/api-go/go.mod services/api-go/go.sum services/api-go/tools.go ./services/api-go/
+RUN cd services/api-go && go mod download
+
+COPY services/api-go ./services/api-go
+
+# -trimpath 去掉构建机的绝对路径（镜像里不该暴露 /Users/xxx，也让构建可复现）；
+# -s -w 去掉符号表与 DWARF，二进制小一半左右。排障需要栈时另出 debug 镜像，不要在这里加回来。
+RUN cd services/api-go && \
+    go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+
+# Stage 2: 运行
+FROM alpine:3.20 AS runner
+
+WORKDIR /app
+
+# ca-certificates：Coins.ph / Telegram / 火鸟网关都是 https，缺根证书时所有出站请求都
+# 以 x509: certificate signed by unknown authority 失败，且报错位置离原因很远。
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S -g 10001 app \
+    && adduser -S -u 10001 -G app app
+
+ENV PORT=3000 \
+    NODE_ENV=production \
+    MIGRATIONS_DIR=/app/migrations
+
+COPY --from=builder /out/api ./api
+# 迁移文件必须随镜像走：进程启动时会自己跑迁移（main.go 里 3 次重试，仍失败则退出）。
+# 这是刻意与 Node 版保持一致的「新环境先建表」，否则登录类接口在空库上全是 502。
+# 目录名固定 migrations：main.go 的默认值 migrate.DefaultDir 就是它。
+COPY --chown=app:app services/api/migrations ./migrations
+
+# 非 root 运行：进程只需要读二进制与迁移文件，不需要写任何路径。
+USER app
+
+EXPOSE 3000
+
+# 探针与 Node 版同口径：宁可多探一次 127.0.0.1，也不让 kubelet 走 Service 绕一圈。
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health || exit 1
+
+# 迁移不再由 shell 循环包一层：main.go 内部已按「3 次 / 间隔 5s / 仍失败 exit 1」实现，
+# 两处都重试会让最坏情况变成 9 次、启动时间翻三倍。
+CMD ["/app/api"]

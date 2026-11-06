@@ -75,6 +75,8 @@ jobs:
           API_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:${ROLLING}"
           TGBOT_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-tg-bot:${PRIMARY}"
           TGBOT_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-tg-bot:${ROLLING}"
+          API_GO_IMAGE_TAG="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api-go:${PRIMARY}"
+          API_GO_IMAGE_LATEST="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api-go:${ROLLING}"
 
           # 4.1 检查/构建基础运行镜像 (firebird-base)
           # 注意：只在该 tag 不存在时才构建。修改 Dockerfile.base（加扩展/改 ini）后必须同步递增 tag 后缀
@@ -128,3 +130,19 @@ jobs:
             --cache-to type=gha,mode=max,scope=firebird-api \
             --cache-to type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api:buildcache",mode=max \
             -t "$API_IMAGE_TAG" -t "$API_IMAGE_LATEST" -f deploy/docker/Dockerfile.api .
+
+          # 4.4 构建 Go 版 API 镜像（services/api-go）
+          # 与 Node 版并行存在、tag 策略完全一致（PRIMARY 不可变 / ROLLING 浮动）。
+          # 为什么要独立镜像而不是替换 4.3：chart 的 api.engine 按站切换，
+          # canary 先跑 Go、main 仍跑 Node，两边必须同时有新镜像可拉。
+          # cache scope 用 firebird-api-go 与 Node 版隔离 —— 两种构建的层结构完全不同，
+          # 混用同一个 scope 会让缓存互相挤掉。
+          echo "🚀 构建 Go 版 API 镜像: $API_GO_IMAGE_TAG ..."
+          docker buildx build --push \
+            --platform linux/amd64 \
+            --cache-from type=gha,scope=firebird-api-go \
+            --cache-from type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api-go:buildcache" \
+            --cache-from "$API_GO_IMAGE_LATEST" \
+            --cache-to type=gha,mode=max,scope=firebird-api-go \
+            --cache-to type=registry,ref="asia-southeast1-docker.pkg.dev/${GCP_PROJECT}/containers/firebird-api-go:buildcache",mode=max \
+            -t "$API_GO_IMAGE_TAG" -t "$API_GO_IMAGE_LATEST" -f deploy/docker/Dockerfile.api-go .

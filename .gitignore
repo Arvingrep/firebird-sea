@@ -47,6 +47,16 @@ backup_configs/
 * [0-9].*
 * ([0-9]).*
 *conflicted copy*
+# Go 单编产物：`cd services/api-go && go build ./cmd/api` 默认把二进制落在包目录，
+# 而整个 services/api-go/ 是新增目录，git add 时会被一起带进提交（曾漏过 11MB 的）。
+# 本地单编建议 `go build -o /tmp/api ./cmd/api`，下面几条只是兜底。
+#
+# 不用 `/services/api-go/api` 这种锚定写法：从仓库根跑 `go build ./services/api-go/cmd/api`
+# 会把 `api` 落在**当前目录**，曾真出现过一次 `services/api/api`（12MB、Mach-O），
+# 而 `services/api/` 是 Node 版、必须保持零改动。锚定只盖得住 api-go，盖不住这个。
+/services/*/api
+/services/*/bin/
+*.test
 
 
 # 本地工具状态（每次运行会变，入库只会制造噪音）
