@@ -10,11 +10,9 @@
 // 流程种下，Node 不接触任何骑手凭证。硬约束：initData/手机号不进日志；
 // Location 只接受 PHP 网关签出且在允许域名内的 https 直达 URL，其他一律 502。
 const crypto = require('node:crypto');
-
-// 落地页/错误页均为服务端拼接的静态模板，外部输入只有表单自身，统一 HTML 转义防反射 XSS。
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
+// 落地页/错误页的 HTML 外壳（浅色底、转义、head meta）统一由 htmlPage 提供：
+// 2026-11-06「打开是黑屏」就是各页面自己拼样式、漏了背景色导致的，别再分散定义。
+const { escapeHtml, renderPageHead, PAGE_SHELL } = require('./htmlPage');
 
 // 手机号归一（与 PHP 网关 fbs_normalize_phone 行为必须一致，改动需两侧同步）：
 //   1. 去空格 / 横线 / 括号 / 点号
@@ -30,19 +28,20 @@ function normalizePhone(raw) {
   return s;
 }
 
+// 页面外壳样式见 htmlPage.js（PAGE_SHELL）：浅色底 + color-scheme 三处钉死，防 TG 深色模式黑屏。
+
 function renderLandingPage({ nonce, postPath }) {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>骑手绑定</title>
+${renderPageHead('骑手绑定')}
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-body { font-family: -apple-system, sans-serif; padding: 24px; }
-input { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; margin: 12px 0; }
-button { width: 100%; padding: 12px; font-size: 16px; }
-.hint { color: #666; font-size: 13px; }
+<style>${PAGE_SHELL}
+input { width: 100%; box-sizing: border-box; padding: 12px; font-size: 16px; margin: 12px 0; border: 1px solid #D0D7DE; border-radius: 8px; }
+button { width: 100%; padding: 14px; font-size: 16px; border: 0; border-radius: 8px; background: #2E7D32; color: #fff; font-weight: 600; }
+button:active { background: #276B2A; }
+.hint { color: #57606A; font-size: 13px; }
+.guide { color: #1F2328; }
 </style>
 </head>
 <body>
@@ -53,13 +52,20 @@ button { width: 100%; padding: 12px; font-size: 16px; }
 <p class="hint">支持 09171234567、+639171234567、63-917-123-4567 等写法，空格横线括号会自动忽略。</p>
 <button type="submit">绑定并进入工作台</button>
 </form>
-<noscript><p>请在 Telegram 内打开本页面。</p></noscript>
+<noscript><p class="guide">请在 Telegram 内打开本页面。</p></noscript>
 <script nonce="${nonce}">
 (function () {
   var tg = window.Telegram && window.Telegram.WebApp;
+  // 无条件 ready/expand：不调用时部分客户端按 0 高度渲染，同样表现为空白。
+  if (tg) {
+    try { if (tg.ready) tg.ready(); } catch (e) {}
+    try { if (tg.expand) tg.expand(); } catch (e) {}
+    // 头部/背景跟随页面浅色，避免深色主题下的黑边与黑底。
+    try { if (tg.setHeaderColor) tg.setHeaderColor('#FFFFFF'); } catch (e) {}
+    try { if (tg.setBackgroundColor) tg.setBackgroundColor('#FFFFFF'); } catch (e) {}
+  }
   var data = tg && tg.initData;
   if (data) {
-    if (tg.ready) tg.ready();
     document.getElementById('initData').value = data;
   } else {
     document.getElementById('msg').textContent = '请从 Telegram 内打开本页面';
@@ -76,13 +82,17 @@ function renderErrorPage(code, message) {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>操作失败</title>
+${renderPageHead('操作失败')}
+<style>${PAGE_SHELL}
+h1 { font-size: 18px; margin: 0 0 12px; }
+p { margin: 0 0 8px; }
+code { color: #57606A; font-size: 13px; }
+</style>
 </head>
 <body>
-<p>操作失败（${escapeHtml(code)}）</p>
+<h1>操作失败</h1>
 <p>${escapeHtml(message)}</p>
+<p><code>${escapeHtml(code)}</code></p>
 </body>
 </html>`;
 }
