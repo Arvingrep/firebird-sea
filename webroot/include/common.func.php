@@ -4274,9 +4274,23 @@ function isPc(){
 
 /**
  * 判断是否为手机端
+ *
+ * Telegram Mini App 用户一律走 H5：登录桥（webroot/api/fbs）成功后种 HN_tg=1 标记 cookie
+ * （30 天，域与登录 cookie 同取，canary 上是 .fbird.men）。桌面版 Telegram 的 WebView 上报
+ * 的是桌面浏览器 UA，纯 UA 判定会让 TG 用户落到 PC 模板（topInfo w1200），与「Mini App 套用
+ * 火鸟 H5」的需求相悖；cookie 优先于 UA，非 TG 用户没有这个 cookie，行为完全不变。
+ * cookiePre 硬编码 'HN_'：与 common.inc.php 的下发口径一致，标记 cookie 不跟随站点自定义前缀。
+ *
+ * 值守卫必须是 === '1'：HN_tg=0 或任何其它值都不触发，避免被随手写成空值/调试值劫持到 H5。
+ *
+ * 注意（不要"修"）：下面的正则没有 /i 标志、而主体已经 strtolower，所以模式里的大写词
+ * （AppleWebKit、Windows\s+Phone、Nokia、Symbian、MQQBrowser 等）是死词，永远匹配不上。
+ * 这是历史行为，改动会波及线上全站的模板选择，本次只加 cookie 短路，正则一行不动。
+ *
  * @return bool
  */
 function isMobile(){
+    if (isset($_COOKIE['HN_tg']) && $_COOKIE['HN_tg'] === '1') return true;
     $useragent = strtolower($_SERVER['HTTP_USER_AGENT']);
     if (preg_match("/iphone|ios|android|mini|mobile|mobi|Nokia|Symbian|iPod|iPad|Windows\s+Phone|MQQBrowser|wp7|wp8|UCBrowser7|UCWEB|360\s+Aphone\s+Browser|AppleWebKit|cfnetwork|harmony/", $useragent)) {
         return true;
