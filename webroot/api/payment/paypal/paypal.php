@@ -52,6 +52,7 @@ if(isset($set_modules) && $set_modules == TRUE){
             'live'    => 'Live（正式）'
         )),
         array('title' => 'Webhook ID',  'name' => 'webhook_id', 'type' => 'text', 'description' => 'PayPal 开发者后台创建 Webhook 后生成的 ID，用于校验回调签名；不填则 Webhook 兜底不可用。'),
+        array('title' => '付款页语言/地区', 'name' => 'locale', 'type' => 'text', 'description' => 'PayPal 付款页的语言与地区，如 en-PH（菲律宾英文，默认）、zh-CN。留空使用 en-PH。'),
         array('title' => '支付货币',    'name' => 'type',       'type' => 'select', 'options' => array(
             'PHP' => '菲律宾比索 - PHP',
             'USD' => '美元 - USD',
@@ -175,6 +176,11 @@ class paypal {
             $this->log('create order: no valid approve link, order=' . $poid);
             $this->fatal('Unable to start PayPal checkout / 无法发起 PayPal 支付');
         }
+
+        // 付款页默认菲律宾英文（区号 +63）。实测创建订单时传 locale 不影响付款页，
+        // 需要在跳转链接上加 locale.x / country.x 才生效。
+        $loc = $this->localeOf($payment);
+        $approve .= (strpos($approve, '?') === false ? '?' : '&') . 'locale.x=' . str_replace('-', '_', $loc) . '&country.x=' . substr($loc, 3);
 
         $this->ensureTable();
         global $dsql;
@@ -427,6 +433,12 @@ class paypal {
             }
         }
         return $payment;
+    }
+
+    /** PayPal 付款页语言/地区（如 en-PH）；格式不合法时退回 en-PH */
+    private function localeOf($payment){
+        $l = isset($payment['locale']) ? trim($payment['locale']) : '';
+        return preg_match('/^[a-z]{2}-[A-Z]{2}$/', $l) ? $l : 'en-PH';
     }
 
     private function envOf($payment){
