@@ -8,8 +8,9 @@
  * @link           https://www.ihuoniao.cn/
  */
 require_once(HUONIAOADMIN.'../include/common.inc.php');
-//TG 专用站点：外卖商家端不在五个业务块内，整套 wmsj 关闭。
-//放在这里是因为 wmsj 下 36 个 PHP 都经本文件引导（login.php / exit.php 各自单独加了一道）。
+//TG 专用站点守卫。注意 business 目前是**产品裁决放行**的（商家要用网页后台接单），
+//所以这道调用现在等于空操作。保留它不是冗余：将来若把 business 移出白名单，
+//wmsj 下 36 个页面会跟着自动关掉，不需要再回来改 40 个文件。
 require_once(HUONIAOADMIN.'../include/tgWhitelist.inc.php');
 fbsTgServiceGuard('business');
 require_once(HUONIAOADMIN.'function/waimai.fun.php');

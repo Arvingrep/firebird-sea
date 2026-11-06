@@ -76,3 +76,70 @@ du -sh /var/www/html/webroot/data/cache/fbs_bridge
 
 > 注意：**不能**按文件名或「全部删除」清理 —— 删掉未过期的文件等于把该 initData
 > 的额度清零，会静默放宽防重放。清理条件必须基于时间。
+
+---
+
+## KI-002 · /install/index.php 可访问且没有任何自锁
+
+**状态**：接受风险，暂不修复（2026-11-06，复核人 Vic 判定为既有高危，与 TG 线无关）
+
+**现象**
+
+`webroot/install/index.php` 对公网可访问，且**完全没有安装锁**。
+（此前的记录写成"自锁判 `common.inc.php` 存在但永远锁不上"，措辞有误：`common.inc.php`
+是站点核心引导文件，无论装没装都在，所以那段判断根本不可能起到锁的作用 —— 实质状态是"无锁"。）
+
+**为什么现在可以接受**
+
+TG 需求线明确「不改火鸟既有代码、既有问题只出清单不修」。且它不是本次改动引入的。
+
+**上线前必须人工确认的一条**
+
+镜像里是否还带着 `webroot/install/`。若带着，任何人都可能重装站点。
+
+```bash
+# 在 php 容器里执行，应返回 "no install dir"
+docker exec <php-pod> sh -c '[ -d /var/www/html/webroot/install ] && echo "install dir EXISTS" || echo "no install dir"'
+# 或从公网直接访问，应 404
+curl -s -o /dev/null -w '%{http_code}\n' https://<站点域名>/install/index.php
+```
+
+**将来怎么修（优先级）**
+
+镜像里直接删掉 `webroot/install/` > 安装完成后写死一个 lock 文件 > 加登录校验
+
+---
+
+## KI-003 · index.php:1423 在特定路径下会渲染商家登录表单
+
+**状态**：待真机确认（2026-11-06，复核人 Vic）
+
+**现象**
+
+`index.php:1423`：`$templates == 'login.html'` 且路径含 `wmsj` 时，模板目录切到
+`/wmsj/templates/touch/`。若此时 `$service` 解析成 `member`（在白名单内，放行），
+会渲染出**商家登录表单**——商家数据页本身仍受守卫约束，泄漏面只有一个表单。
+
+注意：这条与 KI-002 不同，**不是既有问题**，是这轮引入白名单后才出现的可达性变化，
+只是尚未在真机上确认能不能真的走到。
+
+**为什么现在可以接受**
+
+需要「会员子域 + 特定路径」的组合才触发，真机上是否可达尚未确认；且 wmsj 登录页
+本身有自己的账号鉴权，不构成越权。
+
+**怎么验（可执行，不是"看一眼"）**
+
+```bash
+# 1) 确认模板切换分支存在且条件是什么
+sed -n '1415,1430p' webroot/index.php
+
+# 2) 用会员子域 + login.html 路径请求，看返回体里有没有商家登录表单的特征串
+#    （特征串取 wmsj/templates/touch/login.html 里的表单 action 或唯一 class）
+curl -s "https://<会员子域>/?service=member&template=login.html&do=wmsj" | grep -c '<商家登录表单的特征串>'
+```
+
+**什么条件下必须重修**
+
+真机/curl 确认该路径可达且能提交登录 → 必须把 wmsj 路径特征纳入守卫，
+或改掉 `:1423` 的模板选择条件。

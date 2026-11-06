@@ -321,11 +321,12 @@ test('rootDomain：频道子域算站内，避免把站内跳转扔进系统浏�
 //
 // 两份名单语义不同、不该相等，但交叠部分必须同源 —— 否则第三个 service 加进来时
 // 必有一边漏改，而漏改的表现是「静默不注入/静默放行」，跑普通测试不会红。
-//   PHP 允许集  = { waimai, article, travel, member, siteConfig }   允许访问
-//   shim 处理集 = { waimai, travel, courier, article }              会做页面适配
-//   交集        = { waimai, travel, article }                       两边都必须在
-//   只在 PHP    = { member, siteConfig }                            shim 不处理，正常
-//   只在 shim   = { courier }                                       PHP 侧是 do=courier，正常
+//   PHP 允许集  = { waimai, article, travel, member, siteConfig, business }   允许访问
+//                 （business 是产品裁决加的例外：商家要用网页后台接单）
+//   shim 处理集 = { waimai, travel, courier, article }                       会做页面适配
+//   交集        = { waimai, travel, article }                                两边都必须在
+//   只在 PHP    = { member, siteConfig, business }                           shim 不处理，正常
+//   只在 shim   = { courier }                                                PHP 侧是 do=courier，正常
 // ---------------------------------------------------------------------------
 
 test('白名单同源守卫：shim 适配的 service 必须都在 PHP 白名单里', () => {

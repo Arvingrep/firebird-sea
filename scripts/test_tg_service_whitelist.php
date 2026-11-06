@@ -117,12 +117,11 @@ check('四个函数都已定义',
 // ---------------------------------------------------------------------------
 // 1. 白名单
 // ---------------------------------------------------------------------------
-foreach (array('waimai', 'article', 'travel', 'member', 'siteConfig') as $service) {
+foreach (array('waimai', 'article', 'travel', 'member', 'siteConfig', 'business') as $service) {
     check("放行 {$service}", fbsTgServiceAllowed($service), true);
 }
 
 $blocked = array(
-    'business'    => '商家端',
     'website'     => '自助建站（website.php 入口）',
     'special'     => '专题（special.php 入口）',
     'shop'        => '商城模块',
@@ -178,19 +177,20 @@ $decisions = array(
     // [service, defaultIndex, fromMarker, enabled] => 期望
     '放行的 service 直接过'                    => array(array('waimai', '', '', true), 'allow'),
     'member 放行（登录桥全链路靠它）'          => array(array('member', '', '', true), 'allow'),
-    '被拦 service → 回首页'                    => array(array('business', '', '', true), 'home'),
+    'business 放行（产品裁决：商家要能用网页后台）' => array(array('business', '', '', true), 'allow'),
+    '被拦 service → 回首页'                    => array(array('shop', '', '', true), 'home'),
     'website 入口被拦'                         => array(array('website', '', '', true), 'home'),
     'special 入口被拦'                         => array(array('special', '', '', true), 'home'),
     '空 service 被拦'                          => array(array('', '', '', true), 'home'),
-    '默认首页是别的放行模块 → 仍回首页'        => array(array('business', 'siteConfig', '', true), 'home'),
-    '默认首页与当前 service 相同 → 404'        => array(array('business', 'business', '', true), 'notfound'),
-    '默认首页是数字型自定义模块 → 404（防死循环）' => array(array('business', '3', '', true), 'notfound'),
-    '带 from=tg_whitelist 再来一次 → 404'      => array(array('business', '', 'tg_whitelist', true), 'notfound'),
-    '带别的 from 标记 → 正常回首页'            => array(array('business', '', 'index_395', true), 'home'),
-    '开关关闭 → 一律放行'                      => array(array('business', '', '', false), 'allow'),
-    '开关关闭时也不看 from'                    => array(array('business', '', 'tg_whitelist', false), 'allow'),
-    'from 是数组时不炸、按空处理'              => array(array('business', '', array('x'), true), 'home'),
-    'defaultIndex 为 null 不炸'                => array(array('business', null, '', true), 'home'),
+    '默认首页是别的放行模块 → 仍回首页'        => array(array('shop', 'siteConfig', '', true), 'home'),
+    '默认首页与当前 service 相同 → 404'        => array(array('shop', 'shop', '', true), 'notfound'),
+    '默认首页是数字型自定义模块 → 404（防死循环）' => array(array('shop', '3', '', true), 'notfound'),
+    '带 from=tg_whitelist 再来一次 → 404'      => array(array('shop', '', 'tg_whitelist', true), 'notfound'),
+    '带别的 from 标记 → 正常回首页'            => array(array('shop', '', 'index_395', true), 'home'),
+    '开关关闭 → 一律放行'                      => array(array('shop', '', '', false), 'allow'),
+    '开关关闭时也不看 from'                    => array(array('shop', '', 'tg_whitelist', false), 'allow'),
+    'from 是数组时不炸、按空处理'              => array(array('shop', '', array('x'), true), 'home'),
+    'defaultIndex 为 null 不炸'                => array(array('shop', null, '', true), 'home'),
 );
 
 foreach ($decisions as $desc => $case) {

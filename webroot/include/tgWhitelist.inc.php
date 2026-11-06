@@ -5,6 +5,9 @@
  * 需求文档验收第 2 条：首页与导航只出现外卖、跑腿、资讯、旅游四个入口，其他模块不可见，
  * 直接输入 URL 也打不开。前半靠后台停用模块，后半靠这个文件。
  *
+ * **例外**：business（商家端）经产品裁决放行，见 fbsTgServiceAllowed() 的注释。
+ * 也就是说"直接输 URL 打不开"这一条对商家端不成立，其余模块成立。
+ *
  * 为什么要单独一个文件：站内有四个**互相独立**的 PHP 入口，都不经过 index.php ——
  *   webroot/index.php                 ?service=xxx 与伪静态都从这里进
  *   webroot/website.php               自助建站展示（?type=template 还能看草稿，本身无登录校验）
@@ -26,13 +29,22 @@ if (!function_exists('fbsTgServiceAllowed')) {
      * 名单对应需求文档的五个业务块：外卖（含跑腿、骑手端 do=courier）、资讯、旅游、会员、站点首页。
      * article 本期未做页面适配，但名单按文档保留，避免下一期再改一次。
      * 严格匹配：不做大小写折叠、不 trim —— $service 进来之前已被调用方洗成纯字母数字。
+     *
+     * business 是**产品裁决后加进来的例外**（2026-11-06）：不放行它，商家自己的网页后台
+     * 整体不可用（会员中心里「全部订单 / 待接单 / 商品管理」PC 8 处 + 移动 4 处跳转全被 302，
+     * 订单角标 AJAX 静默失败），这一期商家没有别的接单入口。
+     * 代价是验收第 2 条「其它模块直接输入 URL 也打不开」出现一个例外：?service=business
+     * 与 /wmsj/** 商家能打开。首页导航不受影响（导航由模块表驱动，不会因此多出商家入口），
+     * 顾客与骑手链路也确认零影响（Vic 复核：模板里只有 5 处引用 /wmsj/，4 处是商家自己的跳转，
+     * 1 处是顾客跑腿页引的 CSS，走静态直出不触发守卫）。
+     * 商家端没有做 Telegram 适配，页面里仍会出现火鸟自己的顶栏与返回键 —— 这是已知的观感差异。
      */
     function fbsTgServiceAllowed($service)
     {
         if (!is_scalar($service)) {
             return false;
         }
-        $allow = array('waimai', 'article', 'travel', 'member', 'siteConfig');
+        $allow = array('waimai', 'article', 'travel', 'member', 'siteConfig', 'business');
         return in_array((string)$service, $allow, true);
     }
 }
