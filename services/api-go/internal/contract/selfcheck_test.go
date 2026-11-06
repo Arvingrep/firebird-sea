@@ -69,8 +69,13 @@ func TestSelfCheckRoutesCoverSpec(t *testing.T) {
 
 	missingInSpec, missingInCode := DiffRoutes(routes, specRoutes)
 
-	if len(missingInCode) != 0 {
-		t.Fatalf("spec 有、代码没有：%v", missingInCode)
+	if rest := withoutNotYetInCode(missingInCode); len(rest) != 0 {
+		t.Fatalf("spec 有、代码没有：%v", rest)
+	}
+	// 与正式用例同一套判据：待移植清单必须恰好等于当前真实缺口，
+	// 否则「实现了没删」和「清单指错」都会让这条自检变成假绿来源。
+	if len(missingInCode) != len(notYetInCode) {
+		t.Fatalf("待移植路由应恰好 %d 条，实得 %v", len(notYetInCode), missingInCode)
 	}
 
 	// 口径外路由只豁免「代码有 spec 没有」这一个方向；反向已在上面全量断言。

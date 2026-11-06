@@ -90,7 +90,11 @@ func TestMigrate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("空库迁移应成功，实际 %v", err)
 		}
-		want := []string{"001_fbs_tables.sql", "002_tma_shared_state.sql", "003_addr_share.sql"}
+		// 期望值从同一份 Load 结果派生，而不是钉死文件名：这条用例守的是「Run 把 Load
+		// 出来的每一条都执行了、且顺序一致」，不是「仓库里恰好有三个迁移」。
+		// 后者属于仓库状态，会随新增迁移无意义地变红；真正的守卫是
+		// selfcheck_test.go 的 TestSelfCheckLoadRealMigrations（它比对目录实际文件数）。
+		want := migrationNames(migrations)
 		if len(ran) != len(want) {
 			t.Fatalf("应执行 %v，实际 %v", want, ran)
 		}

@@ -43,6 +43,39 @@ func contractExempt() map[string]struct{} {
 	}
 }
 
+// notYetInCode 是 openapi.yaml 已收录、Go 版尚未移植的路由。
+//
+// 这与 contractExempt 是相反方向：那边是「代码有、spec 本不该有」，这边是「spec 有、
+// 代码还没有」。两条都不能省，否则两种漂移各有一个方向是瞎的。
+//
+// 登记条件是「Node 已有实现、Go 待移植」，不是「暂时不想做」。每条都必须写清来源，
+// 因为这里每加一行，就是给一道门禁开一个口子；口子越多，门禁越像装饰。
+//
+// 移除方式：把路由实现进 httpapi.Routes() 后，从本表删掉对应行。本表与
+// missingInCode 是双向核对的——实现了却不删，用例会报「清单里的路由已经存在」。
+var notYetInCode = map[string]struct{}{
+	// #212 骑手 Telegram 全链路（services/api/src/riderRoute.js 260 行、
+	// dispatchRoute.js 247 行，含 006/008 两条迁移）。canary 上 Node 版已上线，
+	// Go 版待移植；在那之前 canary 的 api.engine 必须保持 node。
+	"GET /tg-api/rider/bind":         {},
+	"POST /tg-api/rider/bind":        {},
+	"POST /tg-api/rider/session":     {},
+	"POST /tg-api/internal/dispatch": {},
+}
+
+// withoutNotYetInCode 从「spec 有、代码没有」的差集里剔除已登记待移植的路由，
+// 只留下真正没人认领的缺口。
+func withoutNotYetInCode(keys []string) []string {
+	rest := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if _, ok := notYetInCode[key]; ok {
+			continue
+		}
+		rest = append(rest, key)
+	}
+	return rest
+}
+
 func loadContractSpec(t *testing.T) Spec {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Clean(contractSpecPath))
@@ -206,8 +239,8 @@ components:
 		if !containsString(missingInSpec, "GET /tg-api/rogue") {
 			t.Fatalf("新加但未写进 spec 的路由必须报出，实得 missingInSpec = %v", missingInSpec)
 		}
-		if len(missingInCode) != 0 {
-			t.Fatalf("反向不该因为多一条代码路由而报错，实得 %v", missingInCode)
+		if rest := withoutNotYetInCode(missingInCode); len(rest) != 0 {
+			t.Fatalf("反向不该因为多一条代码路由而报错，实得 %v", rest)
 		}
 	})
 
@@ -224,8 +257,14 @@ components:
 		}
 
 		missingInSpec, missingInCode := DiffRoutes(code, sortedSet(spec.Routes))
-		if len(missingInCode) != 0 {
-			t.Fatalf("spec 有、代码没有：%v", missingInCode)
+		if rest := withoutNotYetInCode(missingInCode); len(rest) != 0 {
+			t.Fatalf("spec 有、代码没有（已排除 %d 条待移植路由）：%v", len(notYetInCode), rest)
+		}
+		// 待移植清单也要真的用得上：实现完却不删，这道口子会变成永久豁免，
+		// 后续任何人新增路由都能「反正清单里已经有一堆」而蒙混过去。
+		if len(missingInCode) != len(notYetInCode) {
+			t.Fatalf("待移植清单应恰好命中 %d 条，实得 %v（实现了就把对应行从 notYetInCode 删掉）",
+				len(notYetInCode), missingInCode)
 		}
 
 		exempt := contractExempt()
