@@ -1,4 +1,21 @@
 
+/* 定位降级守卫：site_map 指向 google 但 Google Maps JS SDK 实际没加载时，
+   HN_Location.googleMap() 会在 new google.maps.LatLng 抛 ReferenceError 且不回调，
+   页面永久停在「定位中」/「加载中」。此时用原生定位拿坐标（跳过逆地理）后直接回调。
+   返回 true 表示已接管定位流程，调用方必须 return，不要再调 HN_Location.init。 */
+function HN_geoUnavailable(cb){
+  if(typeof site_map === 'undefined' || site_map != 'google' || typeof google !== 'undefined'){
+    return false;
+  }
+  if(!navigator.geolocation){ cb(null); return true; }
+  navigator.geolocation.getCurrentPosition(
+    function(p){ cb(p.coords); },
+    function(){ cb(null); },
+    {timeout: 8000, maximumAge: 60000}
+  );
+  return true;
+}
+
 new Vue({
   el:'#page',
   data:{
@@ -261,18 +278,30 @@ new Vue({
         // tt.checkCity(localData)  //新版本会自动定位当前城市，这里不需要有这个提示层了
         utils.setStorage('waimai_local', JSON.stringify({'time': time, 'lng': tt.lng, 'lat': tt.lat, 'address': localData.address, 'cityid': localData.cityid, 'cityname': localData.cityname,site_map:site_map}));
       }else{
+        /* site_map=google 但页面没有加载 Google Maps JS SDK 时，HN_Location 会走 googleMap()，
+           在 new google.maps.LatLng 处抛 ReferenceError，回调整体不返回 → 地址栏永久停「定位中」、
+           列表永久停「加载中」。此处退化为原生定位并跳过逆地理，保证列表一定能出来。 */
+        if(HN_geoUnavailable(function(coords){
+            if(coords){
+              tt.lng = coords.longitude;
+              tt.lat = coords.latitude;
+              tt.address = '当前位置';
+            }
+            tt.page = 1;
+            tt.getshopList();
+          })) return;
         HN_Location.init(function(data){
         if (data == undefined || data.address == "" || data.name == "" || data.lat == "" || data.lng == "") {
             tt.address = langData['siteConfig'][27][136];
           // $('.posiChose span').html(langData['siteConfig'][27][136]);    /* 定位失败 */
+          /* 提示交给 Vue 的 loadText：请求成功后会被「下拉加载更多」覆盖，不会和商家列表同时出现 */
+          tt.loadText = langData['siteConfig'][27][137];    /* 定位失败，请重新刷新页面！ */
           /* 定位失败/被拒时也要放行请求：后端 shopList 支持无坐标的城市级查询，
-             否则整页没有商家（TG 内嵌 WebView 常拿不到定位权限）。此时不发坐标参数。
-             .loading 是列表底部文案位（不是遮罩），getshopList 成功后会改写，不会挡住列表。 */
+             否则整页没有商家（TG 内嵌 WebView 常拿不到定位权限）。此时不发坐标参数。 */
           if(!tt.isload){
             tt.page = 1;
             tt.getshopList();
           }
-          $('.loading').html(langData['siteConfig'][27][137]).show();    /* 定位失败，请重新刷新页面！ */
         }else{
           if(!tt.islocal){
               tt.lng = data.lng;

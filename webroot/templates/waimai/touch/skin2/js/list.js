@@ -1,4 +1,20 @@
 $(function(){
+	/* 定位降级守卫：site_map 指向 google 但 Google Maps JS SDK 实际没加载时，
+	   HN_Location.googleMap() 会在 new google.maps.LatLng 抛 ReferenceError 且不回调，
+	   列表永久停在「加载中」。此时用原生定位拿坐标（跳过逆地理）后直接回调。
+	   返回 true 表示已接管定位流程，调用方必须 return。 */
+	function HN_geoUnavailable(cb){
+	  if(typeof site_map === 'undefined' || site_map != 'google' || typeof google !== 'undefined'){
+	    return false;
+	  }
+	  if(!navigator.geolocation){ cb(null); return true; }
+	  navigator.geolocation.getCurrentPosition(
+	    function(p){ cb(p.coords); },
+	    function(){ cb(null); },
+	    {timeout: 8000, maximumAge: 60000}
+	  );
+	  return true;
+	}
 	var page = 1,shop_load = 0; 
 	var str = window.location.search;
 	var strArrary = str.split('?');
@@ -219,6 +235,20 @@ $(function(){
 	}else{
 		
 		var time = Date.parse(new Date())/1000;
+		/* 同 index.js：site_map=google 但 SDK 未加载时 HN_Location 会抛 ReferenceError 且不回调，
+		   列表永久停在「加载中」。退化为原生定位（跳过逆地理）后直接出列表。 */
+		if(HN_geoUnavailable(function(coords){
+			if(coords){
+				lat = coords.latitude;
+				lng = coords.longitude;
+				address = '当前位置';
+			}
+			if(id!=0){
+				swiper1.slideTo($('.fenlei_box ul li[data-id="'+id+'"]').index())
+			}else{
+				getlist();
+			}
+		})) return;
 		HN_Location.init(function(data){
 			if (data == undefined || data.address == "" || data.name == "" || data.lat == "" || data.lng == "") {
 				address = langData['siteConfig'][27][136];
