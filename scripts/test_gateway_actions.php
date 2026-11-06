@@ -15,8 +15,28 @@
 define('FBS_GATEWAY_TEST', true);   // 只加载函数，不跑 HTTP 入口（该入口会 exit）
 putenv('FBS_TG_BOT_TOKEN=' . '123456:TEST-FAKE-BOT-TOKEN');
 
-// 站点配置 fail-closed 用：指向一个不存在的文件（G7 用例），其余用例走 context 注入
-define('FBS_GATEWAY_SITE_CONFIG_FILE', sys_get_temp_dir() . '/fbs_gateway_nonexistent_config.php');
+// 站点配置用：指向本进程专属的临时文件，默认不存在（G7a 的 fail-closed 用例），
+// G7b–G7d 按需写入/删除；其余用例一律走 context 注入，不受影响。
+$CFG_FILE = sys_get_temp_dir() . '/fbs_gateway_cfg_' . getmypid() . '.php';
+@unlink($CFG_FILE);
+define('FBS_GATEWAY_SITE_CONFIG_FILE', $CFG_FILE);
+
+/** 写一份"火鸟缓存文件"（只含本用例需要的变量） */
+function cfg_write($path, $body)
+{
+    file_put_contents($path, "<?php\n" . $body . "\n");
+}
+
+/** 从 set_cookies 数组里抽出所有 domain 属性值 */
+function set_cookie_domains(array $payload)
+{
+    $out = array();
+    if (!isset($payload['data']['set_cookies']) || !is_array($payload['data']['set_cookies'])) return $out;
+    foreach ($payload['data']['set_cookies'] as $c) {
+        if (preg_match('/;\s*domain=([^;]*)/i', $c, $m)) $out[] = trim($m[1]);
+    }
+    return $out;
+}
 
 require __DIR__ . '/../webroot/api/fbs/index.php';
 
@@ -425,16 +445,63 @@ check('G6 ?action= 仍可用（兼容冒烟场景）', $action === 'member_find_
 unset($_SERVER['FBS_GATEWAY_SECRET']);
 putenv('FBS_GATEWAY_SECRET=' . $SECRET);
 
-printf("\n==== G7 站点配置 fail-closed（R18）====\n");
+printf("\n==== G7 站点配置：缓存文件 → env → 500 三级（R18）====\n");
+
+// 统一前置：文件不存在 + env 未设
+@unlink($CFG_FILE);
+putenv('FBS_GATEWAY_COOKIE_DOMAIN=');
 
 $pdoCfg = make_pdo();
+
+// 象限 1：缓存缺失 + env 未设 → 保持原 fail-closed
 list($code, $payload) = call_gw('issue_session', session_params(8888, init_hash('cfg')), ctx_no_config($pdoCfg));
-check('G7 站点配置读不到 → 500 CONFIG_MISSING（不拿 cookieDomain="" 凑出 host-only cookie）',
+check('G7a 缓存缺失 + env 未设 → 500 CONFIG_MISSING（不拿 cookieDomain="" 凑出 host-only cookie）',
     $code === 500 && is_err($payload, 'CONFIG_MISSING') && !isset($payload['data']),
     "http=$code payload=" . json_encode($payload));
 
+// 象限 2：缓存缺失 + env 设 → 走 env（canary 的真实形态：emptyDir 每次重建清空 config.php）
+putenv('FBS_GATEWAY_COOKIE_DOMAIN=fbird.men');
+list($code, $payload) = call_gw('issue_session', session_params(8888, init_hash('cfg_env')), ctx_no_config($pdoCfg));
+$domains = ($code === 200) ? set_cookie_domains($payload) : array();
+check('G7b 缓存缺失 + env=fbird.men → 200，Set-Cookie 带 domain=fbird.men',
+    $code === 200 && in_array('fbird.men', $domains, true) && count($payload['data']['set_cookies']) > 0,
+    "http=$code domains=" . json_encode($domains));
+
+// 象限 3：缓存有 cookieDomain + env 同设 → 必须用缓存（站点一致性优先，env 不覆盖）
+cfg_write($CFG_FILE, "\$cfg_cookiePath='/files/';\n\$cfg_cookieDomain='file.example.com';\n\$cfg_onlinetime=48;\n\$cfg_httpSecureAccess=0;");
+putenv('FBS_GATEWAY_COOKIE_DOMAIN=env.example.com');
+list($cfg3, $err3) = fbs_gateway_load_site_config(ctx_no_config($pdoCfg));
+check('G7c 缓存有 $cfg_cookieDomain → 用缓存值，env 不覆盖；其余三项也来自缓存',
+    $err3 === null && $cfg3['cookieDomain'] === 'file.example.com' && $cfg3['cookiePath'] === '/files/'
+    && $cfg3['onlinetime'] === 48 && $cfg3['httpSecureAccess'] === 0,
+    'cfg=' . json_encode($cfg3) . ' err=' . json_encode($err3));
+list($code, $payload) = call_gw('issue_session', session_params(8888, init_hash('cfg_file')), ctx_no_config($pdoCfg));
+$domains = ($code === 200) ? set_cookie_domains($payload) : array();
+check('G7c 端到端：Set-Cookie 用 file.example.com 且不出现 env.example.com',
+    $code === 200 && in_array('file.example.com', $domains, true) && !in_array('env.example.com', $domains, true),
+    "http=$code domains=" . json_encode($domains));
+
+// 象限 4：缓存存在但无 cookieDomain + env 设 → 走 env，其余三项仍取缓存
+cfg_write($CFG_FILE, "\$cfg_cookiePath='/files/';\n\$cfg_onlinetime=48;\n\$cfg_httpSecureAccess=0;");
+putenv('FBS_GATEWAY_COOKIE_DOMAIN=env.example.com');
+list($cfg4, $err4) = fbs_gateway_load_site_config(ctx_no_config($pdoCfg));
+check('G7d 缓存缺 $cfg_cookieDomain + env → cookieDomain 取 env，cookiePath/onlinetime/httpSecureAccess 取缓存',
+    $err4 === null && $cfg4['cookieDomain'] === 'env.example.com' && $cfg4['cookiePath'] === '/files/'
+    && $cfg4['onlinetime'] === 48 && $cfg4['httpSecureAccess'] === 0,
+    'cfg=' . json_encode($cfg4) . ' err=' . json_encode($err4));
+list($code, $payload) = call_gw('issue_session', session_params(8888, init_hash('cfg_mix')), ctx_no_config($pdoCfg));
+$domains = ($code === 200) ? set_cookie_domains($payload) : array();
+check('G7d 端到端：200 且 Set-Cookie 带 domain=env.example.com',
+    $code === 200 && in_array('env.example.com', $domains, true),
+    "http=$code domains=" . json_encode($domains));
+
+// 还原现场，避免影响后续用例（G8 走 context 注入，不读文件；但保持环境干净）
+@unlink($CFG_FILE);
+putenv('FBS_GATEWAY_COOKIE_DOMAIN=');
+
+// 既有语义：context 注入显式空 cookieDomain（host-only）仍然正常签发 —— 测试注入路径不受本次改动影响
 list($code, $payload) = call_gw('issue_session', session_params(8888, init_hash('cfg2')), ctx($pdoCfg, array('cookieDomain' => '')));
-check('G7 配置里显式写了空 cookieDomain（火鸟允许的 host-only）→ 仍正常签发',
+check('G7e 注入 context 显式空 cookieDomain（火鸟允许的 host-only）→ 仍正常签发',
     $code === 200 && count($payload['data']['set_cookies']) > 0, "http=$code");
 
 printf("\n==== G8 建号命名锁（S2）====\n");

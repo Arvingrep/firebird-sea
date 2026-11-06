@@ -238,16 +238,29 @@ function fbs_gateway_site_config_file()
 }
 
 /**
- * 读取与 Cookie 相关的站点配置。**读不到就报错，不回落到默认值。**
+ * 读取与 Cookie 相关的站点配置。**两级都读不到就报错，不回落到默认值。**
+ *
+ * 取值顺序（fail-closed 语义不变：绝不静默回落成 cookieDomain='' 的 host-only）：
+ *   1. `$context['config']` —— 测试注入，原样保留；
+ *   2. `data/cache/config.php` 里的 `$cfg_cookieDomain`（站点一致性优先，env 不覆盖）；
+ *   3. 文件缺失 **或** 文件里没写 cookieDomain → `FBS_GATEWAY_COOKIE_DOMAIN`（chart 注入，
+ *      与 values 的 `tma.bridge.cookieDomain` 同源）；
+ *   4. 两级都拿不到 → 500 CONFIG_MISSING（消息里给出 env 变量名，便于运维自查）。
+ *
+ * 为什么需要第 3 级（2026-11-06 canary 真机 500 CONFIG_MISSING 的根因）：
+ *   - canary 是 baked 模式，`data/` 挂 emptyDir，**每次 Pod 重建 config.php 就消失**；
+ *   - 新版火鸟已移除 cookieDomain 自定义（`siteConfig.inc.php` 全文无此变量，
+ *     `common.inc.php:84` 注释"新版本不支持cookie作用域自定义"）→ 缓存里永远不会有它。
+ *   两条叠加，只认缓存的写法在 canary 上必然 500，且管理员无法通过后台修复。
  *
  * 为什么不复用 bridge.php 的 fbs_bridge_load_site_config()：那个函数在文件缺失时静默回落成
  * cookieDomain=''（host-only）。登录场景里这是最坏的一种失败——cookie 照发、HTTP 200、日志写
  * 「登录成功」，但用户从 x.com 跳到 www.x.com 就变游客，没有任何信号。所以网关这条链路单独
- * fail-closed：cookieDomain 没有在配置里定义过，就直接 500 CONFIG_MISSING。
+ * fail-closed。
  *
  * 只对 cookieDomain 做强制（它是跨域共享登录态的唯一依据）；cookiePath / onlinetime /
- * httpSecureAccess 缺失时用火鸟默认值（siteConfig.inc.php:35-49），它们最多影响 Cookie 的
- * 有效期与 secure 标记，不会造成「看起来登录成功」的静默错位。
+ * httpSecureAccess 缺失时优先取缓存文件、再退化到火鸟默认值（siteConfig.inc.php:35-49），
+ * 它们最多影响 Cookie 的有效期与 secure 标记，不会造成「看起来登录成功」的静默错位。
  *
  * @return array [cfg|null, error|null]  error = ['code'=>..,'message'=>..]
  */
@@ -269,38 +282,79 @@ function fbs_gateway_load_site_config(array $context)
     }
 
     $file = fbs_gateway_site_config_file();
-    if (!is_file($file) || !is_readable($file)) {
+    $loaded = null;
+    if (is_file($file) && is_readable($file)) {
+        $loaded = (static function ($__file) {
+            $cfg_cookiePath = $cfg_cookieDomain = $cfg_onlinetime = $cfg_httpSecureAccess = null;
+            include $__file;
+            return array(
+                'cookiePath'       => $cfg_cookiePath,
+                'cookieDomain'     => $cfg_cookieDomain,
+                'onlinetime'       => $cfg_onlinetime,
+                'httpSecureAccess' => $cfg_httpSecureAccess,
+            );
+        })($file);
+    } else {
         error_log('[fbs_gateway] site config missing/unreadable: ' . $file);
-        return array(null, array('code' => 'CONFIG_MISSING', 'message' => 'data/cache/config.php not found'));
     }
 
-    $loaded = (static function ($__file) {
-        $cfg_cookiePath = $cfg_cookieDomain = $cfg_onlinetime = $cfg_httpSecureAccess = null;
-        include $__file;
-        return array(
-            'cookiePath'       => $cfg_cookiePath,
-            'cookieDomain'     => $cfg_cookieDomain,
-            'onlinetime'       => $cfg_onlinetime,
-            'httpSecureAccess' => $cfg_httpSecureAccess,
-        );
-    })($file);
+    // 非 cookieDomain 的三项：文件里有就沿用文件（站点一致性优先），没有才用火鸟默认值。
+    // 它们最多影响 Cookie 的有效期/secure 标记，不会造成「看着登录成功、跨域却变游客」的静默错位，
+    // 所以即使走 env 兜底 cookieDomain，这三项也仍然优先取文件。
+    $cookiePath = (is_array($loaded) && is_string($loaded['cookiePath']) && $loaded['cookiePath'] !== '')
+        ? $loaded['cookiePath'] : '/';
+    $onlinetime = (is_array($loaded) && is_numeric($loaded['onlinetime']) && (int)$loaded['onlinetime'] > 0)
+        ? (int)$loaded['onlinetime'] : 100;
+    $httpSecureAccess = (is_array($loaded) && $loaded['httpSecureAccess'] !== null && $loaded['httpSecureAccess'] !== '')
+        ? (int)$loaded['httpSecureAccess'] : 1;
 
-    if (!is_array($loaded) || !array_key_exists('cookieDomain', $loaded) || $loaded['cookieDomain'] === null) {
-        error_log('[fbs_gateway] site config does not define $cfg_cookieDomain: ' . $file);
-        return array(null, array('code' => 'CONFIG_MISSING', 'message' => 'cookieDomain is not configured'));
+    // 第一优先：缓存文件里的 $cfg_cookieDomain（站点自己声明的口径，env 不得覆盖）
+    if (is_array($loaded) && array_key_exists('cookieDomain', $loaded)
+        && $loaded['cookieDomain'] !== null && $loaded['cookieDomain'] !== '') {
+        return array(array(
+            'cookiePath'       => $cookiePath,
+            'cookieDomain'     => (string)$loaded['cookieDomain'],
+            // 与 common.inc.php:86 一致：原生在加载配置后仍硬编码 $cfg_cookiePre='HN_'
+            'cookiePre'        => 'HN_',
+            'onlinetime'       => $onlinetime,
+            'httpSecureAccess' => $httpSecureAccess,
+        ), null);
     }
 
-    $cfg = array(
-        'cookiePath'       => (is_string($loaded['cookiePath']) && $loaded['cookiePath'] !== '') ? $loaded['cookiePath'] : '/',
-        'cookieDomain'     => (string)$loaded['cookieDomain'],
-        // 与 common.inc.php:86 一致：原生在加载配置后仍硬编码 $cfg_cookiePre='HN_'
-        'cookiePre'        => 'HN_',
-        'onlinetime'       => (is_numeric($loaded['onlinetime']) && (int)$loaded['onlinetime'] > 0) ? (int)$loaded['onlinetime'] : 100,
-        'httpSecureAccess' => ($loaded['httpSecureAccess'] !== null && $loaded['httpSecureAccess'] !== '')
-            ? (int)$loaded['httpSecureAccess'] : 1,
-    );
+    // 第二优先：env 兜底。为什么需要它（canary 实测 500 CONFIG_MISSING）：
+    //   1) baked 模式下 data/ 挂 emptyDir（_helpers.tpl 的 data-shared），**每次 Pod 重建
+    //      data/cache/config.php 就消失**；
+    //   2) 新版火鸟已移除 cookieDomain 自定义（siteConfig.inc.php 无此变量，
+    //      common.inc.php:84 注释"新版本不支持cookie作用域自定义"）→ 即便缓存生成过，
+    //      里面也永远不会有 $cfg_cookieDomain。
+    //   两条叠加 ⇒ 只认缓存的写法在 canary 上必然 500，且管理员无法通过后台修复。
+    //   env 与 values-canary 的 tma.bridge.cookieDomain 同源（chart 同一处注入），不会出现两套口径。
+    $envDomain = getenv('FBS_GATEWAY_COOKIE_DOMAIN');
+    if (is_string($envDomain) && trim($envDomain) !== '') {
+        error_log('[fbs_gateway] cookieDomain from env: '
+            . (is_array($loaded) ? 'cache lacks $cfg_cookieDomain' : 'cache missing')
+            . ' (' . $file . ')');
+        return array(array(
+            'cookiePath'       => $cookiePath,
+            'cookieDomain'     => trim($envDomain),
+            'cookiePre'        => 'HN_',
+            'onlinetime'       => $onlinetime,
+            'httpSecureAccess' => $httpSecureAccess,
+        ), null);
+    }
 
-    return array($cfg, null);
+    // 两级都拿不到：保持 fail-closed（绝不回落成 cookieDomain='' 的 host-only 静默降级）
+    if (!is_array($loaded)) {
+        return array(null, array(
+            'code'    => 'CONFIG_MISSING',
+            'message' => 'data/cache/config.php not found and FBS_GATEWAY_COOKIE_DOMAIN is not set',
+        ));
+    }
+    error_log('[fbs_gateway] site config does not define $cfg_cookieDomain: ' . $file);
+    return array(null, array(
+        'code'    => 'CONFIG_MISSING',
+        'message' => 'cookieDomain is not configured (set $cfg_cookieDomain in data/cache/config.php or FBS_GATEWAY_COOKIE_DOMAIN)',
+    ));
 }
 
 /* ============================== 防重放 ============================== */
