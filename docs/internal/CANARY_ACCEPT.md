@@ -381,3 +381,40 @@ location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|svg|woff2)$ {
 
 判定方法：**数字一致 = 链路没坏**；不一致再按第一节到第八节逐项定位，不要先怀疑代码。
 
+
+### 8.9 外卖定位线收口（2026-11-06 晚，fbs3→fbs8 六轮）
+
+**结论：denied / granted 两种定位状态均能出商家列表，滚动分页、筛选、排序绑定恢复。**
+最终判定版本 `08092f93`，复测 6 项全 PASS，无新缺陷。
+
+**版本台账（资产 → 版本串，勿混）**
+
+| 资产 | 版本串 |
+|---|---|
+| `siteConfig/touch/*/css/index.css` | `20261106fbs4`（A2 头条 flex） |
+| `waimai/touch/skin2/js/index.js` | `20261106fbs7` |
+| `waimai/touch/skin2/js/list.js` | `20261106fbs8` |
+| `waimai/touch/skin2/js/slist.js` | `20261106fbs8` |
+
+**提交链**：`0a36cfcd` → `0b143836` → `c8007e3d` → `2a22ea50` → `e3d0996f` → `08092f93`
+（`42e937e9`/`bc726826` 为 A2 与首页 css 版本串）。
+
+**最终判据（复测即用）**
+
+1. denied：`shopList` 请求发出且 URL **无 `lng=`/`lat=` 键**；出城市级商家；`addr="定位失败"`
+2. granted：URL **带** `lng/lat`；出按坐标商家；`addr="当前位置"`；无 `google is not defined`
+3. 负向：mock `state=101` 一次后仍能连续翻页，**且** `hasScrollHandlerWithShopLoad:true`、`sortHandlers>0`
+   （只断言请求序列会漏掉「绑定缺失」这一类）
+4. 页脚不再与商家列表同时出现「定位失败，请重新刷新页面！」（KI-013）
+
+**本轮教训（写进纪律）**
+
+- 「置位锁 + 只在成功分支复位」的写法，异常路径必然漏。同一形态今天在 `slist.js`
+  (`shop_load`)、`index.js` (`isload`)、`list.js` (`shop_load`) 各出现一次，前三轮只修了当次看到的那个。
+- 同一段守卫代码在不同作用域语义相反：`index.js` 写在方法内 `return` 只退方法；
+  `list.js` 写在 ready 回调层 `return` 会截断后续所有绑定。**改 `return` 前先问它退的是哪一层。**
+- 判「新版本是否生效」用**版本串 + 内容指纹**双证；md5 只能判字节相同，HTML 因尾注
+  `<!--Processed in pageload …-->` 每次不同，连字节都判不了。
+- 静态资产线上真实路径是 `/templates/...`（`$templets_skin` 解析），不是仓库目录路径。
+- 无判别力的断言要主动作废：canary 只有 3 家店、`pageSize=10` → 恒 1 页，
+  「滚到底加载第 2 页」改了和没改现象一样，必须用 Fetch 阶段改写 `totalPage` 造多页才有判别力。

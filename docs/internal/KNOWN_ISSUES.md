@@ -616,3 +616,21 @@ GET /include/ajax.php?service=travel&action=videoList&page=1&pageSize=10
 
 **共性判据（写进验收清单）**：任何「置位锁 + 只在成功分支复位」的写法，异常路径必然漏；
 验收时必须跑「接口返非 100」与「网络错误」两条负向路径，只看成功路径查不出来。
+
+**KI-014 补充（2026-11-06 晚，根因定性升级 + 根治待办）**
+
+1. **不是环境偶然，是常态**：同 URL 同 UA，只改 `Accept` 头，边缘返回两种 HTML——
+   `Accept: */*` 那份带 maps 脚本；浏览器口径（`text/html,application/...`）那份的 maps 脚本
+   被替换成 `<script type="module" src="...cloudflareinsights.com/beacon.min.js">`。
+   即**真实浏览器里 `typeof google === 'undefined'` 是常态**，守卫是防常态而非防万一。
+2. **推论**：跑腿、`local.html`、地址簿等同样直接调 `HN_Location` 的页面大概率同病。
+3. **不要逐页补守卫**。本轮已在 waimai 三个入口逐页补，两次翻车都出在这上面：
+   - `list.js`：守卫的 `return` 写在 `$(function(){})` ready 回调层，退出整个回调 →
+     滚动分页/筛选/排序全部绑不上（页面看起来正常、功能全死）；
+   - `slist.js`：整个文件漏补 → granted 时 0 家店、零请求。
+   **根治方案**：在 `publicLocation.js` 的 `googleMap()` 里加 `typeof google === 'undefined'`
+   兜底（退化到原生坐标、跳过逆地理），并**全局升 `cfg_staticVersion`**——该文件被 20+ 模板
+   以 `?v={#$cfg_staticVersion#}` 引用，只改内容不换 URL 会继续吃 30 天缓存。
+   另一条路是把 `site_map` 换成实际可用的地图服务。
+4. 止血代价（当前已上线状态）：`address` 在降级路径是硬编码中文「当前位置」，
+   不跟 `langData`，且丢了接口本可返回的街址（如 `514 Paterno St`）；逆地理恢复后自动消失。
