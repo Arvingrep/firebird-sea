@@ -242,6 +242,9 @@ $(function(){
 				lat = coords.latitude;
 				lng = coords.longitude;
 				address = '当前位置';
+			}else{
+				/* 拒绝授权也要给地址栏一个终态，别停在初始串 */
+				address = langData['siteConfig'][27][136];    /* 定位失败 */
 			}
 			if(id!=0){
 				swiper1.slideTo($('.fenlei_box ul li[data-id="'+id+'"]').index())

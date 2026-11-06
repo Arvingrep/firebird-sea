@@ -286,6 +286,10 @@ new Vue({
               tt.lng = coords.longitude;
               tt.lat = coords.latitude;
               tt.address = '当前位置';
+            }else{
+              /* 拒绝授权也要给地址栏一个终态，否则会一直停在初始串「定位中...」，
+                 用户会以为还在加载；页脚文案不用补，会被「下拉加载更多/没有更多了」覆盖 */
+              tt.address = langData['siteConfig'][27][136];    /* 定位失败 */
             }
             tt.page = 1;
             tt.getshopList();
