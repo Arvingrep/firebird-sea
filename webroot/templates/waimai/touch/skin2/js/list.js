@@ -237,7 +237,10 @@ $(function(){
 		var time = Date.parse(new Date())/1000;
 		/* 同 index.js：site_map=google 但 SDK 未加载时 HN_Location 会抛 ReferenceError 且不回调，
 		   列表永久停在「加载中」。退化为原生定位（跳过逆地理）后直接出列表。 */
-		if(HN_geoUnavailable(function(coords){
+		/* 注意：这里不能用 `if(...) return;` —— 本段在 $(function(){}) 的 ready 回调里，
+		   return 会把后面所有绑定（滚动分页 :282、快捷筛选 :309、排序 :322）全部截断。
+		   必须用 else 包住原流程。 */
+		var geoHandled = HN_geoUnavailable(function(coords){
 			if(coords){
 				lat = coords.latitude;
 				lng = coords.longitude;
@@ -251,7 +254,8 @@ $(function(){
 			}else{
 				getlist();
 			}
-		})) return;
+		});
+		if(!geoHandled){
 		HN_Location.init(function(data){
 			if (data == undefined || data.address == "" || data.name == "" || data.lat == "" || data.lng == "") {
 				address = langData['siteConfig'][27][136];
@@ -277,6 +281,7 @@ $(function(){
 	
 			}
 			}, device.indexOf('huoniao') > -1 ? false : true);
+		}
 
 	} 
 

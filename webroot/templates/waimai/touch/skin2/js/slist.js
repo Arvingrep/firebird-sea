@@ -112,7 +112,22 @@ $(function(){
 			// 谷歌地图
 			}else if (site_map == 'google') {
 
-				if (navigator.geolocation) {
+				/* 未加载 Google Maps SDK（真实浏览器常态：边缘侧把 maps 脚本替换掉了）时，
+				   下面的 new google.maps.LatLng 会抛 ReferenceError 且 getCurrentPosition 回调不返回 →
+				   一个 shopList 请求都不发、页面 0 家店。改用原生坐标直接出结果，跳过逆地理。 */
+				if (typeof google === 'undefined') {
+					if (navigator.geolocation) {
+						navigator.geolocation.getCurrentPosition(function(position) {
+							lat = position.coords.latitude;
+							lng = position.coords.longitude;
+							getlist();
+						}, function() {
+							lat = ''; lng = ''; getlist();   /* 拒绝授权也要出城市级结果 */
+						}, {timeout: 8000, maximumAge: 60000});
+					} else {
+						getlist();
+					}
+				} else if (navigator.geolocation) {
 
 					//获取当前地理位置
 					navigator.geolocation.getCurrentPosition(function(position) {
