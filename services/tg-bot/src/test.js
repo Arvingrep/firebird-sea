@@ -137,6 +137,10 @@ async function run() {
   if (!bot.getStdout().includes(`"web_app":{"url":"${expectedUrl}"}`)) {
     throw new Error(`/start 未生成 web_app 按钮，stdout=${bot.getStdout()}`);
   }
+  // 骑手入口与顾客入口并列：/start 里也应有，否则骑手找不到绑定入口
+  if (!bot.getStdout().includes(`"web_app":{"url":"${APP_BASE_URL}/tg-api/rider/bind"}`)) {
+    throw new Error(`/start 未生成骑手入口按钮，stdout=${bot.getStdout()}`);
+  }
   console.log('   ✅ PASS');
 
   console.log('🧪 测试 6: 派单脚本缺失且 n8n 不可达 → 明确报错回复（fail-safe，不崩溃）');
@@ -153,6 +157,22 @@ async function run() {
     throw new Error(`n8n 不可达时未回复报错文案，stdout=${out6}`);
   }
   console.log('   ✅ PASS（进程存活，回复派单通道不可用）');
+
+  console.log('🧪 测试 7: /rider 派发骑手绑定入口（web_app → /tg-api/rider/bind）');
+  const before7 = bot.getStdout().length;
+  const s7 = await postJson(PORT, '/webhook/telegram', {
+    message: { chat: { id: 12345, type: 'private' }, text: '/rider', from: { first_name: 'Boss' } }
+  });
+  if (s7.status !== 200 || !s7.data.ok) throw new Error('/rider command failed');
+  await new Promise(r => setTimeout(r, 200));
+  const out7 = bot.getStdout().slice(before7);
+  if (!out7.includes(`"web_app":{"url":"${APP_BASE_URL}/tg-api/rider/bind"}`)) {
+    throw new Error(`/rider 未生成 web_app 绑定按钮，stdout=${out7}`);
+  }
+  if (!out7.includes('绑定并进入工作台')) {
+    throw new Error(`/rider 文案缺失，stdout=${out7}`);
+  }
+  console.log('   ✅ PASS');
 
   console.log('🎉 所有 Telegram Bot 基建测试全部 100% 通过！');
   cleanup();
