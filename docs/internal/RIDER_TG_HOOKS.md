@@ -41,20 +41,35 @@ Node 侧 gatewayClient 统一 reject（`GATEWAY_HTTP_ERROR` + `err.status` + `er
 | 500 | `BIND_FAILED` | 写库失败（含并发双插撞唯一键，N6 落 `result=error` 审计） |
 | 503 | `AUDIT_UNAVAILABLE` | 审计/限频计数底账不可用，fail-closed 拒绝（N4，宁拒勿漏） |
 | 503 | `BRIDGE_CONFIG_MISSING` / `CONFIG_MISSING` | 读不到 `$fb_bridge_token` / 站点 basehost（rider_ql、rider_notify_url） |
-| 429 | `REPLAY_LIMITED` | 紧窗凭证动作（rider_ql / rider_notify_url）同一签名体 15s 内第二次请求（见下） |
+| 429 | `REPLAY_LIMITED` | 紧窗凭证动作（rider_ql / rider_notify_url）同一 (签名体, 时间戳) 的原样重发（见下） |
 
-时间窗按「是否返回活凭证」分两档（最终移植轮裁决）：
+时间窗按「是否返回活凭证」分两档（最终移植轮裁决；重放语义 2026-11-06 修复轮 4 按 Ray F-B1 修正）：
 
 - **紧窗 ±15s + 重放计数**：`issue_session` / `rider_ql` / `rider_notify_url`——三者每次成功都
-  签发活凭证（会话 cookie / ql token 600s），签名体被截获重放即重复取凭证。重放计数与
-  issue_session 同款文件账本（sha256 键 + flock），差异仅在阈值：凭证签发没有「多签一次有益」
-  的语义，**同一签名体只放行一次**，第二次同参请求 429 `REPLAY_LIMITED`（issue_session 保留
-  max=5 的登录防抖不变）。计数放在验签之后、业务动作之前，无需 DB，账本不可写 fail-open 留痕
-  （防重放是辅助防线，签名窗口本身兜底）。
+  签发活凭证（会话 cookie / ql token 600s）。重放计数与 issue_session 同款文件账本（sha256 键 +
+  flock），差异有两点：
+  - **放行单位是 (body, ts) 二元组**：ts 虽在 header，但它参与 HMAC 签名串——同一 body 配新 ts 必须
+    重新签名，攻击者没有 secret 签不出来，所以「同参换新 ts」只可能来自客户端合法重试（双击、
+    几秒后再点），**放行并重记 last_ts**（账本内容 `count expiry last_ts`）；「同参同 ts」才是
+    真重放，429 `REPLAY_LIMITED`。issue_session 保留 max=5 的登录防抖不变。
+  - 计数放在验签之后、业务动作之前，无需 DB；账本不可写 fail-open（留痕含 action/目录/errno，
+    文案与登录桥那条区分）。
 - **宽窗 ±300s**：`rider_bind`——幂等（同对重绑只刷新）+ 每次尝试落审计 + 不签任何令牌，
   重放无攻击面，无需紧窗。
 
 旧网关 rider 动作的 60s 窗口作废；Node 侧 initData 验签的 1 小时窗口不变。
+
+已知接受项（与 bridge.php 现状一致，不另行加固）：
+
+- **账本落在单 Pod 本地盘（baked 模式 data/ 是 emptyDir）**：重放计数只在本 Pod 内生效，请求被
+  负载均衡到另一 Pod 时约 50% 概率不被拦。签名紧窗（±15s）仍是主防线，账本是 Pod 内辅助防线；
+  bridge 的登录防抖账本同款现状，接受。
+- **账本无 GC**：方案 A 后文件数 = 不同 (body 参数) 组合数，每文件 <10 字节，量级可控；过期后
+  内容失效但文件留存，直到 emptyDir 随 Pod 重建清空。接受。
+- **部署顺序**：rider 路由（A1/A2）调 `FBS_GATEWAY_URL` 的 rider 动作，PHP 网关（B）未部署时
+  网关返回 `UNKNOWN_ACTION` 404 → Node 502——**A1/A2/B 三支必须同一发布窗口上线（A1 → A2 → B）**，
+  不允许 A1/A2 先行单独生效。（env 层面已无阻塞：canary 已把 DB_*/TRUST_PROXY_HOPS/CORS_ORIGINS
+  移出 `tma.enabled` 守卫，Node 容器不依赖 TMA 开关。）
 
 ## 三、绑定规则（B1：冲突绝不静默顶替）
 

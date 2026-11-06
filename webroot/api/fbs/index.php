@@ -421,25 +421,29 @@ function fbs_gateway_replay_guard($initDataHash, array $context)
     return null;
 }
 
-/** 紧窗凭证动作（rider_ql / rider_notify_url）的重放账本：同一签名体最多放行一次。
+/** 紧窗凭证动作（rider_ql / rider_notify_url）的重放账本：同一 (签名体, 时间戳) 只放行一次。
  *
  * 与 bridge.php 的 fbs_bridge_replay_check() 同款机制（sha256 键 + flock + 计数过期清零），
- * 差异仅在阈值：issue_session 的 FBS_BRIDGE_REPLAY_MAX=5 是登录防抖（同一 initData 允许
- * 几秒内重试网络失败），凭证签发没有「多签一次有益」的语义——ql/notify_url 每次成功都
- * 签发活凭证（ql token 600s），第二次同参请求一律拒绝。不直接复用 fbs_bridge_replay_check
- * 是因为其阈值读全局常量 FBS_BRIDGE_REPLAY_MAX，改它会影响登录链路的 5 次语义。
+ * 差异有二：其一，阈值——issue_session 的 FBS_BRIDGE_REPLAY_MAX=5 是登录防抖（同一 initData
+ * 允许几秒内重试网络失败），凭证签发没有「同一次签发重复拿凭证」的语义；其二，放行单位——
+ * 这里以 (body, ts) 二元组为准而不是 body 单独：ts 虽在 header，但它参与 HMAC 签名串，同一
+ * body 配新 ts 必须重新签名，攻击者没有 secret 签不出来，所以「同参换新 ts」只可能来自
+ * 客户端的合法重试（双击、几秒后再点），放行；「同参同 ts」才是真重放，计数拦截。
  *
- * 键为 action + sha256(签名体)：签名体含时间戳，换时间戳即换键，合法重试永远是新键；
- * TTL 只需盖过 ±15s 紧窗（超窗后签名 401 兜底，账本只是紧窗内的辅助防线）。
+ * 键为 action + sha256(签名体)（不散列 ts，文件数 = 不同参数组合数），账本内容为
+ * `count expiry last_ts`：last_ts !== 当前 ts 视为新请求放行并重记 last_ts，文件不膨胀、无需 GC。
+ * （修复轮 4 修正：此前注释声称「签名体含时间戳、换 ts 即换键」，实际 ts 在 header 不在 body，
+ * 该写法会把 2 分钟内换 ts 重试的正常用户全部 429——见 Ray F-B1。）
  *
  * 存储写失败 fail-open（口径同 bridge.php：防重放是限流性质的保护，签名窗口本身兜底），
- * 留痕在 fbs_gateway_replay_once_guard()。
+ * 在本函数内留痕（action / 账本目录 / errno），guard 层不再重复记。
  *
- * @param string   $key 账本键（调用方保证含 action 前缀避免跨动作挤占）
+ * @param string $key 账本键（调用方保证含 action 前缀避免跨动作挤占）
+ * @param int    $ts  请求签名时间戳（dispatch 侧已验过格式）
  * @param string|null $dir 测试注入
  * @return array [allowed(bool), count(int)]，count===0 表示账本不可用（fail-open）
  */
-function fbs_gateway_replay_once($key, $dir = null)
+function fbs_gateway_replay_once($key, $ts, $dir = null)
 {
     if ($dir === null) {
         $dir = defined('FBS_GATEWAY_REPLAY_DIR')
@@ -453,24 +457,40 @@ function fbs_gateway_replay_once($key, $dir = null)
 
     $fp = @fopen($file, 'c+');
     if (!$fp) {
-        return array(true, 0);   // 存储不可用：fail-open，guard 层留痕
+        $err = error_get_last();
+        error_log('[fbs_gateway] tight-window replay ledger unavailable, protection OFF (fail-open): '
+            . 'key=' . (string)$key . ' dir=' . $dir
+            . ' :: ' . ($err !== null && isset($err['message']) ? $err['message'] : 'fopen failed'));
+        return array(true, 0);
     }
 
     $allowed = true;
     $count   = 0;
     if (flock($fp, LOCK_EX)) {
         $raw = stream_get_contents($fp);
-        $old = array(0, 0);
+        $old = array(0, 0, 0);   // count, expiry, last_ts
         if ($raw !== false && $raw !== '') {
             $parts = explode(' ', trim($raw));
-            if (count($parts) === 2 && is_numeric($parts[0]) && is_numeric($parts[1])) {
-                $old = array((int)$parts[0], (int)$parts[1]);
+            if (count($parts) === 3 && is_numeric($parts[0]) && is_numeric($parts[1]) && is_numeric($parts[2])) {
+                $old = array((int)$parts[0], (int)$parts[1], (int)$parts[2]);
             }
         }
-        // 过期则清零重记
-        $count = ($old[1] > $now) ? $old[0] : 0;
-        $count++;
-        $expiry = ($old[1] > $now) ? $old[1] : $now + FBS_GATEWAY_REPLAY_ONCE_TTL;
+        // 过期则清零重记（TTL 只需盖过同一 (body, ts) 的重放窗口，超窗后签名 401 兜底）
+        if ($old[1] > $now) {
+            $count  = $old[0];
+            $expiry = $old[1];
+        } else {
+            $count  = 0;
+            $expiry = $now + FBS_GATEWAY_REPLAY_ONCE_TTL;
+        }
+
+        if ($old[2] === (int)$ts) {
+            // 同 body 同 ts：真重放，计数（阈值 1，第二次即拒）
+            $count++;
+        } else {
+            // 同 body 换 ts：重新签名的新请求，放行并重记
+            $count = 1;
+        }
 
         if ($count > 1) {
             $allowed = false;
@@ -478,11 +498,15 @@ function fbs_gateway_replay_once($key, $dir = null)
 
         ftruncate($fp, 0);
         rewind($fp);
-        fwrite($fp, $count . ' ' . $expiry);
+        fwrite($fp, $count . ' ' . $expiry . ' ' . (int)$ts);
         fflush($fp);
         flock($fp, LOCK_UN);
     } else {
         // 拿不到锁：fail-open
+        $err = error_get_last();
+        error_log('[fbs_gateway] tight-window replay ledger lock unavailable, protection OFF (fail-open): '
+            . 'key=' . (string)$key . ' dir=' . $dir
+            . ' :: ' . ($err !== null && isset($err['message']) ? $err['message'] : 'flock failed'));
         $allowed = true;
         $count = 0;
     }
@@ -493,23 +517,20 @@ function fbs_gateway_replay_once($key, $dir = null)
 
 /**
  * fbs_gateway_replay_once 的 guard 封装：放行返回 null，否则 ['code'=>..,'message'=>..]。
- * fail-open 口径与 fbs_gateway_replay_guard() 完全一致（count===0 留痕）。
+ * fail-open 的留痕在 fbs_gateway_replay_once() 内（含 action/目录/errno，文案与登录桥的
+ * fbs_gateway_replay_guard 区分），此处 count===0 只做放行不再重复记。
  *
  * @param string $key
+ * @param int    $ts
  * @param array  $context  可注入 replay_dir（测试用）
  */
-function fbs_gateway_replay_once_guard($key, array $context)
+function fbs_gateway_replay_once_guard($key, $ts, array $context)
 {
     $dir = array_key_exists('replay_dir', $context) ? $context['replay_dir'] : null;
-    list($allowed, $count) = fbs_gateway_replay_once($key, $dir);
-
-    if ($count === 0) {
-        error_log('[fbs_gateway] replay store unavailable, replay protection is OFF (fail-open)');
-        return null;
-    }
+    list($allowed, $count) = fbs_gateway_replay_once($key, $ts, $dir);
 
     if (!$allowed) {
-        error_log('[fbs_gateway] replay limited (tight window): count=' . $count);
+        error_log('[fbs_gateway] replay limited (tight window): count=' . $count . ' key=' . (string)$key);
         return array('code' => 'REPLAY_LIMITED', 'message' => 'duplicate credential request within the tight window');
     }
     return null;
@@ -1012,6 +1033,24 @@ function fbs_gateway_courier_usable(PDO $pdo, $prefix, $cid)
 }
 
 /**
+ * G-7：courier_id 是否已绑定（fbs_courier_map 里有行才签发凭证）。
+ * rider_ql / rider_notify_url 此前只查 waimai_courier 可用态，不查绑定——未绑定骑手
+ * 拿到 courier_id 也能签发 ql token。bind 流程刚插入的行立即可查，不影响主链路。
+ * 表名不带前缀：与 rider_bind 的写入方一致（audit/map 表都是无前缀的业务表）。
+ */
+function fbs_gateway_courier_bound(PDO $pdo, $cid)
+{
+    try {
+        $stmt = $pdo->prepare('SELECT `tg_user_id` FROM `fbs_courier_map` WHERE `courier_id` = ? LIMIT 1');
+        $stmt->execute(array((int)$cid));
+        return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] courier bound check failed: cid=' . (int)$cid . ' :: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * 签发骑手 H5 快捷登录令牌：格式必须与 waimai.class.php courierQlToken()/courierQl() 完全一致
  * （base64url(did.exp.target.oid) + '.' + HMAC-SHA256(b64, $fb_bridge_token)，10 分钟有效、无状态，
  * 消费方是 /ql.html?token=...）。改动任一侧都要同步另一侧。
@@ -1167,6 +1206,10 @@ function fbs_gateway_action_rider_ql(array $params, array $context)
     if (!fbs_gateway_courier_usable($pdo, $prefix, $cid)) {
         return fbs_gateway_err(404, 'COURIER_NOT_FOUND', 'courier not found or unavailable');
     }
+    // G-7：只有已绑定（fbs_courier_map 有行）的骑手才签发 ql token（rider_ql / rider_notify_url 同口径）
+    if (!fbs_gateway_courier_bound($pdo, $cid)) {
+        return fbs_gateway_err(404, 'COURIER_NOT_FOUND', 'courier is not bound to any telegram user');
+    }
     $fb_bridge_token = fbs_gateway_bridge_token($context);
     if ($fb_bridge_token === null) {
         return fbs_gateway_err(503, 'BRIDGE_CONFIG_MISSING', 'bridge config missing');
@@ -1193,6 +1236,10 @@ function fbs_gateway_action_rider_notify_url(array $params, array $context)
     }
     if (!fbs_gateway_courier_usable($pdo, $prefix, $cid)) {
         return fbs_gateway_err(404, 'COURIER_NOT_FOUND', 'courier not found or unavailable');
+    }
+    // G-7：只有已绑定（fbs_courier_map 有行）的骑手才签发 ql token（rider_ql / rider_notify_url 同口径）
+    if (!fbs_gateway_courier_bound($pdo, $cid)) {
+        return fbs_gateway_err(404, 'COURIER_NOT_FOUND', 'courier is not bound to any telegram user');
     }
     $fb_bridge_token = fbs_gateway_bridge_token($context);
     if ($fb_bridge_token === null) {
@@ -1254,6 +1301,7 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
     if ($action === 'rider_ql' || $action === 'rider_notify_url') {
         $replayDenied = fbs_gateway_replay_once_guard(
             $action . ':' . hash('sha256', $rawBody),
+            (int)$timestamp,
             $context
         );
         if ($replayDenied !== null) {
