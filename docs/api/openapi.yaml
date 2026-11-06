@@ -142,6 +142,61 @@ paths:
         '429': { description: 限频或同一 initData 重放超限（HTML 错误页，无 Cookie） }
         '502': { description: 网关/凭证签发失败（BRIDGE_FAILED，无 Cookie） }
         '503': { description: 登录桥未配置（BRIDGE_NOT_CONFIGURED） }
+  /tg-api/rider/bind:
+    get:
+      summary: 骑手绑定落地页（T6）
+      description: |
+        Telegram 内打开的内联 HTML：输入骑手手机号，取 `Telegram.WebApp.initData` 后表单 POST
+        到本路径。无 initData（非 TG 环境）显示提示不提交。响应自带 CSP（script-src 限自身与
+        telegram.org + nonce、frame-ancestors 限 Telegram 域）与 `Cache-Control: no-store`。
+        配置缺失返回 503。
+      responses:
+        '200': { description: 落地页 HTML }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+    post:
+      summary: 骑手绑定：initData 验签 → 手机号归一 → 网关 rider_bind → rider_ql → 302 工作台
+      description: |
+        字段 `initData`、`phone`。手机号先归一（去空格/横线/括号/点号 → 前导 `+63`/`63` 转 `0` →
+        必须为 `0` 开头 10–11 位），再交 PHP 网关查唯一可用骑手（quit != 1 且 status = 1）。
+        绑定冲突**绝不静默顶替**：骑手已被他人绑定 → 409 `COURIER_ALREADY_BOUND`；当前 Telegram
+        已绑其他骑手 → 409 `TG_ALREADY_BOUND`；同一对重复提交按幂等成功处理。PHP 侧另有按
+        `tg_user_id`（5 次/60 秒）与 `phone`（3 次/300 秒）的双维度限频（超限 429
+        `BIND_RATE_LIMITED`），每次尝试（成功/失败）均写 `fbs_bind_audit` 审计行。成功时签
+        10 分钟一次性工作台直达 URL（`/ql.html?token=...`，落地种骑手 cookie 后 302 进
+        `/?service=waimai&do=courier` 工作台）；302 目标还须落在 `CORS_ORIGINS` 域名白名单内。
+        Node 不接触任何骑手凭证。Node 侧限频 10 次/分钟/IP。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [initData, phone]
+              properties:
+                initData: { type: string, description: Telegram WebApp initData 原始串 }
+                phone: { type: string, description: 骑手手机号（09171234567 / +639171234567 等，归一后 0 开头 10-11 位） }
+      responses:
+        '302': { description: 绑定成功，Location 为 PHP 签出的一次性工作台直达 URL }
+        '400': { description: 手机号格式非法（INVALID_PHONE，HTML 错误页含可接受格式提示） }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA，HTML 错误页） }
+        '404': { description: 手机号未匹配骑手（COURIER_NOT_FOUND） }
+        '409': { description: 绑定冲突（COURIER_ALREADY_BOUND / TG_ALREADY_BOUND，引导先解绑，不顶替原绑定） }
+        '429': { description: 限频（RATE_LIMITED / BIND_RATE_LIMITED：tg 5 次/60s、phone 3 次/300s、IP 10 次/60s） }
+        '502': { description: 网关失败（RIDER_FAILED） }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+  /tg-api/rider/session:
+    post:
+      summary: 已绑定骑手换工作台直达 URL（T6，供 bot/n8n 侧对接）
+      description: |
+        仅 POST（不接受 query 传 initData——短期凭证不应进 URL/访问日志），响应带
+        `Cache-Control: no-store`。已绑定的返回 `{success:true, data:{bound:true, courier_id, url}}`，
+        `url` 为 PHP 签出的 10 分钟一次性工作台直达 URL（须通过 `CORS_ORIGINS` 域名白名单）；
+        未绑定返回 `{success:true, data:{bound:false}}`。
+      responses:
+        '200': { description: bound:true（含 courier_id 与 url）或 bound:false }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA） }
+        '502': { description: 网关失败（RIDER_FAILED） }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
   /tg-api/services:
     get:
       summary: 四大核心模块元数据

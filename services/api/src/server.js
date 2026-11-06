@@ -25,6 +25,7 @@ const { createFbProxy } = require('./fbProxy');
 const { createAddrShareRouter } = require('./addrShareRoute');
 const { createCredentialProvider } = require('./credentialProvider');
 const { createBridgeRoute } = require('./bridgeRoute');
+const { createRiderRoute } = require('./riderRoute');
 const { createRevocationStore, createReplayCounter, createIdempotencyStore } = require('./sharedState');
 
 assertProductionConfig();
@@ -436,6 +437,27 @@ if (process.env.TMA_BRIDGE_FORCE_SECURE === 'false' && process.env.TMA_ENV === '
 }
 router.get('/auth/bridge', bridge.getLanding);
 router.post('/auth/bridge', bridge.postBridge);
+
+// 2g. 骑手绑定与工作台直达（T6）：TG 落地页输手机号 → initData 验签 → 网关 rider_bind（PHP
+// 查 waimai_courier、冲突 409、双维度限频、写审计）→ 网关 rider_ql（10 分钟直达 URL）→ 302 进
+// H5 工作台；/rider/session（仅 POST）供 bot/n8n 侧换工作台 URL。配置不齐时处理器内部返回 503。
+// 302 目标域名白名单复用 CORS_ORIGINS（与对外 CORS 同一份站点域名清单）。
+const riderGateway = process.env.FBS_GATEWAY_URL && process.env.FBS_GATEWAY_SECRET ? {
+  riderBind: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_bind', p),
+  riderQl: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_ql', p),
+} : null;
+const rider = createRiderRoute({
+  botToken: BOT_TOKEN,
+  validateInitData: validateTelegramInitData,
+  gateway: riderGateway,
+  conn: cliConn(),
+  allow: createLimiter({ max: Number(process.env.TMA_RIDER_MAX || 10), windowSeconds: 60 }),
+  allowedHosts: corsOrigins.map((o) => { try { return new URL(o).host; } catch (e) { return ''; } }).filter(Boolean),
+});
+router.get('/rider/bind', rider.getLanding);
+router.post('/rider/bind', rider.postBind);
+// 只挂 POST：initData 是短期凭证，不接受 query 传参（避免进访问日志/Referer/浏览器历史）
+router.post('/rider/session', rider.session);
 
 app.listen(PORT, () => {
   console.log(`🚀 Firebird SEA Core API is listening on port ${PORT}`);
