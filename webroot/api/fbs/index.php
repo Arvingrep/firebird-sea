@@ -27,6 +27,12 @@
  *   429 REPLAY_LIMITED               同一份 initData 在 TTL 窗口内签发次数超限
  *   500 CONFIG_MISSING / CONFIG_INVALID / MEMBER_CREATE_FAILED / DB_QUERY_FAILED / INTERNAL_ERROR
  *   500 DB_UNAVAILABLE               连不上库 / 拿不到建号命名锁（Node 侧改判 503，见 services/api/src/tgLogin.js）
+ *   404 COURIER_NOT_FOUND            rider_* 手机号未匹配可用骑手 / courier_id 不可用
+ *   409 COURIER_ALREADY_BOUND / TG_ALREADY_BOUND / COURIER_AMBIGUOUS   rider_bind 冲突（不顶替）
+ *   429 BIND_RATE_LIMITED            rider_bind 三维度限频（tg 5/60s、phone 3/300s、ip 20/300s）
+ *   500 BIND_FAILED                  rider_bind 并发双插撞唯一键（N6：同样落审计，result=error）
+ *   503 AUDIT_UNAVAILABLE            rider_bind 审计/限频计数不可用（fail-closed，宁拒勿漏）
+ *   503 BRIDGE_CONFIG_MISSING        rider_ql/notify_url 读不到 $fb_bridge_token
  *   503 GATEWAY_SECRET_NOT_CONFIGURED  本文件拿不到 FBS_GATEWAY_SECRET
  *
  * 【鉴权顺序（安全边界，不可调换）】
@@ -43,6 +49,17 @@
  *                          → data: {member_id, created, set_cookies: [...]}
  *                          init_data_hash = sha256(initData) 的 hex，仅用于防重放记账；
  *                          **不要传 initData 原文**（里面有用户资料，没必要扩大暴露面）。
+ *   rider_bind             入参 tg_user_id(必填) / phone(必填) / ip
+ *                          → data: {courier_id, idempotent?}
+ *                          绑定冲突绝不静默顶替（B1）：409 COURIER_ALREADY_BOUND /
+ *                          TG_ALREADY_BOUND / COURIER_AMBIGUOUS；三维度限频 429
+ *                          BIND_RATE_LIMITED；审计/计数底账不可用 503 AUDIT_UNAVAILABLE。
+ *                          initData 验签在 Node 侧（services/api/src/riderRoute.js +
+ *                          telegramAuth，1 小时窗口）完成，本动作信任验签后的 tg_user_id。
+ *   rider_ql               入参 courier_id(必填)
+ *                          → data: {courier_id, url}   （10 分钟一次性工作台直达 URL）
+ *   rider_notify_url       入参 order_id(必填) / courier_id(必填)
+ *                          → data: {url}               （派单卡片「查看订单」一次性直达 URL）
  *
  * set_cookies 是可直接 header('Set-Cookie: ...') 的完整头字符串，由 PHP 侧生成；
  * Node 不得重新拼装任何属性（domain/path/secure/SameSite/expires 都在这里定死），
@@ -64,7 +81,7 @@ if (!defined('FBS_GATEWAY_MARKER_TTL')) define('FBS_GATEWAY_MARKER_TTL', 30 * 86
 /** 动作白名单 */
 function fbs_gateway_actions()
 {
-    return array('member_find_or_create', 'issue_session');
+    return array('member_find_or_create', 'issue_session', 'rider_bind', 'rider_ql', 'rider_notify_url');
 }
 
 /* ============================== 响应封装 ============================== */
@@ -711,6 +728,382 @@ function fbs_gateway_action_issue_session(array $params, array $context)
     ));
 }
 
+/* ============================== 骑手绑定与直达 URL（T6/T7，修复轮 3 移植自旧网关） ============================== */
+
+/**
+ * 手机号归一：必须与 Node 侧 services/api/src/riderRoute.js normalizePhone 行为完全一致
+ * （改动需两侧同步，否则会出现「同号一边能绑一边绑不上」）。规则：
+ *   1. 去空格 / 横线 / 括号 / 点号
+ *   2. 前导 +63 转 0；纯数字 63 开头的 12 位同样转 0
+ *   3. 结果必须是「0 开头 + 共 10-11 位数字」，否则返回 null
+ *
+ * @return string|null
+ */
+function fbs_normalize_phone($raw)
+{
+    $s = preg_replace('/[\s\-().]+/', '', trim((string)$raw));
+    if (strpos($s, '+63') === 0) {
+        $s = '0' . substr($s, 3);
+    } else if (preg_match('/^63[0-9]{10}$/', $s)) {
+        $s = '0' . substr($s, 2);
+    }
+    if (!preg_match('/^0[0-9]{9,10}$/', $s)) return null;
+    return $s;
+}
+
+/**
+ * 审计/限频只允许安全字符：结果码来自固定集合，手机号已归一（纯数字），ip 去掉一切非地址字符。
+ * Node 已传 ip（req.ip）；缺省回落到 fbs_bridge_client_ip()。
+ *
+ * @return string
+ */
+function fbs_bind_ip(array $params, array $context)
+{
+    $raw = isset($params['ip']) ? (string)$params['ip'] : '';
+    if ($raw === '') $raw = isset($context['ip']) ? (string)$context['ip'] : fbs_bridge_client_ip();
+    return substr(preg_replace('/[^0-9a-fA-F:.]/', '', $raw), 0, 64);
+}
+
+/**
+ * 绑定审计（B1 补偿控制）：成功与失败都写一行。result 枚举 5+1 类（N6 补 error）：
+ *   success / conflict_tg / conflict_courier / not_found / rate_limited / error
+ * （error = 并发双插撞 fbs_courier_map 唯一键的最终失败，N6。）
+ *
+ * 【N4 fail-closed】审计是 B1 两项补偿（限频底账 + 事后排查）的共同前提，写不进去等于
+ * 补偿控制静默失效——所以 INSERT 失败必须 error_log（带 tg/phone/ip 便于排查）并返回
+ * false，调用方一律 503 AUDIT_UNAVAILABLE 拒绝，宁拒勿漏。
+ *
+ * @return bool true=写入成功
+ */
+function fbs_gateway_bind_audit(PDO $pdo, $tgUserId, $courierId, $phone, $result, $ip)
+{
+    $tg = preg_match('/^[1-9][0-9]{0,18}$/', (string)$tgUserId) ? (string)$tgUserId : '0';
+    $cid = (int)$courierId;
+    $ph = preg_match('/^0[0-9]{9,10}$/', (string)$phone) ? (string)$phone : '';
+    if (!in_array($result, array('success', 'conflict_tg', 'conflict_courier', 'not_found', 'rate_limited', 'error'), true)) $result = 'not_found';
+    try {
+        $stmt = $pdo->prepare('INSERT INTO fbs_bind_audit (`tg_user_id`, `courier_id`, `phone`, `result`, `ip`) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute(array($tg, $cid, $ph, $result, $ip));
+        return true;
+    } catch (Throwable $e) {
+        // 只记脱敏后的定位字段与错误消息，不落 initData（本动作根本收不到 initData）
+        error_log('[fbs_gateway] bind audit failed: tg=' . $tg . ' phone=' . $ph . ' ip=' . $ip
+            . ' result=' . $result . ' :: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * 三维度限频（B1 补偿控制）：以 fbs_bind_audit 为计数底账，无需引入 Redis。
+ *   tg_user_id 维度：60  秒内最多 5  次
+ *   phone      维度：300 秒内最多 3  次
+ *   ip         维度：300 秒内最多 20 次（N5：审计已落 ip 但旧实现没参与限频，
+ *              tg 5/60s 挡不住「慢速枚举换号」——同 IP 慢慢换 tg/phone 打满审计表）
+ * 被限频的记录本身不计入（result = 'rate_limited' 被排除），否则用户被拦一次就会不断
+ * 自我延长窗口，越试越锁死。阈值与 Node 侧 openapi 描述一致。
+ *
+ * 【N4 fail-closed】COUNT 失败（底账不可读）无法判断是否已超限——拒绝并 error_log，
+ * 由调用方 503 AUDIT_UNAVAILABLE，不放行。
+ *
+ * @return array ['limited'=>bool, 'error'=>array|null]
+ */
+function fbs_gateway_bind_rate_limited(PDO $pdo, $tgUserId, $phone, $ip)
+{
+    $tg = preg_match('/^[1-9][0-9]{0,18}$/', (string)$tgUserId) ? (string)$tgUserId : '0';
+    $ph = preg_match('/^0[0-9]{9,10}$/', (string)$phone) ? (string)$phone : '';
+    $dims = array(
+        // [sql 条件, 参数, 窗口秒, 阈值, 维度名]
+        array("`tg_user_id` = ?", array($tg), 60, 5, 'tg'),
+        array("`phone` = ? AND `phone` != ''", array($ph), 300, 3, 'phone'),
+        array("`ip` = ? AND `ip` != ''", array($ip), 300, 20, 'ip'),
+    );
+    foreach ($dims as $d) {
+        list($cond, $args, $window, $max, $name) = $d;
+        try {
+            $stmt = $pdo->prepare('SELECT COUNT(*) AS `c` FROM fbs_bind_audit WHERE ' . $cond
+                . " AND `result` != 'rate_limited' AND `created_at` > NOW() - INTERVAL " . (int)$window . ' SECOND');
+            $stmt->execute($args);
+            $c = (int)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            error_log('[fbs_gateway] bind rate-limit count failed (dim=' . $name . ' tg=' . $tg
+                . ' phone=' . $ph . ' ip=' . $ip . ') :: ' . $e->getMessage());
+            return array('limited' => false, 'error' => array('code' => 'AUDIT_UNAVAILABLE', 'message' => 'bind rate-limit ledger unavailable'));
+        }
+        if ($c >= $max) {
+            return array('limited' => true, 'error' => null);
+        }
+    }
+    return array('limited' => false, 'error' => null);
+}
+
+/**
+ * 读桥接配置 $fb_bridge_token（ql.html 令牌的 HMAC 密钥），缺失返回 null。
+ * 新网关是自包含入口（不再加载 common.inc.php / HUONIAOINC），直接按仓库相对路径
+ * 读 include/config/fbird.inc.php；context['bridge_token'] 供测试注入。
+ */
+function fbs_gateway_bridge_token(array $context = array())
+{
+    if (array_key_exists('bridge_token', $context)) {
+        $t = (string)$context['bridge_token'];
+        return $t !== '' ? $t : null;
+    }
+    $file = dirname(__DIR__, 2) . '/include/config/fbird.inc.php';
+    if (!is_file($file) || !is_readable($file)) {
+        error_log('[fbs_gateway] bridge token config missing/unreadable: ' . $file);
+        return null;
+    }
+    $token = (static function ($__file) {
+        $fb_bridge_token = null;
+        include $__file;
+        return $fb_bridge_token;
+    })($file);
+    return (is_string($token) && $token !== '') ? $token : null;
+}
+
+/**
+ * 站点基地址（rider_ql / rider_notify_url 拼 /ql.html?token=... 用）。
+ * 从站点配置缓存 data/cache/config.php 读 $cfg_basehost + $cfg_httpSecureAccess，
+ * scheme 口径与 include/attachment.php:53 一致（$cfg_secureAccess = httpSecureAccess ? 'https://' : 'http://'）。
+ * fail-closed：读不到/没配 basehost 返回 null，调用方 503。
+ *
+ * @return string|null 形如 https://host（不带尾斜杠）
+ */
+function fbs_gateway_site_base_url(array $context = array())
+{
+    if (array_key_exists('base_url', $context)) {
+        $u = trim((string)$context['base_url']);
+        return $u !== '' ? rtrim($u, '/') : null;
+    }
+    $file = fbs_gateway_site_config_file();
+    if (!is_file($file) || !is_readable($file)) {
+        error_log('[fbs_gateway] site config missing/unreadable for base url: ' . $file);
+        return null;
+    }
+    $loaded = (static function ($__file) {
+        $cfg_basehost = $cfg_httpSecureAccess = null;
+        include $__file;
+        return array('basehost' => $cfg_basehost, 'secure' => $cfg_httpSecureAccess);
+    })($file);
+    if (!is_array($loaded) || $loaded['basehost'] === null || trim((string)$loaded['basehost']) === '') {
+        error_log('[fbs_gateway] site config does not define $cfg_basehost: ' . $file);
+        return null;
+    }
+    $scheme = ((int)$loaded['secure'] === 1) ? 'https://' : 'http://';
+    return $scheme . trim((string)$loaded['basehost']);
+}
+
+/**
+ * 骑手可用口径：与 waimai.class.php courierQlToken/courierQl 一致（quit != 1 且 status = 1），
+ * 保证签出的工作台直达 URL 一定能被 courierQl 接受（两处同样校验，避免绑定成功但登录被拒）。
+ *
+ * @return bool
+ */
+function fbs_gateway_courier_usable(PDO $pdo, $prefix, $cid)
+{
+    try {
+        $stmt = $pdo->prepare('SELECT `id` FROM `' . $prefix . 'waimai_courier` WHERE `id` = ? AND `quit` != 1 AND `status` = 1 LIMIT 1');
+        $stmt->execute(array((int)$cid));
+        return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] courier usable check failed: cid=' . (int)$cid . ' :: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * 签发骑手 H5 快捷登录令牌：格式必须与 waimai.class.php courierQlToken()/courierQl() 完全一致
+ * （base64url(did.exp.target.oid) + '.' + HMAC-SHA256(b64, $fb_bridge_token)，10 分钟有效、无状态，
+ * 消费方是 /ql.html?token=...）。改动任一侧都要同步另一侧。
+ *
+ * @param string $baseUrl fbs_gateway_site_base_url() 的结果（https://host）
+ * @return string 完整直达 URL
+ */
+function fbs_gateway_courier_ql_url($did, $target, $oid, $fb_bridge_token, $baseUrl)
+{
+    if (!in_array($target, array('index', 'history', 'detail'))) $target = 'index';
+    $exp = time() + 600;
+    $raw = $did . '.' . $exp . '.' . $target . '.' . $oid;
+    $b64 = rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+    $sig = hash_hmac('sha256', $b64, $fb_bridge_token);
+    return $baseUrl . '/ql.html?token=' . $b64 . '.' . $sig;
+}
+
+/** rider_bind → [httpCode, payload]。逻辑逐条移植自旧网关（修复轮 2 · B1），仅换 PDO。 */
+function fbs_gateway_action_rider_bind(array $params, array $context)
+{
+    // Node 侧已完成 initData 验签（telegramAuth，1 小时窗口），这里的 tg_user_id 视为可信身份
+    $tgUserId = fbs_gateway_parse_tg_user_id(isset($params['tg_user_id']) ? $params['tg_user_id'] : null);
+    if ($tgUserId === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'invalid tg_user_id');
+    }
+    // 归一在 Node 已做过一次，这里是二次防线（网关不假设调用方一定归一，且审计里必须落统一格式）
+    $phone = fbs_normalize_phone(isset($params['phone']) ? $params['phone'] : '');
+    if ($phone === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'invalid phone');
+    }
+    $ip = fbs_bind_ip($params, $context);
+
+    list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
+    if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
+    if (!fbs_gateway_valid_prefix($prefix)) {
+        return fbs_gateway_err(500, 'CONFIG_INVALID', 'DB_PREFIX contains illegal characters');
+    }
+
+    // ① 限频优先于查骑手：避免被刷成一堆不存在手机号的审计行，也避免把 waimai_courier 当探测面
+    $rate = fbs_gateway_bind_rate_limited($pdo, $tgUserId, $phone, $ip);
+    if ($rate['error'] !== null) {
+        return fbs_gateway_err(503, $rate['error']['code'], $rate['error']['message']);
+    }
+    if ($rate['limited']) {
+        if (!fbs_gateway_bind_audit($pdo, $tgUserId, 0, $phone, 'rate_limited', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'bind audit unavailable');
+        }
+        return fbs_gateway_err(429, 'BIND_RATE_LIMITED', 'too many bind attempts');
+    }
+
+    // ② 按手机号查唯一骑手；状态口径同 fbs_gateway_courier_usable
+    try {
+        $stmt = $pdo->prepare('SELECT `id` FROM `' . $prefix . 'waimai_courier` WHERE `phone` = ? AND `quit` != 1 AND `status` = 1');
+        $stmt->execute(array($phone));
+        $ret = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] rider_bind courier lookup failed: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'courier lookup failed');
+    }
+    if (!$ret) {
+        if (!fbs_gateway_bind_audit($pdo, $tgUserId, 0, $phone, 'not_found', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'bind audit unavailable');
+        }
+        return fbs_gateway_err(404, 'COURIER_NOT_FOUND', 'courier not found or unavailable');
+    }
+    if (count($ret) > 1) {
+        // 同一手机号命中多位骑手属数据问题：宁可拒绝也不猜，审计记 conflict_courier 便于按手机号排查
+        if (!fbs_gateway_bind_audit($pdo, $tgUserId, 0, $phone, 'conflict_courier', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'bind audit unavailable');
+        }
+        return fbs_gateway_err(409, 'COURIER_AMBIGUOUS', 'multiple couriers match this phone');
+    }
+    $cid = (int)$ret[0]['id'];
+
+    // ③ 冲突检查：绝不静默顶替（B1）。两个维度各自唯一——
+    //    fbs_courier_map.tg_user_id 是主键、courier_id 是唯一键，一对一是硬约束。
+    try {
+        $stmt = $pdo->prepare('SELECT `tg_user_id`, `courier_id` FROM `fbs_courier_map` WHERE `tg_user_id` = ? OR `courier_id` = ? LIMIT 2');
+        $stmt->execute(array((string)$tgUserId, $cid));
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] rider_bind conflict lookup failed: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'bind conflict lookup failed');
+    }
+    $boundCid = null;   // 本 TG 当前绑的骑手
+    $boundTg = null;    // 本骑手当前绑的 TG
+    if (is_array($rows)) {
+        foreach ($rows as $r) {
+            if ((string)$r['tg_user_id'] === (string)$tgUserId) $boundCid = (int)$r['courier_id'];
+            if ((int)$r['courier_id'] === $cid) $boundTg = (string)$r['tg_user_id'];
+        }
+    }
+
+    if ($boundCid === $cid) {
+        // 同一对 (TG, 骑手) = 幂等成功：只刷新手机号写法，不动别人的绑定，也不签任何凭证
+        try {
+            $stmt = $pdo->prepare('UPDATE `fbs_courier_map` SET `phone` = ? WHERE `tg_user_id` = ? AND `courier_id` = ?');
+            $stmt->execute(array($phone, (string)$tgUserId, $cid));
+        } catch (Throwable $e) {
+            error_log('[fbs_gateway] rider_bind idempotent update failed: ' . $e->getMessage());
+            return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'bind update failed');
+        }
+        if (!fbs_gateway_bind_audit($pdo, $tgUserId, $cid, $phone, 'success', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'bind audit unavailable');
+        }
+        return fbs_gateway_ok(array('courier_id' => $cid, 'idempotent' => true));
+    }
+    if ($boundCid !== null) {
+        // 本 TG 已绑别的骑手：用户自己能解，优先报这个（比 courier 冲突更可自助）
+        if (!fbs_gateway_bind_audit($pdo, $tgUserId, $cid, $phone, 'conflict_tg', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'bind audit unavailable');
+        }
+        return fbs_gateway_err(409, 'TG_ALREADY_BOUND', 'this telegram is already bound to another courier');
+    }
+    if ($boundTg !== null) {
+        // 该骑手已被别的 TG 占用：原绑定保持不动
+        if (!fbs_gateway_bind_audit($pdo, $tgUserId, $cid, $phone, 'conflict_courier', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'bind audit unavailable');
+        }
+        return fbs_gateway_err(409, 'COURIER_ALREADY_BOUND', 'this courier is already bound to another telegram');
+    }
+
+    try {
+        $stmt = $pdo->prepare('INSERT INTO `fbs_courier_map` (`tg_user_id`, `courier_id`, `phone`) VALUES (?, ?, ?)');
+        $stmt->execute(array((string)$tgUserId, $cid, $phone));
+    } catch (Throwable $e) {
+        // N6：并发双插撞唯一键（两副本同时受理同一绑定）也是终态失败，必须落审计（result=error），
+        // 否则审计里「成功」与「实际没绑上」对不上账；审计写不进则照样 fail-closed。
+        if (!fbs_gateway_bind_audit($pdo, $tgUserId, $cid, $phone, 'error', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'bind audit unavailable');
+        }
+        error_log('[fbs_gateway] rider_bind insert failed (tg=' . $tgUserId . ' cid=' . $cid . ') :: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'BIND_FAILED', 'bind failed');
+    }
+    if (!fbs_gateway_bind_audit($pdo, $tgUserId, $cid, $phone, 'success', $ip)) {
+        return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'bind audit unavailable');
+    }
+    return fbs_gateway_ok(array('courier_id' => $cid));
+}
+
+/** rider_ql → [httpCode, payload]。给已绑定骑手签 10 分钟一次性工作台直达 URL。 */
+function fbs_gateway_action_rider_ql(array $params, array $context)
+{
+    $cid = fbs_gateway_parse_tg_user_id(isset($params['courier_id']) ? $params['courier_id'] : null);
+    if ($cid === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'invalid courier_id');
+    }
+    list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
+    if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
+    if (!fbs_gateway_valid_prefix($prefix)) {
+        return fbs_gateway_err(500, 'CONFIG_INVALID', 'DB_PREFIX contains illegal characters');
+    }
+    if (!fbs_gateway_courier_usable($pdo, $prefix, $cid)) {
+        return fbs_gateway_err(404, 'COURIER_NOT_FOUND', 'courier not found or unavailable');
+    }
+    $fb_bridge_token = fbs_gateway_bridge_token($context);
+    if ($fb_bridge_token === null) {
+        return fbs_gateway_err(503, 'BRIDGE_CONFIG_MISSING', 'bridge config missing');
+    }
+    $baseUrl = fbs_gateway_site_base_url($context);
+    if ($baseUrl === null) {
+        return fbs_gateway_err(503, 'CONFIG_MISSING', 'site base url unavailable');
+    }
+    return fbs_gateway_ok(array('courier_id' => $cid, 'url' => fbs_gateway_courier_ql_url((string)$cid, 'index', 0, $fb_bridge_token, $baseUrl)));
+}
+
+/** rider_notify_url → [httpCode, payload]。给派单通知卡生成「打开即该订单详情」的一次性按钮 URL。 */
+function fbs_gateway_action_rider_notify_url(array $params, array $context)
+{
+    $oid = fbs_gateway_parse_tg_user_id(isset($params['order_id']) ? $params['order_id'] : null);
+    $cid = fbs_gateway_parse_tg_user_id(isset($params['courier_id']) ? $params['courier_id'] : null);
+    if ($oid === null || $cid === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'invalid order_id or courier_id');
+    }
+    list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
+    if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
+    if (!fbs_gateway_valid_prefix($prefix)) {
+        return fbs_gateway_err(500, 'CONFIG_INVALID', 'DB_PREFIX contains illegal characters');
+    }
+    if (!fbs_gateway_courier_usable($pdo, $prefix, $cid)) {
+        return fbs_gateway_err(404, 'COURIER_NOT_FOUND', 'courier not found or unavailable');
+    }
+    $fb_bridge_token = fbs_gateway_bridge_token($context);
+    if ($fb_bridge_token === null) {
+        return fbs_gateway_err(503, 'BRIDGE_CONFIG_MISSING', 'bridge config missing');
+    }
+    $baseUrl = fbs_gateway_site_base_url($context);
+    if ($baseUrl === null) {
+        return fbs_gateway_err(503, 'CONFIG_MISSING', 'site base url unavailable');
+    }
+    return fbs_gateway_ok(array('url' => fbs_gateway_courier_ql_url((string)$cid, 'detail', (string)$oid, $fb_bridge_token, $baseUrl)));
+}
+
 /* ============================== 分发 ============================== */
 
 /**
@@ -765,6 +1158,10 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
 
     try {
         if ($action === 'member_find_or_create') return fbs_gateway_action_member_find_or_create($params, $context);
+        // rider 动作（T6/T7）每支显式 return，绝不直落 issue_session 兜底
+        if ($action === 'rider_bind') return fbs_gateway_action_rider_bind($params, $context);
+        if ($action === 'rider_ql') return fbs_gateway_action_rider_ql($params, $context);
+        if ($action === 'rider_notify_url') return fbs_gateway_action_rider_notify_url($params, $context);
         return fbs_gateway_action_issue_session($params, $context);
     } catch (Throwable $e) {
         // 绝不把堆栈/DSN 回给调用方

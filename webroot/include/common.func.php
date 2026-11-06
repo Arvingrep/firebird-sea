@@ -6647,6 +6647,50 @@ function getWechatMsgErrCode($code){
 
 
 /**
+ * 骑手 Telegram 派单通知（T7）：把派单事件转交集群内 Node(services/api) 的
+ * POST /tg-api/internal/dispatch，由 Node 查 fbs_courier_map 并用 bot token 发消息。
+ * 为什么不让 PHP 直发 Telegram：PHP 容器不注入 bot token（密钥面收敛），且不能让派单等待外网。
+ * 验签算法与 services/api/src/gatewayClient.js 完全一致（action 常量 'dispatch'）：
+ * HMAC-SHA256(FBS_GATEWAY_SECRET, ts\ndispatch\nbody)，头 X-Fbs-Timestamp / X-Fbs-Signature。
+ * 不调用 fastcgi_finish_request：三处挂点都在响应生成中途（后台页/接口 JSON 输出中段），
+ * 提前结束请求会截断后续输出；以 1.2 秒总超时兜底，通知不可达最多拖慢响应 1.2 秒。
+ * 通知失败一律返回 false，绝不影响派单事务本身。
+ * @param $event     事件：new_order 派单 / grab 抢单 / reassign 改派给另一骑手 / reclaim 订单被客服收回（改派第三方平台）
+ * @param $orderId   订单 id
+ * @param $courierId 骑手 id（须已通过 /tg-api/rider/bind 绑定 Telegram）
+ * @return bool
+ */
+function fb_tg_dispatch($event, $orderId, $courierId){
+    $secret = getenv('FBS_GATEWAY_SECRET');
+    if (!$secret || !in_array($event, array('new_order', 'grab', 'reassign', 'reclaim'))) return false;
+    // 目标地址：默认经站点 nginx 服务转发到 Node api（helm configmap 的 /tg-api/ location）；
+    // 特殊拓扑用 TG_DISPATCH_URL 覆盖（与 gatewayClient 的 FBS_GATEWAY_URL 同一配置模式）
+    $url = getenv('TG_DISPATCH_URL');
+    if (!$url) {
+        $site = getenv('SITE_ID');
+        if (!$site) return false;
+        $url = 'http://firebird-' . $site . '/tg-api/internal/dispatch';
+    }
+    $body = json_encode(array('event' => $event, 'order_id' => (int)$orderId, 'courier_id' => (int)$courierId));
+    $ts   = (string)time();
+    $sig  = hash_hmac('sha256', $ts . "\ndispatch\n" . $body, $secret);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, array(
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $body,
+        CURLOPT_HTTPHEADER     => array('Content-Type: application/json', 'X-Fbs-Timestamp: ' . $ts, 'X-Fbs-Signature: ' . $sig),
+        CURLOPT_CONNECTTIMEOUT_MS => 800,
+        CURLOPT_TIMEOUT_MS     => 1200,
+        CURLOPT_NOSIGNAL       => true,
+        CURLOPT_RETURNTRANSFER => true,
+    ));
+    curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return $code >= 200 && $code < 300;
+}
+
+/**
  * APP推送消息
  * @param $uid     会员id
  * @param $title   消息标题

@@ -930,6 +930,8 @@ if ($action == "setCourier") {
                     $ret = $dsql->dsqlOper($sql, "update");
                     if ($ret == "ok") {
                         sendapppush($peisongid, "您有订单被其他骑手派送", "订单号：" . $shopname . $ordernumstore, "", "peisongordercancel");
+                        // T7：改派到第三方平台，原骑手被摘单 —— 发 reclaim（「已被客服收回，无需继续配送」，无按钮），失败不影响流程
+                        fb_tg_dispatch('reclaim', (int)$value, (int)$peisongid);
                     }
 
                 }
@@ -1144,6 +1146,8 @@ if ($action == "setCourier") {
                     global $cfg_secureAccess;
                     $url = $cfg_secureAccess . $cfg_basehost . '/index.php?service=waimai&do=courier&template=detail&id=' . $value;
                     sendapppush($courier, "您有新的配送订单", "订单号：" . $shopname . $ordernumstore, $url, "newfenpeiorder");
+                    // T7：Telegram 通知骑手（经集群内 Node 转发；改派时文案区分；失败不影响派单）
+                    fb_tg_dispatch($peisongid ? 'reassign' : 'new_order', (int)$value, (int)$courier);
                     // aliyunPush($courier, "您有新的配送订单", "订单号：".$shopname.$ordernumstore, "newfenpeiorder", $cfg_secureAccess.$cfg_basehost.'/index.php?service=waimai&do=courier&template=detail&id='.$value);
 
                     if ($peisongid) {

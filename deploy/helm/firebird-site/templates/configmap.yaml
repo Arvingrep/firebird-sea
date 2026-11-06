@@ -55,6 +55,18 @@ data:
             fastcgi_read_timeout 5;
         }
 
+        # 骑手派单 TG 通知通路（T7）：集群内 PHP（fb_tg_dispatch → http://firebird-<site>/tg-api/…）
+        # 经本服务转发到 Node api 的 /tg-api/internal/dispatch。公网 /tg-api 流量由 Traefik
+        # IngressRoute 直达 api 服务，不经过这里；api 未启用时该 location 不渲染。
+        {{- if .Values.api.enabled }}
+        location /tg-api/ {
+            proxy_pass http://firebird-api-{{ .Values.siteId }}:{{ .Values.api.service.port | default 3000 }};
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        {{- end }}
+
         # 火鸟伪静态重写
         location / {
             try_files $uri $uri/ /index.php?$args;
