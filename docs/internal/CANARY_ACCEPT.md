@@ -320,6 +320,48 @@ location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|svg|woff2)$ {
 3. **区分 curl 与 devtools**：devtools 的 Size 列若是 `(disk cache)` / `(memory cache)`，
    显示的是**本地旧副本的响应头**，不代表线上现值；`cf-cache-status: DYNAMIC` 才说明没被边缘缓存。
 
+### 8.8 事故复盘：AD-20 缓存直查开关递归 → 全站 OOM（2026-11-06 11:04Z–11:32Z）
+
+**现象**：`/`、`/waimai/index.html`、`/news/index.html`、`/tg/entry.php` 全部
+`503 / content-length: 20 / body: no available server`；静态资源仍 200 但那是 Cloudflare
+边缘 `HIT`（`age` 上千秒），不代表源站活着。持续约 28 分钟。
+
+**根因**：`9d4a1870`（AD-20「SQL 结果缓存加直查开关」，10:54Z 上线）在
+`webroot/include/class/dsql.class.php::cache()` 加了 `HN_DSQL_CACHE_SKIP` 直查分支，
+`return $this->dsqlOper(...)` **漏传第 6 个参数 `$from_cache = true`**；`dsqlOper` 在
+`HUONIAOADMIN=='' && from_cache==false` 时会回手调 `cache()` → **cache ↔ dsqlOper 无限递归**，
+每请求数十毫秒吃满内存。
+
+**为什么是 503 而不是 500**：php-fpm 与 cronjob 双双 OOMKilled（exit 137）→ Deployment 0/2
+就绪 → Traefik（IngressRoute）把 Service 端点清空 → 返回原生文案 `no available server`。
+静态资源不经 PHP，但源站整站无可路由后端，只剩边缘缓存命中。
+
+**修复**：`a6a505be`（#211，11:14Z）补 `$from_cache = true`，并加源码级回归守卫
+`services/api/test/dsql-cache-skip.test.js`。
+
+**排除项（下次别往这些方向查）**
+- **不是 chart 参数**：replicas=2、探针、`minReadySeconds`、resources 均未参与触发；
+  chart 只提供开关（`fileCache.queryBypass: true` → 注入 `HN_DSQL_CACHE_SKIP=1`），
+  缺陷在 PHP 参数漏传。eval 线上 chart 必须 `git show origin/canary:...`，工作区可能有
+  其他线的在途改动。
+- **不是测试集群缩容**：节点被缩到 0 会是 Pending/调度失败，不会出现 OOMKilled。
+
+**同类事故的第一动作（比等镜像快）**：把 `values-canary.yaml` 的
+`fileCache.queryBypass` 置 `false` 再 `helm upgrade`——开关消失即不再走直查分支，
+代价只是回到「多副本缓存不收敛」的旧行为。
+
+**恢复判据（防「假恢复」）**：本机走 HTTP 代理时，`-D-` 会先输出一行
+`HTTP/1.1 200 Connection Established`（隧道握手），**那不是源站响应**。真恢复的三条判据：
+①输出里有 `HTTP/2 200`；②body 是 `<!DOCTYPE html>` 起的真 HTML；③响应头带
+`set-cookie: fb_srv_canary=<hex>; Path=/; HttpOnly`（Traefik 服务标记）。三条齐了才算恢复。
+
+**待运维执行的加固（本次未做，无 apply 权限）**
+- `resources.limits.memory` 512Mi → 1Gi（requests 128Mi → 256Mi）；cronjob `limits.memory`
+  256Mi → 512Mi（本次 cron 一起 OOM）；
+- `minReadySeconds: 5`；**探针间隔不要放宽**（3s×3 是有意的快速摘除）；
+- 长期：`memory_limit` / `pm.max_children` 显式写进镜像或 configmap（当前全仓
+  `pm.max_children` 零命中，全靠 php-fpm 默认值）。
+
 ## 九、已实测通过的线上基线（2026-11-06，下次拿它做对照）
 
 比读期望值可靠：下面全部是当天在 canary 上真实跑出来的数字。
@@ -339,18 +381,3 @@ location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|svg|woff2)$ {
 
 判定方法：**数字一致 = 链路没坏**；不一致再按第一节到第八节逐项定位，不要先怀疑代码。
 
-
-## 十、AD-20 缓存直查开关的收敛实测（`fileCache.queryBypass`，待验）
-
-> 背景：FileDataCache SQL 结果缓存 TTL=0 且全仓库无失效调用（delete/clearAll 零调用方），
-> 多副本下后台改 `site_module` / `site_payment` 等表后各 Pod **永不收敛**。canary 已开
-> `queryBypass: true`（`HN_DSQL_CACHE_SKIP=1`，php-fpm 与 cron 同注入）——相关 SELECT 直查 DB。
-
-| # | 步骤 | 判据 |
-|---|---|---|
-| 10.1 | 确认开关已生效：`kubectl exec <php-pod> -- printenv HN_DSQL_CACHE_SKIP` = `1`；后台保存一处配置（如模块状态）后**立即**刷新前台可见变化（不再需要等 sweeper 的 5 分钟） | 保存后秒级生效 |
-| 10.2 | **收敛时延实测**（本节核心）：后台关闭一个前台可见模块（如 `article` 或 `shop`），秒表计时，前台多副本轮询刷新（至少 2 个浏览器/无痕窗口各刷），记录**最后一个副本不再显示它**的秒数；再把模块打开，同样记录恢复秒数 | 两个方向均为**秒级（预期 <5s）**；对照：开关关闭时该数字为 ≤300s（sweeper 周期）或永不收敛 |
-| 10.3 | DB 压力对照：开关开启前后各采样 5 分钟（`SHOW GLOBAL STATUS LIKE 'Questions'` 差值 / 300s，或慢查询日志），对比 QPS 增量 | 增量可解释（每请求 +N 次配置表点查，N=页面加载触发的缓存 SQL 数）；慢查询无新增 |
-| 10.4 | 副本间一致性抽查：`kubectl exec` 两个 php Pod 各跑一次 `php -r 'echo getenv("HN_DSQL_CACHE_SKIP");'` | 双双输出 `1`（cron Job 亦然，触发一次看日志） |
-
-记录实测数字在下方追加：**（待填：关闭模块收敛 ___s / 恢复 ___s / DB QPS 增量 ___）**
