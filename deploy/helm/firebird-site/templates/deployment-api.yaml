@@ -34,6 +34,13 @@ spec:
               value: "{{ .Values.siteId }}"
             - name: DEFAULT_CURRENCY
               value: "{{ .Values.localization.defaultCurrency }}"
+            # 以下两项不属于 TMA 专属：/checkout 与 /auth/telegram-web 的限流按 req.ip 计数
+            # （缺 TRUST_PROXY_HOPS 时所有用户共用入口 IP 的额度），浏览器跨域调用依赖 CORS_ORIGINS。
+            # 2026-11-06 从 `tma.enabled` 守卫里移出：关掉 canary 孤儿 TMA 桥（KI-005）不能连坐这两项。
+            - name: TRUST_PROXY_HOPS
+              value: "{{ .Values.tma.trustProxyHops | default 1 }}"
+            - name: CORS_ORIGINS
+              value: "{{ range $i, $h := .Values.ingress.hosts }}{{ if $i }},{{ end }}https://{{ $h.host }}{{ end }}"
             {{- if .Values.tma.enabled }}
             # TMA 登录桥接与白名单代理（docs/internal/TMA_LOGIN_BRIDGE.md）。密钥只引用 secretName，值由运维创建
             - name: TMA_ENV
@@ -42,10 +49,6 @@ spec:
               value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/api/fbs/index.php"
             - name: FB_UPSTREAM_URL
               value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/include/ajax.php"
-            - name: TRUST_PROXY_HOPS
-              value: "{{ .Values.tma.trustProxyHops | default 1 }}"
-            - name: CORS_ORIGINS
-              value: "{{ range $i, $h := .Values.ingress.hosts }}{{ if $i }},{{ end }}https://{{ $h.host }}{{ end }}"
             {{- /* 登录桥（TAPD 0002）：明文配置，无密钥。缺任一变量桥端点即 503（fail-closed）。
                    forceSecure 用 hasKey 判定，因为 | default 会把显式 false 当空值而误取 true。 */}}
             {{- $bridge := .Values.tma.bridge | default dict }}
@@ -57,6 +60,10 @@ spec:
               value: "{{ $bridge.targetDefault | default "/" }}"
             - name: TMA_BRIDGE_FORCE_SECURE
               value: "{{ if hasKey $bridge "forceSecure" }}{{ $bridge.forceSecure }}{{ else }}true{{ end }}"
+            {{- end }}
+            # 数据库与网关密钥不属于 TMA 专属（/checkout、/auth/telegram-web 及本轮 TG 登录都要用），
+            # 2026-11-06 从 `tma.enabled` 守卫里移出。TMA_TOKEN_SECRET 留在这里是 optional，
+            # tma.enabled=false 时 buildAuth() 因缺 TMA_ENV 返回 null，孤儿链自然降级为 503。
             - name: DB_HOST
               value: "{{ .Values.database.host }}"
             - name: DB_PORT
@@ -77,7 +84,6 @@ spec:
                   name: {{ $.Values.api.secretRef | default "firebird-api-secret" }}
                   key: {{ $name }}
                   optional: true
-            {{- end }}
             {{- end }}
             {{- with .Values.api.callTestUrl }}
             - name: CALL_TEST_URL
