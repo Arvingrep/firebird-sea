@@ -253,6 +253,17 @@ DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD TRUST_PROXY_HOPS CORS_ORIGINS TMA_TO
 - 值守卫：`HN_tg=0` 或任何非 `1` 的值都不触发（`isset` + `=== '1'`），
   所以清 cookie / 覆写成 0 就能回到原判定，线上可随时回退。
 
+**采样纪律：单次 curl 不足以判 FAIL，两向各连续 3 次一致才算过。** 滚动窗口期内旧 Pod
+仍在应答，2026-11-06 实测：前 8 次全是 PC 页（66101B），第 9 次才翻转，中间还回跳过一次。
+
+```
+with    HN_tg=1  run1/2/3  bytes=48485  viewport=1  w1200=0
+without          run1/2/3  bytes=66102  viewport=0  w1200=1
+```
+
+bytes 与 viewport / w1200 三个数一起看（单看 bytes 会被压缩差异骗，单看 viewport 分不出
+"PC 模板加了 meta" 这种改动）；三次不一致就再等一轮滚动，别急着判回归。
+
 ## 九、已实测通过的线上基线（2026-11-06，下次拿它做对照）
 
 比读期望值可靠：下面全部是当天在 canary 上真实跑出来的数字。
