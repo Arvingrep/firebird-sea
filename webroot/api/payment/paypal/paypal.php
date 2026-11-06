@@ -719,9 +719,13 @@ class paypal {
     }
 
     private function fatal($msg){
+        global $cfg_secureAccess, $cfg_basehost;
+        $home = htmlspecialchars($cfg_secureAccess . $cfg_basehost, ENT_QUOTES, 'UTF-8');
         header('Content-Type: text/html; charset=utf-8');
+        // 返回键会重新请求下单地址再次报错，看起来像「返回不了」，所以给一个明确的出口
         echo '<!DOCTYPE html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-           . '<p style="font:16px/1.6 sans-serif;padding:24px">' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</p>';
+           . '<div style="font:16px/1.6 sans-serif;padding:24px"><p>' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</p>'
+           . '<p><a href="' . $home . '">Home / 返回首页</a></p></div>';
         die;
     }
 
