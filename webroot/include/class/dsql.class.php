@@ -752,8 +752,10 @@ class dsql extends db_connect
             // 各 Pod 各持一份永久缓存，后台改 site_module/site_payment 等表后永不收敛
             // （sweeper 只清本地文件，跨 Pod 无效）。开关打开后相关 SELECT 直查 DB，
             // 一致性优先；DB 压力影响由 canary 实测评估（见验收口径，单请求增数次点查）。
+            // 必须传 $from_cache = true：dsqlOper 在 HUONIAOADMIN == '' 且 from_cache == false 时
+            // 会回手调 cache()，漏传即 cache → dsqlOper → cache 无限递归，每个请求 OOMKilled。
             if ((getenv('HN_DSQL_CACHE_SKIP') ?: ($_SERVER['HN_DSQL_CACHE_SKIP'] ?? '')) === '1') {
-                return $this->dsqlOper($sql, $type, $fetch, $table_name, $sensitive);
+                return $this->dsqlOper($sql, $type, $fetch, $table_name, $sensitive, true);
             }
 
             // 初始化文件缓存（自定义缓存目录和默认过期时间）
