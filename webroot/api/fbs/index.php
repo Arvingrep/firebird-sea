@@ -1102,9 +1102,17 @@ function fbs_gateway_action_rider_bind(array $params, array $context)
     }
 
     // ② 按手机号查唯一骑手；状态口径同 fbs_gateway_courier_usable
+    //    号码必须「两侧都归一」后再比：库内 phone 是历史存量（0 开头 / 63 / +63，且可能带空格横线括号），
+    //    只归一入参时，库里存 63 形态（如 639170000101）就永远匹配不上归一后的 09170000101 —— 
+    //    表现为用户输对了号码仍一律 COURIER_NOT_FOUND（2026-11-06 canary 实测即此因）。
+    //    故 DB 侧先剥分隔符，入参侧展开 0 / 63 / +63 三种写法，1 次 IN 查询覆盖全部存量形态。
     try {
-        $stmt = $pdo->prepare('SELECT `id` FROM `' . $prefix . 'waimai_courier` WHERE `phone` = ? AND `quit` != 1 AND `status` = 1');
-        $stmt->execute(array($phone));
+        $digits = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(`phone`, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')";
+        $stmt = $pdo->prepare(
+            'SELECT `id` FROM `' . $prefix . 'waimai_courier` WHERE ' . $digits . ' IN (?, ?, ?) AND `quit` != 1 AND `status` = 1'
+        );
+        $rest = substr($phone, 1); // $phone 已归一为 0XXXXXXXXXX
+        $stmt->execute(array($phone, '63' . $rest, '+63' . $rest));
         $ret = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
         error_log('[fbs_gateway] rider_bind courier lookup failed: ' . $e->getMessage());
