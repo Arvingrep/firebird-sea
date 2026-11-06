@@ -34,9 +34,30 @@ function fakeConn() {
 // AC1: 空库迁移创建 AD-5 全部表及关键约束（SQL 文本层；真实库见集成测试）
 test('AC1: migration creates all AD-5 tables', async () => {
   const conn = fakeConn();
-  assert.deepEqual(await migrate(conn), ['001_fbs_tables.sql', '002_tma_shared_state.sql', '003_addr_share.sql']);
+  assert.deepEqual(await migrate(conn), [
+    '001_fbs_tables.sql', '002_tma_shared_state.sql', '003_addr_share.sql',
+    '004_fbs_courier_map.sql', '005_fbs_dispatch_dedup.sql', '006_fbs_dispatch_dedup_courier.sql',
+    '007_fbs_bind_audit.sql', '008_fbs_dispatch_dedup_created_idx.sql',
+  ]);
   const sql = conn.executed.join('\n');
-  for (const t of [...TABLES, 'fbs_token_revoked', 'fbs_idem', 'fbs_replay', 'fbs_addr_share']) assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${t} \\(`), `missing ${t}`);
+  for (const t of [...TABLES, 'fbs_token_revoked', 'fbs_idem', 'fbs_replay', 'fbs_addr_share',
+    'fbs_courier_map', 'fbs_bind_audit', 'fbs_dispatch_dedup']) assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${t} \\(`), `missing ${t}`);
+});
+
+// B1 补偿控制：审计表要能按 tg_user_id / phone 双维度限频（各有索引）
+test('AC1: fbs_bind_audit 具备双维度限频所需索引与 result 取值域注释', () => {
+  const sql = allSql();
+  assert.match(sql, /KEY idx_fbs_bind_audit_tg \(tg_user_id, created_at\)/);
+  assert.match(sql, /KEY idx_fbs_bind_audit_phone \(phone, created_at\)/);
+  assert.match(sql, /result 取值：success \/ conflict_tg \/ conflict_courier \/ not_found \/ rate_limited/);
+});
+
+// T7 去重表：主键三元组（改派给第二位骑手不被吞）+ created_at 索引（TTL 清理不全表扫）
+test('AC1: fbs_dispatch_dedup 主键为 (event, order_id, courier_id)，且有 created_at 索引', () => {
+  const sql = allSql();
+  assert.match(sql, /PRIMARY KEY \(event, order_id\)/);
+  assert.match(sql, /PRIMARY KEY \(event, order_id, courier_id\)/);
+  assert.match(sql, /ADD KEY idx_fbs_dispatch_dedup_created \(created_at\)/);
 });
 
 test('AC1: chain_tx unique (txid,event_index); charge holds_tail + tail unique; role shop_id not null', () => {

@@ -142,6 +142,117 @@ paths:
         '429': { description: 限频或同一 initData 重放超限（HTML 错误页，无 Cookie） }
         '502': { description: 网关/凭证签发失败（BRIDGE_FAILED，无 Cookie） }
         '503': { description: 登录桥未配置（BRIDGE_NOT_CONFIGURED） }
+  /tg-api/rider/bind:
+    get:
+      summary: 骑手绑定落地页（T6）
+      description: |
+        Telegram 内打开的内联 HTML：输入骑手手机号，取 `Telegram.WebApp.initData` 后表单 POST
+        到本路径。无 initData（非 TG 环境）显示提示不提交。响应自带 CSP（script-src 限自身与
+        telegram.org + nonce、frame-ancestors 限 Telegram 域）与 `Cache-Control: no-store`。
+        配置缺失返回 503。
+      responses:
+        '200': { description: 落地页 HTML }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+    post:
+      summary: 骑手绑定：initData 验签 → 手机号归一 → 网关 rider_bind → rider_ql → 302 工作台
+      description: |
+        字段 `initData`、`phone`。手机号先归一（去空格/横线/括号/点号 → 前导 `+63`/`63` 转 `0` →
+        必须为 `0` 开头 10–11 位），再交 PHP 网关查唯一可用骑手（quit != 1 且 status = 1）。
+        绑定冲突**绝不静默顶替**：骑手已被他人绑定 → 409 `COURIER_ALREADY_BOUND`；当前 Telegram
+        已绑其他骑手 → 409 `TG_ALREADY_BOUND`；同一对重复提交按幂等成功处理。PHP 侧另有按
+        `tg_user_id`（5 次/60 秒）、`phone`（3 次/300 秒）与来源 `ip`（20 次/300 秒）的三维度限频
+        （超限 429 `BIND_RATE_LIMITED`；被拒请求不计入额度），每次尝试（成功/冲突/限频/审计不可用）
+        均写 `fbs_bind_audit` 审计行；审计或限频计数不可用时 fail-closed 拒绝（503
+        `AUDIT_UNAVAILABLE`）。网关契约（canary 新形态）：成功 200 `{success:true,data}`，业务失败
+        非 2xx `{success:false,error:{code,message}}`，Node 侧由 gatewayClient reject 还原为
+        409/429/404/503。成功时签
+        10 分钟一次性工作台直达 URL（`/ql.html?token=...`，落地种骑手 cookie 后 302 进
+        `/?service=waimai&do=courier` 工作台）；302 目标还须落在 `CORS_ORIGINS` 域名白名单内。
+        Node 不接触任何骑手凭证。Node 侧限频 10 次/分钟/IP。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [initData, phone]
+              properties:
+                initData: { type: string, description: Telegram WebApp initData 原始串 }
+                phone: { type: string, description: 骑手手机号（09171234567 / +639171234567 等，归一后 0 开头 10-11 位） }
+      responses:
+        '302': { description: 绑定成功，Location 为 PHP 签出的一次性工作台直达 URL }
+        '400': { description: 手机号格式非法（INVALID_PHONE，HTML 错误页含可接受格式提示） }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA，HTML 错误页） }
+        '404': { description: 手机号未匹配骑手（COURIER_NOT_FOUND） }
+        '409': { description: 绑定冲突（COURIER_ALREADY_BOUND / TG_ALREADY_BOUND，引导先解绑，不顶替原绑定） }
+        '429': { description: 限频（RATE_LIMITED / BIND_RATE_LIMITED：tg 5 次/60s、phone 3 次/300s、网关 ip 20 次/300s、Node 侧 IP 10 次/60s） }
+        '502': { description: 网关失败（RIDER_FAILED）；或绑定已生效但换工作台 URL 失败（WORKBENCH_URL_FAILED，文案提示稍后从 bot 重新打开，勿重复绑定） }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED）或网关审计不可用 fail-closed（AUDIT_UNAVAILABLE） }
+  /tg-api/rider/session:
+    post:
+      summary: 已绑定骑手换工作台直达 URL（T6，供 bot/n8n 侧对接）
+      description: |
+        仅 POST（不接受 query 传 initData——短期凭证不应进 URL/访问日志），响应带
+        `Cache-Control: no-store`。已绑定的返回 `{success:true, data:{bound:true, courier_id, url}}`，
+        `url` 为 PHP 签出的 10 分钟一次性工作台直达 URL（须通过 `CORS_ORIGINS` 域名白名单）；
+        未绑定返回 `{success:true, data:{bound:false}}`。
+      responses:
+        '200': { description: bound:true（含 courier_id 与 url）或 bound:false }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA） }
+        '502': { description: 网关失败（RIDER_FAILED） }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+  /tg-api/internal/dispatch:
+    post:
+      summary: 骑手派单 Telegram 通知（T7，仅集群内 PHP 调用）
+      description: |
+        PHP 派单挂点（`fb_tg_dispatch`，waimaiOrder.php 派单/改派、waimai.class.php 抢单）转交的
+        通知入口。**收下即返回**：HMAC 验签 + 去重占位写库后立刻 `202 {accepted:true}`，
+        sendMessage 与重试全部在响应之后异步执行——挂点在派单/抢单/改派关键路径上，同步等
+        Telegram 会顶穿 PHP 的 800ms 预算并产出「日志说超时、骑手其实收到了」的假失败。
+
+        `202` 只代表**已受理**，不代表已送达。之后的查绑定 / 换直达 URL / 发消息失败只落日志
+        （每条带 `event=` / `order_id=` / `courier_id=`，线上按订单号 grep 即可定位），最终失败
+        会释放去重占位以便下次同键事件重发；PHP 侧不再得知发送结果，业务事务因此完全解耦。
+
+        HMAC 与 gatewayClient 同算法同密钥（方向反转：
+        `HMAC-SHA256(FBS_GATEWAY_SECRET, ts\ndispatch\nbody)`，头 `X-Fbs-Timestamp` /
+        `X-Fbs-Signature`，60 秒窗口）。查 `fbs_courier_map` 得 tg_user_id，按 `TELEGRAM_BOT_TOKEN`
+        发 sendMessage；inline 按钮「查看订单」为网关 `rider_notify_url` 签出的一次性工作台直达
+        URL（打开即该订单详情）。事件四种：`new_order`（派单）、`grab`（抢单）、`reassign`
+        （改派给另一骑手）带按钮；`reclaim`（订单被客服收回，如改派第三方平台）不带按钮。
+        去重 `fbs_dispatch_dedup`（键 = event + order_id + courier_id，TTL 1 天，语义等同
+        Redis SETNX EX 86400——同单改派给另一位骑手不会被吞通知）。发送失败重试 1 次，
+        429 按其 `retry_after` 退避（上限 5s）。因此本端点的投递保证是 **at-most-once**：
+        硬崩溃时在飞通知可能丢失（残余靠带 order_id 的日志定位补发）；进程收 SIGTERM
+        （RollingUpdate 发版）会先排空在飞任务（上限 8s）再退出（N3）。网关 `rider_notify_url`
+        走 canary 新契约：成功 200 `{success:true,data:{url}}`，失败由 gatewayClient reject
+        ——无论哪种失败都降级为无按钮纯文本继续投递。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event, order_id, courier_id]
+              properties:
+                event: { type: string, enum: [new_order, grab, reassign, reclaim] }
+                order_id: { type: integer }
+                courier_id: { type: integer }
+      responses:
+        '202':
+          description: 已受理（dedup:false 本次负责投递；dedup:true 同键已在投递/已投递，本次跳过）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  accepted: { type: boolean }
+                  dedup: { type: boolean }
+        '400': { description: event / order_id / courier_id 非法（INVALID_EVENT / INVALID_PARAM） }
+        '401': { description: 时间戳过期或验签失败（BAD_SIGNATURE） }
+        '503': { description: 派单通知未配置（DISPATCH_NOT_CONFIGURED） }
   /tg-api/services:
     get:
       summary: 四大核心模块元数据

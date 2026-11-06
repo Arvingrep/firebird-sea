@@ -25,6 +25,8 @@ const { createFbProxy } = require('./fbProxy');
 const { createAddrShareRouter } = require('./addrShareRoute');
 const { createCredentialProvider } = require('./credentialProvider');
 const { createBridgeRoute } = require('./bridgeRoute');
+const { createRiderRoute } = require('./riderRoute');
+const { createDispatchRoute } = require('./dispatchRoute');
 const { createRevocationStore, createReplayCounter, createIdempotencyStore } = require('./sharedState');
 
 assertProductionConfig();
@@ -43,7 +45,11 @@ app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
 // （fbClient.js:57），缺 urlencoded 时 req.body 恒为 {}，所有写接口（地址/下单/取消）字段全部丢失，
 // 上游只会回「请输入联系人」一类误导性错误（2026-10-26 canary 实测）。
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// 内部派单通知（T7）的 HMAC 签名覆盖原始字节：PHP 的 json_encode 与 JSON.stringify 重序列化
+// 不保证同形（转义/空格差异），故只对 /tg-api/internal/* 留一份原文，其余路径不额外占内存。
+app.use(express.json({
+  verify: (req, res, buf) => { if (req.path.startsWith('/tg-api/internal/')) req.rawBody = buf; },
+}));
 
 // AD-9：Node 路由统一挂在 /tg-api，/api 前缀留给火鸟 PHP（含 /api/payment/notify.php）
 const router = express.Router();
@@ -437,7 +443,63 @@ if (process.env.TMA_BRIDGE_FORCE_SECURE === 'false' && process.env.TMA_ENV === '
 router.get('/auth/bridge', bridge.getLanding);
 router.post('/auth/bridge', bridge.postBridge);
 
-app.listen(PORT, () => {
+// 2g. 骑手绑定与工作台直达（T6）：TG 落地页输手机号 → initData 验签 → 网关 rider_bind（PHP
+// 查 waimai_courier、冲突 409、双维度限频、写审计）→ 网关 rider_ql（10 分钟直达 URL）→ 302 进
+// H5 工作台；/rider/session（仅 POST）供 bot/n8n 侧换工作台 URL。配置不齐时处理器内部返回 503。
+// 302 目标域名白名单复用 CORS_ORIGINS（与对外 CORS 同一份站点域名清单）。
+const riderGateway = process.env.FBS_GATEWAY_URL && process.env.FBS_GATEWAY_SECRET ? {
+  riderBind: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_bind', p),
+  riderQl: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_ql', p),
+} : null;
+const rider = createRiderRoute({
+  botToken: BOT_TOKEN,
+  validateInitData: validateTelegramInitData,
+  gateway: riderGateway,
+  conn: cliConn(),
+  allow: createLimiter({ max: Number(process.env.TMA_RIDER_MAX || 10), windowSeconds: 60 }),
+  allowedHosts: corsOrigins.map((o) => { try { return new URL(o).host; } catch (e) { return ''; } }).filter(Boolean),
+});
+router.get('/rider/bind', rider.getLanding);
+router.post('/rider/bind', rider.postBind);
+// 只挂 POST：initData 是短期凭证，不接受 query 传参（避免进访问日志/Referer/浏览器历史）
+router.post('/rider/session', rider.session);
+
+// 2h. 派单 Telegram 通知（T7）：PHP 挂点 fb_tg_dispatch（common.func.php）→ 集群内站点 nginx →
+// POST /tg-api/internal/dispatch。HMAC 验签（复用 FBS_GATEWAY_SECRET，action 常量 'dispatch'，
+// 不引入新密钥）→ 去重占位写库 → **立刻 202 accepted** → 响应之后异步查绑定 / 换一次性直达 URL /
+// 发 sendMessage（失败重试 1 次，429 按其 retry_after 退避）。
+// 异步化原因：PHP 挂点在派单/抢单/改派关键路径上，同步等 Telegram 会顶穿 PHP 的 800ms 预算，
+// 产出「日志说超时但骑手收到了」的假失败。202 只代表已受理，投递失败只落日志（带 event/order_id/
+// courier_id 便于按单号定位）并释放去重占位，业务事务侧完全不受影响。
+const dispatch = createDispatchRoute({
+  secret: process.env.FBS_GATEWAY_SECRET,
+  botToken: BOT_TOKEN,
+  conn: cliConn(),
+  gateway: process.env.FBS_GATEWAY_URL && process.env.FBS_GATEWAY_SECRET ? {
+    riderNotifyUrl: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_notify_url', p),
+  } : null,
+});
+router.post('/internal/dispatch', dispatch.postDispatch);
+
+const httpServer = app.listen(PORT, () => {
   console.log(`🚀 Firebird SEA Core API is listening on port ${PORT}`);
   console.log(`📍 Serving Metro Manila (PHP & USDT Settlements)`);
+});
+
+// N3 优雅退出：202 = at-most-once（硬崩溃时在飞通知会丢、去重占位剩 1 天）。
+// RollingUpdate 发版必发 SIGTERM——不接线的话在飞 Telegram 发送会被直接杀死且去重位占满 1 天。
+// 先等在飞任务排空（上限 8s，给 pod terminationGracePeriod 留余量），再关 HTTP 监听退出。
+// 残余（超 8s 仍没发完的）靠带 event/order_id/courier_id 的日志定位补发。
+const SIGTERM_DRAIN_MS = 8000;
+process.on('SIGTERM', () => {
+  console.error('[server] SIGTERM received: draining in-flight dispatch tasks...'); // 生命周期事件走 stderr（门禁禁新增 stdout 日志）
+  Promise.race([
+    dispatch.drain(),
+    new Promise((resolve) => setTimeout(resolve, SIGTERM_DRAIN_MS)),
+  ]).then(() => {
+    console.error('[server] drain done (or timed out), closing server');
+    httpServer.close(() => process.exit(0));
+    // close 回调只在无连接时触发；兜底强制退出，防悬挂进程拖住滚动更新
+    setTimeout(() => process.exit(0), 2000).unref();
+  });
 });
