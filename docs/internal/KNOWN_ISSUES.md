@@ -497,3 +497,34 @@ img onerror 隐藏空 li 之类的兜底会掩盖素材问题，让运营永远�
 **验收要求**
 
 必须走异常路径：网络 offline 或 mock `state != 100` → 滚动一次 → 看分页还能否继续；再恢复网络验正常路径。curl 验不出这条。
+
+## KI-012 · 旅游模块在 canary 全空（数据侧：环境未配内容，代码按预期工作）
+
+**结论**：数据侧，不是代码缺陷。接口与模板均按预期工作，**不派代码单**。
+
+**证据（2026-11-06，Vic，375×812 H5 口径）**
+
+接口层全部返回统一「无数据」语义 `state=101`，无 5xx、无 `state≠100`：
+
+```
+GET /include/ajax.php?service=travel&action=strategyList&page=1&pageSize=5&typeid=
+→ {"state":101,"info":"暂无数据！"}            （HTTP 200，body 38 字节）
+GET /include/ajax.php?service=travel&action=videoList&page=1&pageSize=10
+→ {"state":101,"info":"暂无数据！"}
+```
+
+服务端渲染（`/travel/index.html` 原文 31601B）四个区块零记录，PHP 循环没吐任何 `<li>`：
+
+- 当季热门 → `<ul class="swiper-wrapper"></ul>`（空）
+- 景点推荐 / 精选酒店 → `<dl>` 只有 `<dt>` 标题，无 `<dd>`
+- 旅游攻略 → `<ul class="travel_nav"></ul>` + `<ul class="show"></ul>`
+
+`state=101` 与本项目其它模块的无数据语义一致（外卖负向对照「不存在的店 xyz」同码）。
+页面上那句「旅游视频 暂无数据！」是**接口 `info` 直出**，不是模板兜底文案：
+`travel/touch/skin1/js/index.js:200-206` `$(".tip").html(data.info).show();`；
+真正的错误路径另有文案（`:208-210`「请求出错请刷新重试」），本次未触发。
+
+**关掉条件**
+
+运营在后台为旅游模块配置内容（攻略/景点/酒店/视频任一）后，需复验 5 个区块是否有记录、
+详情页是否可达。仅数据填充，无需改代码。
