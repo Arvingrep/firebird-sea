@@ -187,3 +187,93 @@ canary 首页若用 `skin5`，确认 `:440-461` 这几处楼盘入口是否显�
 **将来怎么修（优先级）**
 
 模板条件渲染（`{#if $house_state#}`）> 删掉硬编码块 > 后台把该模块的入口文案置空
+
+---
+
+## KI-005 · canary 旧 Node 登录链与本仓库 PHP 网关契约断链（四层不一致）
+
+**状态**：临时关闭（2026-11-06，复核人 Vic 发现 FAIL，独立核实 实现工程师 Max，裁决人 team-lead）
+
+**现象**
+
+合并 canary 后，canary 侧 Node 登录链（`memberMap.js` / `credentialProvider.js` /
+`bridgeRoute.js` / `fbProxy.js`）仍按旧网关契约调用合并树里的**我方 PHP 网关**
+（`webroot/api/fbs/index.php`）。两侧测试都用桩网关、没有跨 Node↔PHP 接缝的用例，
+所以合并时两侧各自全绿、接缝处必然失败：
+
+| 层 | 旧 Node 侧 | 我方网关（合并树实际） | 结果 |
+|---|---|---|---|
+| 1 键名 | `{"tg_id": ...}` / `{"member_id": ...}` | `{"tg_user_id": ...}` / `{"tg_user_id": ..., "init_data_hash": ...}` | 400 `MISSING_PARAM` |
+| 2 响应包裹 | `{state, info}`，判 `state === 100`（`memberMap.js:31`、`credentialProvider.js:14`） | `{success, data}`，`data.set_cookies[]` | 判定恒假 |
+| 3 错误语义 | 失败=业务对象；`gatewayClient` 非 2xx 直接 reject | 非 2xx + `{success:false,error:{code,message}}` | 旧链把异常吞成无信息量 throw |
+| 4 缺 `ttl` | `credentialProvider.js:18` 读 `info.ttl` | 只回 `set_cookies[]`，无 `ttl` | 静默退化 `cacheSeconds=120`，缓存在与火鸟会话无关的周期上 |
+
+**层 2+3 的合并效果**：`memberMap.js:33` 只抛 `new Error('gateway member_find_or_create failed')`，
+上层打日志只剩这一句 → 线上表现为 **502 + 一句无信息量错误**，排查必须逐层复现。
+**层 1 与层 2 是两套独立的不兼容**：只改键名仍然 100% 失败（响应还是 `{success,data}`），
+只改响应解析也 100% 失败（入参还被网关拒绝）。
+
+**身份其实不缺（纠正一条误判）**
+
+`tmaToken.js:22` 的 payload 已含 `sub: String(tgId)` 与 `mid`，`fbProxy` 侧可直接用
+`claims.sub` 当 `tg_user_id`。真正缺的只有 `init_data_hash`（旧链从来没拿过它，
+浏览器端 initData 在 `bridgeRoute` 就消费掉了）。
+
+**限频约束（它决定了收敛路径，不是可选优化）**
+
+网关对**同一份 initData** 限 5 次 / 7200s（`webroot/api/fbs/index.php:327-343` 的
+`fbs_gateway_replay_guard`，阈值在 `bridge.php:76/79`），第 6 次 429 `REPLAY_LIMITED`。
+`fbProxy` 是**每请求**换凭证（`fbProxy.js:192`，缓存仅 120s），即每份 initData 只能撑
+5×120s 就会被自己的防重放打死。因此收敛时**必须**在登录那一刻缓存 `set_cookies`、
+`fbProxy` 只读缓存；缓存策略还要同时回答：
+
+- `ttl` 由 **Node 侧配置**给出（网关不返回，不能靠猜）；
+- 火鸟后台改密码/踢人后，旧 cookie 的失效窗口有多大——建议 TTL ≤ 后台在线时长，
+  并在上游返回 401 时主动失效缓存条目。
+
+**影响范围**
+
+- 仅 canary 的孤儿 Node 链 `/tg-api/auth/telegram`（`server.js:127`）、
+  `/tg-api/auth/bridge`（`server.js:435-436`）：全仓零调用方（旧 Vue TMA 应用已归档）。
+- **不受影响**：我方 `entry.php → /tg-api/auth/telegram-web`（`tgLogin.js`，按我方契约
+  直连网关，读 `data.set_cookies[]`）；PHP 直连入口 `bridge.php` 同样走我方契约。
+
+**临时措施（本轮）**
+
+`deploy/helm/firebird-site/values-canary.yaml` 置 `tma.enabled: false`：
+`TMA_ENV` / `TMA_BRIDGE_*` / `FB_UPSTREAM_URL` 不再注入，`buildAuth()`（`server.js:98-101`）
+因缺 `TMA_ENV` 返回 `null`，两条路由降级为 **503 AUTH_NOT_CONFIGURED**（fail-closed，不是 502）。
+一行值可回退，`bridge` 其余字段原样保留。
+
+**已知副作用（实测渲染，上线前必须先修 chart）**
+
+chart 的 `{{- if .Values.tma.enabled }}` 守卫（`deployment-api.yaml:37-81`）**不只包 TMA 变量**，
+还包着 `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD`、`TRUST_PROXY_HOPS`、`CORS_ORIGINS`
+以及 `TMA_TOKEN_SECRET`+`FBS_GATEWAY_SECRET` 引用。关闭本开关后 api 容器会一并失去这 8 项：
+`/checkout`（`server.js:283` 的 `cliConn()` 依赖 `DB_HOST`）不可用、限流因缺
+`TRUST_PROXY_HOPS` 退化为「入口 IP 一份额度」、跨域头缺失；`tgLogin` 的 member_map 落库
+降级为 `member_map_synced:false`（`tgLogin.js:220-234` 有 try/catch，不阻断登录）。
+**部署本值前必须**先把非 TMA 专属变量移出该守卫（只留 `TMA_ENV`/`FB_UPSTREAM_URL`/
+`TMA_BRIDGE_*`/重复的 `FBS_GATEWAY_URL` 在守卫内）。
+
+**为什么不选「PHP 兼收 `member_id`」**
+
+那等于给网关开一条「凭 member_id 换会话」的旁路：不需要 initData 验签、也不需要
+`init_data_hash`，刚加固的防重放当场失效。旧链是孤儿，没有理由为它放宽生产网关的安全边界。
+
+**将来怎么修（验收后单独任务）**
+
+1. `bridgeRoute.js` / `fbProxy.js` 把 `initData` 与其 `hash` 透传进 `credentialProvider`，
+   改走我方契约（`tg_user_id` + `init_data_hash`，读 `data.set_cookies[]`）；
+2. **新增「登录时缓存 `set_cookies`、`fbProxy` 只读缓存」这一层**（受上面 5 次/7200s 约束，
+   这是唯一可行路径）；按上文回答 `ttl` 来源与踢人失效窗口；
+3. **补真实跨接缝测试**：docker 起 `php:8.2-cli` + `php -S` 跑真实 `webroot/api/fbs/index.php`，
+   Node 侧用**真实** `gatewayClient.js` 打过去，断言 HMAC 通过、`set_cookies` 回填、429 不会
+   在第 5 次之后误伤。禁止两侧继续各自用桩——本 KI 就是这么漏出来的；
+4. 改完把 `tma.enabled` 改回 `true` 并真机回归 `/tg-api/auth/bridge`。
+
+**什么条件下必须重修**
+
+- canary 要重新启用旧 TMA 前端；或
+- 任何调用方开始调用 `/tg-api/auth/telegram` / `/tg-api/auth/bridge`；或
+- 我方网关契约再变（上表四层差异全部要重新对齐）。
