@@ -361,11 +361,28 @@ func isAllowedTarget(target string, hosts map[string]struct{}) bool {
 	return ok
 }
 
+// whatwgDefaultPorts 是 WHATWG 里「特殊 scheme」的默认端口：`new URL(o).host` 会把
+// 默认端口从 host 里省略掉（https://x:443 → "x"），非默认端口保留（→ "x:8443"）。
+var whatwgDefaultPorts = map[string]string{
+	"http":  "80",
+	"https": "443",
+	"ws":    "80",
+	"wss":   "443",
+	"ftp":   "21",
+}
+
 // AllowedHostsFromOrigins 复刻 server.js 的白名单取法：
 //
 //	allowedHosts: corsOrigins.map((o) => { try { return new URL(o).host } catch { return '' } }).filter(Boolean)
 //
 // 解析不出绝对 URL 的项直接丢弃（Node 里 new URL 抛错 → 回落空串 → 被 filter 掉）。
+//
+// 两处容易漏的 WHATWG 归一，漏了会让合法配置全线 502：
+//  1. 默认端口被省略——`CORS_ORIGINS=https://h:443` 的 .host 是 "h"，不是 "h:443"。
+//     只取 url.Parse(origin).Host 会保留 ":443"，而网关签出的 url 经 new URL 归一后
+//     主机不带端口，于是 host 通道与 hostname 通道**同时**落空 → 所有 bound:true 请求 502，
+//     日志只说 "rider_ql returned invalid url"，排查会一路指向 PHP 网关。
+//  2. 主机一律小写（.host 是归一化结果），IPv6 保留方括号（"https://[::1]:443" → "[::1]"）。
 func AllowedHostsFromOrigins(origins []string) []string {
 	hosts := make([]string, 0, len(origins))
 	for _, origin := range origins {
@@ -373,7 +390,14 @@ func AllowedHostsFromOrigins(origins []string) []string {
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 			continue
 		}
-		hosts = append(hosts, parsed.Host)
+		name := strings.ToLower(parsed.Hostname())
+		if strings.Contains(name, ":") {
+			name = "[" + name + "]"
+		}
+		if port := parsed.Port(); port != "" && port != whatwgDefaultPorts[strings.ToLower(parsed.Scheme)] {
+			name += ":" + port
+		}
+		hosts = append(hosts, name)
 	}
 	return hosts
 }

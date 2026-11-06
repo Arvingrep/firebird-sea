@@ -662,6 +662,56 @@ func TestAllowedHostsFromOrigins(t *testing.T) {
 	}
 }
 
+// TestAllowedHostsFromOriginsStripsDefaultPort 钉住 WHATWG 的默认端口归一。
+//
+// 回归来由：上一版用 url.Parse(o).Host，`CORS_ORIGINS=https://h:443` 会得到 "h:443"，
+// 而网关签出的 url 经 new URL 归一后主机不带端口 → host 与 hostname 两条通道同时落空，
+// 所有 bound:true 请求 502。既有用例只覆盖了非默认端口 :8443，两端一致，因此没抓到。
+//
+// 期望值不是猜的，是 Node 里跑出来的：
+//
+//	> new URL('https://h:443').host        'h'
+//	> new URL('https://h:8443').host       'h:8443'
+//	> new URL('http://h:80').host          'h'
+//	> new URL('HTTP://H.EXAMPLE:80').host  'h.example'
+//	> new URL('https://[::1]:443').host    '[::1]'
+func TestAllowedHostsFromOriginsStripsDefaultPort(t *testing.T) {
+	cases := []struct{ origin, want string }{
+		{"https://h:443", "h"},               // 默认端口省略
+		{"https://h:8443", "h:8443"},         // 非默认端口保留
+		{"http://h:80", "h"},                 // http 默认端口
+		{"HTTP://H.EXAMPLE:80", "h.example"}, // scheme 大小写 + 主机小写
+		{"https://[::1]:443", "[::1]"},       // IPv6 保留方括号
+		{"https://[::1]:8443", "[::1]:8443"}, // IPv6 非默认端口
+		{"wss://h:443", "h"},                 // 其它特殊 scheme 同理
+	}
+	for _, c := range cases {
+		got := AllowedHostsFromOrigins([]string{c.origin})
+		if len(got) != 1 || got[0] != c.want {
+			t.Fatalf("AllowedHostsFromOrigins(%q) = %v，want [%q]", c.origin, got, c.want)
+		}
+	}
+}
+
+// TestSessionBoundWithExplicitDefaultPortOrigin 是上面那条的端到端形态：
+// 白名单写成带 :443 的 origin，网关签出的 url 不带端口，必须仍然 200。
+func TestSessionBoundWithExplicitDefaultPortOrigin(t *testing.T) {
+	db, mock := rwDB(t)
+	mock.ExpectQuery(regexp.QuoteMeta(sessionSQL)).WithArgs(int64(77)).
+		WillReturnRows(sqlmock.NewRows([]string{"courier_id"}).AddRow("101"))
+	fakeGateway, _ := rwOKGateway(t)
+	route := New(Dep{
+		BotToken: rwBotToken, DB: db, Gateway: fakeGateway,
+		AllowedHosts: AllowedHostsFromOrigins([]string{"https://canary.fbird.men:443"}),
+		Logf:         rwSilentLogfn,
+	})
+
+	recorder := rwServe(t, route, rwBody(rwSignInitData(t, 77, rwBotToken, time.Now())), "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("白名单写 :443 时 bound:true 应为 200，实际 %d：%s", recorder.Code, recorder.Body.String())
+	}
+}
+
 // —— 12. 走真实 tgauth.Validate（Node 用例用的是真实验签实现）——
 
 func TestSessionWithRealInitDataSignature(t *testing.T) {

@@ -56,7 +56,16 @@ func Parse(contentType string, raw []byte) map[string]any {
 		}
 		fields := make(map[string]any, len(values))
 		for key := range values {
-			// 重复键取首个（与 URLSearchParams.get / qs 的首值语义一致）。
+			// 重复键取首个。
+			//
+			// ⚠️ 这与 Node 不一致，别按下面这句话去推断对齐：express 的
+			// urlencoded({ extended: true }) 走 qs，重复键解析成**数组**而不是取首值，
+			// 于是 `req.body.initData` 是数组、`typeof !== 'string'`，telegramAuth 直接判非法
+			// → 401。本实现取首值 → 验签照常进行（首值仍须通过 HMAC，所以不是鉴权漏洞，
+			// 只是「Node 拒、Go 收」这一方向的放宽）。
+			// 已实测：POST body=initData=<合法>&initData=<同一合法>，Node 401 / Go 200。
+			// 是否收紧到「重复键视为缺失」需先定口径（会同时影响其它收 form 的路由），
+			// 故此处只把注释改成事实，行为保持不动。
 			fields[key] = values.Get(key)
 		}
 		return fields

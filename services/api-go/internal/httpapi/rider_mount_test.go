@@ -16,7 +16,12 @@ import (
 
 // TestRiderSessionMountedPostOnly 断言两件事：
 //  1. POST /tg-api/rider/session 命中处理器（未配置 → 503，**不是** 404）；
-//  2. 只挂 POST —— GET/其它方法由 mux 的 method 匹配挡住（Node 的 router.post）。
+//  2. 只挂 POST —— GET 被 mux 的 method 匹配挡住。
+//
+// 注意（别把这条当「已与 Node 对齐」的证据）：Node 侧 `router.post('/rider/session')`
+// 对 GET 是落到最终 404 兜底（HTML "Cannot GET …"），Go 1.22 mux 给的是 405。
+// 状态码 404 vs 405 的差异是本项目已接受的既有偏差，不在本路由职责内；
+// 这条用例只证明「GET 不会进到处理器里」。
 func TestRiderSessionMountedPostOnly(t *testing.T) {
 	server := pcServer(t, func(dep *Dep) {
 		// 空依赖 = notConfigured，端点固定 503；这样这条用例只验「挂载与方法」。
