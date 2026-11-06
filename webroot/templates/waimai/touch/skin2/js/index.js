@@ -424,10 +424,15 @@ new Vue({
               tt.loadText = '没有更多了';
             }
           }else{
+            /* state≠100 是终态：必须复位 isload，否则此后滚动分页永久不发请求（首屏商家还在，比白屏更难发现） */
+            tt.isload = false;
             tt.loadText = data.info;
           }
         },
-        error:function(){},
+        error:function(data){
+          /* 网络错误同样复位，否则一次抖动后下拉不再加载 */
+          tt.isload = false;
+        },
       })
     },
 
