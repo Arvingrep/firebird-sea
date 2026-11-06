@@ -83,6 +83,13 @@ tgBot:
 tgApp:
   baseUrl: "https://canary.fbird.men"
 
+# 网关 cookieDomain 兜底（FBS_GATEWAY_COOKIE_DOMAIN → php-fpm）。
+# 必须与下面 tma.bridge.cookieDomain 同值：这是跨域登录态的唯一依据，两处不一致会种出两份不同域的 cookie。
+# 为什么需要：baked 模式 data/ 是 emptyDir，Pod 重建后 data/cache/config.php 消失；且新版火鸟已移除
+# cookieDomain 自定义，缓存里永远不会有 $cfg_cookieDomain → 只认缓存必然 500 CONFIG_MISSING（KI 见报告）。
+gateway:
+  cookieDomain: "fbird.men"
+
 # Telegram Mini App 登录桥接与白名单代理：仅 canary 启用（prod 晋升时另建独立密钥并单独 PR）。
 # 前置：TMA_TOKEN_SECRET / FBS_GATEWAY_SECRET 已在集群 firebird-api-secret 中创建；revert 本提交即回滚。
 tma:

@@ -150,6 +150,14 @@ gateway:
   #   php → /api/fbs/index.php 一律 503（fail-closed，没有"没配密钥就放行"的分支）
   secretRef: "firebird-api-secret"
   secretKey: "FBS_GATEWAY_SECRET"
+  # 网关 cookieDomain 兜底（渲染成 php-fpm 的 FBS_GATEWAY_COOKIE_DOMAIN）。
+  # 空 = 不注入 env，网关只认 data/cache/config.php 里的 $cfg_cookieDomain，缺了照旧 500 fail-closed。
+  # 非空 = 缓存文件缺失、或文件里没有 $cfg_cookieDomain 时用它兜底（仍然 fail-closed：两级都没有才 500）。
+  # 适用场景：baked 模式 data/ 是 emptyDir（Pod 重建即清空），且新版火鸟已移除 cookieDomain 配置项，
+  # 缓存路径在部分站点天然走不通。非空值必须与站点对外的父域一致（如 fbird.men），
+  # 否则 cookie 种到别的域上，表现为"换个子域就变游客"。只注入 php-fpm：cookie 由 PHP 签发，
+  # Node 只透传 set_cookies，不需要这个值。
+  cookieDomain: ""
 
 # Telegram web_app 按钮的对外站点，同时是 chart 内 tg-bot 的 TG_APP_BASE_URL。
 tgApp:

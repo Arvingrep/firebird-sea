@@ -111,6 +111,14 @@
 {{- end }}
 - name: FBS_TG_SERVICE_WHITELIST
   value: {{ $whitelist | quote }}
+# 网关 cookieDomain 兜底：data/cache/config.php 缺失（baked 模式 emptyDir 每次 Pod 重建清空）
+# 或文件里没有 $cfg_cookieDomain（新版火鸟已移除该配置项）时，网关用它签发跨域 cookie。
+# 只在 php-fpm 注入：cookie 由 PHP 签发，Node 侧只透传 set_cookies。
+# 留空则不注入 → 网关保持原 fail-closed（两级都拿不到才 500，绝不回落 host-only）。
+{{- if .Values.gateway.cookieDomain }}
+- name: FBS_GATEWAY_COOKIE_DOMAIN
+  value: {{ .Values.gateway.cookieDomain | quote }}
+{{- end }}
 - name: GOOGLE_MAPS_API_KEY
   valueFrom:
     secretKeyRef:

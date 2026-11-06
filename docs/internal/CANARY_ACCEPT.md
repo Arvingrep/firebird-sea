@@ -10,7 +10,7 @@
 | # | 事项 | 怎么确认 | 不做会怎样 |
 |---|---|---|---|
 | 0.1 | `firebird-api-secret` 补 key `FBS_GATEWAY_SECRET`（两侧同值） | `kubectl get secret firebird-api-secret -o jsonpath='{.data.FBS_GATEWAY_SECRET}'` 有输出 | PHP 侧一律 503 `GATEWAY_SECRET_NOT_CONFIGURED`，登录服务"未正确配置" |
-| 0.2 | `webroot/data/cache/config.php` 存在且定义了 `$cfg_cookieDomain` | `ls -l webroot/data/cache/config.php`，文件里出现 `$cfg_cookieDomain` | 登录 100% 500 `CONFIG_MISSING`（这是 fail-closed，刻意为之） |
+| 0.2 | **二者满足其一**：① `webroot/data/cache/config.php` 存在且定义 `$cfg_cookieDomain`；**或** ② php-fpm env `FBS_GATEWAY_COOKIE_DOMAIN` 非空（canary 由 values 的 `gateway.cookieDomain` 注入，值与 `tma.bridge.cookieDomain` 相同） | ① `ls -l` + 文件里出现 `$cfg_cookieDomain`；② `kubectl exec <pod> -c php-fpm -- printenv FBS_GATEWAY_COOKIE_DOMAIN` | 两级都拿不到才 500 `CONFIG_MISSING`（fail-closed，刻意为之）<br>**为什么不能只验 ①**：canary 是 baked 模式，`data/` 挂 emptyDir（Pod 重建即清空）；且新版火鸟已移除 cookieDomain 自定义（`siteConfig.inc.php` 无此变量，`common.inc.php:84` 注释"新版本不支持cookie作用域自定义"），缓存里永远不会有它 —— 只认缓存的写法在 canary 上必然 500 |
 | 0.3 | `webroot/data/cache/fbs_bridge/` 存在且 php-fpm 可写 | `ls -ld`，属主与 php-fpm 运行用户一致；`sudo -u <fpm用户> touch` 试一次 | 防重放**静默关闭**（fail-open 无告警），`replay_limit_exceeded` 分支永不触发，看起来一切正常 |
 | 0.4 | `tgBot.enabled` 只在 canary 打开，且确认**没有别的实例**在轮询同一 token | `kubectl get deploy -A \| grep tg-bot` 只有 canary 一个；本机 `docker-compose` 已停 | 两个 poller 抢 `getUpdates` → Telegram 409，机器人**随机不响应**（不是全挂，最难查） |
 | 0.5 | canary 的**默认首页**必须是 `siteConfig` 或白名单内的模块，且不能是「数字型自定义模块」 | 查 `webroot/data/cache/config.php` 的 `$cfg_defaultindex` | 默认首页若指向被拦模块，首页会被白名单 302 走；若是数字型（把商家模块设为首页），会变成 302 → 再解析 → 404，**整站打不开**。这是白名单唯一能打不开站的组合 |
@@ -232,6 +232,7 @@ DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD TRUST_PROXY_HOPS CORS_ORIGINS TMA_TO
 | `GET /api/fbs/index.php` | **403** | 网关要求 POST + HMAC，浏览器直开被拒（预期，不是故障） |
 | 带 `Cookie: HN_tg=1` 的首页 | `telegram-web-app.js` = **1**、`tg-shim.js?v=2` = **1** | `sub_filter` 注入生效 |
 | 不带 cookie 的首页 | 两者 = **0** | 注入是 cookie 门控，非无条件 |
+| 2026-11-06 真机首登 | **500 `CONFIG_MISSING`**（用户点菜单按钮即复现） | 当时网关只认 `data/cache/config.php`；已修：三级取值 cache → `FBS_GATEWAY_COOKIE_DOMAIN` → 500。修后判据见 §0.2 |
 | 被拦模块（如 `?service=shop`） | **302**，`Location` 带 `from=tg_whitelist` | 白名单守卫生效且可区分来源 |
 | `/shop?from=tg_whitelist` | **404** | 防止 302 回首页再解析成 302 的循环（守卫带豁免标记） |
 
