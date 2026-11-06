@@ -187,6 +187,7 @@ test('2 replicas everywhere, with sticky sessions and HPA still opt-in', () => {
   }
   const ing = T('ingressroute.yaml');
   assert.match(ing, /sticky:\s*\n\s+cookie:/);
-  assert.match(values, /^ingressRoute:\s*\n\s+enabled: true\s*\n\s+sticky:\s*\n\s+enabled: true/m);
+  // denyGateway（AD-19）插在 enabled 与 sticky 之间，是后加的行——断言容忍它的存在与否
+  assert.match(values, /^ingressRoute:\s*\n\s+enabled: true(?:\s*\n\s+denyGateway: true[^\n]*)?\s*\n\s+sticky:\s*\n\s+enabled: true/m);
   assert.match(values, /^autoscaling:\s*\n\s+enabled: false/m, 'HPA 仍需显式开启');
 });

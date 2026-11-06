@@ -339,3 +339,18 @@ location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|svg|woff2)$ {
 
 判定方法：**数字一致 = 链路没坏**；不一致再按第一节到第八节逐项定位，不要先怀疑代码。
 
+
+## 十、AD-20 缓存直查开关的收敛实测（`fileCache.queryBypass`，待验）
+
+> 背景：FileDataCache SQL 结果缓存 TTL=0 且全仓库无失效调用（delete/clearAll 零调用方），
+> 多副本下后台改 `site_module` / `site_payment` 等表后各 Pod **永不收敛**。canary 已开
+> `queryBypass: true`（`HN_DSQL_CACHE_SKIP=1`，php-fpm 与 cron 同注入）——相关 SELECT 直查 DB。
+
+| # | 步骤 | 判据 |
+|---|---|---|
+| 10.1 | 确认开关已生效：`kubectl exec <php-pod> -- printenv HN_DSQL_CACHE_SKIP` = `1`；后台保存一处配置（如模块状态）后**立即**刷新前台可见变化（不再需要等 sweeper 的 5 分钟） | 保存后秒级生效 |
+| 10.2 | **收敛时延实测**（本节核心）：后台关闭一个前台可见模块（如 `article` 或 `shop`），秒表计时，前台多副本轮询刷新（至少 2 个浏览器/无痕窗口各刷），记录**最后一个副本不再显示它**的秒数；再把模块打开，同样记录恢复秒数 | 两个方向均为**秒级（预期 <5s）**；对照：开关关闭时该数字为 ≤300s（sweeper 周期）或永不收敛 |
+| 10.3 | DB 压力对照：开关开启前后各采样 5 分钟（`SHOW GLOBAL STATUS LIKE 'Questions'` 差值 / 300s，或慢查询日志），对比 QPS 增量 | 增量可解释（每请求 +N 次配置表点查，N=页面加载触发的缓存 SQL 数）；慢查询无新增 |
+| 10.4 | 副本间一致性抽查：`kubectl exec` 两个 php Pod 各跑一次 `php -r 'echo getenv("HN_DSQL_CACHE_SKIP");'` | 双双输出 `1`（cron Job 亦然，触发一次看日志） |
+
+记录实测数字在下方追加：**（待填：关闭模块收敛 ___s / 恢复 ___s / DB QPS 增量 ___）**

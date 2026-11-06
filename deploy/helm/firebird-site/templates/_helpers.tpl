@@ -51,6 +51,11 @@
 - name: MEMORY_CACHE_REDIS_DB
   value: "{{ .Values.memoryCache.redis.db | default 1 }}"
 {{- end }}
+{{- if .Values.fileCache.queryBypass }}
+# AD-20：dsql.class.php::cache 内开关——跳过 FileDataCache 直查 DB（多副本缓存永不收敛，一致性优先）
+- name: HN_DSQL_CACHE_SKIP
+  value: "1"
+{{- end }}
 - name: DEFAULT_CURRENCY
   value: "{{ .Values.localization.defaultCurrency }}"
 - name: SITE_ID
