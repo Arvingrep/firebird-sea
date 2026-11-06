@@ -70,3 +70,12 @@ Do not reconstruct `workflowsPath` from environment name/id, instance identifier
 
 Never write `n8nac-config.json`, `~/.n8n-manager`, or n8n-manager secret files by hand.
 <!-- n8n-as-code-end -->
+
+---
+
+## 多 agent 协作规则
+1. 你在独立的 git worktree 里工作，只修改当前目录下的文件，不要动其他 worktree 或主目录。
+2. 不要切换分支，不要 merge、rebase 或 push，除非我明确要求。
+3. 改动完成后做小而清楚的 commit，提交信息写明改了什么。
+4. 不要修改锁文件和公共配置（如 package-lock.json、.env、数据库迁移），需要改时先问我。
+5. 完成后汇报：改了哪些文件、怎么测试、有没有未完成的事项。
