@@ -7,6 +7,7 @@
 <meta name="apptitle" content="{#$langData['siteConfig'][2][9]#}">
 <link rel="stylesheet" type="text/css" href="{#$cfg_staticPath#}css/core/touchBase.css?v={#$cfg_staticVersion#}">
 <link rel="stylesheet" href="{#$templets_skin#}css/login_v2.css?v={#$cfg_staticVersion#}">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="{#$cfg_staticPath#}js/core/jquery-1.8.3.min.js"></script>
 <script src="{#$cfg_staticPath#}js/core/touchScale.js?v={#$cfg_staticVersion#}"></script>
 <script src="{#$cfg_staticPath#}js/core/zepto.min.js"></script>
@@ -118,6 +119,8 @@
 		      <li class="alipay"><a href="{#$cfg_basehost#}/api/login.php?type={#$login.code#}"><img src="{#$cfg_basehost#}/api/login/{#$login.code#}/img/100.png?v={#$cfg_staticVersion#}" alt=""></a></li>
 		      {#elseif $login.code == "facebook"#}
 		      <li class="facebook"><a href="{#$cfg_basehost#}/api/login.php?type={#$login.code#}"><img src="{#$cfg_basehost#}/api/login/{#$login.code#}/img/100.png?v={#$cfg_staticVersion#}" alt=""></a></li>
+		      {#elseif $login.code == "telegram"#}
+		      <li class="telegram"><a href="{#$cfg_basehost#}/api/login.php?type={#$login.code#}"><img src="{#$cfg_basehost#}/api/login/{#$login.code#}/img/100.png?v={#$cfg_staticVersion#}" alt="Telegram"></a></li>
 		      {#/if#}
 		      {#/siteConfig#}
 			  {#if $is_app && $umeng_phoneLoginState#}
@@ -195,5 +198,44 @@
 {#/if#}
 <script src="{#$cfg_staticPath#}js/vue/axios.min.js?v={#$cfg_staticVersion#}"></script>
 <script src="{#$templets_skin#}js/login_v2.js?v={#$cfg_staticVersion#}"></script>
+<script>
+// Telegram Mini App 内自动一键登录。仅当后台安装并启用了「Telegram快捷登录」（登录方式里出现 li.telegram）才生效。
+// 实际验签与会话签发在服务端 api/login/telegram，这里只负责跳过去。
+(function () {
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg || !tg.initData) return;                 // 不在 Telegram Mini App 内：什么都不做
+  var li = document.querySelector('.other_login li.telegram');
+  if (!li) return;                                  // 未安装/未启用该登录方式
+
+  // 登录成功后回到进入登录页之前的页面：只传同站地址，服务端还会再校验
+  function furl() {
+    var raw = '';
+    try { raw = decodeURIComponent(redirectUrl || ''); } catch (e) { raw = redirectUrl || ''; }
+    if (!raw) return '';
+    var a = document.createElement('a');
+    a.href = raw;
+    if (a.host !== location.host) return '';
+    return a.href;
+  }
+  function go() {
+    var f = furl();
+    location.href = '/api/login.php?type=telegram' + (f ? '&furl=' + encodeURIComponent(f) : '');
+  }
+  var link = li.getElementsByTagName('a')[0];
+  if (link) link.onclick = function () { go(); return false; };
+
+  // 每个 Telegram 会话只自动登录一次：退出登录后不会被立刻登回去；失败也不会反复消耗同一份 initData 的重放额度。
+  // 存储不可用时（拿不到标记）宁可不自动跳，也不能每次加载都跳造成循环。
+  var key = 'fbs_tg_autologin';
+  var canAuto = false;
+  try {
+    if (sessionStorage.getItem(key) !== '1') {
+      sessionStorage.setItem(key, '1');
+      canAuto = sessionStorage.getItem(key) === '1';
+    }
+  } catch (e) {}
+  if (canAuto) go();
+})();
+</script>
 </body>
 </html>
