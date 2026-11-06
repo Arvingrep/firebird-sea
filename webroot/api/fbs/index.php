@@ -984,9 +984,10 @@ function fbs_gateway_bridge_token(array $context = array())
 
 /**
  * 站点基地址（rider_ql / rider_notify_url 拼 /ql.html?token=... 用）。
- * 从站点配置缓存 data/cache/config.php 读 $cfg_basehost + $cfg_httpSecureAccess，
- * scheme 口径与 include/attachment.php:53 一致（$cfg_secureAccess = httpSecureAccess ? 'https://' : 'http://'）。
- * fail-closed：读不到/没配 basehost 返回 null，调用方 503。
+ * 依次读 data/cache/config.php、include/config/siteConfig.inc.php 里的
+ * $cfg_basehost + $cfg_httpSecureAccess，scheme 口径与 include/attachment.php:53 一致
+ * （$cfg_secureAccess = httpSecureAccess ? 'https://' : 'http://'）；都没有时回落
+ * env SITE_BASEHOST（固定 https://）。fail-closed：全部读不到返回 null，调用方 503。
  *
  * @return string|null 形如 https://host（不带尾斜杠）
  */
@@ -996,22 +997,41 @@ function fbs_gateway_site_base_url(array $context = array())
         $u = trim((string)$context['base_url']);
         return $u !== '' ? rtrim($u, '/') : null;
     }
-    $file = fbs_gateway_site_config_file();
-    if (!is_file($file) || !is_readable($file)) {
-        error_log('[fbs_gateway] site config missing/unreadable for base url: ' . $file);
-        return null;
+    // 候选配置（按序）：① 运行时缓存 data/cache/config.php；② include/config/siteConfig.inc.php。
+    // 容器化部署不生成运行时缓存文件，站点配置直接由 siteConfig.inc.php 提供；只读 ① 会让
+    // rider_ql / rider_notify_url 恒定 503 CONFIG_MISSING（2026-11-06 实测：绑定成功后签发
+    // 直达链接失败，骑手永远进不了工作台）。
+    $candidates = array(
+        fbs_gateway_site_config_file(),
+        dirname(__DIR__, 2) . '/include/config/siteConfig.inc.php',
+    );
+    foreach ($candidates as $file) {
+        if (!is_file($file) || !is_readable($file)) {
+            continue;
+        }
+        $loaded = (static function ($__file) {
+            $cfg_basehost = $cfg_httpSecureAccess = null;
+            include $__file;
+            return array('basehost' => $cfg_basehost, 'secure' => $cfg_httpSecureAccess);
+        })($file);
+        if (!is_array($loaded) || $loaded['basehost'] === null || trim((string)$loaded['basehost']) === '') {
+            continue;
+        }
+        $scheme = ((int)$loaded['secure'] === 1) ? 'https://' : 'http://';
+        return $scheme . trim((string)$loaded['basehost']);
     }
-    $loaded = (static function ($__file) {
-        $cfg_basehost = $cfg_httpSecureAccess = null;
-        include $__file;
-        return array('basehost' => $cfg_basehost, 'secure' => $cfg_httpSecureAccess);
-    })($file);
-    if (!is_array($loaded) || $loaded['basehost'] === null || trim((string)$loaded['basehost']) === '') {
-        error_log('[fbs_gateway] site config does not define $cfg_basehost: ' . $file);
-        return null;
+    // 最后兜底：helm 注入的 SITE_BASEHOST（口径与 phpEnv/cronjob 一致）。env 只有 host 没有
+    // scheme 开关，对外域名一律走 https（Cloudflare 强制），此处固定 https://。
+    $envHost = getenv('SITE_BASEHOST');
+    if ($envHost === false || $envHost === '') {
+        $envHost = isset($_SERVER['SITE_BASEHOST']) ? $_SERVER['SITE_BASEHOST'] : '';
     }
-    $scheme = ((int)$loaded['secure'] === 1) ? 'https://' : 'http://';
-    return $scheme . trim((string)$loaded['basehost']);
+    $envHost = trim((string)$envHost);
+    if ($envHost !== '') {
+        return 'https://' . $envHost;
+    }
+    error_log('[fbs_gateway] site base url unavailable: no readable site config and SITE_BASEHOST unset');
+    return null;
 }
 
 /**
