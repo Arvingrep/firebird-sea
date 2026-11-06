@@ -26,6 +26,7 @@ const { createAddrShareRouter } = require('./addrShareRoute');
 const { createCredentialProvider } = require('./credentialProvider');
 const { createBridgeRoute } = require('./bridgeRoute');
 const { createRiderRoute } = require('./riderRoute');
+const { createDispatchRoute } = require('./dispatchRoute');
 const { createRevocationStore, createReplayCounter, createIdempotencyStore } = require('./sharedState');
 
 assertProductionConfig();
@@ -44,7 +45,11 @@ app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
 // （fbClient.js:57），缺 urlencoded 时 req.body 恒为 {}，所有写接口（地址/下单/取消）字段全部丢失，
 // 上游只会回「请输入联系人」一类误导性错误（2026-10-26 canary 实测）。
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// 内部派单通知（T7）的 HMAC 签名覆盖原始字节：PHP 的 json_encode 与 JSON.stringify 重序列化
+// 不保证同形（转义/空格差异），故只对 /tg-api/internal/* 留一份原文，其余路径不额外占内存。
+app.use(express.json({
+  verify: (req, res, buf) => { if (req.path.startsWith('/tg-api/internal/')) req.rawBody = buf; },
+}));
 
 // AD-9：Node 路由统一挂在 /tg-api，/api 前缀留给火鸟 PHP（含 /api/payment/notify.php）
 const router = express.Router();
@@ -458,6 +463,23 @@ router.get('/rider/bind', rider.getLanding);
 router.post('/rider/bind', rider.postBind);
 // 只挂 POST：initData 是短期凭证，不接受 query 传参（避免进访问日志/Referer/浏览器历史）
 router.post('/rider/session', rider.session);
+
+// 2h. 派单 Telegram 通知（T7）：PHP 挂点 fb_tg_dispatch（common.func.php）→ 集群内站点 nginx →
+// POST /tg-api/internal/dispatch。HMAC 验签（复用 FBS_GATEWAY_SECRET，action 常量 'dispatch'，
+// 不引入新密钥）→ 去重占位写库 → **立刻 202 accepted** → 响应之后异步查绑定 / 换一次性直达 URL /
+// 发 sendMessage（失败重试 1 次，429 按其 retry_after 退避）。
+// 异步化原因：PHP 挂点在派单/抢单/改派关键路径上，同步等 Telegram 会顶穿 PHP 的 800ms 预算，
+// 产出「日志说超时但骑手收到了」的假失败。202 只代表已受理，投递失败只落日志（带 event/order_id/
+// courier_id 便于按单号定位）并释放去重占位，业务事务侧完全不受影响。
+const dispatch = createDispatchRoute({
+  secret: process.env.FBS_GATEWAY_SECRET,
+  botToken: BOT_TOKEN,
+  conn: cliConn(),
+  gateway: process.env.FBS_GATEWAY_URL && process.env.FBS_GATEWAY_SECRET ? {
+    riderNotifyUrl: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_notify_url', p),
+  } : null,
+});
+router.post('/internal/dispatch', dispatch.postDispatch);
 
 app.listen(PORT, () => {
   console.log(`🚀 Firebird SEA Core API is listening on port ${PORT}`);

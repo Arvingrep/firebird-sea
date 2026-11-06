@@ -201,6 +201,54 @@ paths:
         '401': { description: initData 无效或过期（INVALID_INIT_DATA） }
         '502': { description: 网关失败（RIDER_FAILED） }
         '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+  /tg-api/internal/dispatch:
+    post:
+      summary: 骑手派单 Telegram 通知（T7，仅集群内 PHP 调用）
+      description: |
+        PHP 派单挂点（`fb_tg_dispatch`，waimaiOrder.php 派单/改派、waimai.class.php 抢单）转交的
+        通知入口。**收下即返回**：HMAC 验签 + 去重占位写库后立刻 `202 {accepted:true}`，
+        sendMessage 与重试全部在响应之后异步执行——挂点在派单/抢单/改派关键路径上，同步等
+        Telegram 会顶穿 PHP 的 800ms 预算并产出「日志说超时、骑手其实收到了」的假失败。
+
+        `202` 只代表**已受理**，不代表已送达。之后的查绑定 / 换直达 URL / 发消息失败只落日志
+        （每条带 `event=` / `order_id=` / `courier_id=`，线上按订单号 grep 即可定位），最终失败
+        会释放去重占位以便下次同键事件重发；PHP 侧不再得知发送结果，业务事务因此完全解耦。
+
+        HMAC 与 gatewayClient 同算法同密钥（方向反转：
+        `HMAC-SHA256(FBS_GATEWAY_SECRET, ts\ndispatch\nbody)`，头 `X-Fbs-Timestamp` /
+        `X-Fbs-Signature`，60 秒窗口）。查 `fbs_courier_map` 得 tg_user_id，按 `TELEGRAM_BOT_TOKEN`
+        发 sendMessage；inline 按钮「查看订单」为网关 `rider_notify_url` 签出的一次性工作台直达
+        URL（打开即该订单详情）。事件四种：`new_order`（派单）、`grab`（抢单）、`reassign`
+        （改派给另一骑手）带按钮；`reclaim`（订单被客服收回，如改派第三方平台）不带按钮。
+        去重 `fbs_dispatch_dedup`（键 = event + order_id + courier_id，TTL 1 天，语义等同
+        Redis SETNX EX 86400——同单改派给另一位骑手不会被吞通知）。发送失败重试 1 次，
+        429 按其 `retry_after` 退避（上限 5s）。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event, order_id, courier_id]
+              properties:
+                event: { type: string, enum: [new_order, grab, reassign, reclaim] }
+                order_id: { type: integer }
+                courier_id: { type: integer }
+      responses:
+        '202':
+          description: 已受理（dedup:false 本次负责投递；dedup:true 同键已在投递/已投递，本次跳过）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  accepted: { type: boolean }
+                  dedup: { type: boolean }
+        '400': { description: event / order_id / courier_id 非法（INVALID_EVENT / INVALID_PARAM） }
+        '401': { description: 时间戳过期或验签失败（BAD_SIGNATURE） }
+        '503': { description: 派单通知未配置（DISPATCH_NOT_CONFIGURED） }
   /tg-api/services:
     get:
       summary: 四大核心模块元数据
