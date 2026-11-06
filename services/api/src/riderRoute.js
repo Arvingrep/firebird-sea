@@ -208,14 +208,21 @@ function createRiderRoute({ botToken, validateInitData, gateway, conn, allow, al
         throw new Error('rider_bind failed');
       }
       // 2) 换工作台直达 URL：PHP 签 10 分钟一次性令牌（ql.html 落地种骑手 cookie）。
-      //    ql 失败不再还原状态码（绑定已成立，用户态按网关故障 502 处理）
-      const ql = await gateway.riderQl({ courier_id: courierId });
-      const url = ql && ql.success === true && ql.data && ql.data.url;
-      if (typeof url !== 'string' || !isAllowedTarget(url)) {
-        throw new Error('rider_ql returned invalid url');
+      //    ql 失败不再还原状态码（绑定已成立，按网关故障 502 处理）。
+      //    G-8：文案必须与绑定失败区分——这里绑定已生效，套用「服务暂时不可用，请稍后重试」
+      //    会诱导用户反复重绑（重绑撞 tg 维度限频还可能 429）。提示从 bot 重新打开即可拿新链接。
+      try {
+        const ql = await gateway.riderQl({ courier_id: courierId });
+        const url = ql && ql.success === true && ql.data && ql.data.url;
+        if (typeof url !== 'string' || !isAllowedTarget(url)) {
+          throw new Error('rider_ql returned invalid url');
+        }
+        res.setHeader('Cache-Control', 'no-store');
+        return res.redirect(302, url);
+      } catch (qlErr) {
+        console.error('[rider/bind] bind ok but ql failed:', String((qlErr && qlErr.message) || qlErr).slice(0, 300));
+        return sendError(res, 502, 'WORKBENCH_URL_FAILED', '绑定已生效，获取工作台链接暂时失败，请稍后从 bot 重新打开');
       }
-      res.setHeader('Cache-Control', 'no-store');
-      return res.redirect(302, url);
     } catch (err) {
       // 只记消息：err 与 req.body 可能携带 initData/手机号，不能整体进日志
       console.error('[rider/bind] failed:', String((err && err.message) || err).slice(0, 300));

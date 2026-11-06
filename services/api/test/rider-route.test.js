@@ -277,18 +277,23 @@ test('手机号未匹配骑手（网关 404 语义）→ 404 COURIER_NOT_FOUND�
   assert.match(res.body, /未找到该手机号对应的骑手账号/);
 });
 
-test('rider_ql 失败 / 返回非 https URL → 502，不重定向（ql 失败不还原状态码）', async () => {
+test('rider_ql 失败 / 返回非 https URL → 502，不重定向；文案区分「绑定已生效」（G-8）', async () => {
   const bad1 = makeGateway({ qlScript: httpError(404, 'COURIER_NOT_FOUND', '骑手不存在或状态不可用') });
   const r1 = makeRes();
   await createRiderRoute(makeDeps({ gateway: bad1 })).postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r1);
   assert.strictEqual(r1.statusCode, 502);
   assert.strictEqual(r1.redirectUrl, null);
+  // G-8：绑定已生效，ql 失败的文案不能与绑定失败相同（诱导反复重绑）
+  assert.ok(r1.body.includes('WORKBENCH_URL_FAILED'), `错误码应为 WORKBENCH_URL_FAILED，实际：${r1.body}`);
+  assert.ok(r1.body.includes('绑定已生效'), `文案应提示绑定已生效，实际：${r1.body}`);
+  assert.ok(!r1.body.includes('RIDER_FAILED'), 'ql 失败不得复用 RIDER_FAILED（用户会误判绑定失败）');
 
   const bad2 = makeGateway({ qlScript: { success: true, data: { url: 'http://evil.example/ql' } } });
   const r2 = makeRes();
   await createRiderRoute(makeDeps({ gateway: bad2 })).postBind(makeReq({ body: { initData: signInitData(1), phone: '0912345678' } }), r2);
   assert.strictEqual(r2.statusCode, 502);
   assert.strictEqual(r2.redirectUrl, null);
+  assert.ok(r2.body.includes('WORKBENCH_URL_FAILED'));
 });
 
 test('302 目标域名白名单（m7）：https 但不在 CORS_ORIGINS 派生白名单内 → 502，不重定向', async () => {
