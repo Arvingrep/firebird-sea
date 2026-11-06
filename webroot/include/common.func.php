@@ -6652,23 +6652,42 @@ function getWechatMsgErrCode($code){
  * 为什么不让 PHP 直发 Telegram：PHP 容器不注入 bot token（密钥面收敛），且不能让派单等待外网。
  * 验签算法与 services/api/src/gatewayClient.js 完全一致（action 常量 'dispatch'）：
  * HMAC-SHA256(FBS_GATEWAY_SECRET, ts\ndispatch\nbody)，头 X-Fbs-Timestamp / X-Fbs-Signature。
+ *
+ * 超时预算（修复轮 2 · M3）：Node 侧已改成「收下即返回」——验签 + 去重占位写库后立刻回 202，
+ * Telegram 发送与重试都在响应之后异步做。所以这里只要 800ms 就够，且**不再重试**：
+ * 原来 1.2s + 重试 会与 Node 的 5s 发送超时倒挂（PHP 先放弃、Node 还在发），日志里全是
+ * 「超时失败」而骑手其实收到了消息，排障时完全误导。失败的语义统一为：只记日志，不影响派单。
+ *
  * 不调用 fastcgi_finish_request：三处挂点都在响应生成中途（后台页/接口 JSON 输出中段），
- * 提前结束请求会截断后续输出；以 1.2 秒总超时兜底，通知不可达最多拖慢响应 1.2 秒。
- * 通知失败一律返回 false，绝不影响派单事务本身。
+ * 提前结束请求会截断后续输出。
  * @param $event     事件：new_order 派单 / grab 抢单 / reassign 改派给另一骑手 / reclaim 订单被客服收回（改派第三方平台）
  * @param $orderId   订单 id
  * @param $courierId 骑手 id（须已通过 /tg-api/rider/bind 绑定 Telegram）
- * @return bool
+ * @return bool 仅表示「Node 已受理」，不代表已送达（送达失败只有 Node 侧日志知道）
  */
 function fb_tg_dispatch($event, $orderId, $courierId){
     $secret = getenv('FBS_GATEWAY_SECRET');
-    if (!$secret || !in_array($event, array('new_order', 'grab', 'reassign', 'reclaim'))) return false;
+    if (!$secret) {
+        // 配置缺失要留痕：M1 后本变量对 4 个 site 无条件注入，取不到说明 secret 没建（optional: true）
+        error_log(sprintf('[fb_tg_dispatch] skipped event=%s order_id=%d courier_id=%d reason=FBS_GATEWAY_SECRET missing',
+            (string)$event, (int)$orderId, (int)$courierId));
+        return false;
+    }
+    if (!in_array($event, array('new_order', 'grab', 'reassign', 'reclaim'))) {
+        error_log(sprintf('[fb_tg_dispatch] skipped event=%s order_id=%d courier_id=%d reason=unknown event',
+            (string)$event, (int)$orderId, (int)$courierId));
+        return false;
+    }
     // 目标地址：默认经站点 nginx 服务转发到 Node api（helm configmap 的 /tg-api/ location）；
     // 特殊拓扑用 TG_DISPATCH_URL 覆盖（与 gatewayClient 的 FBS_GATEWAY_URL 同一配置模式）
     $url = getenv('TG_DISPATCH_URL');
     if (!$url) {
         $site = getenv('SITE_ID');
-        if (!$site) return false;
+        if (!$site) {
+            error_log(sprintf('[fb_tg_dispatch] skipped event=%s order_id=%d courier_id=%d reason=SITE_ID missing',
+                (string)$event, (int)$orderId, (int)$courierId));
+            return false;
+        }
         $url = 'http://firebird-' . $site . '/tg-api/internal/dispatch';
     }
     $body = json_encode(array('event' => $event, 'order_id' => (int)$orderId, 'courier_id' => (int)$courierId));
@@ -6679,15 +6698,22 @@ function fb_tg_dispatch($event, $orderId, $courierId){
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $body,
         CURLOPT_HTTPHEADER     => array('Content-Type: application/json', 'X-Fbs-Timestamp: ' . $ts, 'X-Fbs-Signature: ' . $sig),
-        CURLOPT_CONNECTTIMEOUT_MS => 800,
-        CURLOPT_TIMEOUT_MS     => 1200,
+        CURLOPT_CONNECTTIMEOUT_MS => 300,
+        CURLOPT_TIMEOUT_MS     => 800,
         CURLOPT_NOSIGNAL       => true,
         CURLOPT_RETURNTRANSFER => true,
     ));
     curl_exec($ch);
-    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $code   = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $errno  = curl_errno($ch);
+    $errmsg = $errno ? curl_error($ch) : '';
     curl_close($ch);
-    return $code >= 200 && $code < 300;
+    if ($code >= 200 && $code < 300) return true;
+    // 失败只记日志（派单/抢单/改派事务不受影响）。日志固定带 event/order_id/courier_id，
+    // 线上按订单号 grep 就能定位是哪一单、哪个骑手、哪个事件没通知出去；不记 body/签名（含密钥材料）。
+    error_log(sprintf('[fb_tg_dispatch] failed event=%s order_id=%d courier_id=%d http=%d errno=%d err=%s',
+        $event, (int)$orderId, (int)$courierId, $code, $errno, $errmsg));
+    return false;
 }
 
 /**
