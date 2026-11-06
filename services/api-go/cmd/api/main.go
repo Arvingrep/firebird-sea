@@ -42,6 +42,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/member"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/migrate"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/payment"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/rider"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/state"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/tglogin"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/token"
@@ -183,6 +184,7 @@ func run() error {
 		Bridge:         bridgeRoute,
 		Addr:           addrRouter,
 		FBProxy:        proxy,
+		Rider:          buildRider(db, botToken, now),
 		TMAStaticDir:   os.Getenv("TMA_STATIC_DIR"),
 		TrustProxyHops: hops,
 	}
@@ -416,6 +418,45 @@ func credentialProviderOf(bundle *authBundle) func(ctx context.Context, memberID
 	return bundle.creds.Provide
 }
 
+// buildRider 构造骑手 session 处理器（T6，server.js 2g 的等价装配）。
+//
+// 三组配置按 Node 的取法各自独立降级：
+//   - gateway：`FBS_GATEWAY_URL && FBS_GATEWAY_SECRET ? {...} : null`，缺一即 null；
+//   - 白名单：CORS_ORIGINS 每项取 host（解析失败的项丢弃），与对外 CORS 同一份清单；
+//   - DB：没有连接池时传 nil（Node 的 cliConn() 在缺库时同样不可用）。
+//
+// 与 Node 一样，缺配置**不**阻断启动：rider.New 只把端点标成 notConfigured，
+// 由 /tg-api/rider/session 自己返回 503，这样 /health 仍能探活。
+func buildRider(db *sql.DB, botToken string, now func() time.Time) *rider.Route {
+	dep := rider.Dep{
+		BotToken:     botToken,
+		DB:           db,
+		AllowedHosts: rider.AllowedHostsFromOrigins(splitOrigins(os.Getenv("CORS_ORIGINS"))),
+	}
+	gatewayURL := os.Getenv("FBS_GATEWAY_URL")
+	secret := os.Getenv("FBS_GATEWAY_SECRET")
+	if gatewayURL != "" && secret != "" {
+		dep.Gateway = gatewayAdapter{cfg: gateway.Config{BaseURL: gatewayURL, Secret: secret, Now: now}}
+	}
+	return rider.New(dep)
+}
+
+// splitOrigins 复刻 server.js 对 CORS_ORIGINS 的处理：
+// split(',') → map(s => s.trim()) → filter(Boolean)，即按逗号拆分、去首尾空白、丢掉空项。
+//
+// 注意：注释里若写连续两个单引号，gofmt 会把它改写成弯引号（go/printer 的
+// 老式文档注释约定），所以上面对 JS 的描述用文字而不是原样代码。
+func splitOrigins(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
 // errCheckoutNoDB 表示「没有数据库连接池」——这是文档化的支持模式（本地只跑内存接口），
 // 调用方据此降级成「不注册收银台」，而不是拒绝启动。
 var errCheckoutNoDB = errors.New("收银台需要数据库连接池")
@@ -499,6 +540,12 @@ func validateAssembly(bundle *authBundle, dep httpapi.Dep) error {
 	if dep.DB != nil && dep.Checkout == nil {
 		missing = append(missing, "Checkout")
 	}
+	// 骑手 session 不依赖登录编排（只依赖 botToken / 网关 / 库），所以它在
+	// 「无 auth 的降级装配」下也必须是接上的：漏接的表现是路由静默 404，
+	// 正是 validateAssembly 要拦的那类「少填一个字段」。
+	if dep.Rider == nil {
+		missing = append(missing, "Rider")
+	}
 	if bundle != nil {
 		// auth 装配成功时，登录编排 / 令牌 / 凭证三者缺一都会让相关端点静默 503 或恒 401。
 		if bundle.login == nil {
@@ -547,6 +594,11 @@ func (g gatewayAdapter) MemberFindOrCreate(ctx context.Context, params map[strin
 
 func (g gatewayAdapter) IssueSession(ctx context.Context, params map[string]any) (map[string]any, error) {
 	return gateway.IssueSession(ctx, g.cfg, params)
+}
+
+// RiderQL 是骑手工作台直达 URL 的动作（rider.Route 的 Gateway 接口）。
+func (g gatewayAdapter) RiderQL(ctx context.Context, params map[string]any) (map[string]any, error) {
+	return gateway.Call(ctx, g.cfg, "rider_ql", params)
 }
 
 // —— 数据库 ——

@@ -28,6 +28,9 @@ import (
 
 // startupDep 返回「无库启动」时的装配形态：DB 是 nil *sql.DB（与 run() 里
 // DB_HOST 未设置时同形，不是空结构），收银台不注册。
+//
+// 骑手 session 也走真实装配函数：无库时它是 notConfigured（端点 503），
+// 但 route 本身必须存在 —— 装配层不允许「依赖没接上」以 nil 的形式溜过去。
 func startupDep(now func() time.Time) httpapi.Dep {
 	return httpapi.Dep{
 		Env:      func(string) string { return "" },
@@ -37,6 +40,7 @@ func startupDep(now func() time.Time) httpapi.Dep {
 		Payments: payment.New(payment.Dep{Now: now}),
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: nil,
+		Rider:    buildRider(nil, "123456:TEST", now),
 		Logf:     func(string) {},
 	}
 }

@@ -93,6 +93,7 @@ func buildTestAssembly(t *testing.T) assembly {
 		Bridge:         bridgeRoute,
 		Addr:           addrRouter,
 		FBProxy:        proxy,
+		Rider:          buildRider(db, botToken, now),
 		TrustProxyHops: 0,
 	}
 	return assembly{bundle: bundle, dep: dep, bridge: bridgeRoute}
@@ -147,7 +148,8 @@ func TestSelfCheckAssemblyRejectsEachMissingDependency(t *testing.T) {
 		"缺 Auth.Credentials": {func(d *httpapi.Dep) {
 			d.Auth = &httpapi.Auth{Login: d.Auth.Login, Tokens: d.Auth.Tokens}
 		}, "Auth.Credentials"},
-		"缺 Addr": {func(d *httpapi.Dep) { d.Addr = nil }, "Addr"},
+		"缺 Addr":  {func(d *httpapi.Dep) { d.Addr = nil }, "Addr"},
+		"缺 Rider": {func(d *httpapi.Dep) { d.Rider = nil }, "Rider"},
 	}
 	for name, item := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -177,6 +179,7 @@ func TestSelfCheckAssemblyDegradesWithoutAuth(t *testing.T) {
 		Payments: payment.New(payment.Dep{Now: now}),
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: func(http.ResponseWriter, *http.Request) {},
+		Rider:    buildRider(nilDB, "123456:TEST", now),
 	}
 	if err := validateAssembly(nil, dep); err != nil {
 		t.Fatalf("无 auth 的降级装配不该报错：%v", err)
@@ -215,6 +218,7 @@ func TestSelfCheckAssemblyAllowsNoDatabase(t *testing.T) {
 		Payments: payment.New(payment.Dep{Now: now}),
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: nil,
+		Rider:    buildRider(nilDB, "123456:TEST", now),
 	}
 	if err := validateAssembly(nil, dep); err != nil {
 		t.Fatalf("无库启动是文档化模式，装配校验不该拦：%v", err)

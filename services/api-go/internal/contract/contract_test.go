@@ -57,9 +57,9 @@ var notYetInCode = map[string]struct{}{
 	// #212 骑手 Telegram 全链路（services/api/src/riderRoute.js 260 行、
 	// dispatchRoute.js 247 行，含 006/008 两条迁移）。canary 上 Node 版已上线，
 	// Go 版待移植；在那之前 canary 的 api.engine 必须保持 node。
+	// POST /tg-api/rider/session 已移植（internal/rider），故不在本表内。
 	"GET /tg-api/rider/bind":         {},
 	"POST /tg-api/rider/bind":        {},
-	"POST /tg-api/rider/session":     {},
 	"POST /tg-api/internal/dispatch": {},
 }
 

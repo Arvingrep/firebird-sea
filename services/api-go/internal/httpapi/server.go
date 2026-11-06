@@ -26,6 +26,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fbproxy"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpbody"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/payment"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/rider"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/tgauth"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/token"
 )
@@ -75,6 +76,9 @@ type Dep struct {
 	Bridge      *bridge.Route
 	Addr        *addrshare.Router
 	FBProxy     *fbproxy.Proxy
+	// Rider 是 /tg-api/rider/session（rider.New 的产物）。配置不齐时它自己
+	// 返回 503，与 Node「无条件挂载、端点内降级」一致；为 nil 表示未装配（测试场景）。
+	Rider *rider.Route
 
 	// TMAStaticDir 为空或目录不存在时不挂载 /tma（Node 的 existsSync 守卫）。
 	TMAStaticDir string
@@ -108,6 +112,7 @@ type Server struct {
 	bridge      *bridge.Route
 	addr        *addrshare.Router
 	fbProxy     *fbproxy.Proxy
+	rider       *rider.Route
 	staticDir   string
 	hops        int
 	runCallTest func(context.Context, string, any, calltest.Options) calltest.Result
@@ -157,6 +162,7 @@ func NewServer(d Dep) *Server {
 		bridge:      d.Bridge,
 		addr:        d.Addr,
 		fbProxy:     d.FBProxy,
+		rider:       d.Rider,
 		staticDir:   d.TMAStaticDir,
 		// TrustProxyHops 为 0 即「不信任 X-Forwarded-For」，与 express 未配置
 		// trust proxy 时 req.ip == RemoteAddr 的行为一致。
@@ -187,6 +193,7 @@ func (s *Server) Routes() []Route {
 		{Method: "GET", Path: "/tg-api/auth/bridge"},
 		{Method: "POST", Path: "/tg-api/auth/bridge"},
 		{Method: "POST", Path: "/tg-api/auth/telegram-web"},
+		{Method: "POST", Path: "/tg-api/rider/session"},
 		{Method: "GET", Path: "/tg-api/services"},
 		{Method: "POST", Path: "/tg-api/payment/create-charge"},
 		{Method: "POST", Path: "/tg-api/checkout"},
@@ -285,6 +292,15 @@ func (s *Server) build() http.Handler {
 	if s.bridge != nil {
 		mux.HandleFunc("GET /tg-api/auth/bridge", s.bridge.GetLanding)
 		mux.HandleFunc("POST /tg-api/auth/bridge", s.bridge.PostBridge)
+	}
+
+	// 9. 骑手 session（T6，server.js 2g）：只挂 POST —— initData 是短期凭证，
+	// 不接受 query 传参（避免进访问日志/Referer/浏览器历史）。
+	// Node 是**无条件挂载**、配置不齐时端点内 503；生产装配（cmd/api）也总会构造
+	// rider.New（缺配置时它是 notConfigured，端点仍 503），所以这里的 nil 判断
+	// 只影响「测试里没注入」的场景。
+	if s.rider != nil {
+		mux.HandleFunc("POST /tg-api/rider/session", s.rider.Session)
 	}
 
 	return s.wrap(mux)
