@@ -8778,10 +8778,14 @@ function getDistance($lng1, $lat1, $lng2, $lat2){
     $_dituReport->DEBUG("data:" . $lng1 .','. $lat1 .'    '. $lng2 .','. $lat2);
 
     global $cfg_map;
-    $originlat      = $cfg_map != 1 && $lat1 > $lng1 ? $lng1 : $lat1;
-    $originlng      = $cfg_map != 1 && $lng1 < $lat1 ? $lat1 : $lng1;
-    $destinationlat = $cfg_map != 1 && $lat2 > $lng2 ? $lng2 : $lat2;
-    $destinationlng = $cfg_map != 1 && $lng2 < $lat2 ? $lat2 : $lng2;
+    // 经纬度顺序纠正原本只在百度/高德模式（$cfg_map != 1）生效；Google 模式（$cfg_map == 1）
+    // 直接取原始参数。而调用方（waimai.class.php 等 46 处）按国内惯例「纬度在前」传参，
+    // Google/海外部署下两个数当纬经度用反，距离算出几千公里（2026-11-06 canary 实测
+    // 「距离店铺 7660 公里」）。菲律宾/中国均为纬度<经度，统一做纠正对三种地图口径都正确。
+    $originlat      = $lat1 > $lng1 ? $lng1 : $lat1;
+    $originlng      = $lng1 < $lat1 ? $lat1 : $lng1;
+    $destinationlat = $lat2 > $lng2 ? $lng2 : $lat2;
+    $destinationlng = $lng2 < $lat2 ? $lat2 : $lng2;
     if ($originlng == '' || $originlat == '' || $destinationlng == '' || $destinationlat == '') {
         return;
     }
