@@ -18,6 +18,9 @@ const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 const { createTokenService, createLimiter } = require('./tmaToken');
 const { createMemberMap } = require('./memberMap');
 const { createLoginService } = require('./loginService');
+// gatewayClient 已在文件顶部 require（第 14 行），此处不重复引入：
+// merge feat/tg-tma × canary 时两侧各自新增了同一条 gatewayClient 的 const 声明，
+// 按行拼接未去重 → 重复声明 SyntaxError，api 启动即退（见本次修复的 commit message）。
 const { createFbProxy } = require('./fbProxy');
 const { createAddrShareRouter } = require('./addrShareRoute');
 const { createCredentialProvider } = require('./credentialProvider');
