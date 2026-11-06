@@ -62,9 +62,9 @@
   value: "{{ .Values.siteId }}"
 - name: SITE_BASEHOST
   value: "{{ .Values.domain | default "fbird.men" }}"
-# FBS_GATEWAY_SECRET 注入见下方 {{ if .Values.gateway.secretRef }} 条目（canary 29334cf7 形态，
-# gateway.secretRef/gateway.secretKey）；移植轮丢弃了旧分支里 api.secretRef 版的重复注入（N2），
-# 否则同容器会出现两条同名 env，最后一个生效、来源不可审计。
+# FBS_GATEWAY_SECRET 注入见下方 gateway.secretRef / gateway.secretKey 条目（canary 29334cf7 形态）。
+# 移植轮丢弃了旧分支里 api.secretRef 版的重复注入（N2）：否则同容器会出现两条同名 env，
+# 最后一个生效、来源不可审计。
 - name: GCS_KEY_ID
   valueFrom:
     secretKeyRef:
