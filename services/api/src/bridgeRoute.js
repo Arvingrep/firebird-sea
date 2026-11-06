@@ -6,6 +6,9 @@
 // 硬约束：Node 不自签任何凭证（不调 tokens.issue）；凭证值不进日志/错误信息/HTML；
 // 浏览器不接触 Node 自签 token——loginService 返回的 token 在此丢弃，桥只取 memberId。
 const crypto = require('node:crypto');
+// 页面外壳（浅色底 / head meta / 转义）统一走 htmlPage：TG 深色模式下页面不铺底
+// 会变成黑底黑字（2026-11-06 canary 黑屏事故），不要在各自文件里重复拼。
+const { escapeHtml, renderPageHead, PAGE_SHELL } = require('./htmlPage');
 
 // 目标页净化：只放行站内相对路径，杜绝开放重定向（调查报告 R2）。
 // 任务书规则：以单个 / 开头、不得以 // 或 /\ 开头、不得含 \、不得含协议或 @、长度 ≤ 200；
@@ -25,21 +28,18 @@ function sanitizeTarget(raw, fallback) {
 }
 
 // 落地页/错误页均为服务端拼接的静态模板，外部输入只有 to（必须先过 sanitizeTarget），
-// 统一做 HTML 转义防反射 XSS。
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
+// 统一做 HTML 转义防反射 XSS（escapeHtml 来自 htmlPage）。
 function renderLandingPage({ nonce, postPath, to }) {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>正在登录…</title>
+${renderPageHead('正在登录…')}
 <!-- 依赖说明：POST 提交必须携带浏览器代填的 Origin / Sec-Fetch-Site 头（现代浏览器对
      导航式 POST 均发送），服务端以此做登录 CSRF 来源闸门；无这些头的极老 WebView 会被 403 -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>${PAGE_SHELL}
+p { margin: 0; }
+</style>
 </head>
 <body>
 <p id="msg">正在登录，请稍候…</p>
@@ -51,9 +51,15 @@ function renderLandingPage({ nonce, postPath, to }) {
 <script nonce="${nonce}">
 (function () {
   var tg = window.Telegram && window.Telegram.WebApp;
+  // 无条件 ready/expand：不调用时部分客户端按 0 高度渲染，同样表现为空白/黑屏。
+  if (tg) {
+    try { if (tg.ready) tg.ready(); } catch (e) {}
+    try { if (tg.expand) tg.expand(); } catch (e) {}
+    try { if (tg.setHeaderColor) tg.setHeaderColor('#FFFFFF'); } catch (e) {}
+    try { if (tg.setBackgroundColor) tg.setBackgroundColor('#FFFFFF'); } catch (e) {}
+  }
   var data = tg && tg.initData;
   if (data) {
-    if (tg.ready) tg.ready();
     document.getElementById('initData').value = data;
     // 必须用真实表单提交而非 fetch：只有导航式 POST 才会跟随服务端的 302 + Set-Cookie
     document.getElementById('f').submit();
@@ -72,13 +78,17 @@ function renderErrorPage(code, message) {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>登录失败</title>
+${renderPageHead('登录失败')}
+<style>${PAGE_SHELL}
+h1 { font-size: 18px; margin: 0 0 12px; }
+p { margin: 0 0 8px; }
+code { color: #57606A; font-size: 13px; }
+</style>
 </head>
 <body>
-<p>登录失败（${escapeHtml(code)}）</p>
+<h1>登录失败</h1>
 <p>${escapeHtml(message)}</p>
+<p><code>${escapeHtml(code)}</code></p>
 </body>
 </html>`;
 }
