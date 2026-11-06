@@ -105,6 +105,7 @@ $(function(){
 	    	}
 	    	else {
 	    		alert('failed'+this.getStatus());
+	    		getlist();   // 定位失败也要出城市级结果，否则整页空白
 	    	}
 	    },{enableHighAccuracy: true})
 
@@ -160,9 +161,11 @@ $(function(){
 								default:
 										 break;
 							}
+							getlist();   // 定位失败/被拒绝也要出城市级结果，否则整页空白
 				 })
 			 }else {
 				alert(langData['waimai'][3][72])    /* 不支持 */
+				getlist();   // 浏览器不支持定位时同样降级为城市级结果
 			 }
 			}
 
@@ -272,7 +275,9 @@ $(function(){
 
 
     function getlist(selecttype){
-    	if(!lat || !lng) return;
+    	// 无坐标（URL 没带、没选过地址、拒绝定位）也照常请求：后端 shopList 支持不带坐标的城市级查询，
+    	// 早退只会让整页空白。此时不拼 lng/lat 参数。lat/lng 是隐式全局，未赋值时用 typeof 守卫。
+    	var hasGeo = (typeof lat !== 'undefined' && lat) && (typeof lng !== 'undefined' && lng);
 		var sx = '';
 		if(selecttype){
 			sx = selecttype;
@@ -306,15 +311,19 @@ $(function(){
       utils.setStorage('wm_history_search', JSON.stringify(history));
 		}
 		
+		var reqData = {
+			page: page,
+			keywords: keywords,
+			pageSize: 10
+		};
+		if(hasGeo){
+			reqData.lng = lng;
+			reqData.lat = lat;
+		}
+
 		$.ajax({
             url: '/include/ajax.php?service=waimai&action=shopList&'+sx,
-            data: {
-                lng: lng,
-                lat: lat,
-                page: page,
-				keywords:keywords,
-                pageSize: 10
-            },
+            data: reqData,
             type: 'get',
             dataType: 'json',
             success: function(data){
