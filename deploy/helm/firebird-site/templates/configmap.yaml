@@ -72,6 +72,12 @@ data:
             add_header Cache-Control "public, no-transform";
         }
 
+        # 安装向导下线：源码树里有 webroot/install/（含 db_default.txt 5.1MB），
+        # 仅靠 .dockerignore:31 构建期排除是"副作用"而非策略，此处显式 404 兜底。
+        # 必须用 ^~ 前缀匹配（优先于下方正则 php location），否则 /install/index.php 会被正则抢走。
+        location ^~ /install/ { return 404; }
+        location = /install { return 404; }
+
         {{- if .Values.configLock.enabled }}
         {{- if or (contains "'" .Values.configLock.message) (contains "'" .Values.configLock.messageJson) }}{{ fail "configLock.message / messageJson 不能包含单引号" }}{{ end }}
         # GitOps 配置锁：/admin/ 下 PHP 响应里，应用自己的"写入失败，请检查权限"被替换为"该配置由 Git 管理变更并发布"。
