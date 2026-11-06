@@ -133,7 +133,8 @@ Path / Domain / Expires / HttpOnly / Secure / SameSite 全部记下
 
 这一轮 6 PASS / 0 FAIL / 2 待运维，但验收过程中有 5 处「期望值写错、差点把正常判成
 FAIL」。全部是判据问题，不是代码问题。留档，避免下一轮复现。
-（8.6 是修复「桌面 TG 落 PC 模板」之后**新增**的判据，不属于上面这 5 处。）
+（8.6 是修复「桌面 TG 落 PC 模板」之后**新增**的判据，8.7 是 2026-11-06 缓存头复核的结论，
+两者都不属于上面这 5 处。）
 
 ### 8.1 顶栏去重（shim 注入）必须带 `Cookie: HN_tg=1`
 
@@ -264,6 +265,52 @@ without          run1/2/3  bytes=66102  viewport=0  w1200=1
 bytes 与 viewport / w1200 三个数一起看（单看 bytes 会被压缩差异骗，单看 viewport 分不出
 "PC 模板加了 meta" 这种改动）；三次不一致就再等一轮滚动，别急着判回归。
 
+### 8.7 缓存头：静态 30 天是设计，动态页**本来**就没有长缓存（2026-11-06 复核，不改配置）
+
+2026-11-06 有反馈称「HTML 响应头也是 `cache-control: max-age=2592000`」。复核结论：
+**canary 上复现不出来**，30 天只挂在静态资源上，而且这是有意为之。仓库里 `expires` 全仓
+只有一处 —— `deploy/helm/firebird-site/templates/configmap.yaml:70`：
+
+```nginx
+location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|svg|woff2)$ {
+    expires 30d;
+    add_header Cache-Control "public, no-transform";
+}
+```
+
+三点必须知道：
+
+- 正则**不含 `html|htm`**，HTML 请求根本不会命中这条 location；server 级没有 `expires`，
+  也没有第二处 `add_header Cache-Control`；全仓 `grep -rn 2592000` 零命中。
+- HTML/PHP 侧的 `no-store, no-cache, must-revalidate`（外加 `expires: Thu, 19 Nov 1981`）
+  是 PHP 会话缓存限制器发的，不是 nginx；`location ~ \.php$` 只做 `sub_filter` 注入，不动缓存头。
+- 所以**不要**为了「给 HTML 补 no-cache」再加规则：`add_header` 是追加语义，PHP 已经发过的
+  `Cache-Control` 会变成两条；而 `location ~* \.(html|htm)$` 会抢在 `location /` 之前命中
+  `/index.html`，把现在靠 `try_files` 落到 index.php 的路径变成 404（真要加必须自带
+  `try_files $uri $uri/ /index.php?$args;`）。
+
+2026-11-06 实测（`curl -sS -D - -o /dev/null`，已去 `\r`）：
+
+```
+/                               200  text/html      no-store, no-cache, must-revalidate    cf=DYNAMIC
+/index.html                     200  text/html      no-store, no-cache, must-revalidate    cf=DYNAMIC
+/tg/entry.php                   200  text/html      no-store, no-cache, must-revalidate    cf=DYNAMIC
+/static/css/core/touchBase.css  200  text/css       max-age=2592000 public, no-transform    cf=BYPASS
+/static/js/tg-shim.js?v=2       200  javascript     max-age=2592000 public, no-transform    cf=BYPASS
+```
+
+（`/news/`、`/waimai/`、`/tg/entry` 与上面前三条同值，不重复列。）
+
+**复测甄别三项** —— 再遇到「HTML 有 30 天缓存」，先按这三条排除，别直接改配置：
+
+1. **给 URL 原文**：`curl -sS -D - -o /dev/null '<url>' | tr -d '\r'`，输出必须带
+   `cf-cache-status`。`2592000` 与静态 location 是精确对应，若 `content-type` 是
+   `text/css` / `javascript`，那就是静态资源命中，不是 HTML。
+2. **看 `content-type`**：`text/html` 才可能是动态页；`text/html` + `max-age=2592000`
+   在当前 chart 下**产不出来**，出现即说明中间还有一层（Cloudflare Cache Rule / 反代）在改头。
+3. **区分 curl 与 devtools**：devtools 的 Size 列若是 `(disk cache)` / `(memory cache)`，
+   显示的是**本地旧副本的响应头**，不代表线上现值；`cf-cache-status: DYNAMIC` 才说明没被边缘缓存。
+
 ## 九、已实测通过的线上基线（2026-11-06，下次拿它做对照）
 
 比读期望值可靠：下面全部是当天在 canary 上真实跑出来的数字。
@@ -277,6 +324,7 @@ bytes 与 viewport / w1200 三个数一起看（单看 bytes 会被压缩差异�
 | 不带 cookie 的首页 | 两者 = **0** | 注入是 cookie 门控，非无条件 |
 | 2026-11-06 真机首登 | **500 `CONFIG_MISSING`**（用户点菜单按钮即复现） | 当时网关只认 `data/cache/config.php`；已修：三级取值 cache → `FBS_GATEWAY_COOKIE_DOMAIN` → 500。修后判据见 §0.2 |
 | 2026-11-06 桌面版 Telegram 点菜单按钮 | 落到 **PC 模板**（`topInfo w1200`、无 viewport） | `isMobile()` 当时纯 UA 判定，桌面 WebView 上报桌面 UA；本次修复：认 `HN_tg=1` 短路。判据见 §8.6 |
+| 2026-11-06 缓存头复核 | `/`、`/index.html`、`/tg/entry.php` 全为 `no-store, no-cache, must-revalidate`；`/static/css/core/touchBase.css` 为 `max-age=2592000 public, no-transform` | 动态页不长缓存、静态 30 天是设计；判据与甄别见 §8.7 |
 | 被拦模块（如 `?service=shop`） | **302**，`Location` 带 `from=tg_whitelist` | 白名单守卫生效且可区分来源 |
 | `/shop?from=tg_whitelist` | **404** | 防止 302 回首页再解析成 302 的循环（守卫带豁免标记） |
 
