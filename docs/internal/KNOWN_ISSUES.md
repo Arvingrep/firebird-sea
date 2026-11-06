@@ -528,3 +528,31 @@ GET /include/ajax.php?service=travel&action=videoList&page=1&pageSize=10
 
 运营在后台为旅游模块配置内容（攻略/景点/酒店/视频任一）后，需复验 5 个区块是否有记录、
 详情页是否可达。仅数据填充，无需改代码。
+
+## KI-013 · 外卖首页定位失败时，商家列表与「定位失败，请重新刷新页面！」同时出现（文案自相矛盾）
+
+**现状（2026-11-06，渲染级实测，无头 Chrome 395×812、定位权限默认 denied、HN_tg=1 + iPhone UA 走 8766 代理）**
+
+- `/waimai/index.html`：3 张商家卡正常渲染（`dd.li_box`，含配送费字段），**同时**页脚
+  `.loading` 仍显示「定位失败，请重新刷新页面！」；头部 `.posiChose span` 也显示「定位失败」。
+- `/waimai/list.html`：3 张商家卡、3 个 `shop-*.html` 链接，**没有**该文案——因为 `getlist()`
+  在 `page==1` 时先 `$('.ulbox.show').html('')` 清空容器，把先写入的提示一并清掉。
+
+**成因**
+
+`index.js` 失败分支用 `$('.loading').html(...)` 直接写 Vue 管理的文本节点
+（`index.html:276` 的 `<div class="loading" v-cloak>{{loadText}}</div>`）。jQuery 写完后，
+`getshopList` 成功只改 `tt.loadText` 的值，Vue 不会因为「值未变化」而重绘该节点，
+于是提示留在原地。列表页因为是 jQuery 直接 API 渲染、不是 Vue，所以被容器清空带走。
+
+**影响**
+
+文案自相矛盾：「请重新刷新页面」引导用户做无效操作（刷新后仍然拿不到定位），
+且与「已展示 3 家商家」的事实冲突。功能不阻塞（商家可用、可进店下单），属体验瑕疵。
+**不为此单独开部署窗口**（每次滚动发布都有几秒 unready 窗口，成本大于收益）。
+
+**修复方案（下次有其它改动搭车时一起做）**
+
+把提示改成 Vue 驱动而非 jQuery 直写：失败分支只置 `tt.address`（头部已有「定位失败」），
+页脚提示改由 `tt.loadText` 承载，或在 `getshopList` 的 `state!=100` / `error` 分支里设置——
+即「只有在真的没拿到数据时才说失败」。`list.js` 无需改。
