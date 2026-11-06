@@ -296,3 +296,52 @@ chart 的 `{{- if .Values.tma.enabled }}` 守卫（修复前的 `deployment-api.
 - canary 要重新启用旧 TMA 前端；或
 - 任何调用方开始调用 `/tg-api/auth/telegram` / `/tg-api/auth/bridge`；或
 - 我方网关契约再变（上表四层差异全部要重新对齐）。
+
+---
+
+## KI-006 · `/tg/entry.php` 无 CSP（内容安全策略）头
+
+**状态**：接受（2026-11-06，验收期发现，裁决人 team-lead）——**不阻塞验收的加固项**
+
+**现象**
+
+`webroot/tg/entry.php:12-15` 只发 4 个响应头（`Content-Type` / `Cache-Control: no-store…` /
+`X-Content-Type-Options: nosniff` / `Referrer-Policy: no-referrer`），**没有
+`Content-Security-Policy`**。全仓 `grep -rniE "content-security-policy|script-src|default-src"`
+在 `webroot/tg/`、`webroot/include/`、`deploy/` 零命中（仅 `services/api/src/server.js` 与
+`bridgeRoute.js` 有 CSP，那是旧 `/tma` 静态路由与旧登录桥落地页，与本页无关）。
+
+该页会加载 `https://telegram.org/js/telegram-web-app.js`，并把 `initData` POST 到同源接口
+`/tg-api/auth/telegram-web`。
+
+**根因**
+
+落地页是刻意最小化的 HTML 壳（不 include 火鸟内核），当时只考虑了"别把整站引导链拉进来"，
+安全头按"能跑起来"的最小集给，CSP 没在范围内。
+
+**影响范围与风险等级**
+
+- 当前**页面无用户可控输入**（`role` 参数被白名单成 `customer`），反射型 XSS 无入口；
+- 风险来自"以后有人往这页加任何渲染逻辑"——届时没有第二道防线，一次注入就能读走 `initData`
+  （等于可重放登录凭证）。属于**低概率、高后果**，因此记为加固项而不是缺陷。
+- 不影响登录功能、不影响验收任何一条。
+
+**修法建议（未实施）**
+
+在 `entry.php` 的 `header()` 段加：
+
+```
+Content-Security-Policy: default-src 'self'; script-src 'self' https://telegram.org; connect-src 'self'; frame-ancestors https://web.telegram.org
+```
+
+- `frame-ancestors` **必须**显式放行 Telegram WebView（`https://web.telegram.org`），
+  否则 Mini App 内嵌直接白屏——这是本项最容易踩的坑；
+- 若将来引入 Google Maps 等外链，需同步加 `img-src` / `script-src` 白名单，
+  否则是"加了 CSP 反而把页面弄坏"；
+- 加完必须真机回归一次（TG 内打开 + 登录），不能只 curl 看头。
+
+**什么条件下必须重修**
+
+- `/tg/entry.php` 开始渲染任何用户可控内容（哪怕只是一个昵称）；或
+- 该页引入第三方脚本（统计、地图、支付 SDK）；或
+- 安全评审要求全站安全头统一。
