@@ -245,16 +245,35 @@ canary 首页若用 `skin5`，确认 `:440-461` 这几处楼盘入口是否显�
 因缺 `TMA_ENV` 返回 `null`，两条路由降级为 **503 AUTH_NOT_CONFIGURED**（fail-closed，不是 502）。
 一行值可回退，`bridge` 其余字段原样保留。
 
-**已知副作用（实测渲染，上线前必须先修 chart）**
+**验收口径（状态码，实测）**
 
-chart 的 `{{- if .Values.tma.enabled }}` 守卫（`deployment-api.yaml:37-81`）**不只包 TMA 变量**，
+- `/tg-api/fb/*` 在 `tma.enabled=false` 下是 **404，不是 503**：`FB_UPSTREAM_URL` 缺失使
+  `server.js:157` 的 `if (fbUpstream)` 整块不执行，路由根本没挂载（404 比 503 更严格，但语义不同）。
+- `/tg-api/auth/telegram-web` 缺网关配置时是 **500 `GATEWAY_SECRET_NOT_CONFIGURED`，不是 503**：
+  `tgLogin.js:150-154` 把静态配置错映射为 500，口径见 `LOGIN_STATUS_BY_CODE`（`tgLogin.js:45`
+  「静态配置错，重试无用」）。注意这与瞬态的 `DB_UNAVAILABLE → 503`（`tgLogin.js:52-54`）刻意不同。
+- 真正的 503 只有两条：`/tg-api/auth/telegram`（`AUTH_NOT_CONFIGURED`）、
+  `/tg-api/auth/bridge` 的 GET 与 POST（`BRIDGE_NOT_CONFIGURED`）。
+
+
+**已知副作用（实测渲染；`29334cf7` 已修，此处保留修复前口径备查）**
+
+chart 的 `{{- if .Values.tma.enabled }}` 守卫（修复前的 `deployment-api.yaml:37-81`）**不只包 TMA 变量**，
 还包着 `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD`、`TRUST_PROXY_HOPS`、`CORS_ORIGINS`
-以及 `TMA_TOKEN_SECRET`+`FBS_GATEWAY_SECRET` 引用。关闭本开关后 api 容器会一并失去这 8 项：
+以及 `TMA_TOKEN_SECRET` 引用。关闭本开关后 api 容器会一并失去这 8 项：
 `/checkout`（`server.js:283` 的 `cliConn()` 依赖 `DB_HOST`）不可用、限流因缺
 `TRUST_PROXY_HOPS` 退化为「入口 IP 一份额度」、跨域头缺失；`tgLogin` 的 member_map 落库
 降级为 `member_map_synced:false`（`tgLogin.js:220-234` 有 try/catch，不阻断登录）。
 **部署本值前必须**先把非 TMA 专属变量移出该守卫（只留 `TMA_ENV`/`FB_UPSTREAM_URL`/
-`TMA_BRIDGE_*`/重复的 `FBS_GATEWAY_URL` 在守卫内）。
+`TMA_BRIDGE_*`/重复的 `FBS_GATEWAY_URL` 在守卫内）。该前置条件已由 `29334cf7` 完成。
+
+> 计数修正（`29334cf7` 的 commit message 写「新增 9 个 env」，实测 **8**）：
+> `FBS_GATEWAY_SECRET` 在旧模板里本来就有**无条件渲染**的专属条目（守卫外 `:91`），
+> 守卫内那份被同名覆盖、从未生效，所以它不属于「新增」。新增集合准确为
+> `CORS_ORIGINS DB_HOST DB_NAME DB_PASSWORD DB_PORT DB_USER TMA_TOKEN_SECRET TRUST_PROXY_HOPS`。
+> `505dec92` 已把 api 侧两条同名 env（`FBS_GATEWAY_SECRET`、`FBS_GATEWAY_URL`）与
+> php-fpm 侧同名 `FBS_GATEWAY_SECRET` 去重，渲染零行为变化。
+
 
 **为什么不选「PHP 兼收 `member_id`」**
 
