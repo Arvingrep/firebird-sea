@@ -118,6 +118,21 @@ function customerEntryUrl(base) {
   return `${raw}/tg/entry.php?role=customer`;
 }
 
+// 骑手绑定入口（Telegram Mini App）。与顾客入口同源不同路径：
+// /tg-api/rider/bind 是 API 侧渲染的落地页，只在 Telegram 内作为 Mini App 打开时
+// 才拿得到 initData（普通浏览器 / 站内 webview 里 initData 恒为空，页面会提示「请在
+// Telegram 内打开」）。因此这个 URL 只应通过 web_app 按钮派发，不能当普通链接发。
+function riderEntryUrl(base) {
+  const raw = String(base || '').trim().replace(/\/+$/, '');
+  if (raw === '') return '';
+  try {
+    if (new URL(raw).protocol !== 'https:') return '';
+  } catch (_) {
+    return '';
+  }
+  return `${raw}/tg-api/rider/bind`;
+}
+
 // --- 2. 核心消息处理器 ---
 async function handleIncomingMessage(msg) {
   const chatId = msg.chat?.id;
@@ -147,10 +162,32 @@ async function handleIncomingMessage(msg) {
     } else if (!entryUrl) {
       console.error('[TG-BOT] TG_APP_BASE_URL 未配置或不是 https，/start 缺少「打开商店」入口');
     }
+    const riderUrl = riderEntryUrl(APP_BASE_URL);
+    if (riderUrl && isPrivate) {
+      rows.push([{ text: '🛵 骑手入口', web_app: { url: riderUrl } }]);
+    }
     rows.push([{ text: '📋 查看 BMAD 看板', url: 'https://github.com/arvin/firebird-sea/projects' }]);
     rows.push([{ text: '📊 实时系统探针', callback_data: 'check_status' }]);
     const markup = { inline_keyboard: rows };
     return sendTelegramMessage(chatId, welcome, markup);
+  }
+
+  // 指令 1.5: /rider —— 骑手绑定入口（必须在私聊里发，web_app 按钮在群里非法）
+  if (text.startsWith('/rider')) {
+    const isPrivate = !msg.chat?.type || msg.chat.type === 'private';
+    const riderUrl = riderEntryUrl(APP_BASE_URL);
+    if (!riderUrl) {
+      console.error('[TG-BOT] TG_APP_BASE_URL 未配置或不是 https，/rider 无法生成入口');
+      return sendTelegramMessage(chatId, '❌ 骑手入口未配置（TG_APP_BASE_URL 缺失或不是 https）');
+    }
+    if (!isPrivate) {
+      return sendTelegramMessage(chatId, '请在私聊中发送 /rider 获取骑手绑定入口');
+    }
+    return sendTelegramMessage(
+      chatId,
+      '🛵 *骑手绑定*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮，输入你注册骑手时留的手机号。\n绑定成功后自动进入骑手工作台（链接 10 分钟内有效）。\n\n若提示「手机号未找到骑手档案」，先让运营在后台补录骑手。',
+      { inline_keyboard: [[{ text: '🛵 绑定并进入工作台', web_app: { url: riderUrl } }]] }
+    );
   }
 
   // 指令 2: /status
