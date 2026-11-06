@@ -35,6 +35,16 @@ if(GetCookie('siteCityInfo')){
 	$siteCityInfo = cityInfoById($cityid);
 }
 
+// 原生 App / 小程序 / TMA 直连接口时既没有分站 cookie 也不传 cityid，
+// $siteCityInfo 为空会让依赖它的业务写入空分站（如外卖收货地址 cityid = '' 触发 SQL 1366）。
+// 这里兜底到站点默认分站，行为与网页端首次访问一致。
+if(empty($siteCityInfo)){
+	if(!class_exists('siteConfig')){
+		include_once(HUONIAOROOT.'/api/handlers/siteConfig.class.php');
+	}
+	$siteCityInfo = checkDefaultCity();
+}
+
 $dsql = new dsql($dbo);
 $userLogin = new userLogin($dbo);
 

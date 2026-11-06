@@ -21,7 +21,8 @@ $cfg_pcState = 0;
 $cfg_timeZone = 8;
 $cfg_mapCity = '马尼拉';
 $cfg_map = 1;
-$cfg_map_google = '';
+// Google Maps key 走环境变量注入（与 RESEND_KEY/GCS_KEY 同一惯例），经 firebird-storage-secret → deployment env
+$cfg_map_google = getenv('GOOGLE_MAPS_API_KEY') ?: '';
 $cfg_map_baidu = '';
 $cfg_map_baidu_server = '';
 $cfg_map_baidu_wxmini = '';

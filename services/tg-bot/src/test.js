@@ -3,61 +3,58 @@
  */
 
 const http = require('node:http');
-const { spawn, execFileSync } = require('node:child_process');
+const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 
 const PORT = 3099;
+const N8N_STUB_PORT = 3098;
+const N8N_DEAD_PORT = 3097; // 故意不监听的端口：验证 n8n 不可达兜底
 const APP_BASE_URL = 'https://fh580.net';
 
-// 测试 3 会真跑 scripts/dispatch-task.js，而它会写 .agents/tasks 并 `git checkout -b feat/task-*`。
-// 直接在仓库里跑会污染工作区（已发生过一次 commit 落错分支）。这里把派单目录换成临时 git 仓库：
-// 脚本按自身 __dirname 推导 tasks 目录，所以复制一份到 <tmp>/scripts 就彻底隔离，
-// 同时仍然执行真实脚本（含建分支逻辑），不是把它桩掉。
-function makeIsolatedDispatchRoot() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fbs-tg-dispatch-'));
-  fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
-  fs.copyFileSync(
-    path.join(__dirname, '../../../scripts/dispatch-task.js'),
-    path.join(root, 'scripts', 'dispatch-task.js')
-  );
-  try {
-    execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
-  } catch (_) {
-    // 没有 git 也能跑：脚本自身会跳过建分支
-  }
-  return root;
+// 集群镜像不含 scripts/（canary 已删除本地派单脚本，改走 n8n 流水线），所以
+// TG_DISPATCH_ROOT 指向一个空临时目录：existsSync 判定脚本缺失 → 走 n8n 兜底路径。
+const DISPATCH_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'fbs-tg-dispatch-'));
+
+// n8n stub：记录收到的转发请求，返回 200（模拟 n8n 可达）
+const n8nRequests = [];
+const n8nStub = http.createServer((req, res) => {
+  let body = '';
+  req.on('data', c => body += c);
+  req.on('end', () => {
+    n8nRequests.push({ url: req.url, body });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{"ok":true}');
+  });
+});
+n8nStub.listen(N8N_STUB_PORT, '127.0.0.1');
+
+function spawnBot(port, n8nUrl) {
+  const p = spawn('node', [path.join(__dirname, 'server.js')], {
+    env: {
+      ...process.env,
+      TG_BOT_PORT: String(port),
+      TG_APP_BASE_URL: APP_BASE_URL,
+      TG_DISPATCH_ROOT: DISPATCH_ROOT,
+      N8N_WEBHOOK_URL: n8nUrl
+    },
+    stdio: 'pipe'
+  });
+  let stdout = '';
+  p.stdout.on('data', data => { stdout += String(data); });
+  return { proc: p, getStdout: () => stdout };
 }
 
-const DISPATCH_ROOT = makeIsolatedDispatchRoot();
+// 主实例：n8n 可达（stub）。mock 模式（无 BOT_TOKEN）把消息与 reply_markup 打到 stdout。
+const bot = spawnBot(PORT, `http://127.0.0.1:${N8N_STUB_PORT}/webhook/test`);
 
-function cleanup() {
-  fs.rmSync(DISPATCH_ROOT, { recursive: true, force: true });
-}
-
-const serverProcess = spawn('node', [path.join(__dirname, 'server.js')], {
-  env: {
-    ...process.env,
-    TG_BOT_PORT: String(PORT),
-    TG_APP_BASE_URL: APP_BASE_URL,
-    TG_DISPATCH_ROOT: DISPATCH_ROOT
-  },
-  stdio: 'pipe'
-});
-
-// mock 模式（无 BOT_TOKEN）会把消息与 reply_markup 打到 stdout，测试据此断言按钮
-let serverStdout = '';
-serverProcess.stdout.on('data', data => {
-  serverStdout += String(data);
-});
-
-function postJson(path, payload) {
+function postJson(port, path, payload) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(payload);
     const req = http.request({
       hostname: '127.0.0.1',
-      port: PORT,
+      port: port,
       path: path,
       method: 'POST',
       headers: {
@@ -85,6 +82,15 @@ function getJson(path) {
   });
 }
 
+function cleanup() {
+  bot.proc.kill();
+  if (deadBot) deadBot.proc.kill();
+  n8nStub.close();
+  fs.rmSync(DISPATCH_ROOT, { recursive: true, force: true });
+}
+
+let deadBot = null;
+
 async function run() {
   await new Promise(r => setTimeout(r, 600));
 
@@ -94,21 +100,27 @@ async function run() {
   console.log('   ✅ PASS');
 
   console.log('🧪 测试 2: 模拟用户发送 /status 指令 Webhook');
-  const s = await postJson('/webhook/telegram', {
+  const s = await postJson(PORT, '/webhook/telegram', {
     message: { chat: { id: 12345 }, text: '/status', from: { first_name: 'Boss' } }
   });
   if (s.status !== 200 || !s.data.ok) throw new Error('Status command failed');
   console.log('   ✅ PASS');
 
-  console.log('🧪 测试 3: 模拟用户发送需求随笔 Webhook (触发脱水派单)');
-  const d = await postJson('/webhook/telegram', {
+  console.log('🧪 测试 3: 需求随笔 Webhook（派单脚本缺失 → n8n 可达 → 兜底 ack）');
+  const d = await postJson(PORT, '/webhook/telegram', {
     message: { chat: { id: 12345 }, text: '外卖订单增加马尼拉配送加急选项', from: { first_name: 'Boss' } }
   });
   if (d.status !== 200 || !d.data.ok) throw new Error('Dispatch webhook failed');
-  console.log('   ✅ PASS');
+  await new Promise(r => setTimeout(r, 400));
+  if (n8nRequests.length === 0) throw new Error('n8n stub 未收到转发请求');
+  const out3 = bot.getStdout();
+  if (!out3.includes('【需求已提交 n8n 派单通道】')) {
+    throw new Error(`未回复 n8n 兜底 ack，stdout=${out3}`);
+  }
+  console.log('   ✅ PASS（n8n stub 收到转发，回复 ack）');
 
   console.log('🧪 测试 4: 调用主动推送卡片接口 /send-card');
-  const c = await postJson('/send-card', {
+  const c = await postJson(PORT, '/send-card', {
     chatId: '12345',
     text: '🚀 *【测试上线通知】* GKE 部署完成！'
   });
@@ -116,27 +128,39 @@ async function run() {
   console.log('   ✅ PASS');
 
   console.log('🧪 测试 5: /start 带 web_app 入口按钮（顾客打开 TMA）');
-  serverStdout = '';
-  const s5 = await postJson('/webhook/telegram', {
+  const s5 = await postJson(PORT, '/webhook/telegram', {
     message: { chat: { id: 12345, type: 'private' }, text: '/start', from: { first_name: 'Boss' } }
   });
   if (s5.status !== 200 || !s5.data.ok) throw new Error('Start command failed');
   await new Promise(r => setTimeout(r, 200));
   const expectedUrl = `${APP_BASE_URL}/tg/entry.php?role=customer`;
-  if (!serverStdout.includes(`"web_app":{"url":"${expectedUrl}"}`)) {
-    throw new Error(`/start 未生成 web_app 按钮，stdout=${serverStdout}`);
+  if (!bot.getStdout().includes(`"web_app":{"url":"${expectedUrl}"}`)) {
+    throw new Error(`/start 未生成 web_app 按钮，stdout=${bot.getStdout()}`);
   }
   console.log('   ✅ PASS');
 
+  console.log('🧪 测试 6: 派单脚本缺失且 n8n 不可达 → 明确报错回复（fail-safe，不崩溃）');
+  deadBot = spawnBot(PORT + 2, `http://127.0.0.1:${N8N_DEAD_PORT}/webhook/test`);
+  await new Promise(r => setTimeout(r, 600));
+  const d6 = await postJson(PORT + 2, '/webhook/telegram', {
+    message: { chat: { id: 12345 }, text: '再来一单测试不可达路径', from: { first_name: 'Boss' } }
+  });
+  if (d6.status !== 200 || !d6.data.ok) throw new Error('Unreachable-n8n webhook failed');
+  await new Promise(r => setTimeout(r, 600)); // 等 forwardToN8n 超时/连接拒绝后回消息
+  if (!deadBot.proc.pid || deadBot.proc.exitCode !== null) throw new Error('n8n 不可达导致进程退出（未 fail-safe）');
+  const out6 = deadBot.getStdout();
+  if (!out6.includes('派单通道不可用')) {
+    throw new Error(`n8n 不可达时未回复报错文案，stdout=${out6}`);
+  }
+  console.log('   ✅ PASS（进程存活，回复派单通道不可用）');
+
   console.log('🎉 所有 Telegram Bot 基建测试全部 100% 通过！');
-  serverProcess.kill();
   cleanup();
   process.exit(0);
 }
 
 run().catch(err => {
   console.error('❌ 测试失败:', err);
-  serverProcess.kill();
   cleanup();
   process.exit(1);
 });

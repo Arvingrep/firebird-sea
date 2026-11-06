@@ -860,6 +860,8 @@ class waimai
             $list[$key]['promotionsStr'] = $promotionsStr;
 
             $list[$key]['pic'] = $value['shop_banner'] ? getFilePath(explode(",", $value['shop_banner'])[0]) : getFilePath('/static/images/shop.png');  //图片
+            $list[$key]['star'] = $value['star'] !== null ? round((float)$value['star'], 1) : null;   //评分（前端排序/星级徽标用）
+            $list[$key]['sale'] = (int)($value['sale'] ?? 0);                                         //月售（前端排序/销量展示用）
 
 
             //关键字搜索商品
@@ -2069,6 +2071,60 @@ class waimai
 
 
     /**
+     * 地址文本 → 经纬度（Google Geocoding）
+     * 供「前端只提交地址、不提交坐标」的场景兜底，key 用服务端注入的 $cfg_map_google。
+     * 只在能拿到「足够精确」的结果时返回坐标：status 必须为 OK，且不接受
+     * partial_match / location_type=APPROXIMATE（只命中城市或街道级别），
+     * 否则返回空数组由调用方报错——宁可让用户补全地址，也不把错坐标写进库
+     * （错坐标会连带影响配送范围、距离运费与骑手导航）。
+     */
+    private function geocodeAddressByText($query)
+    {
+        global $cfg_map_google;
+        $query = trim(preg_replace('/\s+/u', ' ', (string)$query));
+        if ($query === '' || empty($cfg_map_google)) {
+            return array();
+        }
+        // key 只放在请求 URL 里，不写日志、不回传前端
+        $url = 'https://maps.googleapis.com/maps/api/geocode/json?address=' . rawurlencode($query)
+             . '&language=zh-CN&key=' . $cfg_map_google;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT        => 6,
+        ));
+        $raw = curl_exec($ch);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if (!$raw) {
+            error_log('[operAddress] geocode transport failed: ' . ($curlErr ? $curlErr : 'empty response'));
+            return array();
+        }
+        $json = json_decode($raw, true);
+        $status = isset($json['status']) ? $json['status'] : 'UNKNOWN';
+        if ($status !== 'OK' || empty($json['results'][0]['geometry']['location'])) {
+            // 只记状态与错误信息（不含 key、不含完整 URL）
+            $errMsg = isset($json['error_message']) ? $json['error_message'] : '';
+            error_log('[operAddress] geocode failed: status=' . $status . ' msg=' . $errMsg);
+            return array();
+        }
+        $hit = $json['results'][0];
+        $loc = $hit['geometry']['location'];
+        $locType = isset($hit['geometry']['location_type']) ? $hit['geometry']['location_type'] : '';
+        if (!empty($hit['partial_match']) || $locType === 'APPROXIMATE') {
+            error_log('[operAddress] geocode imprecise: type=' . $locType . ' partial=' . (empty($hit['partial_match']) ? '0' : '1'));
+            return array();
+        }
+        return array(
+            'lat'       => $loc['lat'],
+            'lng'       => $loc['lng'],
+            'formatted' => isset($hit['formatted_address']) ? $hit['formatted_address'] : '',
+        );
+    }
+
+    /**
      * 添加/修改地址
      */
     public function operAddress()
@@ -2106,8 +2162,36 @@ class waimai
             return array ("state" => 200, "info" => '请选择街道/小区/建筑！');
         }
 
+        // 坐标缺失时服务端按地址文本反查（Google Geocoding）。
+        // TMA 表单已改为「只填地址」，不再依赖前端 Google Places 取坐标：
+        // 前端没拿到 key / Places 加载失败时，旧逻辑会因坐标为空把保存彻底卡死（2026-10-26 线上）。
+        if ((empty($lng) || empty($lat)) && trim($street) !== '') {
+            // 只用主地址（street）做反查：补充项/备注是「3 楼靠影院」这类噪音，
+            // 带上去 Google 会返回 partial_match=true，按精度门槛会被判失败。
+            $cityName = '';
+            if (!empty($siteCityInfo['name'])) {
+                $cityName = $siteCityInfo['name'];
+            } elseif (!empty($siteCityInfo['typename'])) {
+                $cityName = $siteCityInfo['typename'];
+            }
+            $geo = array();
+            if ($cityName) {
+                // 先带分站城市名：TMA 用户常只写「街道 + 门牌」，单靠街道名可能被解析到别的国家
+                $geo = $this->geocodeAddressByText(trim($street) . ' ' . $cityName);
+            }
+            if (empty($geo['lat']) && empty($geo['lng'])) {
+                $geo = $this->geocodeAddressByText(trim($street));
+            }
+            if (!empty($geo['lat']) && !empty($geo['lng'])) {
+                $lat = $geo['lat'];
+                $lng = $geo['lng'];
+            }
+        }
+
         if (empty($lng) || empty($lat)) {
-            return array ("state" => 200, "info" => '请选择地图坐标！');
+            // 解析不出就报错，让用户补全地址：不做「分站中心点」兜底，
+            // 错误坐标会污染配送范围、距离运费与骑手导航，比存不下更糟。
+            return array ("state" => 200, "info" => '地址解析失败，请填写更完整的地址！');
         }
 
         if (empty($address)) {
@@ -6721,6 +6805,12 @@ class waimai
         $areaCode    = (int)$this->param['areaCode'];
         $code        = (int)$this->param['code'];
         $vertcode    = (int)$this->param['vertcode'];
+        $regtype     = trim($this->param['regtype']);
+
+        // 邮箱注册通道（菲律宾站 SMS 未接入，regtype=email 走邮件验证码流程）
+        if ($regtype == 'email') {
+            return $this->courierRegByEmail();
+        }
 
         $ip       = GetIP();
         $ipaddr   = getIpAddr($ip);
@@ -6847,6 +6937,276 @@ class waimai
             return array ('state' => 200, 'info' => '注册失败！请联系系统管理员');
         }
 
+    }
+
+    /**
+     * 配送员注册 —— 发送邮箱验证码
+     * 菲律宾站 SMS 通道未接入（courierReg 原手机验证码流程不可用），新增邮件验证码注册通道
+     */
+    public function courierSendEmailCode()
+    {
+        global $dsql;
+        $email = trim($this->param['email']);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return array('state' => 200, 'info' => '请填写正确的邮箱地址');
+        }
+        $email = addslashes($email);
+        $ip    = GetIP();
+
+        // 60 秒内同邮箱重复发送拦截
+        $sql = $dsql->SetQuery("SELECT `id`, `pubdate` FROM `#@__site_messagelog` WHERE `type` = 'email' AND `lei` = 'courier_reg' AND `user` = '$email' ORDER BY `id` DESC LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if ($ret && (time() - (int)$ret[0]['pubdate']) < 60) {
+            return array('state' => 200, 'info' => '发送太频繁，请 1 分钟后再试');
+        }
+
+        // 已注册拦截（邮箱即用户名）
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `username` = '$email' LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if ($ret) {
+            return array('state' => 200, 'info' => '该邮箱已注册过骑手账号，请直接登录');
+        }
+
+        $code  = sprintf("%06d", mt_rand(0, 999999));
+        $title = '骑手注册验证码';
+        $body  = "您的骑手注册验证码是：<b>" . $code . "</b>，10 分钟内有效。如非本人操作请忽略本邮件。";
+
+        $err = sendmail($email, $title, $body);
+        if (!empty($err)) {
+            return array('state' => 200, 'info' => '邮件发送失败，请稍后再试');
+        }
+
+        // sendmail() 内部已按 lei='' 记录一次发送日志；此处另存一条带验证码的记录供注册校验（lei=courier_reg）
+        messageLog("email", "courier_reg", $email, $title, $body, 0, 0, $code);
+        return array('state' => 100, 'info' => '验证码已发送，请查收邮件（注意垃圾箱）');
+    }
+
+    /**
+     * 配送员邮箱注册（courierReg regtype=email 时进入）
+     * 参数：email / username(姓名) / password / vertcode(邮件验证码) / phone(选填) / cityid
+     */
+    public function courierRegByEmail()
+    {
+        global $dsql;
+        $email    = trim($this->param['email']);
+        $name     = trim($this->param['username']);
+        $password = (string)$this->param['password'];
+        $vcode    = trim($this->param['vertcode']);
+        $phone    = trim($this->param['phone']);
+        $cityid   = (int)$this->param['cityid'];
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return array('state' => 200, 'info' => '请填写正确的邮箱地址');
+        }
+        if (empty($name) || $name == "undefined") {
+            return array('state' => 200, 'info' => '请填写姓名');
+        }
+        if (strlen($password) < 6) {
+            return array('state' => 200, 'info' => '请设置至少 6 位的登录密码');
+        }
+        if ($vcode == '') {
+            return array('state' => 200, 'info' => '请填写邮箱验证码');
+        }
+        if (empty($cityid)) {
+            return array('state' => 200, 'info' => '请选择城市！');
+        }
+
+        $email_ = addslashes($email);
+        $name_  = cn_substrR(addslashes($name), 10);
+        $pwd_   = addslashes($password);
+        $phone_ = preg_replace('/[^0-9+]/', '', $phone);
+
+        // 校验验证码：type=email + lei=courier_reg，10 分钟内有效，一次性使用
+        $sql = $dsql->SetQuery("SELECT `id`, `code`, `pubdate` FROM `#@__site_messagelog` WHERE `type` = 'email' AND `lei` = 'courier_reg' AND `user` = '$email_' ORDER BY `id` DESC LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if (!$ret) {
+            return array('state' => 200, 'info' => '验证码输入错误，请重试！');
+        }
+        if ((time() - (int)$ret[0]['pubdate']) > 600) {
+            return array('state' => 200, 'info' => '验证码已过期，请重新获取');
+        }
+        if (strcasecmp(trim($vcode), trim($ret[0]['code'])) !== 0) {
+            return array('state' => 200, 'info' => '验证码输入错误，请重试！');
+        }
+        // 验证通过，销毁验证码防重放
+        $dsql->dsqlOper("DELETE FROM `#@__site_messagelog` WHERE `id` = " . (int)$ret[0]['id'], "update");
+
+        // 唯一性校验
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `username` = '$email_' LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if ($ret) {
+            return array('state' => 200, 'info' => '该邮箱已注册过骑手账号，请直接登录');
+        }
+        if ($phone_ != '') {
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `phone` = '$phone_' LIMIT 1");
+            $ret = $dsql->dsqlOper($sql, "results");
+            if ($ret) {
+                return array('state' => 200, 'info' => '该手机号已被其他骑手使用');
+            }
+        }
+
+        $time = time();
+        $sql  = $dsql->SetQuery("INSERT INTO `#@__waimai_courier` (`username`, `name`, `password`, `phone`, `cityid`, `status`, `state`, `regtime`) VALUES ('$email_', '$name_', '$pwd_', '$phone_', '$cityid', 1, 0, '$time')");
+        $ret  = $dsql->dsqlOper($sql, "update");
+        if ($ret != "ok") {
+            return array('state' => 200, 'info' => '注册失败！请联系系统管理员');
+        }
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `username` = '$email_' ORDER BY `id` DESC LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        $did = $ret ? (int)$ret[0]['id'] : 0;
+        return array('state' => 100, 'info' => '注册成功！', 'did' => $did);
+    }
+
+    /**
+     * 配送员 Telegram 注册（供 n8n 调度桥服务间调用，token 鉴权）
+     * Telegram 消息本身即身份验证（bot 收到消息说明 chatid 真实），PHP 侧以桥接 token 防公网滥用
+     * 参数：token / chatid / name(姓名) / password / phone(选填) / cityid(选填，默认 10000 与现有店铺同城市)
+     */
+    public function courierRegTg()
+    {
+        global $dsql;
+        $cfgfile = HUONIAOINC . "/config/fbird.inc.php";
+        if (!file_exists($cfgfile)) {
+            return array('state' => 200, 'info' => '桥接配置缺失');
+        }
+        include $cfgfile;
+        if (!isset($fb_bridge_token) || $fb_bridge_token == '' || $this->param['token'] !== $fb_bridge_token) {
+            return array('state' => 200, 'info' => '无权调用');
+        }
+
+        $chatid   = trim($this->param['chatid']);
+        $name     = trim($this->param['name']);
+        $password = (string)$this->param['password'];
+        $phone    = trim($this->param['phone']);
+        $cityid   = (int)$this->param['cityid'];
+        if ($cityid <= 0) $cityid = 10000;
+
+        if (!preg_match('/^-?\d{4,20}$/', $chatid)) {
+            return array('state' => 200, 'info' => 'chatid 不合法');
+        }
+        if (empty($name)) {
+            return array('state' => 200, 'info' => '请提供姓名：/reg 姓名 密码 [手机号]');
+        }
+        if (strlen($password) < 6) {
+            return array('state' => 200, 'info' => '密码至少 6 位：/reg 姓名 密码 [手机号]');
+        }
+
+        $digits_ = preg_replace('/[^0-9]/', '', $chatid);
+        $username_ = 'tg' . $digits_;
+        $name_   = cn_substrR(addslashes($name), 10);
+        $pwd_    = addslashes($password);
+        $phone_  = preg_replace('/[^0-9+]/', '', $phone);
+
+        // 幂等：同一 Telegram 重复注册直接返回已有骑手 id（便于重新绑定）
+        $sql = $dsql->SetQuery("SELECT `id`, `status` FROM `#@__waimai_courier` WHERE `username` = '$username_' LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if ($ret) {
+            return array('state' => 100, 'info' => '该 Telegram 已注册过骑手账号，已直接返回', 'did' => (int)$ret[0]['id']);
+        }
+        if ($phone_ != '') {
+            $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `phone` = '$phone_' LIMIT 1");
+            $ret = $dsql->dsqlOper($sql, "results");
+            if ($ret) {
+                return array('state' => 200, 'info' => '该手机号已被其他骑手使用');
+            }
+        }
+
+        $time = time();
+        $sql  = $dsql->SetQuery("INSERT INTO `#@__waimai_courier` (`username`, `name`, `password`, `phone`, `cityid`, `status`, `state`, `regtime`) VALUES ('$username_', '$name_', '$pwd_', '$phone_', '$cityid', 1, 0, '$time')");
+        $ret  = $dsql->dsqlOper($sql, "update");
+        if ($ret != "ok") {
+            return array('state' => 200, 'info' => '注册失败！请联系系统管理员');
+        }
+        $sql = $dsql->SetQuery("SELECT `id` FROM `#@__waimai_courier` WHERE `username` = '$username_' ORDER BY `id` DESC LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        $did = $ret ? (int)$ret[0]['id'] : 0;
+        return array('state' => 100, 'info' => '注册成功！', 'did' => $did);
+    }
+
+    /**
+     * 骑手 H5 快捷登录：签发一次性登录令牌（供 n8n 调度桥推送 TG 卡片时携带，
+     * 骑手点击即免密进入 H5 工作台；令牌 HMAC 签名 + 10 分钟有效，无状态）
+     * */
+    public function courierQlToken()
+    {
+        global $dsql;
+        $cfgfile = HUONIAOINC . "/config/fbird.inc.php";
+        if (!file_exists($cfgfile)) {
+            return array('state' => 200, 'info' => '桥接配置缺失');
+        }
+        include $cfgfile;
+        if (!isset($fb_bridge_token) || $fb_bridge_token == '' || $this->param['token'] !== $fb_bridge_token) {
+            return array('state' => 200, 'info' => '无权调用');
+        }
+
+        $did    = (int)$this->param['did'];
+        $chatid = trim($this->param['chatid']);
+        $target = trim($this->param['target']) != '' ? trim($this->param['target']) : 'index';
+        $oid    = (int)$this->param['oid'];
+
+        // 定位骑手：优先 did，否则按 tg<chatid> 用户名反查
+        if ($did > 0) {
+            $where = "`id` = '$did'";
+        } elseif (preg_match('/^-?\d{4,20}$/', $chatid)) {
+            $where = "`username` = 'tg" . preg_replace('/[^0-9]/', '', $chatid) . "'";
+        } else {
+            return array('state' => 200, 'info' => '缺少骑手标识');
+        }
+        $sql = $dsql->SetQuery("SELECT `id`, `status`, `quit` FROM `#@__waimai_courier` WHERE $where LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if (!$ret || (int)$ret[0]['quit'] == 1 || (int)$ret[0]['status'] != 1) {
+            return array('state' => 200, 'info' => '骑手不存在或状态不可用');
+        }
+        $did = (int)$ret[0]['id'];
+
+        if (!in_array($target, array('index', 'history', 'detail'))) $target = 'index';
+        $exp  = time() + 600;
+        $raw  = $did . '.' . $exp . '.' . $target . '.' . $oid;
+        $b64  = rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+        $sig  = hash_hmac('sha256', $b64, $fb_bridge_token);
+        global $cfg_secureAccess, $cfg_basehost;
+        $url = $cfg_secureAccess . $cfg_basehost . "/ql.html?token=" . $b64 . '.' . $sig;
+        return array('state' => 100, 'info' => 'ok', 'url' => $url, 'did' => $did);
+    }
+
+    /**
+     * 骑手 H5 快捷登录：校验令牌并种骑手 cookie（浏览器直接访问，无需桥接 token）
+     * */
+    public function courierQl()
+    {
+        global $dsql;
+        $cfgfile = HUONIAOINC . "/config/fbird.inc.php";
+        if (!file_exists($cfgfile)) {
+            return array('state' => 200, 'info' => '桥接配置缺失');
+        }
+        include $cfgfile;
+        $token = trim($this->param['token']);
+        if ($fb_bridge_token == '' || !preg_match('/^([A-Za-z0-9\-_]+)\.([0-9a-f]{64})$/', $token, $m)) {
+            return array('state' => 200, 'info' => '令牌不合法');
+        }
+        $sig = hash_hmac('sha256', $m[1], $fb_bridge_token);
+        if (!hash_equals($sig, $m[2])) {
+            return array('state' => 200, 'info' => '令牌校验失败');
+        }
+        $raw = base64_decode(strtr($m[1], '-_', '+/'));
+        $p   = explode('.', $raw);
+        if (count($p) != 4 || !preg_match('/^\d+$/', $p[0]) || !preg_match('/^\d+$/', $p[1]) || (int)$p[1] < time()) {
+            return array('state' => 200, 'info' => '令牌已过期，请从 Telegram 重新获取');
+        }
+        $did    = (int)$p[0];
+        $target = in_array($p[2], array('index', 'history', 'detail')) ? $p[2] : 'index';
+        $oid    = (int)$p[3];
+
+        $sql = $dsql->SetQuery("SELECT `id`, `status`, `quit` FROM `#@__waimai_courier` WHERE `id` = '$did' LIMIT 1");
+        $ret = $dsql->dsqlOper($sql, "results");
+        if (!$ret || (int)$ret[0]['quit'] == 1 || (int)$ret[0]['status'] != 1) {
+            return array('state' => 200, 'info' => '骑手不存在或状态不可用');
+        }
+
+        PutCookie("courier", $did, 24 * 60 * 60 * 7, "/");
+        $tpl = array('index' => 'index', 'history' => 'history', 'detail' => 'detail');
+        $jump = "/?service=waimai&do=courier&template=" . $tpl[$target] . ($target == 'detail' && $oid > 0 ? '&id=' . $oid : '');
+        return array('state' => 100, 'info' => '登录成功', 'did' => $did, 'jump' => $jump);
     }
 
     /**

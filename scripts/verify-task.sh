@@ -19,7 +19,9 @@ fi
 echo "  ✅ 官方商业授权证书 [通过]"
 
 # 2. 检查关键目录
-for dir in webroot docs .agents/tasks; do
+# .agents/tasks 已随 BMAD 体系下线（2026-10-27），目录不存在是预期状态；
+# 这里只要求 .agents 本身在（RULES.md / secret-scan-allow.txt 等仍在用）。
+for dir in webroot docs .agents; do
     if [ ! -d "$dir" ]; then
         echo "❌ [FAIL] 缺失关键架构目录: $dir"
         exit 1
@@ -27,17 +29,31 @@ for dir in webroot docs .agents/tasks; do
 done
 echo "  ✅ 核心架构目录完整性 [通过]"
 
-# 3. Docs as Code 强制联动卡点 (检查 Git 暂存区或工作区)
+# 3. Docs as Code 强制联动卡点
+#
+# 判定「本次交付改了哪些文件」。注意这里必须取**工作树变更 ∪ 相对基线的提交**：
+#   - 只看 git status：CI 里 checkout 后工作树是干净的 → 两边都是 0 → else 分支 →
+#     永远打印「Docs-as-Code 规范对齐 [通过]」。这是一条从不检查的检查项，
+#     和本次评审要修的「恒绿假门禁」是同一个毛病。
+#   - 只看 diff：本地提交前工作树是脏的，diff 还没有内容，本该拦的拦不住。
+# 未跟踪文件（?? 项）不计入 —— 它们不属于本次交付，否则本地几个无关的 .ts/.json
+# 就会误报「改了代码没同步文档」。
+BASE_REF="${VERIFY_BASE:-origin/main}"
+CHANGED="$(
+    { git status --porcelain --untracked-files=no | cut -c4-
+      git diff --name-only "$BASE_REF"...HEAD 2>/dev/null
+    } | sed 's/^.* -> //' | sed '/^$/d' | sort -u
+)"
 CODE_CHANGED=0
 DOCS_CHANGED=0
 
 # 检查是否有代码变动 (PHP, JS, TS, HTML)
-if git status --porcelain | grep -E '\.(php|js|ts|html|vue|json)' | grep -v 'package' &>/dev/null; then
+if printf '%s\n' "$CHANGED" | grep -E '\.(php|js|ts|html|vue|json)' | grep -v 'package' | grep -q .; then
     CODE_CHANGED=1
 fi
 
 # 检查 docs 目录是否变动
-if git status --porcelain | grep -E 'docs/' &>/dev/null; then
+if printf '%s\n' "$CHANGED" | grep -qE '^docs/'; then
     DOCS_CHANGED=1
 fi
 
@@ -59,9 +75,14 @@ if command -v php &>/dev/null; then
     fi
 fi
 
-# 5. 流程脚本自测（BMAD 建单/回写、测试先行运行器、门禁）：快、纯本地
-for t in "node --test scripts/bmad/bmad.test.js scripts/bmad/sync.test.js" "bash scripts/acceptance/selftest.sh" "bash scripts/test-gates.sh"; do
-    f="${t##* }"; [ -e "$f" ] || continue   # 显式列出测试文件：Node 20 对目录参数会把目录下所有 .js 当测试跑
+# 5. 流程脚本自测（门禁自测 + Makefile 自测）：快、纯本地
+#    曾经这里列过 4 项，其中 2 项（scripts/bmad/*.test.js、scripts/acceptance/selftest.sh）
+#    指向已下线的 BMAD 体系。判定用 `f="${t##* }"; [ -e "$f" ] || continue` 取「最后一个词」，
+#    拿到的是不存在的 scripts/bmad/sync.test.js → 静默 continue，**永久失效且不留任何提示**。
+#    现在改为：列在这里的脚本必须存在，不存在就 FAIL —— 假绿比红危险。
+for t in "node --test scripts/makefile.test.js" "bash scripts/test-gates.sh"; do
+    f="${t##* }"   # 显式列出测试文件：Node 20 对目录参数会把目录下所有 .js 当测试跑
+    [ -e "$f" ] || { echo "❌ [FAIL] 自测脚本不存在：$f（列在 verify-task.sh 里就必须能被找到）"; exit 1; }
     if $t >/dev/null 2>&1; then echo "  ✅ $t [通过]"; else echo "❌ [FAIL] $t"; $t 2>&1 | tail -15; exit 1; fi
 done
 
@@ -74,10 +95,27 @@ for svc in services/api services/payment-listener services/news-sync; do
     fi
 done
 
+# 6.2 TMA（Telegram Mini App）前端：已于 2026-11-04 整体归档，不再在此构建
+#     原段是 `if [ -f apps/tma/package.json ]; then ... typecheck / test / build ... fi`。
+#     apps/tma 删除后，这段的守卫恒为假 —— 它不会报错，只会**静默跳过**。
+#     这正是「检查存在 ≠ 检查有效」的经典形态：脚本里有 30 行 TMA 检查，
+#     日志里看不到任何一行，CI 却显示通过。所以这里不保留原段，改为留一条显式说明，
+#     让后来人一眼看出「TMA 构建为什么不在 verify-task 里」。
+#     前端构建产物不再随 api 镜像发布（见 deploy/docker/Dockerfile.api 注释）；
+#     归档包与复活步骤随归档 PR 一起入库（docs/archive/tma-legacy-*.tar.gz + TMA-LEGACY-NOTES.md）。
+
 # 6.5 Story 6.3 完整链路替身验收(采集→去重→发布→重试→告警,零外部依赖,断言在脚本内);不存在则跳过
 if [ -f services/news-sync/e2e-local.sh ]; then
     E2E_OUT="$(mktemp -d)"
-    if bash services/news-sync/e2e-local.sh "$E2E_OUT" 18190 >/dev/null 2>&1; then echo "  ✅ news-sync 完整链路替身验收 [通过]"
+    # 端口不能写死：端口是机器级资源，同机并发验收（不同 worktree 也一样）会抢同一个端口，
+    # 症状是 EADDRINUSE / curl 502，报错看起来像功能坏了而不是环境冲突。这里探一个空闲端口再传进去。
+    E2E_PORT="$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>console.log(p))})' 2>/dev/null || true)"
+    if [ -z "$E2E_PORT" ]; then
+        # 只有探测失败（无 node / node 报错被 2>/dev/null 吞掉）才走到这里：回落旧值，但必须留痕。
+        # 不留痕的话，下次有人撞上 EADDRINUSE / curl 502，会重新排查一遍已经查过的并发问题。
+        echo "  ⚠️ [WARN] 未探到空闲端口，回落 18190（同机并发跑验收可能撞 EADDRINUSE/502）"
+    fi
+    if bash services/news-sync/e2e-local.sh "$E2E_OUT" "${E2E_PORT:-18190}" >/dev/null 2>&1; then echo "  ✅ news-sync 完整链路替身验收 [通过]"
     else echo "❌ [FAIL] news-sync 完整链路替身验收(末尾日志):"; tail -20 "$E2E_OUT/full-run.txt" 2>/dev/null; exit 1; fi
 fi
 

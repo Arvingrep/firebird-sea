@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>骑手快捷登录</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #FF7B29 0%, #FF9A4D 45%, #FFF7F0 100%);
+  }
+  .card {
+    width: 86%; max-width: 340px; background: #fff; border-radius: 16px;
+    padding: 40px 24px 32px; text-align: center;
+    box-shadow: 0 12px 40px rgba(255, 123, 41, .25);
+  }
+  .logo {
+    width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 16px;
+    background: linear-gradient(135deg, #FF7B29, #FFB25E);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 34px; color: #fff;
+  }
+  h1 { font-size: 18px; color: #222; margin-bottom: 8px; }
+  p  { font-size: 13px; color: #999; line-height: 1.6; }
+  .spin {
+    width: 28px; height: 28px; margin: 24px auto 0; border-radius: 50%;
+    border: 3px solid #FFE3CB; border-top-color: #FF7B29;
+    animation: r .8s linear infinite;
+  }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .btn {
+    display: none; margin-top: 24px; padding: 12px 28px;
+    background: linear-gradient(90deg, #FF7B29, #FF9A4D);
+    color: #fff; font-size: 15px; border: none; border-radius: 24px;
+  }
+  .err { display: none; color: #E5484D; margin-top: 16px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🛵</div>
+  <h1>骑手工作台</h1>
+  <p id="tip">正在为你快捷登录，请稍候…</p>
+  <div class="spin" id="spin"></div>
+  <p class="err" id="err"></p>
+</div>
+<script>
+(function () {
+  var token = new URLSearchParams(location.search).get('token') || '';
+  fetch('/include/ajax.php?service=waimai&action=courierQl', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'token=' + encodeURIComponent(token)
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.state === 100 && d.jump) {
+      location.replace(d.jump);
+    } else {
+      fail((d && d.info) || '登录失败');
+    }
+  }).catch(function () { fail('网络异常，请稍后重试'); });
+
+  function fail(msg) {
+    document.getElementById('spin').style.display = 'none';
+    var e = document.getElementById('err');
+    e.textContent = msg;
+    e.style.display = 'block';
+    document.getElementById('tip').textContent = '令牌 10 分钟内有效，可回到 Telegram 重新点击卡片';
+  }
+})();
+</script>
+</body>
+</html>

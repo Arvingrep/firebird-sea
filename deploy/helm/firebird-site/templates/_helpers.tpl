@@ -57,6 +57,15 @@
   value: "{{ .Values.siteId }}"
 - name: SITE_BASEHOST
   value: "{{ .Values.domain | default "fbird.men" }}"
+{{- if .Values.tma.enabled }}
+# TMA 网关验签密钥（只引用 secretName，值由运维在集群中创建；缺失时网关返回 503）
+- name: FBS_GATEWAY_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.api.secretRef | default "firebird-api-secret" }}
+      key: FBS_GATEWAY_SECRET
+      optional: true
+{{- end }}
 - name: GCS_KEY_ID
   valueFrom:
     secretKeyRef:
@@ -102,6 +111,12 @@
 {{- end }}
 - name: FBS_TG_SERVICE_WHITELIST
   value: {{ $whitelist | quote }}
+- name: GOOGLE_MAPS_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: firebird-storage-secret
+      key: google-maps-api-key
+      optional: true
 {{- end -}}
 
 {{- /* init 容器：播种 data/ 与配置 PVC 三方同步（脚本来自 ConfigMap firebird-init-<site>） */ -}}

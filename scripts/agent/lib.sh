@@ -9,9 +9,13 @@ set -euo pipefail
 ROOT_DIR="${AGENT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 AGENT_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Agent 的基线/PR 目标分支：canary 验收流程下为 canary，默认 main（行为不变）。
+# Agent 的基线/PR 目标分支：默认 canary（= 实际集成分支，PR 基线也是它）；main 是生产，只经 canary 晋升。
 # 由 workflow 经 AGENT_BASE_BRANCH 注入；脚本里不再写死 origin/main。
-BASE_BRANCH="${AGENT_BASE_BRANCH:-main}"
+BASE_BRANCH="${AGENT_BASE_BRANCH:-canary}"
+# 容忍误填 origin/canary：底下每个消费点都自己拼 origin/ 前缀（dev.sh/qa.sh 的 origin/${BASE_BRANCH}、
+# Makefile 的 GATE_BASE），不归一就会拼出 origin/origin/canary —— 表现是 fetch 失败（set -e 下直接 die）
+# 或门禁报「相对 origin/origin/canary 无改动」，报错完全不指向「多写了前缀」。在此归一一次，四处一起受益。
+BASE_BRANCH="${BASE_BRANCH#origin/}"
 
 # 从当前（可信）检出复制 scripts/agent 到临时目录后重新执行自身：
 # 之后的 git checkout 无论切到哪个分支，都不会改变正在运行的脚本（bash 按需读取脚本文件），
@@ -79,11 +83,6 @@ set_label() { # set_label <issue|pr number> <add> [remove...]
   fi
 }
 
-bmad_stage() { # bmad_stage <issue-or-pr-url> <stage-key>
-  BMAD_USE_GH_OAUTH=1 node "$ROOT_DIR/scripts/github-sync.js" --set-stage "$1" "$2" >/dev/null \
-    || log "⚠️ BMAD Project 状态更新失败: $1 → $2"
-}
-
 # 统计某 PR 上 QA 打回次数（用于 attempt 上限，防止死循环烧额度）
 qa_reject_count() {
   gh api "repos/${REPO}/issues/$1/comments" --paginate --jq \
@@ -94,7 +93,8 @@ qa_reject_count() {
 ensure_labels() {
   local spec
   for spec in "agent:dev|1d76db|Dev Agent 认领施工" "agent:qa|fbca04|等待 QA Agent 独立验收" \
-              "qa:accepted|0e8a16|QA 通过（自动合并）" "qa:rejected|d93f0b|QA 打回" \
+              "qa:accepted|0e8a16|QA 通过（默认等人工合并）" "qa:rejected|d93f0b|QA 打回" \
+              "agent:injection-suspect|5319e7|不可信输入命中注入特征，禁止自动合并" \
               "agent:blocked|b60205|超过重试上限，需人工介入"; do
     IFS='|' read -r name color desc <<<"$spec"
     gh label create "$name" -R "$REPO" --color "$color" --description "$desc" >/dev/null 2>&1 || true

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: default
+
+# 单一真相源：server.js 既是运行代码（由本目录 test/ 直接测试），
+# 也是 ConfigMap 的内容，避免「测试跑的」和「线上跑的」是两份文件。
+resources:
+  - deployment.yaml
+  - service.yaml
+
+configMapGenerator:
+  - name: firebird-mail-config
+    files:
+      - cert.pem
+      - server.js
+
+# 固定名字，deployment.yaml 里的 configMap 引用不随 hash 变化
+generatorOptions:
+  disableNameSuffixHash: true

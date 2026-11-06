@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>研发框架评审 · firebird-sea</title>
+<style>
+  :root{
+    --bg:#f7f6f3; --card:#fff; --ink:#1c1b19; --muted:#6b6862;
+    --line:#e5e2db; --brand:#d2691e; --danger:#b3261e; --danger-bg:#fdf0ee;
+    --ok:#2e6b3f; --ok-bg:#eef5f0; --warn:#8a6100; --warn-bg:#fdf6e7;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#191817; --card:#222120; --ink:#eceae6; --muted:#9a968e;
+      --line:#33312e; --brand:#e08a4d; --danger:#e58076; --danger-bg:#2b1d1b;
+      --ok:#7db38d; --ok-bg:#1c2620; --warn:#d5a94a; --warn-bg:#2a2418; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px 20px 80px;background:var(--bg);color:var(--ink);
+    font:15px/1.65 -apple-system,"PingFang SC","Noto Sans SC",sans-serif;}
+  .wrap{max-width:920px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 6px;font-weight:600;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 4px}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 32px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:10px 16px;font-size:13px}
+  .stat b{display:block;font-size:20px;font-weight:600;margin-bottom:2px}
+  .stat.red b{color:var(--danger)} .stat.amber b{color:var(--warn)} .stat.green b{color:var(--ok)}
+
+  section{margin-bottom:38px}
+  h2{font-size:16px;font-weight:600;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .hint{color:var(--muted);font-size:13px;margin:0 0 14px}
+
+  .alert{background:var(--danger-bg);border:1px solid var(--danger);border-left:3px solid var(--danger);
+    border-radius:10px;padding:16px 18px;margin-bottom:16px}
+  .alert h3{margin:0 0 8px;font-size:15px;font-weight:600;color:var(--danger)}
+  .alert p{margin:0 0 10px;font-size:14px}
+  .alert ul{margin:0;padding-left:20px;font-size:14px}
+  .alert li{margin-bottom:6px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+    background:rgba(125,125,125,.12);padding:1px 5px;border-radius:4px}
+
+  .item{display:flex;gap:12px;padding:13px 15px;background:var(--card);
+    border:1px solid var(--line);border-radius:10px;margin-bottom:8px;transition:.15s}
+  .item:hover{border-color:var(--brand)}
+  .item input{margin:3px 0 0;width:16px;height:16px;accent-color:var(--brand);flex:0 0 auto;cursor:pointer}
+  .item .body{flex:1;min-width:0}
+  .item .t{font-size:14px;font-weight:500;margin-bottom:3px}
+  .item .d{font-size:13px;color:var(--muted);line-height:1.55}
+  .item .d code{font-size:12px}
+  .item .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;
+    margin-left:8px;vertical-align:1px;font-weight:500}
+  .tag.p0{background:var(--danger-bg);color:var(--danger)}
+  .tag.p1{background:var(--warn-bg);color:var(--warn)}
+  .tag.p2{background:rgba(125,125,125,.12);color:var(--muted)}
+  .item.done{opacity:.42}
+  .item.done .t{text-decoration:line-through}
+
+  .keep{background:var(--ok-bg);border:1px solid var(--ok);border-radius:10px;
+    padding:14px 18px;font-size:13.5px;line-height:1.75;color:var(--ink)}
+  .keep b{color:var(--ok)}
+
+  footer{position:sticky;bottom:0;background:var(--bg);padding:14px 0 4px;
+    border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  button{font:inherit;font-size:14px;font-weight:500;padding:9px 20px;border-radius:8px;
+    border:1px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer}
+  button:hover{opacity:.88}
+  #count{font-size:13px;color:var(--muted);margin-left:auto}
+  textarea{position:absolute;left:-9999px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>研发框架评审</h1>
+  <p class="sub">基线 <code>main@65778c64</code> · 调查员 Vera 只读取证 · 每条结论带 <code>文件:行号</code></p>
+
+  <div class="stats">
+    <div class="stat red"><b>6</b>P0 缺陷</div>
+    <div class="stat red"><b>9</b>P1 缺陷</div>
+    <div class="stat amber"><b>15</b>P2 缺陷</div>
+    <div class="stat amber"><b>8</b>项该删</div>
+    <div class="stat green"><b>18</b>项保留</div>
+  </div>
+
+  <section>
+    <h2>一、先处理这个：凭据已经躺在仓库里</h2>
+    <p class="hint">不是框架问题，是安全问题。以下三条都在 <code>deploy/k8s-mail-server.yaml</code>，该文件已入库、正在 default 命名空间运行、且不在 ArgoCD 管理下。</p>
+
+    <div class="alert">
+      <h3>Telegram bot token 明文暴露</h3>
+      <p><code>:276</code> 把 <code>TELEGRAM_BOT_TOKEN</code> 以明文写在 YAML 里（<code>8865562503:AAG…</code>）。任何有仓库读权限的人都能接管这个 bot、读它的全部消息历史。</p>
+      <p style="margin-bottom:0">更麻烦的是：门禁抓不到它。 <code>scripts/agent/gates.sh:112</code> 的密钥扫描只检查 <strong>diff 的新增行</strong>——已经入库的密钥永远扫不到。这道门禁给你的是虚假安全感。</p>
+    </div>
+
+    <div class="item">
+      <input type="checkbox" data-k="P0-1">
+      <div class="body">
+        <div class="t">轮换 Telegram bot token<span class="tag p0">立即</span></div>
+        <div class="d"><code>k8s-mail-server.yaml:276</code> · 找 @BotFather 执行 <code>/revoke</code> 重新签发，然后改成 Secret 引用。轮换前这串 token 视为已泄露。</div>
+      </div>
+    </div>
+    <div class="item">
+      <input type="checkbox" data-k="P0-2">
+      <div class="body">
+        <div class="t">轮换 SMTP 密码 + TLS 私钥<span class="tag p0">立即</span></div>
+        <div class="d"><code>:28-55</code> 是完整的 <code>-----BEGIN PRIVATE KEY-----</code> RSA 私钥；<code>:67</code> 与 <code>:282</code> 是明文密码 <code>FbirdMail2026!</code>。私钥泄露意味着 TLS 可被中间人。</div>
+      </div>
+    </div>
+    <div class="item">
+      <input type="checkbox" data-k="P0-3">
+      <div class="body">
+        <div class="t">修 fail-open 认证逻辑<span class="tag p0">立即</span></div>
+        <div class="d"><code>:126</code> 与 <code>:141</code> 写的是 <code>pass === VALID_PASS || !VALID_PASS</code> ——<strong>SMTP_PASS 为空时任意密码都能通过认证</strong>。这是一个可以被人随便用的开放中继。</div>
+      </div>
+    </div>
+    <div class="item">
+      <input type="checkbox" data-k="P0-4">
+      <div class="body">
+        <div class="t">把邮件服务收进 GitOps<span class="tag p1">本周</span></div>
+        <div class="d">它在跑，但不在 ArgoCD 里 → selfHeal 不回滚它、没有审计记录、和 <code>RULES.md:68-71</code> 自己定的「一切以 Git 为准」直接矛盾。要么进 Helm chart 加 <code>mailRelay.enabled</code>，要么建独立 ArgoCD Application。</div>
+      </div>
+    </div>
+    <div class="item">
+      <input type="checkbox" data-k="P0-5">
+      <div class="body">
+        <div class="t">密钥门禁改成全仓扫描<span class="tag p1">本周</span></div>
+        <div class="d"><code>gates.sh:112</code> 只看 diff 新增行，且正则不含裸 Telegram token 与通用 <code>password:</code>。存量密钥永远查不出——正是它漏掉了上面那条 token。</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>二、该删（8 项）</h2>
+    <p class="hint">判定标准：零调用方、或触发它存在的前置条件已经被删掉。</p>
+
+    <div class="item"><input type="checkbox" data-k="D8"><div class="body">
+      <div class="t">.claude/skills/bmad-* —— 214 个文件，2.0 MB<span class="tag p0">规范说谎</span></div>
+      <div class="d">我上一轮只删了 <code>.agents/skills/bmad-*</code>，漏了 <code>.claude/skills/</code>。它还躺在 git 索引里，<code>gates.sh:79</code> 还在为它写排除规则。而 <code>REPO-CONVENTIONS.md:43</code> 已经宣布「BMAD 技能包已下线归档」——规范和事实相反。每个 AI 会话都会被这些 skill 干扰。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="D1"><div class="body">
+      <div class="t">scripts/agent-run.sh<span class="tag p2">零调用</span></div>
+      <div class="d">BMAD 时代的 TASK 派单执行器，全仓无调用方，只有过时文档提到它。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="D2"><div class="body">
+      <div class="t">scripts/mail-relay-server.js<span class="tag p2">双源漂移</span></div>
+      <div class="d">168 行，零调用。真正在跑的是 <code>k8s-mail-server.yaml:56-251</code> 里内联的 220 行副本，而且两份已经漂移（内联版多一个 25 端口 server）。同一逻辑两份，改错一份等于白改。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="D3"><div class="body">
+      <div class="t">scripts/agent/dev.sh + story.sh<span class="tag p1">死代码</span></div>
+      <div class="d"><code>dev.sh:3</code> 自述由 <code>agent-dev.yml</code> 触发，那个文件上一轮已删。Dev Agent 施工侧已废，但验收侧（qa.sh）还活着——这是整条链路不对称的根源。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="D4"><div class="body">
+      <div class="t">scripts/acceptance-runner.sh + scripts/acceptance/ + make accept<span class="tag p1">恒红</span></div>
+      <div class="d">旧 TASK 派单链的验收器。而且 <code>acceptance-runner.sh:105</code> 用了 <code>node -c</code>——Node 根本没有 <code>-c</code> 参数，每个 JS 文件都判 FAIL，所以 <code>make accept</code> 永远是红的。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="D5"><div class="body">
+      <div class="t">scripts/deploy-release.sh + make release<span class="tag p0">假发布</span></div>
+      <div class="d">这个最危险。它<strong>只做 <code>helm template</code> + <code>mv</code> 归档 + 打印一张「GKE 生产上线成功」卡片</strong>，不 apply、不推镜像、不触发 ArgoCD。<code>make release</code> 会告诉你上线成功，而线上什么都没变。同时它还挡在 <code>.agents/tasks/reports/*-ACCEPTANCE.md</code> 这道早已无人签发的闸门前——恒失败。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="D6"><div class="body">
+      <div class="t">.agents/ACCEPTANCE_GATE.md + TASK_SPEC_TEMPLATE.md + .agents/tasks/<span class="tag p2">已旁路</span></div>
+      <div class="d">标题就是「BMAD 双 Agent 研发生态」；<code>BACKLOG.md:3</code> 自述「由 dispatch-task.js 自动维护」（该脚本已删），第 18 行链到的 TASK-016 不存在，第 22 行说的 <code>archive/2026-10-09-reset/</code> 也不存在。<code>make backlog</code> 现在 cat 出来的就是这份错信息。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="D7"><div class="body">
+      <div class="t">docs/internal/patches/（4 个文件）<span class="tag p2">危险</span></div>
+      <div class="d">内容是「给 <code>bmad-project-sync.yml</code> 打补丁」的草案，目标文件已删。里面还在教 <code>git worktree add … cp … push</code>——照着做会重建已宣布下线的 workflow，直接违反规范。</div>
+    </div></div>
+  </section>
+
+  <section>
+    <h2>三、该修（挑 9 条关键的）</h2>
+    <p class="hint">这些还在执行路径上，但行为与宣称不符——「假绿」比「红」更危险。</p>
+
+    <div class="item"><input type="checkbox" data-k="O1"><div class="body">
+      <div class="t">TMA 的 9 个测试 + typecheck 从没在 CI 跑过<span class="tag p0">最大缺口</span></div>
+      <div class="d"><code>apps/tma/package.json</code> 有 <code>test</code>（9 个文件：auth / fbClient / cart / checkout / geo / delivery …）和 <code>typecheck</code>，但 <code>verify-task.sh</code> 的循环只跑 <code>services/api</code>、<code>news-sync</code>、<code>payment-listener</code>。TMA 构建只在 merge 后 Dockerfile 里发生 → <strong>编译不过也能全绿过关</strong>。这是你最想做的模块。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="O2"><div class="body">
+      <div class="t">数据库集成测试从未执行<span class="tag p0">假绿</span></div>
+      <div class="d"><code>verify-task.sh:94</code> 判断 <code>[ -f scripts/test-api-db.sh ]</code>，该文件不存在 → 整块跳过。而 <code>ci-verify.yml:48</code> 的 job 名还写着「数据库集成测试」。所有资金路径的 DB 测试一次都没跑过。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="O3"><div class="body">
+      <div class="t">BMAD 死行静默吞掉<span class="tag p1">断链</span></div>
+      <div class="d"><code>verify-task.sh:63</code> 第一项取 <code>${t##* }</code> = <code>scripts/bmad/sync.test.js</code>，不存在 → <code>continue</code>，退出码 0。「流程脚本自测」少了一半而无人知。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="O4"><div class="body">
+      <div class="t">lib.sh 的 bmad_stage 每轮白跑 4 次<span class="tag p1">噪音</span></div>
+      <div class="d"><code>lib.sh:86-89</code> 调已删的 <code>scripts/github-sync.js</code>，被 <code>qa.sh:162,163,183,184</code> 调用。每轮 QA 起 4 个 node 进程、打 4 行「BMAD Project 状态更新失败」。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="O5"><div class="body">
+      <div class="t">自动合并还开着，但施工的 Agent 已经没了<span class="tag p1">风险</span></div>
+      <div class="d"><code>ci-verify.yml:66,78</code>：<code>feature/*</code> 也进 LLM QA，且 <code>AGENT_AUTO_MERGE=1</code> 默认开 → 通过即在无人复核下自动 squash 合并进 canary。另外它跑在你两台 Mac 的 self-hosted runner 上，机器一关，PR 就永久 pending。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="O6"><div class="body">
+      <div class="t">make test-mcp 恒失败（我昨天造成的）<span class="tag p1">回退</span></div>
+      <div class="d"><code>mcp-acceptance-test.js:19-24</code> 校验的是 <code>WkFtg2gh0000000{2,3,4,5}</code>——这 4 个我昨天已经停用了。现在跑必然失败，而且失败原因会误导人去「重新激活」已经判定无用的工作流。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="O7"><div class="body">
+      <div class="t">两份「必读规范」教了一条不存在的命令<span class="tag p1">我的错</span></div>
+      <div class="d"><code>AGENTS.md:82</code> 和 <code>docs/REPO-CONVENTIONS.md:112</code> 都写 <code>bash scripts/gates.sh</code>，真实路径是 <code>scripts/agent/gates.sh</code>。任何人（或 Agent）照做第一步就报 No such file。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="O8"><div class="body">
+      <div class="t">README 还在教已删的 make agent-dev<span class="tag p1">入口错</span></div>
+      <div class="d"><code>README.md:9</code> 教 <code>make agent-dev ISSUE=&lt;n&gt;</code>（target 已删），<code>:15</code> 链到已删的 <code>AGENT_PIPELINE.md</code>。新人第一步就失败。</div>
+    </div></div>
+
+    <div class="item"><input type="checkbox" data-k="O9"><div class="body">
+      <div class="t">仓库地图 7 个目标全指向已删项<span class="tag p2">误导</span></div>
+      <div class="d"><code>REPO_MAP.md:41,43,67,80,81</code> 指向 <code>services/tg-bot</code>、<code>apps/bmad-dashboard</code>、<code>AGENT_PIPELINE.md</code>、<code>dispatch-task.js</code> 等 7 个已不存在的东西。它还是 README 的「目录地图」入口——等于仓库唯一的导航图是错的。</div>
+    </div></div>
+  </section>
+
+  <section>
+    <h2>四、不动（18 项）</h2>
+    <div class="keep">
+      <b>骨架保留</b>：<code>ci-gke.yml</code>、<code>repo-hygiene.yml</code>、<code>deploy/helm/firebird-site/</code>、<code>scripts/agent/{gates,qa,lib}.sh</code>、<code>repo-hygiene.sh</code>、<code>api-contract-check.js</code>、<code>test-gates.sh</code>、<code>local-accept*.sh</code>、<code>clean-bloat.sh</code>、<code>setup-base.sh</code>、<code>.agents/RULES.md</code>、<code>REPO-CONVENTIONS.md</code>、<code>RELEASE_FLOW.md</code>、<code>LOCAL_ACCEPT.md</code>、<code>n8nac-config.json</code>、<code>AGENTS.md</code>（n8nac 层）
+      <br><br>
+      这套设计的底子是好的：双环境、镜像 tag 隔离（canary 绝不推 40 位 SHA，未验收镜像不可能滚进生产）、GitOps、门禁分层。<b>问题从来不是设计，是主线换了配套没跟上。</b>
+    </div>
+  </section>
+
+  <footer>
+    <button id="copy">复制勾选清单</button>
+    <button id="clear" style="background:transparent;color:var(--brand)">清空</button>
+    <span id="count">已选 0 项</span>
+  </footer>
+  <textarea id="buf"></textarea>
+</div>
+
+<script>
+  const items = [...document.querySelectorAll('.item input')];
+  const count = document.getElementById('count');
+  function sync(){
+    let n = 0;
+    items.forEach(i => {
+      i.closest('.item').classList.toggle('done', i.checked);
+      if (i.checked) n++;
+    });
+    count.textContent = '已选 ' + n + ' 项';
+  }
+  items.forEach(i => i.addEventListener('change', sync));
+  document.getElementById('copy').onclick = () => {
+    const picked = items.filter(i => i.checked)
+      .map(i => '- ' + i.dataset.k + '  ' + i.closest('.item').querySelector('.t').textContent.trim());
+    const txt = picked.length ? '研发框架评审 · 待处理清单\n\n' + picked.join('\n') : '（还没有勾选任何项）';
+    const buf = document.getElementById('buf');
+    buf.value = txt; buf.select();
+    document.execCommand('copy');
+    const btn = document.getElementById('copy');
+    btn.textContent = '已复制';
+    setTimeout(() => btn.textContent = '复制勾选清单', 1600);
+  };
+  document.getElementById('clear').onclick = () => { items.forEach(i => i.checked = false); sync(); };
+  sync();
+</script>
+</body>
+</html>

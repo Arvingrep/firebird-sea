@@ -197,6 +197,21 @@ paymentListener:
       cpu: 20m
       memory: 64Mi
 
+# Telegram Mini App 登录桥接与白名单代理（docs/internal/TMA_LOGIN_BRIDGE.md）。
+# 默认关闭。开启前须在 api.secretRef 指向的 Secret 中创建 TMA_TOKEN_SECRET 与 FBS_GATEWAY_SECRET
+# （≥16 字符，canary 与 prod 各自独立）；本模板只引用 secretName，不含任何密钥值。
+tma:
+  enabled: false
+  env: ""            # 令牌的环境声明；留空则取 siteId
+  trustProxyHops: 1  # 位于 Traefik 之后
+  # 登录桥（TAPD 0002）：TG 内打开 → Set-Cookie + 302 落火鸟 H5 页。
+  # 四个变量都是明文配置，不含密钥；未注入时桥端点一律 503（fail-closed，不会下发 host-only Cookie）。
+  bridge:
+    cookieDomain: ""     # 会话 Cookie 的父域（如 fbird.men）；留空回落 ingress.hosts[0]
+    cookieMaxAge: 86400  # 秒；应与火鸟后台在线时长对齐，否则「以为还在登录」
+    targetDefault: "/"   # to 参数不合法时的落地页，只能是站内相对路径
+    forceSecure: true    # 强制 Secure；仅纯 http 本地调试才设 false（prod 会打 WARN）
+
 # Traefik IngressRoute 路由定义
 ingressRoute:
   enabled: true

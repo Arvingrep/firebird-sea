@@ -187,7 +187,10 @@ test('真验签：2 小时前的 initData → 401 EXPIRED_INIT_DATA；收银台�
     assert.strictEqual(r1.status, 401);
     assert.strictEqual(r1.json.error.code, 'EXPIRED_INIT_DATA');
 
-    assert.strictEqual(validateTelegramInitData(twoHoursAgo, BOT_TOKEN).valid, true);
+    // canary 强化版 telegramAuth：默认 maxAge=3600（T2.1，可由调用方覆盖）；
+    // 登录桥在此之上再显式收窄到 LOGIN_MAX_AGE_SECONDS。2 小时前的 initData 在两种口径下都过期。
+    assert.strictEqual(validateTelegramInitData(twoHoursAgo, BOT_TOKEN).valid, false);
+    assert.match(validateTelegramInitData(twoHoursAgo, BOT_TOKEN).error, /expired/i);
     assert.strictEqual(validateTelegramInitData(twoHoursAgo, BOT_TOKEN, { maxAgeSeconds: LOGIN_MAX_AGE_SECONDS }).valid, false);
     assert.match(validateTelegramInitData(twoHoursAgo, BOT_TOKEN, { maxAgeSeconds: LOGIN_MAX_AGE_SECONDS }).error, /expired/);
 

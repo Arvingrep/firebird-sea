@@ -1,0 +1,192 @@
+# docs/agent/rules.yaml —— 规则唯一真相源  v1.0
+#
+# 这个文件回答一个问题：**每条规则，在机器上是谁在拦、谁在证明它拦得住。**
+# 它不取代 docs/internal/AGENT_PIPELINE.md（那是给人读的叙述版），它取代那份文档里
+# 的「规则表」——表只有一份，就是下面这份；文档里再抄一份就会两边不一致。
+#
+# ── 四环（一条 hard 规则要能活过三个月，四个环缺一不可）───────────────
+#   ① 产生环  声明    YAML 里有这一行                  → 一定有
+#   ② 执行环  动作    enforce 指向的锚点真实存在        → check-rings.js 查
+#   ③ 检查环  验证    test 指向的用例真实存在且故意违反必红 → check-rings.js 查
+#   ④ 收口环  结论    run 目录里有终态产物              → spec-lint.sh S5 查
+#
+# ── 锚点格式（决定这套东西能不能活过三个月）──────────────────────────
+#   enforce / test 不是自由文本，是「文件#签名」。签名 = 被指文件里真实存在的一段内容
+#   （检查项名称 / case 名 / 函数名 / 表达式）。
+#   为什么不用行号：行号是位置的坐标，文件一改全部指针静默失效。本仓库
+#   AGENT_PIPELINE.md 早期 18 个 `file:行号` 锚点实测 8 个错位，零症状——不报错、
+#   不断链、CI 全绿，文档看着完整，规则其实已指到别处。签名是内容坐标，不会飘。
+#
+# ── level 语义 ────────────────────────────────────────────────────────
+#   hard = 机器拦（必须有 enforce + test，缺一即红）
+#   soft = 人工守（允许 enforce: none，但必须能说清谁在守）
+#   note = 仅约定（不计入强度，不进体检）
+#
+# ── 维护规矩 ──────────────────────────────────────────────────────────
+#   1. 只搬已经在机器上生效的规则，不搬愿望。没有执行点的写 soft，不许写 hard。
+#   2. 新增 hard 规则 = 改本文件 + 在 scripts/test-gates.sh 加一条「故意违反 → 指定
+#      检查项 FAIL」的用例 + 跑 `make rules` 确认 100%。三件事是一件事。
+#   3. 改了本文件必须重跑 `make rules`：它会核对 gates.sh 的每个检查项是否都有规则
+#      背书——门禁在白拦而没人写下为什么，和写了规则没人拦，是同一个病的两面。
+#
+# ── 校验 ──────────────────────────────────────────────────────────────
+#   make rules        # 四环体检 + 门禁项背书（本文件 ↔ gates.sh）
+#   make lint         # 规范面自洽 8 项
+#   make anchors      # 文档里指向执行面的锚点还准不准
+
+meta:
+  version: "1.0"
+  updated: "2026-11-05"
+  owner: arvin
+  checked_by: scripts/agent/check-rings.js
+  prose: docs/internal/AGENT_PIPELINE.md
+
+rules:
+  - id: P-01
+    rule: 受保护路径（.github/ scripts/agent/ scripts/acceptance/ .agents/）只能 owner 改，Agent 分支触碰即 FAIL
+    level: hard
+    enforce: scripts/agent/gates.sh#受保护路径未改动
+    test: scripts/test-gates.sh#Agent 分支改 scripts/acceptance → FAIL
+    surface3: branch_protection
+    src: docs/internal/AGENT_PIPELINE.md#P-01
+
+  - id: B-06
+    rule: 单 PR 增量 ≤ 1200 行（docs/、.agents/、package-lock.json 不计）
+    level: hard
+    enforce: scripts/agent/gates.sh#增量 ≤
+    test: scripts/test-gates.sh#_bmad-output 不计 1200 行增量
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#B-06
+
+  - id: B-08
+    rule: 分支前缀决定是否触发 Agent 门禁（agent/ arvino/ feature/ owner/）
+    level: hard
+    enforce: .github/workflows/ci-verify.yml#startsWith(github.head_ref, 'agent/')
+    test: scripts/test-gates.sh#B-08 四前缀在两个 job 均触发门禁
+    surface3: branch_protection
+    src: docs/internal/AGENT_PIPELINE.md#B-08
+
+  - id: C-01
+    rule: 改了业务代码（php/js/ts/vue/sql，且不在 scripts/ .github/ automation/ 下）必须同 PR 改 docs/
+    level: hard
+    enforce: scripts/agent/gates.sh#Docs-as-Code
+    test: scripts/test-gates.sh#C-01 改业务代码不带 docs → FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#C-01
+
+  - id: C-02
+    rule: 改 services/api 路由必须带 services/api/test/ 测试 + docs/api/openapi.yaml
+    level: hard
+    enforce: scripts/agent/gates.sh#API 契约同步
+    test: scripts/test-gates.sh#改路由+带测试但 OpenAPI 未更新 → FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#C-02
+
+  - id: C-05
+    rule: 改 deploy/helm/** 须 helm lint + 全部 values-*.yaml 渲染通过
+    level: hard
+    enforce: scripts/agent/gates.sh#Helm 多站点渲染
+    test: scripts/test-gates.sh#C-05 values 文件 YAML 损坏 → 渲染 FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#C-05
+
+  - id: C-06
+    rule: 动 Dockerfile 或删改被引用目录后，全仓 Dockerfile 的 COPY 源路径存在、COPY --from 指向已定义阶段
+    level: hard
+    enforce: scripts/agent/gates.sh#Dockerfile 引用路径存在
+    test: scripts/test-gates.sh#C-06 Dockerfile COPY 断引用 → FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#C-06
+
+  - id: C-07
+    # 为什么这条属于 hard 而不是 note：`@v4` 是**可被上游重新指向**的指针。上游账号被接管后，
+    # 下一次 CI 执行的就是攻击者的代码，而 runner 上挂着 AGENT_GH_TOKEN 与自托管 runner 的整台机器。
+    # 只有 40 位提交 SHA 不可移动 —— 这不是「更安全一点」，是把可变引用换成不可变引用。
+    rule: 所有 GitHub Actions 引用必须 pin 到 40 位提交 SHA（tag / 分支可被上游重指）
+    level: hard
+    enforce: scripts/agent/gates.sh#Actions 引用已 pin
+    test: scripts/test-gates.sh#S-03 Actions 引用用 tag（可被上游重指）→ FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#C-07
+
+  - id: D-01
+    rule: 新增 npm/composer 依赖必须先在 base 分支登记 .agents/approved-deps.txt，同 PR 自登记无效
+    level: hard
+    enforce: scripts/agent/gates.sh#Zero-Dep
+    test: scripts/test-gates.sh#未登记依赖 → FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#D-01
+
+  - id: S-01
+    rule: 严禁私钥/助记词/TRONGRID_API_KEY/TG token 入仓（增量与全仓都扫）
+    level: hard
+    # 两个执行点，用 ` | ` 分隔：只锚增量那一半，规则文本里的「与全仓都扫」就成了没人证明的半句。
+    # check-rings 的门禁项背书会抓这种半对齐，所以两条都必须写、必须都命中。
+    enforce: scripts/agent/gates.sh#无密钥泄漏（增量） | scripts/agent/gates.sh#无密钥入库（全仓）
+    test: scripts/test-gates.sh#S-01 新增行含 TRONGRID_API_KEY → 增量泄漏 FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#S-01
+
+  - id: S-02
+    rule: 存量泄漏登记在 .agents/secret-scan-allow.txt，到期即 FAIL
+    level: hard
+    enforce: scripts/agent/gates.sh#密钥存量欠债
+    test: scripts/test-gates.sh#S-02 白名单已过期 → 存量欠债 FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#S-02
+
+  - id: Q-01
+    rule: 无 .bak/.tmp/.orig/test_*.php 等垃圾文件
+    level: hard
+    enforce: scripts/agent/gates.sh#无垃圾文件
+    test: scripts/test-gates.sh#Q-01 新增 .bak 垃圾文件 → FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#Q-01
+
+  - id: Q-02
+    rule: 无 var_dump/print_r/console.log/debugger（scripts/ deploy/ 豁免）
+    level: hard
+    enforce: scripts/agent/gates.sh#无调试残留
+    test: scripts/test-gates.sh#Q-02 业务代码 var_dump → FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#Q-02
+
+  - id: Q-03
+    rule: 改动文件语法必须过（php/js/sh/json）
+    level: hard
+    enforce: scripts/agent/gates.sh#改动文件语法
+    test: scripts/test-gates.sh#Q-03 语法错误的 .js/.json → FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#Q-03
+
+  - id: Q-04
+    rule: 非空交付（相对 base 必须真有改动）
+    level: hard
+    enforce: scripts/agent/gates.sh#非空交付
+    test: scripts/test-gates.sh#Q-04 相对基线无改动 → 非空交付 FAIL
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#Q-04
+
+  - id: O-02
+    rule: kubectl / ArgoCD 工具只读（get/describe/logs/events/top），写操作仅 owner 应急
+    level: hard
+    enforce: scripts/agent/gates.sh#kubectl/ArgoCD 只读
+    test: scripts/test-gates.sh#O-02 kubectl 写操作 → FAIL
+    surface3: .claude/settings.local.json
+    src: docs/internal/AGENT_PIPELINE.md#O-02
+
+  - id: T-02
+    rule: 返工上限 AGENT_MAX_ATTEMPTS 默认 3，超限打 agent:blocked 停止自动返工
+    level: hard
+    enforce: scripts/agent/lib.sh#MAX_ATTEMPTS="${AGENT_MAX_ATTEMPTS:-3}"
+    test: scripts/test-gates.sh#T-02 返工上限默认 3 且有 agent:blocked 机制
+    surface3: none
+    src: docs/internal/AGENT_PIPELINE.md#T-02
+
+  - id: O-01
+    rule: 集群期望状态 = Git，改副本/探针/Ingress/CronJob/镜像 tag 一律走 PR
+    level: soft
+    enforce: none
+    test: none
+    surface3: ArgoCD selfHeal
+    src: docs/internal/AGENT_PIPELINE.md#O-01

@@ -41,6 +41,12 @@ firebird-sea/
 - **API 接口**：需具备标准 JSON 响应结构 `{ success: boolean, data?: any, error?: { code: string, message: string } }`。
 - **TG 免密鉴权**：凡受保护的接口必须校验 Telegram `initData` 的 HMAC-SHA256 签名，未通过者直接返回 401。
 - **双语与双币**：所有业务字段需支持多语言展示（zh / en），金额计算必须显式区分 `PHP`（法币单位，两位小数）与 `USDT`（加密货币，最高 6 位小数）。
+- **接口契约同步**（2026-11-05 起由门禁强制）：新增 / 改名 / 删除对外接口，必须同一 PR 更新对应契约——
+  `services/api` 的路由改 `docs/api/openapi.yaml`；`webroot/api/handlers/*.class.php` 的 public 方法改
+  `docs/api/openapi-waimai-article.yaml`。门禁第 10 项做**双向集合比对**：代码有文档缺、文档有代码没有，均 FAIL。
+  判据是**接口集合是否变化**，不是「碰了文件」——修 bug 不动签名的改动不需要动文档，否则日常修复会被无理由拦下，
+  人就会用 `chore/` 前缀绕过整条门禁。
+  尚未纳管的 service 必须登记在 `.agents/api-contract-debt.txt`（含到期日）：未登记即 FAIL，到期未补即 FAIL。
 
 ---
 
@@ -62,7 +68,17 @@ firebird-sea/
 2. **功能与 Agent 的 PR 一律以 `canary` 为目标分支**（`AGENT_BASE_BRANCH=canary`），合并后在 canary 环境验收；
    验收通过后才允许开 `canary → main` 的晋升 PR。**严禁**绕过 canary 把未验收改动直接合入 main（hotfix 例外，且合并后必须回灌 canary）。
 3. **镜像 tag 纪律**：canary 构建只能推 `canary` / `canary-<sha12>`，**绝不推 40 位 SHA tag**（Image Updater 追 40 位 SHA，会把未验收镜像滚进生产）；`values-canary.yaml` 的 `image.tag` 不得改回 `latest`。
-4. 受保护路径（`.github/`、`scripts/agent/`、`scripts/acceptance/`、`.agents/`）只能由 owner 修改；Agent 分支触碰即门禁 FAIL。
+4. 受保护路径（`.github/`、`scripts/agent/`、`scripts/acceptance/`、`.agents/`）只能由 owner 修改；**除下方 owner 通道外**，Agent 分支触碰即门禁 FAIL。
+   **owner 通道**（2026-11-05）：分支前缀 `owner/` **且** PR 带 `owner-approved` 标签时，门禁记 `⚠️ WARN` 放行（不再 FAIL）。
+   两个条件缺一不可——只认前缀等于谁都能建分支，只认标签等于 agent 能给自己打标签（PAT 带 `issues:write`）。
+   放行只代表「允许提交」，不代表「已批准合并」：owner 仍需本人 review 后点合并。
+   ⚠️ **这是流程标记，不是安全边界**：当前 Agent 用的 `AGENT_GH_TOKEN` 是 owner 本人的 PAT
+   （`repo` + `workflow`），因此它能建 `owner/*` 分支、能给自己打标签、能改仓库变量——
+   「两个信号」实际握在同一只手里。它的价值是**把「绕过」换成「留痕」**（可审计、可追责），
+   不是阻止越权。真正的强制只能靠 GitHub Environment 的 required reviewers（审批只能在网页点）
+   与凭证分离，见 `docs/internal/RELEASE_FLOW.md §8` 与 #192。
+   **操作顺序**：先打 `owner-approved` 标签，**再** push（`pull_request` 事件不含 `labeled`，事后打标签不会触发复跑，只能再 push 或重开 PR）。
+   为什么开这条：护栏自身也要升级（改 gates.sh、加用例、收紧 workflow），而「谁碰谁错」会让升级护栏的那次 PR 永远红，唯一出路只剩绕过（直推 canary），绕过没有任何 review 记录。
 5. 详见 `docs/internal/RELEASE_FLOW.md`。
 
 ## 6. GitOps 铁律：一切变更以 Git 为准，kubectl 只读

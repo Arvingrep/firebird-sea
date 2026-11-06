@@ -22,6 +22,10 @@ spec:
         - name: firebird-{{ .Values.siteId }}
           port: {{ .Values.service.port }}
     {{- end }}
+    # 2026-11-05：`/tma` 路由已删除。TMA 前端 2026-11-04 归档（见 docs/internal/TMA-LEGACY-NOTES.md），
+    # 镜像里不再有 /app/tma，server.js 的静态挂载有 existsSync 守卫、目录不存在就不挂。
+    # 这条 route 留着只会把 /tma/* 转给 api 再返 404 —— 路由应当反映真实存在的服务，
+    # 而不是记录一个曾经存在过的服务。`tma.enabled` 仍然有效：它还给 api 注入登录桥的环境变量。
     {{- if .Values.api.enabled }}
     - kind: Rule
       match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tg-api`)
