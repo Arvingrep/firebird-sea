@@ -273,7 +273,10 @@ class Logintelegram {
            . 'fetch("/api/login.php?type=telegram&act=confirm_submit",{method:"POST",credentials:"include",headers:{"Content-Type":"application/x-www-form-urlencoded"},'
            . 'body:"t="+encodeURIComponent(T)+"&initData="+encodeURIComponent(tg.initData)})'
            . '.then(function(r){return r.json();}).then(function(j){'
-           . 'if(j&&j.ok){m.textContent="已确认，请回到刚才的浏览器。 / Confirmed — return to your browser.";b.style.display="none";setTimeout(function(){try{tg.close();}catch(e){}},1500);}'
+           . 'if(j&&j.ok){m.textContent="登录成功，正在进入… / Signed in, loading…";b.style.display="none";'
+           // 留在 Mini App：同时把 Mini App 自己这一端也登录（原浏览器那端由轮询签发），然后直接进站内首页，不再关闭窗口
+           . 'fetch("/api/login.php?action=back&type=telegram",{method:"POST",credentials:"include",redirect:"manual",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"initData="+encodeURIComponent(tg.initData)})'
+           . '.catch(function(){}).then(function(){location.replace("/");});}'
            . 'else{b.disabled=false;s.textContent="确认失败，请回到网站重新发起 / Failed, please retry from the website";}'
            . '}).catch(function(){b.disabled=false;s.textContent="网络异常 / Network error";});};'
            . '})();</script></body></html>';
