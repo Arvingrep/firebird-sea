@@ -58,9 +58,16 @@ var pageVue = new Vue({
 				tt.hnStartList();
 			},100)
 		})
-		// 浏览器兜底：800ms 后 bridge 仍未接管则直接启动
+		// 浏览器兜底：800ms 后 bridge 仍未接管则直接启动；
+		// TG/浏览器里没有 APP 定位推送，改用原生 geolocation 兜底（拒绝/失败则保持默认中心）
 		setTimeout(function(){
 			tt.hnStartList();
+			if(!window.WebViewJavascriptBridge && navigator.geolocation){
+				navigator.geolocation.getCurrentPosition(function(p){
+					tt.myPosition = {'lng':p.coords.longitude,'lat':p.coords.latitude};
+					if(map){ tt.changePosi(); tt.changecenter(); }
+				}, function(){}, {timeout:8000, maximumAge:60000});
+			}
 		},800)
 		
 		
@@ -372,6 +379,12 @@ var pageVue = new Vue({
 						tt.changecenter()
 					},xhtime);
 					tt.loading = false;
+				}
+			}).catch(function(){
+				// 网络异常等 rejection 路径也必须收敛 loading，否则永久转圈
+				tt.loading = false;
+				if(site_map == 'google'){
+					try{ tt.google_map(tt.myPosition,tt.posiArray,0); }catch(e){}
 				}
 			});
 		},
