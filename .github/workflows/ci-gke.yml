@@ -42,11 +42,14 @@ jobs:
   build-and-push:
     needs: helm-lint
     runs-on: ubuntu-latest
-    # 步骤 5 产出的 bot commit 带 [skip ci]：GitHub 本身不会再起 run，
-    # 这里再挡一层，避免有人改了 paths-ignore 或手动 dispatch 后重复构建、反复写回。
+    # 步骤 5 产出的 bot commit 带 GitHub 的跳过标记，本身不会再起 run；
+    # 这里用专用标记 [image-pin] 再挡一层，避免手动 dispatch 后重复构建、反复写回。
+    # 注意：不要用跳过标记本身做条件判断 —— GitHub 会连「提交信息正文里提到它」的
+    # 普通提交一起跳过（2026-11-07 实测：正文写了该标记的提交 check-runs 为 0）。
+    # 所以本仓库的提交信息里别出现那个带方括号的跳过串。
     if: >-
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
-      && !contains(github.event.head_commit.message || '', '[skip ci]')
+      && !contains(github.event.head_commit.message || '', '[image-pin]')
     permissions:
       # 步骤 5 需要把「本次镜像的不可变 tag」写回 values-canary.yaml 并 bot 提交。
       contents: write
@@ -192,7 +195,7 @@ jobs:
         if: >-
           github.ref == 'refs/heads/canary'
           && github.event_name == 'push'
-          && !contains(github.event.head_commit.message || '', '[skip ci]')
+          && !contains(github.event.head_commit.message || '', '[image-pin]')
         run: |
           set -euo pipefail
           SHA="${{ github.sha }}"
@@ -224,7 +227,7 @@ jobs:
             fi
 
             git add "$FILE"
-            git commit -q -m "chore(deploy): canary 镜像钉到 $TAG [skip ci]"
+            git commit -q -m "chore(deploy): canary 镜像钉到 $TAG [skip ci] [image-pin]"
             if git push origin HEAD:canary; then
               echo "✅ 已写回 $TAG；ArgoCD 将同步到这个 revision，镜像已就绪"
               exit 0
@@ -244,7 +247,7 @@ jobs:
         if: >-
           github.ref == 'refs/heads/canary'
           && github.event_name == 'push'
-          && !contains(github.event.head_commit.message || '', '[skip ci]')
+          && !contains(github.event.head_commit.message || '', '[image-pin]')
         run: |
           set -u
           URL="https://canary.fbird.men"
