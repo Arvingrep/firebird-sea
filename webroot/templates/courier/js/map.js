@@ -1,7 +1,17 @@
 var route = 0; //首次进入渲染第一条路线
 var map,blbale3 ;
-var xhtime = 5000; //循环时间	
+var xhtime = 5000; //循环时间
 var interval;  //设置循环变量
+// 等 Google Maps JS API 就绪再渲染，避免与 axios 竞态导致 google undefined
+function hnWaitGoogleMap(cb){
+	if(window.google && window.google.maps && window.google.maps.Map){ cb(); return; }
+	var n = 0;
+	var t = setInterval(function(){
+		n++;
+		if(window.google && window.google.maps && window.google.maps.Map){ clearInterval(t); cb(); }
+		else if(n > 40){ clearInterval(t); }  // 最多等 20s，超时放弃（SDK 加载失败场景）
+	}, 500);
+}
 var pageVue = new Vue({
 	el: "#page",
 	data:{
@@ -346,7 +356,7 @@ var pageVue = new Vue({
 					}else if(site_map == 'amap'){
 						tt.amapMap(tt.myPosition,tt.posiArray,0);
 					}else if(site_map == 'google'){
-						tt.google_map(tt.myPosition,tt.posiArray,0);
+						hnWaitGoogleMap(function(){ tt.google_map(tt.myPosition,tt.posiArray,0); });
 					}
 					if(tt.myPosition.lng == '' || tt.myPosition.lat == ''){
 						tt.loading = true;
@@ -371,7 +381,7 @@ var pageVue = new Vue({
 					}else if(site_map == 'amap'){
 						tt.amapMap(tt.myPosition,tt.posiArray,0);
 					}else if(site_map == 'google'){
-						tt.google_map(tt.myPosition,tt.posiArray,0);
+						hnWaitGoogleMap(function(){ tt.google_map(tt.myPosition,tt.posiArray,0); });
 					}
 					tt.changePosi();
 					interval = setInterval(function(){
@@ -384,7 +394,9 @@ var pageVue = new Vue({
 				// 网络异常等 rejection 路径也必须收敛 loading，否则永久转圈
 				tt.loading = false;
 				if(site_map == 'google'){
-					try{ tt.google_map(tt.myPosition,tt.posiArray,0); }catch(e){}
+					hnWaitGoogleMap(function(){
+						try{ tt.google_map(tt.myPosition,tt.posiArray,0); }catch(e){}
+					});
 				}
 			});
 		},
@@ -421,6 +433,7 @@ var pageVue = new Vue({
 				})
 				 map.setCenter([tt.myPosition.lng,tt.myPosition.lat]); //设置地图中心点
 			}else if(site_map=="google"){
+				if(!map){ return; }
 				var cposition = new google.maps.LatLng(Number(tt.myPosition.lat),Number(tt.myPosition.lng));
 				if(blbale3){blbale3.setMap(null);}
 				blbale3  = new MarkerWithLabel({
@@ -684,6 +697,7 @@ var pageVue = new Vue({
 			}else if(site_map=='amap'){
 				blbale3.setAngle(tt.rotation);
 			}else if(site_map=='google'){
+				if(!map){ return; }
 				var cposition = new google.maps.LatLng(Number(tt.myPosition.lat),Number(tt.myPosition.lng));
 				if(blbale3){blbale3.setMap(null);}
 				blbale3  = new MarkerWithLabel({
