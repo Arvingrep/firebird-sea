@@ -34,6 +34,17 @@ var pageVue = new Vue({
 			$("#mapbox .tab_all li[data-type=waimai],#mapbox .tab_all li[data-type=paotui]").remove();
 		}
 		var tt = this;
+		// 非 APP 环境（TG WebView / 普通浏览器）没有 WebViewJavascriptBridge，
+		// 回调永远不会触发，loading 会永久转圈 —— 这里做兜底启动（幂等）
+		var hnListStarted = false;
+		tt.hnStartList = function(){
+			if(hnListStarted) return;
+			hnListStarted = true;
+			// 坐标兜底：APP 定位未就绪或浏览器无定位推送时，用马尼拉市中心，避免 NaN 坐标让渲染链路抛错
+			if(!tt.myPosition.lng){ tt.myPosition = {'lng':120.9842,'lat':14.5995}; }
+			tt.loading = false;
+			tt.getList();
+		};
 		// 监听app传到变量
 		setupWebViewJavascriptBridge(function(bridge) {
 			  //获取方向
@@ -44,10 +55,13 @@ var pageVue = new Vue({
 				 tt.changePosi()
 			 });
 			setTimeout(function(){
-				tt.loading = false;
-				tt.getList();
+				tt.hnStartList();
 			},100)
 		})
+		// 浏览器兜底：800ms 后 bridge 仍未接管则直接启动
+		setTimeout(function(){
+			tt.hnStartList();
+		},800)
 		
 		
 		if(site_map=='amap'){ 
