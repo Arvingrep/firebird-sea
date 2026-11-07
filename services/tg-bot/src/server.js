@@ -118,6 +118,18 @@ function customerEntryUrl(base) {
   return `${raw}/tg/entry.php?role=customer`;
 }
 
+// 网站登录确认入口（Telegram Mini App）：令牌由 api/login/telegram 插件下发，页面在 Telegram 内打开才能拿到 initData。
+function loginConfirmUrl(base, token) {
+  const raw = String(base || '').trim().replace(/\/+$/, '');
+  if (raw === '' || !/^[a-f0-9]{32}$/.test(String(token || ''))) return '';
+  try {
+    if (new URL(raw).protocol !== 'https:') return '';
+  } catch (_) {
+    return '';
+  }
+  return `${raw}/api/login.php?type=telegram&act=confirm&t=${token}`;
+}
+
 // 骑手绑定入口（Telegram Mini App）。与顾客入口同源不同路径：
 // /tg-api/rider/bind 是 API 侧渲染的落地页，只在 Telegram 内作为 Mini App 打开时
 // 才拿得到 initData（普通浏览器 / 站内 webview 里 initData 恒为空，页面会提示「请在
@@ -140,6 +152,26 @@ async function handleIncomingMessage(msg) {
   const fromName = msg.from?.first_name || 'Boss';
 
   console.log(`📩 [TG-BOT] 收到来自 ${fromName} (${chatId}) 的消息: "${text}"`);
+
+  // 指令 0: /start login_<令牌> —— 网站（微信/浏览器）发起的「用 Telegram 登录」确认。
+  // 令牌是 32 位十六进制；只在私聊发 web_app 确认按钮（Mini App 页里才拿得到可验签的 initData）。
+  const loginMatch = /^\/start(?:@\w+)?\s+login_([a-f0-9]{32})\s*$/.exec(text.trim());
+  if (loginMatch) {
+    const isPrivate = !msg.chat?.type || msg.chat.type === 'private';
+    const confirmUrl = loginConfirmUrl(APP_BASE_URL, loginMatch[1]);
+    if (!confirmUrl) {
+      console.error('[TG-BOT] TG_APP_BASE_URL 未配置或不是 https，无法生成网站登录确认入口');
+      return sendTelegramMessage(chatId, '❌ 网站登录暂时不可用，请稍后再试');
+    }
+    if (!isPrivate) {
+      return sendTelegramMessage(chatId, '请在与机器人的私聊中确认网站登录');
+    }
+    return sendTelegramMessage(
+      chatId,
+      '🔐 *网站登录确认*\n━━━━━━━━━━━━━━━━━━━━\n有人正在网站上请求用你的 Telegram 账号登录。\n只有这是你本人刚刚发起的，才点下方按钮确认；否则请忽略本消息。\n（链接 5 分钟内有效）',
+      { inline_keyboard: [[{ text: '✅ 确认登录', web_app: { url: confirmUrl } }]] }
+    );
+  }
 
   // 指令 1: /start
   if (text.startsWith('/start')) {

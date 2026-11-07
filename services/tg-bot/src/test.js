@@ -143,6 +143,26 @@ async function run() {
   }
   console.log('   ✅ PASS');
 
+  console.log('🧪 测试 5b: /start login_<令牌> → 网站登录确认 web_app 按钮（非普通 /start）');
+  const tok = 'a'.repeat(31) + '1';
+  const s5b = await postJson(PORT, '/webhook/telegram', {
+    message: { chat: { id: 12345, type: 'private' }, text: `/start login_${tok}`, from: { first_name: 'Boss' } }
+  });
+  if (s5b.status !== 200 || !s5b.data.ok) throw new Error('Start login command failed');
+  await new Promise(r => setTimeout(r, 200));
+  const confirmUrl = `${APP_BASE_URL}/api/login.php?type=telegram&act=confirm&t=${tok}`;
+  if (!bot.getStdout().includes(`"web_app":{"url":"${confirmUrl}"}`)) {
+    throw new Error(`login_ 令牌未生成确认按钮，stdout=${bot.getStdout()}`);
+  }
+  // 非法令牌（非 32 位十六进制）不能走确认分支，落回普通 /start，且不会出现带该令牌的按钮
+  const before = bot.getStdout().length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: { chat: { id: 12345, type: 'private' }, text: '/start login_xyz', from: { first_name: 'Boss' } }
+  });
+  await new Promise(r => setTimeout(r, 200));
+  if (bot.getStdout().slice(before).includes('act=confirm')) throw new Error('非法令牌不应生成确认按钮');
+  console.log('   ✅ PASS');
+
   console.log('🧪 测试 6: 派单脚本缺失且 n8n 不可达 → 明确报错回复（fail-safe，不崩溃）');
   deadBot = spawnBot(PORT + 2, `http://127.0.0.1:${N8N_DEAD_PORT}/webhook/test`);
   await new Promise(r => setTimeout(r, 600));
