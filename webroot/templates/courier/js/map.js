@@ -9,7 +9,7 @@ function hnWaitGoogleMap(cb){
 	var t = setInterval(function(){
 		n++;
 		if(window.google && window.google.maps && window.google.maps.Map){ clearInterval(t); cb(); }
-		else if(n > 40){ clearInterval(t); }  // 最多等 20s，超时放弃（SDK 加载失败场景）
+		else if(n > 120){ clearInterval(t); }  // 最多等 60s，超时放弃（弱网/SDK 加载失败场景）
 	}, 500);
 }
 var pageVue = new Vue({
