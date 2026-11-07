@@ -22,6 +22,23 @@ cd "$WT"
 ```
 之后所有 git 操作都在 `$WT` 里进行。`~/Documents/firebird-sea` 是 Arvin 自己的目录，不要在里面改文件、切分支。
 
+## 执行纪律：Superpowers
+所有写代码的 agent（claude、codex）在任务内部按 Superpowers（obra/superpowers）的方法干活。
+**首次运行**：如果你的工具里还没装 Superpowers，先按它官方 README 里对应你这个工具的方式自行安装（Claude Code 走插件市场），装好后在汇报里注明"已安装 Superpowers"。
+
+使用以下技能：
+- `test-driven-development`：先写会失败的测试（迁移类就是先写对比用例），再写实现
+- `systematic-debugging`：测试或对比失败时按步骤找根因，不靠猜
+- `verification-before-completion`：开 PR 之前必须亲自跑过测试和对比工具，汇报里贴出结果；没跑过不许说完成
+- `requesting-code-review` / `receiving-code-review`：claude 审核别人的 PR 时使用
+
+为了适应无人值守的定时运行，以下几点**以本文件为准，覆盖 Superpowers 的默认行为**：
+- **跳过 `brainstorming`**：没有人在旁边回答问题。需求以 issue 正文和评论里的业务规则为准，不清楚就按"阻塞"处理。
+- **计划写在 issue 评论里**：不要用 `writing-plans` 在仓库里生成计划或规格文件（`docs/plans/`、`docs/specs/` 等一律不提交）。
+- **不用 `using-git-worktrees` 新建 worktree**：使用上面"工作目录"一节指定的目录。
+- **`finishing-a-development-branch` 只做到"推送并开 PR"**：不合并、不删分支。
+- `.superpowers/` 下的临时文件不提交。
+
 ## 每轮流程
 1. `git fetch`，基于最新的 `origin/canary`。`~/Documents/firebird-sea` 根目录有 `STOP` 文件就结束。
 2. 按分工找 issue：打开状态；没有「状态/进行中」「状态/待审核」「阻塞」；没有其他 `agent/*` 标签；里程碑按 M0 → M1 → … 顺序，同一里程碑取编号最小的。找不到就结束。
