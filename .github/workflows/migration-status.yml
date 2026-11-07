@@ -1,0 +1,26 @@
+# PR 关联的 issue 自动标「状态/待审核」；PR 关闭但未合并时撤掉。合并后 issue 由 Closes #N 自动关闭。
+name: migration-status
+on:
+  pull_request:
+    types: [opened, reopened, edited, closed]
+permissions:
+  issues: write
+  pull-requests: read
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const nums = [...(pr.body || '').matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi)].map(m => Number(m[1]));
+            for (const n of [...new Set(nums)]) {
+              const p = { owner: context.repo.owner, repo: context.repo.repo, issue_number: n };
+              if (pr.state === 'open') {
+                await github.rest.issues.addLabels({ ...p, labels: ['状态/待审核'] });
+                await github.rest.issues.removeLabel({ ...p, name: '状态/进行中' }).catch(() => {});
+              } else {
+                await github.rest.issues.removeLabel({ ...p, name: '状态/待审核' }).catch(() => {});
+              }
+            }
