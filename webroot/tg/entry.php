@@ -110,7 +110,16 @@ if ($role !== 'customer') $role = 'customer';
       return res.json().catch(function () { return null; }).then(function (data) {
         // 接口契约（对象形）：{success:true,data:{redirect}} / {success:false,error:{code,message}}
         if (res.ok && data && data.success === true) {
-          location.replace((data.data && data.data.redirect) || '/');
+          var go = (data.data && data.data.redirect) || '/';
+          // 同时登录火鸟站点会话：入口页拿得到真实 initData，站内页面（如「我的」）之后再跳转时不一定还带着它。
+          // 用 fetch 提交即可（Set-Cookie 照常生效）；后台没装「Telegram快捷登录」或失败都不影响进入首页。
+          fetch('/api/login.php?action=back&type=telegram', {
+            method: 'POST',
+            credentials: 'include',
+            redirect: 'manual',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'initData=' + encodeURIComponent(initData)
+          }).catch(function () {}).then(function () { location.replace(go); });
           return;
         }
         var err = (data && data.error) || {};
