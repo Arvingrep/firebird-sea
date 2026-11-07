@@ -1,0 +1,32 @@
+# 维护个人 Project「firebird-sea 总看板」。个人 Project 不能用 GITHUB_TOKEN 操作，
+# 所以跑在 Mac mini 的 self-hosted runner 上，使用本机 gh 登录态（与旧 BMAD 看板同步方式相同）。
+name: project-board
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+  push:
+    branches: [main, canary]
+    paths: ['.github/workflows/project-board.yml', '.github/scripts/project-board.sh']
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: project-board
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: [self-hosted, firebird-agent]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: 同步看板
+        run: |
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            bash .github/scripts/project-board.sh issue "${{ github.event.issue.number }}"
+          else
+            bash .github/scripts/project-board.sh full
+          fi
