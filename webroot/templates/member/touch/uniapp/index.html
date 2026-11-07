@@ -12,6 +12,25 @@
 		<meta property="og:description" content="" />
 		<meta property="og:image" content="{#$shareAdvancedUrl#}" />
 		<link rel="canonical" href="">
+		<script>
+			/* PayPal 是跳转式支付：get_code 以 302 跳到 PayPal 授权页，AJAX 跟不过去会一直卡在“支付中”。
+			   打包后的 payBottom 只对 alipay/wxpay 做整页跳转，其余走 AJAX；打包 JS 被浏览器缓存 30 天不便改，
+			   这里在页面里拦下 paytype=paypal 的支付请求，改成整页跳转（与 alipay/wxpay 的 web 分支一致）。 */
+			(function(){
+				var P = XMLHttpRequest.prototype, open = P.open, send = P.send;
+				P.open = function(m, u){ this.__fbsUrl = String(u || ''); this.__fbsM = String(m || ''); return open.apply(this, arguments); };
+				P.send = function(body){
+					try{
+						if(this.__fbsM.toUpperCase() === 'POST' && this.__fbsUrl.indexOf('include/ajax.php') > -1 && typeof body === 'string'
+							&& /(^|&)paytype=paypal(&|$)/.test(body) && /(^|&)action=pay(&|$)/.test(body)){
+							location.href = '/include/ajax.php?' + body;
+							return;
+						}
+					}catch(e){}
+					return send.apply(this, arguments);
+				};
+			})();
+		</script>
 		<script type="module" crossorigin src="/templates/member/touch/uniapp/js/index-DQWPpaQC.js"></script>
 		<link rel="stylesheet" crossorigin href="/templates/member/touch/uniapp/css/index-DBOi4GNi.css">
 	</head>
