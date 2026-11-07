@@ -76,8 +76,9 @@ type Dep struct {
 	Bridge      *bridge.Route
 	Addr        *addrshare.Router
 	FBProxy     *fbproxy.Proxy
-	// Rider 是 /tg-api/rider/session（rider.New 的产物）。配置不齐时它自己
-	// 返回 503，与 Node「无条件挂载、端点内降级」一致；为 nil 表示未装配（测试场景）。
+	// Rider 是 /tg-api/rider/bind（GET 落地页）与 /tg-api/rider/session（POST，
+	// rider.New 的产物）。配置不齐时它自己返回 503，与 Node「无条件挂载、端点内降级」一致；
+	// 为 nil 表示未装配（测试场景）。
 	Rider *rider.Route
 
 	// TMAStaticDir 为空或目录不存在时不挂载 /tma（Node 的 existsSync 守卫）。
@@ -193,6 +194,7 @@ func (s *Server) Routes() []Route {
 		{Method: "GET", Path: "/tg-api/auth/bridge"},
 		{Method: "POST", Path: "/tg-api/auth/bridge"},
 		{Method: "POST", Path: "/tg-api/auth/telegram-web"},
+		{Method: "GET", Path: "/tg-api/rider/bind"},
 		{Method: "POST", Path: "/tg-api/rider/session"},
 		{Method: "GET", Path: "/tg-api/services"},
 		{Method: "POST", Path: "/tg-api/payment/create-charge"},
@@ -294,12 +296,16 @@ func (s *Server) build() http.Handler {
 		mux.HandleFunc("POST /tg-api/auth/bridge", s.bridge.PostBridge)
 	}
 
-	// 9. 骑手 session（T6，server.js 2g）：只挂 POST —— initData 是短期凭证，
-	// 不接受 query 传参（避免进访问日志/Referer/浏览器历史）。
+	// 9. 骑手绑定（T6，server.js 2g）：
+	//   - GET  /tg-api/rider/bind 是 TG 落地页（Node 是 router.get，server.js:463）；
+	//   - POST /tg-api/rider/session 只挂 POST —— initData 是短期凭证，不接受 query 传参
+	//     （避免进访问日志/Referer/浏览器历史）；POST /rider/bind 与 /internal/dispatch
+	//     尚未移植，见 internal/contract 的 notYetInCode。
 	// Node 是**无条件挂载**、配置不齐时端点内 503；生产装配（cmd/api）也总会构造
 	// rider.New（缺配置时它是 notConfigured，端点仍 503），所以这里的 nil 判断
 	// 只影响「测试里没注入」的场景。
 	if s.rider != nil {
+		mux.HandleFunc("GET /tg-api/rider/bind", s.rider.GetLanding)
 		mux.HandleFunc("POST /tg-api/rider/session", s.rider.Session)
 	}
 

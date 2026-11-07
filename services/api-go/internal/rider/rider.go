@@ -1,13 +1,17 @@
 // Package rider 是骑手侧 Telegram 接口的 Go 版移植。
 //
-// 本次只移植 **POST /tg-api/rider/session**（已绑定骑手换工作台直达 URL），
-// 另外三条骑手路由（GET/POST /rider/bind、POST /internal/dispatch）不在范围内。
+// 已移植两条：
+//   - **GET /tg-api/rider/bind**（落地页，本文件之外的 page.go）
+//   - **POST /tg-api/rider/session**（已绑定骑手换工作台直达 URL，本文件）
+//
+// 尚未移植：POST /tg-api/rider/bind、POST /tg-api/internal/dispatch（不在本次范围）。
 //
 // 真值来源固定为三份，改任何一行前都必须读原文，不许凭印象：
-//   - services/api/src/riderRoute.js 的 session()（第 245-265 行）与
+//   - services/api/src/riderRoute.js 的 session()（第 245-265 行）、getLanding()
+//     （第 158-170 行）、renderLandingPage / renderErrorPage（第 33-98 行）与
 //     isAllowedTarget()（第 143-149 行）
-//   - docs/api/openapi.yaml 的 /tg-api/rider/session（第 191-203 行）
-//   - services/api/test/rider-route.test.js 里标 session 的用例
+//   - docs/api/openapi.yaml 的 /tg-api/rider/session 与 /tg-api/rider/bind
+//   - services/api/test/rider-route.test.js 里标 session / 落地页的用例
 //
 // 硬约束（与 Node 逐条一致）：
 //   - initData 只从 POST body 取，不接受 query 传参：它是短期凭证，一旦进 URL 就会进
@@ -33,6 +37,7 @@ import (
 	"strings"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/gateway"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/htmlpage"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpbody"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/tgauth"
 )
@@ -81,6 +86,10 @@ type Dep struct {
 	AllowedHosts []string
 	// Env 只为复刻 Node 构造期那条「prod + 白名单为空」的告警判定。
 	Env func(string) string
+	// Nonce 生成落地页的 CSP nonce；nil 时用 htmlpage.NewNonce
+	// （= Node 的 crypto.randomBytes(16).toString('base64')）。
+	// 注入点只为测试固定 nonce（黄金样本逐字节比对），生产装配不设置。
+	Nonce func() (string, error)
 	// Logf 接收一行结构化日志（默认写 stderr）。
 	Logf func(line string)
 }
@@ -93,6 +102,8 @@ type Route struct {
 	gateway  Gateway
 	// hosts 是**已小写**的白名单集合（Node 构造期就 map 成小写再塞进 Set）。
 	hosts map[string]struct{}
+	// nonce 生成落地页的 CSP nonce（每次请求现生成，不复用）。
+	nonce func() (string, error)
 	logf  func(line string)
 	// notConfigured 为 true 时端点统一 503（进程不因此退出）。
 	notConfigured bool
@@ -115,6 +126,10 @@ func New(d Dep) *Route {
 		validate = func(initData, botToken string) tgauth.Result {
 			return tgauth.Validate(initData, botToken, tgauth.Options{})
 		}
+	}
+	nonce := d.Nonce
+	if nonce == nil {
+		nonce = htmlpage.NewNonce
 	}
 
 	// 缺失项清单与 Node 同序（Node: botToken → validateInitData → gateway → conn）。
@@ -143,11 +158,12 @@ func New(d Dep) *Route {
 		db:            d.DB,
 		gateway:       d.Gateway,
 		hosts:         hosts,
+		nonce:         nonce,
 		logf:          logf,
 		notConfigured: len(missing) > 0,
 	}
 	if route.notConfigured {
-		route.warn("warn", "骑手 session 未配置，端点将返回 503", missing)
+		route.warn("warn", "骑手绑定未配置，端点将返回 503", missing)
 	} else if len(hosts) == 0 && (env("TMA_ENV") == "prod" || env("NODE_ENV") == "production") {
 		// N7：白名单为空 = 只校验 https 不校验域名（fail-open），dev 敞开是刻意的；
 		// 但 prod 下属于配置风险，warn 一行提醒补 CORS_ORIGINS。
@@ -409,13 +425,16 @@ func (r *Route) logFailure(err error) {
 
 // warn 写一行结构化日志。fields 只允许放「环境变量名」这类诊断信息，
 // 绝不允许放 initData、网关返回的 URL、或任何凭证。
+//
+// Route 取模块级 "rider"（Node 的前缀同样是 [rider]）：同一个 Route 实例现在服务
+// GET /rider/bind 与 POST /rider/session 两个端点，写死某一个端点会误导排查。
 func (r *Route) warn(level, message string, missing []string) {
 	entry := struct {
 		Level   string   `json:"level"`
 		Route   string   `json:"route"`
 		Message string   `json:"message"`
 		Missing []string `json:"missing,omitempty"`
-	}{Level: level, Route: "rider/session", Message: message, Missing: missing}
+	}{Level: level, Route: "rider", Message: message, Missing: missing}
 	line, err := json.Marshal(entry)
 	if err != nil {
 		return
