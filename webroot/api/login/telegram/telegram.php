@@ -86,9 +86,18 @@ class Logintelegram {
            . '<script>(function(){'
            . 'var tg=window.Telegram&&window.Telegram.WebApp;'
            . 'if(tg){try{tg.ready&&tg.ready();}catch(e){}try{tg.expand&&tg.expand();}catch(e){}}'
-           . 'var d=tg&&tg.initData;'
+           . 'var d=tg&&tg.initData,src="sdk";'
+           // SDK 没给出 initData 时（站内跳转后偶发），退回读 SDK 自己存的会话参数 / URL 片段
+           . 'function pick(s){try{var m=/(?:^|[#&?])tgWebAppData=([^&]+)/.exec(s||"");return m?decodeURIComponent(m[1]):"";}catch(e){return "";}}'
+           . 'if(!d){var ss="";try{ss=sessionStorage.getItem("__telegram__initParams")||"";if(ss){var o=JSON.parse(ss);d=o&&o.tgWebAppData?String(o.tgWebAppData):"";src="session";}}catch(e){}}'
+           . 'if(!d){d=pick(location.hash);src="hash";}'
            . 'if(d){document.getElementById("d").value=d;document.getElementById("f").submit();}'
-           . 'else{document.getElementById("msg").textContent="请从 Telegram 内打开本页面 / Please open this page inside Telegram";}'
+           // 失败时给出不含敏感内容的诊断（仅布尔值），方便现场判断是哪一层丢了 initData
+           . 'else{var hs="";try{hs=sessionStorage.getItem("__telegram__initParams")?"y":"n";}catch(e){hs="x";}'
+           . 'document.getElementById("msg").textContent="请从 Telegram 内打开本页面 / Please open this page inside Telegram";'
+           . 'var p=document.createElement("p");p.style.cssText="font-size:12px;color:#999";'
+           . 'p.textContent="debug: sdk="+(tg?"y":"n")+" platform="+(tg&&tg.platform||"-")+" session="+hs+" hash="+(location.hash?"y":"n");'
+           . 'document.body.appendChild(p);}'
            . '})();</script></body></html>';
         exit;
     }
