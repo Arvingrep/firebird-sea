@@ -54,13 +54,13 @@ func contractExempt() map[string]struct{} {
 // 移除方式：把路由实现进 httpapi.Routes() 后，从本表删掉对应行。本表与
 // missingInCode 是双向核对的——实现了却不删，用例会报「清单里的路由已经存在」。
 var notYetInCode = map[string]struct{}{
-	// #212 骑手 Telegram 全链路（services/api/src/riderRoute.js 260 行、
-	// dispatchRoute.js 247 行，含 006/008 两条迁移）。canary 上 Node 版已上线，
-	// Go 版待移植；在那之前 canary 的 api.engine 必须保持 node。
-	// POST /tg-api/rider/session 已移植（internal/rider），故不在本表内。
-	// GET /tg-api/rider/bind 也已移植（internal/rider/page.go），同样不在本表内。
-	// POST /tg-api/rider/bind 已移植（internal/rider/bind.go），同样不在本表内。
-	"POST /tg-api/internal/dispatch": {},
+	// #212 骑手 Telegram 全链路的 4 条路由现已全部移植，本表清空：
+	//   POST /tg-api/rider/session  → internal/rider/session（rider.go）
+	//   GET  /tg-api/rider/bind     → internal/rider/page.go
+	//   POST /tg-api/rider/bind     → internal/rider/bind.go
+	//   POST /tg-api/internal/dispatch → internal/dispatch
+	// 表本身留着：下一条新增路由仍有地方登记；空表时双向核对同样成立
+	// （「清单里的路由已经存在」这条断言在空表下恒为假，不会失效）。
 }
 
 // withoutNotYetInCode 从「spec 有、代码没有」的差集里剔除已登记待移植的路由，

@@ -36,6 +36,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/coins"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/config"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/credential"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/dispatch"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fbproxy"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/gateway"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpapi"
@@ -62,6 +63,9 @@ const (
 	migrationTimeout    = 60 * time.Second
 	// shutdownTimeout 给在途请求留 15s：扣款/下单这类写请求不能一刀切断。
 	shutdownTimeout = 15 * time.Second
+	// dispatchDrain 是 SIGTERM 后等在飞派单通知的上限（N3，与 Node 的
+	// SIGTERM_DRAIN_MS = 8000 同值）：给 pod 的 terminationGracePeriod 留余量。
+	dispatchDrain = 8 * time.Second
 	// 只读头超时：慢速请求头是最廉价的连接占用手段，10s 足够任何正常客户端。
 	readHeaderTimeout = 10 * time.Second
 	// IdleTimeout 与常见反代 keep-alive 上限对齐，避免两侧同时认为连接还活着。
@@ -185,6 +189,7 @@ func run() error {
 		Addr:           addrRouter,
 		FBProxy:        proxy,
 		Rider:          buildRider(db, botToken, hops, now),
+		Dispatch:       buildDispatch(db, botToken, now),
 		TMAStaticDir:   os.Getenv("TMA_STATIC_DIR"),
 		TrustProxyHops: hops,
 	}
@@ -231,6 +236,20 @@ func run() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
+	// N3：先排空在飞派单通知（上限 8s），再关 HTTP 监听。
+	// dispatch 的投递是在响应之后脱离请求生命周期的 goroutine，**不在** httpServer.Shutdown
+	// 的等待范围内；不接线的话发版（RollingUpdate 必发 SIGTERM）会把在飞 sendMessage
+	// 直接杀死，并让去重占位残留满 1 天（同键事件那天再也发不出去）。
+	// Node 的顺序同样如此：drain → close → exit。
+	drainCtx, cancelDrain := context.WithTimeout(context.Background(), dispatchDrain)
+	drainErr := dep.Dispatch.Drain(drainCtx)
+	cancelDrain()
+	if drainErr != nil {
+		// 残余（超 8s 仍没发完的）靠带 order_id 的日志定位补发，不阻断退出。
+		writeLog(os.Stderr, "dispatch_drain_timeout", map[string]any{"detail": drainErr.Error()})
+	}
+
 	if err := httpServer.Shutdown(ctx); err != nil {
 		return fmt.Errorf("优雅退出超时: %w", err)
 	}
@@ -450,6 +469,32 @@ func buildRider(db *sql.DB, botToken string, hops int, now func() time.Time) *ri
 	return rider.New(dep)
 }
 
+// buildDispatch 构造派单 Telegram 通知处理器（T7，server.js 2h 的等价装配）。
+//
+// 三组配置按 Node 的取法各自独立降级：
+//   - secret / botToken：与 Node 同源（FBS_GATEWAY_SECRET、TELEGRAM_BOT_TOKEN，
+//     后者沿用 main 的 DEMO 兜底——Node 也是 `process.env.TELEGRAM_BOT_TOKEN || DEMO_BOT_TOKEN`）；
+//   - gateway：`FBS_GATEWAY_URL && FBS_GATEWAY_SECRET ? {...} : null`，缺一即 null
+//     （降级为无按钮纯文本）；
+//   - DB：没有连接池时传 nil。这**不**等于「未配置」——Node 的 cliConn() 恒返回一个
+//     query 对象（migrate.js:37-52），缺库只在查询时失败，端点照给 202。
+//
+// 与 Node 一样，缺配置不阻断启动：dispatch.New 只把端点标成 notConfigured，
+// 由 /tg-api/internal/dispatch 自己返回 503，/health 仍能探活。
+func buildDispatch(db *sql.DB, botToken string, now func() time.Time) *dispatch.Route {
+	secret := os.Getenv("FBS_GATEWAY_SECRET")
+	dep := dispatch.Dep{
+		Secret:   secret,
+		BotToken: botToken,
+		DB:       db,
+		Now:      now,
+	}
+	if gatewayURL := os.Getenv("FBS_GATEWAY_URL"); gatewayURL != "" && secret != "" {
+		dep.Gateway = gatewayAdapter{cfg: gateway.Config{BaseURL: gatewayURL, Secret: secret, Now: now}}
+	}
+	return dispatch.New(dep)
+}
+
 // splitOrigins 复刻 server.js 对 CORS_ORIGINS 的处理：
 // split(',') → map(s => s.trim()) → filter(Boolean)，即按逗号拆分、去首尾空白、丢掉空项。
 //
@@ -555,6 +600,11 @@ func validateAssembly(bundle *authBundle, dep httpapi.Dep) error {
 	if dep.Rider == nil {
 		missing = append(missing, "Rider")
 	}
+	// 派单通知同理：它只依赖 botToken / 网关 / 库，在「无 auth 的降级装配」下也必须接上。
+	// 漏接的表现是 PHP 挂点收到 404（而不是 503），PHP 侧只看到「通知失败」。
+	if dep.Dispatch == nil {
+		missing = append(missing, "Dispatch")
+	}
 	if bundle != nil {
 		// auth 装配成功时，登录编排 / 令牌 / 凭证三者缺一都会让相关端点静默 503 或恒 401。
 		if bundle.login == nil {
@@ -613,6 +663,12 @@ func (g gatewayAdapter) RiderQL(ctx context.Context, params map[string]any) (map
 // RiderBind 是骑手绑定动作（rider.Route 的 Gateway 接口）。
 func (g gatewayAdapter) RiderBind(ctx context.Context, params map[string]any) (map[string]any, error) {
 	return gateway.RiderBind(ctx, g.cfg, params)
+}
+
+// RiderNotifyURL 是派单通知里「查看订单」按钮用的一次性订单直达 URL
+// （dispatch.Gateway 接口，动作名与 PHP 端白名单一致）。
+func (g gatewayAdapter) RiderNotifyURL(ctx context.Context, params map[string]any) (map[string]any, error) {
+	return gateway.Call(ctx, g.cfg, "rider_notify_url", params)
 }
 
 // —— 数据库 ——

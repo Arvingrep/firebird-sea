@@ -23,6 +23,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/bridge"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/calltest"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/coins"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/dispatch"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fbproxy"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpbody"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/payment"
@@ -80,6 +81,9 @@ type Dep struct {
 	// （POST，三条都是 rider.New 的产物）。配置不齐时它自己返回 503，与 Node
 	// 「无条件挂载、端点内降级」一致；为 nil 表示未装配（测试场景）。
 	Rider *rider.Route
+	// Dispatch 是 /tg-api/internal/dispatch（POST，PHP 派单挂点调用的内部通知口，
+	// dispatch.New 的产物）。同样是无条件挂载、缺配置时端点内 503；为 nil 表示未装配。
+	Dispatch *dispatch.Route
 
 	// TMAStaticDir 为空或目录不存在时不挂载 /tma（Node 的 existsSync 守卫）。
 	TMAStaticDir string
@@ -114,6 +118,7 @@ type Server struct {
 	addr        *addrshare.Router
 	fbProxy     *fbproxy.Proxy
 	rider       *rider.Route
+	dispatch    *dispatch.Route
 	staticDir   string
 	hops        int
 	runCallTest func(context.Context, string, any, calltest.Options) calltest.Result
@@ -164,6 +169,7 @@ func NewServer(d Dep) *Server {
 		addr:        d.Addr,
 		fbProxy:     d.FBProxy,
 		rider:       d.Rider,
+		dispatch:    d.Dispatch,
 		staticDir:   d.TMAStaticDir,
 		// TrustProxyHops 为 0 即「不信任 X-Forwarded-For」，与 express 未配置
 		// trust proxy 时 req.ip == RemoteAddr 的行为一致。
@@ -197,6 +203,7 @@ func (s *Server) Routes() []Route {
 		{Method: "GET", Path: "/tg-api/rider/bind"},
 		{Method: "POST", Path: "/tg-api/rider/bind"},
 		{Method: "POST", Path: "/tg-api/rider/session"},
+		{Method: "POST", Path: "/tg-api/internal/dispatch"},
 		{Method: "GET", Path: "/tg-api/services"},
 		{Method: "POST", Path: "/tg-api/payment/create-charge"},
 		{Method: "POST", Path: "/tg-api/checkout"},
@@ -302,8 +309,8 @@ func (s *Server) build() http.Handler {
 	//   - POST /tg-api/rider/bind 是表单提交：验签 → 手机号归一 → 网关 rider_bind →
 	//     rider_ql → 302 工作台（server.js:464）；
 	//   - POST /tg-api/rider/session 只挂 POST —— initData 是短期凭证，不接受 query 传参
-	//     （避免进访问日志/Referer/浏览器历史）；POST /internal/dispatch 尚未移植，
-	//     见 internal/contract 的 notYetInCode。
+	//     （避免进访问日志/Referer/浏览器历史）。
+	// 4 条骑手线路由至此全部挂上，internal/contract 的 notYetInCode 已清空。
 	// Node 是**无条件挂载**、配置不齐时端点内 503；生产装配（cmd/api）也总会构造
 	// rider.New（缺配置时它是 notConfigured，端点仍 503），所以这里的 nil 判断
 	// 只影响「测试里没注入」的场景。
@@ -311,6 +318,13 @@ func (s *Server) build() http.Handler {
 		mux.HandleFunc("GET /tg-api/rider/bind", s.rider.GetLanding)
 		mux.HandleFunc("POST /tg-api/rider/bind", s.rider.PostBind)
 		mux.HandleFunc("POST /tg-api/rider/session", s.rider.Session)
+	}
+
+	// 10. 派单 Telegram 通知（T7，server.js 2h）：PHP 派单挂点经 nginx 调的内部端点。
+	// 与 rider 同理：Node 无条件挂载、缺配置时端点内 503（不是 404），
+	// 生产装配总会构造 dispatch.New，nil 只对应「测试里没注入」。
+	if s.dispatch != nil {
+		mux.HandleFunc("POST /tg-api/internal/dispatch", s.dispatch.Dispatch)
 	}
 
 	return s.wrap(mux)
