@@ -423,7 +423,9 @@ func credentialProviderOf(bundle *authBundle) func(ctx context.Context, memberID
 // 三组配置按 Node 的取法各自独立降级：
 //   - gateway：`FBS_GATEWAY_URL && FBS_GATEWAY_SECRET ? {...} : null`，缺一即 null；
 //   - 白名单：CORS_ORIGINS 每项取 host（解析失败的项丢弃），与对外 CORS 同一份清单；
-//   - DB：没有连接池时传 nil（Node 的 cliConn() 在缺库时同样不可用）。
+//   - DB：没有连接池时传 nil。这**不**等于 Node 的「未配置」——cliConn() 在缺库时
+//     照样返回一个 query 对象（migrate.js:37-52），失败发生在 spawn；nil 只让查询
+//     报错，端点照 Node 给 200（GET）/ 502（session 查询失败），不是 503。
 //
 // 与 Node 一样，缺配置**不**阻断启动：rider.New 只把端点标成 notConfigured，
 // 由 /tg-api/rider/session 自己返回 503，这样 /health 仍能探活。

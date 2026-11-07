@@ -180,7 +180,6 @@ func TestSessionNotConfiguredReturns503(t *testing.T) {
 	cases := map[string]func(*Dep){
 		"缺 botToken": func(d *Dep) { d.BotToken = "" },
 		"缺网关":        func(d *Dep) { d.Gateway = nil },
-		"缺数据库":       func(d *Dep) { d.DB = nil },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -202,6 +201,26 @@ func TestSessionNotConfiguredReturns503(t *testing.T) {
 				t.Fatalf("Cache-Control 应为 no-store，实际 %q", got)
 			}
 		})
+	}
+}
+
+// TestSessionNilDBReturns502 钉住「没有连接池 = 502，不是 503」。
+//
+// Node 侧 conn 恒非空（server.js:458 传 cliConn()，migrate.js:37-52 无条件返回对象），
+// 缺库时失败发生在 spawn，走 reject → catch → RIDER_FAILED(502)。Go 若因为 db 为 nil
+// 就 503，等于把「查询故障」错报成「未配置」，运维会去查环境变量而不是查数据库。
+func TestSessionNilDBReturns502(t *testing.T) {
+	route := rwRoute(t, func(dep *Dep) { dep.DB = nil })
+	if route.NotConfigured() {
+		t.Fatal("nil DB 不该被判成未配置：Node 的 conn 恒非空")
+	}
+	recorder := rwServe(t, route, rwBody("signed:77"), "")
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("缺 DB 时应为 502（Node 的查询失败语义），实际 %d", recorder.Code)
+	}
+	want := `{"success":false,"error":{"code":"RIDER_FAILED","message":"Service temporarily unavailable"}}`
+	if got := recorder.Body.String(); got != want {
+		t.Fatalf("响应体不符\n got=%s\nwant=%s", got, want)
 	}
 }
 

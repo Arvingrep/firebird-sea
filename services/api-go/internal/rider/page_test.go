@@ -236,12 +236,13 @@ func pgCSPNonce(t *testing.T, csp string) string {
 
 // —— 3. 503 门禁：四类缺失（行为清单第 1、2 条）——
 
-// TestLandingNotConfiguredGates 逐个拆依赖，证明「任一缺失即 503」。
+// TestLandingNotConfiguredGates 逐个拆依赖，证明「缺 botToken / 缺网关即 503」。
 // 顺序照 Node createRiderRoute 的 missing 顺序（riderRoute.js:124-129）。
 //
-// 第四个条件「initData 验签模块未装」在 Go 侧结构上不可达：validate 永远有默认实现
-// （tgauth.Validate），nil 表示「用默认」而不是「没装」。这一条单独由
-// TestLandingNilValidateFallsBackToDefault 钉住，属已知且刻意的结构差异。
+// 另外两条**不是**门禁，各有专门用例：
+//   - 「initData 验签模块未装」在 Go 侧结构上不可达（validate 恒有默认实现），
+//     见 TestLandingNilValidateFallsBackToDefault；
+//   - 「DB 空」在 Node 侧也不可达（conn 恒非空），见 TestLandingNilDBStillServes。
 func TestLandingNotConfiguredGates(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -249,7 +250,6 @@ func TestLandingNotConfiguredGates(t *testing.T) {
 	}{
 		{name: "botToken 空", mutate: func(dep *Dep) { dep.BotToken = "" }},
 		{name: "网关未配", mutate: func(dep *Dep) { dep.Gateway = nil }},
-		{name: "DB 空", mutate: func(dep *Dep) { dep.DB = nil }},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -264,7 +264,8 @@ func TestLandingNotConfiguredGates(t *testing.T) {
 			if recorder.Code != http.StatusServiceUnavailable {
 				t.Fatalf("%s 时 GET 应为 503，实际 %d", testCase.name, recorder.Code)
 			}
-			// GET 自身不用 DB/网关，但仍受它们门禁——这是 Node 的实际行为。
+			// GET 自身不用网关，但仍受它门禁——这是 Node 的实际行为
+			// （riderRoute.js:123-132 构造期算好，getLanding 第 159 行直接复用）。
 			pgAssertSameBytes(t, testCase.name+" 的错误页", recorder.Body.String(), pgGolden(t, "error-503.golden"))
 			pgAssertErrorHeaders(t, recorder, "")
 
@@ -276,6 +277,28 @@ func TestLandingNotConfiguredGates(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLandingNilDBStillServes 钉住「DB 不是门禁」这条 Node 事实。
+//
+// Node 的 conn 恒非空：server.js:458 传 cliConn()，它无条件返回一个 query 对象
+// （migrate.js:37-52），DB_HOST 缺失只会在真正 spawn 时失败。所以 riderRoute.js:128
+// 的 `if (!conn)` 在生产装配里是死代码，缺库时 GET 照样 200。
+// Go 早期把 nil DB 当门禁，凭空造出一条 Node 没有的 503（真双进程对拍：Node 200 / Go 503），
+// 这条用例钉死回归。
+func TestLandingNilDBStillServes(t *testing.T) {
+	route := rwRoute(t, func(dep *Dep) {
+		dep.DB = nil
+		dep.Nonce = pgFixedNonce
+	})
+	if route.NotConfigured() {
+		t.Fatal("nil DB 不该被判成未配置：Node 的 conn 恒非空")
+	}
+	recorder := pgGetLanding(t, route)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("缺 DB 时落地页应为 200（Node 行为），实际 %d", recorder.Code)
+	}
+	pgAssertSameBytes(t, "缺 DB 时的落地页 body", recorder.Body.String(), pgGolden(t, "landing.golden"))
 }
 
 // TestLandingNilValidateFallsBackToDefault 记录第四道门禁的结构差异：

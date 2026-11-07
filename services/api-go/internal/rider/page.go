@@ -162,10 +162,12 @@ func landingCSP(nonce string) string {
 //
 // 只挂 GET —— Node 是 router.get（server.js:463），POST 由 PostBind 处理。
 func (r *Route) GetLanding(w http.ResponseWriter, req *http.Request) {
-	// 老规矩先判 notConfigured：四个条件（botToken / 验签模块 / 网关 / DB）任一缺失即 503，
-	// 且这一判断在**任何**业务分支之前。GET 自己不用 DB 也不用网关，但仍然受它们门禁 ——
-	// 这是 Node 的实际行为（riderRoute.js:123-132 在构造期算好，getLanding 第 159 行直接复用），
-	// 不是笔误。同理**不**能把 GET 做成「先出页面、配置坏了再报」：配置半残时落地页
+	// 老规矩先判 notConfigured，且这一判断在**任何**业务分支之前。
+	// 只有两条门禁真实可达：botToken 与网关。GET 自己不用网关，但也受它门禁 ——
+	// 这是 Node 的实际行为（riderRoute.js:123-132 在构造期算好，getLanding 第 159 行复用）。
+	// DB **不是**门禁：Node 的 conn 恒非空（cliConn 无条件返回对象，migrate.js:37-52），
+	// riderRoute.js:128 的 `if (!conn)` 是死代码，缺库时 Node 照样给 200。
+	// 同理**不**能把 GET 做成「先出页面、配置坏了再报」：botToken/网关半残时落地页
 	// 收得了手机号却提交不了，比 503 更难排查。
 	if r.notConfigured {
 		r.sendErrorPage(w, http.StatusServiceUnavailable, CodeNotConfigured, notConfiguredMessage)

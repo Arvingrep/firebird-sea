@@ -76,7 +76,10 @@ type Dep struct {
 	// ValidateInitData 可注入；nil 时走 tgauth.Validate（1h 时效，与 Node 的
 	// telegramAuth 的 MAX_AUTH_AGE_SECONDS = 3600 一致）。
 	ValidateInitData func(initData, botToken string) tgauth.Result
-	// DB 是 fbs_courier_map 的只读连接池；nil 视为未配置（Node 的 conn 为空）。
+	// DB 是 fbs_courier_map 的只读连接池。nil **不是**「未配置」：Node 的 cliConn()
+	// 不管有没有 DB_HOST 都会返回一个 query 对象（migrate.js:37-52），缺库只在真正
+	// spawn 时失败，于是 riderRoute.js:128 的 `if (!conn)` 在生产装配里是死代码。
+	// Go 侧同理——nil 只让查询失败（见 courierID），端点不会因此 503。
 	DB *sql.DB
 	// Gateway 为 nil 表示 FBS_GATEWAY_URL / FBS_GATEWAY_SECRET 没配齐
 	// （Node 的 `process.env.X && process.env.Y ? {...} : null`）。
@@ -132,18 +135,22 @@ func New(d Dep) *Route {
 		nonce = htmlpage.NewNonce
 	}
 
-	// 缺失项清单与 Node 同序（Node: botToken → validateInitData → gateway → conn）。
-	// 注意 Go 侧的「initData 验签模块未装」这一条结构上不可达：validate 永远有默认实现
-	// （tgauth.Validate），Node 那条 `if (!validateInitData)` 只对应「模块没 require 到」。
+	// 缺失项清单与 Node 同序（Node: botToken → validateInitData → gateway → conn），
+	// 但四条里只有前两条在两侧都真实可达：
+	//   - 「initData 验签模块未装」：Go 的 validate 永远有默认实现（tgauth.Validate），
+	//     nil 表示「用默认」而不是「没装」；Node 那条 `if (!validateInitData)` 只对应
+	//     「模块没 require 到」。
+	//   - 「DB 空」：Node 的 conn 恒非空——server.js:458 传的是 cliConn()，它无条件
+	//     返回一个 query 对象（migrate.js:37-52）。缺 DB_HOST 时 Node 给的是 200（GET）
+	//     和 502（session 查询失败），riderRoute.js:128 的 `if (!conn)` 是死代码。
+	//     这条曾经被做成门禁，凭空多出一条 Node 没有的 503，已被真双进程对拍抓到
+	//     （缺 DB：Node 200 / Go 503），别再改回去。
 	var missing []string
 	if d.BotToken == "" {
 		missing = append(missing, "TELEGRAM_BOT_TOKEN")
 	}
 	if d.Gateway == nil {
 		missing = append(missing, "FBS_GATEWAY_URL / FBS_GATEWAY_SECRET")
-	}
-	if d.DB == nil {
-		missing = append(missing, "DB_HOST")
 	}
 
 	// 白名单条目一律小写（Node: allowedHosts.map(h => String(h).toLowerCase())）。
@@ -259,6 +266,12 @@ func tgIDString(verified tgauth.Result) (string, error) {
 // courierID 查 fbs_courier_map 得到 courier_id。第二个返回值为 false 表示「未绑定」
 // （含无行、NULL、值不是正的安全整数三种形态，与 Node 的 firstInt 一致）。
 func (r *Route) courierID(ctx context.Context, tgUserID int64) (int64, bool, error) {
+	// 没有连接池 = Node 里 cliConn 的 spawn 失败（可执行文件缺失 / 非 0 退出）。
+	// 那条路径在 Node 是 Promise reject → session 的 catch → 502，不是 503；
+	// 这里必须跟着走 502，否则把「查询故障」错报成「未配置」。
+	if r.db == nil {
+		return 0, false, errors.New("db not configured")
+	}
 	var raw sql.NullString
 	// tg_user_id 走 ? 绑定参数：Node 靠「只可能是数字」的正则保证安全（把数字直接拼进
 	// SQL），Go 侧改成绑定参数，两条路都堵上。参数类型是 int64，与 Node 的数字字面量同型。
