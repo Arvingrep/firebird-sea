@@ -22,6 +22,12 @@ on:
         required: true
         default: 'canary'
 
+# canary 同时被多个 agent 推送。串行化构建，保证「最后写回 values 的那次」
+# 一定是最新提交的那次；否则旧 run 可能后完成，把 tag 钉回旧镜像。
+concurrency:
+  group: ci-build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   helm-lint:
     runs-on: ubuntu-latest
@@ -36,9 +42,14 @@ jobs:
   build-and-push:
     needs: helm-lint
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary'
+    # 步骤 5 产出的 bot commit 带 [skip ci]：GitHub 本身不会再起 run，
+    # 这里再挡一层，避免有人改了 paths-ignore 或手动 dispatch 后重复构建、反复写回。
+    if: >-
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/canary')
+      && !contains(github.event.head_commit.message || '', '[skip ci]')
     permissions:
-      contents: read
+      # 步骤 5 需要把「本次镜像的不可变 tag」写回 values-canary.yaml 并 bot 提交。
+      contents: write
       actions: write # 必须具备此权限，GitHub Actions 才能将 Docker 构建缓存持久化至 Caches 页面
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -159,3 +170,105 @@ jobs:
             --cache-from "$TGBOT_IMAGE_LATEST" \
             --cache-to type=gha,mode=max,scope=firebird-tgbot \
             -t "$TGBOT_IMAGE_TAG" -t "$TGBOT_IMAGE_LATEST" -f deploy/docker/Dockerfile.tgbot .
+
+      # ── 5. canary 的「部署」原来和「镜像产出」没有因果关系 ──────────────────
+      # 2026-11-07 事故：Deployment 引用浮动 tag `:canary`，ArgoCD 只在 git 里
+      # manifest 变化时同步。那次 ArgoCD 03:30:01 同步完成，镜像 03:30:42 才推上去，
+      # Pod 拉到上一版 digest（8e69481…）后 git 再没变过，于是永远停在旧镜像，
+      # 骑手入口 /tg-api/rider/bind 直接 404。而且纯代码提交根本不会触发任何部署。
+      #
+      # 修法：CI 每轮已经推了不可变 tag `canary-<sha12>`（上面 PRIMARY），只是没人引用。
+      # 构建成功后把它写回 values-canary.yaml —— ArgoCD 看到这个 bot commit 时，
+      # 镜像必定已存在，顺序天然正确；git 里写的 tag 就是线上跑的镜像，可追溯、可回滚。
+      # bot commit 带 [skip ci]，GitHub 不会为它再起一次构建，不会形成写回循环。
+      #
+      # ⚠️ 生效范围（实测过 helm template + ArgoCD 参数）：firebird-canary 这个
+      # Application 还有一组 spec.source.helm.parameters，把 image.tag / api.image.tag
+      # 静态钉在 canary-91a71bf3e298 等旧 sha；Helm 参数优先于 values 文件，所以那两个键
+      # 写回也不生效。本步骤真正修的是**没被覆盖**的 api.goImage.tag 和 tgBot.image.tag
+      # —— 线上正是这两个还挂着浮动 `:canary`（firebird-api-go:canary / tg-bot:canary），
+      # 404 就出在前者。若将来清掉那组 parameters，这 4 个键会一起生效。
+      - name: 5. 钉住 canary 镜像 tag（GitOps 写回）
+        if: >-
+          github.ref == 'refs/heads/canary'
+          && github.event_name == 'push'
+          && !contains(github.event.head_commit.message || '', '[skip ci]')
+        run: |
+          set -euo pipefail
+          SHA="${{ github.sha }}"
+          TAG="canary-${SHA:0:12}"
+          FILE="deploy/helm/firebird-site/values-canary.yaml"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 多个 agent 并发推 canary，写回可能被顶掉；每次重新 fetch 到最新 tip 再试。
+          for attempt in 1 2 3 4 5; do
+            # 显式 refspec：actions/checkout 是浅克隆，不能假定 refs/remotes/origin/canary 一定存在。
+            git fetch --quiet origin "+canary:refs/remotes/origin/canary"
+            git checkout --quiet -B canary-pin "origin/canary"
+
+            if grep -qF "tag: \"$TAG\"" "$FILE"; then
+              echo "✅ $TAG 已写回过，跳过（幂等）"
+              exit 0
+            fi
+
+            # 同时匹配「浮动 canary」和「上一轮写回的 canary-<sha12>」——
+            # 只匹配前者的话，第二次构建会因为一个都替换不到而失败。
+            # nginx:alpine 之类外部镜像的 tag 一律不动。
+            # 目前恰好 4 处：image（php + baked nginx）、api.image、api.goImage、tgBot.image。
+            sed -i -E "s/tag: \"canary(-[0-9a-f]{12})?\"/tag: \"$TAG\"/g" "$FILE"
+            n=$(grep -cF "tag: \"$TAG\"" "$FILE" || true)
+            if [ "$n" -ne 4 ]; then
+              echo "❌ 期望钉住 4 个 tag，实际 $n 个 —— values 结构变了，停止写回以免半钉状态"
+              exit 1
+            fi
+
+            git add "$FILE"
+            git commit -q -m "chore(deploy): canary 镜像钉到 $TAG [skip ci]"
+            if git push origin HEAD:canary; then
+              echo "✅ 已写回 $TAG；ArgoCD 将同步到这个 revision，镜像已就绪"
+              exit 0
+            fi
+            echo "⚠️ 第 $attempt 次写回撞上并发推送，重试"
+            sleep 5
+          done
+          echo "❌ 写回失败：canary 持续被并发推送顶掉"
+          exit 1
+
+      # ── 6. 部署后闸门 ────────────────────────────────────────────────────
+      # 上面只保证「镜像一定存在且被钉住」，不保证服务真的能响应。
+      # 这次 404 是用户发现的，不是流水线发现的 —— 补一道自动闸门。
+      # 集群内还有 templates/job-smoke-api.yaml 的 PostSync hook 做更严格的检查；
+      # 这里从公网再打一次，覆盖 ingress / Cloudflare / 站点证书这一整条链路。
+      - name: 6. 部署后冒烟（骑手入口）
+        if: >-
+          github.ref == 'refs/heads/canary'
+          && github.event_name == 'push'
+          && !contains(github.event.head_commit.message || '', '[skip ci]')
+        run: |
+          set -u
+          URL="https://canary.fbird.men"
+          DEADLINE=600
+          start=$(date +%s)
+          ok=0
+          while :; do
+            page=$(curl -fsS -m 15 "$URL/tg-api/rider/bind" 2>/dev/null || true)
+            code=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$URL/tg-api/rider/bind" || true)
+            sess=$(curl -s -o /dev/null -m 15 -w '%{http_code}' -X POST \
+                     "$URL/tg-api/rider/session" \
+                     -H 'Content-Type: application/json' -d '{}' || true)
+            echo "[gate] rider/bind=$code  session=$sess  page_chars=${#page}"
+            if [ "$code" = "200" ] && [ "$sess" = "401" ] \
+               && printf '%s' "$page" | grep -qF '<title>骑手绑定</title>' \
+               && printf '%s' "$page" | grep -qF 'name="phone"'; then
+              ok=1; break
+            fi
+            [ $(( $(date +%s) - start )) -ge "$DEADLINE" ] && break
+            sleep 10
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "❌ 部署后冒烟失败：${DEADLINE}s 内骑手入口未就绪。"
+            echo "   检查 ArgoCD 是否同步到本次 bot commit、Pod 是否拉到 canary-${{ github.sha }} 的前 12 位镜像。"
+            exit 1
+          fi
+          echo "✅ 骑手入口已就绪"

@@ -1,0 +1,107 @@
+{{- if .Values.smokeTest.api.enabled }}
+# ArgoCD PostSync 冒烟（API 服务）。
+#
+# 为什么不能复用 job-smoke-test.yaml：那个 Job 打的是 firebird-<site>:80（Web 服务），
+# 而 /tg-api 由 IngressRoute 直接转给 firebird-api-<site>:3000，Web 服务上根本没有这些路径。
+#
+# 2026-11-07 事故：canary 跑的是上一版 Go 镜像，/tg-api/rider/bind 一直 404，
+# 但 Pod Ready、Web 冒烟全绿、ArgoCD Synced —— 没有任何一道闸门发现。
+# 这里在每次同步后真实打 API：既验状态码，也验页面指纹（404 的纯文本过不了 marker），
+# 再用 POST 证明验签分支活着。失败即 Job 失败 → ArgoCD 把这次同步标红。
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: firebird-api-smoke-{{ .Values.siteId }}
+  labels:
+    app: firebird-api-smoke
+    site: {{ .Values.siteId }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ add (.Values.smokeTest.api.timeoutSeconds | default 180) 30 }}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: firebird-api-smoke
+        site: {{ .Values.siteId }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: smoke
+          image: curlimages/curl:8.11.1
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits: { memory: 32Mi }
+          env:
+            - name: API_BASE
+              value: "http://firebird-api-{{ .Values.siteId }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.api.service.port | default 3000 }}"
+            - name: DEADLINE
+              value: {{ .Values.smokeTest.api.timeoutSeconds | default 180 | quote }}
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -u
+              start=$(date +%s)
+              fail=0
+
+              # 轮询到期望结果为止；PostSync 时可能还在滚动发布，不能一次失败就判死。
+              # marker 是关键：只看状态码的话，一个「恰好也返回 200」的错误页会蒙混过关。
+              probe() {
+                label="$1"; path="$2"; want="$3"; marker="$4"; method="$5"; data="$6"
+                ok=0
+                while :; do
+                  if [ "$method" = "POST" ]; then
+                    body=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
+                             --data "$data" "${API_BASE}${path}" || true)
+                    code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' -X POST \
+                             -H 'Content-Type: application/json' --data "$data" \
+                             "${API_BASE}${path}" || true)
+                  else
+                    body=$(curl -s -m 10 "${API_BASE}${path}" || true)
+                    code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "${API_BASE}${path}" || true)
+                  fi
+                  if [ "$code" = "$want" ] && printf '%s' "$body" | grep -qF "$marker"; then
+                    echo "[api-smoke] OK   ${label} ${path} -> ${code} (${marker})"
+                    ok=1; break
+                  fi
+                  [ $(( $(date +%s) - start )) -ge "$DEADLINE" ] && break
+                  sleep 5
+                done
+                if [ "$ok" -ne 1 ]; then
+                  echo "[api-smoke] FAIL ${label} ${path} -> ${code}，期望 ${want} 且含 ${marker}"
+                  printf '%s\n' "$body" | head -c 300
+                  echo
+                  fail=1
+                fi
+              }
+
+              probe "健康检查"   "/tg-api/health"            "200" '"status"'                  GET  ''
+              probe "骑手落地页" "/tg-api/rider/bind"        "200" '<title>骑手绑定</title>'   GET  ''
+              probe "session 验签" "/tg-api/rider/session"    "401" 'INVALID_INIT_DATA'       POST '{"initData":""}'
+              probe "dispatch 验签" "/tg-api/internal/dispatch" "401" 'BAD_SIGNATURE'         POST '{}'
+
+              # 落地页的另外两个表单字段与 CSP：少一个都说明跑的不是我们要的那版页面。
+              page=$(curl -s -m 10 "${API_BASE}/tg-api/rider/bind" || true)
+              for marker in 'name="initData"' 'name="phone"' 'action="/tg-api/rider/bind"'; do
+                if printf '%s' "$page" | grep -qF "$marker"; then
+                  echo "[api-smoke] OK   页面含 ${marker}"
+                else
+                  echo "[api-smoke] FAIL 页面缺 ${marker}"
+                  fail=1
+                fi
+              done
+              headers=$(curl -s -D - -o /dev/null -m 10 "${API_BASE}/tg-api/rider/bind" | tr -d '\r' || true)
+              if printf '%s' "$headers" | grep -qi '^content-security-policy:' \
+                 && printf '%s' "$headers" | grep -qF "'nonce-"; then
+                echo "[api-smoke] OK   CSP 带 nonce"
+              else
+                echo "[api-smoke] FAIL CSP 缺 nonce"
+                fail=1
+              fi
+
+              exit $fail
+{{- end }}
