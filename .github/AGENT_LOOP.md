@@ -13,8 +13,17 @@
 
 M0 没全部关闭之前，codex 不领任何任务；gemini 可以先整理 M1 的规则。
 
+## 工作目录（必须遵守）
+多个 agent 在同一台电脑上运行，**不能共用同一个目录**，否则会互相覆盖未提交的改动。每个 agent 只在自己的 worktree 里工作：
+```
+WT=~/Documents/firebird-sea-agents/<你的名字>
+[ -d "$WT" ] || git -C ~/Documents/firebird-sea worktree add --detach "$WT" origin/canary
+cd "$WT"
+```
+之后所有 git 操作都在 `$WT` 里进行。`~/Documents/firebird-sea` 是 Arvin 自己的目录，不要在里面改文件、切分支。
+
 ## 每轮流程
-1. `git fetch`，基于最新的 `origin/canary`。仓库根目录有 `STOP` 文件就结束。
+1. `git fetch`，基于最新的 `origin/canary`。`~/Documents/firebird-sea` 根目录有 `STOP` 文件就结束。
 2. 按分工找 issue：打开状态；没有「状态/进行中」「状态/待审核」「阻塞」；没有其他 `agent/*` 标签；里程碑按 M0 → M1 → … 顺序，同一里程碑取编号最小的。找不到就结束。
 3. 领取：加「状态/进行中」和自己的 `agent/<名字>` 标签。重新读一次这个 issue，如果出现了别的 `agent/*` 标签，说明撞车了：撤掉自己的两个标签，换下一个。
 4. 在评论里写本轮计划（3–6 步）。
