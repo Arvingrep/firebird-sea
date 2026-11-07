@@ -214,6 +214,18 @@ func IssueSession(ctx context.Context, cfg Config, params map[string]any) (map[s
 	return Call(ctx, cfg, "issue_session", params)
 }
 
+// RiderBind 是骑手绑定（T6）：PHP 侧按归一后手机号查唯一可用骑手、做冲突检查
+// （绝不静默顶替）、按 tg/phone/ip 三维度限频并写审计。业务失败走非 2xx，
+// 调用方靠 *Error 的 Status + Payload.error.code 还原用户提示（见 internal/rider）。
+func RiderBind(ctx context.Context, cfg Config, params map[string]any) (map[string]any, error) {
+	return Call(ctx, cfg, "rider_bind", params)
+}
+
+// RiderQL 签一个短期一次性工作台直达 URL（ql.html 落地种骑手 cookie）。
+func RiderQL(ctx context.Context, cfg Config, params map[string]any) (map[string]any, error) {
+	return Call(ctx, cfg, "rider_ql", params)
+}
+
 // ---- 响应字段读取 ----
 //
 // 网关响应是任意 JSON：encoding/json 把数字解成 float64，而测试替身常直接塞

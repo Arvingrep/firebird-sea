@@ -184,7 +184,7 @@ func run() error {
 		Bridge:         bridgeRoute,
 		Addr:           addrRouter,
 		FBProxy:        proxy,
-		Rider:          buildRider(db, botToken, now),
+		Rider:          buildRider(db, botToken, hops, now),
 		TMAStaticDir:   os.Getenv("TMA_STATIC_DIR"),
 		TrustProxyHops: hops,
 	}
@@ -418,22 +418,29 @@ func credentialProviderOf(bundle *authBundle) func(ctx context.Context, memberID
 	return bundle.creds.Provide
 }
 
-// buildRider 构造骑手 session 处理器（T6，server.js 2g 的等价装配）。
+// buildRider 构造骑手绑定/工作台处理器（T6，server.js 2g 的等价装配）。
 //
-// 三组配置按 Node 的取法各自独立降级：
+// 四组配置按 Node 的取法各自独立降级：
 //   - gateway：`FBS_GATEWAY_URL && FBS_GATEWAY_SECRET ? {...} : null`，缺一即 null；
 //   - 白名单：CORS_ORIGINS 每项取 host（解析失败的项丢弃），与对外 CORS 同一份清单；
+//   - 限频：`createLimiter({ max: TMA_RIDER_MAX || 10, windowSeconds: 60 })`，按客户端 IP 分桶；
 //   - DB：没有连接池时传 nil。这**不**等于 Node 的「未配置」——cliConn() 在缺库时
 //     照样返回一个 query 对象（migrate.js:37-52），失败发生在 spawn；nil 只让查询
 //     报错，端点照 Node 给 200（GET）/ 502（session 查询失败），不是 503。
 //
 // 与 Node 一样，缺配置**不**阻断启动：rider.New 只把端点标成 notConfigured，
-// 由 /tg-api/rider/session 自己返回 503，这样 /health 仍能探活。
-func buildRider(db *sql.DB, botToken string, now func() time.Time) *rider.Route {
+// 由各端点自己返回 503，这样 /health 仍能探活。
+func buildRider(db *sql.DB, botToken string, hops int, now func() time.Time) *rider.Route {
 	dep := rider.Dep{
 		BotToken:     botToken,
 		DB:           db,
 		AllowedHosts: rider.AllowedHostsFromOrigins(splitOrigins(os.Getenv("CORS_ORIGINS"))),
+		// 限流分桶键必须与 httpapi 的 clientKey 同源（TRUST_PROXY_HOPS），否则同一客户端
+		// 在「按 XFF 分桶」和「按 RemoteAddr 分桶」之间来回跳，额度形同双份。
+		TrustProxyHops: hops,
+		// 10 次/分钟与本项目其它写接口同一量级：绑定是低频动作，正常用户不会触发；
+		// 而 PHP 侧另有 tg/phone/ip 三维度底账，这一层只挡「同一来源的快速重放」。
+		Allow: token.NewLimiter(envInt("TMA_RIDER_MAX", 10), time.Minute, now),
 	}
 	gatewayURL := os.Getenv("FBS_GATEWAY_URL")
 	secret := os.Getenv("FBS_GATEWAY_SECRET")
@@ -600,7 +607,12 @@ func (g gatewayAdapter) IssueSession(ctx context.Context, params map[string]any)
 
 // RiderQL 是骑手工作台直达 URL 的动作（rider.Route 的 Gateway 接口）。
 func (g gatewayAdapter) RiderQL(ctx context.Context, params map[string]any) (map[string]any, error) {
-	return gateway.Call(ctx, g.cfg, "rider_ql", params)
+	return gateway.RiderQL(ctx, g.cfg, params)
+}
+
+// RiderBind 是骑手绑定动作（rider.Route 的 Gateway 接口）。
+func (g gatewayAdapter) RiderBind(ctx context.Context, params map[string]any) (map[string]any, error) {
+	return gateway.RiderBind(ctx, g.cfg, params)
 }
 
 // —— 数据库 ——

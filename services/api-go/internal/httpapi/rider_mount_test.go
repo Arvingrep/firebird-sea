@@ -106,19 +106,59 @@ func TestRiderLandingMounted(t *testing.T) {
 		t.Fatalf("Cache-Control 应为 no-store，实际 %q", got)
 	}
 
-	// ③ POST /tg-api/rider/bind 尚未移植（见 internal/contract 的 notYetInCode），
-	// 这里只钉住「不会被 GET 处理器接走」。
+	// ③ POST 已移植：空 initData 走真实验签 → 401 错误页。
+	// 这条同时证明「POST 没被 GET 处理器接走」（GET 处理器对空方法也给 200 落地页）。
 	postRecorder := httptest.NewRecorder()
-	configured.Handler().ServeHTTP(postRecorder, httptest.NewRequest(http.MethodPost, "/tg-api/rider/bind", strings.NewReader("")))
-	if postRecorder.Code == http.StatusOK {
-		t.Fatalf("POST /tg-api/rider/bind 尚无实现，不该返回 200（实际 %d）", postRecorder.Code)
+	postRequest := httptest.NewRequest(http.MethodPost, "/tg-api/rider/bind", strings.NewReader("phone=09171234567"))
+	postRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	configured.Handler().ServeHTTP(postRecorder, postRequest)
+	if postRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("POST /tg-api/rider/bind（空 initData）应 401，实际 %d（body=%s）",
+			postRecorder.Code, postRecorder.Body.String())
+	}
+	if !strings.Contains(postRecorder.Body.String(), "INVALID_INIT_DATA") {
+		t.Fatalf("401 错误页应含错误码 INVALID_INIT_DATA，实际 body=%s", postRecorder.Body.String())
+	}
+	if got := postRecorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("错误页 Cache-Control 应为 no-store，实际 %q", got)
+	}
+}
+
+// TestRiderBindPostMounted 证明 POST /tg-api/rider/bind 真的接在 mux 上。
+//
+// 与上一条同理，验的是装配而不是处理器行为（处理器行为在 internal/rider）：
+// 万一 build() 漏挂或写成 GET，包级测试全绿而线上 404。这里用「未配置 → 503」
+// 作为探针，因为它不需要真网关与真 initData。
+func TestRiderBindPostMounted(t *testing.T) {
+	unconfigured := pcServer(t, func(dep *Dep) {
+		dep.Rider = rider.New(rider.Dep{Logf: func(string) {}})
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/tg-api/rider/bind",
+		strings.NewReader("initData=x&phone=09171234567"))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	unconfigured.Handler().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("POST /tg-api/rider/bind 应已挂载并返回 503（未配置），实际 %d（body=%s）",
+			recorder.Code, recorder.Body.String())
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
+		t.Fatalf("错误页 Content-Type = %q", got)
+	}
+	if !strings.Contains(recorder.Body.String(), "RIDER_NOT_CONFIGURED") {
+		t.Fatalf("503 错误页应含错误码，实际 body=%s", recorder.Body.String())
 	}
 }
 
 // landingGateway 只为让 rider.Route 过「网关已配置」这道门禁；
-// GET 落地页不会调用它（rider 包里的用例证明网关未被触达）。
+// GET 落地页与 POST 的 401 分支都不会调用它（rider 包里的用例证明网关未被触达）。
 type landingGateway struct{}
 
 func (landingGateway) RiderQL(context.Context, map[string]any) (map[string]any, error) {
 	return nil, errors.New("落地页不该调用网关")
+}
+
+func (landingGateway) RiderBind(context.Context, map[string]any) (map[string]any, error) {
+	return nil, errors.New("空 initData 不该触达网关")
 }

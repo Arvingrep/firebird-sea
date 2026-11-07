@@ -58,6 +58,13 @@ func (g testGateway) RiderQL(ctx context.Context, params map[string]any) (map[st
 	return gateway.Call(ctx, g.cfg, "rider_ql", params)
 }
 
+// RiderBind 只为满足 Gateway 接口（session 端点不调它）。
+// 真正测 POST /rider/bind 的假网关在 bind_test.go：那边的替身按 action 分派，
+// 且会记录每次调用的参数。
+func (g testGateway) RiderBind(ctx context.Context, params map[string]any) (map[string]any, error) {
+	return gateway.Call(ctx, g.cfg, "rider_bind", params)
+}
+
 // rwGatewayReply 是假网关的一次响应。
 type rwGatewayReply struct {
 	status int

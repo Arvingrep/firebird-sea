@@ -40,7 +40,7 @@ func startupDep(now func() time.Time) httpapi.Dep {
 		Payments: payment.New(payment.Dep{Now: now}),
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: nil,
-		Rider:    buildRider(nil, "123456:TEST", now),
+		Rider:    buildRider(nil, "123456:TEST", 0, now),
 		Logf:     func(string) {},
 	}
 }

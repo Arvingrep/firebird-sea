@@ -93,7 +93,7 @@ func buildTestAssembly(t *testing.T) assembly {
 		Bridge:         bridgeRoute,
 		Addr:           addrRouter,
 		FBProxy:        proxy,
-		Rider:          buildRider(db, botToken, now),
+		Rider:          buildRider(db, botToken, 0, now),
 		TrustProxyHops: 0,
 	}
 	return assembly{bundle: bundle, dep: dep, bridge: bridgeRoute}
@@ -179,7 +179,7 @@ func TestSelfCheckAssemblyDegradesWithoutAuth(t *testing.T) {
 		Payments: payment.New(payment.Dep{Now: now}),
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: func(http.ResponseWriter, *http.Request) {},
-		Rider:    buildRider(nilDB, "123456:TEST", now),
+		Rider:    buildRider(nilDB, "123456:TEST", 0, now),
 	}
 	if err := validateAssembly(nil, dep); err != nil {
 		t.Fatalf("无 auth 的降级装配不该报错：%v", err)
@@ -218,7 +218,7 @@ func TestSelfCheckAssemblyAllowsNoDatabase(t *testing.T) {
 		Payments: payment.New(payment.Dep{Now: now}),
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: nil,
-		Rider:    buildRider(nilDB, "123456:TEST", now),
+		Rider:    buildRider(nilDB, "123456:TEST", 0, now),
 	}
 	if err := validateAssembly(nil, dep); err != nil {
 		t.Fatalf("无库启动是文档化模式，装配校验不该拦：%v", err)

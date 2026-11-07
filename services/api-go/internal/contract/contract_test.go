@@ -59,7 +59,7 @@ var notYetInCode = map[string]struct{}{
 	// Go 版待移植；在那之前 canary 的 api.engine 必须保持 node。
 	// POST /tg-api/rider/session 已移植（internal/rider），故不在本表内。
 	// GET /tg-api/rider/bind 也已移植（internal/rider/page.go），同样不在本表内。
-	"POST /tg-api/rider/bind":        {},
+	// POST /tg-api/rider/bind 已移植（internal/rider/bind.go），同样不在本表内。
 	"POST /tg-api/internal/dispatch": {},
 }
 

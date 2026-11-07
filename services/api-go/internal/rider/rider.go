@@ -1,22 +1,26 @@
 // Package rider 是骑手侧 Telegram 接口的 Go 版移植。
 //
-// 已移植两条：
-//   - **GET /tg-api/rider/bind**（落地页，本文件之外的 page.go）
+// 已移植三条（Node 侧都在 riderRoute.js 里）：
+//   - **GET /tg-api/rider/bind**（落地页，page.go）
+//   - **POST /tg-api/rider/bind**（initData 验签 → 手机号归一 → 网关 rider_bind →
+//     rider_ql → 302 工作台，bind.go）
 //   - **POST /tg-api/rider/session**（已绑定骑手换工作台直达 URL，本文件）
 //
-// 尚未移植：POST /tg-api/rider/bind、POST /tg-api/internal/dispatch（不在本次范围）。
+// 尚未移植：POST /tg-api/internal/dispatch（不在本次范围）。
 //
 // 真值来源固定为三份，改任何一行前都必须读原文，不许凭印象：
-//   - services/api/src/riderRoute.js 的 session()（第 245-265 行）、getLanding()
-//     （第 158-170 行）、renderLandingPage / renderErrorPage（第 33-98 行）与
-//     isAllowedTarget()（第 143-149 行）
-//   - docs/api/openapi.yaml 的 /tg-api/rider/session 与 /tg-api/rider/bind
-//   - services/api/test/rider-route.test.js 里标 session / 落地页的用例
+//   - services/api/src/riderRoute.js 的 postBind()（第 199-241 行）、sendBindError()
+//     （第 176-197 行）、normalizePhone()（第 23-29 行）、session()（第 245-265 行）、
+//     getLanding()（第 158-170 行）、renderLandingPage / renderErrorPage（第 33-98 行）
+//     与 isAllowedTarget()（第 143-149 行）
+//   - docs/api/openapi.yaml 的 /tg-api/rider/bind 与 /tg-api/rider/session
+//   - services/api/test/rider-route.test.js 里标 bind / session / 落地页的用例
 //
 // 硬约束（与 Node 逐条一致）：
 //   - initData 只从 POST body 取，不接受 query 传参：它是短期凭证，一旦进 URL 就会进
 //     访问日志 / Referer / 浏览器历史。
-//   - initData 原文与工作台直达 URL（含一次性 token）**一律不进日志**，日志只记错误消息。
+//   - initData 原文、手机号、工作台直达 URL（含一次性 token）**一律不进日志**，
+//     日志只记错误消息（截断 300）。
 //   - 302/Location 那套白名单校验在这里用于「回给调用方的 url」：只接受 https，且
 //     白名单非空时 host 必须在白名单内；白名单为空时只校验 https（fail-open，
 //     Node 刻意如此，生产属配置风险，构造期会 warn 一行）。
@@ -29,6 +33,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -63,9 +68,14 @@ const (
 // digitsPattern 对应 Node 的 /^\d+$/：tgId 只允许纯数字。
 var digitsPattern = regexp.MustCompile(`^\d+$`)
 
-// Gateway 是 session 唯一用到的网关动作。生产装配 internal/gateway + Config，
+// Gateway 是骑手侧用到的两个网关动作。生产装配 internal/gateway + Config，
 // 测试注入 httptest 或假实现。
+//
+// 两个动作放在同一个接口里（Node 侧也是同一个 gateway 对象上的两个方法）：
+// rider_bind 与 rider_ql 是「绑定 → 换直达 URL」的同一条链路，拆成两个接口只会
+// 让「只接上一半」的装配错误编译得过去。
 type Gateway interface {
+	RiderBind(ctx context.Context, params map[string]any) (map[string]any, error)
 	RiderQL(ctx context.Context, params map[string]any) (map[string]any, error)
 }
 
@@ -87,6 +97,14 @@ type Dep struct {
 	// AllowedHosts 是工作台 URL 的域名白名单，由 CORS_ORIGINS 推导（见
 	// AllowedHostsFromOrigins）。空 = 只校验 https，不校验域名。
 	AllowedHosts []string
+	// Allow 是 POST /rider/bind 的固定窗口限频，入参是客户端 IP（见 ClientKey）。
+	// nil 表示不限（Node 的 `allow && !allow(req.ip)`）。生产由 token.NewLimiter
+	// 按 TMA_RIDER_MAX（默认 10）次 / 60 秒装配。
+	Allow func(key string) bool
+	// TrustProxyHops 决定 ClientKey 是否采信 X-Forwarded-For，与 httpapi 的
+	// TRUST_PROXY_HOPS 同源（0 = 只认 RemoteAddr，等价于 express 未配 trust proxy）。
+	// 必须与其它 handler 取同一个值：限流分桶键不一致时，同一客户端会在两个桶里各占额度。
+	TrustProxyHops int
 	// Env 只为复刻 Node 构造期那条「prod + 白名单为空」的告警判定。
 	Env func(string) string
 	// Nonce 生成落地页的 CSP nonce；nil 时用 htmlpage.NewNonce
@@ -105,6 +123,10 @@ type Route struct {
 	gateway  Gateway
 	// hosts 是**已小写**的白名单集合（Node 构造期就 map 成小写再塞进 Set）。
 	hosts map[string]struct{}
+	// allow 是 POST /rider/bind 的限频器（nil = 不限）。
+	allow func(key string) bool
+	// hops 是限流分桶用的信任代理跳数（见 ClientKey）。
+	hops int
 	// nonce 生成落地页的 CSP nonce（每次请求现生成，不复用）。
 	nonce func() (string, error)
 	logf  func(line string)
@@ -165,6 +187,8 @@ func New(d Dep) *Route {
 		db:            d.DB,
 		gateway:       d.Gateway,
 		hosts:         hosts,
+		allow:         d.Allow,
+		hops:          d.TrustProxyHops,
 		nonce:         nonce,
 		logf:          logf,
 		notConfigured: len(missing) > 0,
@@ -434,6 +458,50 @@ func AllowedHostsFromOrigins(origins []string) []string {
 // logFailure 只记错误消息（截断 300），不记 initData / URL。
 func (r *Route) logFailure(err error) {
 	r.warn("error", truncate(err.Error(), logMessageLimit), nil)
+}
+
+// ClientKey 取客户端 IP，供 POST /rider/bind 的限频分桶与网关 ip 参数共用。
+//
+// 语义与 httpapi.Server.clientKey / addrshare.Router.ClientKey 完全一致：
+// TrustProxyHops > 0 时按 express 的 `trust proxy = n` 取「X-Forwarded-For + RemoteAddr」
+// 链条里倒数第 hops+1 个地址；否则只认 RemoteAddr —— 裸奔部署下 XFF 是客户端可伪造的，
+// 采信它等于把限流桶交给攻击者挑。
+//
+// 为什么不直接复用 httpapi 里的那份：httpapi 依赖本包（装配层 import rider），
+// 反向 import 会成环。三处各一份是有意的（与 addrshare 同款），改动时必须三处同步。
+//
+// 对齐的 Node 语义：express 未配 trust proxy 时 `req.ip` 就是 socket 地址
+// （见 server.js:42 的 `if (process.env.TRUST_PROXY_HOPS) app.set('trust proxy', ...)`）。
+func (r *Route) ClientKey(req *http.Request) string {
+	remote := hostOnly(req.RemoteAddr)
+	if r.hops <= 0 {
+		return remote
+	}
+	chain := make([]string, 0, 8)
+	for _, part := range strings.Split(req.Header.Get("X-Forwarded-For"), ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			chain = append(chain, trimmed)
+		}
+	}
+	if remote != "" {
+		chain = append(chain, remote)
+	}
+	index := len(chain) - 1 - r.hops
+	if index < 0 || index >= len(chain) {
+		return remote
+	}
+	return chain[index]
+}
+
+// hostOnly 去掉 RemoteAddr 里的端口；裸 IP 或空串原样返回。
+func hostOnly(address string) string {
+	if address == "" {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(address); err == nil {
+		return host
+	}
+	return address
 }
 
 // warn 写一行结构化日志。fields 只允许放「环境变量名」这类诊断信息，
