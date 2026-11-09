@@ -6,7 +6,9 @@ name: auto-merge
 on:
   issue_comment:
     types: [created]
-  check_suite:
+  # GitHub Actions 自己产生的 check_suite 不会触发工作流，改用 workflow_run：PR 的 CI 跑完就检查一次。
+  workflow_run:
+    workflows: [go-test, migration-status]
     types: [completed]
   schedule:
     - cron: '*/20 * * * *'
@@ -19,8 +21,9 @@ concurrency:
 jobs:
   merge:
     if: >-
-      github.event_name != 'issue_comment' ||
-      (github.event.issue.pull_request && github.event.sender.login == 'Arvingrep')
+      (github.event_name != 'issue_comment' ||
+       (github.event.issue.pull_request && github.event.sender.login == 'Arvingrep')) &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.actor.login == 'Arvingrep')
     runs-on: [self-hosted, firebird-agent]
     timeout-minutes: 10
     steps:
