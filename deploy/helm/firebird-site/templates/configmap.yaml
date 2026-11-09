@@ -17,8 +17,8 @@ data:
         "1"     '<script src="https://telegram.org/js/telegram-web-app.js"></script><script src="/static/js/tg-shim.js?v=2"></script></head>';
     }
 
-    {{- if or .Values.go.actions .Values.go.compatEnabled }}
-    {{- if not .Values.api.enabled }}{{ fail "go.actions / go.compatEnabled 需要 api.enabled=true（分流与对比的上游是 firebird-api-<siteId>，api 未启用时上游 Service 不存在）" }}{{ end }}
+    {{- if .Values.go.actions }}
+    {{- if not .Values.api.enabled }}{{ fail "go.actions 需要 api.enabled=true（分流的上游是 firebird-api-<siteId>，api 未启用时上游 Service 不存在）" }}{{ end }}
     {{- end }}
     {{- if .Values.go.actions }}
     # ---- PHP→Go 迁移分流（go.actions 白名单，#234）----
@@ -126,21 +126,6 @@ data:
             sub_filter '{{ .Values.configLock.matchRaw }}' '{{ .Values.configLock.message }}';
         }
 
-        {{- end }}
-
-        {{- if .Values.go.compatEnabled }}
-        # ---- Go 对比入口：/go-compat/include/ajax.php（#231/#235，仅 canary 放行）----
-        # 用途：PHP/Go 逐字段对比工具把同一请求打到 Go 兼容层；不经白名单（对比要打任意 action），
-        # 收口靠两层：本段只在 go.compatEnabled=true 的 values 里渲染 + api-go 侧环境开关（默认关）。
-        # proxy_pass 不带 URI → 请求路径原样透传（含 /go-compat 前缀），由 api-go 兼容层自行挂载。
-        location ^~ /go-compat/ {
-            proxy_pass http://firebird-api-{{ .Values.siteId }}:{{ .Values.api.service.port | default 3000 }};
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Real-IP $remote_addr;
-        }
         {{- end }}
 
         {{- if .Values.go.actions }}
