@@ -7,14 +7,14 @@
 
 | 你是 | 只领这些 issue | 产出 |
 |---|---|---|
-| claude | ① 里程碑「迁移 M0 地基」的全部 issue（M0 只由 claude 做）；② 带「需Arvin审批」且带「agent可领」的 issue（迁移线还需已有「规则已整理」）；③ 审核其他 agent（codex、minimax）开的 PR | 代码 PR；对别人 PR 的审核意见 |
-| codex | ① 带「agent可领」、没有「需Arvin审批」的 issue（任何工作线）；其中迁移线（线/迁移Go）还必须已有「规则已整理」；② 每轮先审核 claude 开的、还没审过的 PR | 代码 PR；对 claude PR 的审核意见 |
+| claude | ① 带「需Arvin审批」（高风险：流量分流、登录会话、表结构）且带「agent可领」的 issue，只由 claude 做；② 其余「agent可领」的实现类 issue，与 codex 共享（迁移线须已有「规则已整理」，类型/地基除外）；③ 审核其他 agent（codex、minimax）开的 PR | 代码 PR；对别人 PR 的审核意见 |
+| codex | ① 带「agent可领」、没有「需Arvin审批」的 issue（任何工作线）；其中迁移线（线/迁移Go）还必须已有「规则已整理」（类型/地基除外）；② 每轮先审核 claude 开的、还没审过的 PR | 代码 PR；对 claude PR 的审核意见 |
 | gemini | 迁移线里还没有「规则已整理」的 issue；以及带「类型/调研」和「agent可领」的 issue | 只写评论，不写代码 |
 | minimax | 迁移线（线/迁移Go）里带「类型/读」「agent可领」「规则已整理」、没有「需Arvin审批」的 issue：实现读接口并补 L2 对比用例（testdata/compare/） | 代码 PR |
 | workbuddy | 同 gemini（整理规则、调研），两者谁先领到谁做 | 只写评论，不写代码 |
 
 没有「agent可领」的 issue 是 Arvin 的人工任务（推送分支、真机验收等），任何 agent 都不领。
-「迁移 M0 地基」没全部关闭之前，codex、minimax 不领迁移线的任务（codex 其他线照常）；gemini、workbuddy 可以先整理「迁移 M1 资讯」的规则。
+迁移线不再按里程碑整体串行，而是按 issue 正文里的「依赖：#N」排队：依赖没关闭的不领。另外 M1 及以后的**实现**至少要等 #231（兼容层骨架）关闭；整理规则不受限制。
 minimax 通过 Emdash 里的 OpenCode（模型选 MiniMax）运行；workbuddy 在 WorkBuddy 桌面应用里运行，不经过 Emdash，同样按本文件领 issue。同一个 issue 被两个 agent 同时领取时按下面第 3 步的撞车规则处理。
 
 ## issue 的分类（每个打开的 issue 都恰好有一个）
@@ -63,7 +63,7 @@ cd "$WT"
 ## 每轮流程
 1. `git fetch`，基于最新的 `origin/canary`。`~/Documents/firebird-sea` 根目录有 `STOP` 文件就结束。
 2. 按分工找 issue：打开状态；没有「状态/进行中」「状态/待审核」「状态/阻塞」；没有其他 `agent/*` 标签；正文里写的"依赖：#N"都已关闭。
-   排序：**优先级 P0 → P1 → P2**；同一优先级里，迁移线按里程碑「迁移 M0 → M1 → …」（前一个里程碑没关完不领后一个），其他线按编号从小到大。找不到就结束。
+   排序：**优先级 P0 → P1 → P2**；同一优先级里，迁移线按里程碑「迁移 M0 → M1 → …」排在前面的先领（但不必等前一个里程碑全部关完，只看「依赖：#N」），其他线按编号从小到大。找不到就结束。
 3. 领取：加「状态/进行中」和自己的 `agent/<名字>` 标签。重新读一次这个 issue，如果出现了别的 `agent/*` 标签，说明撞车了：撤掉自己的两个标签，换下一个。
 4. 在评论里写本轮计划（3–6 步）。
 
@@ -81,8 +81,8 @@ cd "$WT"
 ### 审核（claude 审别人的 PR；codex 审 claude 的 PR）
 - 每轮先看有没有还没审过的 PR（实现 agent 看关联 issue 上的 `agent/<名字>` 标签；不能审自己做的）。逐条对照 issue 的业务规则和验收标准审核，必要时本地跑测试。
 - 结论写成 PR 评论，**最后一行必须是机器可读标记**：通过写 `<!-- review:pass agent=<你的名字> -->`，要改写 `<!-- review:changes agent=<你的名字> -->` 并列出必须修改的地方。
-- **合并是自动的**（`.github/workflows/auto-merge.yml`）：进 canary、CI 全绿、有别的 agent 的通过标记、关联 issue 不带「需Arvin审批」「涉及资金」→ 自动合并 → issue 自动关闭 → canary 自动构建部署。任何 agent 都不手动合并。
-- 带「需Arvin审批」「涉及资金」的 PR 照常审核，但只有 Arvin 能合并。
+- **合并是自动的**（`.github/workflows/auto-merge.yml`）：进 canary、CI 全绿、有别的 agent 的通过标记、关联 issue 不带「涉及资金」→ 自动合并 → issue 自动关闭 → canary 自动构建部署。任何 agent 都不手动合并。
+- 「需Arvin审批」的 PR 也自动合并（审核要更严：逐条核对回滚路径）；只有「涉及资金」的 PR 由 Arvin 合并。
 
 ## 失败
 同一个 issue 连续 3 轮做不完：加「状态/阻塞」，评论写明原因，撤掉自己的 `agent/*` 和「状态/进行中」，结束。
@@ -111,7 +111,7 @@ cd "$WT"
 总调度 <日期 时间>
 进度：按里程碑列出 已关闭/总数，P0 未完成的单独列出
 今日完成：#编号 标题（谁做的）……
-等 Arvin 合并：只列带「需Arvin审批」「涉及资金」的 PR #N……
+等 Arvin 合并：只列带「涉及资金」的 PR #N……
 等 Arvin 回答：#编号 问题一句话……
 超时释放：#编号……
 异常：无 / 具体情况
