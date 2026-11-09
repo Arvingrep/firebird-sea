@@ -1,0 +1,34 @@
+# 流程闭环的最后一步：满足条件的 PR 自动合并进 canary（条件见 .github/scripts/auto-merge.sh）。
+# 跑在 Arvin 的 MacBook（self-hosted runner）上，用本机 gh 登录态合并：
+# GITHUB_TOKEN 做的合并不会触发后续 workflow（关 issue、构建部署 canary 都会断）。
+# 仓库公开：只响应 Arvingrep 自己的评论；只执行默认分支上的脚本，从不检出 PR 代码。
+name: auto-merge
+on:
+  issue_comment:
+    types: [created]
+  check_suite:
+    types: [completed]
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: auto-merge
+  cancel-in-progress: false
+jobs:
+  merge:
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request && github.event.sender.login == 'Arvingrep')
+    runs-on: [self-hosted, firebird-agent]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/scripts
+      - name: 合并满足条件的 PR
+        run: |
+          unset GH_TOKEN GITHUB_TOKEN
+          bash .github/scripts/auto-merge.sh
