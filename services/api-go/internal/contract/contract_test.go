@@ -30,7 +30,9 @@ const contractSpecPath = "../../../../docs/api/openapi.yaml"
 //
 //   - `/`、`/health`：app 级探针，不是对外 API；
 //   - `/tma`、`/tma/`：前端静态产物入口（构建产物才有意义，随版本变化）；
-//   - `/tg-api/payment/mock-webhook`：非生产的联调口子，生产根本不注册。
+//   - `/tg-api/payment/mock-webhook`：非生产的联调口子，生产根本不注册；
+//   - `/include/ajax.php`、`/go-compat/include/ajax.php`：火鸟 ajax.php 兼容层，
+//     契约是 PHP 原接口，不属于 /tg-api。
 //
 // 只豁免「代码有、spec 没有」这一个方向；反向仍然全量比对。
 func contractExempt() map[string]struct{} {
@@ -40,6 +42,8 @@ func contractExempt() map[string]struct{} {
 		"GET /tma":                          {},
 		"GET /tma/":                         {},
 		"POST /tg-api/payment/mock-webhook": {},
+		"ALL /include/ajax.php":             {},
+		"ALL /go-compat/include/ajax.php":   {},
 	}
 }
 

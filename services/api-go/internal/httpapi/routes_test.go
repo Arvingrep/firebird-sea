@@ -76,8 +76,10 @@ func TestRoutePrefixConfig(t *testing.T) {
 			if strings.HasPrefix(route.Path, "/api/") || route.Path == "/api" {
 				t.Fatalf("%s %s 抢占了 PHP 网关的 /api 命名空间", route.Method, route.Path)
 			}
-			// 除探针（/ 与 /health）外，业务路由必须落在 /tg-api 或前端静态入口 /tma 下。
-			if route.Path == "/" || route.Path == "/health" {
+			// 除探针（/ 与 /health）和火鸟 ajax.php 兼容层外，业务路由必须落在 /tg-api
+			// 或前端静态入口 /tma 下。
+			if route.Path == "/" || route.Path == "/health" ||
+				route.Path == "/include/ajax.php" || route.Path == "/go-compat/include/ajax.php" {
 				continue
 			}
 			if !strings.HasPrefix(route.Path, "/tg-api") && !strings.HasPrefix(route.Path, "/tma") {

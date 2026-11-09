@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/addrshare"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/bridge"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/calltest"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/coins"
@@ -84,6 +85,8 @@ type Dep struct {
 	// Dispatch 是 /tg-api/internal/dispatch（POST，PHP 派单挂点调用的内部通知口，
 	// dispatch.New 的产物）。同样是无条件挂载、缺配置时端点内 503；为 nil 表示未装配。
 	Dispatch *dispatch.Route
+	// Ajax 是火鸟 ajax.php 兼容层（#231）；为 nil 表示未装配（测试场景）。
+	Ajax *ajax.Router
 
 	// TMAStaticDir 为空或目录不存在时不挂载 /tma（Node 的 existsSync 守卫）。
 	TMAStaticDir string
@@ -119,6 +122,7 @@ type Server struct {
 	fbProxy     *fbproxy.Proxy
 	rider       *rider.Route
 	dispatch    *dispatch.Route
+	ajax        *ajax.Router
 	staticDir   string
 	hops        int
 	runCallTest func(context.Context, string, any, calltest.Options) calltest.Result
@@ -170,6 +174,7 @@ func NewServer(d Dep) *Server {
 		fbProxy:     d.FBProxy,
 		rider:       d.Rider,
 		dispatch:    d.Dispatch,
+		ajax:        d.Ajax,
 		staticDir:   d.TMAStaticDir,
 		// TrustProxyHops 为 0 即「不信任 X-Forwarded-For」，与 express 未配置
 		// trust proxy 时 req.ip == RemoteAddr 的行为一致。
@@ -218,6 +223,8 @@ func (s *Server) Routes() []Route {
 		{Method: "POST", Path: "/tg-api/payment/mock-webhook", Conditional: "ENV != production"},
 		{Method: "GET", Path: "/tma", Conditional: "TMA_STATIC_DIR"},
 		{Method: "GET", Path: "/tma/", Conditional: "TMA_STATIC_DIR"},
+		{Method: "ALL", Path: "/include/ajax.php"},
+		{Method: "ALL", Path: "/go-compat/include/ajax.php", Conditional: "GO_COMPAT_ENABLED"},
 	}
 	return routes
 }
@@ -325,6 +332,17 @@ func (s *Server) build() http.Handler {
 	// 生产装配总会构造 dispatch.New，nil 只对应「测试里没注入」。
 	if s.dispatch != nil {
 		mux.HandleFunc("POST /tg-api/internal/dispatch", s.dispatch.Dispatch)
+	}
+
+	// 11. 火鸟 ajax.php 兼容层（#231）：
+	//   - /include/ajax.php 接 nginx 按白名单分流来的真实流量（#234）；
+	//   - /go-compat/include/ajax.php 用于和 PHP 对比（#235），只有 GO_COMPAT_ENABLED=true
+	//     才注册，关闭时 404。只认 "true"：开关拼错应当是「没打开」，而不是对外多开一个入口。
+	if s.ajax != nil {
+		mux.Handle("/include/ajax.php", s.ajax)
+		if s.env("GO_COMPAT_ENABLED") == "true" {
+			mux.Handle("/go-compat/include/ajax.php", s.ajax)
+		}
 	}
 
 	return s.wrap(mux)
