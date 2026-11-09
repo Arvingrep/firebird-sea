@@ -1,0 +1,76 @@
+{{- if .Values.go.enabled -}}
+{{- /* Go 迁移服务 Deployment（services/firebird-go，#231）。
+       环境变量沿用集群既有约定：DB_* 与 api 一致，REDIS_* 与 cronjob 一致。
+       密钥只引用 secretName，值由 Secret 提供，不进 Git。 */ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firebird-go-{{ .Values.siteId }}
+  labels:
+    app: firebird-go
+    site: {{ .Values.siteId }}
+spec:
+  replicas: {{ .Values.go.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: firebird-go
+      site: {{ .Values.siteId }}
+  template:
+    metadata:
+      labels:
+        app: firebird-go
+        site: {{ .Values.siteId }}
+    spec:
+      containers:
+        - name: go
+          image: "{{ .Values.go.image.repository }}:{{ .Values.go.image.tag }}"
+          imagePullPolicy: {{ .Values.go.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+            - name: SITE_ID
+              value: "{{ .Values.siteId }}"
+            - name: DB_HOST
+              value: "{{ .Values.database.host }}"
+            - name: DB_PORT
+              value: "{{ .Values.database.port | default 3306 }}"
+            - name: DB_NAME
+              value: "{{ .Values.database.name }}"
+            - name: DB_USER
+              value: "{{ .Values.database.user | default "firebird_user" }}"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.passwordSecretRef | default "firebird-db-secret" }}
+                  key: {{ .Values.database.passwordSecretKey | default "password" }}
+            - name: REDIS_HOST
+              value: "{{ .Values.redis.host }}"
+            - name: REDIS_PORT
+              value: "{{ .Values.redis.port | default 6379 }}"
+            {{- if .Values.redis.passwordSecretRef }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.passwordSecretRef }}
+                  key: {{ .Values.redis.passwordSecretKey | default "password" }}
+            {{- end }}
+          # 进程存活与依赖可连分开探：/healthz 不碰 MySQL/Redis，
+          # 依赖抖动只会摘流量（readyz 503），不会触发无意义的重启。
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.go.resources | nindent 12 }}
+{{- end -}}

@@ -159,6 +159,26 @@ api:
       cpu: 50m
       memory: 64Mi
 
+# Go 迁移服务 (services/firebird-go)——PHP→Go 主站迁移的宿主（#231）。
+# 与 api（Node/Go 引擎切换的伴生 API）互相独立：服务名、镜像、发布节奏都分开。
+# 默认关闭；只在 values-canary.yaml 打开做验收。镜像由 CI 构建后按 canary-<sha12> 钉 tag。
+go:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-go"
+    tag: "latest"
+    pullPolicy: Always
+  service:
+    port: 80
+  resources:
+    limits:
+      cpu: 300m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
 # ⑥ Telegram 顾客免密登录接线：Node(api) → 集群内 nginx → PHP 网关 webroot/api/fbs/index.php
 # 密钥不进 Git、不进 ConfigMap（明文），只从 Secret 以 env 注入；api 与 php 两侧同值同 key（HMAC）。
 gateway:
