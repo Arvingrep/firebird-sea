@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 )
 
 // StateOK 是火鸟接口约定的成功状态码。
@@ -35,7 +36,7 @@ type Response struct {
 type Request struct {
 	Service string
 	Action  string
-	// Params 对应 ajax.php 的 $param：GET 与 POST 合并，同名时 POST 优先，
+	// Params 对应 ajax.php 的 $param：GET 与 POST 合并，同名时 POST 优先（Cookie 不进入），
 	// 不含 service、action、callback、_。值未做 RemoveXSS 等处理。
 	Params url.Values
 	// HTTP 是原始请求，处理函数从它取 context、cookie。
@@ -81,17 +82,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// 解析错误不拦截：畸形的键值对被跳过，其余照常可用，与 PHP 解析 $_GET/$_POST 的宽松行为一致。
-	_ = req.ParseForm()
 	// 只解析 urlencoded 请求体；multipart 等第一个上传类 action 迁移时再加。
-	callback := req.Form.Get("callback")
-	params := make(url.Values, len(req.Form))
-	for key, values := range req.Form {
-		switch key {
-		case "service", "action", "callback", "_":
-		default:
-			params[key] = values
-		}
-	}
+	_ = req.ParseForm()
+	params := mergeParams(query, req.PostForm)
+	callback := requestValue(req, "callback")
 
 	response := handler(&Request{Service: service, Action: action, Params: params, HTTP: req})
 	payload, err := encode(response)
@@ -107,6 +101,42 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// 带上它浏览器会拒绝把 JSONP 响应当脚本执行。
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(payload)
+}
+
+// requestValue 对应 PHP 的 $_REQUEST[name]：GET < POST < COOKIE，后者覆盖前者（#233 裁决：
+// 镜像没有 php.ini，request_order 为空，按 variables_order=EGPCS）。同名取最后一个值。
+func requestValue(req *http.Request, name string) string {
+	if cookie, err := req.Cookie(name); err == nil {
+		return cookie.Value
+	}
+	if values := req.PostForm[name]; len(values) > 0 {
+		return values[len(values)-1]
+	}
+	if values := req.URL.Query()[name]; len(values) > 0 {
+		return values[len(values)-1]
+	}
+	return ""
+}
+
+// mergeParams 对应 ajax.php 里 foreach($_GET)、foreach($_POST) 生成 $param 的过程：
+// POST 覆盖 GET；不含 service、action、callback、_；Cookie 不进入 $param。
+// PHP 里 a=1&a=2 得到最后一个值，a[]=1&a[]=2 得到数组，后来源对同名键整体覆盖。
+func mergeParams(sources ...url.Values) url.Values {
+	params := url.Values{}
+	for _, source := range sources {
+		for key, values := range source {
+			switch key {
+			case "service", "action", "callback", "_":
+				continue
+			}
+			if strings.HasSuffix(key, "[]") {
+				params[key] = append([]string(nil), values...)
+			} else {
+				params[key] = []string{values[len(values)-1]}
+			}
+		}
+	}
+	return params
 }
 
 // encode 对应 json_encode($return, JSON_UNESCAPED_UNICODE)：不转义中文和 < > &，末尾没有换行。
