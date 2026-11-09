@@ -17,6 +17,23 @@ data:
         "1"     '<script src="https://telegram.org/js/telegram-web-app.js"></script><script src="/static/js/tg-shim.js?v=2"></script></head>';
     }
 
+    {{- if or .Values.go.actions .Values.go.compatEnabled }}
+    {{- if not .Values.api.enabled }}{{ fail "go.actions / go.compatEnabled 需要 api.enabled=true（分流与对比的上游是 firebird-api-<siteId>，api 未启用时上游 Service 不存在）" }}{{ end }}
+    {{- end }}
+    {{- if .Values.go.actions }}
+    # ---- PHP→Go 迁移分流（go.actions 白名单，#234）----
+    # 以 "service.action" 组合串为键：命中白名单 → $fbs_go_action=1 → /include/ajax.php 转 api-go。
+    # 判定只看 URL 查询参数（$arg_service / $arg_action），POST body 与 cookie 不参与判定。
+    # map 必须在 http 上下文（本文件被 include 进 http 块），与上面 $fbs_tg_head 同理。
+    # 注意键里是 action 的原样大小写；service/action 不在 URL 上的请求组合串为 "."，落 default 走 PHP。
+    map "$arg_service.$arg_action" $fbs_go_action {
+        default 0;
+        {{- range .Values.go.actions }}
+        "{{ . }}" 1;
+        {{- end }}
+    }
+    {{- end }}
+
     server {
         listen 80;
         server_name {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}localhost;
@@ -107,6 +124,37 @@ data:
             sub_filter_types application/json text/plain;
             sub_filter '{{ .Values.configLock.matchJson | replace "\\" "\\\\" }}' '{{ .Values.configLock.messageJson | replace "\\" "\\\\" }}';
             sub_filter '{{ .Values.configLock.matchRaw }}' '{{ .Values.configLock.message }}';
+        }
+
+        {{- end }}
+
+        {{- if .Values.go.compatEnabled }}
+        # ---- Go 对比入口：/go-compat/include/ajax.php（#231/#235，仅 canary 放行）----
+        # 用途：PHP/Go 逐字段对比工具把同一请求打到 Go 兼容层；不经白名单（对比要打任意 action），
+        # 收口靠两层：本段只在 go.compatEnabled=true 的 values 里渲染 + api-go 侧环境开关（默认关）。
+        # proxy_pass 不带 URI → 请求路径原样透传（含 /go-compat 前缀），由 api-go 兼容层自行挂载。
+        location ^~ /go-compat/ {
+            proxy_pass http://firebird-api-{{ .Values.siteId }}:{{ .Values.api.service.port | default 3000 }};
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        {{- end }}
+
+        {{- if .Values.go.actions }}
+        # ---- PHP→Go 分流入口：/include/ajax.php（#234）----
+        # 白名单内的 service+action → api-go（现有 firebird-api-<siteId> Service，canary 上 engine=go），
+        # 其余（含白名单外的 action、无 service/action 参数的请求）照旧走 PHP。
+        # 正则 location 按出现顺序匹配，必须位于下方通用 php location 之前才会被本段截获。
+        # if 里只放 proxy_pass（无 URI 部分）——这是 nginx 在 if 上下文里允许的安全用法之一：
+        # 命中 if 的请求按内层配置代理，未命中的继续走外层 fastcgi，不会出现 "proxy_pass 带变量" 类报错。
+        location ~ ^/include/ajax\.php$ {
+            if ($fbs_go_action = 1) {
+                proxy_pass http://firebird-api-{{ .Values.siteId }}:{{ .Values.api.service.port | default 3000 }};
+            }
+            {{- include "firebird.nginxPhpBody" . | nindent 12 }}
         }
 
         {{- end }}
