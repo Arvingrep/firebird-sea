@@ -178,3 +178,61 @@ func TestRegisterDuplicatePanics(t *testing.T) {
 	router := pongRouter()
 	router.Register("siteConfig", "ping", func(*Request) Response { return Response{} })
 }
+
+func capture(router *Router, req *http.Request) *Request {
+	var got *Request
+	router.Register("article", "list", func(r *Request) Response {
+		got = r
+		return Response{State: StateOK}
+	})
+	serve(router, req)
+	return got
+}
+
+// PHP 同名参数取最后一个（$_GET['a'] 对 a=1&a=2 是 2），不是第一个。
+func TestDuplicateParamTakesLastLikePHP(t *testing.T) {
+	got := capture(NewRouter(func(string) {}), get("/include/ajax.php?service=article&action=list&a=1&a=2"))
+	if got == nil || got.Params.Get("a") != "2" || len(got.Params["a"]) != 1 {
+		t.Fatalf("Params[a] = %v，want [2]", got.Params["a"])
+	}
+}
+
+// a[] 在 PHP 里是数组，全部保留，且后来源整体覆盖前来源。
+func TestArrayParamKeepsAllValuesAndPostReplacesGet(t *testing.T) {
+	got := capture(NewRouter(func(string) {}), postForm(
+		"/include/ajax.php?service=article&action=list&ids[]=1&ids[]=2&tags[]=x", "ids[]=8&ids[]=9"))
+	if want := []string{"8", "9"}; len(got.Params["ids[]"]) != 2 || got.Params["ids[]"][0] != want[0] || got.Params["ids[]"][1] != want[1] {
+		t.Fatalf("Params[ids[]] = %v，want %v", got.Params["ids[]"], want)
+	}
+	if got.Params.Get("tags[]") != "x" {
+		t.Fatalf("Params[tags[]] = %v", got.Params["tags[]"])
+	}
+}
+
+// 裁决（#233）：PHP 镜像没有 php.ini，request_order 为空 → variables_order=EGPCS，
+// $_REQUEST 里 GET < POST < COOKIE。$param 只由 $_GET/$_POST 生成，Cookie 不增加新参数，
+// 但 callback 取自 $_REQUEST，同名时 Cookie 胜出。
+func TestCookieOnlyOverridesCallback(t *testing.T) {
+	req := postForm("/include/ajax.php?service=siteConfig&action=ping&callback=fromget", "callback=frompost")
+	req.AddCookie(&http.Cookie{Name: "callback", Value: "fromcookie"})
+	req.AddCookie(&http.Cookie{Name: "login_user", Value: "secret"})
+	_, _, body := serve(pongRouter(), req)
+	if body != `fromcookie({"state":100,"info":"pong"})` {
+		t.Fatalf("响应体 = %s", body)
+	}
+
+	req = postForm("/include/ajax.php?service=article&action=list&x=get", "x=post")
+	req.AddCookie(&http.Cookie{Name: "x", Value: "cookie"})
+	req.AddCookie(&http.Cookie{Name: "login_user", Value: "secret"})
+	got := capture(NewRouter(func(string) {}), req)
+	if got.Params.Get("x") != "post" || got.Params.Has("login_user") {
+		t.Fatalf("Params = %v：Cookie 不该进入 $param", got.Params)
+	}
+}
+
+func TestGetAndPostPriority(t *testing.T) {
+	got := capture(NewRouter(func(string) {}), postForm("/include/ajax.php?service=article&action=list&a=get&b=get", "a=post"))
+	if got.Params.Get("a") != "post" || got.Params.Get("b") != "get" {
+		t.Fatalf("Params = %v", got.Params)
+	}
+}
