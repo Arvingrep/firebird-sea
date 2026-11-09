@@ -334,3 +334,14 @@ uploads:
 configOverrides:
   enabled: false
   files: {}
+
+# ⑦ PHP→Go 迁移分流（总方案 #298 / 分流 #234）：nginx 按 URL 查询参数 service+action
+# 把 webroot/include/ajax.php 的请求转给现有 api-go Service（firebird-api-<siteId>），
+# 其余请求照旧走 PHP。默认全空：什么都不分流，渲染结果与未引入本段之前完全一致。
+go:
+  # 白名单：形如 "article.config" 的 "service.action" 串。命中才转 Go，其余一律 PHP。
+  # 判定只看 URL 查询参数（$arg_service / $arg_action），POST body 与 cookie 不参与判定。
+  # 回滚 = 把该 action 从列表删掉（ArgoCD 同步后立即回 PHP，无需重启）。
+  # 第一批 action 加入前须 Arvin 审批（改变真实用户流量走向）。
+  actions: []
+  # /go-compat 对比入口不在这里：由 api.goCompat（#231）经 Traefik 直连 api-go。
