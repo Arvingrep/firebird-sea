@@ -1,0 +1,27 @@
+# services/api-go 的单元测试与契约测试门禁。此前镜像只构建不跑测试，测试从未在 CI 里执行过。
+name: go-test
+on:
+  pull_request:
+    paths: ['services/api-go/**', '.github/workflows/go-test.yml']
+  push:
+    branches: [main, canary]
+    paths: ['services/api-go/**', '.github/workflows/go-test.yml']
+permissions:
+  contents: read
+jobs:
+  api-go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/api-go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/api-go/go.mod
+          cache-dependency-path: services/api-go/go.sum
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test -count=1 ./...
