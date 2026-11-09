@@ -34,6 +34,12 @@ cd "$WT"
 ```
 之后所有 git 操作都在 `$WT` 里进行。`~/Documents/firebird-sea` 是 Arvin 自己的目录，不要在里面改文件、切分支。
 
+## 通过 Emdash 启动时（Arvin 在 Emdash 里给 issue 建任务）
+- Emdash 已经为这个任务建好独立的 worktree 和分支，**直接在当前目录工作**，不再按上一节自建 `~/Documents/firebird-sea-agents/<名字>`。
+- 开工前先让分支基于最新 canary：`git fetch origin canary && git rebase origin/canary`（新建的 worktree 还没有提交，等同于直接切到 canary 最新代码）。
+- 任务里附带的 GitHub issue 就是你要做的那一个，不用再按"每轮流程"自己挑；其余规则（领取时打标签、先写规则、测试、PR 第一行 `Closes #N`、不自己合并）照常执行。
+- 分支名用 Emdash 生成的即可，PR 合并后会被自动清理。
+
 ## 执行纪律：Superpowers
 所有写代码的 agent（claude、codex）在任务内部按 Superpowers（obra/superpowers）的方法干活。
 **首次运行**：如果你的工具里还没装 Superpowers，先按它官方 README 里对应你这个工具的方式自行安装（Claude Code 走插件市场），装好后在汇报里注明"已安装 Superpowers"。
