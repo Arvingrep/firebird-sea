@@ -39,6 +39,15 @@ spec:
         - name: firebird-api-{{ .Values.siteId }}
           port: {{ .Values.api.service.port | default 3000 }}
     {{- end }}
+    {{- if and .Values.api.goCompat .Values.api.goCompat.enabled }}
+    # Go 兼容层对比入口（#231）：不走 nginx，不影响 /include/ajax.php 的现有流量。
+    - kind: Rule
+      match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/go-compat`)
+      priority: 100
+      services:
+        - name: firebird-api-{{ .Values.siteId }}
+          port: {{ .Values.api.service.port | default 3000 }}
+    {{- end }}
     - kind: Rule
       match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tg-api`)
       priority: 100
