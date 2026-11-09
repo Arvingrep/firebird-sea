@@ -1,0 +1,39 @@
+# PR 合并后自动删除来源分支；本文件更新时顺带清理所有"对应 PR 已合并"的历史分支。
+# 只删本仓库内、且对应 PR 已合并的分支；main、canary 永不删除；未合并的分支不动。
+name: branch-cleanup
+on:
+  pull_request:
+    types: [closed]
+  push:
+    branches: [main, canary]
+    paths: ['.github/workflows/branch-cleanup.yml']
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const keep = new Set(['main', 'canary']);
+            const { owner, repo } = context.repo;
+            const del = async (ref) => {
+              if (keep.has(ref)) return;
+              try { await github.rest.git.deleteRef({ owner, repo, ref: `heads/${ref}` }); core.info(`deleted ${ref}`); }
+              catch (e) { core.info(`skip ${ref}: ${e.status}`); }
+            };
+            if (context.eventName === 'pull_request') {
+              await del(context.payload.pull_request.head.ref);
+              return;
+            }
+            const branches = await github.paginate(github.rest.repos.listBranches, { owner, repo, per_page: 100 });
+            for (const b of branches) {
+              if (keep.has(b.name)) continue;
+              const prs = await github.rest.pulls.list({ owner, repo, head: `${owner}:${b.name}`, state: 'all', per_page: 10 });
+              const merged = prs.data.find(p => p.merged_at && p.head.sha === b.commit.sha);
+              if (merged) await del(b.name);
+              else core.info(`keep ${b.name}（无已合并 PR，或分支在合并后又有新提交）`);
+            }
