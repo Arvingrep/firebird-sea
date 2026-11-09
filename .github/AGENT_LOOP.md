@@ -13,6 +13,8 @@
 | minimax | 迁移线（线/迁移Go）里带「类型/读」「agent可领」「规则已整理」、没有「需Arvin审批」的 issue：实现读接口并补 L2 对比用例（testdata/compare/） | 代码 PR |
 | workbuddy | 同 gemini（整理规则、调研），两者谁先领到谁做 | 只写评论，不写代码 |
 
+**阻塞不等人**：agent 遇到需要拍板的问题照常加「状态/阻塞」并写清选项；claude 每轮先处理这些阻塞——能依据代码事实或已有决定裁决的，直接在 issue 上写「总调度（claude）裁决」并撤掉「状态/阻塞」，被阻塞的 agent 下一轮按裁决继续；只有「涉及资金」的问题留给 Arvin。
+
 没有「agent可领」的 issue 是 Arvin 的人工任务（推送分支、真机验收等），任何 agent 都不领。
 迁移线不再按里程碑整体串行，而是按 issue 正文里的「依赖：#N」排队：依赖没关闭的不领。另外 M1 及以后的**实现**至少要等 #231（兼容层骨架）关闭；整理规则不受限制。
 minimax 通过 Emdash 里的 OpenCode（模型选 MiniMax）运行；workbuddy 在 WorkBuddy 桌面应用里运行，不经过 Emdash，同样按本文件领 issue。同一个 issue 被两个 agent 同时领取时按下面第 3 步的撞车规则处理。
