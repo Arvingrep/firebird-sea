@@ -31,6 +31,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/addrshare"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/siteconfig"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/bridge"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/checkout"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/coins"
@@ -190,6 +192,7 @@ func run() error {
 		FBProxy:        proxy,
 		Rider:          buildRider(db, botToken, hops, now),
 		Dispatch:       buildDispatch(db, botToken, now),
+		Ajax:           buildAjax(),
 		TMAStaticDir:   os.Getenv("TMA_STATIC_DIR"),
 		TrustProxyHops: hops,
 	}
@@ -500,6 +503,15 @@ func buildDispatch(db *sql.DB, botToken string, now func() time.Time) *dispatch.
 //
 // 注意：注释里若写连续两个单引号，gofmt 会把它改写成弯引号（go/printer 的
 // 老式文档注释约定），所以上面对 JS 的描述用文字而不是原样代码。
+// buildAjax 注册火鸟 ajax.php 兼容层的全部 service。
+func buildAjax() *ajax.Router {
+	router := ajax.NewRouter(func(line string) {
+		writeLog(os.Stderr, "ajax_error", map[string]any{"error": line})
+	})
+	siteconfig.Register(router)
+	return router
+}
+
 func splitOrigins(raw string) []string {
 	parts := strings.Split(raw, ",")
 	out := make([]string, 0, len(parts))
@@ -604,6 +616,10 @@ func validateAssembly(bundle *authBundle, dep httpapi.Dep) error {
 	// 漏接的表现是 PHP 挂点收到 404（而不是 503），PHP 侧只看到「通知失败」。
 	if dep.Dispatch == nil {
 		missing = append(missing, "Dispatch")
+	}
+	// 兼容层漏接的表现是所有已切到 Go 的 action 静默 404。
+	if dep.Ajax == nil {
+		missing = append(missing, "Ajax")
 	}
 	if bundle != nil {
 		// auth 装配成功时，登录编排 / 令牌 / 凭证三者缺一都会让相关端点静默 503 或恒 401。

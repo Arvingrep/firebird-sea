@@ -19,7 +19,9 @@ const specPath = "../../../../docs/api/openapi.yaml"
 //
 //   - `/`、`/health`：app 级探针，不是对外 API；
 //   - `/tma`、`/tma/`：前端静态产物入口（构建产物才有意义，随版本变化）；
-//   - `/tg-api/payment/mock-webhook`：非生产的联调口子，生产根本不注册。
+//   - `/tg-api/payment/mock-webhook`：非生产的联调口子，生产根本不注册；
+//   - `/include/ajax.php`、`/go-compat/include/ajax.php`：火鸟 ajax.php 兼容层，
+//     契约是 PHP 原接口，不属于 /tg-api。
 //
 // 注意：这些只是「不进 missingInSpec 断言」，反向的 missingInCode 仍然全量比对——
 // spec 里如果冒出这几条，说明有人把内部接口写进了契约，要报出来。
@@ -29,6 +31,8 @@ var knownNotInSpec = map[string]struct{}{
 	"GET /tma":                          {},
 	"GET /tma/":                         {},
 	"POST /tg-api/payment/mock-webhook": {},
+	"ALL /include/ajax.php":             {},
+	"ALL /go-compat/include/ajax.php":   {},
 }
 
 func loadSpec(t *testing.T) Spec {
@@ -58,8 +62,8 @@ func TestSelfCheckRoutesCoverSpec(t *testing.T) {
 	if len(spec.Routes) == 0 {
 		t.Fatal("spec 解析出 0 条路由，解析器或缩进约束已失效")
 	}
-	if len(routes) != 27 {
-		t.Fatalf("路由表条数应为 27，实际 %d：%v", len(routes), routes)
+	if len(routes) != 29 {
+		t.Fatalf("路由表条数应为 29，实际 %d：%v", len(routes), routes)
 	}
 
 	specRoutes := make([]string, 0, len(spec.Routes))
