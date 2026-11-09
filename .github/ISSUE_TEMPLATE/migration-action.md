@@ -2,7 +2,8 @@
 name: 迁移一个 action 到 Go
 about: 把火鸟 ajax.php 的一个 service.action 迁到 Go
 title: "[Mx] service.action"
-labels: ["线/迁移Go", "agent可领"]
+# 填写完 PHP 源码位置等信息后，再手动加「agent可领」「类型/*」「优先级/*」和里程碑；空模板不要加「agent可领」。
+labels: ["线/迁移Go"]
 ---
 
 迁移 `service=<service>&action=<action>` 到 Go。
