@@ -1,4 +1,6 @@
-# PR 关联的 issue 自动标「状态/待审核」；PR 关闭但未合并时撤掉。合并后 issue 由 Closes #N 自动关闭。
+# PR 关联的 issue 自动标「状态/待审核」；PR 关闭时撤掉。
+# PR 合并进 canary 时由本工作流关闭 issue——GitHub 的 Closes #N 只在合并进默认分支（main）时生效，
+# 而我们的 PR 都进 canary，不手动关的话 issue 永远开着，"依赖：#N 已关闭" 也永远不满足。
 name: migration-status
 on:
   pull_request:
@@ -22,5 +24,9 @@ jobs:
                 await github.rest.issues.removeLabel({ ...p, name: '状态/进行中' }).catch(() => {});
               } else {
                 await github.rest.issues.removeLabel({ ...p, name: '状态/待审核' }).catch(() => {});
+                if (pr.merged && pr.base.ref === 'canary') {
+                  await github.rest.issues.createComment({ ...p, body: `已随 #${pr.number} 合并进 canary，自动关闭。` });
+                  await github.rest.issues.update({ ...p, state: 'closed', state_reason: 'completed' });
+                }
               }
             }
