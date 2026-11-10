@@ -133,21 +133,25 @@ function staffBindErrorText(err) {
 }
 
 // --- 1. 发送 Telegram 消息工具函数 ---
-function sendTelegramMessage(chatId, text, replyMarkup = null) {
+// opts.plainText：这一条消息不带 parse_mode（Telegram 默认纯文本）。
+// 只有「文案里拼了外部输入」的调用才需要它——全局默认是 legacy Markdown，而 legacy Markdown 下
+// 文本里只要有一个未配对的 `_` / `*` / 反引号 / `[`，Telegram 就整条 400 `can't parse entities`：
+// 用户看不到回执（绑定其实已成功），只会以为失败反复重试。固定文案不需要，一律保持原样。
+function sendTelegramMessage(chatId, text, replyMarkup = null, opts = {}) {
+  const payload = { chat_id: chatId, text: text };
+  if (!opts.plainText) payload.parse_mode = 'Markdown';
+  payload.reply_markup = replyMarkup;
+
   if (!BOT_TOKEN) {
-    // mock 模式把 reply_markup 一起打出来：测试据此断言按钮（含 web_app）真的生成了
+    // mock 模式把「将要发给 Telegram 的完整 payload」打出来：测试据此断言按钮（含 web_app）
+    // 真的生成了、以及该条消息是否带了 parse_mode
     console.log(`[TG-BOT:MOCK] 发送消息至 Chat ID ${chatId}: \n${text}` +
-      (replyMarkup ? `\nmarkup=${JSON.stringify(replyMarkup)}` : ''));
+      `\npayload=${JSON.stringify(payload)}`);
     return Promise.resolve({ ok: true, mock: true });
   }
 
   return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'Markdown',
-      reply_markup: replyMarkup
-    });
+    const body = JSON.stringify(payload);
 
     const options = {
       hostname: 'api.telegram.org',
@@ -156,24 +160,24 @@ function sendTelegramMessage(chatId, text, replyMarkup = null) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload)
+        'Content-Length': Buffer.byteLength(body)
       }
     };
 
     const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
+      let respBody = '';
+      res.on('data', chunk => respBody += chunk);
       res.on('end', () => {
         try {
-          resolve(JSON.parse(body));
+          resolve(JSON.parse(respBody));
         } catch (e) {
-          resolve({ ok: false, error: body });
+          resolve({ ok: false, error: respBody });
         }
       });
     });
 
     req.on('error', reject);
-    req.write(payload);
+    req.write(body);
     req.end();
   });
 }
@@ -292,7 +296,7 @@ async function handleContactShare(msg) {
   // 安全红线：msg.from.id === msg.contact.user_id 必须严格相等；user_id 缺失（转发消息）同样拒绝。
   if (!msg.from || !msg.contact || String(msg.contact.user_id) !== String(msg.from.id)) {
     console.error('[TG-BOT] contact 归属校验失败：contact.user_id 与 from.id 不一致，拒绝绑定');
-    return sendTelegramMessage(chatId, '⛔ 只能绑定你本人的手机号：请点键盘上的「📱 分享手机号完成绑定」按钮发送，不要转发别人的名片。');
+    return sendTelegramMessage(chatId, '⛔ 只能绑定你本人的手机号：请重新点下方按钮分享你本人的手机号，不要转发别人的名片。');
   }
   if (!contactBindConfigured()) {
     console.error('[TG-BOT] FBS_GATEWAY_URL / FBS_GATEWAY_SECRET 未配置，一键绑定不可用（落地页手输路径不受影响）');
@@ -301,7 +305,7 @@ async function handleContactShare(msg) {
   // 轻校验：只留数字、长度 7-13（完整归一化 +63/63→0 是网关 fbs_normalize_phone 的职责，bot 不重复实现）。
   const digits = String(msg.contact.phone_number || '').replace(/[^0-9]/g, '');
   if (digits.length < 7 || digits.length > 13) {
-    return sendTelegramMessage(chatId, '❌ 手机号无法识别，请点键盘上的「📱 分享手机号完成绑定」按钮重新发送。');
+    return sendTelegramMessage(chatId, '❌ 手机号无法识别，请重新点下方按钮分享你本人的手机号。');
   }
   // 员工邀请优先：用户先发 /staff <邀请码> 时身份已经确定，不再让他选一次。
   // 没有 pending 态时必须原样落到下面的 cbind 二选一（既有骑手/商家通道，一行都不能回归）。
@@ -465,10 +469,11 @@ async function handleStaffContactBind(msg, digits, pending) {
   const staffUrl = staffEntryUrl(APP_BASE_URL);
   return sendTelegramMessage(
     chatId,
-    // 标题直接拼纯文本、不加 Markdown 强调：sendMessage 全局 parse_mode=Markdown，
-    // 店名里只要出现一个 `_` 或 `*` 就会 400 整条发不出去（绑定其实已成功，用户却什么都看不到）
     `✅ 已加入${title ? ` ${title}` : ''}\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮进入员工工作台。`,
-    staffUrl ? { inline_keyboard: [[{ text: '👔 进入工作台', web_app: { url: staffUrl } }]] } : null
+    staffUrl ? { inline_keyboard: [[{ text: '👔 进入工作台', web_app: { url: staffUrl } }]] } : null,
+    // 店名是外部输入（business_list.title），legacy Markdown 下含未配对的 `_`/`*` 会让整条 400：
+    // 绑定已成功、用户却收不到回执和按钮 → 必须裸文本发这条
+    { plainText: true }
   );
 }
 

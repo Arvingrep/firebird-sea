@@ -705,6 +705,52 @@ async function run() {
   if (gwRequests[gwRequests.length - 1].body.action !== 'staff_bind') throw new Error('归属失败后未走员工分支');
   console.log('   ✅ PASS（红线校验先于员工分支，pending 保留）');
 
+  console.log('🧪 测试 25: 店名含 Markdown 特殊字符 → 「已加入」消息不带 parse_mode（否则整条 400）');
+  // legacy Markdown 下未配对的 _ / * 会让 sendMessage 返回 400 can't parse entities：
+  // 绑定其实成功，用户却收不到回执和「进入工作台」按钮。这条钉住「拼了外部输入就裸文本发」。
+  const trickyTitle = 'Mala_Hot*Pot';
+  gwResponder = (action) => (action === 'staff_bind'
+    ? { status: 200, data: { success: true, data: { staff_id: 11, sid: 1, title: trickyTitle } } }
+    : { status: 200, data: { success: true, data: {} } });
+  const before25 = bot.getStdout().length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920009, type: 'private' },
+      text: `/staff ${validStaffToken}`,
+      from: { id: 920009, first_name: 'Staff' }
+    }
+  });
+  await new Promise(r => setTimeout(r, 150));
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920009, type: 'private' },
+      from: { id: 920009, first_name: 'Staff' },
+      contact: { phone_number: '09171234574', user_id: 920009 }
+    }
+  });
+  await new Promise(r => setTimeout(r, 400));
+  const payloads25 = bot.getStdout().slice(before25)
+    .split('\n')
+    .filter(l => l.startsWith('payload='))
+    .map(l => JSON.parse(l.slice('payload='.length)));
+  const joined25 = payloads25.find(p => String(p.text || '').includes('已加入'));
+  if (!joined25) throw new Error(`未找到「已加入」消息的 payload，stdout=${bot.getStdout().slice(before25)}`);
+  if (Object.prototype.hasOwnProperty.call(joined25, 'parse_mode')) {
+    throw new Error(`「已加入」消息仍带 parse_mode（店名含 _/* 会整条 400）: ${JSON.stringify(joined25)}`);
+  }
+  if (!joined25.text.includes(trickyTitle)) throw new Error(`店名未原样出现（被转义/改写）: ${JSON.stringify(joined25.text)}`);
+  if (!joined25.reply_markup || !JSON.stringify(joined25.reply_markup).includes('/tg/staff.php')) {
+    throw new Error(`「已加入」消息缺员工工作台按钮: ${JSON.stringify(joined25.reply_markup)}`);
+  }
+  // 对照组：同一轮里固定文案（无外部输入）仍然走默认 Markdown，证明「别的消息一律不动」
+  const confirm25 = payloads25.find(p => String(p.text || '').includes('邀请已确认'));
+  if (!confirm25) throw new Error('未找到「邀请已确认」消息的 payload');
+  if (confirm25.parse_mode !== 'Markdown') {
+    throw new Error(`固定文案的默认 parse_mode 被误改: ${JSON.stringify(confirm25)}`);
+  }
+  gwResponder = null;
+  console.log('   ✅ PASS（成功消息裸文本 + 店名原样，固定文案仍 Markdown）');
+
   console.log('🎉 所有 Telegram Bot 基建测试全部 100% 通过！');
   cleanup();
   process.exit(0);
