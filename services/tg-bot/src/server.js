@@ -112,6 +112,26 @@ function contactBindErrorText(err) {
   return '⚠️ 服务暂时不可用，请稍后重试。';
 }
 
+// --- 1.3 员工一键加入失败文案（按网关 staff_bind 错误码映射，口径见 task-002 brief-staff.md §6）---
+// 逐条映射，不透传 code：员工看到的是「该找谁」的动作，不是内部错误码。
+const STAFF_BIND_MESSAGES = {
+  STAFF_INVITE_INVALID: '❌ 邀请链接已失效，请让商家重新生成。',
+  STAFF_SHOP_NOT_FOUND: '❌ 店铺不存在，请联系商家。',
+  STAFF_NOT_FOUND: '❌ 这个手机号没有注册过本平台账号，请先注册再绑定。',
+  STAFF_IS_BUSINESS: '❌ 商家账号不能作为员工加入。',
+  STAFF_ALREADY_BOUND: '❌ 这个 Telegram 账号已绑定其他店铺。',
+  STAFF_AMBIGUOUS: '❌ 该手机号关联了多个账号，请联系客服。',
+  BIND_RATE_LIMITED: '⏳ 尝试过于频繁，请稍后再试。',
+  AUDIT_UNAVAILABLE: '⚠️ 服务暂时不可用，请稍后再试。',
+  BIND_FAILED: '❌ 绑定失败，请稍后再试。'
+};
+
+function staffBindErrorText(err) {
+  const payload = err && err.gwPayload;
+  const code = (payload && payload.error && payload.error.code) || (err && err.gwCode) || '';
+  return STAFF_BIND_MESSAGES[code] || '❌ 绑定失败，请稍后再试。';
+}
+
 // --- 1. 发送 Telegram 消息工具函数 ---
 function sendTelegramMessage(chatId, text, replyMarkup = null) {
   if (!BOT_TOKEN) {
@@ -219,6 +239,19 @@ function merchantEntryUrl(base) {
   return `${raw}/tg/entry.php?role=merchant`;
 }
 
+// 员工工作台入口（Telegram Mini App）：纯 PHP 落地页，用 initData 换会话 Cookie 后 302 到
+// /member?action=workPlatform。域名推导与 merchantEntryUrl 完全同款（同一个 TG_APP_BASE_URL）。
+function staffEntryUrl(base) {
+  const raw = String(base || '').trim().replace(/\/+$/, '');
+  if (raw === '') return '';
+  try {
+    if (new URL(raw).protocol !== 'https:') return '';
+  } catch (_) {
+    return '';
+  }
+  return `${raw}/tg/staff.php`;
+}
+
 // 网站登录确认入口（Telegram Mini App）：令牌由 api/login/telegram 插件下发，页面在 Telegram 内打开才能拿到 initData。
 function loginConfirmUrl(base, token) {
   const raw = String(base || '').trim().replace(/\/+$/, '');
@@ -269,6 +302,12 @@ async function handleContactShare(msg) {
   const digits = String(msg.contact.phone_number || '').replace(/[^0-9]/g, '');
   if (digits.length < 7 || digits.length > 13) {
     return sendTelegramMessage(chatId, '❌ 手机号无法识别，请点键盘上的「📱 分享手机号完成绑定」按钮重新发送。');
+  }
+  // 员工邀请优先：用户先发 /staff <邀请码> 时身份已经确定，不再让他选一次。
+  // 没有 pending 态时必须原样落到下面的 cbind 二选一（既有骑手/商家通道，一行都不能回归）。
+  const staffInvite = peekStaffPending(String(msg.from.id));
+  if (staffInvite) {
+    return handleStaffContactBind(msg, digits, staffInvite);
   }
   // contact 消息不携带「是哪个键盘按钮触发的」，无法推断骑手/商家身份；
   // 用一次性内联按钮让用户选链路，手机号随 callback_data 传递（≤64B），bot 不落任何内存态。
@@ -334,6 +373,103 @@ async function handleBindRoleChoice(cb) {
   );
 }
 
+// --- 1.6 /staff 员工邀请 + contact 一键加入 ---
+// 邀请 token 由 PHP 侧 fbs_staff_invite.func.php 签发（v1_<sid>_<exp>_<hex32>，47 字符）。
+// bot 只做「形状 + exp 未过期」的本地预检；真正的验签（HMAC + sid 是否存在）在网关 staff_bind 里，
+// bot 不复制一份密钥派生逻辑——否则 bridge token 轮转时两处口径必分叉。
+const STAFF_TOKEN_RE = /^v1_(\d{1,19})_(\d{1,19})_([a-f0-9]{32})$/;
+// pending 寿命 15 分钟：覆盖「收到邀请 → 点键盘分享手机号」的真实操作窗口。
+// 单副本 + Recreate 部署，允许内存态（与既有 cbind 的内联按钮方案同一量级）。
+const STAFF_PENDING_TTL_MS = 15 * 60 * 1000;
+const staffPending = new Map(); // tg_user_id -> { token, expiresAt }
+
+function parseStaffInviteToken(raw, nowMs = Date.now()) {
+  const m = STAFF_TOKEN_RE.exec(String(raw || '').trim());
+  if (!m) return null;
+  const sid = Number(m[1]);
+  const exp = Number(m[2]); // unix 秒
+  if (!Number.isSafeInteger(sid) || sid <= 0) return null;
+  if (!Number.isSafeInteger(exp) || exp * 1000 <= nowMs) return null;
+  return { sid, exp, token: m[0] };
+}
+
+// 只读不消费：绑定失败要保留 pending 让用户重试一次，删除由调用方在成功后显式做。
+// 过期项在读到时顺手清掉，避免把「已过期」误报成「绑定失败」。
+function peekStaffPending(tgUserId) {
+  const key = String(tgUserId || '');
+  const pending = staffPending.get(key);
+  if (!pending) return null;
+  if (pending.expiresAt <= Date.now()) {
+    staffPending.delete(key);
+    return null;
+  }
+  return pending;
+}
+
+// /staff <token> 与 /start staff_<token> 共用。
+// 顺序：私聊守卫（早退，必须在发键盘之前）→ token 形状/时效 → 写 pending → 文本 + 键盘两条消息。
+async function handleStaffInvite(msg, rawToken) {
+  const chatId = msg.chat && msg.chat.id;
+  const isPrivate = !msg.chat || !msg.chat.type || msg.chat.type === 'private';
+  if (!isPrivate) {
+    // request_contact 键盘在群里会对整个群生效（噪音），web_app 按钮更是非法 → 一律早退
+    return sendTelegramMessage(chatId, '请在私聊中发送 /staff <邀请码> 完成员工加入');
+  }
+  const invite = parseStaffInviteToken(rawToken);
+  if (!invite) {
+    return sendTelegramMessage(chatId, '❌ 邀请链接无效或已过期，请让商家重新生成');
+  }
+  const tgUserId = String((msg.from && msg.from.id) || '');
+  if (!/^[1-9][0-9]{0,18}$/.test(tgUserId)) {
+    return sendTelegramMessage(chatId, '❌ 无法识别你的 Telegram 账号，请稍后重试。');
+  }
+  staffPending.set(tgUserId, { token: invite.token, expiresAt: Date.now() + STAFF_PENDING_TTL_MS });
+  return sendTelegramMessage(chatId, '✅ 邀请已确认。请点下方按钮分享手机号完成加入：')
+    .then(() =>
+      // reply_markup 一条消息只能一个：web_app 内联按钮与 request_contact 回复键盘必须分两条发
+      // （既有 contact 绑定踩过的坑，见 /rider 处注释）
+      sendTelegramMessage(chatId, '或点下方按钮分享手机号完成加入：', {
+        keyboard: [[{ text: '📱 分享手机号完成加入', request_contact: true }]],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      })
+    );
+}
+
+// pending 态下的手机号落地：直连网关 staff_bind。
+// ip 传 tg_user_id（纯数字），与既有 contact 绑定口径一致：空串会让网关回落到 Pod IP，
+// 全 bot 用户挤进同一个 ip 限频桶（20/300s），批量入职当天必然误伤。
+async function handleStaffContactBind(msg, digits, pending) {
+  const chatId = msg.chat && msg.chat.id;
+  const tgUserId = String(msg.from.id);
+  const params = { tg_user_id: tgUserId, phone: digits, ip: tgUserId, token: pending.token };
+  let resp;
+  try {
+    resp = await gatewayCall('staff_bind', params);
+  } catch (err) {
+    // 只记状态与消息：不落手机号 / token 细节
+    console.error(`[TG-BOT] staff_bind 失败: HTTP ${err.gwStatus || '-'} ${String(err.message).slice(0, 200)}`);
+    return sendTelegramMessage(chatId, staffBindErrorText(err));
+  }
+  // 2xx 但 success:false 同样视为失败，绝不静默成功（与 handleBindRoleChoice 同一口径）
+  if (!resp || resp.success !== true) {
+    const code = resp && resp.error && resp.error.code;
+    return sendTelegramMessage(chatId, STAFF_BIND_MESSAGES[code] || '❌ 绑定失败，请稍后再试。');
+  }
+  // 成功才消费 pending：失败保留，用户再点一次键盘即可重试（token 自身时效由网关把关）
+  staffPending.delete(tgUserId);
+  const data = resp.data || {};
+  const title = String(data.title || '').trim();
+  const staffUrl = staffEntryUrl(APP_BASE_URL);
+  return sendTelegramMessage(
+    chatId,
+    // 标题直接拼纯文本、不加 Markdown 强调：sendMessage 全局 parse_mode=Markdown，
+    // 店名里只要出现一个 `_` 或 `*` 就会 400 整条发不出去（绑定其实已成功，用户却什么都看不到）
+    `✅ 已加入${title ? ` ${title}` : ''}\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮进入员工工作台。`,
+    staffUrl ? { inline_keyboard: [[{ text: '👔 进入工作台', web_app: { url: staffUrl } }]] } : null
+  );
+}
+
 // 回调分流：一键绑定的角色选择回调；其余维持原有 check_status。
 function dispatchCallbackQuery(cb) {
   if (cb && typeof cb.data === 'string' && cb.data.startsWith('cbind:')) {
@@ -378,6 +514,13 @@ async function handleIncomingMessage(msg) {
     );
   }
 
+  // 指令 0.5: /start staff_<邀请码> —— 员工邀请深链（t.me/<bot>?start=staff_<token>）。
+  // 必须在通用 /start 之前：否则会被欢迎语吞掉，点邀请链接的人永远走不到绑定。
+  const staffStartMatch = /^\/start(?:@\w+)?\s+staff_(\S+)\s*$/.exec(text.trim());
+  if (staffStartMatch) {
+    return handleStaffInvite(msg, staffStartMatch[1]);
+  }
+
   // 指令 1: /start
   if (text.startsWith('/start')) {
     const welcome = `
@@ -387,6 +530,7 @@ async function handleIncomingMessage(msg) {
 1. 💡 *随想文字/语音*：自动脱水剪枝并派单至 BMAD 看板
 2. 📊 */status*：查看 Coins.ph 比索行情与系统状态
 3. 🧹 */clean*：执行工程脱水剪枝清理
+👔 员工绑定：/staff <邀请码>
 ━━━━━━━━━━━━━━━━━━━━
 💡 请直接在此发送任何需求，我将为您启动自动化闭环！
 `;
@@ -465,6 +609,16 @@ async function handleIncomingMessage(msg) {
         one_time_keyboard: true
       })
     );
+  }
+
+  // 指令 1.7: /staff <邀请码> —— 员工邀请（商家在后台「员工管理」生成，24h 有效）。
+  // 必须早于常规输入兜底：否则裸 /staff 会被当成需求文本派单到看板。
+  if (/^\/staff(?:@\w+)?\s*$/.test(text.trim())) {
+    return sendTelegramMessage(chatId, '❌ 缺少邀请码。用法：`/staff <邀请码>`（由商家在后台「员工管理」生成）');
+  }
+  const staffMatch = /^\/staff(?:@\w+)?\s+(\S+)\s*$/.exec(text.trim());
+  if (staffMatch) {
+    return handleStaffInvite(msg, staffMatch[1].replace(/^staff_/, ''));
   }
 
   // 指令 2: /status

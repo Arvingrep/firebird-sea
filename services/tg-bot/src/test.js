@@ -421,6 +421,290 @@ async function run() {
   if (gwRequests.length !== gwCountBefore16) throw new Error('群聊 contact 不应调用网关');
   console.log('   ✅ PASS（/rider /merchant /start /contact 群聊均门控，无键盘噪音）');
 
+  // ================= 员工邀请：/staff <token> 与 contact 一键加入 =================
+  // token 形状 v1_<sid>_<exp>_<hex32>（exp 是 unix 秒）。bot 只做形状+时效预检，
+  // 签名由网关验，所以这里用固定的假 HMAC 即可。
+  const nowSec = () => Math.floor(Date.now() / 1000);
+  const staffToken = (sid, expSec) => `v1_${sid}_${expSec}_${'a'.repeat(32)}`;
+  const validStaffToken = staffToken(1, nowSec() + 86400);
+
+  console.log('🧪 测试 17: /start staff_<合法 token> → 「邀请已确认」+ 另一条消息带 request_contact 键盘');
+  const before17 = bot.getStdout().length;
+  const gwCountBefore17 = gwRequests.length;
+  const s17 = await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920001, type: 'private' },
+      text: `/start staff_${validStaffToken}`,
+      from: { id: 920001, first_name: 'Staff' }
+    }
+  });
+  if (s17.status !== 200 || !s17.data.ok) throw new Error('/start staff_ webhook failed');
+  await new Promise(r => setTimeout(r, 200));
+  const out17 = bot.getStdout().slice(before17);
+  const confirmAt17 = out17.indexOf('邀请已确认');
+  const keyboardAt17 = out17.indexOf('"request_contact":true');
+  if (confirmAt17 < 0) throw new Error(`/start staff_ 未回复「邀请已确认」，stdout=${out17}`);
+  if (keyboardAt17 < 0) throw new Error(`/start staff_ 未发送 request_contact 键盘，stdout=${out17}`);
+  // 键盘必须挂在后一条消息上：reply_markup 二选一，同一条里既 web_app 又 keyboard 会被 Telegram 丢弃
+  if (confirmAt17 > keyboardAt17) throw new Error(`键盘先于确认文案发出（应拆两条），stdout=${out17}`);
+  if (!out17.includes('"keyboard":[[{"text":"📱 分享手机号完成加入","request_contact":true}]]')) {
+    throw new Error(`键盘结构不符（request_contact 必须在第一行第一列），stdout=${out17}`);
+  }
+  if (!out17.includes('"one_time_keyboard":true') || !out17.includes('"resize_keyboard":true')) {
+    throw new Error(`键盘缺少 one_time_keyboard/resize_keyboard，stdout=${out17}`);
+  }
+  if (gwRequests.length !== gwCountBefore17) throw new Error('仅确认邀请不应调用网关');
+  console.log('   ✅ PASS（两条消息：文案 + 键盘，未调网关）');
+
+  console.log('🧪 测试 18: /staff <合法 token> → 与 /start staff_ 同款（确认文案 + 键盘）');
+  const before18 = bot.getStdout().length;
+  const s18 = await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920002, type: 'private' },
+      text: `/staff ${validStaffToken}`,
+      from: { id: 920002, first_name: 'Staff' }
+    }
+  });
+  if (s18.status !== 200 || !s18.data.ok) throw new Error('/staff webhook failed');
+  await new Promise(r => setTimeout(r, 200));
+  const out18 = bot.getStdout().slice(before18);
+  if (!out18.includes('邀请已确认')) throw new Error(`/staff 未回复「邀请已确认」，stdout=${out18}`);
+  if (!out18.includes('"request_contact":true')) throw new Error(`/staff 未发送 request_contact 键盘，stdout=${out18}`);
+  // 裸 /staff 必须早退提示用法，绝不能落进「常规输入 → 派单」把 /staff 当成需求提交
+  const before18b = bot.getStdout().length;
+  const n8nCountBefore18 = n8nRequests.length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: { chat: { id: 920002, type: 'private' }, text: '/staff', from: { id: 920002, first_name: 'Staff' } }
+  });
+  await new Promise(r => setTimeout(r, 300));
+  const out18b = bot.getStdout().slice(before18b);
+  if (!out18b.includes('缺少邀请码')) throw new Error(`裸 /staff 未提示用法，stdout=${out18b}`);
+  if (n8nRequests.length !== n8nCountBefore18) throw new Error('裸 /staff 被误当成需求转发');
+  console.log('   ✅ PASS');
+
+  console.log('🧪 测试 19: /start staff_<过期 token> → 只回「无效或已过期」，绝不发键盘');
+  const before19 = bot.getStdout().length;
+  const s19 = await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920003, type: 'private' },
+      text: `/start staff_${staffToken(1, nowSec() - 60)}`,
+      from: { id: 920003, first_name: 'Staff' }
+    }
+  });
+  if (s19.status !== 200 || !s19.data.ok) throw new Error('expired staff token webhook failed');
+  await new Promise(r => setTimeout(r, 200));
+  const out19 = bot.getStdout().slice(before19);
+  if (!out19.includes('无效或已过期')) throw new Error(`过期 token 未拒绝，stdout=${out19}`);
+  if (out19.includes('request_contact')) throw new Error(`过期 token 仍发了键盘，stdout=${out19}`);
+  if (out19.includes('邀请已确认')) throw new Error(`过期 token 仍回了「邀请已确认」，stdout=${out19}`);
+  // 过期 token 不得写入 pending：其后分享手机号仍应走 cbind 二选一
+  const before19b = bot.getStdout().length;
+  const gwCountBefore19 = gwRequests.length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920003, type: 'private' },
+      from: { id: 920003, first_name: 'Staff' },
+      contact: { phone_number: '09171234568', user_id: 920003 }
+    }
+  });
+  await new Promise(r => setTimeout(r, 200));
+  const out19b = bot.getStdout().slice(before19b);
+  if (!out19b.includes('cbind:r|09171234568') || !out19b.includes('cbind:m|09171234568')) {
+    throw new Error(`过期 token 后 contact 未落到 cbind 二选一，stdout=${out19b}`);
+  }
+  if (gwRequests.length !== gwCountBefore19) throw new Error('过期 token 后 contact 不应调用网关');
+  console.log('   ✅ PASS（无键盘、无 pending、contact 回落 cbind）');
+
+  console.log('🧪 测试 20: 群聊 /start staff_<token> → 只提示私聊，不发键盘且不写 pending');
+  const before20 = bot.getStdout().length;
+  const s20 = await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 555002, type: 'group' },
+      text: `/start staff_${validStaffToken}`,
+      from: { id: 920004, first_name: 'Staff' }
+    }
+  });
+  if (s20.status !== 200 || !s20.data.ok) throw new Error('/start staff_ group failed');
+  await new Promise(r => setTimeout(r, 200));
+  const out20 = bot.getStdout().slice(before20);
+  if (!out20.includes('请在私聊中发送')) throw new Error(`群聊未早退提示，stdout=${out20}`);
+  if (out20.includes('request_contact') || out20.includes('web_app')) {
+    throw new Error(`群聊泄漏键盘或 web_app 按钮，stdout=${out20}`);
+  }
+  // 门控必须在写 pending 之前：否则群里点一次链接，私聊里就被按员工身份绑定了
+  const before20b = bot.getStdout().length;
+  const gwCountBefore20 = gwRequests.length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920004, type: 'private' },
+      from: { id: 920004, first_name: 'Staff' },
+      contact: { phone_number: '09171234569', user_id: 920004 }
+    }
+  });
+  await new Promise(r => setTimeout(r, 200));
+  const out20b = bot.getStdout().slice(before20b);
+  if (!out20b.includes('cbind:r|09171234569')) {
+    throw new Error(`群聊 token 不应写入 pending（contact 应落 cbind），stdout=${out20b}`);
+  }
+  if (gwRequests.length !== gwCountBefore20) throw new Error('群聊场景不应调用网关');
+  console.log('   ✅ PASS（群里不写 pending，contact 仍走 cbind）');
+
+  console.log('🧪 测试 21: contact + 有 pending → staff_bind（ip = tg_user_id）→ 已加入 + 工作台按钮 → 消费 pending');
+  gwResponder = (action) => (action === 'staff_bind'
+    ? { status: 200, data: { success: true, data: { staff_id: 9, sid: 1, title: '川香阁·马尼拉中餐厅' } } }
+    : { status: 200, data: { success: true, data: {} } });
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920005, type: 'private' },
+      text: `/staff ${validStaffToken}`,
+      from: { id: 920005, first_name: 'Staff' }
+    }
+  });
+  await new Promise(r => setTimeout(r, 150));
+  const before21 = bot.getStdout().length;
+  const gwCountBefore21 = gwRequests.length;
+  const s21 = await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920005, type: 'private' },
+      from: { id: 920005, first_name: 'Staff' },
+      contact: { phone_number: '09171234570', user_id: 920005 }
+    }
+  });
+  if (s21.status !== 200 || !s21.data.ok) throw new Error('staff contact bind failed');
+  await new Promise(r => setTimeout(r, 400));
+  if (gwRequests.length !== gwCountBefore21 + 1) throw new Error(`网关调用次数异常: ${gwRequests.length}`);
+  const gw21 = gwRequests[gwRequests.length - 1].body;
+  if (gw21.action !== 'staff_bind') throw new Error(`应调用 staff_bind: ${gw21.action}`);
+  if (gw21.params.tg_user_id !== '920005') throw new Error(`tg_user_id 不符: ${JSON.stringify(gw21.params)}`);
+  if (gw21.params.phone !== '09171234570') throw new Error(`phone 不符: ${JSON.stringify(gw21.params)}`);
+  // ip 必须是 tg_user_id：空串会让网关回落 Pod IP，全体 bot 用户挤进同一限频桶
+  if (gw21.params.ip !== gw21.params.tg_user_id) throw new Error(`ip 未传 tg_user_id: ${JSON.stringify(gw21.params)}`);
+  if (gw21.params.token !== validStaffToken) throw new Error(`token 未原样上送: ${JSON.stringify(gw21.params)}`);
+  const out21 = bot.getStdout().slice(before21);
+  if (!out21.includes('已加入')) throw new Error(`成功文案缺失，stdout=${out21}`);
+  if (!out21.includes('川香阁·马尼拉中餐厅')) throw new Error(`未带店铺标题，stdout=${out21}`);
+  if (!out21.includes(`"web_app":{"url":"${APP_BASE_URL}/tg/staff.php"}`)) {
+    throw new Error(`未带员工工作台 web_app 按钮，stdout=${out21}`);
+  }
+  // 成功后 pending 必须被消费：再分享一次应回到 cbind 二选一，而不是二次 staff_bind
+  const before21b = bot.getStdout().length;
+  const gwCountBefore21b = gwRequests.length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920005, type: 'private' },
+      from: { id: 920005, first_name: 'Staff' },
+      contact: { phone_number: '09171234570', user_id: 920005 }
+    }
+  });
+  await new Promise(r => setTimeout(r, 300));
+  const out21b = bot.getStdout().slice(before21b);
+  if (!out21b.includes('cbind:r|09171234570')) {
+    throw new Error(`成功后 pending 未清除（应回 cbind），stdout=${out21b}`);
+  }
+  if (gwRequests.length !== gwCountBefore21b) throw new Error('成功后二次 contact 不应再调网关');
+  gwResponder = null;
+  console.log('   ✅ PASS（含 ip/token 入参断言与 pending 消费）');
+
+  console.log('🧪 测试 22: contact + 无 pending → 仍走既有 cbind 二选一（回归保护）');
+  const before22 = bot.getStdout().length;
+  const gwCountBefore22 = gwRequests.length;
+  const s22 = await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920006, type: 'private' },
+      from: { id: 920006, first_name: 'Staff' },
+      contact: { phone_number: '09171234571', user_id: 920006 }
+    }
+  });
+  if (s22.status !== 200 || !s22.data.ok) throw new Error('no-pending contact failed');
+  await new Promise(r => setTimeout(r, 300));
+  const out22 = bot.getStdout().slice(before22);
+  if (!out22.includes('cbind:r|09171234571') || !out22.includes('cbind:m|09171234571')) {
+    throw new Error(`无 pending 时未回落到 cbind 二选一，stdout=${out22}`);
+  }
+  if (out22.includes('邀请已确认')) throw new Error(`无 pending 时误入员工分支，stdout=${out22}`);
+  if (gwRequests.length !== gwCountBefore22) throw new Error('选择身份前不应调用网关');
+  console.log('   ✅ PASS（无 pending 时不进员工分支）');
+
+  console.log('🧪 测试 23: staff_bind 404 STAFF_NOT_FOUND → 「没有注册过」文案，且 pending 保留可重试');
+  gwResponder = (action) => (action === 'staff_bind'
+    ? { status: 404, data: { success: false, error: { code: 'STAFF_NOT_FOUND', message: 'no member for phone' } } }
+    : { status: 200, data: { success: true, data: {} } });
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920007, type: 'private' },
+      text: `/staff ${validStaffToken}`,
+      from: { id: 920007, first_name: 'Staff' }
+    }
+  });
+  await new Promise(r => setTimeout(r, 150));
+  const before23 = bot.getStdout().length;
+  const gwCountBefore23 = gwRequests.length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920007, type: 'private' },
+      from: { id: 920007, first_name: 'Staff' },
+      contact: { phone_number: '09171234572', user_id: 920007 }
+    }
+  });
+  await new Promise(r => setTimeout(r, 400));
+  const out23 = bot.getStdout().slice(before23);
+  if (!out23.includes('没有注册过')) throw new Error(`STAFF_NOT_FOUND 文案未映射，stdout=${out23}`);
+  if (gwRequests[gwRequests.length - 1].body.action !== 'staff_bind') throw new Error('未调用 staff_bind');
+  // 失败保留 pending：再分享一次必须仍打 staff_bind（而不是掉回 cbind）——用户可重试一次
+  const gwCountBefore23b = gwRequests.length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920007, type: 'private' },
+      from: { id: 920007, first_name: 'Staff' },
+      contact: { phone_number: '09171234572', user_id: 920007 }
+    }
+  });
+  await new Promise(r => setTimeout(r, 400));
+  if (gwRequests.length !== gwCountBefore23b + 1) throw new Error('失败后 pending 被误删（重试未调网关）');
+  if (gwRequests[gwRequests.length - 1].body.action !== 'staff_bind') {
+    throw new Error('失败后 pending 被误删（重试未走员工分支）');
+  }
+  gwResponder = null;
+  console.log('   ✅ PASS（文案已映射，pending 保留可重试）');
+
+  console.log('🧪 测试 24: 有 pending 但 contact 归属不一致 → 不发起绑定，且 pending 不被消费');
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920008, type: 'private' },
+      text: `/staff ${validStaffToken}`,
+      from: { id: 920008, first_name: 'Staff' }
+    }
+  });
+  await new Promise(r => setTimeout(r, 150));
+  const before24 = bot.getStdout().length;
+  const gwCountBefore24 = gwRequests.length;
+  const s24 = await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920008, type: 'private' },
+      from: { id: 920008, first_name: 'Staff' },
+      contact: { phone_number: '09171234573', user_id: 999999 } // 转发的名片
+    }
+  });
+  if (s24.status !== 200 || !s24.data.ok) throw new Error('ownership mismatch with pending failed');
+  await new Promise(r => setTimeout(r, 300));
+  if (gwRequests.length !== gwCountBefore24) throw new Error('归属不一致时不应调用网关（含 staff_bind）');
+  if (!bot.getStdout().slice(before24).includes('只能绑定你本人的手机号')) {
+    throw new Error(`归属不一致未拒绝，stdout=${bot.getStdout().slice(before24)}`);
+  }
+  // pending 未被消费：本人随后正确分享仍应走 staff_bind
+  const gwCountBefore24b = gwRequests.length;
+  await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 920008, type: 'private' },
+      from: { id: 920008, first_name: 'Staff' },
+      contact: { phone_number: '09171234573', user_id: 920008 }
+    }
+  });
+  await new Promise(r => setTimeout(r, 400));
+  if (gwRequests.length !== gwCountBefore24b + 1) throw new Error('归属失败后 pending 丢失');
+  if (gwRequests[gwRequests.length - 1].body.action !== 'staff_bind') throw new Error('归属失败后未走员工分支');
+  console.log('   ✅ PASS（红线校验先于员工分支，pending 保留）');
+
   console.log('🎉 所有 Telegram Bot 基建测试全部 100% 通过！');
   cleanup();
   process.exit(0);
