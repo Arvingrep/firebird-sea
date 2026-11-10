@@ -32,13 +32,21 @@ type fakeGateway struct {
 	memberErr error
 	session   map[string]any
 	sessErr   error
+	// merchant 是 merchant_session 的响应（role=merchant 分支专用）。
+	merchant    map[string]any
+	merchantErr error
 	// sawInitDataHash 记录 issue_session 是否带上了 initData 的 sha256（防重放配额）。
 	sawInitDataHash string
-	calls           int
+	// sawMerchantParams 记录 merchant_session 的入参（防重放记账断言用）。
+	sawMerchantParams map[string]any
+	// memberCallsCount 单独数 MemberFindOrCreate（merchant 分支的「绝不建号」断言用）。
+	memberCallsCount int
+	calls            int
 }
 
 func (f *fakeGateway) MemberFindOrCreate(context.Context, map[string]any) (map[string]any, error) {
 	f.calls++
+	f.memberCallsCount++
 	return f.member, f.memberErr
 }
 
@@ -49,6 +57,15 @@ func (f *fakeGateway) IssueSession(_ context.Context, params map[string]any) (ma
 	}
 	return f.session, f.sessErr
 }
+
+func (f *fakeGateway) MerchantSession(_ context.Context, params map[string]any) (map[string]any, error) {
+	f.calls++
+	f.sawMerchantParams = params
+	return f.merchant, f.merchantErr
+}
+
+// memberCalls 返回 MemberFindOrCreate 的调用次数（merchant 分支的「绝不建号」断言用）。
+func (f *fakeGateway) memberCalls() int { return f.memberCallsCount }
 
 func validValidate(initData, _ string) tgauth.Result {
 	if initData == "expired" {
@@ -228,6 +245,171 @@ func TestSelfCheckRoleNotSupported(t *testing.T) {
 	}
 	if code := errorCode(t, recorder); code != "ROLE_NOT_SUPPORTED" {
 		t.Fatalf("code 应为 ROLE_NOT_SUPPORTED，实得 %q", code)
+	}
+	// 未知 role 一律 501 且**不触达网关**（courier 也不走本端点）。
+	if gw.calls != 0 {
+		t.Fatalf("501 分支不该打网关，实际 %d 次", gw.calls)
+	}
+}
+
+func TestSelfCheckUnknownRoleStill501(t *testing.T) {
+	for _, role := range []string{"admin", "courier", "shop", ""} {
+		gw := &fakeGateway{member: okMember(1), session: okSession(1, "a=1")}
+		form := url.Values{"initData": {"good"}}
+		if role != "" {
+			form.Set("role", role)
+		}
+		recorder := post(newHandler(t, gw), form, nil)
+		if role == "" {
+			// 空 role 回落 customer，应成功而不是 501。
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("缺 role 应回落 customer（200），实得 %d", recorder.Code)
+			}
+			continue
+		}
+		if recorder.Code != http.StatusNotImplemented || errorCode(t, recorder) != "ROLE_NOT_SUPPORTED" {
+			t.Fatalf("role=%q 应 501 ROLE_NOT_SUPPORTED，实得 %d / %q",
+				role, recorder.Code, errorCode(t, recorder))
+		}
+		if gw.calls != 0 {
+			t.Fatalf("role=%q 不该触达网关", role)
+		}
+	}
+}
+
+// TestSelfCheckMerchantRoleSession 是 merchant 分支的核心用例（方案 A）：
+//   - MerchantSession 被调且带 init_data_hash（防重放记账）；
+//   - MemberFindOrCreate **不被调**（商家绝不建号）；
+//   - set_cookies 逐字透传、redirect=/wmsj/、member_map_synced 恒 false。
+func TestSelfCheckMerchantRoleSession(t *testing.T) {
+	cookies := []string{
+		"HN_login_user=YWJjZGVm; Path=/; Domain=.example.com; HttpOnly",
+		"HN_tg=1; Path=/; Domain=.example.com; Max-Age=2592000",
+	}
+	gw := &fakeGateway{merchant: map[string]any{
+		"success": true,
+		"data": map[string]any{
+			"member_id":   float64(2),
+			"shop_ids":    []any{float64(1), float64(5)},
+			"redirect":    "/wmsj/",
+			"set_cookies": []any{cookies[0], cookies[1]},
+		},
+	}}
+	recorder := post(newHandler(t, gw), url.Values{"initData": {"good"}, "role": {"merchant"}}, nil)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("merchant 登录应 200，实得 %d（body=%q）", recorder.Code, recorder.Body.String())
+	}
+	// Cookie 必须原样透传：不增、不删、不改属性、不重排。
+	got := recorder.Header()["Set-Cookie"]
+	if len(got) != len(cookies) {
+		t.Fatalf("Set-Cookie 条数应为 %d，实得 %d：%v", len(cookies), len(got), got)
+	}
+	for index, want := range cookies {
+		if got[index] != want {
+			t.Fatalf("第 %d 条 Cookie 被改写：%q → %q", index+1, want, got[index])
+		}
+	}
+
+	body := decode(t, recorder)
+	data := body["data"].(map[string]any)
+	if data["member_id"] != float64(2) {
+		t.Fatalf("data.member_id 应为 2，实得 %v", data["member_id"])
+	}
+	if data["redirect"] != "/wmsj/" {
+		t.Fatalf("data.redirect 应为 /wmsj/，实得 %v", data["redirect"])
+	}
+	if data["member_map_synced"] != false {
+		t.Fatalf("merchant 分支 member_map_synced 必须恒 false，实得 %v", data["member_map_synced"])
+	}
+
+	// 防重放记账：merchant_session 带 sha256(initData)。
+	params := gw.sawMerchantParams
+	if params == nil {
+		t.Fatal("MerchantSession 未被调用")
+	}
+	if got, _ := params["init_data_hash"].(string); got != sha256Hex("good") {
+		t.Fatalf("merchant_session 应带 initData 的 sha256，实得 %q", got)
+	}
+	// MemberFindOrCreate 绝不被调：网关建号会把商家变成「有 cookie 无店铺」的空会员。
+	if gw.memberCalls() != 0 {
+		t.Fatalf("merchant 分支不得调用 MemberFindOrCreate，实际 %d 次", gw.memberCalls())
+	}
+}
+
+// TestSelfCheckMerchantRedirectSanitized 钉住 redirect 过 SafeRedirect：
+// 网关返回协议相对路径也必须回落 /wmsj/。
+func TestSelfCheckMerchantRedirectSanitized(t *testing.T) {
+	for _, redirect := range []string{"//evil.example.com/", "https://evil/", "/a\\b", ""} {
+		gw := &fakeGateway{merchant: map[string]any{
+			"success": true,
+			"data": map[string]any{
+				"member_id":   float64(2),
+				"redirect":    redirect,
+				"set_cookies": []any{"HN_login_user=abc"},
+			},
+		}}
+		recorder := post(newHandler(t, gw), url.Values{"initData": {"good"}, "role": {"merchant"}}, nil)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("redirect=%q 应 200，实得 %d", redirect, recorder.Code)
+		}
+		if got := decode(t, recorder)["data"].(map[string]any)["redirect"]; got != "/wmsj/" {
+			t.Fatalf("redirect=%q 应被净化成 /wmsj/，实得 %v", redirect, got)
+		}
+	}
+}
+
+// TestSelfCheckMerchantGatewayFailurePassthrough 钉住网关失败码原样透传
+// （MERCHANT_NOT_BOUND → 404，文案给可执行动作）。
+func TestSelfCheckMerchantGatewayFailurePassthrough(t *testing.T) {
+	cases := []struct {
+		err        error
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			err: &gateway.Error{
+				Code:    gateway.CodeHTTPError,
+				Message: "gateway rejected",
+				Payload: map[string]any{
+					"success": false,
+					"error":   map[string]any{"code": "MERCHANT_NOT_BOUND", "message": "x"},
+				},
+			},
+			wantStatus: http.StatusNotFound, wantCode: "MERCHANT_NOT_BOUND",
+		},
+		{
+			err:        &gateway.Error{Code: gateway.CodeTimeout, Message: "timeout"},
+			wantStatus: http.StatusBadGateway, wantCode: "GATEWAY_UNAVAILABLE",
+		},
+	}
+	for _, item := range cases {
+		gw := &fakeGateway{merchantErr: item.err}
+		recorder := post(newHandler(t, gw), url.Values{"initData": {"good"}, "role": {"merchant"}}, nil)
+		if recorder.Code != item.wantStatus || errorCode(t, recorder) != item.wantCode {
+			t.Fatalf("应 %d / %q，实得 %d / %q",
+				item.wantStatus, item.wantCode, recorder.Code, errorCode(t, recorder))
+		}
+	}
+}
+
+// TestSelfCheckMerchantInvalidSessionPayload 钉住「2xx 但形状不对 → 502 GATEWAY_UNAVAILABLE」。
+func TestSelfCheckMerchantInvalidSessionPayload(t *testing.T) {
+	for name, merchant := range map[string]map[string]any{
+		"缺 set_cookies": {"success": true, "data": map[string]any{"member_id": float64(2)}},
+		"空 set_cookies": {"success": true, "data": map[string]any{"member_id": float64(2), "set_cookies": []any{}}},
+		"member_id 为 0": {"success": true, "data": map[string]any{"member_id": float64(0), "set_cookies": []any{"a=1"}}},
+		"success false": {"success": false},
+	} {
+		gw := &fakeGateway{merchant: merchant}
+		recorder := post(newHandler(t, gw), url.Values{"initData": {"good"}, "role": {"merchant"}}, nil)
+		if recorder.Code != http.StatusBadGateway || errorCode(t, recorder) != "GATEWAY_UNAVAILABLE" {
+			t.Fatalf("%s 应 502 GATEWAY_UNAVAILABLE，实得 %d / %q",
+				name, recorder.Code, errorCode(t, recorder))
+		}
+		if recorder.Header().Get("Set-Cookie") != "" {
+			t.Fatalf("%s：失败时不得下发任何 Cookie", name)
+		}
 	}
 }
 

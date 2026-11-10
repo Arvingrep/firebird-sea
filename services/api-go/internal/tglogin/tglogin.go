@@ -32,6 +32,7 @@ import (
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/gateway"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpbody"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/merchant"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/tgauth"
 )
 
@@ -64,6 +65,16 @@ var statusByCode = map[string]int{
 	"DB_QUERY_FAILED":               http.StatusInternalServerError,
 	"UNKNOWN_ACTION":                http.StatusInternalServerError,
 	"INTERNAL_ERROR":                http.StatusInternalServerError,
+	// —— merchant 分支（方案 A）：网关 merchant_session 的契约码，HTTP 码与 PHP 侧一致 ——
+	"MERCHANT_NOT_BOUND":     http.StatusNotFound,
+	"MERCHANT_NOT_FOUND":     http.StatusNotFound,
+	"MERCHANT_NO_SHOP":       http.StatusNotFound,
+	"MERCHANT_AMBIGUOUS":     http.StatusConflict,
+	"MERCHANT_ALREADY_BOUND": http.StatusConflict,
+	"TG_ALREADY_BOUND":       http.StatusConflict,
+	"BIND_RATE_LIMITED":      http.StatusTooManyRequests,
+	"AUDIT_UNAVAILABLE":      http.StatusServiceUnavailable,
+	"BIND_FAILED":            http.StatusInternalServerError,
 	// 有意改判：PHP 侧 db_unavailable 是 500，但对外按「重试有没有用」判据应为 503 ——
 	// 连不上库是瞬态依赖故障，重试有效。看到 PHP 侧是 500 不要当 bug 改回去。
 	"DB_UNAVAILABLE": http.StatusServiceUnavailable,
@@ -87,7 +98,16 @@ var messageByCode = map[string]string{
 	"DB_QUERY_FAILED":               "登录服务暂不可用，请稍后再试",
 	"INVALID_INIT_DATA":             "登录信息校验失败",
 	"EXPIRED_INIT_DATA":             "登录信息已过期，请重新打开",
-	"ROLE_NOT_SUPPORTED":            "该身份暂未开放",
+	// merchant 分支：文案给可执行动作（找运营做什么），不写「联系管理员」这类没有落点的句子
+	"MERCHANT_NOT_BOUND":     "尚未绑定商家账号，请在机器人里发送 /merchant 完成绑定",
+	"MERCHANT_NOT_FOUND":     "未找到该手机号对应的商家账号，请确认号码与站点登记的会员手机号一致",
+	"MERCHANT_NO_SHOP":       "该商家账号还没有被分配外卖店铺，请联系运营在后台分配后再试",
+	"MERCHANT_AMBIGUOUS":     "该手机号匹配到多个商家账号，无法自动登录，请联系运营核对",
+	"MERCHANT_ALREADY_BOUND": "该商家账号已被其他 Telegram 绑定，如需换绑请联系运营",
+	"TG_ALREADY_BOUND":       "当前 Telegram 已绑定其他商家账号，如需换绑请联系运营",
+	"BIND_RATE_LIMITED":      "操作过于频繁，请稍后再试",
+	"AUDIT_UNAVAILABLE":      "服务暂时不可用，请稍后再试",
+	"ROLE_NOT_SUPPORTED":     "该身份暂未开放",
 }
 
 const defaultMessage = "登录服务暂不可用，请稍后再试"
@@ -111,10 +131,14 @@ func MessageForCode(code string) string {
 	return defaultMessage
 }
 
-// Gateway 是日志用到的两个网关动作。生产接线 gateway 包 + Config，测试注入假实现。
+// Gateway 是登录桥用到的网关动作。生产接线 gateway 包 + Config，测试注入假实现。
+//
+// merchant 分支只用 MerchantSession（绑定走 /tg-api/merchant/bind 的落地页，
+// 不经过本端点——与 Node 的 gatewayClient.merchantSession 同一形态）。
 type Gateway interface {
 	MemberFindOrCreate(ctx context.Context, params map[string]any) (map[string]any, error)
 	IssueSession(ctx context.Context, params map[string]any) (map[string]any, error)
+	MerchantSession(ctx context.Context, params map[string]any) (map[string]any, error)
 }
 
 // Dep 注入全部依赖，测试逐项替换。
@@ -234,8 +258,9 @@ func (h *handler) serve(w http.ResponseWriter, req *http.Request) {
 	if role == "" {
 		role = "customer"
 	}
-	if role != "customer" {
-		// 骑手线（courier）在后续步骤实现，这里一律 501。
+	if role != "customer" && role != "merchant" {
+		// 白名单：customer（顾客）/ merchant（商家，方案 A）。骑手不走本端点
+		// （rider/bind 落地页），其余未知 role 一律 501，且不触达网关。
 		h.sendError(w, "ROLE_NOT_SUPPORTED", "")
 		return
 	}
@@ -254,6 +279,13 @@ func (h *handler) serve(w http.ResponseWriter, req *http.Request) {
 	if h.gateway == nil {
 		h.logError("网关客户端未装配")
 		h.sendError(w, "GATEWAY_UNAVAILABLE", "")
+		return
+	}
+
+	// 商家分支（方案 A）：与顾客分支共享的只有「验签 + Set-Cookie 原样透传」，
+	// 其余刻意不同构（见 serveMerchant 注释）。
+	if role == "merchant" {
+		h.serveMerchant(w, req, tgUserID, initDataHash)
 		return
 	}
 
@@ -324,6 +356,84 @@ func (h *handler) serve(w http.ResponseWriter, req *http.Request) {
 			At:              h.now().UnixMilli(),
 		},
 	})
+}
+
+// serveMerchant 是 role=merchant 的处理分支（Node: merchantLogin，tgLogin.js）。
+//
+// 与顾客分支共享的只有「验签 + Set-Cookie 原样透传」，其余刻意不同构：
+//  1. **会员解析只读** —— merchant_session 内部查 fbs_merchant_map 拿既有会员，**绝不建号**；
+//     issue_session 的 resolve_member（index.php）会在 username=tg_<id> 不存在时插空会员，
+//     商家拿到「有 cookie 无店铺」，/wmsj 立刻弹「您没有外卖店铺权限」。
+//  2. **不写 fbs_member_map** —— 那是收银台归属校验的唯一依据（payOrderRead.js），
+//     写进去会把该 TG 的顾客下单归属永久改掉；member_map_synced 恒 false。
+//  3. **redirect 是商家后台 /wmsj/**（多店由页面按 waimai_shop_manager 列表自选），不是 '/'。
+//     网关返回值过 merchant.SafeRedirect 后透传（开放重定向在登录链路上直接可利用）；
+//     SafeRedirect 从 merchant 包 import（Node 的 tgLogin.js 也 require merchantRoute），
+//     归一契约只能有一处实现。
+func (h *handler) serveMerchant(w http.ResponseWriter, req *http.Request, tgUserID int64, initDataHash string) {
+	session, err := h.gateway.MerchantSession(req.Context(), map[string]any{
+		"tg_user_id":     tgUserID,
+		"init_data_hash": initDataHash,
+	})
+	if err != nil {
+		code := GatewayFailureCode(err)
+		h.logError("网关调用失败 role=merchant code=" + code + " err=" + err.Error())
+		h.sendError(w, code, "")
+		return
+	}
+	cookies, memberID, redirect, ok := merchantSessionResponse(session)
+	if !ok {
+		h.logError("merchant_session 未返回 set_cookies 或 member_id 非法")
+		h.sendError(w, "GATEWAY_UNAVAILABLE", "")
+		return
+	}
+
+	// Cookie 原样透传：不增、不删、不改属性、不重新排序。
+	w.Header()["Set-Cookie"] = cookies
+
+	// 200 + JSON 而不是 302：同顾客分支的理由（fetch 跨重定向的 Set-Cookie 在部分
+	// WebView 上不被采纳），由落地页自行 location.replace。
+	writeJSON(w, http.StatusOK, loginBody{
+		Success: true,
+		Data: loginData{
+			MemberID:        memberID,
+			Redirect:        merchant.SafeRedirect(redirect),
+			MemberMapSynced: false,
+			At:              h.now().UnixMilli(),
+		},
+	})
+}
+
+// merchantSessionResponse 校验 merchant_session 的响应形状（对应 Node merchantLogin 里的
+// 内联校验）。与顾客侧 sessionResponse 的差异：**不校验顺序无关的 redirect 缺失**——
+// redirect 缺失时由 SafeRedirect 回落 /wmsj/，不算契约违约。
+func merchantSessionResponse(session map[string]any) ([]string, int64, string, bool) {
+	if session == nil || !gateway.Bool(session, "success") {
+		return nil, 0, "", false
+	}
+	data, ok := gateway.Map(session, "data")
+	if !ok {
+		return nil, 0, "", false
+	}
+	rawCookies, ok := data["set_cookies"].([]any)
+	if !ok || len(rawCookies) == 0 {
+		return nil, 0, "", false
+	}
+	cookies := make([]string, 0, len(rawCookies))
+	for _, entry := range rawCookies {
+		text, ok := entry.(string)
+		if !ok {
+			return nil, 0, "", false
+		}
+		cookies = append(cookies, text)
+	}
+	// member_id 会原样回给前端：非正整数一律按契约违约处理。
+	memberID, ok := gateway.Int(data, "member_id")
+	if !ok || memberID <= 0 {
+		return nil, 0, "", false
+	}
+	redirect, _ := data["redirect"].(string)
+	return cookies, memberID, redirect, true
 }
 
 // upsertMemberMap 维护 fbs_member_map（tg_user_id ↔ 火鸟会员 id），收银台的归属校验读这张表。

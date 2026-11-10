@@ -120,12 +120,15 @@ func tlFakeValidate(initData, _ string) tgauth.Result {
 
 // tlGateway 是 Gateway 的替身：记下每次调用的 params，可按脚本返回或抛错。
 type tlGateway struct {
-	memberCalls  []map[string]any
-	sessionCalls []map[string]any
-	member       map[string]any
-	session      map[string]any
-	memberErr    error
-	sessionErr   error
+	memberCalls   []map[string]any
+	sessionCalls  []map[string]any
+	merchantCalls []map[string]any
+	member        map[string]any
+	session       map[string]any
+	merchant      map[string]any
+	memberErr     error
+	sessionErr    error
+	merchantErr   error
 }
 
 func (g *tlGateway) MemberFindOrCreate(_ context.Context, params map[string]any) (map[string]any, error) {
@@ -144,7 +147,19 @@ func (g *tlGateway) IssueSession(_ context.Context, params map[string]any) (map[
 	return g.session, nil
 }
 
-func (g *tlGateway) callCount() int { return len(g.memberCalls) + len(g.sessionCalls) }
+// MerchantSession 满足扩展后的 Gateway 接口：顾客侧用例不会走到这里
+// （只记录调用，返回值不参与断言——merchant 分支的用例在 selfcheck_test.go）。
+func (g *tlGateway) MerchantSession(_ context.Context, params map[string]any) (map[string]any, error) {
+	g.merchantCalls = append(g.merchantCalls, params)
+	if g.merchantErr != nil {
+		return nil, g.merchantErr
+	}
+	return g.merchant, nil
+}
+
+func (g *tlGateway) callCount() int {
+	return len(g.memberCalls) + len(g.sessionCalls) + len(g.merchantCalls)
+}
 
 func tlMemberOK() map[string]any {
 	return map[string]any{"success": true, "data": map[string]any{"member_id": float64(tlMemberID), "created": true}}
