@@ -62,8 +62,8 @@ func TestSelfCheckRoutesCoverSpec(t *testing.T) {
 	if len(spec.Routes) == 0 {
 		t.Fatal("spec 解析出 0 条路由，解析器或缩进约束已失效")
 	}
-	if len(routes) != 29 {
-		t.Fatalf("路由表条数应为 29，实际 %d：%v", len(routes), routes)
+	if len(routes) != 32 {
+		t.Fatalf("路由表条数应为 32，实际 %d：%v", len(routes), routes)
 	}
 
 	specRoutes := make([]string, 0, len(spec.Routes))

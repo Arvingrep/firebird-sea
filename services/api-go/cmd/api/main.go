@@ -43,6 +43,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/gateway"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpapi"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/member"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/merchant"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/migrate"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/payment"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/rider"
@@ -191,6 +192,7 @@ func run() error {
 		Addr:           addrRouter,
 		FBProxy:        proxy,
 		Rider:          buildRider(db, botToken, hops, now),
+		Merchant:       buildMerchant(botToken, hops, now),
 		Dispatch:       buildDispatch(db, botToken, now),
 		Ajax:           buildAjax(),
 		TMAStaticDir:   os.Getenv("TMA_STATIC_DIR"),
@@ -472,6 +474,31 @@ func buildRider(db *sql.DB, botToken string, hops int, now func() time.Time) *ri
 	return rider.New(dep)
 }
 
+// buildMerchant 构造商家免密入口处理器（方案 A，与 buildRider 并列同语义装配）。
+//
+// 与骑手的装配差异（都有意为之，不许"顺手对齐"）：
+//   - **无 DB 参数**：映射查询全在 PHP（fbs_merchant_map 读、fbs_member_map 绝不写），
+//     Go 侧直查会绕过 waimai_shop_manager 鉴权；
+//   - **无白名单**：302 目标是站内路径 /wmsj/，过 merchant.SafeRedirect 校验，
+//     不需要 CORS_ORIGINS 推导的域名白名单；
+//   - 限频：`TMA_MERCHANT_MAX || 10` 次/分钟（Node 的 createLimiter 同值）。
+//
+// 缺配置不阻断启动：merchant.New 只把端点标成 notConfigured，由各端点自己 503。
+func buildMerchant(botToken string, hops int, now func() time.Time) *merchant.Route {
+	dep := merchant.Dep{
+		BotToken: botToken,
+		// 限流分桶键必须与 httpapi 的 clientKey 同源（TRUST_PROXY_HOPS），理由同 buildRider。
+		TrustProxyHops: hops,
+		Allow:          token.NewLimiter(envInt("TMA_MERCHANT_MAX", 10), time.Minute, now),
+	}
+	gatewayURL := os.Getenv("FBS_GATEWAY_URL")
+	secret := os.Getenv("FBS_GATEWAY_SECRET")
+	if gatewayURL != "" && secret != "" {
+		dep.Gateway = gatewayAdapter{cfg: gateway.Config{BaseURL: gatewayURL, Secret: secret, Now: now}}
+	}
+	return merchant.New(dep)
+}
+
 // buildDispatch 构造派单 Telegram 通知处理器（T7，server.js 2h 的等价装配）。
 //
 // 三组配置按 Node 的取法各自独立降级：
@@ -621,6 +648,11 @@ func validateAssembly(bundle *authBundle, dep httpapi.Dep) error {
 	if dep.Ajax == nil {
 		missing = append(missing, "Ajax")
 	}
+	// 商家入口同理：只依赖 botToken / 网关（无 DB / 无白名单），漏接的表现是
+	// 三条 /tg-api/merchant/* 路由静默 404。
+	if dep.Merchant == nil {
+		missing = append(missing, "Merchant")
+	}
 	if bundle != nil {
 		// auth 装配成功时，登录编排 / 令牌 / 凭证三者缺一都会让相关端点静默 503 或恒 401。
 		if bundle.login == nil {
@@ -660,7 +692,8 @@ func validateAssembly(bundle *authBundle, dep httpapi.Dep) error {
 }
 
 // gatewayAdapter 把网关包的包级函数收成一个对象，同时满足
-// member.MemberGateway / credential.Gateway / tglogin.Gateway 三个最小接口。
+// member.MemberGateway / credential.Gateway / tglogin.Gateway / rider.Gateway /
+// dispatch.Gateway / merchant.Gateway 各最小接口。
 type gatewayAdapter struct{ cfg gateway.Config }
 
 func (g gatewayAdapter) MemberFindOrCreate(ctx context.Context, params map[string]any) (map[string]any, error) {
@@ -685,6 +718,16 @@ func (g gatewayAdapter) RiderBind(ctx context.Context, params map[string]any) (m
 // （dispatch.Gateway 接口，动作名与 PHP 端白名单一致）。
 func (g gatewayAdapter) RiderNotifyURL(ctx context.Context, params map[string]any) (map[string]any, error) {
 	return gateway.Call(ctx, g.cfg, "rider_notify_url", params)
+}
+
+// MerchantBind 是商家绑定动作（merchant.Route 的 Gateway 接口）。
+func (g gatewayAdapter) MerchantBind(ctx context.Context, params map[string]any) (map[string]any, error) {
+	return gateway.MerchantBind(ctx, g.cfg, params)
+}
+
+// MerchantSession 是商家换会话动作（merchant.Route 与 tglogin.Gateway 共用）。
+func (g gatewayAdapter) MerchantSession(ctx context.Context, params map[string]any) (map[string]any, error) {
+	return gateway.MerchantSession(ctx, g.cfg, params)
 }
 
 // —— 数据库 ——

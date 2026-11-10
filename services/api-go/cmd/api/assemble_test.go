@@ -94,6 +94,7 @@ func buildTestAssembly(t *testing.T) assembly {
 		Addr:           addrRouter,
 		FBProxy:        proxy,
 		Rider:          buildRider(db, botToken, 0, now),
+		Merchant:       buildMerchant(botToken, 0, now),
 		Dispatch:       buildDispatch(db, botToken, now),
 		Ajax:           buildAjax(),
 		TrustProxyHops: 0,
@@ -152,6 +153,7 @@ func TestSelfCheckAssemblyRejectsEachMissingDependency(t *testing.T) {
 		}, "Auth.Credentials"},
 		"缺 Addr":     {func(d *httpapi.Dep) { d.Addr = nil }, "Addr"},
 		"缺 Rider":    {func(d *httpapi.Dep) { d.Rider = nil }, "Rider"},
+		"缺 Merchant": {func(d *httpapi.Dep) { d.Merchant = nil }, "Merchant"},
 		"缺 Dispatch": {func(d *httpapi.Dep) { d.Dispatch = nil }, "Dispatch"},
 		"缺 Ajax":     {func(d *httpapi.Dep) { d.Ajax = nil }, "Ajax"},
 	}
@@ -184,6 +186,7 @@ func TestSelfCheckAssemblyDegradesWithoutAuth(t *testing.T) {
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: func(http.ResponseWriter, *http.Request) {},
 		Rider:    buildRider(nilDB, "123456:TEST", 0, now),
+		Merchant: buildMerchant("123456:TEST", 0, now),
 		Dispatch: buildDispatch(nilDB, "123456:TEST", now),
 		Ajax:     buildAjax(),
 	}
@@ -225,6 +228,7 @@ func TestSelfCheckAssemblyAllowsNoDatabase(t *testing.T) {
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: nil,
 		Rider:    buildRider(nilDB, "123456:TEST", 0, now),
+		Merchant: buildMerchant("123456:TEST", 0, now),
 		Dispatch: buildDispatch(nilDB, "123456:TEST", now),
 		Ajax:     buildAjax(),
 	}

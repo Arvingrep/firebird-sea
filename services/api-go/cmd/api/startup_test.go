@@ -41,6 +41,8 @@ func startupDep(now func() time.Time) httpapi.Dep {
 		Coins:    coins.New(coins.Dep{Now: now}),
 		Checkout: nil,
 		Rider:    buildRider(nil, "123456:TEST", 0, now),
+		// 商家入口同理：无库也必须存在（它根本没有 DB 依赖，映射查询全在 PHP）。
+		Merchant: buildMerchant("123456:TEST", 0, now),
 		// 派单通知同理：无库时它仍要存在（缺库不等于「未配置」，端点照给 202）。
 		Dispatch: buildDispatch(nil, "123456:TEST", now),
 		Ajax:     buildAjax(),
