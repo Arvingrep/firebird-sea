@@ -418,3 +418,23 @@ location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|svg|woff2)$ {
 - 静态资产线上真实路径是 `/templates/...`（`$templets_skin` 解析），不是仓库目录路径。
 - 无判别力的断言要主动作废：canary 只有 3 家店、`pageSize=10` → 恒 1 页，
   「滚到底加载第 2 页」改了和没改现象一样，必须用 Fetch 阶段改写 `totalPage` 造多页才有判别力。
+
+## 十、商家 Telegram 免密入口（2026-11-10，方案 A 主线落地）
+
+实现：`f840aae0`（Node）+ `bff3803e`（网关）+ `2e432c93`（迁移 009/010）+ `dda205f3`（bot）+ `f6d745e4`（测试）。
+全链路事实依据与错误码见 `docs/internal/MERCHANT_TG_HOOKS.md`；上线前必须先按
+`docs/internal/MERCHANT_TG_ONBOARD.md` 补 `waimai_shop_manager`（生产当前 0 行）。
+
+本阶段范围与已知差异（不改变第六节版本号约定，本轮无静态资产变更）：
+
+1. `role=merchant` 打通：`/tg/entry.php?role=merchant` → `merchant_session` → 会员 cookie → `/wmsj/`；
+   未绑定自动跳 `/tg-api/merchant/bind` 绑定页。**entry.php 商家分支跳过 `action=back`**（防覆盖，
+   见 MERCHANT_TG_HOOKS 铁律）。
+2. 商家后台页面（`/wmsj/**`）会因 `HN_tg` 标记 cookie 被注入 SDK + shim：shim 对 `/wmsj` 推不出
+   service，只做 `ready/expand`，不碰 DOM——**TG 原生返回键 + 火鸟自己顶栏并存**，与第七节裁决一致，
+   商家端顶栏适配属二期（需要给 shim 加 `business` 规则，本轮明确不做）。
+3. 同一浏览器同一时间只能一个身份（火鸟单 cookie 模型的硬限制）：商家会话会顶掉同 WebView 里的
+   顾客会话，返回商城需重新打开商店。产品已接受「最后登录者胜」。
+4. Go 镜像（`services/api-go`）**未同步**商家动作——canary `api.engine` 现为 go 时，商家入口不可用；
+   切引擎前必须先补 Go 同构实现（rider 当年就是双份对拍）。本项是明确的遗留任务，不是遗漏。
+5. 无自助解绑入口（骑手也无；商家换绑走运营）。文案已如实说明，不承诺用户自己能解。
