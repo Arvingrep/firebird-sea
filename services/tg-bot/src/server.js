@@ -118,6 +118,20 @@ function customerEntryUrl(base) {
   return `${raw}/tg/entry.php?role=customer`;
 }
 
+// 商家免密入口（Telegram Mini App，方案 A）：直达顾客落地页的 role=merchant 变体。
+// 首次绑定的商家在 entry.php 里会被无缝跳到 /tg-api/merchant/bind 绑定页，
+// 所以这里只维护一个 URL；/start 与 /merchant 都指它。
+function merchantEntryUrl(base) {
+  const raw = String(base || '').trim().replace(/\/+$/, '');
+  if (raw === '') return '';
+  try {
+    if (new URL(raw).protocol !== 'https:') return '';
+  } catch (_) {
+    return '';
+  }
+  return `${raw}/tg/entry.php?role=merchant`;
+}
+
 // 网站登录确认入口（Telegram Mini App）：令牌由 api/login/telegram 插件下发，页面在 Telegram 内打开才能拿到 initData。
 function loginConfirmUrl(base, token) {
   const raw = String(base || '').trim().replace(/\/+$/, '');
@@ -198,6 +212,12 @@ async function handleIncomingMessage(msg) {
     if (riderUrl && isPrivate) {
       rows.push([{ text: '🛵 骑手入口', web_app: { url: riderUrl } }]);
     }
+    const merchantUrl = merchantEntryUrl(APP_BASE_URL);
+    if (merchantUrl && isPrivate) {
+      rows.push([{ text: '🏪 商家后台', web_app: { url: merchantUrl } }]);
+    } else if (!merchantUrl) {
+      console.error('[TG-BOT] TG_APP_BASE_URL 未配置或不是 https，/start 缺少「商家后台」入口');
+    }
     rows.push([{ text: '📋 查看 BMAD 看板', url: 'https://github.com/arvin/firebird-sea/projects' }]);
     rows.push([{ text: '📊 实时系统探针', callback_data: 'check_status' }]);
     const markup = { inline_keyboard: rows };
@@ -219,6 +239,24 @@ async function handleIncomingMessage(msg) {
       chatId,
       '🛵 *骑手绑定*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮，输入你注册骑手时留的手机号。\n绑定成功后自动进入骑手工作台（链接 10 分钟内有效）。\n\n若提示「手机号未找到骑手档案」，先让运营在后台补录骑手。',
       { inline_keyboard: [[{ text: '🛵 绑定并进入工作台', web_app: { url: riderUrl } }]] }
+    );
+  }
+
+  // 指令 1.6: /merchant —— 商家免密入口（必须在私聊里发，web_app 按钮在群里非法）
+  if (text.startsWith('/merchant')) {
+    const isPrivate = !msg.chat?.type || msg.chat.type === 'private';
+    const merchantUrl = merchantEntryUrl(APP_BASE_URL);
+    if (!merchantUrl) {
+      console.error('[TG-BOT] TG_APP_BASE_URL 未配置或不是 https，/merchant 无法生成入口');
+      return sendTelegramMessage(chatId, '❌ 商家入口未配置（TG_APP_BASE_URL 缺失或不是 https）');
+    }
+    if (!isPrivate) {
+      return sendTelegramMessage(chatId, '请在私聊中发送 /merchant 获取商家后台入口');
+    }
+    return sendTelegramMessage(
+      chatId,
+      '🏪 *商家后台*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮即可进入商家后台（/wmsj）。\n首次使用需输入入驻时登记的会员手机号完成绑定；已绑定的直接进入。\n\n若提示「还没有被分配外卖店铺」，请联系运营在后台「外卖 → 店铺 → 管理会员」里分配。',
+      { inline_keyboard: [[{ text: '🏪 进入商家后台', web_app: { url: merchantUrl } }]] }
     );
   }
 
