@@ -123,3 +123,27 @@ error_log，**不自动清理映射行**（绝不静默顶替同样适用于清�
 4. `fbs_member_map` 无新增行；`fbs_merchant_map` 幂等/冲突语义正确（同对刷 phone、换绑 409）。
 5. `fbs_merchant_audit` 每次尝试一行，result 与实际一致；被限频请求 result=rate_limited 且不计入额度。
 6. `api-contract-check` 过；`npm test` 全绿（php 组需 docker）；Go 镜像未实现（见遗留项）。
+
+## 七、测试环境限制（PHP 真值用例是 docker-gated，本机 npm test 对 PHP 侧是「假绿」）
+
+商家线与骑手线的 PHP 真值测试（限频阈值/窗口语义、dispatch 级窗口分类、手机号归一契约）
+依赖 `docker run php:…` 容器执行，**本机没有 docker 时整组 skip**——`npm test` 显示
+skipped 而不是 fail，全绿不代表 PHP 侧被验证过。当前 skip 的是这 11 个用例：
+
+| 测试文件 | docker-gated 用例 | 覆盖内容 |
+|---|---|---|
+| `services/api/test/php-merchant-bind.test.js` | 4 个 | 归一矩阵（8 组）、商家三维限频（阈值/维度隔离/排除 rate_limited/窗口边界）、dispatch 级窗口分类（merchant_session 紧窗 20s→401、merchant_bind 宽窗不 401） |
+| `services/api/test/php-rider-bind.test.js` | 7 个 | 16 组归一矩阵、骑手三维限频、(body,ts) 重放账本行为（F-B1）、窗口分类 |
+
+不依赖 docker、任何环境都真跑的是两份「源码约束」用例（php-merchant-bind 2 个 +
+php-rider-bind 2 个）与 Node 侧全部用例（merchant-route 23、tg-login 22 等）——它们钉住
+注册点/显式分支/表名/铁律，但**钉不住阈值与窗口的运行时行为**。
+
+因此：
+
+- **CI 必须固定跑 PHP 容器**（有 docker 的 runner 上执行 `cd services/api && npm test`，
+  确认输出里 `skipped` 不含上述两个文件），否则 PHP 侧回归只能靠 code review 兜底；
+- 本机排查网关行为时，别信「npm test 全绿」，用
+  `node --test test/php-merchant-bind.test.js test/php-rider-bind.test.js` 看是不是整组 skip；
+- 本机无 docker 的临时验证手段：括号平衡脚本 + 源码约束用例 + `node --check`，
+  覆盖不了运行时语义（阈值、INTERVAL 窗口、重放账本），只能当语法兜底。

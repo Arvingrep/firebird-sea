@@ -5,6 +5,47 @@
 > 本文档只给**只读校验 SQL 与操作步骤**，不提供任何改生产数据的脚本；
 > 数据变更一律由运营在火鸟后台界面完成并留痕。
 
+## 〇、上线顺序（必须按序，颠倒会 500）
+
+新表 `fbs_merchant_map` / `fbs_merchant_audit` 由迁移 009/010 创建；**代码先于建表部署时，
+绑定与会话会在网关层炸 500 `DB_QUERY_FAILED`**（PDO 查不存在的表，验证员 2026-11-10 在
+canary 库实测 `fbs_merchant%` 表缺失时的表现）。必须严格按下面四步走：
+
+1. **跑迁移建表**（先于部署，或与部署同批但迁移先行）：
+   ```bash
+   DB_HOST=… DB_PORT=3306 DB_USER=… DB_PASSWORD=… DB_NAME=… \
+     node services/api/src/migrate.js     # 幂等，重复跑无害；输出应含 009_fbs_merchant_map.sql / 010_fbs_merchant_audit.sql
+   ```
+2. **部署新镜像**（Node api + php 同一 commit 集合，网关动作与路由必须同时上线）。
+3. **运营按本文第二、三节补 `waimai_shop_manager` 归属**（生产当前 0 行）。
+4. **验证链路通、且未绑定是正常态**（不是故障）：
+
+   ```bash
+   # 探针 A（无凭证即可打）：端点活着、且 401 发生在触碰数据库之前
+   curl -sS -o /dev/null -w '%{http_code}\n' -X POST \
+     https://<域名>/tg-api/merchant/session \
+     -H 'Content-Type: application/json' -d '{"initData":"probe"}'
+   # 期望 401（INVALID_INIT_DATA，发生在触碰数据库之前）。本探针只证明端点活着；
+   # 「迁移没跑」的症状要在带真实 initData 的探针 B 里才会暴露：502 MERCHANT_FAILED
+   # 且网关 error_log 出现 DB_QUERY_FAILED → 回第 1 步。
+   ```
+
+   要验证「表已建 + 未绑定」需要一份真实 initData（从 Telegram 打开 bot 的 /merchant
+   落地页，开发者工具网络面板复制 `initData` 请求体）：
+
+   ```bash
+   curl -sS -X POST https://<域名>/tg-api/merchant/session \
+     -H 'Content-Type: application/json' \
+     -d '{"initData":"<真实 initData>"}'
+   # 期望 200 {"success":true,"data":{"bound":false}} —— 未绑定的正确响应（Node 侧把网关的
+   # 404 MERCHANT_NOT_BOUND 翻译成 bound:false，网关层原始语义是 404 MERCHANT_NOT_BOUND）。
+   # 绑定成功后再打一次应返回 200 bound:true + Set-Cookie。
+   ```
+
+> 注意区分：网关动作 `merchant_session` 对未绑定返回 **404 `MERCHANT_NOT_BOUND`**；
+> Node 端点 `/tg-api/merchant/session` 把它翻译成 **200 `{bound:false}`**（未绑定不是错误，
+> 调用方据此引导去绑定页）。两条都不是故障，别当 5xx 排查。
+
 ## 一、为什么必须先补数据
 
 商家免密绑定校验的是「**这个手机号对应的会员**在 `waimai_shop_manager` 里至少有一家未删除的店」。
