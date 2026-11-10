@@ -409,4 +409,33 @@ test('源码护栏：Node 侧无任何写表语句，且代码（除注释外）
   assert.ok(!code.includes('fbs_merchant_map'), 'Node 侧也不读 fbs_merchant_map（查绑定在网关 merchant_session 内做）');
   // initData 只进 sha256 后交给网关，原文不得出现在任何出站参数名里
   assert.match(src, /createHash\('sha256'\)\.update\(initData\)/);
+  // R2：有效期必须复用 telegramAuth 的 1 小时常量，不得另写字面量（与 tgLogin 的登录口径一致）
+  assert.match(src, /maxAgeSeconds: MAX_AUTH_AGE_SECONDS/g);
+  assert.strictEqual(src.match(/maxAgeSeconds:/g).length, 2, 'postBind 与 session 两处都必须收窄到 1h');
+});
+
+// ---- R2：initData 有效期与顾客桥对齐（1 小时）----
+
+// 与 signInitData 同算法，但 auth_date 可指定
+function signInitDataAt(userId, authDate, token = BOT_TOKEN) {
+  const fields = { auth_date: String(authDate), user: JSON.stringify({ id: userId, first_name: 'M' }) };
+  const check = Object.keys(fields).sort().map((k) => `${k}=${fields[k]}`).join('\n');
+  const secret = crypto.createHmac('sha256', 'WebAppData').update(token).digest();
+  const hash = crypto.createHmac('sha256', secret).update(check).digest('hex');
+  return new URLSearchParams({ ...fields, hash }).toString();
+}
+
+test('initData 过期（auth_date 超过 1 小时）→ 401，不触达网关（与 tgLogin 同口径）', async () => {
+  const gw = makeGateway();
+  const merchant = createMerchantRoute(makeDeps({ gateway: gw }));
+  const stale = signInitDataAt(77, Math.floor(Date.now() / 1000) - 3601);
+  const res = makeRes();
+  await merchant.postBind(makeReq({ body: { initData: stale, phone: '09178889999' } }), res);
+  assert.strictEqual(res.statusCode, 401);
+  assert.strictEqual(gw.bindCalls.length, 0, '过期 initData 不得触达网关');
+
+  const resSession = makeRes();
+  await merchant.session(makeReq({ body: { initData: stale } }), resSession);
+  assert.strictEqual(resSession.statusCode, 401);
+  assert.strictEqual(gw.sessionCalls.length, 0);
 });

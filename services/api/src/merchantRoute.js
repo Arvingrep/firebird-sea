@@ -22,6 +22,10 @@
 const crypto = require('node:crypto');
 const { escapeHtml, renderPageHead, PAGE_SHELL } = require('./htmlPage');
 const { normalizePhone } = require('./riderRoute');
+// initData 有效期与顾客桥（tgLogin.js 的 LOGIN_MAX_AGE_SECONDS=3600）对齐：都取 telegramAuth
+// 导出的 1 小时常量，不在本文件写字面量——商家与顾客是同一份 initData 的两个消费方，
+// 一边 1h 一边 24h 会出现「落地页能绑、顾客桥判过期」的口径分裂（验证员 R2）。
+const { MAX_AUTH_AGE_SECONDS } = require('./telegramAuth');
 
 // 商家后台落地页：/wmsj/ 的 index.php 自己会再跳 order/waimaiOrder.php（多店在页面内切换）。
 const MERCHANT_HOME = '/wmsj/';
@@ -191,7 +195,7 @@ function createMerchantRoute({ botToken, validateInitData, gateway, allow, postP
     if (notConfigured) return sendError(res, 503, 'MERCHANT_NOT_CONFIGURED', '服务暂未配置，请稍后重试');
     if (allow && !allow(req.ip)) return sendError(res, 429, 'RATE_LIMITED', '操作过于频繁，请稍后再试');
     const initData = req.body && req.body.initData;
-    const v = validateInitData(initData, botToken);
+    const v = validateInitData(initData, botToken, { maxAgeSeconds: MAX_AUTH_AGE_SECONDS });
     if (!v || !v.valid) return sendError(res, 401, 'INVALID_INIT_DATA', '请从 Telegram 内重新打开本页面');
     const phone = normalizePhone(req.body && req.body.phone);
     if (!phone) return sendError(res, 400, 'INVALID_PHONE', '手机号格式不正确。支持 09178889999 或 +639178889999 等写法。');
@@ -244,7 +248,7 @@ function createMerchantRoute({ botToken, validateInitData, gateway, allow, postP
       return res.status(503).json({ success: false, error: { code: 'MERCHANT_NOT_CONFIGURED', message: 'merchant entry not configured' } });
     }
     const initData = (req.body && req.body.initData) || '';
-    const v = validateInitData(initData, botToken);
+    const v = validateInitData(initData, botToken, { maxAgeSeconds: MAX_AUTH_AGE_SECONDS });
     if (!v || !v.valid) {
       return res.status(401).json({ success: false, error: { code: 'INVALID_INIT_DATA', message: 'Invalid or missing initData' } });
     }
