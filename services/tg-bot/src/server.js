@@ -232,7 +232,11 @@ function customerEntryUrl(base) {
 // 商家免密入口（Telegram Mini App，方案 A）：直达顾客落地页的 role=merchant 变体。
 // 首次绑定的商家在 entry.php 里会被无缝跳到 /tg-api/merchant/bind 绑定页，
 // 所以这里只维护一个 URL；/start 与 /merchant 都指它。
-function merchantEntryUrl(base) {
+//
+// to='member' 时落点是商户中心工作台（/member?action=workPlatform，员工管理所在），
+// 缺省落点仍是外卖接单后台（/wmsj/）。两者共用同一枚会员 cookie，不是两套登录。
+// 参数由 entry.php 白名单归一，这里的值写错也只会退回默认落点，不会把开放跳转带出去。
+function merchantEntryUrl(base, to) {
   const raw = String(base || '').trim().replace(/\/+$/, '');
   if (raw === '') return '';
   try {
@@ -240,7 +244,8 @@ function merchantEntryUrl(base) {
   } catch (_) {
     return '';
   }
-  return `${raw}/tg/entry.php?role=merchant`;
+  const suffix = to === 'member' ? '&to=member' : '';
+  return `${raw}/tg/entry.php?role=merchant${suffix}`;
 }
 
 // 员工工作台入口（Telegram Mini App）：纯 PHP 落地页，用 initData 换会话 Cookie 后 302 到
@@ -370,10 +375,18 @@ async function handleBindRoleChoice(cb) {
     );
   }
   const merchantUrl = merchantEntryUrl(APP_BASE_URL);
+  const merchantHubUrl = merchantEntryUrl(APP_BASE_URL, 'member');
   return sendTelegramMessage(
     chatId,
-    '✅ *商家绑定成功！*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮进入商家后台（/wmsj）。',
-    merchantUrl ? { inline_keyboard: [[{ text: '🏪 进入商家后台', web_app: { url: merchantUrl } }]] } : null
+    '✅ *商家绑定成功！*\n━━━━━━━━━━━━━━━━━━━━\n两个入口已开通，点哪个进哪个：接单后台看订单，商户中心管店铺和员工。',
+    merchantUrl
+      ? {
+          inline_keyboard: [[
+            { text: '🏪 接单后台', web_app: { url: merchantUrl } },
+            { text: '🧭 商户中心', web_app: { url: merchantHubUrl } }
+          ]]
+        }
+      : null
   );
 }
 
@@ -538,6 +551,7 @@ async function handleIncomingMessage(msg) {
 2. 📊 */status*：查看 Coins.ph 比索行情与系统状态
 3. 🧹 */clean*：执行工程脱水剪枝清理
 👔 员工绑定：/staff <邀请码>
+🏪 商家入口：/merchant（接单后台 + 商户中心）
 ━━━━━━━━━━━━━━━━━━━━
 💡 请直接在此发送任何需求，我将为您启动自动化闭环！
 `;
@@ -554,9 +568,14 @@ async function handleIncomingMessage(msg) {
     if (riderUrl && isPrivate) {
       rows.push([{ text: '🛵 骑手入口', web_app: { url: riderUrl } }]);
     }
+    // 商家两个入口并排：接单后台（/wmsj）是高频动作，商户中心（员工管理）是低频，但都要能一键进
     const merchantUrl = merchantEntryUrl(APP_BASE_URL);
+    const merchantHubUrl = merchantEntryUrl(APP_BASE_URL, 'member');
     if (merchantUrl && isPrivate) {
-      rows.push([{ text: '🏪 商家后台', web_app: { url: merchantUrl } }]);
+      rows.push([
+        { text: '🏪 商家后台', web_app: { url: merchantUrl } },
+        { text: '🧭 商户中心', web_app: { url: merchantHubUrl } }
+      ]);
     } else if (!merchantUrl) {
       console.error('[TG-BOT] TG_APP_BASE_URL 未配置或不是 https，/start 缺少「商家后台」入口');
     }
@@ -597,6 +616,7 @@ async function handleIncomingMessage(msg) {
   if (text.startsWith('/merchant')) {
     const isPrivate = !msg.chat?.type || msg.chat.type === 'private';
     const merchantUrl = merchantEntryUrl(APP_BASE_URL);
+    const merchantHubUrl = merchantEntryUrl(APP_BASE_URL, 'member');
     if (!merchantUrl) {
       console.error('[TG-BOT] TG_APP_BASE_URL 未配置或不是 https，/merchant 无法生成入口');
       return sendTelegramMessage(chatId, '❌ 商家入口未配置（TG_APP_BASE_URL 缺失或不是 https）');
@@ -604,10 +624,17 @@ async function handleIncomingMessage(msg) {
     if (!isPrivate) {
       return sendTelegramMessage(chatId, '请在私聊中发送 /merchant 获取商家后台入口');
     }
+    // 两个入口共用同一次免密登录（同一枚会员 cookie），不是两套账号。
+    // 一行两个按钮：Telegram 允许同一行并排放置多个 web_app 按钮。
     return sendTelegramMessage(
       chatId,
-      '🏪 *商家后台*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮即可进入商家后台（/wmsj）。\n首次使用需输入入驻时登记的会员手机号完成绑定；已绑定的直接进入。\n\n若提示「还没有被分配外卖店铺」，请联系运营在后台「外卖 → 店铺 → 管理会员」里分配。',
-      { inline_keyboard: [[{ text: '🏪 进入商家后台', web_app: { url: merchantUrl } }]] }
+      '🏪 *商家后台*\n━━━━━━━━━━━━━━━━━━━━\n两个入口共用同一次登录，点哪个进哪个：\n• *接单后台*：看订单、接单、改营业状态\n• *商户中心*：店铺资料、员工管理、生成员工邀请码\n\n首次使用需输入入驻时登记的会员手机号完成绑定；已绑定的直接进入。\n\n若提示「还没有被分配外卖店铺」，请联系运营在后台「外卖 → 店铺 → 管理会员」里分配。',
+      {
+        inline_keyboard: [[
+          { text: '🏪 接单后台', web_app: { url: merchantUrl } },
+          { text: '🧭 商户中心', web_app: { url: merchantHubUrl } }
+        ]]
+      }
     ).then(() =>
       // 同 /rider：request_contact 键盘单独一条消息，与 web_app 内联按钮并存（见 /rider 处注释）
       sendTelegramMessage(chatId, '或点下方按钮一键分享手机号完成绑定：', {
