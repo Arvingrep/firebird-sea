@@ -97,26 +97,32 @@ $initData = harness_build_init_data($pairs, $secret);
 if ($mode === 'tampered') { $initData = substr($initData, 0, -3) . 'zzz'; }
 
 $pdo = new StaffHarnessPdo($fix);
+
+// 站点配置夹具：刻意**不含** $cfg_cookieDomain —— 复现 canary baked 模式实况
+// （data/ emptyDir + 新版火鸟缓存永远不会有 $cfg_cookieDomain），cookieDomain 只能靠 env 兜底
+$cfgFile = sys_get_temp_dir() . '/fbs-staff-cfg-' . getmypid() . '.php';
+file_put_contents($cfgFile, "<?php\\n\\$cfg_cookiePath='/';\\n\\$cfg_onlinetime=100;\\n\\$cfg_httpSecureAccess=1;\\n");
+
 $ctx = array(
   'bot_token' => $secret,
   'pdo' => $pdo,
   'db_prefix' => 'huoniao_',
   'replay_dir' => sys_get_temp_dir() . '/fbs-staff-replay-' . getmypid(),
   'now' => $now,
-  'config' => array('cookiePath' => '/', 'cookieDomain' => '', 'cookiePre' => 'HN_', 'onlinetime' => 100, 'httpSecureAccess' => 1),
+  // 站点配置走 fail-closed strict 解析的测试注入口：夹具文件**不含** $cfg_cookieDomain，
+  // cookieDomain 一律由 env FBS_GATEWAY_COOKIE_DOMAIN（docker -e 注入）兜底，复现 canary 实况
+  'config_file' => $cfgFile,
 );
 list($code, $payload, $cookies) = fbs_staff_landing_handle($initData, $ctx);
 echo json_encode(array('code' => $code, 'payload' => $payload, 'cookies' => $cookies)), "\\n";
 `;
 
-function runStaffHarness(mode, fixture) {
-  const r = spawnSync(
-    'docker',
-    ['run', '--rm', '-i', '-v', `${ROOT}:/app`, '-w', '/app',
-     '-e', `HARNESS_MODE=${mode}`, '-e', `HARNESS_FIXTURE=${JSON.stringify(fixture)}`,
-     'php:8.2-cli', 'php'],
-    { input: HARNESS, encoding: 'utf8' },
-  );
+function runStaffHarness(mode, fixture, opts) {
+  const env = ['run', '--rm', '-i', '-v', `${ROOT}:/app`, '-w', '/app',
+   '-e', `HARNESS_MODE=${mode}`, '-e', `HARNESS_FIXTURE=${JSON.stringify(fixture)}`];
+  if (opts && opts.envDomain) env.push('-e', `FBS_GATEWAY_COOKIE_DOMAIN=${opts.envDomain}`);
+  env.push('php:8.2-cli', 'php');
+  const r = spawnSync('docker', env, { input: HARNESS, encoding: 'utf8' });
   assert.strictEqual(r.status, 0, `php harness 退出码 ${r.status}\nstdout: ${r.stdout}\nstderr: ${r.stderr}`);
   try {
     return JSON.parse(r.stdout);
@@ -185,20 +191,146 @@ test('行为：会员 state != 1 → 200 MEMBER_DISABLED', (t) => {
   assert.strictEqual(errCode(out), 'MEMBER_DISABLED');
 });
 
-test('行为：正常绑定 → 200 success + Set-Cookie + redirect=/member?action=workPlatform', (t) => {
+test('行为：正常绑定 → 200 success + Set-Cookie（domain + www 双份）+ redirect=/member?action=workPlatform', (t) => {
   if (!hasDocker()) return t.skip('docker 不可用');
   const out = runStaffHarness('valid', {
     map: [{ tg: '555001', member: 42, sid: 1, staff: 7 }],
     staff: [{ id: 7, sid: 1 }],
     member: [{ id: 42, password: 'a'.repeat(47), state: 1 }],
-  });
+  }, { envDomain: 'stafftest.example' });
   assert.strictEqual(out.code, 200);
   assert.strictEqual(out.payload.success, true);
   assert.strictEqual(out.payload.data.redirect, '/member?action=workPlatform');
-  assert.ok(out.cookies.length >= 2, '至少签出 HN_login_user + HN_userid 两条 Cookie');
   const joined = out.cookies.join('\n');
   assert.match(joined, /HN_login_user=/);
   assert.match(joined, /HN_userid=42/);
+  // merchant_session 同款：cookieDomain 非空时 build_session_cookies 发 domain + www.<domain> 双份
+  const doms = out.cookies.map((c) => (c.match(/; domain=([^;]+)/) || [])[1] || '');
+  assert.deepStrictEqual(doms, ['stafftest.example', 'stafftest.example', 'www.stafftest.example', 'www.stafftest.example'],
+    '必须与 merchant_session 同款：domain=<d> 与 domain=www.<d> 各两条（login_user + userid），顺序一致');
+});
+
+test('行为：cache 缺 cookieDomain 且 env 未设置 → 500 CONFIG_MISSING 且零 Set-Cookie（fail-closed）', (t) => {
+  if (!hasDocker()) return t.skip('docker 不可用');
+  const out = runStaffHarness('valid', {
+    map: [{ tg: '555001', member: 42, sid: 1, staff: 7 }],
+    staff: [{ id: 7, sid: 1 }],
+    member: [{ id: 42, password: 'a'.repeat(47), state: 1 }],
+  });  // 不注入 FBS_GATEWAY_COOKIE_DOMAIN
+  assert.strictEqual(out.code, 500);
+  assert.strictEqual(errCode(out), 'CONFIG_MISSING');
+  assert.match(out.payload.error.message, /FBS_GATEWAY_COOKIE_DOMAIN/, '错误消息必须带 env 变量名（与网关一致）');
+  assert.deepStrictEqual(out.cookies, [], '绝不签 Cookie：绝不静默回落 host-only');
+});
+
+// ---- ①b 网关平价：staff.php 与 merchant_session 的配置解析/Cookie 发射同源 ----
+
+// 从 index.php 摘函数源码（照 php-merchant-bind.test.js 的引号感知花括号配对）
+function extractFunction(src, name) {
+  const start = src.indexOf(`function ${name}(`);
+  assert.ok(start >= 0, `找不到 function ${name}()，测试需同步更新`);
+  const open = src.indexOf('{', start);
+  let depth = 0;
+  let i = open;
+  let quote = null;
+  for (; i < src.length; i++) {
+    const c = src[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"') { quote = c; continue; }
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return src.slice(start, i + 1);
+    }
+  }
+  throw new Error(`function ${name}() 花括号未闭合`);
+}
+
+const GATEWAY = path.join(ROOT, 'webroot', 'api', 'fbs', 'index.php');
+
+const PARITY_HARNESS = `<?php
+error_reporting(E_ALL & ~E_DEPRECATED);
+// 整个网关以测试模式载入（内含 require bridge.php），fbs_bridge_build_session_cookies 随之可用
+define('FBS_GATEWAY_TEST', true);
+define('FBS_BRIDGE_TEST', true);
+define('FBS_GATEWAY_SITE_CONFIG_FILE', '/tmp/fbs-parity-cfg.php');
+require '/app/webroot/api/fbs/index.php';
+
+// 场景复现 canary：cache 缺 $cfg_cookieDomain，env FBS_GATEWAY_COOKIE_DOMAIN 兜底
+file_put_contents('/tmp/fbs-parity-cfg.php', "<?php\\n\\$cfg_cookiePath='/';\\n\\$cfg_onlinetime=100;\\n\\$cfg_httpSecureAccess=1;\\n");
+
+list($cfgGw, $errGw) = fbs_gateway_load_site_config(array());
+list($cfgBr, $errBr) = fbs_bridge_site_config_strict(array('config_file' => '/tmp/fbs-parity-cfg.php'));
+
+$now = 1794361000;
+$pw = str_repeat('a', 47);
+$cGw = ($cfgGw !== null) ? fbs_bridge_build_session_cookies(42, $pw, $cfgGw, $now) : array();
+$cBr = ($cfgBr !== null) ? fbs_bridge_build_session_cookies(42, $pw, $cfgBr, $now) : array();
+echo json_encode(array(
+  'errGw' => $errGw, 'errBr' => $errBr,
+  'cfgGw' => $cfgGw, 'cfgBr' => $cfgBr,
+  'cGw' => $cGw, 'cBr' => $cBr,
+)), "\\n";
+`;
+
+test('平价：同一 env 场景下 fbs_bridge_site_config_strict 与网关 fbs_gateway_load_site_config 的 cookieDomain 相等，Cookie 发射条数/domain 属性集完全一致', (t) => {
+  if (!hasDocker()) return t.skip('docker 不可用');
+  const r = spawnSync(
+    'docker',
+    ['run', '--rm', '-i', '-v', `${ROOT}:/app`, '-w', '/app',
+     '-e', 'FBS_GATEWAY_COOKIE_DOMAIN=parity.example',
+     'php:8.2-cli', 'php'],
+    { input: PARITY_HARNESS, encoding: 'utf8' },
+  );
+  assert.strictEqual(r.status, 0, `php harness 退出码 ${r.status}\nstdout: ${r.stdout}\nstderr: ${r.stderr}`);
+  const out = JSON.parse(r.stdout);
+  assert.strictEqual(out.errGw, null, '网关侧解析应成功');
+  assert.strictEqual(out.errBr, null, 'bridge strict 侧解析应成功');
+  assert.strictEqual(out.cfgBr.cookieDomain, out.cfgGw.cookieDomain,
+    'cookieDomain 必须与 merchant_session 的解析结果逐字节相等');
+  // 三项非强制项同口径：cache 有就沿用，缺就火鸟默认值
+  assert.strictEqual(out.cfgBr.cookiePath, out.cfgGw.cookiePath);
+  assert.strictEqual(out.cfgBr.onlinetime, out.cfgGw.onlinetime);
+  assert.strictEqual(out.cfgBr.httpSecureAccess, out.cfgGw.httpSecureAccess);
+  assert.strictEqual(out.cfgBr.cookiePre, out.cfgGw.cookiePre);
+  // Cookie 发射平价：条数、Cookie 名序列、domain 属性集合逐一对齐（值因 RenrenCrypt 随机 IV 可不同）
+  assert.strictEqual(out.cBr.length, out.cGw.length, 'Set-Cookie 条数必须与 merchant 完全一致');
+  const attrsOf = (c) => {
+    const parts = c.split(';').map((s) => s.trim());
+    const name = parts[0].split('=')[0];
+    const rest = parts.slice(1).sort();
+    return { name, rest };
+  };
+  out.cGw.forEach((c, i) => {
+    const a = attrsOf(c);
+    const b = attrsOf(out.cBr[i]);
+    assert.strictEqual(b.name, a.name, `第 ${i + 1} 条 Cookie 名必须一致`);
+    assert.deepStrictEqual(b.rest, a.rest, `第 ${i + 1} 条 Cookie 属性（path/domain/secure/SameSite/expires）必须与 merchant 完全一致`);
+  });
+});
+
+test('平价：cache 与 env 都拿不到 cookieDomain 时，strict 与网关同报 CONFIG_MISSING（错误串一致）', (t) => {
+  if (!hasDocker()) return t.skip('docker 不可用');
+  const r = spawnSync(
+    'docker',
+    // 关键：容器里不注入 FBS_GATEWAY_COOKIE_DOMAIN（docker run 默认不继承宿主机 env）
+    ['run', '--rm', '-i', '-v', `${ROOT}:/app`, '-w', '/app',
+     '--env', 'FBS_PARITY_NO_ENV=1', 'php:8.2-cli', 'php'],
+    { input: PARITY_HARNESS, encoding: 'utf8' },
+  );
+  assert.strictEqual(r.status, 0, `php harness 退出码 ${r.status}\nstdout: ${r.stdout}\nstderr: ${r.stderr}`);
+  const out = JSON.parse(r.stdout);
+  assert.strictEqual(out.cfgGw, null);
+  assert.strictEqual(out.cfgBr, null);
+  assert.strictEqual(out.errGw.code, 'CONFIG_MISSING');
+  assert.strictEqual(out.errBr.code, 'CONFIG_MISSING');
+  assert.strictEqual(out.errBr.message, out.errGw.message, '错误消息（含 env 变量名提示）必须与网关逐字一致');
+  assert.deepStrictEqual(out.cGw, []);
+  assert.deepStrictEqual(out.cBr, []);
 });
 
 // ---- ② 源码约束（不需要 docker，永远真跑）----
@@ -242,6 +374,26 @@ test('源码约束：查询一律参数化，fbs_staff_map 查库/复核 staff �
   assert.ok(src.includes("state'] !== 1"), 'state 门禁（MEMBER_DISABLED）');
   assert.ok(src.includes("fbs_bridge_build_session_cookies("), '会话 Cookie 复用 bridge 权威实现');
   assert.ok(src.includes("'/member?action=workPlatform'"), 'redirect 指向员工工作台');
+});
+
+test('源码约束：配置解析走 fail-closed strict（与网关同口径），绝不静默回落 host-only', () => {
+  const src = fs.readFileSync(STAFF_PHP, 'utf8');
+  const bridge = fs.readFileSync(path.join(ROOT, 'webroot', 'api', 'fbs', 'bridge.php'), 'utf8');
+  // 剥掉 PHP 注释后再比对，避免被「注释里点名坏例」误伤
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  assert.ok(code.includes('fbs_bridge_site_config_strict('), 'staff.php 必须走 strict 版站点配置解析');
+  assert.ok(!/fbs_bridge_load_site_config\(/.test(code),
+    'staff.php 不得调用静默回落版 fbs_bridge_load_site_config()（cookieDomain 缺失时会发 host-only）');
+  assert.ok(bridge.includes('function fbs_bridge_load_site_config('),
+    'bridge.php 原有 fbs_bridge_load_site_config() 必须保留（别的调用方还在用）');
+  const strictBody = bridge.slice(
+    bridge.indexOf('function fbs_bridge_site_config_strict('),
+    bridge.indexOf('\n}', bridge.indexOf('function fbs_bridge_site_config_strict(')),
+  );
+  assert.match(strictBody, /FBS_GATEWAY_COOKIE_DOMAIN/, 'env 兜底变量名必须与网关同一处（chart 同源注入）');
+  assert.match(strictBody, /CONFIG_MISSING/, '两级都拿不到必须 fail-closed');
+  assert.ok(src.includes("return $fail($cfgError['code'], $cfgError['message'], 500);"),
+    '配置缺失必须 500 且绝不签 Cookie');
 });
 
 test('源码约束：member.controller.php 注册 staffInvite（鉴权 + NO_SHOP + NOT_READY 降级）', () => {

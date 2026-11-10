@@ -14,7 +14,9 @@
  * 与顾客/商家落地页的差异：员工不走「按 username=tg_<id> 查/建会员」，
  * 而是 3) 读 fbs_staff_map 底账 → 4) 用 staff_id 复核 huoniao_staff 行仍在且 sid 未变 →
  * 5) 用 member_id 取真实会员 → 6) 用 fbs_bridge_build_session_cookies() 签原生会话 Cookie
- * （path/domain 属性与 merchant_session 完全一致，同一个 fbs_bridge_load_site_config()）。
+ * （配置走 fbs_bridge_site_config_strict()：与网关同口径 fail-closed，cache 的
+ * $cfg_cookieDomain → env FBS_GATEWAY_COOKIE_DOMAIN → 都没有 500 CONFIG_MISSING，
+ * 确保 Domain 属性与 merchant_session 完全一致，绝不静默回落 host-only）。
  *
  * 安全约定：
  *   - 不接受任何 GET 参数改 sid，不渲染任何表单；
@@ -160,10 +162,18 @@ function fbs_staff_landing_handle($initData, array $context = array())
         return $fail('MEMBER_DISABLED', 'member is disabled');
     }
 
-    // 7. 签原生会话 Cookie（path/domain 属性与 merchant_session 完全一致）
-    $cfg = isset($context['config']) && is_array($context['config'])
-        ? $context['config']
-        : fbs_bridge_load_site_config();
+    // 7. 站点配置（fail-closed，与网关 fbs_gateway_load_site_config 同口径）：cache 里的
+    //    $cfg_cookieDomain → env FBS_GATEWAY_COOKIE_DOMAIN → 都没有则 500 CONFIG_MISSING，
+    //    绝不签 Cookie。绝不走 fbs_bridge_load_site_config()——那个在 cache 缺失时静默回落
+    //    host-only，员工从子域/www. 入口会被踢回登录页，还会与 domain cookie 互相顶替会话。
+    $strictCtx = array();
+    if (isset($context['config_file']) && is_string($context['config_file']) && $context['config_file'] !== '') {
+        $strictCtx['config_file'] = $context['config_file'];
+    }
+    list($cfg, $cfgError) = fbs_bridge_site_config_strict($strictCtx);
+    if ($cfgError !== null) {
+        return $fail($cfgError['code'], $cfgError['message'], 500);
+    }
     $cookies = fbs_bridge_build_session_cookies($memberRow['id'], (string)$memberRow['password'], $cfg, $now);
 
     return array(200, array(
