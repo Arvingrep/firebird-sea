@@ -38,10 +38,30 @@ test('AC1: migration creates all AD-5 tables', async () => {
     '001_fbs_tables.sql', '002_tma_shared_state.sql', '003_addr_share.sql',
     '004_fbs_courier_map.sql', '005_fbs_dispatch_dedup.sql', '006_fbs_dispatch_dedup_courier.sql',
     '007_fbs_bind_audit.sql', '008_fbs_dispatch_dedup_created_idx.sql',
+    '009_fbs_merchant_map.sql', '010_fbs_merchant_audit.sql',
   ]);
   const sql = conn.executed.join('\n');
   for (const t of [...TABLES, 'fbs_token_revoked', 'fbs_idem', 'fbs_replay', 'fbs_addr_share',
-    'fbs_courier_map', 'fbs_bind_audit', 'fbs_dispatch_dedup']) assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${t} \\(`), `missing ${t}`);
+    'fbs_courier_map', 'fbs_bind_audit', 'fbs_dispatch_dedup',
+    'fbs_merchant_map', 'fbs_merchant_audit']) assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${t} \\(`), `missing ${t}`);
+});
+
+// 商家线（009/010）：映射表一对一硬约束 + 独立审计表（不复用骑手表，列名走 member_id 语义）
+test('AC1: fbs_merchant_map 一对一（tg 主键 + member 唯一），fbs_merchant_audit 具备三维度限频索引', () => {
+  const sql = allSql();
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS fbs_merchant_map \(\s*tg_user_id VARCHAR\(32\) NOT NULL PRIMARY KEY,\s*member_id BIGINT NOT NULL/,
+    'fbs_merchant_map 必须是 tg_user_id 主键 + member_id 列');
+  assert.match(sql, /UNIQUE KEY uq_fbs_merchant_map_member \(member_id\)/,
+    'member_id 必须唯一：一个商家号只能被一个 TG 占用');
+  assert.doesNotMatch(sql.slice(sql.indexOf('CREATE TABLE IF NOT EXISTS fbs_merchant_map ('),
+    sql.indexOf('ENGINE=InnoDB', sql.indexOf('CREATE TABLE IF NOT EXISTS fbs_merchant_map ('))), /shop_id/,
+  'fbs_merchant_map 的列里不带 shop_id：一人多店由 /wmsj 页面切换');
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS fbs_merchant_audit \(/);
+  assert.match(sql, /member_id BIGINT NOT NULL DEFAULT 0/);
+  assert.match(sql, /KEY idx_fbs_merchant_audit_tg \(tg_user_id, created_at\)/);
+  assert.match(sql, /KEY idx_fbs_merchant_audit_phone \(phone, created_at\)/);
+  assert.match(sql, /result 取值：success \/ conflict_tg \/ conflict_merchant \/ not_found \/ no_shop/,
+    'result 取值域必须写在迁移注释里（Ops 按手机号排查的依据）');
 });
 
 // B1 补偿控制：审计表要能按 tg_user_id / phone 双维度限频（各有索引）

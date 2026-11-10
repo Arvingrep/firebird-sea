@@ -8,6 +8,17 @@
 ## 表（均只由 Node 写，网关与火鸟只读）
 `fbs_charge`、`fbs_chain_tx`、`fbs_cursor`、`fbs_refund`、`fbs_audit`、`fbs_role`、`fbs_member_map`、`fbs_draft_item`、`fbs_i18n`、`fbs_outbox`，另有迁移记录表 `fbs_migrations`。
 
+**例外（写入方是 PHP 网关，不是 Node）**：`fbs_courier_map`（004）、`fbs_bind_audit`（007）、
+`fbs_merchant_map`（009）、`fbs_merchant_audit`（010）由 `webroot/api/fbs/index.php` 的
+`rider_bind` / `merchant_bind` 写入；Node 侧只读或完全不碰。这四张表**不参与**上面那条
+「只由 Node 写」的口径，改动前先看 `docs/internal/RIDER_TG_HOOKS.md` 与
+`docs/internal/MERCHANT_TG_HOOKS.md` 的写入方说明。
+
+- `fbs_merchant_map`：`tg_user_id` 主键 + `member_id` **唯一**（一个商家号只能被一个 TG 占用），
+  与 `fbs_courier_map` 同构；**不带 shop_id**（一个会员可管多家店，店铺由 `/wmsj` 页面切换）。
+- `fbs_merchant_audit`：镜像 `fbs_bind_audit`，列名用 `member_id` 语义；同时是商家绑定
+  「tg / phone / ip」三维度限频的计数底账（不复用骑手审计表，避免两类行混在一起）。
+
 - `fbs_chain_tx`：`UNIQUE (txid, event_index)`。
 - `fbs_charge`：含 `holds_tail`；MariaDB 无部分唯一索引，用生成列 `tail_key = IF(holds_tail=1, payable_micro, NULL)` + `UNIQUE`（NULL 不参与唯一性），实现"`holds_tail=1` 时 `payable_micro` 唯一"。`holds_tail` 的置位/清除由收银台负责，见 `CHECKOUT.md`。
 - `fbs_role`：`shop_id NOT NULL DEFAULT 0`（0 = 无店铺），使 `UNIQUE (tg_user_id, role, shop_id)` 对全局角色同样生效。
