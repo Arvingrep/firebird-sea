@@ -201,6 +201,80 @@ paths:
         '401': { description: initData 无效或过期（INVALID_INIT_DATA） }
         '502': { description: 网关失败（RIDER_FAILED） }
         '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+  /tg-api/merchant/bind:
+    get:
+      summary: 商家绑定落地页（方案 A）
+      description: |
+        Telegram 内打开的内联 HTML：输入入驻时登记的会员手机号，取 `Telegram.WebApp.initData`
+        后表单 POST 到本路径。无 initData（非 TG 环境）显示提示不提交。响应自带 CSP
+        （script-src 限自身与 telegram.org + nonce、frame-ancestors 限 Telegram 域）与
+        `Cache-Control: no-store`。配置缺失返回 503。
+      responses:
+        '200': { description: 落地页 HTML }
+        '503': { description: 商家入口未配置（MERCHANT_NOT_CONFIGURED） }
+    post:
+      summary: 商家绑定：initData 验签 → 手机号归一 → 网关 merchant_bind → merchant_session → Set-Cookie + 302 /wmsj/
+      description: |
+        字段 `initData`、`phone`。手机号归一口径与骑手一致（去空格/横线/括号/点号 → 前导
+        `+63`/`63` 转 `0` → 必须为 `0` 开头 10–11 位）。PHP 网关按 `member.phone`（两侧归一、
+        0/63/+63 三写法）唯一命中商家会员（`mtype` 只认 1/2），并要求 `waimai_shop_manager`
+        存在且店铺未删（`del=0`；`status=0` 休息不拦）。绑定冲突**绝不静默顶替**：会员已被
+        他人绑定 → 409 `MERCHANT_ALREADY_BOUND`；当前 Telegram 已绑其他会员 → 409
+        `TG_ALREADY_BOUND`；同一对重复提交按幂等成功处理；同一手机号命中多个会员 → 409
+        `MERCHANT_AMBIGUOUS`。三维限频（tg 5 次/60s、phone 3 次/300s、ip 20 次/300s）超限
+        429 `BIND_RATE_LIMITED`，每次尝试写 `fbs_merchant_audit`，底账不可用 fail-closed
+        503 `AUDIT_UNAVAILABLE`。绑定成功后调网关 `merchant_session`（**只读** `fbs_merchant_map`
+        解析既有会员、绝不建号）签火鸟会员 Cookie（`HN_login_user`/`HN_userid`/`HN_tg`，由
+        PHP 生成后原样透传），`302` 到 `/wmsj/`（商家后台首页自跳订单页，多店在页面内切换）。
+        **商家链路绝不写 `fbs_member_map`**（收银台归属校验的唯一依据）。Node 侧限频
+        10 次/分钟/IP。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [initData, phone]
+              properties:
+                initData: { type: string, description: Telegram WebApp initData 原始串 }
+                phone: { type: string, description: 商家会员手机号（09178889999 / +639178889999 等，归一后 0 开头 10-11 位） }
+      responses:
+        '302': { description: 绑定并登录成功，Set-Cookie + Location 为 /wmsj/ }
+        '400': { description: 手机号格式非法（INVALID_PHONE，HTML 错误页含可接受格式提示） }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA，HTML 错误页） }
+        '403': { description: 会员被停用或已申请注销（MEMBER_DISABLED / MEMBER_CANCELLED） }
+        '404': { description: 手机号未匹配商家会员（MERCHANT_NOT_FOUND）或会员无店铺归属（MERCHANT_NO_SHOP） }
+        '409': { description: 绑定冲突（MERCHANT_ALREADY_BOUND / TG_ALREADY_BOUND / MERCHANT_AMBIGUOUS，不顶替原绑定） }
+        '429': { description: 限频（RATE_LIMITED / BIND_RATE_LIMITED） }
+        '502': { description: 网关失败（MERCHANT_FAILED）；或绑定已生效但换会话失败（MERCHANT_SESSION_FAILED，文案提示稍后重新打开，勿重复绑定） }
+        '503': { description: 商家入口未配置（MERCHANT_NOT_CONFIGURED）或网关审计不可用 fail-closed（AUDIT_UNAVAILABLE） }
+  /tg-api/merchant/session:
+    post:
+      summary: 已绑定商家换会员会话（供 bot/n8n 侧对接）
+      description: |
+        仅 POST（不接受 query 传 initData——短期凭证不应进 URL/访问日志），响应带
+        `Cache-Control: no-store`。body 为 JSON `{initData}`。已绑定返回 `Set-Cookie`
+        + `{success:true, data:{bound:true, member_id, shop_ids, redirect:'/wmsj/'}}`；
+        未绑定返回 `{success:true, data:{bound:false}}`；会员无店铺归属返回 403
+        `MERCHANT_NO_SHOP`。网关侧走 `merchant_session`（紧窗 ±15s，按 init_data_hash
+        记账防重放 5 次/2h），只读解析既有会员、绝不建号。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string }
+      responses:
+        '200': { description: bound:true（含 member_id/shop_ids/redirect 与 Set-Cookie）或 bound:false }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA） }
+        '403': { description: 会员无店铺归属（MERCHANT_NO_SHOP）或账号停用/注销（MEMBER_DISABLED / MEMBER_CANCELLED） }
+        '404': { description: 未绑定（以 200 bound:false 表达；会员行缺失的陈旧绑定同口径） }
+        '429': { description: 触发网关防重放记账限制（REPLAY_LIMITED） }
+        '502': { description: 网关失败（MERCHANT_FAILED） }
+        '503': { description: 商家入口未配置（MERCHANT_NOT_CONFIGURED） }
   /tg-api/internal/dispatch:
     post:
       summary: 骑手派单 Telegram 通知（T7，仅集群内 PHP 调用）

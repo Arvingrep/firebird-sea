@@ -21,6 +21,9 @@ const path = require('path');
 const ROUTE_SOURCES = {
   'services/api/src/server.js': '/tg-api',
   'services/api/src/addrShareRoute.js': '/tg-api/addr',
+  // 商家路由同样由 server.js 装配（handler 文件本身不声明 router.*），登记仅为自文档化：
+  // 路由定义在 server.js 的 /tg-api 前缀下，本文件提不出路由，不影响比对结果。
+  'services/api/src/merchantRoute.js': '/tg-api/merchant',
 };
 
 const SPEC_PATH = 'docs/api/openapi.yaml';
