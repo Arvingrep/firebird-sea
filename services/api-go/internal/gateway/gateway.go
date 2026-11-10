@@ -226,6 +226,21 @@ func RiderQL(ctx context.Context, cfg Config, params map[string]any) (map[string
 	return Call(ctx, cfg, "rider_ql", params)
 }
 
+// MerchantBind 是商家绑定（方案 A）：PHP 侧按归一后手机号查唯一商家会员（mtype 1/2）、
+// 校验 waimai_shop_manager 归属、冲突检查（绝不静默顶替）、三维限频、写 fbs_merchant_audit
+// 与 fbs_merchant_map。业务失败走非 2xx，调用方靠 *Error 的 Status + Payload.error.code
+// 还原提示（见 internal/merchant）。宽窗 ±300s：幂等 + 审计 + 不签凭证，重放无收益。
+func MerchantBind(ctx context.Context, cfg Config, params map[string]any) (map[string]any, error) {
+	return Call(ctx, cfg, "merchant_bind", params)
+}
+
+// MerchantSession 是商家换会话：只读 fbs_merchant_map → 既有会员（**绝不建号**）→
+// 签火鸟会员 cookie（HN_login_user + HN_tg 标记）。set_cookies 由 PHP 生成，
+// 调用方原样透传。紧窗 ±15s（与 issue_session 同档）：它返回活凭证。
+func MerchantSession(ctx context.Context, cfg Config, params map[string]any) (map[string]any, error) {
+	return Call(ctx, cfg, "merchant_session", params)
+}
+
 // ---- 响应字段读取 ----
 //
 // 网关响应是任意 JSON：encoding/json 把数字解成 float64，而测试替身常直接塞
