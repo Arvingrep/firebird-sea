@@ -28,7 +28,7 @@ const COOKIES = [
 ];
 
 function okGateway(overrides = {}) {
-  const calls = { member: [], session: [] };
+  const calls = { member: [], session: [], merchant: [] };
   return {
     calls,
     memberFindOrCreate: async (cfg, params) => {
@@ -38,6 +38,11 @@ function okGateway(overrides = {}) {
     issueSession: async (cfg, params) => {
       calls.session.push({ cfg, params });
       return { success: true, data: { member_id: 4242, created: true, set_cookies: COOKIES, ...(overrides.session || {}) } };
+    },
+    merchantSession: async (cfg, params) => {
+      calls.merchant.push({ cfg, params });
+      if (overrides.merchantSession instanceof Error) throw overrides.merchantSession;
+      return { success: true, data: { member_id: 4242, shop_ids: [1, 2], redirect: '/wmsj/', set_cookies: COOKIES, ...(overrides.merchant || {}) } };
     }
   };
 }
@@ -54,7 +59,8 @@ function gatewayHttpError(status, code) {
 function failingGateway(err) {
   return {
     memberFindOrCreate: async () => { throw err; },
-    issueSession: async () => { throw err; }
+    issueSession: async () => { throw err; },
+    merchantSession: async () => { throw err; }
   };
 }
 
@@ -378,5 +384,88 @@ test('fbs_member_map 写失败不影响登录态（cookie 已下发），但响�
     assert.deepStrictEqual(r.headers['set-cookie'], COOKIES);
     assert.strictEqual(r.json.success, true);
     assert.strictEqual(r.json.data.member_map_synced, false, '必须留下可定位的痕迹，不能静默吞掉');
+  } finally { server.close(); }
+});
+
+// ============================== role=merchant（方案 A） ==============================
+
+test('merchant happy path：merchantSession 换 cookie + redirect=/wmsj/，不触达 member_find_or_create / issue_session', async () => {
+  const gw = okGateway();
+  const db = fakeDb();
+  const { server, port } = await startApp({ gateway: gw, db });
+  try {
+    const r = await post(port, { initData: 'good', role: 'merchant' });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.json.success, true);
+    assert.strictEqual(r.json.data.member_id, 4242);
+    assert.strictEqual(r.json.data.redirect, '/wmsj/', '商家落点是 /wmsj/（后台首页自跳订单页）');
+    assert.strictEqual(r.json.data.member_map_synced, false, '商家分支绝不写 fbs_member_map');
+    assert.deepStrictEqual(r.headers['set-cookie'], COOKIES, 'Set-Cookie 必须逐字节等于网关返回值');
+    // 顾客链的两个动作都不得被调用：merchant_session 内部只读解析既有会员
+    assert.strictEqual(gw.calls.member.length, 0, '商家绝不走 member_find_or_create（会建 tg_<id> 空号）');
+    assert.strictEqual(gw.calls.session.length, 0);
+    assert.strictEqual(gw.calls.merchant.length, 1);
+    assert.deepStrictEqual(gw.calls.merchant[0].params, { tg_user_id: 100200, init_data_hash: sha256('good') });
+    assert.ok(!JSON.stringify(gw.calls.merchant[0].params).includes('"good"'), '不得把 initData 原文传给网关');
+    // 全程无任何 SQL（不写 fbs_member_map，也不读 fbs_merchant_map——查绑定在网关内做）
+    assert.strictEqual(db.sqls.length, 0);
+  } finally { server.close(); }
+});
+
+test('merchant：网关契约码透传（NOT_BOUND→404、NO_SHOP→404、AMBIGUOUS→409、AUDIT_UNAVAILABLE→503）', async () => {
+  const cases = [
+    [404, 'MERCHANT_NOT_BOUND', 404],
+    [404, 'MERCHANT_NOT_FOUND', 404],
+    [404, 'MERCHANT_NO_SHOP', 404],
+    [409, 'MERCHANT_AMBIGUOUS', 409],
+    [409, 'MERCHANT_ALREADY_BOUND', 409],
+    [409, 'TG_ALREADY_BOUND', 409],
+    [429, 'BIND_RATE_LIMITED', 429],
+    [429, 'REPLAY_LIMITED', 429],
+    [503, 'AUDIT_UNAVAILABLE', 503],
+    [500, 'BIND_FAILED', 500],
+  ];
+  for (const [gwStatus, gwCode, expectStatus] of cases) {
+    const { server, port } = await startApp({ gateway: failingGateway(gatewayHttpError(gwStatus, gwCode)) });
+    try {
+      const r = await post(port, { initData: 'good', role: 'merchant' });
+      assert.strictEqual(r.json.error.code, gwCode, `${gwCode} 的 code 必须原样透传`);
+      assert.strictEqual(r.status, expectStatus, `${gwCode} → ${expectStatus}`);
+      assert.strictEqual(r.headers['set-cookie'], undefined, '失败时不得下发任何 Cookie');
+      if (expectStatus === 503) assert.strictEqual(r.headers['retry-after'], '60');
+    } finally { server.close(); }
+  }
+});
+
+test('merchant：网关返回空 set_cookies → 502，不下发半截登录态', async () => {
+  const { server, port } = await startApp({ gateway: okGateway({ merchant: { set_cookies: [] } }) });
+  try {
+    const r = await post(port, { initData: 'good', role: 'merchant' });
+    assert.strictEqual(r.status, 502);
+    assert.strictEqual(r.headers['set-cookie'], undefined);
+  } finally { server.close(); }
+});
+
+test('merchant：网关返回非法 redirect（外链）→ 响应仍回落 /wmsj/，不外跳', async () => {
+  const { server, port } = await startApp({ gateway: okGateway({ merchant: { redirect: 'https://evil.example/' } }) });
+  try {
+    const r = await post(port, { initData: 'good', role: 'merchant' });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.json.data.redirect, '/wmsj/');
+  } finally { server.close(); }
+});
+
+test('未知 role（courier / admin / 随便串）：一律 501 ROLE_NOT_SUPPORTED 且不触达网关', async () => {
+  const gw = okGateway();
+  const { server, port } = await startApp({ gateway: gw });
+  try {
+    for (const role of ['courier', 'admin', 'shop', 'MERCHANT']) {
+      const r = await post(port, { initData: 'good', role });
+      assert.strictEqual(r.status, 501, `role=${role}`);
+      assert.strictEqual(r.json.error.code, 'ROLE_NOT_SUPPORTED');
+    }
+    assert.strictEqual(gw.calls.member.length, 0);
+    assert.strictEqual(gw.calls.session.length, 0);
+    assert.strictEqual(gw.calls.merchant.length, 0, '未知 role 不得触达任何网关动作');
   } finally { server.close(); }
 });
