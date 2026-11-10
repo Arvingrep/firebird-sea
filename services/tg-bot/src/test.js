@@ -369,6 +369,58 @@ async function run() {
   if (!deadBot.proc.pid || deadBot.proc.exitCode !== null) throw new Error('缺配置导致进程退出（未优雅降级）');
   console.log('   ✅ PASS（进程存活，回复绑定通道未配置）');
 
+  console.log('🧪 测试 16: 群聊场景钉住既有门控（无键盘噪音 / 无 web_app 400 风险）');
+  // /rider 群聊 → 早退提示，不发生成键盘也不发 web_app 按钮
+  const before16 = bot.getStdout().length;
+  const gwCountBefore16 = gwRequests.length;
+  const s16 = await postJson(PORT, '/webhook/telegram', {
+    message: { chat: { id: 555001, type: 'group' }, text: '/rider', from: { first_name: 'Boss' } }
+  });
+  if (s16.status !== 200 || !s16.data.ok) throw new Error('/rider group failed');
+  await new Promise(r => setTimeout(r, 200));
+  const out16 = bot.getStdout().slice(before16);
+  if (!out16.includes('请在私聊中发送 /rider')) throw new Error(`群聊 /rider 未早退提示，stdout=${out16}`);
+  if (out16.includes('request_contact') || out16.includes('web_app')) {
+    throw new Error(`群聊 /rider 泄漏键盘或 web_app 按钮，stdout=${out16}`);
+  }
+  // /merchant 群聊 → 同样早退
+  const before16b = bot.getStdout().length;
+  const s16b = await postJson(PORT, '/webhook/telegram', {
+    message: { chat: { id: 555001, type: 'group' }, text: '/merchant', from: { first_name: 'Boss' } }
+  });
+  if (s16b.status !== 200 || !s16b.data.ok) throw new Error('/merchant group failed');
+  await new Promise(r => setTimeout(r, 200));
+  const out16b = bot.getStdout().slice(before16b);
+  if (!out16b.includes('请在私聊中发送 /merchant')) throw new Error(`群聊 /merchant 未早退提示，stdout=${out16b}`);
+  if (out16b.includes('request_contact') || out16b.includes('web_app')) {
+    throw new Error(`群聊 /merchant 泄漏键盘或 web_app 按钮，stdout=${out16b}`);
+  }
+  // /start 群聊 → 三行 web_app 全部被 isPrivate 守卫跳过，只剩 BMAD url + callback 按钮（群里合法）
+  const before16c = bot.getStdout().length;
+  const s16c = await postJson(PORT, '/webhook/telegram', {
+    message: { chat: { id: 555001, type: 'group' }, text: '/start', from: { first_name: 'Boss' } }
+  });
+  if (s16c.status !== 200 || !s16c.data.ok) throw new Error('/start group failed');
+  await new Promise(r => setTimeout(r, 200));
+  const out16c = bot.getStdout().slice(before16c);
+  if (out16c.includes('web_app')) throw new Error(`群聊 /start 泄漏 web_app 按钮，stdout=${out16c}`);
+  if (!out16c.includes('查看 BMAD 看板')) throw new Error(`群聊 /start 缺少合法按钮，stdout=${out16c}`);
+  // contact 群聊 → 私聊提示，不调网关
+  const s16d = await postJson(PORT, '/webhook/telegram', {
+    message: {
+      chat: { id: 555001, type: 'group' },
+      from: { id: 777, first_name: 'Boss' },
+      contact: { phone_number: '09171234567', user_id: 777 }
+    }
+  });
+  if (s16d.status !== 200 || !s16d.data.ok) throw new Error('Contact group failed');
+  await new Promise(r => setTimeout(r, 200));
+  if (!bot.getStdout().slice(before16).includes('请在与机器人的私聊中完成手机号绑定')) {
+    throw new Error('群聊 contact 未提示去私聊');
+  }
+  if (gwRequests.length !== gwCountBefore16) throw new Error('群聊 contact 不应调用网关');
+  console.log('   ✅ PASS（/rider /merchant /start /contact 群聊均门控，无键盘噪音）');
+
   console.log('🎉 所有 Telegram Bot 基建测试全部 100% 通过！');
   cleanup();
   process.exit(0);
