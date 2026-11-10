@@ -130,3 +130,41 @@ Node 侧 gatewayClient 统一 reject（`GATEWAY_HTTP_ERROR` + `err.status` + `er
   同算法（方向反转：PHP→Node），action 常量 `dispatch`，Node 侧 60 秒时间窗。
 - 去重：Node 侧 `fbs_dispatch_dedup`，键 `(event, order_id, courier_id)`，TTL 1 天；
   同一订单改派给第二位骑手不会互相吞通知。最终发送失败时 Node 释放占位，允许下次同键重发。
+
+## 六、contact 一键绑定通道（bot 直连网关，request_contact）
+
+**触发**：用户在私聊发送 `/rider` 或 `/merchant` 后，bot 在 web_app 按钮消息之外追加一条
+`request_contact` 回复键盘（`📱 分享手机号完成绑定`，`one_time_keyboard`，点一次自动收起）。
+用户点按钮发出 `message.contact` → bot 生成两个内联按钮「🛵 绑定为骑手 / 🏪 绑定为商家」
+（`callback_data: cbind:r|<phone>` / `cbind:m|<phone>`，手机号随回调传递，bot 不落内存态）
+→ 点选后 bot 直接调 PHP 网关 `rider_bind`（HMAC，同 gatewayClient.js 契约）→ 成功回复
+web_app 工作台按钮。
+
+**信任模型**（安全红线）：bot 在收到 `message.contact` 时**必须**校验
+`msg.from.id === msg.contact.user_id`（Telegram 只在分享本人联系方式时才带 user_id，转发的名片不带）；
+不一致或缺失一律拒绝且**绝不调用网关**。网关侧防冒用完全建立在 bot 这条校验之上——
+HMAC 只证明「请求来自 bot」，不证明「本人同意」。
+
+**ip 参数策略**：bot 传 `ip = tg_user_id`（纯数字）。
+- 不能传空串：网关 `fbs_bind_ip()` 对空 ip 回落到调用方 context IP（bot Pod IP），
+  全部 bot 用户会挤进同一个 ip 桶（20/300s 全局），批量入职当天必然误伤；
+- 纯数字与 web 通道永不共桶：web 侧 ip 经同一清洗保留 `.` / `:`（IPv4/IPv6 均含），
+  纯数字串不可能与任何清洗后的真实 IP 相等 → 满足「bot 与 web 不进同一限频桶」；
+- 审计可追溯：`fbs_bind_audit.ip` 出现纯数字长串即 bot 通道（web 恒带分隔符）；
+  tg 维度（5/60s）仍是更紧的主限，ip 维度退化为 bot 侧每用户 20/300s 冗余兜底；
+  phone 维度（3/300s）与 web 共享——这是有意的，同一手机号指向同一条骑手档案。
+
+**配置与降级**：`FBS_GATEWAY_URL` / `FBS_GATEWAY_SECRET`（deployment-tgbot.yaml 注入，
+Secret 可缺省）。任一缺失时 bot 不崩溃，回复「绑定通道未配置」并引导走 web_app 落地页手输路径。
+
+**错误码映射**（`services/tg-bot/src/server.js` `CONTACT_BIND_MESSAGES`，口径对齐 §五/lp 页）：
+`COURIER_NOT_FOUND`/`COURIER_AMBIGUOUS`/`TG_ALREADY_BOUND`/`COURIER_ALREADY_BOUND`/
+`MISSING_PARAM`/`BIND_RATE_LIMITED`/`AUDIT_UNAVAILABLE`/`BIND_FAILED`，未映射的一律
+「服务暂时不可用」；409 族兜底「已存在绑定关系」提示。
+
+**与落地页的关系**：**共存，不替代**。web_app 落地页（`/tg-api/rider/bind`）路径原样保留；
+一键绑定只是免手输的捷径。落地页仍是唯一能直接换发工作台会话 cookie 的路径——一键绑定成功后
+用户仍需点 web_app 按钮走一次落地页入口拿到会话（rider_ql）。
+
+**测试**：`services/tg-bot/src/test.js` 测试 8-15（键盘追加、归属校验拒绝、签名逐字节校验、
+409/404 文案映射、缺配置降级），mock 模式全跑，无需 BOT_TOKEN。

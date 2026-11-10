@@ -147,3 +147,30 @@ php-rider-bind 2 个）与 Node 侧全部用例（merchant-route 23、tg-login 2
   `node --test test/php-merchant-bind.test.js test/php-rider-bind.test.js` 看是不是整组 skip；
 - 本机无 docker 的临时验证手段：括号平衡脚本 + 源码约束用例 + `node --check`，
   覆盖不了运行时语义（阈值、INTERVAL 窗口、重放账本），只能当语法兜底。
+
+## 八、contact 一键绑定通道（bot 直连网关，request_contact）
+
+**触发**：`/merchant` 回复里除 web_app 入口按钮外，追加一条 `request_contact` 回复键盘
+（与骑手线同构，详见 `RIDER_TG_HOOKS.md` §六：归属红线、角色选择回调、两通道共存）。用户选
+「🏪 绑定为商家」后 bot 直接调 PHP 网关 **`merchant_bind`**（宽窗 ±300s），成功后回复
+`web_app: /tg/entry.php?role=merchant` 按钮——首次进入走 entry.php → tgLogin merchant 分支
+→ `merchant_session` 换发会话 cookie，与落地页绑定后的进入路径完全一致。
+
+**关键差异 vs 骑手线**：错误码映射是商家集——`MERCHANT_NOT_FOUND`/`MERCHANT_AMBIGUOUS`/
+`MERCHANT_NO_SHOP`/`MERCHANT_ALREADY_BOUND`/`TG_ALREADY_BOUND`（两动作共用 409 语义）/
+`BIND_RATE_LIMITED`/`AUDIT_UNAVAILABLE`/`BIND_FAILED`；`MERCHANT_NO_SHOP` 的文案指向
+「外卖 → 店铺 → 管理会员」分配，与 §六 验收探针口径一致。**绑定 ≠ 有会话**：merchant_bind
+成功后没有直接换 cookie，必须走一次 entry.php（单一身份模型：会话只在 session 动作里签发）。
+
+**ip 参数策略**：与骑手线同（bot 传 `ip = tg_user_id`，理由与审计特征见 RIDER_TG_HOOKS §六）；
+merchant 三维限频同样审计在 `fbs_merchant_audit`，`ip != ''` 条件下的共桶分析与骑手一致。
+
+**与落地页的关系**：**共存，不替代**。`/tg-api/merchant/bind` 落地页手输路径原样保留；
+bot 键盘只在私聊追加，群聊不出现（web_app/request_contact 在群里均非法）。
+
+**配置**：`deployment-tgbot.yaml` 注入 `FBS_GATEWAY_URL`（默认
+`http://firebird-<siteId>:<port>`，与 api 侧同源）+ `FBS_GATEWAY_SECRET`（optional，
+同 deployment-api 注入模式）。缺失时 bot 优雅降级回复「绑定通道未配置」，不影响其他指令。
+
+**测试**：`services/tg-bot/src/test.js` 测试 12 断言 merchant_bind 动作名与商家后台
+web_app 按钮；8-15 为全链路（签名逐字节校验、归属拒绝、409/404 映射、缺配置降级）。
