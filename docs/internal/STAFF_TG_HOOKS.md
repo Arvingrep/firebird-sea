@@ -133,6 +133,14 @@ token   = payload + "_" + hmac             # 47 字符；staff_ 前缀 + token �
 
 - 迁移 011/012 随 API 启动自动执行（`fbs_migrations` 记账），无需人工
 - bot 依赖 `FBS_GATEWAY_URL` / `FBS_GATEWAY_SECRET`（contact 一键绑定时已注入，无需新加）
-- canary 验收探针：未绑定 tg 调 `staff_bind`（伪造 token）→ 403；`/tg/staff.php` GET → 200 HTML 壳；
-  后台员工管理页 → 卡片出二维码与链接 → 扫码进 bot → 分享手机号 → 回「已加入」→
-  「进入工作台」→ 工作台出现员工身份
+- **站点 php-fpm 必须注入 `FBS_TG_BOT_TOKEN`**（`deploy/helm/firebird-site/templates/_helpers.tpl`
+  的 `firebird.phpEnv`，复用 api/tgbot 同一枚 Secret key `TELEGRAM_BOT_TOKEN`）。
+  落地页在进程内验 initData 签名，而 baked 模式下 `data/cache/config.php` 每次 Pod 重建就消失、
+  缓存里也不会有 `$cfg_telegramBotToken` —— 缺这条 env，`/tg/staff.php` POST 恒 500
+  「Telegram bot token is not configured」：绑定能成功但拿不到会话 Cookie，免密进工作台整条不可用
+  （2026-11-10 canary 验收实测踩到）
+- canary 验收探针：未绑定 tg 调 `staff_bind`（伪造 token）→ 403；`/tg/staff.php` GET → 200 HTML 壳、
+  POST 非法 initData → 401 `INIT_DATA_INVALID`（**不是 500**）；后台员工管理页 → 卡片出二维码与链接 →
+  扫码进 bot → 分享手机号 → 回「已加入」→「进入工作台」→ 工作台出现员工身份
+- 真机验收需要一条「普通会员 + 手机号」的测试数据（canary 目前只有商家号，会命中
+  `STAFF_IS_BUSINESS`，正常 200 路径无法在现有数据上跑通）

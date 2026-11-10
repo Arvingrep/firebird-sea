@@ -124,6 +124,24 @@
       name: firebird-storage-secret
       key: google-maps-api-key
       optional: true
+# 员工免密落地页（webroot/tg/staff.php）在**进程内**校验 Telegram initData 签名，需要 bot token：
+# fbs_bridge_get_bot_token() 的取值顺序是 data/cache/config.php 的 $cfg_telegramBotToken → env
+# FBS_TG_BOT_TOKEN → 占位常量。baked 模式下 data/ 挂 emptyDir、config.php 每次 Pod 重建就消失，
+# 缓存里也不会有这个值，所以只能靠 env。
+#
+# 为什么之前没配：商家链路（/tg/entry.php?role=merchant）把验签放在 Node（api 部署有该 Secret），
+# 员工链路是纯 PHP，没有 Node 中转 —— 少这一条，落地页 POST 恒 500
+# "Telegram bot token is not configured"，绑定能成但拿不到会话 Cookie，免密进工作台整条不可用。
+# 与 api / tgbot 复用同一枚 Secret key，不在 values 里新造配置项。
+#
+# optional：Secret 未建时 Pod 照常启动（站点其余功能不受影响），落地页 POST 返回结构化 500，
+# 不放大成 CrashLoop —— 与 FBS_GATEWAY_SECRET 同一取舍。
+- name: FBS_TG_BOT_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.api.secretRef | default "firebird-api-secret" }}
+      key: TELEGRAM_BOT_TOKEN
+      optional: true
 {{- end -}}
 
 {{- /* init 容器：播种 data/ 与配置 PVC 三方同步（脚本来自 ConfigMap firebird-init-<site>） */ -}}
