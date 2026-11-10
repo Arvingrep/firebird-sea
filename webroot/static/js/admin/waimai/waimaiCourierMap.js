@@ -1,5 +1,8 @@
 $(function(){
 
+    // 谷歌地图：每 5 秒刷新一次，旧标记/气泡要先摘掉（原来用的 marker 变量在 update 里根本不存在）。
+    // 必须声明在 update(1) 之前，否则首次调用时它还是 undefined。
+    var gOverlays = [];
 
     update(1);
 
@@ -101,7 +104,7 @@ $(function(){
       // 谷歌地图
       }else if (site_map == "google") {
 
-        var points = [], LatLngList = [], markerList = [];
+        var points = [], LatLngList = [];
 
         if(first){
               map = new google.maps.Map(document.getElementById('map'), {
@@ -112,9 +115,10 @@ $(function(){
               streetViewControl: false
             });
         }else{
-            for (var i = 0; i < marker.length; i++) {
-    		    marker[i].setMap(null);
-    		}
+            for (var i = 0; i < gOverlays.length; i++) {
+                gOverlays[i].setMap ? gOverlays[i].setMap(null) : gOverlays[i].close();
+            }
+            gOverlays = [];
         }
 
         //骑手
@@ -138,7 +142,7 @@ $(function(){
             infoWindow.open(map, marker);
 
             LatLngList.push(new google.maps.LatLng(o.lng, o.lat))
-            markerList.push(marker);
+            gOverlays.push(marker, infoWindow);
 
         });
 
@@ -153,19 +157,25 @@ $(function(){
             });
 
             var infoWindow = new google.maps.InfoWindow({
-              content: '<p class="cour_google'+state+' store">'+o.name+'</p>'
+              content: '<p class="cour_google store">'+o.name+'</p>'
             });
             infoWindow.open(map, marker);
 
+            LatLngList.push(poi);
+            gOverlays.push(marker, infoWindow);
         });
 
         // 调整到合适的视野
-        if(first){
+        if(first && LatLngList.length > 0){
             var bounds = new google.maps.LatLngBounds ();
             for (var i = 0, LtLgLen = LatLngList.length; i < LtLgLen; i++) {
               bounds.extend (LatLngList[i]);
             }
             map.fitBounds (bounds);
+            // 只有一个点时 fitBounds 会放到最大级别，Google 在很多地方没有那么高的底图，会是一片灰
+            google.maps.event.addListenerOnce(map, 'idle', function(){
+                if(map.getZoom() > 16) map.setZoom(16);
+            });
         }
 
       }else if(site_map == 'amap'){
