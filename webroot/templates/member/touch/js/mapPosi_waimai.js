@@ -236,9 +236,19 @@ var pagePosi = new Vue({
 
     // 谷歌地图
     draw_google(lnglat) {
+      var tt = this;
       $(".loadImg").hide();
       $('.mapcenter').hide();
-      var gLat = lnglat[0], gLng = lnglat[1],
+      // 定位失败时 drawMap() 传进来的是 ''，lnglat[0] 取到 undefined，new google.maps.LatLng(undefined, undefined)
+      // 会直接抛错 → 地图一片空白、也没法手动拖点选址。失败就落到默认中心（马尼拉），让用户能拖动/搜索。
+      var okLng = lnglat && lnglat[0] !== '' && lnglat[0] != null && isFinite(parseFloat(lnglat[0])),
+        okLat = lnglat && lnglat[1] !== '' && lnglat[1] != null && isFinite(parseFloat(lnglat[1]));
+      if (!okLng || !okLat) {
+        lnglat = [120.9842, 14.5995];
+        tt.lng = lnglat[0];
+        tt.lat = lnglat[1];
+      }
+      var gLat = parseFloat(lnglat[0]), gLng = parseFloat(lnglat[1]),
         mapOptions = {
           zoom: 18,
           center: new google.maps.LatLng(gLng, gLat),
