@@ -29,9 +29,15 @@
  *   500 DB_UNAVAILABLE               连不上库 / 拿不到建号命名锁（Node 侧改判 503，见 services/api/src/tgLogin.js）
  *   404 COURIER_NOT_FOUND            rider_* 手机号未匹配可用骑手 / courier_id 不可用
  *   409 COURIER_ALREADY_BOUND / TG_ALREADY_BOUND / COURIER_AMBIGUOUS   rider_bind 冲突（不顶替）
- *   429 BIND_RATE_LIMITED            rider_bind 三维度限频（tg 5/60s、phone 3/300s、ip 20/300s）
- *   500 BIND_FAILED                  rider_bind 并发双插撞唯一键（N6：同样落审计，result=error）
- *   503 AUDIT_UNAVAILABLE            rider_bind 审计/限频计数不可用（fail-closed，宁拒勿漏）
+ *   429 BIND_RATE_LIMITED            rider_bind / merchant_bind 三维度限频（tg 5/60s、phone 3/300s、ip 20/300s）
+ *   500 BIND_FAILED                  rider_bind / merchant_bind 并发双插撞唯一键（N6：同样落审计，result=error）
+ *   503 AUDIT_UNAVAILABLE            rider_bind / merchant_bind 审计/限频计数不可用（fail-closed，宁拒勿漏）
+ *   404 MERCHANT_NOT_FOUND           merchant_bind 手机号未匹配商家会员
+ *   404 MERCHANT_NO_SHOP             merchant_bind/merchant_session 会员没有可管理店铺（del=0 的店为 0）
+ *   404 MERCHANT_NOT_BOUND           merchant_session 该 TG 还没绑商家（走 /merchant/bind）
+ *   409 MERCHANT_AMBIGUOUS           同一手机号命中多个会员（数据问题，宁可拒绝不猜）
+ *   409 MERCHANT_ALREADY_BOUND       该商家会员已被**别的** TG 绑定（原绑定不动）
+ *   409 TG_ALREADY_BOUND             该 TG 已绑定**别的**商家会员（原绑定不动）
  *   503 BRIDGE_CONFIG_MISSING        rider_ql/notify_url 读不到 $fb_bridge_token
  *   503 GATEWAY_SECRET_NOT_CONFIGURED  本文件拿不到 FBS_GATEWAY_SECRET
  *
@@ -60,6 +66,19 @@
  *                          → data: {courier_id, url}   （10 分钟一次性工作台直达 URL）
  *   rider_notify_url       入参 order_id(必填) / courier_id(必填)
  *                          → data: {url}               （派单卡片「查看订单」一次性直达 URL）
+ *   merchant_bind          入参 tg_user_id(必填) / phone(必填) / ip
+ *                          → data: {member_id, shop_ids, idempotent?}
+ *                          按 member.phone（0/63/+63 三写法，两侧归一）唯一命中商家会员，
+ *                          且该会员必须有 waimai_shop_manager 且店铺未删，才写 fbs_merchant_map。
+ *                          多命中 409 MERCHANT_AMBIGUOUS；查不到 404 MERCHANT_NOT_FOUND；
+ *                          无店铺 404 MERCHANT_NO_SHOP。**绝不写 fbs_member_map**
+ *                          （那是收银台归属底账，写进去会把该 TG 的顾客下单归属改掉）。
+ *   merchant_session       入参 tg_user_id(必填) / init_data_hash(必填)
+ *                          → data: {member_id, shop_ids, set_cookies: [...], redirect: '/wmsj/'}
+ *                          **只读** fbs_merchant_map → 既有会员 → 签会员 cookie；未绑定
+ *                          404 MERCHANT_NOT_BOUND。与 issue_session 的唯一实质差异是
+ *                          「会员解析不建号」（issue_session 的 resolve_member 会插一个
+ *                          username=tg_<id> 的空会员，商家拿到的是「有 cookie 无店铺」）。
  *
  * set_cookies 是可直接 header('Set-Cookie: ...') 的完整头字符串，由 PHP 侧生成；
  * Node 不得重新拼装任何属性（domain/path/secure/SameSite/expires 都在这里定死），
@@ -88,7 +107,11 @@ if (!defined('FBS_GATEWAY_MARKER_TTL')) define('FBS_GATEWAY_MARKER_TTL', 30 * 86
 /** 动作白名单 */
 function fbs_gateway_actions()
 {
-    return array('member_find_or_create', 'issue_session', 'rider_bind', 'rider_ql', 'rider_notify_url');
+    return array(
+        'member_find_or_create', 'issue_session',
+        'rider_bind', 'rider_ql', 'rider_notify_url',
+        'merchant_bind', 'merchant_session',
+    );
 }
 
 /* ============================== 响应封装 ============================== */
@@ -1280,6 +1303,421 @@ function fbs_gateway_action_rider_notify_url(array $params, array $context)
     return fbs_gateway_ok(array('url' => fbs_gateway_courier_ql_url((string)$cid, 'detail', (string)$oid, $fb_bridge_token, $baseUrl)));
 }
 
+/* ============================== 商家绑定与会话（方案 A） ============================== */
+
+/**
+ * 商家绑定审计（镜像 fbs_gateway_bind_audit，表换 fbs_merchant_audit、列换 member_id）。
+ *
+ * 为什么不复用 fbs_bind_audit：那张表的列是 courier_id，商家写 0 会让「该表只记骑手绑定」
+ * 的口径失真，按手机号排查时两类行也混在一起。本表同时是商家侧三维度限频的计数底账。
+ *
+ * result 取值域（8 类，见 migrations/010）：success / conflict_tg / conflict_merchant /
+ *   not_found / no_shop / ambiguous / rate_limited / error。
+ *   会员停用/已注销归并到 not_found：「有没有可用商家账号」是绑定这条链路唯一关心的问题，
+ *   具体原因在 HTTP code（403 MEMBER_DISABLED / MEMBER_CANCELLED）与 error_log 里。
+ *
+ * 【fail-closed】审计是限频 + 事后排查的共同前提，写不进去等于补偿控制静默失效：
+ * INSERT 失败必须 error_log（带 tg/phone/ip 便于排查）并返回 false，调用方一律 503。
+ *
+ * @return bool true=写入成功
+ */
+function fbs_gateway_merchant_audit(PDO $pdo, $tgUserId, $memberId, $phone, $result, $ip)
+{
+    $tg = preg_match('/^[1-9][0-9]{0,18}$/', (string)$tgUserId) ? (string)$tgUserId : '0';
+    $mid = (int)$memberId;
+    $ph = preg_match('/^0[0-9]{9,10}$/', (string)$phone) ? (string)$phone : '';
+    $allowed = array('success', 'conflict_tg', 'conflict_merchant', 'not_found', 'no_shop', 'ambiguous', 'rate_limited', 'error');
+    if (!in_array($result, $allowed, true)) $result = 'not_found';
+    try {
+        $stmt = $pdo->prepare('INSERT INTO fbs_merchant_audit (`tg_user_id`, `member_id`, `phone`, `result`, `ip`) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute(array($tg, $mid, $ph, $result, $ip));
+        return true;
+    } catch (Throwable $e) {
+        // 只记脱敏后的定位字段与错误消息，不落 initData（本动作根本收不到 initData）
+        error_log('[fbs_gateway] merchant audit failed: tg=' . $tg . ' phone=' . $ph . ' ip=' . $ip
+            . ' result=' . $result . ' :: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * 商家绑定的三维度限频：阈值/窗口与 rider_bind 完全同构（不做减法，商家手机号 = 登录账号，
+ * 撞库价值比骑手更高），底账换 fbs_merchant_audit。
+ *   tg_user_id 维度：60  秒内最多 5  次
+ *   phone      维度：300 秒内最多 3  次
+ *   ip         维度：300 秒内最多 20 次
+ * 被限频的记录本身不计入（result = 'rate_limited' 被排除），否则用户被拦一次就会不断
+ * 自我延长窗口，越试越锁死。
+ *
+ * @return array ['limited'=>bool, 'error'=>array|null]
+ */
+function fbs_gateway_merchant_rate_limited(PDO $pdo, $tgUserId, $phone, $ip)
+{
+    $tg = preg_match('/^[1-9][0-9]{0,18}$/', (string)$tgUserId) ? (string)$tgUserId : '0';
+    $ph = preg_match('/^0[0-9]{9,10}$/', (string)$phone) ? (string)$phone : '';
+    $dims = array(
+        // [sql 条件, 参数, 窗口秒, 阈值, 维度名]
+        array("`tg_user_id` = ?", array($tg), 60, 5, 'tg'),
+        array("`phone` = ? AND `phone` != ''", array($ph), 300, 3, 'phone'),
+        array("`ip` = ? AND `ip` != ''", array($ip), 300, 20, 'ip'),
+    );
+    foreach ($dims as $d) {
+        list($cond, $args, $window, $max, $name) = $d;
+        try {
+            $stmt = $pdo->prepare('SELECT COUNT(*) AS `c` FROM fbs_merchant_audit WHERE ' . $cond
+                . " AND `result` != 'rate_limited' AND `created_at` > NOW() - INTERVAL " . (int)$window . ' SECOND');
+            $stmt->execute($args);
+            $c = (int)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            error_log('[fbs_gateway] merchant rate-limit count failed (dim=' . $name . ' tg=' . $tg
+                . ' phone=' . $ph . ' ip=' . $ip . ') :: ' . $e->getMessage());
+            return array('limited' => false, 'error' => array('code' => 'AUDIT_UNAVAILABLE', 'message' => 'bind rate-limit ledger unavailable'));
+        }
+        if ($c >= $max) {
+            return array('limited' => true, 'error' => null);
+        }
+    }
+    return array('limited' => false, 'error' => null);
+}
+
+/**
+ * 按（已归一的）手机号查商家会员。**只读，绝不建号。**
+ *
+ * 口径对齐火鸟 memberLogin()（userLogin.class.php:373）：手机号可直接当登录名，
+ * 且 mtype 排除 0（系统管理员）/3（城市管理员）——商家只可能是 1（个人）/2（企业）。
+ * state / is_cancellation 不在这里判，交给 fbs_gateway_member_guard() 统一处理
+ * （与 issue_session 同一条门禁，避免两套口径）。
+ *
+ * 为什么两侧都归一：member.phone 是历史存量（0 开头 / 63 / +63 且可能带空格横线括号），
+ * 只归一入参时，库里存 63 形态就永远匹配不上——rider_bind 已踩过这个坑（见其注释）。
+ *
+ * member.phone **没有唯一索引**，命中多行是现实可能（同一手机号被多个会员填过），
+ * 所以 LIMIT 2 只为判定歧义，调用方一律 count>1 → 409，绝不猜。
+ *
+ * @return array [rows|null, error|null]  rows 为 0/1/2 行的数组
+ */
+function fbs_gateway_merchant_member_by_phone(PDO $pdo, $prefix, $phone)
+{
+    try {
+        $digits = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(`phone`, ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')";
+        $stmt = $pdo->prepare(
+            'SELECT `id`, `password`, `state`, `is_cancellation`, `mtype`, `phone` FROM `' . $prefix . 'member`'
+            . ' WHERE ' . $digits . ' IN (?, ?, ?) AND `mtype` IN (1, 2) LIMIT 2'
+        );
+        $rest = substr($phone, 1); // $phone 已归一为 0XXXXXXXXXX
+        $stmt->execute(array($phone, '63' . $rest, '+63' . $rest));
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] merchant member lookup failed: ' . $e->getMessage());
+        return array(null, array('code' => 'DB_QUERY_FAILED', 'message' => 'member lookup failed'));
+    }
+    return array(is_array($rows) ? $rows : array(), null);
+}
+
+/**
+ * 会员可管理的店铺 id 列表（商家身份的唯一权威是 waimai_shop_manager）。
+ *
+ * 只认 manager 关系表：waimai_shop.userid 库内值不可信（canary 三行全是 1，而实际管理者是
+ * member.id=2），全仓也没有业务代码读它——按那一列取归属会把店算到系统管理员名下。
+ * 只排除 del<>0（逻辑删除）；status=0 是「店铺休息」，不是不可管理：商家仍要能改菜品/看单。
+ *
+ * @return array [shopIds(int[]), error|null]
+ */
+function fbs_gateway_merchant_shops(PDO $pdo, $prefix, $memberId)
+{
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT m.`shopid` AS `shopid` FROM `' . $prefix . 'waimai_shop_manager` m'
+            . ' JOIN `' . $prefix . 'waimai_shop` s ON s.`id` = m.`shopid`'
+            . ' WHERE m.`userid` = ? AND s.`del` = 0'
+        );
+        $stmt->execute(array((int)$memberId));
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] merchant shop lookup failed: mid=' . (int)$memberId . ' :: ' . $e->getMessage());
+        return array(null, array('code' => 'DB_QUERY_FAILED', 'message' => 'shop lookup failed'));
+    }
+    $ids = array();
+    foreach ((is_array($rows) ? $rows : array()) as $r) {
+        $sid = (int)$r['shopid'];
+        if ($sid > 0 && !in_array($sid, $ids, true)) $ids[] = $sid;
+    }
+    return array($ids, null);
+}
+
+/**
+ * merchant_session 的会员解析：**只读** fbs_merchant_map → member 行。
+ *
+ * 这是与 issue_session 的唯一实质差异。issue_session 的 fbs_gateway_resolve_member()
+ * 在 username=tg_<id> 不存在时会插一个 phone 为空的新会员（bridge.php 的
+ * fbs_bridge_find_or_create_member），商家若走那条路得到的是「有 cookie、无店铺」，
+ * /wmsj 立刻弹「您没有外卖店铺权限」——登录成功但进不去的经典症状。
+ *
+ * 绑定行存在但会员行已不存在（会员被删）属陈旧绑定：返回 404 MERCHANT_NOT_BOUND 而不是
+ * 自动清理那一行——「绝不静默顶替」同样适用于清理，交给运维按审计排查。
+ *
+ * @return array [member|null, error|null]  member = {id, password}
+ */
+function fbs_gateway_lookup_merchant_member(PDO $pdo, $prefix, $tgUserId)
+{
+    try {
+        $stmt = $pdo->prepare('SELECT `member_id` FROM `fbs_merchant_map` WHERE `tg_user_id` = ? LIMIT 1');
+        $stmt->execute(array((string)$tgUserId));
+        $mid = (int)$stmt->fetchColumn();
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] merchant map lookup failed: tg=' . (int)$tgUserId . ' :: ' . $e->getMessage());
+        return array(null, array('code' => 'DB_QUERY_FAILED', 'message' => 'merchant binding lookup failed'));
+    }
+    if ($mid <= 0) {
+        return array(null, array('code' => 'MERCHANT_NOT_BOUND', 'message' => 'this telegram is not bound to any merchant account'));
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT `id`, `password`, `state`, `is_cancellation` FROM `' . $prefix . 'member` WHERE `id` = ? LIMIT 1');
+        $stmt->execute(array($mid));
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] merchant member select failed: mid=' . $mid . ' :: ' . $e->getMessage());
+        return array(null, array('code' => 'DB_QUERY_FAILED', 'message' => 'member lookup failed'));
+    }
+    if (!$row) {
+        error_log('[fbs_gateway] stale merchant binding: tg=' . (int)$tgUserId . ' member_id=' . $mid . ' (member row missing)');
+        return array(null, array('code' => 'MERCHANT_NOT_BOUND', 'message' => 'bound merchant account no longer exists'));
+    }
+
+    $denied = fbs_gateway_member_guard($row);
+    if ($denied !== null) return array(null, $denied);
+
+    return array(array('id' => (int)$row['id'], 'password' => (string)$row['password']), null);
+}
+
+/** merchant_bind → [httpCode, payload]。冲突语义与 rider_bind(B1) 完全同构，只换表/换查人。 */
+function fbs_gateway_action_merchant_bind(array $params, array $context)
+{
+    // Node 侧已完成 initData 验签（telegramAuth，1 小时窗口），这里的 tg_user_id 视为可信身份
+    $tgUserId = fbs_gateway_parse_tg_user_id(isset($params['tg_user_id']) ? $params['tg_user_id'] : null);
+    if ($tgUserId === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'invalid tg_user_id');
+    }
+    // 归一在 Node 已做过一次，这里是二次防线（网关不假设调用方一定归一，且审计里必须落统一格式）
+    $phone = fbs_normalize_phone(isset($params['phone']) ? $params['phone'] : '');
+    if ($phone === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'invalid phone');
+    }
+    $ip = fbs_bind_ip($params, $context);
+
+    list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
+    if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
+    if (!fbs_gateway_valid_prefix($prefix)) {
+        return fbs_gateway_err(500, 'CONFIG_INVALID', 'DB_PREFIX contains illegal characters');
+    }
+
+    // ① 限频优先于查会员：避免手机号被枚举，也避免把 member 表当探测面
+    $rate = fbs_gateway_merchant_rate_limited($pdo, $tgUserId, $phone, $ip);
+    if ($rate['error'] !== null) {
+        return fbs_gateway_err(503, $rate['error']['code'], $rate['error']['message']);
+    }
+    if ($rate['limited']) {
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, 0, $phone, 'rate_limited', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        return fbs_gateway_err(429, 'BIND_RATE_LIMITED', 'too many bind attempts');
+    }
+
+    // ② 查商家会员（两侧归一 + mtype 1/2）。0 行 404、多行 409：手机号没有唯一索引，
+    //    多命中属数据问题，宁可拒绝让运营按手机号排查，也不猜一个「最像的」会员。
+    list($rows, $lookupError) = fbs_gateway_merchant_member_by_phone($pdo, $prefix, $phone);
+    if ($lookupError !== null) {
+        return fbs_gateway_err(500, $lookupError['code'], $lookupError['message']);
+    }
+    if (!$rows) {
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, 0, $phone, 'not_found', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        return fbs_gateway_err(404, 'MERCHANT_NOT_FOUND', 'no merchant member matches this phone');
+    }
+    if (count($rows) > 1) {
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, 0, $phone, 'ambiguous', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        return fbs_gateway_err(409, 'MERCHANT_AMBIGUOUS', 'multiple merchant members match this phone');
+    }
+    $row = $rows[0];
+    $memberId = (int)$row['id'];
+
+    // ③ 会员状态门禁（state / is_cancellation）：与 issue_session 同一条，不另立口径
+    $denied = fbs_gateway_member_guard($row);
+    if ($denied !== null) {
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, $memberId, $phone, 'not_found', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        error_log('[fbs_gateway] merchant_bind member not usable: mid=' . $memberId . ' code=' . $denied['code']);
+        return fbs_gateway_err(403, $denied['code'], $denied['message']);
+    }
+
+    // ④ 店铺归属：至少一家 del=0 的店。0 家 = 未入驻/审核中/未分配管理员，统一 404。
+    //    生产当前最高概率的失败态（waimai_shop_manager 为空），文案由 Node 侧给出可执行指引。
+    list($shopIds, $shopError) = fbs_gateway_merchant_shops($pdo, $prefix, $memberId);
+    if ($shopError !== null) {
+        return fbs_gateway_err(500, $shopError['code'], $shopError['message']);
+    }
+    if (!$shopIds) {
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, $memberId, $phone, 'no_shop', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        return fbs_gateway_err(404, 'MERCHANT_NO_SHOP', 'member has no manageable shop');
+    }
+
+    // ⑤ 冲突检查：绝不静默顶替（B1）。fbs_merchant_map.tg_user_id 是主键、member_id 是唯一键。
+    try {
+        $stmt = $pdo->prepare('SELECT `tg_user_id`, `member_id` FROM `fbs_merchant_map` WHERE `tg_user_id` = ? OR `member_id` = ? LIMIT 2');
+        $stmt->execute(array((string)$tgUserId, $memberId));
+        $boundRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] merchant_bind conflict lookup failed: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'bind conflict lookup failed');
+    }
+    $boundMid = null;   // 本 TG 当前绑的会员
+    $boundTg = null;    // 本会员当前绑的 TG
+    if (is_array($boundRows)) {
+        foreach ($boundRows as $r) {
+            if ((string)$r['tg_user_id'] === (string)$tgUserId) $boundMid = (int)$r['member_id'];
+            if ((int)$r['member_id'] === $memberId) $boundTg = (string)$r['tg_user_id'];
+        }
+    }
+
+    if ($boundMid === $memberId) {
+        // 同一对 (TG, 会员) = 幂等成功：只刷新手机号写法，不动别人的绑定，也不签任何凭证
+        try {
+            $stmt = $pdo->prepare('UPDATE `fbs_merchant_map` SET `phone` = ? WHERE `tg_user_id` = ? AND `member_id` = ?');
+            $stmt->execute(array($phone, (string)$tgUserId, $memberId));
+        } catch (Throwable $e) {
+            error_log('[fbs_gateway] merchant_bind idempotent update failed: ' . $e->getMessage());
+            return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'bind update failed');
+        }
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, $memberId, $phone, 'success', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        return fbs_gateway_ok(array('member_id' => $memberId, 'shop_ids' => $shopIds, 'idempotent' => true));
+    }
+    if ($boundMid !== null) {
+        // 本 TG 已绑别的商家：用户自己能解，优先报这个（比会员冲突更可自助）
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, $memberId, $phone, 'conflict_tg', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        return fbs_gateway_err(409, 'TG_ALREADY_BOUND', 'this telegram is already bound to another merchant');
+    }
+    if ($boundTg !== null) {
+        // 该会员已被别的 TG 占用：原绑定保持不动
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, $memberId, $phone, 'conflict_merchant', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        return fbs_gateway_err(409, 'MERCHANT_ALREADY_BOUND', 'this merchant is already bound to another telegram');
+    }
+
+    try {
+        $stmt = $pdo->prepare('INSERT INTO `fbs_merchant_map` (`tg_user_id`, `member_id`, `phone`) VALUES (?, ?, ?)');
+        $stmt->execute(array((string)$tgUserId, $memberId, $phone));
+    } catch (Throwable $e) {
+        // N6：并发双插撞唯一键也是终态失败，必须落审计（result=error），否则审计与事实对不上账
+        if (!fbs_gateway_merchant_audit($pdo, $tgUserId, $memberId, $phone, 'error', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+        }
+        error_log('[fbs_gateway] merchant_bind insert failed (tg=' . $tgUserId . ' mid=' . $memberId . ') :: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'BIND_FAILED', 'bind failed');
+    }
+    if (!fbs_gateway_merchant_audit($pdo, $tgUserId, $memberId, $phone, 'success', $ip)) {
+        return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'merchant audit unavailable');
+    }
+    return fbs_gateway_ok(array('member_id' => $memberId, 'shop_ids' => $shopIds));
+}
+
+/**
+ * merchant_session → [httpCode, payload]。
+ *
+ * 与 issue_session 同构，只把「会员解析」换成只读的 fbs_gateway_lookup_merchant_member()：
+ * 站点 cookie 配置（fail-closed）、防重放记账、刷新 online、fbs_bridge_build_session_cookies、
+ * HN_tg 标记 cookie —— 全部原样复用，不新写任何 cookie 逻辑。
+ */
+function fbs_gateway_action_merchant_session(array $params, array $context)
+{
+    $tgUserId = fbs_gateway_parse_tg_user_id(isset($params['tg_user_id']) ? $params['tg_user_id'] : null);
+    if ($tgUserId === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'tg_user_id must be a positive integer');
+    }
+    // 必填：没有它就无法记账，静默跳过等于把防重放关掉而没人知道（口径同 issue_session）
+    $initDataHash = fbs_gateway_parse_init_data_hash(isset($params['init_data_hash']) ? $params['init_data_hash'] : null);
+    if ($initDataHash === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'init_data_hash must be sha256 hex (64 chars)');
+    }
+
+    list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
+    if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
+    if (!fbs_gateway_valid_prefix($prefix)) {
+        return fbs_gateway_err(500, 'CONFIG_INVALID', 'DB_PREFIX contains illegal characters');
+    }
+
+    list($member, $error) = fbs_gateway_lookup_merchant_member($pdo, $prefix, $tgUserId);
+    if ($member === null) {
+        if ($error['code'] === 'MEMBER_DISABLED' || $error['code'] === 'MEMBER_CANCELLED') {
+            return fbs_gateway_err(403, $error['code'], $error['message']);
+        }
+        if ($error['code'] === 'MERCHANT_NOT_BOUND') {
+            return fbs_gateway_err(404, $error['code'], $error['message']);
+        }
+        return fbs_gateway_err(500, $error['code'], $error['message']);
+    }
+
+    // 店铺归属复核：绑定时校验过一次，但店铺可能期间被删/管理员被撤。没店就不签会话——
+    // 否则用户拿到 cookie 进 /wmsj 只会看到「您没有外卖店铺权限」弹窗，比直接给出提示更难排查。
+    // 这里不写审计：审计是「绑定动作」的底账，登录不该改写它（也不该占用限频额度）。
+    list($shopIds, $shopError) = fbs_gateway_merchant_shops($pdo, $prefix, (int)$member['id']);
+    if ($shopError !== null) {
+        return fbs_gateway_err(500, $shopError['code'], $shopError['message']);
+    }
+    if (!$shopIds) {
+        return fbs_gateway_err(404, 'MERCHANT_NO_SHOP', 'member has no manageable shop');
+    }
+
+    // fail-closed：站点配置读不到就报错，不拿 cookieDomain='' 之类的默认值凑
+    list($cfg, $cfgError) = fbs_gateway_load_site_config($context);
+    if ($cfgError !== null) {
+        return fbs_gateway_err(500, $cfgError['code'], $cfgError['message']);
+    }
+
+    // 记账放在「会员解析成功之后、签发 Cookie 之前」：被禁用/未绑定/配置缺失都不消耗额度
+    $replayDenied = fbs_gateway_replay_guard($initDataHash, $context);
+    if ($replayDenied !== null) {
+        return fbs_gateway_err(429, $replayDenied['code'], $replayDenied['message']);
+    }
+
+    $now = isset($context['now']) ? (int)$context['now'] : time();
+
+    // 与原生 keepUser 一致：距上次在线超过 60s 才刷新 online（失败不影响登录态）
+    try {
+        $stmt = $pdo->prepare('UPDATE `' . $prefix . 'member` SET `online` = ? WHERE `id` = ? AND `online` < ?');
+        $stmt->execute(array($now, (int)$member['id'], $now - 60));
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] update online failed: ' . $e->getMessage());
+    }
+
+    $cookies = fbs_bridge_build_session_cookies((int)$member['id'], (string)$member['password'], $cfg, $now);
+
+    // HN_tg：属性从 HN_login_user 头里解析后回喂，仅有效期改为 30 天（同 issue_session）。
+    // 没有它 nginx 不会给 /wmsj 页注入 telegram-web-app.js + shim，TG 返回键行为与顾客侧不一致。
+    $cookies = array_merge(
+        $cookies,
+        fbs_gateway_marker_cookies($cookies, $cfg['cookiePre'] . 'login_user', $cfg['cookiePre'] . 'tg', FBS_GATEWAY_MARKER_TTL, $now)
+    );
+
+    return fbs_gateway_ok(array(
+        'member_id'   => (int)$member['id'],
+        'shop_ids'    => $shopIds,
+        'redirect'    => '/wmsj/',
+        'set_cookies' => array_values($cookies),
+    ));
+}
+
 /* ============================== 分发 ============================== */
 
 /**
@@ -1311,10 +1749,11 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
     $rawBody = is_string($rawBody) ? $rawBody : '';
     $now = isset($context['now']) ? (int)$context['now'] : time();
 
-    // 窗口分类（Ray 裁决）：返回活凭证的动作（issue_session / rider_ql / rider_notify_url）
-    // 并入紧窗档 ±15s；rider_bind 幂等 + 审计 + 不签任何令牌，无重放收益，维持 ±300s 宽窗。
+    // 窗口分类（Ray 裁决）：返回活凭证的动作（issue_session / merchant_session / rider_ql /
+    // rider_notify_url）并入紧窗档 ±15s；rider_bind / merchant_bind 幂等 + 审计 + 不签任何令牌，
+    // 无重放收益，维持 ±300s 宽窗。
     // 验签仍在解析入参之前：未通过签名的输入不进入任何业务分支。
-    $window = in_array($action, array('issue_session', 'rider_ql', 'rider_notify_url'), true)
+    $window = in_array($action, array('issue_session', 'merchant_session', 'rider_ql', 'rider_notify_url'), true)
         ? FBS_GATEWAY_TIGHT_WINDOW : FBS_GATEWAY_TIME_WINDOW;
     list($ok, $reason) = fbs_gateway_verify($secret, $timestamp, $signature, $action, $rawBody, $now, $window);
     if (!$ok) {
@@ -1324,8 +1763,8 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
 
     // 紧窗凭证动作的重放计数（放在验签之后、业务动作之前）：rider_ql / rider_notify_url
     // 每次成功都签发活凭证，同一签名体只放行一次。账本无需 DB，放在解码之前 fail-fast。
-    // issue_session 的重放计数在其自身动作内（initData 维度 max=5 防抖），rider_bind 幂等
-    // + 审计兜底，都不走这里。
+    // issue_session / merchant_session 的重放计数在其自身动作内（initData 维度 max=5 防抖，
+    // 因为两者都带 init_data_hash），rider_bind / merchant_bind 幂等 + 审计兜底，都不走这里。
     if ($action === 'rider_ql' || $action === 'rider_notify_url') {
         $replayDenied = fbs_gateway_replay_once_guard(
             $action . ':' . hash('sha256', $rawBody),
@@ -1357,6 +1796,10 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
         if ($action === 'rider_bind') return fbs_gateway_action_rider_bind($params, $context);
         if ($action === 'rider_ql') return fbs_gateway_action_rider_ql($params, $context);
         if ($action === 'rider_notify_url') return fbs_gateway_action_rider_notify_url($params, $context);
+        // 商家动作（方案 A）同样每支显式 return：漏一支就会兜底成 issue_session，
+        // 而 issue_session 会按 username=tg_<id> 自动建号 —— 商家拿到空会员，登录成功但无店铺。
+        if ($action === 'merchant_bind') return fbs_gateway_action_merchant_bind($params, $context);
+        if ($action === 'merchant_session') return fbs_gateway_action_merchant_session($params, $context);
         return fbs_gateway_action_issue_session($params, $context);
     } catch (Throwable $e) {
         // 绝不把堆栈/DSN 回给调用方
