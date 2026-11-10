@@ -28,7 +28,13 @@ if ($role !== 'customer' && $role !== 'merchant') $role = 'customer';
 /*
  * 落点（仅 merchant 生效）：
  *   ''（缺省）→ 跟随后端 redirect，即 /wmsj/ 外卖接单后台 —— 原行为，一个字不动
- *   'member'  → 商户中心工作台 /member?action=workPlatform（员工管理、店铺资料所在）
+ *   'member'  → 商户中心 /b/business-staff.html（员工管理页，侧边栏可回首页）
+ *
+ * 为什么不是 /member?action=workPlatform：
+ *   workPlatform 是「员工工作台」（member.controller.php:10739 起），侧边栏没有员工管理；
+ *   /b 才是商户中心（company 模板），它的侧边栏才有「员工管理」。
+ *   /b 是火鸟自己生成的 busiDomain（common.func.php:4975，无 template 时直接返回 $domain），
+ *   取 /b/business-staff.html 是因为这页已验证可达，而 /b 首页无法离线确认。
  *
  * 为什么用参数而不改后端 redirect：老板日常是来接单的，把默认落点改成商户中心会让
  * 每次接单多点两下；而管店是低频动作。两个入口各带各的参数，互不影响。
@@ -86,7 +92,9 @@ if ($to !== 'member') $to = '';
   var TO = <?php echo json_encode($to, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
   // 商户中心落点：硬编码目标页而非复用后端 redirect —— 后端那枚是「接单后台」的语义，
   // 混用会让两处口径互相牵制。改这里只影响 to=member 的入口。
-  var MEMBER_HOME = '/member?action=workPlatform';
+  // 落员工管理页而不是商户中心首页 /b：这页已验证可达（200），侧边栏能回首页；
+  // 且 member.controller.php:5301 会把 is_staff=1 的员工从这里跳去个人中心，不会越权。
+  var MEMBER_HOME = '/b/business-staff.html';
   var loadingEl = document.getElementById('loading');
   var errorEl = document.getElementById('error');
   var errorTextEl = document.getElementById('error-text');
