@@ -7,6 +7,7 @@
 
 const http = require('node:http');
 const https = require('node:https');
+const crypto = require('node:crypto');
 const url = require('node:url');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -24,6 +25,92 @@ const ROOT_DIR = path.resolve(__dirname, '../../..');
 // 派单脚本的执行目录。测试注入一个临时 git 仓库：dispatch-task.js 会写 .agents/tasks 并
 // `git checkout -b feat/task-*`，在真实仓库里跑会把工作区切到别的分支（见 src/test.js）。
 const DISPATCH_ROOT = process.env.TG_DISPATCH_ROOT || ROOT_DIR;
+
+// --- 1.4 request_contact 一键绑定通道（bot 直连 PHP 网关，HMAC 同 gatewayClient.js 契约）---
+// 与 api 侧 services/api/src/gatewayClient.js:12-17 同一契约：
+//   POST ${FBS_GATEWAY_URL}/api/fbs/index.php，body {"action","params"}，
+//   签名串 timestamp + '\n' + action + '\n' + body，HMAC-SHA256 十六进制，
+//   头 X-Fbs-Timestamp / X-Fbs-Signature。bot 只调 bind 类动作（宽窗 ±300s），不碰 session 动作。
+const FBS_GATEWAY_URL = (process.env.FBS_GATEWAY_URL || '').trim();
+const FBS_GATEWAY_SECRET = process.env.FBS_GATEWAY_SECRET || '';
+const GATEWAY_PATH = '/api/fbs/index.php';
+
+function contactBindConfigured() {
+  if (FBS_GATEWAY_URL === '' || FBS_GATEWAY_SECRET === '') return false;
+  try {
+    const u = new URL(GATEWAY_PATH, FBS_GATEWAY_URL);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
+}
+
+function gatewaySign(secret, timestamp, action, body) {
+  return crypto.createHmac('sha256', secret).update(`${timestamp}\n${action}\n${body}`).digest('hex');
+}
+
+function gatewayCall(action, params, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ action, params });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    let u;
+    try {
+      u = new URL(GATEWAY_PATH, FBS_GATEWAY_URL);
+    } catch (e) {
+      return reject(new Error('FBS_GATEWAY_URL 非法'));
+    }
+    const lib = u.protocol === 'https:' ? https : http;
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+      'X-Fbs-Timestamp': timestamp,
+      'X-Fbs-Signature': gatewaySign(FBS_GATEWAY_SECRET, timestamp, action, body)
+    };
+    const req = lib.request(u, { method: 'POST', headers }, (res) => {
+      let data = '';
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => {
+        const err = new Error(`网关返回 HTTP ${res.statusCode}`);
+        err.gwStatus = res.statusCode;
+        try { err.gwPayload = JSON.parse(data); } catch (_) { /* 非 JSON 错误页，保留状态码即可 */ }
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(err);
+        let payload = null;
+        try { payload = JSON.parse(data); } catch (_) { return reject(new Error('网关返回非 JSON')); }
+        resolve(payload);
+      });
+    });
+    req.on('error', reject);
+    const timer = setTimeout(() => req.destroy(new Error(`网关请求超时（${timeoutMs}ms）`)), timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+    req.end(body);
+  });
+}
+
+// 一键绑定失败文案（按网关错误码映射，口径对齐 riderRoute.js:176-197 与 MERCHANT_TG_HOOKS 错误码表）。
+// 映射不到的一律「服务暂时不可用」，不把内部细节透给用户。
+const CONTACT_BIND_MESSAGES = {
+  COURIER_NOT_FOUND: '❌ 未找到该手机号对应的骑手账号。请确认号码与站点登记的骑手手机号一致；若刚入职，先让运营在后台补录骑手。',
+  COURIER_AMBIGUOUS: '❌ 该手机号对应多个骑手账号，请联系运营核实后再试。',
+  TG_ALREADY_BOUND: '❌ 这个 Telegram 账号已经绑定过其他骑手/商家，请先联系运营处理原绑定。',
+  COURIER_ALREADY_BOUND: '❌ 该骑手已绑定其他 Telegram 账号，请先解绑或联系运营。',
+  MERCHANT_NOT_FOUND: '❌ 未找到该手机号对应的商家会员。请确认号码与会员资料一致，或联系运营补录。',
+  MERCHANT_AMBIGUOUS: '❌ 该手机号对应多个商家会员，请联系运营核实后再试。',
+  MERCHANT_NO_SHOP: '❌ 还没有被分配外卖店铺，请联系运营在后台「外卖 → 店铺 → 管理会员」里分配。',
+  MERCHANT_ALREADY_BOUND: '❌ 该商家已绑定其他 Telegram 账号，请先解绑或联系运营。',
+  MISSING_PARAM: '❌ 手机号格式不正确。请用键盘「分享手机号」按钮重新发送，或到绑定页面手动输入。',
+  BIND_RATE_LIMITED: '⏳ 操作过于频繁，请几分钟后再试。',
+  AUDIT_UNAVAILABLE: '⚠️ 服务暂时不可用，请稍后重试。',
+  BIND_FAILED: '❌ 绑定失败，请稍后重试。'
+};
+
+function contactBindErrorText(err) {
+  const payload = err && err.gwPayload;
+  const code = (payload && payload.error && payload.error.code) || (err && err.gwCode) || '';
+  if (CONTACT_BIND_MESSAGES[code]) return CONTACT_BIND_MESSAGES[code];
+  // 409 一族（冲突语义）兜底提示，避免把未知冲突码说成「服务不可用」误导用户重试
+  if (err && err.gwStatus === 409) return '❌ 该手机号或当前账号已存在绑定关系，请先解绑后再试。';
+  return '⚠️ 服务暂时不可用，请稍后重试。';
+}
 
 // --- 1. 发送 Telegram 消息工具函数 ---
 function sendTelegramMessage(chatId, text, replyMarkup = null) {
@@ -159,11 +246,115 @@ function riderEntryUrl(base) {
   return `${raw}/tg-api/rider/bind`;
 }
 
+// --- 1.5 request_contact 一键绑定：消息与回调处理 ---
+// 信任模型：Telegram 只有在用户分享「自己的」联系方式时 contact.user_id 才等于 from.id；
+// 转发的 contact 不带 user_id。因此 bot 先做归属校验，对不上一律拒绝、绝不调用网关——
+// 网关侧的防冒用完全建立在这条红线之上（bot 是唯一受信调用方，HMAC 只证「bot 发的」不证「本人同意」）。
+async function handleContactShare(msg) {
+  const chatId = msg.chat && msg.chat.id;
+  const isPrivate = !msg.chat || !msg.chat.type || msg.chat.type === 'private';
+  if (!isPrivate) {
+    return sendTelegramMessage(chatId, '请在与机器人的私聊中完成手机号绑定');
+  }
+  // 安全红线：msg.from.id === msg.contact.user_id 必须严格相等；user_id 缺失（转发消息）同样拒绝。
+  if (!msg.from || !msg.contact || String(msg.contact.user_id) !== String(msg.from.id)) {
+    console.error('[TG-BOT] contact 归属校验失败：contact.user_id 与 from.id 不一致，拒绝绑定');
+    return sendTelegramMessage(chatId, '⛔ 只能绑定你本人的手机号：请点键盘上的「📱 分享手机号完成绑定」按钮发送，不要转发别人的名片。');
+  }
+  if (!contactBindConfigured()) {
+    console.error('[TG-BOT] FBS_GATEWAY_URL / FBS_GATEWAY_SECRET 未配置，一键绑定不可用（落地页手输路径不受影响）');
+    return sendTelegramMessage(chatId, '❌ 绑定通道未配置，请点「🛵 骑手入口 / 🏪 商家后台」按钮进入页面手动输入手机号完成绑定。');
+  }
+  // 轻校验：只留数字、长度 7-13（完整归一化 +63/63→0 是网关 fbs_normalize_phone 的职责，bot 不重复实现）。
+  const digits = String(msg.contact.phone_number || '').replace(/[^0-9]/g, '');
+  if (digits.length < 7 || digits.length > 13) {
+    return sendTelegramMessage(chatId, '❌ 手机号无法识别，请点键盘上的「📱 分享手机号完成绑定」按钮重新发送。');
+  }
+  // contact 消息不携带「是哪个键盘按钮触发的」，无法推断骑手/商家身份；
+  // 用一次性内联按钮让用户选链路，手机号随 callback_data 传递（≤64B），bot 不落任何内存态。
+  return sendTelegramMessage(
+    chatId,
+    `📱 收到手机号 ${digits}。\n请选择要绑定的身份：`,
+    {
+      inline_keyboard: [
+        [{ text: '🛵 绑定为骑手', callback_data: `cbind:r|${digits}` }],
+        [{ text: '🏪 绑定为商家', callback_data: `cbind:m|${digits}` }]
+      ]
+    }
+  );
+}
+
+// ip 参数策略（限频三维 tg 5/60s、phone 3/300s、ip 20/300s，底账 fbs_bind_audit）：
+//   bot 传 ip = tg_user_id（纯数字）。
+//   ① 不能传空串：网关 fbs_bind_ip() 对空 ip 会回落到调用方 context IP——即 bot Pod IP，
+//      全部 bot 用户会挤进同一个 ip 桶（20/300s 全局），批量入职当天必然误伤。
+//   ② 纯数字 ip 与 web 通道永不共桶：web 侧 ip 经同一清洗函数保留 '.' 或 ':'（IPv4/IPv6 均含），
+//      纯数字串不可能与任何清洗后的真实 IP 相等，满足「bot 与 web 不进同一限频桶」。
+//   ③ 审计可追溯：fbs_bind_audit 的 ip 列出现纯数字长串即 bot 通道（web 恒带分隔符），
+//      tg 维度仍是更紧的主限（5/60s），ip 维度退化为 bot 侧每用户 20/300s 的冗余兜底。
+async function handleBindRoleChoice(cb) {
+  const chatId = cb.message && cb.message.chat && cb.message.chat.id;
+  const m = /^cbind:([rm])\|(\d{7,13})$/.exec(String(cb.data || ''));
+  if (!chatId || !m) return; // 非本功能的回调，静默交给后续分支
+  if (!contactBindConfigured()) {
+    return sendTelegramMessage(chatId, '❌ 绑定通道未配置，请点「🛵 骑手入口 / 🏪 商家后台」按钮进入页面手动输入手机号完成绑定。');
+  }
+  const tgUserId = String(cb.from && cb.from.id || '');
+  if (!/^[1-9][0-9]{0,18}$/.test(tgUserId)) {
+    return sendTelegramMessage(chatId, '❌ 无法识别你的 Telegram 账号，请重新分享手机号后再试。');
+  }
+  const isRider = m[1] === 'r';
+  const action = isRider ? 'rider_bind' : 'merchant_bind';
+  const params = { tg_user_id: tgUserId, phone: m[2], ip: tgUserId };
+  let resp;
+  try {
+    resp = await gatewayCall(action, params);
+  } catch (err) {
+    // 只记消息：不落手机号/ip 细节
+    console.error(`[TG-BOT] ${action} 失败: HTTP ${err.gwStatus || '-'} ${String(err.message).slice(0, 200)}`);
+    return sendTelegramMessage(chatId, contactBindErrorText(err));
+  }
+  // 2xx 但 success:false 同样视为失败，绝不静默成功（与 riderRoute.js 同一口径）
+  if (!resp || resp.success !== true) {
+    return sendTelegramMessage(chatId, '❌ 绑定失败，请稍后重试。');
+  }
+  if (isRider) {
+    const riderUrl = riderEntryUrl(APP_BASE_URL);
+    return sendTelegramMessage(
+      chatId,
+      '✅ *骑手绑定成功！*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮进入骑手工作台（绑定已生效，无需再输手机号）。',
+      riderUrl ? { inline_keyboard: [[{ text: '🛵 进入工作台', web_app: { url: riderUrl } }]] } : null
+    );
+  }
+  const merchantUrl = merchantEntryUrl(APP_BASE_URL);
+  return sendTelegramMessage(
+    chatId,
+    '✅ *商家绑定成功！*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮进入商家后台（/wmsj）。',
+    merchantUrl ? { inline_keyboard: [[{ text: '🏪 进入商家后台', web_app: { url: merchantUrl } }]] } : null
+  );
+}
+
+// 回调分流：一键绑定的角色选择回调；其余维持原有 check_status。
+function dispatchCallbackQuery(cb) {
+  if (cb && typeof cb.data === 'string' && cb.data.startsWith('cbind:')) {
+    return handleBindRoleChoice(cb);
+  }
+  if (cb && cb.data === 'check_status') {
+    return handleIncomingMessage({ chat: cb.message.chat, text: '/status' });
+  }
+  return Promise.resolve();
+}
+
 // --- 2. 核心消息处理器 ---
 async function handleIncomingMessage(msg) {
   const chatId = msg.chat?.id;
   const text = msg.text || msg.caption || '';
   const fromName = msg.from?.first_name || 'Boss';
+
+  // 指令 0.4: message.contact —— request_contact 一键绑定（无文本，必须放在文本指令之前）
+  if (msg.contact) {
+    return handleContactShare(msg);
+  }
 
   console.log(`📩 [TG-BOT] 收到来自 ${fromName} (${chatId}) 的消息: "${text}"`);
 
@@ -239,6 +430,15 @@ async function handleIncomingMessage(msg) {
       chatId,
       '🛵 *骑手绑定*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮，输入你注册骑手时留的手机号。\n绑定成功后自动进入骑手工作台（链接 10 分钟内有效）。\n\n若提示「手机号未找到骑手档案」，先让运营在后台补录骑手。',
       { inline_keyboard: [[{ text: '🛵 绑定并进入工作台', web_app: { url: riderUrl } }]] }
+    ).then(() =>
+      // request_contact 回复键盘单独一条消息携带：reply_markup 里 inline 与 reply 二选一，不能同发。
+      // 键盘挂在聊天底部（one_time_keyboard：分享一次后自动收起），与上一条消息的 web_app 按钮并存
+      // ——两条绑定通道共存，落地页手输路径不被移除。
+      sendTelegramMessage(chatId, '或点下方按钮一键分享手机号完成绑定：', {
+        keyboard: [[{ text: '📱 分享手机号完成绑定', request_contact: true }]],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      })
     );
   }
 
@@ -257,6 +457,13 @@ async function handleIncomingMessage(msg) {
       chatId,
       '🏪 *商家后台*\n━━━━━━━━━━━━━━━━━━━━\n点下方按钮即可进入商家后台（/wmsj）。\n首次使用需输入入驻时登记的会员手机号完成绑定；已绑定的直接进入。\n\n若提示「还没有被分配外卖店铺」，请联系运营在后台「外卖 → 店铺 → 管理会员」里分配。',
       { inline_keyboard: [[{ text: '🏪 进入商家后台', web_app: { url: merchantUrl } }]] }
+    ).then(() =>
+      // 同 /rider：request_contact 键盘单独一条消息，与 web_app 内联按钮并存（见 /rider 处注释）
+      sendTelegramMessage(chatId, '或点下方按钮一键分享手机号完成绑定：', {
+        keyboard: [[{ text: '📱 分享手机号完成绑定', request_contact: true }]],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      })
     );
   }
 
@@ -354,10 +561,7 @@ const server = http.createServer(async (req, res) => {
         if (update.message) {
           await handleIncomingMessage(update.message);
         } else if (update.callback_query) {
-          const cb = update.callback_query;
-          if (cb.data === 'check_status') {
-            await handleIncomingMessage({ chat: cb.message.chat, text: '/status' });
-          }
+          await dispatchCallbackQuery(update.callback_query);
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
@@ -428,10 +632,7 @@ async function dispatchUpdate(update) {
   if (update.message) {
     await handleIncomingMessage(update.message);
   } else if (update.callback_query) {
-    const cb = update.callback_query;
-    if (cb.data === 'check_status') {
-      await handleIncomingMessage({ chat: cb.message.chat, text: '/status' });
-    }
+    await dispatchCallbackQuery(update.callback_query);
   }
 }
 
