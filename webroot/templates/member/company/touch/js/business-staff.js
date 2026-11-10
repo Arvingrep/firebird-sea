@@ -28,6 +28,75 @@ $(".close_pop").click(function(){
 		text: toUtf8(staffurl)
 	});
 
+  // ---- Telegram 邀请卡片 ----
+  // 请求 member?action=staffInvite → 画二维码 + 可复制链接；任何失败都整块降级为一行文案，
+  // 绝不抛 JS 错误影响原有「员工扫码绑定商家」微信二维码链路。
+  var tgBox = $('#tgInviteBox');
+  if (tgBox.length && typeof staffInviteUrl !== 'undefined' && staffInviteUrl) {
+    $.ajax({
+      url: staffInviteUrl,
+      type: 'GET',
+      dataType: 'json',
+      success: function (res) {
+        if (res && res.success && res.data && res.data.link) {
+          renderTgInvite(tgBox, res.data.link);
+        } else {
+          degradeTgInvite(tgBox);
+        }
+      },
+      error: function () {
+        degradeTgInvite(tgBox);
+      }
+    });
+  }
+
+  function renderTgInvite(box, link) {
+    try {
+      box.find('.tgLink').val(link);
+      var $code = box.find('.tgCodeImg');
+      var utf8 = typeof toUtf8 === 'function' ? toUtf8 : function (s) { return s; };
+      $code.qrcode({
+        render: window.applicationCache ? 'canvas' : 'table',
+        width: $code.width(),
+        height: $code.height(),
+        text: utf8(link)
+      });
+      box.find('.tgCopyBtn').on('click', function () {
+        copyTgLink(link, box);
+      });
+    } catch (e) {
+      degradeTgInvite(box);
+    }
+  }
+
+  function copyTgLink(text, box) {
+    var done = function () {
+      box.find('.tgCopyBtn').text('已复制');
+      setTimeout(function () { box.find('.tgCopyBtn').text('复制'); }, 2000);
+    };
+    var fallback = function () {
+      try {
+        var input = box.find('.tgLink')[0];
+        input.focus();
+        input.select();
+        if (document.execCommand('copy')) { done(); } else { window.prompt('请手动复制链接', text); }
+      } catch (e) {
+        window.prompt('请手动复制链接', text);
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function degradeTgInvite(box) {
+    box.addClass('is-degraded');
+    box.find('.tgLink').val('');
+  }
+  // ---- Telegram 邀请卡片 e ----
+
   // 显示弹窗
   $(".add_btn").click(function(event) {
     /* Act on the event */
