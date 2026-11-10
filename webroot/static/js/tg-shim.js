@@ -421,9 +421,136 @@
   // 运行时区
   // ==========================================================================
 
+  // --------------------------------------------------------------------------
+  // 定位桥接
+  //   Telegram 内置网页里 navigator.geolocation 经常既不弹授权也不回调，页面会一直停在
+  //   「定位中…」。Telegram 7.x 之后的 Mini App 提供 WebApp.LocationManager（Bot API 8.0），
+  //   这里把它包成 W3C Geolocation 的最小子集，火鸟的 HN_Location 不用改。
+  //   客户端不支持（没有 LocationManager）时返回 null，保持原生行为。
+  // --------------------------------------------------------------------------
+  var GEO_PERMISSION_DENIED = 1;
+  var GEO_POSITION_UNAVAILABLE = 2;
+  var GEO_TIMEOUT = 3;
+  // 首次授权要等用户点「允许」，页面传来的 5s 超时不适用；给一个兜底，避免永远转圈。
+  var GEO_GUARD_MS = 30000;
+
+  function geoError(code, message) {
+    return {
+      code: code,
+      message: message,
+      PERMISSION_DENIED: GEO_PERMISSION_DENIED,
+      POSITION_UNAVAILABLE: GEO_POSITION_UNAVAILABLE,
+      TIMEOUT: GEO_TIMEOUT
+    };
+  }
+
+  function toPosition(d) {
+    return {
+      coords: {
+        latitude: d.latitude,
+        longitude: d.longitude,
+        accuracy: d.horizontal_accuracy == null ? 0 : d.horizontal_accuracy,
+        altitude: d.altitude == null ? null : d.altitude,
+        altitudeAccuracy: d.vertical_accuracy == null ? null : d.vertical_accuracy,
+        heading: d.course == null ? null : d.course,
+        speed: d.speed == null ? null : d.speed
+      },
+      timestamp: Date.now()
+    };
+  }
+
+  // 返回 { getCurrentPosition, watchPosition, clearWatch }；没有 LocationManager 返回 null。
+  // nativeGeo 只在「Telegram 客户端说定位不可用」时兜底，可为空。
+  function createGeolocation(WA, nativeGeo, timers) {
+    var LM = WA && WA.LocationManager;
+    if (!LM || typeof LM.getLocation !== 'function') return null;
+    var setT = (timers && timers.setTimeout) || setTimeout;
+    var clearT = (timers && timers.clearTimeout) || clearTimeout;
+
+    function getCurrentPosition(success, error) {
+      var done = false;
+      var guard = setT(function () {
+        finish(null, geoError(GEO_TIMEOUT, 'timeout'));
+      }, GEO_GUARD_MS);
+
+      function finish(pos, err) {
+        if (done) return;
+        done = true;
+        clearT(guard);
+        if (pos) {
+          if (typeof success === 'function') success(pos);
+        } else if (typeof error === 'function') {
+          error(err);
+        }
+      }
+
+      function fetchNow() {
+        try {
+          LM.getLocation(function (d) {
+            // d 为 null：用户拒绝，或设备关了定位
+            if (!d || d.latitude == null || d.longitude == null) {
+              finish(null, geoError(GEO_PERMISSION_DENIED, 'denied'));
+            } else {
+              finish(toPosition(d));
+            }
+          });
+        } catch (e) {
+          finish(null, geoError(GEO_POSITION_UNAVAILABLE, String(e && e.message || e)));
+        }
+      }
+
+      function afterInit() {
+        if (LM.isLocationAvailable === false) {
+          // 客户端明确说本设备没有定位能力：交回原生实现，行为与没装桥接一致
+          if (nativeGeo && typeof nativeGeo.getCurrentPosition === 'function') {
+            done = true;
+            clearT(guard);
+            nativeGeo.getCurrentPosition(success, error);
+          } else {
+            finish(null, geoError(GEO_POSITION_UNAVAILABLE, 'unavailable'));
+          }
+          return;
+        }
+        fetchNow();
+      }
+
+      try {
+        if (LM.isInited) afterInit();
+        else LM.init(afterInit);
+      } catch (e) {
+        finish(null, geoError(GEO_POSITION_UNAVAILABLE, String(e && e.message || e)));
+      }
+    }
+
+    var watchSeq = 0;
+    return {
+      getCurrentPosition: getCurrentPosition,
+      // 火鸟只用一次性定位；watch 退化为「取一次」，clearWatch 空实现。
+      watchPosition: function (success, error) {
+        getCurrentPosition(success, error);
+        return ++watchSeq;
+      },
+      clearWatch: function () {}
+    };
+  }
+
+  function installGeolocation(WA) {
+    try {
+      var shim = createGeolocation(WA, navigator.geolocation || null);
+      if (!shim) return;
+      Object.defineProperty(navigator, 'geolocation', { value: shim, configurable: true });
+    } catch (e) {
+      // 装不上就保持原生行为
+    }
+  }
+
   function boot() {
     var WA = window.Telegram && window.Telegram.WebApp;
     if (!WA || !WA.initData) return; // D1：非 Telegram / 无 initData，什么都不做
+
+    // 定位桥接要在页面脚本调用 navigator.geolocation 之前装好（本脚本在 </head> 注入），
+    // 且不分模块：外卖/旅游/骑手/会员的选址页都靠它。
+    installGeolocation(WA);
 
     var service = detectService({
       search: window.location.search,
@@ -611,6 +738,7 @@
       normalizePage: normalizePage,
       parseQuery: parseQuery,
       rootDomain: rootDomain,
+      createGeolocation: createGeolocation,
       // 内部常量也导出：供「PHP service 白名单 ↔ shim 处理集」的跨文件同源守卫测试比对。
       // 只在 Node 分支可达，浏览器路径零影响。
       SERVICES: SERVICES
