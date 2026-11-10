@@ -377,7 +377,9 @@ async function handleBindRoleChoice(cb) {
 // 邀请 token 由 PHP 侧 fbs_staff_invite.func.php 签发（v1_<sid>_<exp>_<hex32>，47 字符）。
 // bot 只做「形状 + exp 未过期」的本地预检；真正的验签（HMAC + sid 是否存在）在网关 staff_bind 里，
 // bot 不复制一份密钥派生逻辑——否则 bridge token 轮转时两处口径必分叉。
-const STAFF_TOKEN_RE = /^v1_(\d{1,19})_(\d{1,19})_([a-f0-9]{32})$/;
+// 这里的形状/边界与签发侧 fbs_staff_invite_parse() 逐字对齐（sid 1-10 位、exp 10-12 位、
+// exp == now 仍算有效），避免本地预检把网关本会接受的合法邀请先拒掉。
+const STAFF_TOKEN_RE = /^v1_([1-9][0-9]{0,9})_([0-9]{10,12})_([0-9a-f]{32})$/;
 // pending 寿命 15 分钟：覆盖「收到邀请 → 点键盘分享手机号」的真实操作窗口。
 // 单副本 + Recreate 部署，允许内存态（与既有 cbind 的内联按钮方案同一量级）。
 const STAFF_PENDING_TTL_MS = 15 * 60 * 1000;
@@ -388,8 +390,8 @@ function parseStaffInviteToken(raw, nowMs = Date.now()) {
   if (!m) return null;
   const sid = Number(m[1]);
   const exp = Number(m[2]); // unix 秒
-  if (!Number.isSafeInteger(sid) || sid <= 0) return null;
-  if (!Number.isSafeInteger(exp) || exp * 1000 <= nowMs) return null;
+  // 与签发侧一致：exp == now 仍有效，只有 exp < now 才算过期
+  if (!Number.isSafeInteger(exp) || exp < Math.floor(nowMs / 1000)) return null;
   return { sid, exp, token: m[0] };
 }
 
