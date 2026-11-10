@@ -1769,6 +1769,8 @@ function fbs_gateway_staff_audit(PDO $pdo, $tgUserId, $memberId, $sid, $phone, $
  *   phone      维度：300 秒内最多 3  次
  *   ip         维度：300 秒内最多 20 次
  * 被限频的记录本身不计入（result = 'rate_limited' 被排除），否则越试越锁死。
+ * 取舍说明：幂等请求（同店重复）的 'success' 审计行**会计入**额度——本限频防御的是
+ * 暴力探测/撞库，不是正常重试；正常用户重复点两次远够不着 tg 5/60s。
  *
  * @return array ['limited'=>bool, 'error'=>array|null]
  */
@@ -1812,9 +1814,11 @@ function fbs_gateway_staff_is_duplicate_key(Throwable $e)
 /**
  * staff_bind → [httpCode, payload]。
  *
- * 顺序（brief-staff.md 冻结）：验 token（先算签，非法 token 不产生任何 DB 压力）→ 查店 →
- * 归一手机号 → 查会员（唯一命中 + state 门禁）→ 查 staff 现有行 → 查 map 现有行 → 限频 →
- * 写 map + 写 staff 行 → 审计。
+ * 顺序（brief 冻结 + 真库回归裁决）：验 token（先算签，非法 token 不产生任何 DB 压力）→
+ * 查店 → 归一手机号 → 查会员（唯一命中 + state 门禁）→ 查 map 现有行（跨店/幂等）→
+ * 查 staff 现有行 → 限频 → 事务写 map + 写 staff 行 → 审计。
+ * map 检查先于 staff 行检查：两者都归并 409 STAFF_ALREADY_BOUND（bot 文案统一
+ * 「已绑定其他店铺」），STAFF_AMBIGUOUS 只保留「同手机号命中多个会员」一个语义。
  *
  * 与 merchant_bind 的关键差异：
  *   ① 身份来自邀请 token（HMAC 覆盖 sid），不再由调用方声明 sid——员工改 sid 绑别家店必失败；
@@ -1915,33 +1919,10 @@ function fbs_gateway_action_staff_bind(array $params, array $context)
         return fbs_gateway_err(403, 'STAFF_IS_BUSINESS', 'merchant accounts cannot join as staff');
     }
 
-    // ⑥ 查 staff 现有行（huoniao_staff，一人一行是现有逻辑的事实约束）：
-    //    sid 相同 → 幂等复用该行；sid 不同 → 会员已是别家店员工，409 拒绝。
-    try {
-        $stmt = $pdo->prepare('SELECT `id`, `sid` FROM `' . $prefix . 'staff` WHERE `uid` = ? LIMIT 2');
-        $stmt->execute(array($memberId));
-        $staffRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        error_log('[fbs_gateway] staff_bind staff lookup failed: mid=' . $memberId . ' :: ' . $e->getMessage());
-        return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'staff lookup failed');
-    }
-    if (is_array($staffRows) && count($staffRows) > 1) {
-        // 一人多行属数据问题（现有微信通道只会插一行），宁可拒绝也不猜
-        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'ambiguous', $ip)) {
-            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
-        }
-        return fbs_gateway_err(409, 'STAFF_AMBIGUOUS', 'member has multiple staff rows');
-    }
-    $staffRow = (is_array($staffRows) && count($staffRows) === 1) ? $staffRows[0] : null;
-    if ($staffRow !== null && (int)$staffRow['sid'] !== $sid) {
-        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'ambiguous', $ip)) {
-            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
-        }
-        return fbs_gateway_err(409, 'STAFF_AMBIGUOUS', 'member is already staff of another shop');
-    }
-
-    // ⑦ 查 map 现有行（tg 维度主键 + member 维度唯一键，两个方向都要看）：
-    //    同店 → 幂等成功；任一方向已绑别店 → 409。
+    // ⑥ 查 map 现有行（tg 维度主键 + member 维度唯一键，两个方向都要看）。
+    //    **先于 staff 行检查**（裁决：同 tg 换店 / 会员已被别的 TG 占用是同一个人类动作
+    //    「这个员工已经加了别的店」，bot 文案「已绑定其他店铺」对两种情况都说得通，
+    //    且底账 map 比 huoniao_staff 更权威——微信通道只写 staff 行时 map 查不到）。
     try {
         $stmt = $pdo->prepare('SELECT `member_id`, `sid`, `staff_id` FROM `fbs_staff_map` WHERE `tg_user_id` = ? LIMIT 1');
         $stmt->execute(array((string)$tgUserId));
@@ -1956,7 +1937,9 @@ function fbs_gateway_action_staff_bind(array $params, array $context)
 
     if (is_array($mapRow)) {
         if ((int)$mapRow['sid'] === $sid) {
-            // 同店重复 = 幂等成功：只刷新手机号写法，不动绑定，也不重新发邀请
+            // 同店重复 = 幂等成功：只刷新手机号写法，不动绑定，也不重新发邀请。
+            // 注意：幂等请求的 'success' 审计行会计入后续限频额度（限频防御的是暴力探测，
+            // 不是正常重试——正常用户点两次不会撞 tg 5/60s）。
             try {
                 $stmt = $pdo->prepare('UPDATE `fbs_staff_map` SET `phone` = ? WHERE `tg_user_id` = ? AND `sid` = ?');
                 $stmt->execute(array($phone, (string)$tgUserId, $sid));
@@ -1988,7 +1971,34 @@ function fbs_gateway_action_staff_bind(array $params, array $context)
         return fbs_gateway_err(409, 'STAFF_ALREADY_BOUND', 'this member is already bound to another telegram');
     }
 
-    // ⑧ 限频（放在终态检查之后、写入之前：同店幂等重放不占额度）
+    // ⑦ 查 staff 现有行（huoniao_staff，一人一行是现有逻辑的事实约束）：
+    //    sid 相同 → 幂等复用该行；sid 不同 → 会员已是别家店员工，**归并 409 STAFF_ALREADY_BOUND**
+    //    （裁决：与「tg 换店」同一文案口径——微信扫码先绑过别店、现在走 TG 邀请的场景同此）。
+    try {
+        $stmt = $pdo->prepare('SELECT `id`, `sid` FROM `' . $prefix . 'staff` WHERE `uid` = ? LIMIT 2');
+        $stmt->execute(array($memberId));
+        $staffRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] staff_bind staff lookup failed: mid=' . $memberId . ' :: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'staff lookup failed');
+    }
+    if (is_array($staffRows) && count($staffRows) > 1) {
+        // 一人多行属数据问题（网关侧事务写入后不可能再产生；存量脏数据运维清）。宁可拒绝也不猜。
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'already_bound', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        error_log('[fbs_gateway] staff_bind data anomaly: mid=' . $memberId . ' has multiple staff rows');
+        return fbs_gateway_err(409, 'STAFF_ALREADY_BOUND', 'member is already bound to another shop');
+    }
+    $staffRow = (is_array($staffRows) && count($staffRows) === 1) ? $staffRows[0] : null;
+    if ($staffRow !== null && (int)$staffRow['sid'] !== $sid) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'already_bound', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(409, 'STAFF_ALREADY_BOUND', 'member is already staff of another shop');
+    }
+
+    // ⑧ 限频（放在终态检查之后、写入之前；幂等请求会计入额度——防御的是暴力探测，不是正常重试）
     $rate = fbs_gateway_staff_rate_limited($pdo, $tgUserId, $phone, $ip);
     if ($rate['error'] !== null) {
         return fbs_gateway_err(503, $rate['error']['code'], $rate['error']['message']);
@@ -2000,29 +2010,31 @@ function fbs_gateway_action_staff_bind(array $params, array $context)
         return fbs_gateway_err(429, 'BIND_RATE_LIMITED', 'too many bind attempts');
     }
 
-    // ⑨ 写 map + 写 staff 行。staff 行缺失时补插（与微信扫码 addStaff 同构：sid, uid, pubdate），
-    //    已有行（微信通道绑过）复用其 id，绝不重复插。
-    if ($staffRow !== null) {
-        $staffId = (int)$staffRow['id'];
-    } else {
-        try {
+    // ⑨ 写 map + 写 staff 行（**同一事务**：map 撞唯一键回滚整笔，绝不留孤儿 staff 行——
+    //    否则并发双插会留下两行 huoniao_staff，「一人多行判 409」的检查从此把这个会员永久锁死）。
+    //    staff 行缺失时补插（与微信扫码 addStaff 同构：sid, uid, pubdate）；已有行复用其 id。
+    //    事务只包这两条 INSERT：审计在 commit/rollback 之后写（限频底账非业务数据，时机独立）。
+    try {
+        $pdo->beginTransaction();
+        if ($staffRow !== null) {
+            $staffId = (int)$staffRow['id'];
+        } else {
             $stmt = $pdo->prepare('INSERT INTO `' . $prefix . 'staff` (`sid`, `uid`, `pubdate`) VALUES (?, ?, ?)');
             $stmt->execute(array($sid, $memberId, time()));
             $staffId = (int)$pdo->lastInsertId();
-        } catch (Throwable $e) {
-            if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'error', $ip)) {
-                return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
-            }
-            error_log('[fbs_gateway] staff_bind staff insert failed (mid=' . $memberId . ' sid=' . $sid . ') :: ' . $e->getMessage());
-            return fbs_gateway_err(500, 'BIND_FAILED', 'bind failed');
         }
-    }
-
-    try {
         $stmt = $pdo->prepare('INSERT INTO `fbs_staff_map` (`tg_user_id`, `member_id`, `sid`, `staff_id`, `phone`) VALUES (?, ?, ?, ?, ?)');
         $stmt->execute(array((string)$tgUserId, $memberId, $sid, $staffId, $phone));
+        $pdo->commit();
     } catch (Throwable $e) {
-        // 撞唯一键按冲突返回，别吞异常：并发双插时 409 比静默顶替诚实
+        // 先回滚再审计：并发双插撞 uk_fbs_staff_map_member 时 409 比静默顶替诚实，也别吞异常
+        if ($pdo->inTransaction()) {
+            try {
+                $pdo->rollBack();
+            } catch (Throwable $ign) {
+                error_log('[fbs_gateway] staff_bind rollback failed: ' . $ign->getMessage());
+            }
+        }
         if (fbs_gateway_staff_is_duplicate_key($e)) {
             if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'already_bound', $ip)) {
                 return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
@@ -2032,7 +2044,7 @@ function fbs_gateway_action_staff_bind(array $params, array $context)
         if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'error', $ip)) {
             return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
         }
-        error_log('[fbs_gateway] staff_bind map insert failed (tg=' . (string)$tgUserId . ' mid=' . $memberId . ' sid=' . $sid . ') :: ' . $e->getMessage());
+        error_log('[fbs_gateway] staff_bind insert failed (tg=' . (string)$tgUserId . ' mid=' . $memberId . ' sid=' . $sid . ') :: ' . $e->getMessage());
         return fbs_gateway_err(500, 'BIND_FAILED', 'bind failed');
     }
 

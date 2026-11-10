@@ -126,6 +126,9 @@ class RuleStmt {
 class RulePdo extends PDO {
   public $rules = array();
   public $log = array();
+  public $inTx = false;
+  public $committed = 0;
+  public $rolledBack = 0;
   public function __construct($rules) { $this->rules = $rules; }
   public function prepare($sql, $options = null) {
     foreach ($this->rules as $rule) {
@@ -139,6 +142,10 @@ class RulePdo extends PDO {
     }
     throw new RuntimeException('unexpected sql in harness: ' . $sql);
   }
+  public function beginTransaction() { $this->inTx = true; $this->log[] = '[BEGIN TX]'; return true; }
+  public function commit() { $this->inTx = false; $this->committed++; return true; }
+  public function rollBack() { $this->inTx = false; $this->rolledBack++; return true; }
+  public function inTransaction() { return $this->inTx; }
   public function lastInsertId($name = null) { return '55'; }
 }
 
@@ -181,6 +188,8 @@ foreach ($in['cases'] as $c) {
     'insertedMap' => count(preg_grep('/INSERT INTO .fbs_staff_map./', $pdo->log)) > 0,
     'updatedMap' => count(preg_grep('/UPDATE .fbs_staff_map./', $pdo->log)) > 0,
     'auditInserted' => count(preg_grep('/INSERT INTO fbs_staff_audit/', $pdo->log)) > 0,
+    'txCommitted' => $pdo->committed > 0,
+    'txRolledBack' => $pdo->rolledBack > 0,
   );
 }
 
@@ -336,10 +345,17 @@ const CASES = [
     name: 'member_disabled', rules: [R_SHOP(SHOP_OK), R_MEMBERS([member(7, 1, 0)]), R_AUDIT_OK],
     expectHttp: 403, expectCode: 'MEMBER_DISABLED', expectAudit: true, note: 'state=0 → 403（审计归并 not_found）',
   },
-  // staff 行层
+  // staff 行层（裁决：map 底账检查提前，staff 行别店也归并 ALREADY_BOUND）
   {
-    name: 'staff_row_other_shop', rules: [R_SHOP(SHOP_OK), R_MEMBERS([member(7)]), R_STAFF([{ id: 55, sid: 9 }]), R_AUDIT_OK],
-    expectHttp: 409, expectCode: 'STAFF_AMBIGUOUS', expectAudit: true, note: '会员已有员工行指向别店 → 409',
+    name: 'staff_row_other_shop', rules: [R_SHOP(SHOP_OK), R_MEMBERS([member(7)]), R_MAP_TG(null), R_MAP_MEMBER(null), R_STAFF([{ id: 55, sid: 9 }]), R_AUDIT_OK],
+    expectHttp: 409, expectCode: 'STAFF_ALREADY_BOUND', expectAudit: true, note: '会员已是别店员工（微信通道）→ 409 ALREADY_BOUND',
+  },
+  {
+    // 顺序钉住：map 底账检查必须先于 staff 行检查——本用例两行都指向别店，
+    // 走 map 分支返回时 staff 查询尚未执行（sqlCount=4：shop+member+map tg+map member）
+    name: 'wx_bound_other_shop_then_tg_switch',
+    rules: [R_SHOP(SHOP_OK), R_MEMBERS([member(7)]), R_STAFF([{ id: 55, sid: 9 }]), R_MAP_TG({ member_id: 7, sid: 2, staff_id: 55 }), R_MAP_MEMBER(null), R_AUDIT_OK],
+    expectHttp: 409, expectCode: 'STAFF_ALREADY_BOUND', expectAudit: true, expectSqlCount: 5, note: '微信已绑别店 + 同 tg 换店 → map 底账优先，409 ALREADY_BOUND（不触发 staff 查询）',
   },
   // map 层
   {
@@ -361,12 +377,12 @@ const CASES = [
   },
   {
     name: 'fresh_success', rules: [R_SHOP(SHOP_OK), R_MEMBERS([member(7)]), R_STAFF([]), R_MAP_TG(null), R_MAP_MEMBER(null), R_RATE(0), R_STAFF_INSERT_OK, R_MAP_INSERT(), R_AUDIT_OK],
-    expectHttp: 200, expectCode: null, expectInsertedStaff: true, expectInsertedMap: true, expectAudit: true, note: '全新绑定 → 200（staff 插行 + map 插行 + 审计 success）',
+    expectHttp: 200, expectCode: null, expectInsertedStaff: true, expectInsertedMap: true, expectAudit: true, expectCommitted: true, note: '全新绑定 → 200（事务提交：staff 插行 + map 插行 + 审计 success）',
   },
   // 冲突与失败终态
   {
     name: 'map_insert_duplicate', rules: [R_SHOP(SHOP_OK), R_MEMBERS([member(7)]), R_STAFF([]), R_MAP_TG(null), R_MAP_MEMBER(null), R_RATE(0), R_STAFF_INSERT_OK, R_MAP_INSERT(23000), R_AUDIT_OK],
-    expectHttp: 409, expectCode: 'STAFF_ALREADY_BOUND', expectAudit: true, note: '并发撞唯一键 → 409 按冲突返回，别吞异常',
+    expectHttp: 409, expectCode: 'STAFF_ALREADY_BOUND', expectAudit: true, expectRolledBack: true, note: '并发撞唯一键 → 事务回滚（不留孤儿 staff 行）→ 409 按冲突返回，别吞异常',
   },
   {
     name: 'map_insert_other_error', rules: [R_SHOP(SHOP_OK), R_MEMBERS([member(7)]), R_STAFF([]), R_MAP_TG(null), R_MAP_MEMBER(null), R_RATE(0), R_STAFF_INSERT_OK, R_MAP_INSERT(99999), R_AUDIT_OK],
@@ -423,6 +439,11 @@ test('dispatch 级行为：staff_bind 全部错误码与幂等/写入路径逐�
     }
     if (c.expectData) {
       assert.deepStrictEqual(r.data, c.expectData, `[${c.name}] 成功 data 必须是 ${JSON.stringify(c.expectData)}`);
+    }
+    if (c.expectCommitted) assert.strictEqual(r.txCommitted, true, `[${c.name}] 写入必须包事务并 commit`);
+    if (c.expectRolledBack) {
+      assert.strictEqual(r.txRolledBack, true, `[${c.name}] 撞唯一键必须 rollBack 整笔`);
+      assert.strictEqual(r.txCommitted, false, `[${c.name}] 回滚后不得 commit`);
     }
   }
 });
