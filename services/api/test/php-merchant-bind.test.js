@@ -257,9 +257,9 @@ echo json_encode(array(
 
 test('源码约束：白名单/紧窗/显式 return 四处注册齐全，且显式分支在 issue_session 兜底之前', () => {
   const src = fs.readFileSync(GATEWAY, 'utf8');
-  // ① 白名单
-  assert.match(src, /return array\(\s*'member_find_or_create', 'issue_session',\s*'rider_bind', 'rider_ql', 'rider_notify_url',\s*'merchant_bind', 'merchant_session',\s*\);/,
-    'fbs_gateway_actions() 必须注册 merchant_bind / merchant_session');
+  // ① 白名单（staff_bind 是员工绑定线新增动作，见 brief-staff.md / migrations/011-012）
+  assert.match(src, /return array\(\s*'member_find_or_create', 'issue_session',\s*'rider_bind', 'rider_ql', 'rider_notify_url',\s*'merchant_bind', 'merchant_session',\s*'staff_bind',\s*\);/,
+    'fbs_gateway_actions() 必须注册 merchant_bind / merchant_session / staff_bind');
   // ② 紧窗分类：merchant_session 并入，merchant_bind 不在
   assert.match(src, /in_array\(\$action, array\('issue_session', 'merchant_session', 'rider_ql', 'rider_notify_url'\), true\)/,
     '紧窗档必须是 issue_session / merchant_session / rider_ql / rider_notify_url');

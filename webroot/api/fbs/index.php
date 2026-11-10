@@ -89,6 +89,9 @@
 if (!defined('FBS_BRIDGE_TEST')) define('FBS_BRIDGE_TEST', true);
 require_once __DIR__ . '/bridge.php';
 
+// 员工邀请 token 纯函数库：无任何框架/bridge 依赖（见文件头注释），可在网关进程内直接用
+require_once dirname(__DIR__, 2) . '/include/fbs_staff_invite.func.php';
+
 /* ============================== 常量 ============================== */
 
 /** 签名时间窗（秒） */
@@ -111,6 +114,7 @@ function fbs_gateway_actions()
         'member_find_or_create', 'issue_session',
         'rider_bind', 'rider_ql', 'rider_notify_url',
         'merchant_bind', 'merchant_session',
+        'staff_bind',
     );
 }
 
@@ -1718,6 +1722,326 @@ function fbs_gateway_action_merchant_session(array $params, array $context)
     ));
 }
 
+/* ============================== 员工绑定（staff_bind） ============================== */
+
+/**
+ * 员工绑定审计（镜像 fbs_gateway_merchant_audit，表换 fbs_staff_audit、多一列 sid）。
+ *
+ * 为什么不复用 fbs_merchant_audit：那张表的 sid 语义是外卖店铺（waimai_shop.id），员工的
+ * sid 是 business_list.id，两套 id 混在一张底账里按店铺排查会互相污染；且商家版 result
+ * 取值域（conflict_tg / conflict_merchant / no_shop）不含员工场景。本表同时是员工侧
+ * 三维度限频的计数底账（migrations/012）。
+ *
+ * result 取值域（9 类，见 migrations/012 注释）：success / invalid_token / no_shop /
+ *   not_found / is_business / already_bound / ambiguous / rate_limited / error。
+ *   invalid_token 在正常路径不会落审计：token 校验在任何 DB 操作之前（先算签再查库），
+ *   枚举域里保留它只为语义完整。
+ *
+ * 【fail-closed】审计是限频 + 事后排查的共同前提，写不进去等于补偿控制静默失效：
+ * INSERT 失败必须 error_log（带 tg/sid/phone/ip 便于排查）并返回 false，调用方一律 503。
+ *
+ * @return bool true=写入成功
+ */
+function fbs_gateway_staff_audit(PDO $pdo, $tgUserId, $memberId, $sid, $phone, $result, $ip)
+{
+    $tg = preg_match('/^[1-9][0-9]{0,18}$/', (string)$tgUserId) ? (string)$tgUserId : '0';
+    $mid = (int)$memberId;
+    $sidInt = (int)$sid;
+    $ph = preg_match('/^0[0-9]{9,10}$/', (string)$phone) ? (string)$phone : '';
+    $allowed = array('success', 'invalid_token', 'no_shop', 'not_found', 'is_business', 'already_bound', 'ambiguous', 'rate_limited', 'error');
+    if (!in_array($result, $allowed, true)) $result = 'not_found';
+    try {
+        $stmt = $pdo->prepare('INSERT INTO fbs_staff_audit (`tg_user_id`, `member_id`, `sid`, `phone`, `result`, `ip`) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute(array($tg, $mid, $sidInt, $ph, $result, $ip));
+        return true;
+    } catch (Throwable $e) {
+        // 只记脱敏后的定位字段与错误消息，不落 token 本体（HMAC 密钥也不落日志）
+        error_log('[fbs_gateway] staff audit failed: tg=' . $tg . ' sid=' . $sidInt . ' phone=' . $ph . ' ip=' . $ip
+            . ' result=' . $result . ' :: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * 员工绑定的三维度限频：阈值/窗口与 merchant_bind 完全同构（不做减法，手机号 = 登录账号），
+ * 底账换 fbs_staff_audit。
+ *   tg_user_id 维度：60  秒内最多 5  次
+ *   phone      维度：300 秒内最多 3  次
+ *   ip         维度：300 秒内最多 20 次
+ * 被限频的记录本身不计入（result = 'rate_limited' 被排除），否则越试越锁死。
+ *
+ * @return array ['limited'=>bool, 'error'=>array|null]
+ */
+function fbs_gateway_staff_rate_limited(PDO $pdo, $tgUserId, $phone, $ip)
+{
+    $tg = preg_match('/^[1-9][0-9]{0,18}$/', (string)$tgUserId) ? (string)$tgUserId : '0';
+    $ph = preg_match('/^0[0-9]{9,10}$/', (string)$phone) ? (string)$phone : '';
+    $dims = array(
+        // [sql 条件, 参数, 窗口秒, 阈值, 维度名]
+        array("`tg_user_id` = ?", array($tg), 60, 5, 'tg'),
+        array("`phone` = ? AND `phone` != ''", array($ph), 300, 3, 'phone'),
+        array("`ip` = ? AND `ip` != ''", array($ip), 300, 20, 'ip'),
+    );
+    foreach ($dims as $d) {
+        list($cond, $args, $window, $max, $name) = $d;
+        try {
+            $stmt = $pdo->prepare('SELECT COUNT(*) AS `c` FROM fbs_staff_audit WHERE ' . $cond
+                . " AND `result` != 'rate_limited' AND `created_at` > NOW() - INTERVAL " . (int)$window . ' SECOND');
+            $stmt->execute($args);
+            $c = (int)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            error_log('[fbs_gateway] staff rate-limit count failed (dim=' . $name . ' tg=' . $tg
+                . ' phone=' . $ph . ' ip=' . $ip . ') :: ' . $e->getMessage());
+            return array('limited' => false, 'error' => array('code' => 'AUDIT_UNAVAILABLE', 'message' => 'bind rate-limit ledger unavailable'));
+        }
+        if ($c >= $max) {
+            return array('limited' => true, 'error' => null);
+        }
+    }
+    return array('limited' => false, 'error' => null);
+}
+
+/** 撞唯一键判定：MySQL PDO 的重复键是 SQLSTATE 23000 / 错误码 1062。 */
+function fbs_gateway_staff_is_duplicate_key(Throwable $e)
+{
+    if ((string)$e->getCode() === '23000') return true;
+    $info = method_exists($e, 'errorInfo') ? $e->errorInfo() : array();
+    return is_array($info) && isset($info[1]) && (int)$info[1] === 1062;
+}
+
+/**
+ * staff_bind → [httpCode, payload]。
+ *
+ * 顺序（brief-staff.md 冻结）：验 token（先算签，非法 token 不产生任何 DB 压力）→ 查店 →
+ * 归一手机号 → 查会员（唯一命中 + state 门禁）→ 查 staff 现有行 → 查 map 现有行 → 限频 →
+ * 写 map + 写 staff 行 → 审计。
+ *
+ * 与 merchant_bind 的关键差异：
+ *   ① 身份来自邀请 token（HMAC 覆盖 sid），不再由调用方声明 sid——员工改 sid 绑别家店必失败；
+ *   ② 店铺域是 business_list（huoniao_business_list），不是 waimai_shop；
+ *   ③ 额外落一行 huoniao_staff(sid, uid, pubdate)（与微信扫码 addStaff 同构），staff_id 回填 map；
+ *   ④ ip 为空串时不回落 Pod IP：调用方（bot contact 分支）统一传 tg_user_id。
+ */
+function fbs_gateway_action_staff_bind(array $params, array $context)
+{
+    $tgUserId = fbs_gateway_parse_tg_user_id(isset($params['tg_user_id']) ? $params['tg_user_id'] : null);
+    if ($tgUserId === null) {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'invalid tg_user_id');
+    }
+    $token = isset($params['token']) && is_string($params['token']) ? trim($params['token']) : '';
+    if ($token === '') {
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'token is required');
+    }
+
+    // ① 验 token（先算签再查库）。签名/过期/格式错一律同一文案，不泄露差异给探测者
+    $bridgeToken = isset($context['bridge_token']) && is_string($context['bridge_token']) ? $context['bridge_token'] : null;
+    $parsed = fbs_staff_invite_parse($token, $bridgeToken);
+    if ($parsed === false) {
+        return fbs_gateway_err(403, 'STAFF_INVITE_INVALID', 'staff invite token is invalid or expired');
+    }
+    $sid = (int)$parsed['sid'];
+
+    list($pdo, $prefix, $dbError) = fbs_gateway_connect($context);
+    if ($dbError !== null) return fbs_gateway_err(500, $dbError['code'], $dbError['message']);
+    if (!fbs_gateway_valid_prefix($prefix)) {
+        return fbs_gateway_err(500, 'CONFIG_INVALID', 'DB_PREFIX contains illegal characters');
+    }
+
+    // ip：空串统一由调用方传 tg_user_id（与 contact 一键绑定口径一致），绝不回落 Pod IP
+    $rawIp = isset($params['ip']) ? (string)$params['ip'] : '';
+    if ($rawIp === '') $rawIp = (string)$tgUserId;
+    $ip = substr(preg_replace('/[^0-9a-fA-F:.]/', '', $rawIp), 0, 64);
+
+    // ② 查店：sid 在 business_list 必须存在（员工体系挂 business_list，非 waimai_shop）
+    try {
+        $stmt = $pdo->prepare('SELECT `id`, `title` FROM `' . $prefix . 'business_list` WHERE `id` = ? LIMIT 1');
+        $stmt->execute(array($sid));
+        $shop = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] staff_bind shop lookup failed: sid=' . $sid . ' :: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'shop lookup failed');
+    }
+    if (!$shop) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, 0, $sid, '', 'no_shop', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(404, 'STAFF_SHOP_NOT_FOUND', 'shop not found');
+    }
+    $title = (string)$shop['title'];
+
+    // ③ 归一手机号（二次防线：bot 传 contact 原文，审计里必须落统一格式）
+    $phone = fbs_normalize_phone(isset($params['phone']) ? $params['phone'] : '');
+    if ($phone === null) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, 0, $sid, '', 'error', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(400, 'MISSING_PARAM', 'invalid phone');
+    }
+
+    // ④ 查会员：复用 merchant 的按手机号解析（两侧归一 + mtype IN (1,2)，多命中 LIMIT 2 判歧义）。
+    //    mtype=2（商家本人）在 ④ 之后单独拒绝为 STAFF_IS_BUSINESS，不能在 SQL 里排除。
+    list($rows, $lookupError) = fbs_gateway_merchant_member_by_phone($pdo, $prefix, $phone);
+    if ($lookupError !== null) {
+        return fbs_gateway_err(500, $lookupError['code'], $lookupError['message']);
+    }
+    if (!$rows) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, 0, $sid, $phone, 'not_found', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(404, 'STAFF_NOT_FOUND', 'no member matches this phone');
+    }
+    if (count($rows) > 1) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, 0, $sid, $phone, 'ambiguous', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(409, 'STAFF_AMBIGUOUS', 'multiple members match this phone');
+    }
+    $row = $rows[0];
+    $memberId = (int)$row['id'];
+
+    // ⑤ state 门禁（与 issue_session 同一条）；商家本人（mtype=2）不能当员工
+    $denied = fbs_gateway_member_guard($row);
+    if ($denied !== null) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'not_found', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        error_log('[fbs_gateway] staff_bind member not usable: mid=' . $memberId . ' code=' . $denied['code']);
+        return fbs_gateway_err(403, $denied['code'], $denied['message']);
+    }
+    if ((int)$row['mtype'] === 2) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'is_business', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(403, 'STAFF_IS_BUSINESS', 'merchant accounts cannot join as staff');
+    }
+
+    // ⑥ 查 staff 现有行（huoniao_staff，一人一行是现有逻辑的事实约束）：
+    //    sid 相同 → 幂等复用该行；sid 不同 → 会员已是别家店员工，409 拒绝。
+    try {
+        $stmt = $pdo->prepare('SELECT `id`, `sid` FROM `' . $prefix . 'staff` WHERE `uid` = ? LIMIT 2');
+        $stmt->execute(array($memberId));
+        $staffRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] staff_bind staff lookup failed: mid=' . $memberId . ' :: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'staff lookup failed');
+    }
+    if (is_array($staffRows) && count($staffRows) > 1) {
+        // 一人多行属数据问题（现有微信通道只会插一行），宁可拒绝也不猜
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'ambiguous', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(409, 'STAFF_AMBIGUOUS', 'member has multiple staff rows');
+    }
+    $staffRow = (is_array($staffRows) && count($staffRows) === 1) ? $staffRows[0] : null;
+    if ($staffRow !== null && (int)$staffRow['sid'] !== $sid) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'ambiguous', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(409, 'STAFF_AMBIGUOUS', 'member is already staff of another shop');
+    }
+
+    // ⑦ 查 map 现有行（tg 维度主键 + member 维度唯一键，两个方向都要看）：
+    //    同店 → 幂等成功；任一方向已绑别店 → 409。
+    try {
+        $stmt = $pdo->prepare('SELECT `member_id`, `sid`, `staff_id` FROM `fbs_staff_map` WHERE `tg_user_id` = ? LIMIT 1');
+        $stmt->execute(array((string)$tgUserId));
+        $mapRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt = $pdo->prepare('SELECT `tg_user_id` FROM `fbs_staff_map` WHERE `member_id` = ? AND `tg_user_id` != ? LIMIT 1');
+        $stmt->execute(array($memberId, (string)$tgUserId));
+        $boundByOther = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('[fbs_gateway] staff_bind map lookup failed: tg=' . (string)$tgUserId . ' :: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'binding lookup failed');
+    }
+
+    if (is_array($mapRow)) {
+        if ((int)$mapRow['sid'] === $sid) {
+            // 同店重复 = 幂等成功：只刷新手机号写法，不动绑定，也不重新发邀请
+            try {
+                $stmt = $pdo->prepare('UPDATE `fbs_staff_map` SET `phone` = ? WHERE `tg_user_id` = ? AND `sid` = ?');
+                $stmt->execute(array($phone, (string)$tgUserId, $sid));
+            } catch (Throwable $e) {
+                error_log('[fbs_gateway] staff_bind idempotent update failed: ' . $e->getMessage());
+                return fbs_gateway_err(500, 'DB_QUERY_FAILED', 'bind update failed');
+            }
+            if (!fbs_gateway_staff_audit($pdo, $tgUserId, (int)$mapRow['member_id'], $sid, $phone, 'success', $ip)) {
+                return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+            }
+            return fbs_gateway_ok(array(
+                'staff_id'   => (int)$mapRow['staff_id'],
+                'sid'        => $sid,
+                'title'      => $title,
+                'idempotent' => true,
+            ));
+        }
+        // 本 TG 已绑到别的店：用户换店铺需先解绑，原绑定保持不动
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, (int)$mapRow['member_id'], $sid, $phone, 'already_bound', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(409, 'STAFF_ALREADY_BOUND', 'this telegram is already bound to another shop');
+    }
+    if (is_array($boundByOther)) {
+        // 该会员已被别的 TG 绑定（uk_fbs_staff_map_member）：原绑定保持不动
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'already_bound', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(409, 'STAFF_ALREADY_BOUND', 'this member is already bound to another telegram');
+    }
+
+    // ⑧ 限频（放在终态检查之后、写入之前：同店幂等重放不占额度）
+    $rate = fbs_gateway_staff_rate_limited($pdo, $tgUserId, $phone, $ip);
+    if ($rate['error'] !== null) {
+        return fbs_gateway_err(503, $rate['error']['code'], $rate['error']['message']);
+    }
+    if ($rate['limited']) {
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'rate_limited', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        return fbs_gateway_err(429, 'BIND_RATE_LIMITED', 'too many bind attempts');
+    }
+
+    // ⑨ 写 map + 写 staff 行。staff 行缺失时补插（与微信扫码 addStaff 同构：sid, uid, pubdate），
+    //    已有行（微信通道绑过）复用其 id，绝不重复插。
+    if ($staffRow !== null) {
+        $staffId = (int)$staffRow['id'];
+    } else {
+        try {
+            $stmt = $pdo->prepare('INSERT INTO `' . $prefix . 'staff` (`sid`, `uid`, `pubdate`) VALUES (?, ?, ?)');
+            $stmt->execute(array($sid, $memberId, time()));
+            $staffId = (int)$pdo->lastInsertId();
+        } catch (Throwable $e) {
+            if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'error', $ip)) {
+                return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+            }
+            error_log('[fbs_gateway] staff_bind staff insert failed (mid=' . $memberId . ' sid=' . $sid . ') :: ' . $e->getMessage());
+            return fbs_gateway_err(500, 'BIND_FAILED', 'bind failed');
+        }
+    }
+
+    try {
+        $stmt = $pdo->prepare('INSERT INTO `fbs_staff_map` (`tg_user_id`, `member_id`, `sid`, `staff_id`, `phone`) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute(array((string)$tgUserId, $memberId, $sid, $staffId, $phone));
+    } catch (Throwable $e) {
+        // 撞唯一键按冲突返回，别吞异常：并发双插时 409 比静默顶替诚实
+        if (fbs_gateway_staff_is_duplicate_key($e)) {
+            if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'already_bound', $ip)) {
+                return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+            }
+            return fbs_gateway_err(409, 'STAFF_ALREADY_BOUND', 'this telegram or member is already bound');
+        }
+        if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'error', $ip)) {
+            return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+        }
+        error_log('[fbs_gateway] staff_bind map insert failed (tg=' . (string)$tgUserId . ' mid=' . $memberId . ' sid=' . $sid . ') :: ' . $e->getMessage());
+        return fbs_gateway_err(500, 'BIND_FAILED', 'bind failed');
+    }
+
+    if (!fbs_gateway_staff_audit($pdo, $tgUserId, $memberId, $sid, $phone, 'success', $ip)) {
+        return fbs_gateway_err(503, 'AUDIT_UNAVAILABLE', 'staff audit unavailable');
+    }
+    return fbs_gateway_ok(array('staff_id' => $staffId, 'sid' => $sid, 'title' => $title));
+}
+
 /* ============================== 分发 ============================== */
 
 /**
@@ -1800,6 +2124,8 @@ function fbs_gateway_dispatch($action, $rawBody, $timestamp, $signature, array $
         // 而 issue_session 会按 username=tg_<id> 自动建号 —— 商家拿到空会员，登录成功但无店铺。
         if ($action === 'merchant_bind') return fbs_gateway_action_merchant_bind($params, $context);
         if ($action === 'merchant_session') return fbs_gateway_action_merchant_session($params, $context);
+        // 员工动作同样必须显式 return：漏一支就会兜底到 issue_session（按 username=tg_<id> 自动建号）
+        if ($action === 'staff_bind') return fbs_gateway_action_staff_bind($params, $context);
         return fbs_gateway_action_issue_session($params, $context);
     } catch (Throwable $e) {
         // 绝不把堆栈/DSN 回给调用方
