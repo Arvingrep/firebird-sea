@@ -22,6 +22,7 @@
 //   （checkout / call-test）一律对象形，顾客侧已依赖 /auth/tg-verify 的旧形状，故那条不动。
 
 const crypto = require('node:crypto');
+const { safeRedirect } = require('./merchantRoute');
 
 // 登录用 1 小时；收银台仍走 telegramAuth 默认 24h。
 // ⚠ 这个值必须 ≤ 网关的防重放窗口 FBS_BRIDGE_REPLAY_TTL（bridge.php:79 = 7200s）：
@@ -55,6 +56,16 @@ const LOGIN_STATUS_BY_CODE = {
   // —— 本路由自有 ——
   INVALID_INIT_DATA: 401,
   EXPIRED_INIT_DATA: 401,
+  // —— merchant 分支（方案 A）：网关 merchant_session 的契约码，HTTP 码与 PHP 侧一致 ——
+  MERCHANT_NOT_BOUND: 404,
+  MERCHANT_NOT_FOUND: 404,
+  MERCHANT_NO_SHOP: 404,
+  MERCHANT_AMBIGUOUS: 409,
+  MERCHANT_ALREADY_BOUND: 409,
+  TG_ALREADY_BOUND: 409,
+  BIND_RATE_LIMITED: 429,
+  AUDIT_UNAVAILABLE: 503,
+  BIND_FAILED: 500,
   ROLE_NOT_SUPPORTED: 501
 };
 
@@ -73,6 +84,15 @@ const MESSAGE_BY_CODE = {
   DB_QUERY_FAILED: '登录服务暂不可用，请稍后再试',
   INVALID_INIT_DATA: '登录信息校验失败',
   EXPIRED_INIT_DATA: '登录信息已过期，请重新打开',
+  // merchant 分支：文案给可执行动作（找运营做什么），不写「联系管理员」这类没有落点的句子
+  MERCHANT_NOT_BOUND: '尚未绑定商家账号，请在机器人里发送 /merchant 完成绑定',
+  MERCHANT_NOT_FOUND: '未找到该手机号对应的商家账号，请确认号码与站点登记的会员手机号一致',
+  MERCHANT_NO_SHOP: '该商家账号还没有被分配外卖店铺，请联系运营在后台分配后再试',
+  MERCHANT_AMBIGUOUS: '该手机号匹配到多个商家账号，无法自动登录，请联系运营核对',
+  MERCHANT_ALREADY_BOUND: '该商家账号已被其他 Telegram 绑定，如需换绑请联系运营',
+  TG_ALREADY_BOUND: '当前 Telegram 已绑定其他商家账号，如需换绑请联系运营',
+  BIND_RATE_LIMITED: '操作过于频繁，请稍后再试',
+  AUDIT_UNAVAILABLE: '服务暂时不可用，请稍后再试',
   ROLE_NOT_SUPPORTED: '该身份暂未开放'
 };
 
@@ -144,6 +164,50 @@ async function upsertMemberMap(conn, tgUserId, memberId) {
 function createTgLoginRouter(deps) {
   const { env = process.env, validateInitData, botToken, gateway, conn, now = Date.now } = deps;
 
+  // 商家分支（方案 A）：与顾客分支共享的只有「验签 + Set-Cookie 原样透传」，其余刻意不同构：
+  //   1. 会员解析只读 —— merchant_session 内部查 fbs_merchant_map 拿既有会员，**绝不建号**；
+  //      issue_session 的 resolve_member（index.php）会在 username=tg_<id> 不存在时插空会员，
+  //      商家拿到「有 cookie 无店铺」，/wmsj 立刻弹「您没有外卖店铺权限」。
+  //   2. **不写 fbs_member_map** —— 那是收银台归属校验的唯一依据（payOrderRead.js），
+  //      写进去会把该 TG 的顾客下单归属永久改掉；member_map_synced 恒 false。
+  //   3. redirect 是商家后台 /wmsj/（多店由页面按 waimai_shop_manager 列表自选），不是 '/'。
+  //      网关返回值过 safeRedirect 后透传，开放重定向在登录链路上是直接可利用的。
+  async function merchantLogin(req, res, cfg, tgUserId, initDataHash) {
+    let session;
+    try {
+      session = await gateway.merchantSession(cfg, { tg_user_id: tgUserId, init_data_hash: initDataHash });
+      if (!session || session.success !== true || !session.data
+          || !Array.isArray(session.data.set_cookies) || session.data.set_cookies.length === 0) {
+        logStderr('auth/telegram-web', 'merchant_session 未返回 set_cookies');
+        return sendError(res, 'GATEWAY_UNAVAILABLE');
+      }
+      const mid = Number(session.data.member_id);
+      if (!Number.isSafeInteger(mid) || mid <= 0) {
+        logStderr('auth/telegram-web', 'merchant_session 返回的 member_id 非法');
+        return sendError(res, 'GATEWAY_UNAVAILABLE');
+      }
+    } catch (err) {
+      const code = gatewayFailureCode(err);
+      logStderr('auth/telegram-web', `网关调用失败 role=merchant code=${code} err=${err && err.message}`);
+      return sendError(res, code);
+    }
+
+    // Cookie 原样透传：不增、不删、不改属性、不重新排序
+    res.setHeader('Set-Cookie', session.data.set_cookies);
+
+    // 200 + JSON 而不是 302：同顾客分支的理由（fetch 跨重定向的 Set-Cookie 在部分 WebView 上
+    // 不被采纳），由落地页自行 location.replace。
+    return res.status(200).json({
+      success: true,
+      data: {
+        member_id: Number(session.data.member_id),
+        redirect: safeRedirect(session.data.redirect),
+        member_map_synced: false,
+        at: now()
+      }
+    });
+  }
+
   return async function telegramWebLogin(req, res) {
     const baseUrl = env.FBS_GATEWAY_URL;
     const secret = env.FBS_GATEWAY_SECRET;
@@ -166,8 +230,9 @@ function createTgLoginRouter(deps) {
     }
 
     const role = body.role || 'customer';
-    if (role !== 'customer') {
-      // 骑手线（courier）在第 4 步实现，本步一律 501
+    if (role !== 'customer' && role !== 'merchant') {
+      // 白名单：customer（顾客）/ merchant（商家，方案 A）。骑手不走本端点（rider/bind 落地页），
+      // 其余未知 role 一律 501，且不触达网关。
       return sendError(res, 'ROLE_NOT_SUPPORTED');
     }
 
@@ -184,6 +249,10 @@ function createTgLoginRouter(deps) {
 
     // 只把 hash 交给网关记账，原文不出 Node（原文含用户资料，且网关不需要它）
     const initDataHash = crypto.createHash('sha256').update(initData).digest('hex');
+
+    if (role === 'merchant') {
+      return merchantLogin(req, res, cfg, tgUserId, initDataHash);
+    }
 
     let member;
     let session;

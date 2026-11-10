@@ -75,4 +75,10 @@ const cancelOrder = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'cancelOrder'
 const memberFindOrCreate = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'member_find_or_create', params, cfg);
 const issueSession = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'issue_session', params, cfg);
 
-module.exports = { sign, call, deal, orderPaid, cancelOrder, memberFindOrCreate, issueSession, GATEWAY_PATH, DEFAULT_TIMEOUT_MS };
+// 商家免密入口（方案 A）：merchant_session 走紧窗 ±15s（返回活凭证），merchant_bind 宽窗。
+// tgLogin 的 merchant 分支直接以本模块为 gateway（与 memberFindOrCreate/issueSession 同一形态）；
+// merchantRoute 的装配在 server.js 现拼（同 rider 的写法），两条路打的是同一组网关动作。
+const merchantBind = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'merchant_bind', params, cfg);
+const merchantSession = (cfg, params) => call(cfg.baseUrl, cfg.secret, 'merchant_session', params, cfg);
+
+module.exports = { sign, call, deal, orderPaid, cancelOrder, memberFindOrCreate, issueSession, merchantBind, merchantSession, GATEWAY_PATH, DEFAULT_TIMEOUT_MS };
