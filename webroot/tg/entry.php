@@ -2,7 +2,12 @@
 /**
  * Telegram 顾客免密登录落地页（方案甲：Node 中转）
  *
- * 路由：/tg/entry?role=customer（nginx 未加 try_files 前用 /tg/entry.php?role=customer）
+ * 路由：/tg/entry?role=customer|merchant（nginx 未加 try_files 前用 /tg/entry.php?role=…）
+ *
+ * role=merchant（方案 A）：直接用网关 merchant_session 签出的会员 cookie 进 /wmsj/，
+ * **必须跳过顾客分支的 /api/login.php?action=back 二次签 cookie**（那一步按 username=tg_<id>
+ * 查/建会员，会把商家会话覆盖成顾客空号）。未绑定（MERCHANT_NOT_BOUND）时无缝跳
+ * /tg-api/merchant/bind 绑定页。
  *
  * 刻意保持轻量：不 include 火鸟 common.inc.php。
  * 原因：common.inc.php 强依赖 swoole_loader 扩展且要求 PHP 恰好 7.4，而本页只需要
@@ -17,7 +22,8 @@ header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
 
 $role = isset($_GET['role']) ? (string)$_GET['role'] : 'customer';
-if ($role !== 'customer') $role = 'customer';
+// 白名单：customer（顾客）/ merchant（商家）。其余值静默归一成 customer，绝不透传给下游。
+if ($role !== 'customer' && $role !== 'merchant') $role = 'customer';
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -50,8 +56,8 @@ if ($role !== 'customer') $role = 'customer';
 <div class="box">
   <div id="loading">
     <div class="spinner"></div>
-    <p class="title">正在登录…</p>
-    <p class="desc">请稍候，正在为你准备账户</p>
+    <p class="title"><?php echo $role === 'merchant' ? '正在进入商家后台…' : '正在登录…'; ?></p>
+    <p class="desc"><?php echo $role === 'merchant' ? '请稍候，正在为你准备商家账号' : '请稍候，正在为你准备账户'; ?></p>
   </div>
   <div id="error" class="hidden">
     <p class="title">登录失败</p>
@@ -111,6 +117,14 @@ if ($role !== 'customer') $role = 'customer';
         // 接口契约（对象形）：{success:true,data:{redirect}} / {success:false,error:{code,message}}
         if (res.ok && data && data.success === true) {
           var go = (data.data && data.data.redirect) || '/';
+          if (ROLE === 'merchant') {
+            // 商家分支**必须跳过**下面的二次签 cookie：/api/login.php?action=back 走的是
+            // 旧直连桥（按 username=tg_<id> 查/建会员），会把刚签好的「商家会员」会话覆盖成
+            // 顾客空号 —— 表现为「登录成功 → /wmsj 弹『您没有外卖店铺权限』」，日志两边都是 200。
+            // 商家后台 /wmsj 认的就是网关刚种的这枚会员 cookie，直接跳转即可。
+            location.replace(go);
+            return;
+          }
           // 同时登录火鸟站点会话：入口页拿得到真实 initData，站内页面（如「我的」）之后再跳转时不一定还带着它。
           // 用 fetch 提交即可（Set-Cookie 照常生效）；后台没装「Telegram快捷登录」或失败都不影响进入首页。
           fetch('/api/login.php?action=back&type=telegram', {
@@ -123,6 +137,12 @@ if ($role !== 'customer') $role = 'customer';
           return;
         }
         var err = (data && data.error) || {};
+        if (ROLE === 'merchant' && err.code === 'MERCHANT_NOT_BOUND') {
+          // 首次使用的商家：无缝跳到绑定页（同一 WebView 内 initData 仍然可用），
+          // 不要让用户自己找 /merchant 命令。
+          location.replace('/tg-api/merchant/bind');
+          return;
+        }
         fail('请关闭本页面，在 Telegram 中重新打开', err.message || '', err.code || ('HTTP_' + res.status));
       });
     }).catch(function () {
