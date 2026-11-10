@@ -32,6 +32,7 @@ import (
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/addrshare"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/article"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/siteconfig"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/bridge"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/checkout"
@@ -194,7 +195,7 @@ func run() error {
 		Rider:          buildRider(db, botToken, hops, now),
 		Merchant:       buildMerchant(botToken, hops, now),
 		Dispatch:       buildDispatch(db, botToken, now),
-		Ajax:           buildAjax(),
+		Ajax:           buildAjax(db),
 		TMAStaticDir:   os.Getenv("TMA_STATIC_DIR"),
 		TrustProxyHops: hops,
 	}
@@ -531,11 +532,21 @@ func buildDispatch(db *sql.DB, botToken string, now func() time.Time) *dispatch.
 // 注意：注释里若写连续两个单引号，gofmt 会把它改写成弯引号（go/printer 的
 // 老式文档注释约定），所以上面对 JS 的描述用文字而不是原样代码。
 // buildAjax 注册火鸟 ajax.php 兼容层的全部 service。
-func buildAjax() *ajax.Router {
+//
+// 需要数据库的 service 在这里接上业务连接池；DB_HOST 未配置时 db 为 nil，
+// 相关 action 按「查不到数据」降级，与本地纯内存模式的其它路由同口径。
+// 表前缀沿用 PHP 侧的同名环境变量（entrypoint-web.sh: `${DB_PREFIX:-huoniao_}`）。
+func buildAjax(db *sql.DB) *ajax.Router {
 	router := ajax.NewRouter(func(line string) {
 		writeLog(os.Stderr, "ajax_error", map[string]any{"error": line})
 	})
 	siteconfig.Register(router)
+	articleSvc, err := article.New(article.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_")})
+	if err != nil {
+		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
+		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
+	}
+	article.Register(router, articleSvc)
 	return router
 }
 

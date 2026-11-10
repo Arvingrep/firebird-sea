@@ -45,7 +45,7 @@ func startupDep(now func() time.Time) httpapi.Dep {
 		Merchant: buildMerchant("123456:TEST", 0, now),
 		// 派单通知同理：无库时它仍要存在（缺库不等于「未配置」，端点照给 202）。
 		Dispatch: buildDispatch(nil, "123456:TEST", now),
-		Ajax:     buildAjax(),
+		Ajax:     buildAjax(nil),
 		Logf:     func(string) {},
 	}
 }
