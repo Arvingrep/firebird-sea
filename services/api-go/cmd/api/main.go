@@ -549,17 +549,21 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		// 构造失败（前缀非法）交给 article.New 统一报错。
 		files, _ = fburl.New(db, prefix, fburl.DefaultConfig())
 	}
-	articleSvc, err := article.New(article.Dep{DB: db, TablePrefix: prefix, Files: files})
-	if err != nil {
-		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
-		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
-	}
-	article.Register(router, articleSvc)
 	// Identity：按 cookie `<COOKIE_PREFIX>login_user` 识别会员；构造失败（如 DB 未配置）
 	// 降级为 nil（匿名 -1），不阻止启动。
 	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
 		writeLog(os.Stderr, event, fields)
 	})
+	articleDepCfg := article.Dep{DB: db, TablePrefix: prefix, Files: files}
+	if identity != nil { // 保持无类型 nil：nil 时 selfmediaDetail 一律按匿名
+		articleDepCfg.Members = identity
+	}
+	articleSvc, err := article.New(articleDepCfg)
+	if err != nil {
+		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
+		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
+	}
+	article.Register(router, articleSvc)
 	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
