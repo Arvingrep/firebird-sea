@@ -94,14 +94,14 @@ type orderInfo struct {
 
 // orderDetail 迁移自 article.class.php:3025-3071（分发器 handlers.class.php:63-92）：
 //
-//	ordernum 空/缺 → 102；主查询（pay_log.body = member_reward.ordernum）无结果 → 102；
+//	ordernum 空/缺/"0"（PHP falsy，if($ordernum)）→ 102；主查询（pay_log.body = member_reward.ordernum）无结果 → 102；
 //	r.state == 200 或 101 → 外层 101 + info:null；否则 100 + info 为整个数组（含 state 键）。
 //
 // url 按 #242 裁决 A 固定返回 ""（getUrlPath 待 #330 迁移后补），对比用例 ignoreFields。
 func (s *Service) orderDetail(req *ajax.Request) ajax.Response {
 	noData := ajax.Response{State: stateNoData, Info: infoNoData}
 	ordernum := req.Params.Get("ordernum")
-	if s.db == nil || ordernum == "" {
+	if s.db == nil || ordernum == "" || ordernum == "0" {
 		return noData
 	}
 

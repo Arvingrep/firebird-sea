@@ -563,11 +563,12 @@ func TestOrderDetailEmptyResult(t *testing.T) {
 	}
 }
 
-// 缺参 / 空参 → 102，且不触发任何 SQL。
+// 缺参 / 空参 / "0"（PHP falsy）→ 102，且不触发任何 SQL。
 func TestOrderDetailMissingOrdernum(t *testing.T) {
 	for _, target := range []string{
 		"/include/ajax.php?service=article&action=orderDetail",
 		"/include/ajax.php?service=article&action=orderDetail&ordernum=",
+		"/include/ajax.php?service=article&action=orderDetail&ordernum=0", // PHP "0" falsy
 	} {
 		svc, mock := newService(t)
 		got := serve(t, svc, target)
@@ -577,6 +578,21 @@ func TestOrderDetailMissingOrdernum(t *testing.T) {
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Fatalf("不应有 SQL: %v", err)
 		}
+	}
+}
+
+// ordernum="0" 是 PHP falsy → 102 且不触发 SQL。
+// 设置一条本会命中的期望：若 handler 误发查询，期望被消费，下面的断言会失败。
+func TestOrderDetailOrdernumZeroNoQuery(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(orderMainQuery).WithArgs("0").WillReturnRows(
+		sqlmock.NewRows(orderCols).AddRow("R1", 8, "1794014028", 1, 5.5))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=orderDetail&ordernum=0")
+	if got != `{"state":102,"info":"No data!"}` {
+		t.Fatalf("响应体 = %s", got)
+	}
+	if err := mock.ExpectationsWereMet(); err == nil {
+		t.Fatal("ordernum=0 不应触发任何 SQL，但期望的查询已被消费")
 	}
 }
 
