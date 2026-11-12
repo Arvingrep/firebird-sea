@@ -34,7 +34,7 @@ type Dep struct {
 	// TablePrefix 是火鸟表前缀，对应 PHP 的 $DB_PREFIX
 	// （entrypoint-web.sh: `${DB_PREFIX:-huoniao_}`，两处默认必须一致）。
 	TablePrefix string
-	// Files 用于 getFilePath（分类 litpic 转绝对地址）。nil 时 litpic 原样输出。
+	// Files 用于 getFilePath / getUrlPath（图片转绝对地址、专题链接）。nil 时图片原样输出、url 为空串。
 	Files *fburl.Resolver
 }
 
@@ -46,6 +46,8 @@ type Service struct {
 	files      *fburl.Resolver
 	// zhuantiTable 是 #@__article_zhuanti（专题 / 子分类同表，靠 parentid 区分）。
 	zhuantiTable string
+	// zlListTable / zlNewsTable 是 zhuantiList 用到的关联表（已带前缀）。
+	zlListTable, zlNewsTable string
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -58,6 +60,8 @@ func New(dep Dep) (*Service, error) {
 		fieldTable:   "`" + dep.TablePrefix + "article_selfmedia_field`",
 		typeTable:    "`" + dep.TablePrefix + "articletype`",
 		zhuantiTable: "`" + dep.TablePrefix + "article_zhuanti`",
+		zlListTable:  "`" + dep.TablePrefix + "article_zhuantilist`",
+		zlNewsTable:  "`" + dep.TablePrefix + "articlelist_all`",
 		files:        dep.Files,
 	}, nil
 }
@@ -67,6 +71,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "selfmedia_field", s.selfmediaField)
 	router.Register("article", "type", s.typeList)
 	router.Register("article", "zhuantiDetail", s.zhuantiDetail)
+	router.Register("article", "zhuantiList", s.zhuantiList)
 }
 
 // fieldItem 是 selfmedia_field 返回的一行。字段顺序与 PHP 数组一致
