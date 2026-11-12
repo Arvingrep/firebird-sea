@@ -29,9 +29,11 @@ type typeItem struct {
 	ParentID int    `json:"parentid"`
 	Typename string `json:"typename"`
 	Title    string `json:"title"`
-	Litpic   string `json:"litpic,omitempty"`
-	Pinyin   string `json:"pinyin"`
-	Py       string `json:"py"`
+	// Litpic：PHP 仅在原始 litpic 为真值时才写入该键（值为 getFilePath 结果，可能是 ""），
+	// 故用指针：nil → 省略键；非 nil（含 ""）→ 恒输出。
+	Litpic *string `json:"litpic,omitempty"`
+	Pinyin string  `json:"pinyin"`
+	Py     string  `json:"py"`
 	// Lower：son=true 时为 []typeItem 或 ""（无子分类）；son=false 时为子分类数量，
 	// 且只在 >0 时出现。
 	Lower any `json:"lower,omitempty"`
@@ -50,21 +52,30 @@ func phpSon(raw string) bool {
 	return err != nil || f != 0
 }
 
-// clampPage 复刻 ajax.php 对 page/pageSize 的归一：仅当参数出现时
-// (int)、<=0 取默认（page=1/pageSize=10）、>50000 取 50000；
-// 未出现返回 0，交给 getTypeList 的「空 → 1 / 1000」。
+// clampPage 复刻 ajax.php 对 page/pageSize 的归一（按参数来源通道区分）：
+//   - GET（ajax.php:59-62）：(int)、<=0 取默认（page=1/pageSize=10）、>50000 取 50000；
+//   - POST（ajax.php:97-99）：只有 (int) 和 >50000 取 50000，没有 <=0 取默认。
+//
+// POST 与 GET 同名时 POST 覆盖 GET，所以参数出现在 POST 表单里就按 POST 规则。
+// 未出现返回 0，交给 getTypeList 的「空 → 1 / 1000」（POST 的 0 同样落到这里；
+// POST 的负数原样进入 LIMIT，由数据库报错 → 101）。
 func clampPage(req *ajax.Request, key string, def int) int {
 	if !req.Params.Has(key) {
 		return 0
 	}
 	v := phpInt(req.Params.Get(key))
-	if v <= 0 {
+	if !fromPost(req, key) && v <= 0 {
 		v = def
 	}
 	if v > 50000 {
 		v = 50000
 	}
 	return v
+}
+
+// fromPost 判断 key 的最终取值是否来自 POST 通道（POST 覆盖 GET）。
+func fromPost(req *ajax.Request, key string) bool {
+	return req.HTTP != nil && req.HTTP.PostForm != nil && req.HTTP.PostForm.Has(key)
 }
 
 // typeList 迁移自 article.class.php:263-288 + dsql::getTypeList。
@@ -149,12 +160,13 @@ func (s *Service) loadTypes(ctx context.Context, host string, parent, mold int, 
 			item.Title = item.Typename
 		}
 		if l := r["litpic"]; l != "" && l != "0" {
-			item.Litpic = l
+			pic := l
 			if s.files != nil {
-				if item.Litpic, err = s.files.File(ctx, l, fburl.Options{Host: host}); err != nil {
+				if pic, err = s.files.File(ctx, l, fburl.Options{Host: host}); err != nil {
 					return nil, err
 				}
 			}
+			item.Litpic = &pic
 		}
 		if son {
 			children, err := s.loadTypes(ctx, host, item.ID, mold, true, 0, 100000)
