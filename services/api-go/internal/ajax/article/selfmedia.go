@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
 
 // selfmedia 的「暂无数据」：action 返回 {state:200, info:"暂无数据"}，
@@ -294,20 +295,31 @@ func (s *Service) selfmedia(req *ajax.Request) ajax.Response {
 		return ajax.Response{State: ajax.StateOK, Info: result}
 	}
 
+	host := ""
+	if req.HTTP != nil {
+		host = req.HTTP.Host
+	}
 	login := s.resolveLogin(req)
 	for _, r := range raw {
 		item := smItem{
-			ID:      nullable(r.id),
-			Typeid:  nullable(r.typ),
-			Name:    nullable(r.name),
-			Profile: nullable(r.profile),
-			Field:   nullable(r.field),
-			Pubdate: nullable(r.pubdate),
-			// photo / url：裁决 A（#238），等 #330 fburl 合并后再补 getFilePath / getUrlPath；
-			// 对比用例里两者在 ignoreFields 中。
-			Photo:     "",
-			URL:       "",
+			ID:        nullable(r.id),
+			Typeid:    nullable(r.typ),
+			Name:      nullable(r.name),
+			Profile:   nullable(r.profile),
+			Field:     nullable(r.field),
+			Pubdate:   nullable(r.pubdate),
 			TotalFans: smDsqlFailure,
+		}
+		// photo：ac_photo 有值才 getFilePath()（File 对空/"0" 返回 ""）；
+		// url：getUrlPath({service:article, template:mddetail, id})，规则见 #244 业务规则评论。
+		var err error
+		if item.Photo, err = s.zlFile(ctx, host, r.photo.String); err != nil {
+			return ajax.Response{State: stateZhuantiFailed, Info: infoZhuantiFailed}
+		}
+		if item.URL, err = s.zlURL(ctx, host, fburl.Params{
+			{Key: "service", Value: "article"}, {Key: "template", Value: "mddetail"}, {Key: "id", Value: r.id.String},
+		}); err != nil {
+			return ajax.Response{State: stateZhuantiFailed, Info: infoZhuantiFailed}
 		}
 		if r.typ.Valid {
 			if name, ok := selfmediaTypes[r.typ.String]; ok {

@@ -14,6 +14,7 @@ import (
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
 
 const (
@@ -68,7 +69,7 @@ func TestSelfmediaNormalAnonymous(t *testing.T) {
 
 	got := serve(t, svc, "/include/ajax.php?service=article&action=selfmedia")
 	want := `{"state":100,"info":{"pageInfo":{"page":1,"pageSize":10,"totalPage":1,"totalCount":"2"},"list":[` +
-		`{"id":"1","typeid":"1","type":"个人/自媒体","name":"张三","profile":"简介","field":"0","photo":"","pubdate":"1791615275","total_article":6,"click":50,"total_fans":"2","url":"","isfollow":0},` +
+		`{"id":"1","typeid":"1","type":"个人/自媒体","name":"张三","profile":"简介","field":"0","photo":"/u/a.jpg","pubdate":"1791615275","total_article":6,"click":50,"total_fans":"2","url":"","isfollow":0},` +
 		`{"id":"2","typeid":"9","type":null,"name":"李四","profile":null,"field":"7","photo":"","pubdate":"1791615000","total_article":0,"click":0,"total_fans":"0","url":"","isfollow":0}]}}`
 	if got != want {
 		t.Fatalf("响应体 = %s\nwant     %s", got, want)
@@ -385,6 +386,44 @@ func TestSelfmediaCityFilterWithOtherFilters(t *testing.T) {
 	got := serve(t, svc, "/include/ajax.php?service=article&action=selfmedia&cityid=7&type=2")
 	if !strings.Contains(got, `"state":101`) {
 		t.Fatalf("响应 = %s", got)
+	}
+	smMet(t, mock)
+}
+
+// 接入 fburl：ac_photo 有值走 getFilePath（外链按存储类型追加缩放参数），空串输出 ""；
+// url 为 getUrlPath({article, mddetail, id})，域名随请求 Host。
+func TestSelfmediaPhotoAndURLViaFburl(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	files, err := fburl.New(db, "huoniao_", fburl.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := New(Dep{DB: db, TablePrefix: "huoniao_", Files: files})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mock.ExpectQuery(smCountSQL).WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("2"))
+	mock.ExpectQuery(smListCols + smOrderDef + " LIMIT 0, 10").WillReturnRows(
+		sqlmock.NewRows(smListColNames).
+			AddRow("1", "3", "1", "n", "p", "0", "https://img.example.com/a.jpg", "1").
+			AddRow("2", "8", "1", "n", "p", "0", "", "1"))
+	mock.ExpectQuery("SELECT count(`id`) total FROM `huoniao_site_module` WHERE `state` = 0 AND `type` = 0 AND `name` != ''").WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(28))
+	mock.ExpectQuery("SELECT `domain` FROM `huoniao_domain` WHERE `module` = ? AND `part` = 'config'").WithArgs("article").WillReturnRows(sqlmock.NewRows([]string{"domain"}).AddRow("news"))
+	smExpectStats(mock, 3, "0", nil, "0")
+	smExpectStats(mock, 8, "0", nil, "0")
+
+	got := serve(t, svc, "/include/ajax.php?service=article&action=selfmedia")
+	for _, want := range []string{
+		`"photo":"https://img.example.com/a.jpg?x-image-process=image/resize,m_fill,w_4096,h_4096"`, `"url":"https://example.com/news/mddetail-1.html"`,
+		`"photo":"","pubdate":"1","total_article":0,"click":0,"total_fans":"0","url":"https://example.com/news/mddetail-2.html"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("响应体缺 %s\n got %s", want, got)
+		}
 	}
 	smMet(t, mock)
 }

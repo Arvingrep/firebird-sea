@@ -60,6 +60,9 @@ func TestBuildAjaxSelfmediaUsesCookieIdentity(t *testing.T) {
 			mock.ExpectQuery("FROM `huoniao_article_selfmedia` WHERE").
 				WillReturnRows(sqlmock.NewRows([]string{"id", "userid", "type", "ac_name", "ac_profile", "ac_field", "ac_photo", "pubdate"}).
 					AddRow("1", "3", "1", "n", "p", "0", "", "1"))
+			// url 经真实 fburl.Resolver 解析：站点模块数 + article 域名各一次查询。
+			mock.ExpectQuery("SELECT count\\(`id`\\) total FROM `huoniao_site_module`").WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(28))
+			mock.ExpectQuery("SELECT `domain` FROM `huoniao_domain`").WithArgs("article").WillReturnRows(sqlmock.NewRows([]string{"domain"}).AddRow("news"))
 			mock.ExpectQuery("COUNT\\(`id`\\) c FROM `huoniao_articlelist_all`").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("6"))
 			mock.ExpectQuery("SUM\\(`click`\\) c FROM `huoniao_articlelist_all`").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("50"))
 			mock.ExpectQuery("COUNT\\(`id`\\) c FROM `huoniao_member_follow`").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("2"))
