@@ -2,6 +2,7 @@ package article
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -448,5 +449,69 @@ func TestZhuantiDetailFburl(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestZhuantiDetailIDNormalization(t *testing.T) {
+	post := func(svc *Service, target, body string) string {
+		router := ajax.NewRouter(func(string) {})
+		Register(router, svc)
+		req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec.Body.String()
+	}
+	const base = "/include/ajax.php?service=article&action=zhuantiDetail"
+	cases := []struct {
+		name, query, body string
+		wantHit           bool
+	}{
+		{"GET 数组", "&id[]=1&id[]=9", "", true},
+		{"GET 数组 URL 编码", "&id%5B%5D=1&id%5B%5D=9", "", true},
+		{"POST 数组", "", "id[]=1&id[]=9", true},
+		{"POST 数组覆盖 GET 标量", "&id=5", "id[]=1", true},
+		{"POST 标量覆盖 GET 数组", "&id[]=5", "id=1", true},
+		{"占位符为空参数", "&id=1Placeholder", "", false},
+		{"数组首项为 0", "&id[]=0&id[]=1", "", false},
+		{"逗号串首项为 0", "&id=0,1", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc, mock := newService(t)
+			if c.wantHit {
+				mock.ExpectQuery(zhuantiMainSQL).WithArgs(1).WillReturnRows(
+					sqlmock.NewRows(zhuantiCols).AddRow("1", "0", "专题", "", "50", "1", "1", "0", "0", "", "0", "", "", "0"))
+				mock.ExpectQuery(zhuantiLowerSQL).WithArgs(1).WillReturnRows(sqlmock.NewRows(zhuantiCols))
+			}
+			var got string
+			if c.body == "" {
+				got = serve(t, svc, base+c.query)
+			} else {
+				got = post(svc, base+c.query, c.body)
+			}
+			if c.wantHit && !strings.HasPrefix(got, `{"state":100,`) {
+				t.Fatalf("应命中专题 1: %s", got)
+			}
+			if !c.wantHit && got != `{"state":101,"info":"参数错误"}` {
+				t.Fatalf("应为参数错误: %s", got)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// 主查询成功 + 子分类查询异常：PHP 把 dsqlOper 的失败 JSON 字符串放进 lower，外层仍 100。
+func TestZhuantiDetailLowerQueryFails(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(zhuantiMainSQL).WithArgs(1).WillReturnRows(
+		sqlmock.NewRows(zhuantiCols).AddRow("1", "0", "专题", "简介", "50", "1640000000", "1", "0", "0", "", "3", "", "", "0"))
+	mock.ExpectQuery(zhuantiLowerSQL).WithArgs(1).WillReturnError(errors.New("boom"))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=zhuantiDetail&id=1")
+	want := `{"state":100,"info":{"id":"1","typename":"专题","description":"简介","pubdate":"1640000000","litpic":"","banner_large":"","banner_small":"","url":"","lower":"{\"state\": 200, \"info\": \"操作失败！\"}"}}`
+	if got != want {
+		t.Fatalf("响应体 = %s\nwant     %s", got, want)
 	}
 }

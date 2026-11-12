@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -230,8 +231,9 @@ func (s *Service) queryRows(query string, args ...any) ([]orderedRow, bool) {
 // zhuantiInfo 是 zhuantiDetail 的 info。字段顺序与 PHP $detail 一致
 // （article.class.php:4361-4393）；litpic / banner_* / url 已由 fburl 解析。
 type zhuantiInfo struct {
-	main  orderedRow
-	lower []orderedRow
+	main orderedRow
+	// lower 正常是 []orderedRow；子分类查询异常时是 PHP dsqlOper 的失败字符串。
+	lower any
 	// litpic、bannerLarge、bannerSmall、url 是 getFilePath / getUrlPath 的结果。
 	litpic, bannerLarge, bannerSmall, url string
 }
@@ -298,9 +300,42 @@ func (s *Service) resolveZhuanti(ctx context.Context, host string, id int, z *zh
 //	$id = (int)$param['id']; empty → 参数错误
 //	SELECT * FROM article_zhuanti WHERE id=$id AND state=1 AND parentid=0
 //	无行 → 102；有行 → lower = SELECT * ... WHERE parentid=$id AND state=1 ORDER BY weight DESC（整行原样）
+//
+// dsqlFailure 是 dsqlOper 异常返回值（$cfg_siteDebug 关闭时）。
+const dsqlFailure = `{"state": 200, "info": "操作失败！"}`
+
+// normalizeIDParam 复刻 ajax.php 对 id 调用的 convertArrToStrWithComma($value)
+// （common.inc.php:1793，$int=true）。PHP 里 id=… 与 id[]=… 是同一个键 id，
+// 这里两种键都读（mergeParams 保证同名只留后来源的一种）。
+func normalizeIDParam(params url.Values) string {
+	if arr, ok := params["id[]"]; ok && len(arr) > 0 {
+		out := make([]string, len(arr))
+		for i, v := range arr {
+			out[i] = strconv.Itoa(phpInt(v))
+		}
+		return strings.Join(out, ",")
+	}
+	raw := params.Get("id")
+	if raw == "" || strings.Contains(raw, "Placeholder") {
+		return ""
+	}
+	if strings.Contains(raw, ",") {
+		parts := strings.Split(raw, ",")
+		for i, v := range parts {
+			parts[i] = strconv.Itoa(phpInt(v))
+		}
+		return strings.Join(parts, ",")
+	}
+	if n := phpInt(raw); n != 0 {
+		return strconv.Itoa(n)
+	}
+	return ""
+}
+
 func (s *Service) zhuantiDetail(req *ajax.Request) ajax.Response {
-	// ajax.php 先把 id 归一为逗号串，再 (int) 截断；phpInt("5,6") == 5。
-	id := phpInt(req.Params.Get("id"))
+	// ajax.php 先用 convertArrToStrWithComma 把 id 归一为逗号串，再 (int) 截断；
+	// phpInt("5,6") == 5。
+	id := phpInt(normalizeIDParam(req.Params))
 	if id == 0 {
 		return ajax.Response{State: stateParamError, Info: "参数错误"}
 	}
@@ -312,11 +347,14 @@ func (s *Service) zhuantiDetail(req *ajax.Request) ajax.Response {
 		return ajax.Response{State: stateNoData, Info: infoNoData}
 	}
 	lower, ok := s.queryRows("SELECT * FROM "+s.zhuantiTable+" WHERE `parentid` = ? AND `state` = 1 ORDER BY `weight` DESC", id)
+	var lowerVal any = lower
 	if !ok {
-		// PHP 里 dsqlOper 失败返回 false，lower 会是 false；与 No data 口径一致处理。
-		return ajax.Response{State: stateNoData, Info: infoNoData}
+		// dsql.class.php:1156：dsqlOper 异常时返回的是 JSON 字符串（非 false；
+		// $cfg_siteDebug 关闭时为下面这个固定串），article.class.php:4384 原样放进 lower，
+		// 主详情保留，外层仍是 100。
+		lowerVal = dsqlFailure
 	}
-	info := zhuantiInfo{main: mains[0], lower: lower}
+	info := zhuantiInfo{main: mains[0], lower: lowerVal}
 	host := ""
 	if req.HTTP != nil {
 		host = req.HTTP.Host
