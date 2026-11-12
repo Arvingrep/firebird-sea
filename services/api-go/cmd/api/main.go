@@ -41,6 +41,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/credential"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/dispatch"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fbproxy"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/gateway"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpapi"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/member"
@@ -541,7 +542,13 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		writeLog(os.Stderr, "ajax_error", map[string]any{"error": line})
 	})
 	siteconfig.Register(router)
-	articleSvc, err := article.New(article.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_")})
+	prefix := envOr("DB_PREFIX", "huoniao_")
+	var files *fburl.Resolver
+	if db != nil {
+		// 构造失败（前缀非法）交给 article.New 统一报错。
+		files, _ = fburl.New(db, prefix, fburl.DefaultConfig())
+	}
+	articleSvc, err := article.New(article.Dep{DB: db, TablePrefix: prefix, Files: files})
 	if err != nil {
 		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
