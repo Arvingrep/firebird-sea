@@ -33,6 +33,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/addrshare"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/article"
+	ajaxmember "github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/member"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/siteconfig"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/bridge"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/checkout"
@@ -554,6 +555,16 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
 	}
 	article.Register(router, articleSvc)
+	// Identity：按 cookie `<COOKIE_PREFIX>login_user` 识别会员；构造失败（如 DB 未配置）
+	// 降级为 nil（匿名 -1），不阻止启动。
+	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
+		writeLog(os.Stderr, event, fields)
+	})
+	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
+	}
+	ajaxmember.Register(router, memberSvc)
 	return router
 }
 
