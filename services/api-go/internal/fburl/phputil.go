@@ -1,6 +1,9 @@
 package fburl
 
 import (
+	"crypto/md5"
+	"encoding/base64"
+	"encoding/hex"
 	"net/url"
 	"regexp"
 	"strings"
@@ -52,3 +55,52 @@ func phpURLEncode(s string) string {
 }
 
 var stripTagsRe = regexp.MustCompile(`<[^>]*>?`)
+
+// phpBase64Decode mimics non-strict base64_decode: characters outside the alphabet are
+// skipped, padding is optional and a trailing partial group is decoded as far as possible.
+func phpBase64Decode(s string) string {
+	var clean []byte
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '+' || c == '/' {
+			clean = append(clean, c)
+		} else if c == '=' {
+			break
+		}
+	}
+	if len(clean)%4 == 1 {
+		clean = clean[:len(clean)-1]
+	}
+	out, err := base64.RawStdEncoding.WithPadding(base64.NoPadding).DecodeString(string(clean))
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
+const renrenCryptKey = "KaCXPpoD1vyD[XUWwxhFhkXJulzS~u"
+
+// renrenKey ports RenrenCrypt::__key (XOR with the md5 hex of the key).
+func renrenKey(txt, key string) string {
+	sum := md5.Sum([]byte(key))
+	k := hex.EncodeToString(sum[:])
+	out := make([]byte, len(txt))
+	for i := 0; i < len(txt); i++ {
+		out[i] = txt[i] ^ k[i%len(k)]
+	}
+	return string(out)
+}
+
+// renrenDecrypt ports RenrenCrypt::php_decrypt (which base64-decodes its input itself).
+func renrenDecrypt(txt string) string {
+	t := renrenKey(phpBase64Decode(txt), renrenCryptKey)
+	var out []byte
+	for i := 0; i < len(t); i++ {
+		m := t[i]
+		i++
+		if i < len(t) {
+			out = append(out, t[i]^m)
+		}
+	}
+	return string(out)
+}

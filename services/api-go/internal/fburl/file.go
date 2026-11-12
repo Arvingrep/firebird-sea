@@ -57,8 +57,8 @@ func (r *Resolver) withScheme(u string) string {
 
 // RealFile ports getRealFilePath. The PHP cache key ignores resize (first caller wins);
 // here only the attachment row is cached, so resize never leaks between calls.
-// Differences from PHP: encrypted (non-numeric, slash-less) attachment ids are looked up
-// by path instead of being decrypted; external storage is resolved from the build-time
+// Encrypted (non-numeric, slash-less) attachment ids are decrypted like PHP
+// (RenrenCrypt) and looked up by id. Difference from PHP: external storage is resolved from the build-time
 // configuration only (no SDK access).
 func (r *Resolver) RealFile(ctx context.Context, file string, resize, local bool, o Options) (string, error) {
 	if file == "" {
@@ -133,11 +133,17 @@ func (r *Resolver) RealFile(ctx context.Context, file string, resize, local bool
 
 // attachmentURL resolves a numeric attachment id or a path through #@__attachment.
 func (r *Resolver) attachmentURL(ctx context.Context, file string, resize bool, base string) (string, error) {
+	// PHP: $fid = is_numeric($file) || strstr($file,'/') ? $file : php_decrypt(base64_decode($file))
+	// (php_decrypt base64-decodes again, so the input is decoded twice).
+	fid := file
+	if !isNumeric(file) && !strings.Contains(file, "/") {
+		fid = renrenDecrypt(phpBase64Decode(file))
+	}
 	var q, arg, kind string
-	if isNumeric(file) {
+	if isNumeric(fid) {
 		kind = "id:"
 		q = "SELECT `id`, `path` FROM `" + r.prefix + "attachment` WHERE `id` = ?"
-		arg = file
+		arg = fid
 	} else {
 		kind = "path:"
 		arg = strings.TrimSpace(stripTagsRe.ReplaceAllString(strings.TrimSpace(file), ""))
