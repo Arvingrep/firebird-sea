@@ -169,7 +169,7 @@ func (s *Service) zhuantiList(req *ajax.Request) ajax.Response {
 	}
 
 	var total int64
-	cq := "SELECT COUNT(`id`) c FROM " + s.zlTable + " WHERE `state` = 1 AND `parentid` = 0" + where
+	cq := "SELECT COUNT(`id`) c FROM " + s.zhuantiTable + " WHERE `state` = 1 AND `parentid` = 0" + where
 	if err := s.db.QueryRowContext(ctx, cq, args...).Scan(&total); err != nil || total == 0 {
 		return empty
 	}
@@ -189,7 +189,7 @@ func (s *Service) zhuantiList(req *ajax.Request) ajax.Response {
 	}
 	offset := int64(page-1) * int64(pageSize)
 	lq := "SELECT `id`, `typename`, `description`, `pubdate`, `click`, `flag_r`, `flag_h`, `litpic`, `banner_large`, `banner_small` FROM " +
-		s.zlTable + " WHERE `state` = 1 AND `parentid` = 0" + where + order + fmt.Sprintf(" LIMIT %d, %d", offset, pageSize)
+		s.zhuantiTable + " WHERE `state` = 1 AND `parentid` = 0" + where + order + fmt.Sprintf(" LIMIT %d, %d", offset, pageSize)
 	rows, ok := s.zlQuery(ctx, lq, 10, args...)
 	list := []zlItem{}
 	if ok { // 查询失败（如 POST 负数 LIMIT）→ PHP results 为空 → list: []
@@ -223,7 +223,7 @@ func (s *Service) zhuantiList(req *ajax.Request) ajax.Response {
 			if getLower {
 				lower := []zlLower{}
 				item.Lower = &lower
-				lr, _ := s.zlQuery(ctx, "SELECT `id`, `typename` FROM "+s.zlTable+" WHERE `parentid` = ?", 2, zid)
+				lr, _ := s.zlQuery(ctx, "SELECT `id`, `typename` FROM "+s.zhuantiTable+" WHERE `parentid` = ?", 2, zid)
 				for _, x := range lr {
 					lower = append(lower, zlLower{ID: x[0], Typename: x[1]})
 				}
@@ -248,7 +248,7 @@ func (s *Service) zlNews(ctx context.Context, host string, zhuanti int, thumb bo
 	if thumb {
 		where += " AND a.`litpic` <> ''"
 	}
-	from := " FROM " + s.zlListTable + " l LEFT JOIN " + s.zlTable + " z ON z.`id` = l.`typeid` LEFT JOIN " + s.zlNewsTable + " a ON a.`id` = l.`aid` WHERE " + where
+	from := " FROM " + s.zlListTable + " l LEFT JOIN " + s.zhuantiTable + " z ON z.`id` = l.`typeid` LEFT JOIN " + s.zlNewsTable + " a ON a.`id` = l.`aid` WHERE " + where
 	var total int64
 	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(l.`id`) c"+from, args...).Scan(&total); err != nil || total == 0 {
 		return emptyNews, nil
@@ -288,7 +288,7 @@ func (s *Service) zlDescendants(ctx context.Context, root int) []int {
 		for i, id := range frontier {
 			args[i] = id
 		}
-		rows, ok := s.zlQuery(ctx, "SELECT `id` FROM "+s.zlTable+" WHERE `parentid` IN ("+
+		rows, ok := s.zlQuery(ctx, "SELECT `id` FROM "+s.zhuantiTable+" WHERE `parentid` IN ("+
 			strings.TrimSuffix(strings.Repeat("?,", len(frontier)), ",")+")", 1, args...)
 		if !ok {
 			break
