@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
 
 // stateNoData 对应 handlers.class.php:84-87：action 返回「空数组 / false」时
@@ -30,12 +31,16 @@ type Dep struct {
 	// TablePrefix 是火鸟表前缀，对应 PHP 的 $DB_PREFIX
 	// （entrypoint-web.sh: `${DB_PREFIX:-huoniao_}`，两处默认必须一致）。
 	TablePrefix string
+	// Files 用于 getFilePath（分类 litpic 转绝对地址）。nil 时 litpic 原样输出。
+	Files *fburl.Resolver
 }
 
 // Service 是 article 服务的实现。
 type Service struct {
 	db         *sql.DB
 	fieldTable string
+	typeTable  string
+	files      *fburl.Resolver
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -46,12 +51,15 @@ func New(dep Dep) (*Service, error) {
 	return &Service{
 		db:         dep.DB,
 		fieldTable: "`" + dep.TablePrefix + "article_selfmedia_field`",
+		typeTable:  "`" + dep.TablePrefix + "articletype`",
+		files:      dep.Files,
 	}, nil
 }
 
 // Register 注册本服务的全部 action。
 func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "selfmedia_field", s.selfmediaField)
+	router.Register("article", "type", s.typeList)
 }
 
 // fieldItem 是 selfmedia_field 返回的一行。字段顺序与 PHP 数组一致

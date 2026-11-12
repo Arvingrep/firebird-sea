@@ -171,3 +171,82 @@ func TestNewRejectsBadPrefix(t *testing.T) {
 		t.Fatal("非法前缀应当报错")
 	}
 }
+
+// typeCols 是 articletype 的列子集（canary 实表无 title/litpic 时也应工作）。
+var typeCols = []string{"id", "parentid", "typename", "weight", "pinyin", "py", "mold"}
+
+const typeSelect = "SELECT * FROM `huoniao_articletype` WHERE `parentid` = ? AND `mold` = ? ORDER BY `weight` LIMIT ?, ?"
+const typeCount = "SELECT COUNT(*) FROM `huoniao_articletype` WHERE `parentid` = ?"
+
+func TestTypeNormalDefaults(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(typeSelect).WithArgs(0, 0, 0, 1000).WillReturnRows(
+		sqlmock.NewRows(typeCols).AddRow(1, 0, "本地新闻", 50, "bendi", "bd", 0).AddRow(2, 0, "国际", 50, "gj", "gj", 0))
+	mock.ExpectQuery(typeCount).WithArgs(1).WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(2))
+	mock.ExpectQuery(typeCount).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(0))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=type")
+	want := `{"state":100,"info":[{"id":1,"parentid":0,"typename":"本地新闻","title":"本地新闻","pinyin":"bendi","py":"bd","lower":2},` +
+		`{"id":2,"parentid":0,"typename":"国际","title":"国际","pinyin":"gj","py":"gj"}]}`
+	if got != want {
+		t.Fatalf("响应体 = %s\nwant     %s", got, want)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTypePagingAndClamp(t *testing.T) {
+	cases := map[string][2]int{
+		"page=2&pageSize=2":     {2, 2},
+		"pageSize=abc":          {0, 10},
+		"pageSize=99999&page=0": {0, 50000},
+		"page=3":                {2000, 1000},
+	}
+	for q, a := range cases {
+		svc, mock := newService(t)
+		mock.ExpectQuery(typeSelect).WithArgs(0, 0, a[0], a[1]).WillReturnRows(sqlmock.NewRows(typeCols))
+		got := serve(t, svc, "/include/ajax.php?service=article&action=type&"+q)
+		if got != `{"state":102,"info":"No data!"}` {
+			t.Fatalf("%s: %s", q, got)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+}
+
+func TestTypeSonRecursive(t *testing.T) {
+	svc, mock := newService(t)
+	cols := append([]string{"title", "litpic"}, typeCols...)
+	mock.ExpectQuery(typeSelect).WithArgs(1, 3, 0, 1000).WillReturnRows(
+		sqlmock.NewRows(cols).AddRow("T", "", 5, 1, "父", 50, "f", "f", 3))
+	mock.ExpectQuery(typeSelect).WithArgs(5, 3, 0, 100000).WillReturnRows(
+		sqlmock.NewRows(cols).AddRow("", "", 6, 5, "子", 50, "z", "z", 3))
+	mock.ExpectQuery(typeSelect).WithArgs(6, 3, 0, 100000).WillReturnRows(sqlmock.NewRows(cols))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=type&type=1&mold=3&son=1")
+	want := `{"state":100,"info":[{"id":5,"parentid":1,"typename":"父","title":"T","pinyin":"f","py":"f","lower":[` +
+		`{"id":6,"parentid":5,"typename":"子","title":"子","pinyin":"z","py":"z","lower":""}]}]}`
+	if got != want {
+		t.Fatalf("响应体 = %s\nwant     %s", got, want)
+	}
+}
+
+func TestTypeErrorAndNoDB(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(typeSelect).WithArgs(0, 0, 0, 1000).WillReturnError(fmt.Errorf("boom"))
+	if got := serve(t, svc, "/include/ajax.php?service=article&action=type"); got != `{"state":101,"info":"分类获取失败！"}` {
+		t.Fatal(got)
+	}
+	nodb, _ := New(Dep{TablePrefix: "huoniao_"})
+	if got := serve(t, nodb, "/include/ajax.php?service=article&action=type"); got != `{"state":102,"info":"No data!"}` {
+		t.Fatal(got)
+	}
+}
+
+func TestPhpSon(t *testing.T) {
+	for raw, want := range map[string]bool{"": false, "0": false, "abc": false, "0.0": false, "1": true, "-1": true, "0.5": true, "2abc": true, " 3": true} {
+		if phpSon(raw) != want {
+			t.Errorf("phpSon(%q) != %v", raw, want)
+		}
+	}
+}
