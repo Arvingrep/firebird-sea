@@ -4,8 +4,11 @@ package article
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
@@ -41,6 +44,8 @@ type Service struct {
 	fieldTable string
 	typeTable  string
 	files      *fburl.Resolver
+	// zhuantiTable 是 #@__article_zhuanti（专题 / 子分类同表，靠 parentid 区分）。
+	zhuantiTable string
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -49,10 +54,11 @@ func New(dep Dep) (*Service, error) {
 		return nil, fmt.Errorf("article: TablePrefix %q 含非法字符", dep.TablePrefix)
 	}
 	return &Service{
-		db:         dep.DB,
-		fieldTable: "`" + dep.TablePrefix + "article_selfmedia_field`",
-		typeTable:  "`" + dep.TablePrefix + "articletype`",
-		files:      dep.Files,
+		db:           dep.DB,
+		fieldTable:   "`" + dep.TablePrefix + "article_selfmedia_field`",
+		typeTable:    "`" + dep.TablePrefix + "articletype`",
+		zhuantiTable: "`" + dep.TablePrefix + "article_zhuanti`",
+		files:        dep.Files,
 	}, nil
 }
 
@@ -60,6 +66,7 @@ func New(dep Dep) (*Service, error) {
 func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "selfmedia_field", s.selfmediaField)
 	router.Register("article", "type", s.typeList)
+	router.Register("article", "zhuantiDetail", s.zhuantiDetail)
 }
 
 // fieldItem 是 selfmedia_field 返回的一行。字段顺序与 PHP 数组一致
@@ -150,4 +157,210 @@ func phpInt(raw string) int {
 		return -value
 	}
 	return value
+}
+
+// stateParamError 是「参数错误」：PHP action 返回 state=200，外层
+// handlers::getHandle 统一改写成 101。
+const stateParamError = 101
+
+// orderedRow 是按列顺序输出的一行（PHP `SELECT *` 的关联数组顺序 = 表列顺序，
+// Go 的 map 会按键排序，所以必须自己保序）。值全部是 string：PDO FETCH_ASSOC
+// 默认把所有列都当字符串返回，PHP 没有做 (int) 转换。
+type orderedRow struct {
+	keys []string
+	vals []string
+}
+
+func (r orderedRow) MarshalJSON() ([]byte, error) {
+	return marshalPairs(r.keys, func(i int) any { return r.vals[i] })
+}
+
+func marshalPairs(keys []string, val func(i int) any) ([]byte, error) {
+	var b strings.Builder
+	b.WriteByte('{')
+	for i, k := range keys {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		kb, _ := json.Marshal(k)
+		vb, err := json.Marshal(val(i))
+		if err != nil {
+			return nil, err
+		}
+		b.Write(kb)
+		b.WriteByte(':')
+		b.Write(vb)
+	}
+	b.WriteByte('}')
+	return []byte(b.String()), nil
+}
+
+// queryRows 执行 SELECT * 并把每行保序读成字符串。
+func (s *Service) queryRows(query string, args ...any) ([]orderedRow, bool) {
+	rows, err := s.db.QueryContext(context.Background(), query, args...)
+	if err != nil {
+		return nil, false
+	}
+	defer func() { _ = rows.Close() }()
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, false
+	}
+	out := []orderedRow{}
+	for rows.Next() {
+		raw := make([]sql.NullString, len(cols))
+		dest := make([]any, len(cols))
+		for i := range raw {
+			dest[i] = &raw[i]
+		}
+		if err := rows.Scan(dest...); err != nil {
+			return nil, false
+		}
+		vals := make([]string, len(cols))
+		for i := range raw {
+			vals[i] = raw[i].String
+		}
+		out = append(out, orderedRow{keys: cols, vals: vals})
+	}
+	if rows.Err() != nil {
+		return nil, false
+	}
+	return out, true
+}
+
+// zhuantiInfo 是 zhuantiDetail 的 info。字段顺序与 PHP $detail 一致
+// （article.class.php:4361-4393）；litpic / banner_* / url 已由 fburl 解析。
+type zhuantiInfo struct {
+	main orderedRow
+	// lower 正常是 []orderedRow；子分类查询异常时是 PHP dsqlOper 的失败字符串。
+	lower any
+	// litpic、bannerLarge、bannerSmall、url 是 getFilePath / getUrlPath 的结果。
+	litpic, bannerLarge, bannerSmall, url string
+}
+
+func (z zhuantiInfo) MarshalJSON() ([]byte, error) {
+	get := func(k string) string {
+		for i, c := range z.main.keys {
+			if c == k {
+				return z.main.vals[i]
+			}
+		}
+		return ""
+	}
+	keys := []string{"id", "typename", "description", "pubdate", "litpic", "banner_large", "banner_small", "url", "lower"}
+	return marshalPairs(keys, func(i int) any {
+		switch keys[i] {
+		case "litpic":
+			return z.litpic
+		case "banner_large":
+			return z.bannerLarge
+		case "banner_small":
+			return z.bannerSmall
+		case "url":
+			return z.url
+		case "lower":
+			return z.lower
+		}
+		return get(keys[i])
+	})
+}
+
+// resolveZhuanti 填充 litpic / banner_* / url。s.files 为 nil（本地纯内存模式）时
+// 图片原样输出、url 为空。
+func (s *Service) resolveZhuanti(ctx context.Context, host string, id int, z *zhuantiInfo) error {
+	get := func(k string) string {
+		for i, c := range z.main.keys {
+			if c == k {
+				return z.main.vals[i]
+			}
+		}
+		return ""
+	}
+	z.litpic, z.bannerLarge, z.bannerSmall = get("litpic"), get("banner_large"), get("banner_small")
+	if s.files == nil {
+		return nil
+	}
+	o := fburl.Options{Host: host}
+	var err error
+	for _, p := range []*string{&z.litpic, &z.bannerLarge, &z.bannerSmall} {
+		if *p, err = s.files.File(ctx, *p, o); err != nil {
+			return err
+		}
+	}
+	z.url, err = s.files.URL(ctx, fburl.Params{
+		{Key: "service", Value: "article"},
+		{Key: "template", Value: "zt_detail"},
+		{Key: "id", Value: strconv.Itoa(id)},
+	}, o)
+	return err
+}
+
+// zhuantiDetail 迁移自 article.class.php:4361-4393：
+//
+//	$id = (int)$param['id']; empty → 参数错误
+//	SELECT * FROM article_zhuanti WHERE id=$id AND state=1 AND parentid=0
+//	无行 → 102；有行 → lower = SELECT * ... WHERE parentid=$id AND state=1 ORDER BY weight DESC（整行原样）
+//
+// dsqlFailure 是 dsqlOper 异常返回值（$cfg_siteDebug 关闭时）。
+const dsqlFailure = `{"state": 200, "info": "操作失败！"}`
+
+// normalizeIDParam 复刻 ajax.php 对 id 调用的 convertArrToStrWithComma($value)
+// （common.inc.php:1793，$int=true）。PHP 里 id=… 与 id[]=… 是同一个键 id，
+// 这里两种键都读（mergeParams 保证同名只留后来源的一种）。
+func normalizeIDParam(params url.Values) string {
+	if arr, ok := params["id[]"]; ok && len(arr) > 0 {
+		out := make([]string, len(arr))
+		for i, v := range arr {
+			out[i] = strconv.Itoa(phpInt(v))
+		}
+		return strings.Join(out, ",")
+	}
+	raw := params.Get("id")
+	if raw == "" || strings.Contains(raw, "Placeholder") {
+		return ""
+	}
+	if strings.Contains(raw, ",") {
+		parts := strings.Split(raw, ",")
+		for i, v := range parts {
+			parts[i] = strconv.Itoa(phpInt(v))
+		}
+		return strings.Join(parts, ",")
+	}
+	if n := phpInt(raw); n != 0 {
+		return strconv.Itoa(n)
+	}
+	return ""
+}
+
+func (s *Service) zhuantiDetail(req *ajax.Request) ajax.Response {
+	// ajax.php 先用 convertArrToStrWithComma 把 id 归一为逗号串，再 (int) 截断；
+	// phpInt("5,6") == 5。
+	id := phpInt(normalizeIDParam(req.Params))
+	if id == 0 {
+		return ajax.Response{State: stateParamError, Info: "参数错误"}
+	}
+	if s.db == nil {
+		return ajax.Response{State: stateNoData, Info: infoNoData}
+	}
+	mains, ok := s.queryRows("SELECT * FROM "+s.zhuantiTable+" WHERE `id` = ? AND `state` = 1 AND `parentid` = 0", id)
+	if !ok || len(mains) == 0 {
+		return ajax.Response{State: stateNoData, Info: infoNoData}
+	}
+	lower, ok := s.queryRows("SELECT * FROM "+s.zhuantiTable+" WHERE `parentid` = ? AND `state` = 1 ORDER BY `weight` DESC", id)
+	var lowerVal any = lower
+	if !ok {
+		// dsql.class.php:1156：dsqlOper 异常时返回的是 JSON 字符串（非 false；
+		// $cfg_siteDebug 关闭时为下面这个固定串），article.class.php:4384 原样放进 lower，
+		// 主详情保留，外层仍是 100。
+		lowerVal = dsqlFailure
+	}
+	info := zhuantiInfo{main: mains[0], lower: lowerVal}
+	host := ""
+	if req.HTTP != nil {
+		host = req.HTTP.Host
+	}
+	if err := s.resolveZhuanti(context.Background(), host, id, &info); err != nil {
+		return ajax.Response{State: stateNoData, Info: infoNoData}
+	}
+	return ajax.Response{State: ajax.StateOK, Info: info}
 }

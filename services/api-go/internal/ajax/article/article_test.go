@@ -2,6 +2,7 @@ package article
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -356,5 +357,161 @@ func TestTypeLitpicKey(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+var zhuantiCols = []string{"id", "parentid", "typename", "description", "weight", "pubdate", "state", "flag_r", "flag_h", "litpic", "click", "banner_large", "banner_small", "typeid"}
+
+const (
+	zhuantiMainSQL  = "SELECT * FROM `huoniao_article_zhuanti` WHERE `id` = ? AND `state` = 1 AND `parentid` = 0"
+	zhuantiLowerSQL = "SELECT * FROM `huoniao_article_zhuanti` WHERE `parentid` = ? AND `state` = 1 ORDER BY `weight` DESC"
+)
+
+func TestZhuantiDetailNormal(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(zhuantiMainSQL).WithArgs(1).WillReturnRows(
+		sqlmock.NewRows(zhuantiCols).AddRow("1", "0", "专题", "简介", "50", "1640000000", "1", "0", "0", "", "3", "", "", "0"))
+	mock.ExpectQuery(zhuantiLowerSQL).WithArgs(1).WillReturnRows(
+		sqlmock.NewRows(zhuantiCols).AddRow("2", "1", "子", "", "50", "1640000100", "1", "0", "1", "a.jpg", "0", "", "", "0"))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=zhuantiDetail&id=1,9")
+	want := `{"state":100,"info":{"id":"1","typename":"专题","description":"简介","pubdate":"1640000000","litpic":"","banner_large":"","banner_small":"","url":"","lower":[{"id":"2","parentid":"1","typename":"子","description":"","weight":"50","pubdate":"1640000100","state":"1","flag_r":"0","flag_h":"1","litpic":"a.jpg","click":"0","banner_large":"","banner_small":"","typeid":"0"}]}}`
+	if got != want {
+		t.Fatalf("响应体 = %s\nwant     %s", got, want)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestZhuantiDetailNoLower(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(zhuantiMainSQL).WithArgs(1).WillReturnRows(
+		sqlmock.NewRows(zhuantiCols).AddRow("1", "0", "专题", "简介", "50", "1640000000", "1", "0", "0", "", "3", "", "", "0"))
+	mock.ExpectQuery(zhuantiLowerSQL).WithArgs(1).WillReturnRows(sqlmock.NewRows(zhuantiCols))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=zhuantiDetail&id=1")
+	if !strings.HasSuffix(got, `"lower":[]}}`) {
+		t.Fatalf("lower 应为 []: %s", got)
+	}
+}
+
+func TestZhuantiDetailEmpty(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(zhuantiMainSQL).WithArgs(5).WillReturnRows(sqlmock.NewRows(zhuantiCols))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=zhuantiDetail&id=5")
+	if want := `{"state":102,"info":"No data!"}`; got != want {
+		t.Fatalf("got %s want %s", got, want)
+	}
+}
+
+func TestZhuantiDetailBadParam(t *testing.T) {
+	for _, q := range []string{"", "&id=0", "&id=", "&id=abc"} {
+		svc, mock := newService(t)
+		got := serve(t, svc, "/include/ajax.php?service=article&action=zhuantiDetail"+q)
+		if want := `{"state":101,"info":"参数错误"}`; got != want {
+			t.Fatalf("%q: got %s want %s", q, got, want)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// 接上 fburl：litpic / banner_* 走 getFilePath，url 走 getUrlPath(article/zt_detail)。
+func TestZhuantiDetailFburl(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	files, err := fburl.New(db, "huoniao_", fburl.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := New(Dep{DB: db, TablePrefix: "huoniao_", Files: files})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mock.ExpectQuery(zhuantiMainSQL).WithArgs(1).WillReturnRows(
+		sqlmock.NewRows(zhuantiCols).AddRow("1", "0", "专题", "简介", "50", "1640000000", "1", "0", "0", "/photo/a.jpg", "3", "", "", "0"))
+	mock.ExpectQuery(zhuantiLowerSQL).WithArgs(1).WillReturnRows(sqlmock.NewRows(zhuantiCols))
+	mock.ExpectQuery("SELECT count(`id`) total FROM `huoniao_site_module` WHERE `state` = 0 AND `type` = 0 AND `name` != ''").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(28))
+	mock.ExpectQuery("SELECT `domain` FROM `huoniao_domain` WHERE `module` = ? AND `part` = 'config'").WithArgs("article").
+		WillReturnRows(sqlmock.NewRows([]string{"domain"}).AddRow("news"))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=zhuantiDetail&id=1")
+	for _, want := range []string{
+		`"litpic":"https://storage.googleapis.com/fbird-sea-uploads//photo/a.jpg`,
+		`"banner_large":"","banner_small":"","url":"https://example.com/news/zt_detail-1.html"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("缺少 %s\n响应体 = %s", want, got)
+		}
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestZhuantiDetailIDNormalization(t *testing.T) {
+	post := func(svc *Service, target, body string) string {
+		router := ajax.NewRouter(func(string) {})
+		Register(router, svc)
+		req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec.Body.String()
+	}
+	const base = "/include/ajax.php?service=article&action=zhuantiDetail"
+	cases := []struct {
+		name, query, body string
+		wantHit           bool
+	}{
+		{"GET 数组", "&id[]=1&id[]=9", "", true},
+		{"GET 数组 URL 编码", "&id%5B%5D=1&id%5B%5D=9", "", true},
+		{"POST 数组", "", "id[]=1&id[]=9", true},
+		{"POST 数组覆盖 GET 标量", "&id=5", "id[]=1", true},
+		{"POST 标量覆盖 GET 数组", "&id[]=5", "id=1", true},
+		{"占位符为空参数", "&id=1Placeholder", "", false},
+		{"数组首项为 0", "&id[]=0&id[]=1", "", false},
+		{"逗号串首项为 0", "&id=0,1", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc, mock := newService(t)
+			if c.wantHit {
+				mock.ExpectQuery(zhuantiMainSQL).WithArgs(1).WillReturnRows(
+					sqlmock.NewRows(zhuantiCols).AddRow("1", "0", "专题", "", "50", "1", "1", "0", "0", "", "0", "", "", "0"))
+				mock.ExpectQuery(zhuantiLowerSQL).WithArgs(1).WillReturnRows(sqlmock.NewRows(zhuantiCols))
+			}
+			var got string
+			if c.body == "" {
+				got = serve(t, svc, base+c.query)
+			} else {
+				got = post(svc, base+c.query, c.body)
+			}
+			if c.wantHit && !strings.HasPrefix(got, `{"state":100,`) {
+				t.Fatalf("应命中专题 1: %s", got)
+			}
+			if !c.wantHit && got != `{"state":101,"info":"参数错误"}` {
+				t.Fatalf("应为参数错误: %s", got)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// 主查询成功 + 子分类查询异常：PHP 把 dsqlOper 的失败 JSON 字符串放进 lower，外层仍 100。
+func TestZhuantiDetailLowerQueryFails(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(zhuantiMainSQL).WithArgs(1).WillReturnRows(
+		sqlmock.NewRows(zhuantiCols).AddRow("1", "0", "专题", "简介", "50", "1640000000", "1", "0", "0", "", "3", "", "", "0"))
+	mock.ExpectQuery(zhuantiLowerSQL).WithArgs(1).WillReturnError(errors.New("boom"))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=zhuantiDetail&id=1")
+	want := `{"state":100,"info":{"id":"1","typename":"专题","description":"简介","pubdate":"1640000000","litpic":"","banner_large":"","banner_small":"","url":"","lower":"{\"state\": 200, \"info\": \"操作失败！\"}"}}`
+	if got != want {
+		t.Fatalf("响应体 = %s\nwant     %s", got, want)
 	}
 }
