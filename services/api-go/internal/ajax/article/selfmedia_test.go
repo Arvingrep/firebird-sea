@@ -2,6 +2,7 @@ package article
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -319,6 +320,71 @@ func TestSelfmediaMatchesCanaryPHP(t *testing.T) {
 	want := `{"state":100,"info":{"pageInfo":{"page":1,"pageSize":10,"totalPage":1,"totalCount":"1"},"list":[{"id":"1","typeid":"1","type":"个人/自媒体","name":"News Sync Bot","profile":"AI æ–°é—»åŒæ­¥æœºå™¨äºº","field":"0","photo":"","pubdate":"1791615275","total_article":6,"click":52,"total_fans":"2","url":"","isfollow":1}]}}`
 	if got != want {
 		t.Fatalf("响应体 = %s\nwant     %s", got, want)
+	}
+	smMet(t, mock)
+}
+
+// cityid 过滤（customDataShare=0）：COUNT 与列表 SQL 带相同的参数化条件。
+func TestSelfmediaCityFilter(t *testing.T) {
+	const cityWhere = " AND `cityid` = ?"
+	for _, c := range []struct {
+		name     string
+		share    bool
+		target   string
+		cookie   string
+		wantCity int
+		filter   bool
+	}{
+		{"共享开：不过滤（忽略 cityid 参数）", true, "&cityid=7", "", 0, false},
+		{"共享开：不读 cookie", true, "", `{"cityid":"9"}`, 0, false},
+		{"共享关：显式 cityid", false, "&cityid=7", "", 7, true},
+		{"共享关：显式 cityid 优先于 cookie", false, "&cityid=7", `{"cityid":"9"}`, 7, true},
+		{"共享关：cookie 兜底（字符串）", false, "", `{"cityid":"9","name":"x"}`, 9, true},
+		{"共享关：cookie 兜底（数字）", false, "", `{"cityid":12}`, 12, true},
+		{"共享关：cityid=0 回退 cookie", false, "&cityid=0", `{"cityid":"9"}`, 9, true},
+		{"共享关：无 cookie 无参数 → 不过滤", false, "", "", 0, false},
+		{"共享关：cookie 非 JSON → 不过滤", false, "", "garbage", 0, false},
+		{"共享关：cookie cityid 为 0 → 不过滤", false, "", `{"cityid":0}`, 0, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			svc, mock := newService(t)
+			svc.dataShare = c.share
+			countSQL, listSQL := smCountSQL, smListCols
+			var args []driver.Value
+			if c.filter {
+				countSQL += cityWhere
+				listSQL += cityWhere
+				args = []driver.Value{int64(c.wantCity)}
+			}
+			mock.ExpectQuery(countSQL).WithArgs(args...).WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("1"))
+			mock.ExpectQuery(listSQL + smOrderDef + " LIMIT 0, 10").WithArgs(args...).WillReturnRows(
+				sqlmock.NewRows(smListColNames).AddRow("1", "3", "1", "n", "p", "0", "", "1"))
+			smExpectStats(mock, 3, "6", "50", "2")
+			req := httptest.NewRequest(http.MethodGet, "/include/ajax.php?service=article&action=selfmedia"+c.target, nil)
+			if c.cookie != "" {
+				req.AddCookie(&http.Cookie{Name: "HN_siteCityInfo", Value: url.QueryEscape(c.cookie)})
+			}
+			router := ajax.NewRouter(func(string) {})
+			Register(router, svc)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if !strings.Contains(rec.Body.String(), `"state":100`) {
+				t.Fatalf("响应 = %s", rec.Body.String())
+			}
+			smMet(t, mock)
+		})
+	}
+}
+
+// cityid 过滤与其它筛选组合时参数顺序：cityid 在前，type / title 在后。
+func TestSelfmediaCityFilterWithOtherFilters(t *testing.T) {
+	svc, mock := newService(t)
+	svc.dataShare = false
+	where := " AND `cityid` = ? AND `type` = ?"
+	mock.ExpectQuery(smCountSQL+where).WithArgs(int64(7), int64(2)).WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("0"))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=selfmedia&cityid=7&type=2")
+	if !strings.Contains(got, `"state":101`) {
+		t.Fatalf("响应 = %s", got)
 	}
 	smMet(t, mock)
 }

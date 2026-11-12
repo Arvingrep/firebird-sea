@@ -550,15 +550,11 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		files, _ = fburl.New(db, prefix, fburl.DefaultConfig())
 	}
 	// Identity：按 cookie `<COOKIE_PREFIX>login_user` 识别会员；构造失败（如 DB 未配置）
-	// 降级为 nil（匿名 -1），不阻止启动。
+	// 降级为 nil（匿名 -1），不阻止启动。article.selfmedia 与 member.message 共用同一个识别器。
 	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
 		writeLog(os.Stderr, event, fields)
 	})
-	articleDepCfg := article.Dep{DB: db, TablePrefix: prefix, Files: files}
-	if identity != nil { // 保持无类型 nil：nil 时 selfmediaDetail 一律按匿名
-		articleDepCfg.Members = identity
-	}
-	articleSvc, err := article.New(articleDepCfg)
+	articleSvc, err := article.New(articleDep(db, prefix, files, identity, osGetenv))
 	if err != nil {
 		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))

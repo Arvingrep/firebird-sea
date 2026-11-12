@@ -38,6 +38,11 @@ type Dep struct {
 	Files *fburl.Resolver
 	// Members 识别当前会员（selfmedia / selfmediaDetail 的 isfollow / 本人段用）。nil 时一律按未登录（-1）。
 	Members MemberResolver
+	// CustomDataShare 对应 PHP config/article.inc.php 的 $customDataShare。nil 按 canary 现状取 1（共享，不按城市过滤）；
+	// 指向 false 时 selfmedia 走 getCityId 并加 cityid 条件。
+	CustomDataShare *bool
+	// CookiePrefix 是 PHP $cfg_cookiePre（COOKIE_PREFIX，默认 HN_），用于读 siteCityInfo cookie。空串取 HN_。
+	CookiePrefix string
 }
 
 // Service 是 article 服务的实现。
@@ -55,6 +60,8 @@ type Service struct {
 	// sm* 是 selfmedia 用到的表名（已带前缀）。
 	smTable, smNewsTable, smFollowTable string
 	members                             MemberResolver
+	dataShare                           bool
+	cookiePrefix                        string
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -62,14 +69,18 @@ func New(dep Dep) (*Service, error) {
 	if !prefixPattern.MatchString(dep.TablePrefix) {
 		return nil, fmt.Errorf("article: TablePrefix %q 含非法字符", dep.TablePrefix)
 	}
+	cookiePrefix := dep.CookiePrefix
+	if cookiePrefix == "" {
+		cookiePrefix = "HN_"
+	}
 	return &Service{
-		db:           dep.DB,
-		fieldTable:   "`" + dep.TablePrefix + "article_selfmedia_field`",
-		typeTable:    "`" + dep.TablePrefix + "articletype`",
-		zhuantiTable: "`" + dep.TablePrefix + "article_zhuanti`",
-		zlListTable:  "`" + dep.TablePrefix + "article_zhuantilist`",
-		zlNewsTable:  "`" + dep.TablePrefix + "articlelist_all`",
-		files:        dep.Files,
+		db:             dep.DB,
+		fieldTable:     "`" + dep.TablePrefix + "article_selfmedia_field`",
+		typeTable:      "`" + dep.TablePrefix + "articletype`",
+		zhuantiTable:   "`" + dep.TablePrefix + "article_zhuanti`",
+		zlListTable:    "`" + dep.TablePrefix + "article_zhuantilist`",
+		zlNewsTable:    "`" + dep.TablePrefix + "articlelist_all`",
+		files:          dep.Files,
 		sdTable:        "`" + dep.TablePrefix + "article_selfmedia`",
 		sdManagerTable: "`" + dep.TablePrefix + "article_selfmedia_manager`",
 		sdNewsTable:    "`" + dep.TablePrefix + "articlelist_all`",
@@ -78,6 +89,8 @@ func New(dep Dep) (*Service, error) {
 		smNewsTable:    "`" + dep.TablePrefix + "articlelist_all`",
 		smFollowTable:  "`" + dep.TablePrefix + "member_follow`",
 		members:        dep.Members,
+		dataShare:      dep.CustomDataShare == nil || *dep.CustomDataShare,
+		cookiePrefix:   cookiePrefix,
 	}, nil
 }
 

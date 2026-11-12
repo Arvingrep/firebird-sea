@@ -6,8 +6,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/article"
 	ajaxmember "github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/member"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fbidentity"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
 
 // defaultRenrenCryptKey 是 PHP 侧硬编码的 RenrenCrypt 密钥，
@@ -54,3 +56,20 @@ func buildIdentity(db *sql.DB, getenv func(string) string, logf func(event strin
 }
 
 func osGetenv(k string) string { return os.Getenv(k) }
+
+// articleDep 组装 article 服务依赖。identity 为 nil 接口时 Members 必须保持无类型 nil
+// （selfmedia 据此按匿名处理）；
+//
+// customDataShare 对应 PHP config/article.inc.php 的 $customDataShare，由
+// FB_ARTICLE_CUSTOM_DATA_SHARE 控制：未设置 / 非 "0" 取 1（canary 现状，不按城市过滤）；"0" 关闭共享。
+func articleDep(db *sql.DB, prefix string, files *fburl.Resolver, identity ajaxmember.Identity, getenv func(string) string) article.Dep {
+	dep := article.Dep{DB: db, TablePrefix: prefix, Files: files, CookiePrefix: strings.TrimSpace(getenv("COOKIE_PREFIX"))}
+	if identity != nil {
+		dep.Members = identity // Identity 与 article.MemberResolver 方法集相同
+	}
+	if strings.TrimSpace(getenv("FB_ARTICLE_CUSTOM_DATA_SHARE")) == "0" {
+		off := false
+		dep.CustomDataShare = &off
+	}
+	return dep
+}

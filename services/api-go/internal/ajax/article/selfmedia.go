@@ -3,9 +3,10 @@ package article
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"math"
-	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,12 +26,6 @@ const smMaxPage = 50000
 
 // smAnonymous 与 userLogin::getMemberID() 未登录时的 -1 一致。
 const smAnonymous int64 = -1
-
-// MemberResolver 识别当前请求的火鸟会员，语义同 userLogin::getMemberID()：
-// 未登录返回 -1。实现见 internal/fbidentity（*fbidentity.Resolver 满足本接口）。
-type MemberResolver interface {
-	MemberID(ctx context.Context, req *http.Request) (int64, error)
-}
 
 // selfmediaTypes 是 selfmedia_type(true) 的 id→名称映射（article.class.php:3143-3160）。
 // PHP 按数组键取值，"1".."5" 之外（含 NULL、"01"）取不到 → null。
@@ -162,6 +157,47 @@ func (s *Service) resolveLogin(req *ajax.Request) smLogin {
 	return smLogin{kind: smLoginNum, uid: float64(uid)}
 }
 
+// smCityID 复刻 getCityId($param['cityid'])（common.func.php:11949）：
+// cityid 参数非空（PHP empty：""/"0" 为空）直接 (int) 取用；否则读 siteCityInfo cookie
+// （先 siteCityInfo_iOS_APP，再 siteCityInfo），JSON 对象里的 cityid 转 int。
+// 没有 cookie 时 PHP 会回环 curl 取分站，这里不复刻，按 0（不过滤）处理。
+func (s *Service) smCityID(req *ajax.Request) int {
+	if c := smParam(req, "cityid"); smPHPTruthy(c) {
+		return phpInt(c)
+	}
+	if req.HTTP == nil {
+		return 0
+	}
+	var raw string
+	for _, name := range []string{"siteCityInfo_iOS_APP", "siteCityInfo"} {
+		if c, err := req.HTTP.Cookie(s.cookiePrefix + name); err == nil && c.Value != "" {
+			raw = c.Value
+			break
+		}
+	}
+	if raw == "" {
+		return 0
+	}
+	if u, err := url.QueryUnescape(raw); err == nil {
+		raw = u
+	}
+	var info map[string]any
+	if json.Unmarshal([]byte(raw), &info) != nil {
+		return 0
+	}
+	switch v := info["cityid"].(type) {
+	case float64:
+		return int(v)
+	case string:
+		return phpInt(v)
+	case bool:
+		if v {
+			return 1
+		}
+	}
+	return 0
+}
+
 // selfmedia 迁移自 article.class.php:3722-3850，规则见 issue #244「业务规则」评论。
 //
 //	COUNT(state=1 + 筛选) == 0 → 101 暂无数据
@@ -179,10 +215,15 @@ func (s *Service) selfmedia(req *ajax.Request) ajax.Response {
 	page := smPageParam(req, "page", 1)
 	pageSize := smPageParam(req, "pageSize", 10)
 
-	// cityid：canary customDataShare=1，PHP 恒不拼 cityid 条件（实测确认）。
-	// 若将来关闭数据共享，这里需要接上 getCityId（含 siteCityInfo cookie 兜底）。
 	where := " WHERE `state` = 1"
 	var args []any
+	// customDataShare=1（canary 现状）不拼 cityid；=0 时按 getCityId 的结果过滤，结果为 0 则不加条件。
+	if !s.dataShare {
+		if cityid := s.smCityID(req); cityid != 0 {
+			where += " AND `cityid` = ?"
+			args = append(args, cityid)
+		}
+	}
 	if t := phpInt(smParam(req, "type")); t != 0 {
 		where += " AND `type` = ?"
 		args = append(args, t)
