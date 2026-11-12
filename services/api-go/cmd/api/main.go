@@ -33,6 +33,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/addrshare"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/article"
+	ajaxmember "github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/member"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/siteconfig"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/bridge"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/checkout"
@@ -547,6 +548,13 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
 	}
 	article.Register(router, articleSvc)
+	// Identity 暂未接入（fbidentity 需要 RenrenCrypt 密钥，尚未装配进 api-go）：
+	// 不传 userid 时一律按匿名 -1 处理，见 #245 PR 说明。
+	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_")})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
+	}
+	ajaxmember.Register(router, memberSvc)
 	return router
 }
 

@@ -1,0 +1,28 @@
+{
+  "$schema": "./schema.json",
+  "service": "member",
+  "action": "message",
+  "cases": [
+    {"name": "正常：userid=2 不传 state（totalPage=ceil(unread/ps)）", "method": "GET", "params": {"userid": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：userid=9 全已读不传 state（totalPage=0）", "method": "GET", "params": {"userid": "9", "pageSize": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：userid=9 state=1 取 read", "method": "GET", "params": {"userid": "9", "state": "1", "pageSize": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：userid=2 state=0 归一为空串（totalPage=ceil(totalCount/ps)）", "method": "GET", "params": {"userid": "2", "state": "0", "pageSize": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：userid=9 state= 空串", "method": "GET", "params": {"userid": "9", "state": "", "pageSize": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：state=1,2 逗号串（MySQL 转数字=1）", "method": "GET", "params": {"userid": "9", "state": "1,2", "pageSize": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：state=0,1 逗号串（取 unread）", "method": "GET", "params": {"userid": "2", "state": "0,1", "pageSize": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：越界页返回空 list", "method": "GET", "params": {"userid": "2", "pageSize": "2", "page": "9"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：page/pageSize <=0 归一", "method": "GET", "params": {"userid": "2", "page": "-3", "pageSize": "0"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：type=tongji 统计（无 list）", "method": "GET", "params": {"userid": "2", "type": "tongji"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "正常：type=tongji&im=1", "method": "GET", "params": {"userid": "2", "type": "tongji", "im": "1"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "正常：无参数（type 缺省走 tongji，无 list）", "method": "GET", "params": {}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "正常：type=Tongji 大小写敏感走列表", "method": "GET", "params": {"userid": "2", "type": "Tongji"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "正常：POST 表单", "method": "POST", "params": {"userid": "2", "pageSize": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "空结果：userid=999", "method": "GET", "params": {"userid": "999"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "空结果：state=2 过滤后无数据", "method": "GET", "params": {"userid": "2", "state": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "空结果：userid=1e3（is_numeric 通过，按 1000 查）", "method": "GET", "params": {"userid": "1e3"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "参数错误：userid=abc（登录超时）", "method": "GET", "params": {"userid": "abc"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "参数错误：userid[]=2 数组", "method": "GET", "params": {"userid[]": "2"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "未登录：不传 userid（uid=-1 查空，101 暂无数据）", "method": "GET", "params": {"page": "1"}, "requiresLogin": false, "ignoreFields": ["info.list[].url"]},
+    {"name": "未登录：不传 userid + type=tongji（全 0 统计）", "method": "GET", "params": {"type": "tongji"}, "requiresLogin": false, "ignoreFields": []}
+  ]
+}
