@@ -548,9 +548,12 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
 	}
 	article.Register(router, articleSvc)
-	// Identity 暂未接入（fbidentity 需要 RenrenCrypt 密钥，尚未装配进 api-go）：
-	// 不传 userid 时一律按匿名 -1 处理，见 #245 PR 说明。
-	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_")})
+	// Identity：按 cookie `<COOKIE_PREFIX>login_user` 识别会员；构造失败（如 DB 未配置）
+	// 降级为 nil（匿名 -1），不阻止启动。
+	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
+		writeLog(os.Stderr, event, fields)
+	})
+	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
 	}
