@@ -36,6 +36,8 @@ type Dep struct {
 	TablePrefix string
 	// Files 用于 getFilePath / getUrlPath（图片转绝对地址、专题链接）。nil 时图片原样输出、url 为空串。
 	Files *fburl.Resolver
+	// Members 识别当前会员（selfmediaDetail 的 isfollow / 本人段用）。nil 时一律按未登录（-1）。
+	Members MemberResolver
 }
 
 // Service 是 article 服务的实现。
@@ -48,6 +50,9 @@ type Service struct {
 	zhuantiTable string
 	// zlListTable / zlNewsTable 是 zhuantiList 用到的关联表（已带前缀）。
 	zlListTable, zlNewsTable string
+	// sd* 是 selfmediaDetail 用到的表名（已带前缀）。
+	sdTable, sdManagerTable, sdNewsTable, sdFollowTable string
+	members                                             MemberResolver
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -63,6 +68,12 @@ func New(dep Dep) (*Service, error) {
 		zlListTable:  "`" + dep.TablePrefix + "article_zhuantilist`",
 		zlNewsTable:  "`" + dep.TablePrefix + "articlelist_all`",
 		files:        dep.Files,
+
+		sdTable:        "`" + dep.TablePrefix + "article_selfmedia`",
+		sdManagerTable: "`" + dep.TablePrefix + "article_selfmedia_manager`",
+		sdNewsTable:    "`" + dep.TablePrefix + "articlelist_all`",
+		sdFollowTable:  "`" + dep.TablePrefix + "member_follow`",
+		members:        dep.Members,
 	}, nil
 }
 
@@ -72,6 +83,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "type", s.typeList)
 	router.Register("article", "zhuantiDetail", s.zhuantiDetail)
 	router.Register("article", "zhuantiList", s.zhuantiList)
+	router.Register("article", "selfmediaDetail", s.selfmediaDetail)
 }
 
 // fieldItem 是 selfmedia_field 返回的一行。字段顺序与 PHP 数组一致
