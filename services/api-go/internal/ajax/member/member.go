@@ -75,6 +75,12 @@ type Dep struct {
 	CourierID func(ctx context.Context, req *http.Request) (int64, error)
 	// IPHomeMode 对应 $cfg_iphome（0 不显示 1 省 2 市 3 省+市）；nil 取仓库配置的 3。
 	IPHomeMode *int
+	// CookiePrefix 对应 $cfg_cookiePre（login cookie 前缀）；nil 取 HN_。
+	CookiePrefix string
+	// PointState 对应 $cfg_pointState；nil 取仓库配置（开启）。
+	PointState *bool
+	// CryptKey 是 RenrenCrypt 密钥（userid_encode 用）；nil 取 PHP 常量。
+	CryptKey []byte
 	// Clock 仅测试用；nil 取 time.Now。
 	Clock func() time.Time
 }
@@ -86,7 +92,9 @@ type Service struct {
 	urlPath  func(caller int64, id string) string
 
 	logTable, letterTable, upTable, commentTable, memberTable string
-	paotuiTable, tiebaTable, followTable                      string
+	paotuiTable, tiebaTable, followTable, friendTable         string
+	levelTable, businessTable, staffTable, securityTable      string
+	datingTable, areaTable, bonusTable, paymentTable          string
 
 	files            *fburl.Resolver
 	userDetail       UserDetailFunc
@@ -94,6 +102,9 @@ type Service struct {
 	decodeAttachment func(string) string
 	courierID        func(ctx context.Context, req *http.Request) (int64, error)
 	ipHomeMode       int
+	cookiePrefix     string
+	pointState       bool
+	cryptKey         []byte
 	clock            func() time.Time
 }
 
@@ -107,20 +118,44 @@ func New(dep Dep) (*Service, error) {
 	if dep.IPHomeMode != nil {
 		mode = *dep.IPHomeMode
 	}
-	return &Service{
+	cookiePrefix := dep.CookiePrefix
+	if cookiePrefix == "" {
+		cookiePrefix = "HN_"
+	}
+	pointState := true
+	if dep.PointState != nil {
+		pointState = *dep.PointState
+	}
+	cryptKey := dep.CryptKey
+	if len(cryptKey) == 0 {
+		cryptKey = []byte(phpEncryptKey)
+	}
+	svc := &Service{
 		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
-		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
+		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode,
+		cookiePrefix: cookiePrefix, pointState: pointState, cryptKey: cryptKey, clock: dep.Clock,
 		paotuiTable: t("paotui_order"), tiebaTable: t("tieba_list"), followTable: t("member_follow"),
+		friendTable: t("member_friend"),
+		levelTable:  t("member_level"), businessTable: t("business_list"), staffTable: t("staff"),
+		securityTable: t("member_security"), datingTable: t("dating_member"), areaTable: t("site_area"),
+		bonusTable: t("member_bonus"), paymentTable: t("site_payment"),
 		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath,
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
-	}, nil
+	}
+	// member.detail 已迁移：默认把自身投影接到 getComment 的 userDetail 钩子上，
+	// 消除此前 nil → 102 的回退（Dep.UserDetail 仍可覆盖，测试用）。
+	if svc.userDetail == nil {
+		svc.userDetail = svc.userDetailHook
+	}
+	return svc, nil
 }
 
 // Register 注册本服务的全部 action。
 func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
 	router.Register("member", "getComment", s.getComment)
+	router.Register("member", "detail", s.detail)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。

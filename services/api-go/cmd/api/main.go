@@ -574,7 +574,13 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
 	}
 	siteconfig.Register(router, siteSvc)
-	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity, Files: files})
+	memberSvc, err := ajaxmember.New(ajaxmember.Dep{
+		DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity, Files: files,
+		// $cfg_cookiePre / RenrenCrypt 密钥：与 identity 同源，供 member.detail 输出
+		// cookiePre 与 userid_encode。
+		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
+		CryptKey:     resolveCryptKey(osGetenv),
+	})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
 	}
