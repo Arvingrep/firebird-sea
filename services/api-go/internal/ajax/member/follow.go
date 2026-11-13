@@ -50,8 +50,14 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 
 	// $userid = $this->param['from'] ? $this->param['from'] : $userLogin->getMemberID();
 	// from 存在时完全不校验 cookie（现有鉴权缺口，照搬；见 #255 规则评论「待 Arvin 确认 1」）。
+	// 已知偏差：from 传成数组（from[]=x）时 PHP 的 $userid 是数组（<= 0 为假、拼进 SQL 变 "Array"），
+	// 这里按「没传 from」处理，改走 cookie 身份。
 	from := p.scalar("from")
 	userid := from
+	// $userid 的类型随来源变化：cookie 路径是 getMemberID() 的 int，from 路径是字符串。
+	// PHP 7 里 int 与字符串比较会把字符串按 (int) 前导数字转换（7 == "7,8" 为真），
+	// 两个字符串比较才走「都数字串则比数值，否则比字符串」，所以这里要记住来源。
+	useridIsInt := false
 	if from == "" || from == "0" {
 		n, err := s.identityID(ctx, httpReq)
 		if err != nil {
@@ -61,6 +67,7 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 			return fail(infoLoginTimeout)
 		}
 		userid = strconv.FormatInt(n, 10)
+		useridIsInt = true
 	} else if leadingNumber(from) <= 0 {
 		// `$userid <= 0` 是 PHP 松散比较：'abc' 当 0 → 登录超时；'123abc' 当 123 → 继续。
 		return fail(infoLoginTimeout)
@@ -68,7 +75,7 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 
 	// `empty($for)` 为真（"" 或 "0"）时才判「关注自己」。
 	if forType == "" || forType == "0" {
-		if phpLooseEqual(userid, id) {
+		if equalMember(useridIsInt, userid, id) {
 			return fail(infoSelfFollow)
 		}
 	}
@@ -88,7 +95,7 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 			return noData()
 		default:
 			// PHP 命中就无条件 `$id = $auserid`（userid 为 NULL 时拼进 SQL 等同空串）。
-			if phpLooseEqual(selfMediaUserID.String, userid) {
+			if equalMember(useridIsInt, userid, selfMediaUserID.String) {
 				return fail(infoSelfMedia)
 			}
 			id = selfMediaUserID.String
@@ -156,10 +163,15 @@ func leadingNumber(v string) float64 {
 	return f
 }
 
-// phpLooseEqual 复刻 PHP 7 的 `==`：两侧都是数字串时按数值比较（'007' == '7'），否则按字符串比较。
-func phpLooseEqual(a, b string) bool {
-	if isNumeric(a) && isNumeric(b) {
-		return leadingNumber(a) == leadingNumber(b)
+// equalMember 复刻 PHP 7.4（deploy/docker/Dockerfile.base）里 `$userid == $other` 的语义。
+//   - $userid 是 int（cookie 路径）：int 与字符串比较一律把字符串转成数值，7 == "7,8" 为真；
+//   - $userid 是字符串（from 路径）：两侧都是数字串按数值比（"007" == "7"），否则按字符串比。
+func equalMember(useridIsInt bool, userid, other string) bool {
+	if useridIsInt {
+		return leadingNumber(userid) == leadingNumber(other)
 	}
-	return a == b
+	if isNumeric(userid) && isNumeric(other) {
+		return leadingNumber(userid) == leadingNumber(other)
+	}
+	return userid == other
 }

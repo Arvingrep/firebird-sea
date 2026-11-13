@@ -22,12 +22,16 @@ import (
 //     键顺序按字典序，password 同样脱敏成「密码不记录」。
 func (s *Service) memberLog(ctx context.Context, req *http.Request, uid, module, temp string, aid int64,
 	action, note, link, sqlText string) {
-	if s.db == nil || uid == "" || uid == "0" {
+	if s.db == nil {
 		return
 	}
 
 	now := s.now().Unix()
+	// PHP 先做过期清理，再 `if(!$uid) return`。
 	s.cleanMemberLog(ctx, now)
+	if uid == "" || uid == "0" {
+		return
+	}
 
 	ip, ipaddr, useragent, pageURL, param, referer := "", "", "", "", "", ""
 	if req != nil {

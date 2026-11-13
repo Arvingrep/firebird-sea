@@ -45,16 +45,24 @@ func md5Hex(v string) string {
 }
 
 func newFollowService(t *testing.T, identity Identity) (*Service, sqlmock.Sqlmock) {
+	return newFollowServiceWith(t, identity, nil)
+}
+
+func newFollowServiceWith(t *testing.T, identity Identity, mut func(*Dep)) (*Service, sqlmock.Sqlmock) {
 	t.Helper()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	svc, err := New(Dep{
+	dep := Dep{
 		DB: db, TablePrefix: "huoniao_", Identity: identity,
 		Clock: func() time.Time { return fixedNow },
-	})
+	}
+	if mut != nil {
+		mut(&dep)
+	}
+	svc, err := New(dep)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -298,4 +306,62 @@ func TestFollowMemberNoDB(t *testing.T) {
 	}
 	got = do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", "")
 	eq(t, got, `{"state":102,"info":"No data!"}`)
+}
+
+// cookie 路径下 $userid 是 int：PHP 7 里 7 == "7,8" 为真（字符串按 (int) 转成 7），仍判「关注自己」。
+func TestFollowMemberIntCompareAgainstCommaID(t *testing.T) {
+	svc, m := newFollowService(t, fakeIdentity(7))
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=7,8", "")
+	eq(t, got, `{"state":101,"info":"不能关注自己"}`)
+	met(t, m)
+
+	// 同一个 id 走 from（字符串）路径时 7 是字符串，"7" 与 "7,8" 都不是数字串 → 按字符串比 → 不相等，继续关注。
+	svc, m = newFollowService(t, fakeIdentity(9))
+	m.ExpectQuery(qFollowCount).WithArgs("7", "7,8").WillReturnRows(count(0))
+	m.ExpectExec(qFollowInsert).WithArgs("7,8", "7", followNow, "").WillReturnResult(sqlmock.NewResult(1, 1))
+	expectLog(m, "7", 0, "insert", "添加会员关注(7,8=>7=>)",
+		"action=followMember&from=7&id=7,8&service=member",
+		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('7,8', '7', '1700000000', '')")
+	got = do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=7,8&from=7", "")
+	eq(t, got, okBody)
+	met(t, m)
+}
+
+// member_log 过期清理：配了 MemberLogSaveDays 就删 pubdate 早于 now-days*86400 的行，6 小时内只删一次。
+// 清理发生在 memberLog 内部，也就是关注/取关写完之后。
+func TestFollowMemberLogCleanupThrottled(t *testing.T) {
+	days := 30
+	svc, m := newFollowServiceWith(t, fakeIdentity(7), func(d *Dep) { d.MemberLogSaveDays = &days })
+	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(0))
+	m.ExpectExec(qFollowInsert).WithArgs("9", "7", followNow, "").WillReturnResult(sqlmock.NewResult(1, 1))
+	m.ExpectExec("DELETE FROM `huoniao_member_log` WHERE `pubdate` < ?").
+		WithArgs(int64(1700000000 - 30*86400)).
+		WillReturnResult(sqlmock.NewResult(0, 3))
+	expectLog(m, "7", 0, "insert", "添加会员关注(9=>7=>)",
+		"action=followMember&id=9&service=member",
+		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('9', '7', '1700000000', '')")
+	eq(t, do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", ""), okBody)
+	met(t, m)
+
+	// 同一秒的第二次请求：节流命中，不再 DELETE（未登记该期望，出现即报错）。
+	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(1))
+	m.ExpectExec(qFollowDelete).WithArgs("7", "9").WillReturnResult(sqlmock.NewResult(0, 1))
+	expectLog(m, "7", 1, "delete", "删除会员关注(9=>7)", "", "")
+	eq(t, do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", ""), okBody)
+	met(t, m)
+}
+
+// 去重查询失败时 PHP 仍会写日志（if($ret && ...) 不成立），Go 同样继续 INSERT。
+func TestFollowMemberLogCountErrorStillWrites(t *testing.T) {
+	svc, m := newFollowService(t, fakeIdentity(7))
+	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(0))
+	m.ExpectExec(qFollowInsert).WithArgs("9", "7", followNow, "").WillReturnResult(sqlmock.NewResult(1, 1))
+	m.ExpectQuery(qLogCount).WillReturnError(errors.New("log table missing"))
+	m.ExpectExec(qLogInsert).
+		WithArgs("7", "member", "follow", int64(0), "insert", argEq("添加会员关注(9=>7=>)"), "", testLogIP, "", "",
+			argEq("INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('9', '7', '1700000000', '')"),
+			followNow, md5Hex("添加会员关注(9=>7=>)"), testLogURL, argEq("action=followMember&id=9&service=member"), "").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	eq(t, do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", ""), okBody)
+	met(t, m)
 }
