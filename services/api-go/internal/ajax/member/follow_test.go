@@ -218,13 +218,22 @@ func TestFollowMemberForIsNotWhitelisted(t *testing.T) {
 	met(t, m)
 }
 
-// 本地无数据库（DB=nil）时按「查不到数据」降级，不编造成功。
+// 本地无数据库（DB=nil）时：参数/登录校验照旧（不依赖库），真正要读写 member_follow 才降级 102。
 func TestFollowMemberNoDB(t *testing.T) {
 	svc, err := New(Dep{TablePrefix: "huoniao_"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", "")
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember", "")
+	eq(t, got, `{"state":101,"info":"参数错误"}`)
+	got = do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", "")
+	eq(t, got, `{"state":101,"info":"登录超时，请重新登录！"}`)
+
+	svc, err = New(Dep{TablePrefix: "huoniao_", Identity: fakeIdentity(7)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", "")
 	eq(t, got, `{"state":102,"info":"No data!"}`)
 }
 

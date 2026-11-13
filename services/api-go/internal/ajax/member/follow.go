@@ -27,9 +27,6 @@ const (
 // 新版个人中心不再判断关注来源），所以 for=media 与会员关注共用同一行。
 // 接口不回传最终的关注状态，成功恒为 `state=100, info="ok"`，四种错误由外层统一改写成 101。
 func (s *Service) followMember(req *ajax.Request) ajax.Response {
-	if s.db == nil {
-		return noData()
-	}
 	ctx := context.Background()
 	var httpReq *http.Request
 	if req.HTTP != nil {
@@ -74,6 +71,9 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 	if forType == followMedia {
 		// 自媒体 id 与会员 id 命名空间混用：命中就用自媒体的 userid 当关注目标，
 		// 查不到则**不报错**、$id 保持原值继续当会员 id 用（13887-13892）。
+		if s.db == nil {
+			return noData()
+		}
 		var selfMediaUserID sql.NullString
 		err := s.db.QueryRowContext(ctx,
 			"SELECT `userid` FROM "+s.selfMediaTable+" WHERE `id` = ?", id).Scan(&selfMediaUserID)
@@ -89,6 +89,12 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 				id = selfMediaUserID.String
 			}
 		}
+	}
+
+	// 本地无数据库（DB=nil）时按「查不到数据」降级：参数校验与登录校验已经在上面跑完，
+	// 走到这里说明确实需要读写 member_follow。
+	if s.db == nil {
+		return noData()
 	}
 
 	count, err := s.count(ctx,
