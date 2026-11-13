@@ -11,6 +11,7 @@ import (
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
 
 const touchStaticVersion = "1794275238"
@@ -454,7 +455,7 @@ func TestTouchVersionLooseEqual(t *testing.T) {
 		})
 	}
 	// 非数字串（"2.0.0"、"abc"）按字符串比 → 不等于 "2.0" → 旧版。
-	for _, v := range []string{"2.0.0", "abc"} {
+	for _, v := range []string{"2.0.0", "abc", "0x1p1", "2_0e-1"} {
 		t.Run("old-"+v, func(t *testing.T) {
 			svc, mock := touchSvc(t)
 			expectAppConfig(mock, "")
@@ -477,4 +478,48 @@ func TestTouchAppUAStillReturnsMenu(t *testing.T) {
 	wantState(t, r)
 	wantItems(t, r, "资讯", "媒体号", "发布", "消息", "我的")
 	met(t, mock)
+}
+
+// touchSvcWithFiles 注入最小 fburl.Resolver（#@__domain / site_module 用通用 mock 应答），
+// 让非 member 链接真正走到 fburl.URL，用于验证 App UA 的 ErrUnsupported 兜底。
+func touchSvcWithFiles(t *testing.T) (*Service, sqlmock.Sqlmock) {
+	t.Helper()
+	svc, mock := touchSvc(t)
+	cfg := fburl.Config{Secure: true, Rewrite: true, Modules: map[string]fburl.Module{
+		"article": {SubDomain: 2}, "job": {SubDomain: 2}, "tieba": {SubDomain: 2},
+		"siteConfig": {SubDomain: 2}, "circle": {SubDomain: 2}, "business": {SubDomain: 2},
+		"shop": {SubDomain: 2}, "member": {SubDomain: 2},
+	}}
+	res, err := fburl.New(svc.db, "huoniao_", cfg)
+	if err != nil {
+		t.Fatalf("fburl.New: %v", err)
+	}
+	svc.files = res
+	mock.ExpectQuery("SELECT count(`id`) total FROM `huoniao_site_module`").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(1))
+	mock.ExpectQuery("SELECT `domain` FROM `huoniao_domain` WHERE `module` = ? AND `part` = 'config'").
+		WillReturnRows(sqlmock.NewRows([]string{"domain"}).AddRow(""))
+	return svc, mock
+}
+
+// App UA 下 fburl 对 article 返回 ErrUnsupported：必须退回 Web 链接，而不是空串。
+func TestTouchAppUAFallsBackToWebURL(t *testing.T) {
+	svc, mock := touchSvcWithFiles(t)
+	expectAppConfig(mock, "")
+	expectMemberDomain(mock)
+
+	r := touch(t, svc, "&version=2.0&module=article", withUA(appUA))
+	wantState(t, r)
+
+	var list []map[string]any
+	if err := json.Unmarshal(r.Info, &list); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := list[0]["url"].(string)
+	if got == "" {
+		t.Fatalf("App UA 下「资讯」url 为空：兜底没生效")
+	}
+	if !strings.HasPrefix(got, "https://") {
+		t.Fatalf("App UA 下「资讯」url = %q，不是 Web 链接（fburl 对 article+IsApp 返回 ErrUnsupported，兜底应重试）", got)
+	}
 }

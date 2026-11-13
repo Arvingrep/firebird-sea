@@ -39,6 +39,7 @@ import (
 	"errors"
 	"math"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -49,12 +50,24 @@ import (
 // phpLooseEqual 复刻 PHP 的宽松比较 `$a == "2.0"`：两边都是数字串时按数值比
 // （PHP 8：可有前后空白，如 "2"、"2.00"、"2.0 " 都等于 "2.0"），否则按字符串比。
 func phpLooseEqual(a, b string) bool {
-	fa, oka := strconv.ParseFloat(strings.TrimSpace(a), 64)
-	fb, okb := strconv.ParseFloat(strings.TrimSpace(b), 64)
-	if oka == nil && okb == nil {
+	fa, oka := phpFloat(a)
+	fb, okb := phpFloat(b)
+	if oka && okb {
 		return fa == fb
 	}
 	return a == b
+}
+
+// phpNumRe 是 PHP 数字字符串的语法（允许前后空白、符号、小数、指数），
+// 与 strconv.ParseFloat 不同：不接受 "0x1p1"、也不接受 "2_0e-1" 这类 Go 专有写法。
+var phpNumRe = regexp.MustCompile(`^[\t\n\v\f\r ]*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?[\t\n\v\f\r ]*$`)
+
+func phpFloat(s string) (float64, bool) {
+	if !phpNumRe.MatchString(s) {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	return f, err == nil
 }
 
 // iOS 端暂不支持的原生页面 code 列表（2972/3016/4210 的同一串 || 链）。
