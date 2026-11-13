@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
 
 const (
@@ -58,6 +59,24 @@ type Dep struct {
 	// （用来判断 userType，决定是否带 type=user）。为 nil 时 url 输出空串。
 	// 等 #330 落地后接上；对比用例里 url 暂时在 ignoreFields 中。
 	URLPath func(caller int64, id string) string
+
+	// —— getComment（#251）的依赖。member.detail / 各模块 detail / checkCourierAccount 尚未迁移，
+	// 为 nil 且请求确实用到时，getComment 返回 102 而不是编造数据。——
+
+	// Files 对应 getFilePath / getUrlPath；nil 时图片原样输出、detail.url 为空串。
+	Files *fburl.Resolver
+	// UserDetail 对应 member.detail（#253）。
+	UserDetail UserDetailFunc
+	// ModuleDetail 对应 handlers(module, action)->getHandle(aid)（article.detail 是 #260）。
+	ModuleDetail ModuleDetailFunc
+	// DecodeAttachment 对应 decodeAttachmentUrl()；nil 时原样返回。
+	DecodeAttachment func(string) string
+	// CourierID 对应 waimai checkCourierAccount()（peisongid=1）。
+	CourierID func(ctx context.Context, req *http.Request) (int64, error)
+	// IPHomeMode 对应 $cfg_iphome（0 不显示 1 省 2 市 3 省+市）；nil 取仓库配置的 3。
+	IPHomeMode *int
+	// Clock 仅测试用；nil 取 time.Now。
+	Clock func() time.Time
 }
 
 // Service 是 member 服务的实现。
@@ -67,6 +86,15 @@ type Service struct {
 	urlPath  func(caller int64, id string) string
 
 	logTable, letterTable, upTable, commentTable, memberTable string
+	paotuiTable, tiebaTable, followTable                      string
+
+	files            *fburl.Resolver
+	userDetail       UserDetailFunc
+	moduleDetail     ModuleDetailFunc
+	decodeAttachment func(string) string
+	courierID        func(ctx context.Context, req *http.Request) (int64, error)
+	ipHomeMode       int
+	clock            func() time.Time
 }
 
 // New 校验依赖并预拼表名。
@@ -75,7 +103,14 @@ func New(dep Dep) (*Service, error) {
 		return nil, fmt.Errorf("member: TablePrefix %q 含非法字符", dep.TablePrefix)
 	}
 	t := func(name string) string { return "`" + dep.TablePrefix + name + "`" }
+	mode := 3
+	if dep.IPHomeMode != nil {
+		mode = *dep.IPHomeMode
+	}
 	return &Service{
+		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
+		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
+		paotuiTable: t("paotui_order"), tiebaTable: t("tieba_list"), followTable: t("member_follow"),
 		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath,
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
@@ -85,6 +120,7 @@ func New(dep Dep) (*Service, error) {
 // Register 注册本服务的全部 action。
 func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
+	router.Register("member", "getComment", s.getComment)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。
