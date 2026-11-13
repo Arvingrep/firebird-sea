@@ -43,6 +43,9 @@ type Dep struct {
 	SharePic, WebLogo, Hotline, StaticVersion string
 	// AdvMarkState / AdvMarkPostion 对应 $cfg_advMarkState / $cfg_advMarkPostion（adv 用）。
 	AdvMarkState, AdvMarkPostion int
+	// UserSubDomain / BusiSubDomain 对应 $cfg_userSubDomain / $cfg_busiSubDomain
+	// （touchHomePageFooter 的 member 链接按 member.class.php:73-94 复刻时用）。
+	UserSubDomain, BusiSubDomain int
 	// Now 为 nil 时用 time.Now，测试注入固定时间。
 	Now func() time.Time
 }
@@ -56,6 +59,8 @@ type Service struct {
 	sharePic, webLogo, hotline, staticVersion          string
 	advTable, advCityTable                             string
 	advMarkState, advMarkPostion                       int
+	domainTable                                        string
+	userSubDomain, busiSubDomain                       int
 	now                                                func() time.Time
 }
 
@@ -74,6 +79,9 @@ func New(dep Dep) (*Service, error) {
 		advCityTable:   "`" + p + "advlist_city`",
 		advMarkState:   dep.AdvMarkState,
 		advMarkPostion: dep.AdvMarkPostion,
+		domainTable:    "`" + p + "domain`",
+		userSubDomain:  dep.UserSubDomain,
+		busiSubDomain:  dep.BusiSubDomain,
 		now:            now,
 		db:             dep.DB,
 		moduleTable:    "`" + p + "site_module`",
@@ -95,6 +103,7 @@ func Register(router *ajax.Router, s *Service) {
 	if s != nil {
 		router.Register("siteConfig", "siteModule", s.siteModule)
 		router.Register("siteConfig", "adv", s.adv)
+		router.Register("siteConfig", "touchHomePageFooter", s.touchHomePageFooter)
 	}
 }
 
