@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -75,6 +76,9 @@ type Dep struct {
 	CourierID func(ctx context.Context, req *http.Request) (int64, error)
 	// IPHomeMode 对应 $cfg_iphome（0 不显示 1 省 2 市 3 省+市）；nil 取仓库配置的 3。
 	IPHomeMode *int
+	// MemberLogSaveDays 对应 $max_memberBehaviorLog_save_day（member_log 保留天数）。
+	// nil / 0 表示未配置，memberLog 不做过期清理（与 PHP 一致）。
+	MemberLogSaveDays *int
 	// Clock 仅测试用；nil 取 time.Now。
 	Clock func() time.Time
 }
@@ -87,6 +91,8 @@ type Service struct {
 
 	logTable, letterTable, upTable, commentTable, memberTable string
 	paotuiTable, tiebaTable, followTable                      string
+	// behaviorTable 是 member_log（memberLog 写的行为日志），selfMediaTable 是文章自媒体号表。
+	behaviorTable, selfMediaTable string
 
 	files            *fburl.Resolver
 	userDetail       UserDetailFunc
@@ -95,6 +101,11 @@ type Service struct {
 	courierID        func(ctx context.Context, req *http.Request) (int64, error)
 	ipHomeMode       int
 	clock            func() time.Time
+
+	// memberLog 的过期清理状态：logSaveDays>0 时每 6 小时最多清理一次（PHP 用 cache 节流）。
+	logSaveDays  int
+	logCleanMu   sync.Mutex
+	logCleanedAt time.Time
 }
 
 // New 校验依赖并预拼表名。
@@ -107,13 +118,19 @@ func New(dep Dep) (*Service, error) {
 	if dep.IPHomeMode != nil {
 		mode = *dep.IPHomeMode
 	}
+	logSaveDays := 0
+	if dep.MemberLogSaveDays != nil {
+		logSaveDays = *dep.MemberLogSaveDays
+	}
 	return &Service{
 		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
 		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
 		paotuiTable: t("paotui_order"), tiebaTable: t("tieba_list"), followTable: t("member_follow"),
+		behaviorTable: t("member_log"), selfMediaTable: t("article_selfmedia"),
 		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath,
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
+		logSaveDays: logSaveDays,
 	}, nil
 }
 
@@ -121,6 +138,7 @@ func New(dep Dep) (*Service, error) {
 func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
 	router.Register("member", "getComment", s.getComment)
+	router.Register("member", "followMember", s.followMember)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。
