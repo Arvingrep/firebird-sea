@@ -32,6 +32,7 @@ var moduleCols = []string{"id", "type", "title", "subject", "name", "icon", "lin
 // mod 描述一行 site_module；pc / h5 / wx 之外的端开关一律 "0"。
 type mod struct {
 	id, name, pc, h5, wx string
+	typ, link            string // typ 为空按 "0"
 }
 
 func newMock(t *testing.T, members MemberResolver) (*Service, sqlmock.Sqlmock) {
@@ -64,7 +65,11 @@ func (m *mismatch) Error() string {
 func expectModules(mock sqlmock.Sqlmock, where string, mods ...mod) {
 	rows := sqlmock.NewRows(moduleCols)
 	for _, m := range mods {
-		rows.AddRow(m.id, "0", "", "", m.name, "", "", "0", "_self", "", m.wx, "0", "0", "0", "0", m.pc, m.h5, "0", "0", "0")
+		typ := m.typ
+		if typ == "" {
+			typ = "0"
+		}
+		rows.AddRow(m.id, typ, "", "", m.name, "", m.link, "0", "_self", "", m.wx, "0", "0", "0", "0", m.pc, m.h5, "0", "0", "0")
 	}
 	mock.ExpectQuery(moduleSQLHead + where + moduleSQLTail).WillReturnRows(rows)
 }
@@ -183,6 +188,30 @@ func TestSiteModuleDesktopDefault(t *testing.T) {
 	}
 	if _, ok := it["personal"]; ok {
 		t.Fatalf("非 homemaking 不应有 personal")
+	}
+	met(t, mock)
+}
+
+// PHP 对 type 有两种判断：输出豁免 / business 改写是 == 1，URL 分支是真值。
+// type=2：handler 返回 100 时正常输出，URL 走自定义链接分支，但不发生 business 改写；
+// handler 非 100（未知模块）时不被豁免，被跳过。
+func TestSiteModuleTypeTwo(t *testing.T) {
+	svc, mock := newMock(t, nil)
+	expectModules(mock, typeZeroSQL,
+		mod{id: "1", name: "article", pc: "1", typ: "2", link: "miniProgramLive_88"},
+		mod{id: "2", name: "shop", pc: "1", typ: "2", link: "{#$business_channelDomain#}"},
+		mod{id: "3", name: "nosuchmodule", pc: "1", typ: "2", link: "http://x.test/"},
+		mod{id: "4", name: "nosuchmodule2", pc: "1", typ: "1", link: "http://y.test/"},
+	)
+	r := serve(t, svc, "", withUA(desktopUA))
+	wantNames(t, r, 100, "article", "shop", "nosuchmodule2")
+	items := r.items(t)
+	if u := items[0]["url"]; u != "http://example.com/include/json.php?action=getMiniProgramLive&id=88" {
+		t.Fatalf("type=2 miniProgramLive url = %v", u)
+	}
+	// 非 type=1：不改写 name，URL 保持原 link。
+	if items[1]["code"] != "shop" || items[1]["url"] != "{#$business_channelDomain#}" {
+		t.Fatalf("type=2 不应发生 business 改写: %v / %v", items[1]["code"], items[1]["url"])
 	}
 	met(t, mock)
 }

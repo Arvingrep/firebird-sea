@@ -379,8 +379,10 @@ func (s *Service) siteModule(req *ajax.Request) ajax.Response {
 			}
 		}
 
-		isCustom := truthy(v.typ)
-		if !((mc.kind == mcResp && mc.state == 100) || isCustom) {
+		// PHP 两处判断不同：输出豁免与 business 改写是松散 == 1；URL 分支是真值判断。
+		typOne := eqOne(v.typ)
+		typTruthy := truthy(v.typ)
+		if !((mc.kind == mcResp && mc.state == 100) || typOne) {
 			continue
 		}
 		// $moduleConfig = $moduleConfig['info']：mcResp 取其 info；mcInfo/mcNone 上没有 'info' 键 → null。
@@ -392,13 +394,13 @@ func (s *Service) siteModule(req *ajax.Request) ajax.Response {
 
 		link := v.link
 		name := v.name
-		if isCustom && v.link.String == "{#$business_channelDomain#}" && !strings.Contains(v.link.String, ".html") {
+		if typOne && v.link.String == "{#$business_channelDomain#}" && !strings.Contains(v.link.String, ".html") {
 			name = sql.NullString{String: "business", Valid: true}
 			link = sql.NullString{String: businessDomain, Valid: true}
 		}
 
 		var url string
-		if isCustom {
+		if typTruthy {
 			url = link.String
 			switch {
 			case (app || !mobile) && strings.Contains(link.String, "miniProgramLive_"):
