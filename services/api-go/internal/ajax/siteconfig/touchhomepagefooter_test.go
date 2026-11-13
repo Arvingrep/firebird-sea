@@ -439,3 +439,42 @@ func TestTouchMemberParamTrailingEqual(t *testing.T) {
 	}
 	met(t, mock)
 }
+
+// PHP 的 `$version == '2.0'` 是宽松比较：数字串按数值比，"2"、"2.00"、"2.0 " 都进新版。
+func TestTouchVersionLooseEqual(t *testing.T) {
+	for _, v := range []string{"2", "2.00", "2.0%20", "02"} {
+		t.Run(v, func(t *testing.T) {
+			svc, mock := touchSvc(t)
+			expectAppConfig(mock, "")
+			expectMemberDomain(mock)
+			r := touch(t, svc, "&version="+v+"&module=task", withUA(desktopUA))
+			wantState(t, r)
+			wantItems(t, r, "首页", "推荐", "推广", "消息", "我的")
+			met(t, mock)
+		})
+	}
+	// 非数字串（"2.0.0"、"abc"）按字符串比 → 不等于 "2.0" → 旧版。
+	for _, v := range []string{"2.0.0", "abc"} {
+		t.Run("old-"+v, func(t *testing.T) {
+			svc, mock := touchSvc(t)
+			expectAppConfig(mock, "")
+			expectMemberDomain(mock)
+			r := touch(t, svc, "&version="+v+"&module=task", withUA(desktopUA))
+			wantState(t, r)
+			wantItems(t, r, "首页", "同城圈", "发布", "逛附近", "我的")
+			met(t, mock)
+		})
+	}
+}
+
+// App UA 下 fburl 的 App 分支未迁：不能整页降级，member 链接仍要正常输出。
+func TestTouchAppUAStillReturnsMenu(t *testing.T) {
+	svc, mock := touchSvc(t)
+	expectAppConfig(mock, "")
+	expectMemberDomain(mock)
+
+	r := touch(t, svc, "&version=2.0&module=article&platform=android", withUA(androidUA))
+	wantState(t, r)
+	wantItems(t, r, "资讯", "媒体号", "发布", "消息", "我的")
+	met(t, mock)
+}

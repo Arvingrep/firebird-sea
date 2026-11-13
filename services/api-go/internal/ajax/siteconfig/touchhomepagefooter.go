@@ -27,7 +27,8 @@ package siteconfig
 //     复刻 member.config 的 userDomain/busiDomain（member.class.php:73-94）+
 //     $cfg_userSubDomain/$cfg_busiSubDomain（Dep 注入，canary member.inc.php = 2/2）；
 //   - article/tieba/job 的 App 端原生页链接改写（fburl 判 IsApp/IsAndroidApp 时返回
-//     ErrUnsupported）：App UA 下这些 url 输出空串，PHP 会输出完整链接；
+//     ErrUnsupported）：App UA 下这些 url 退回 Web 链接，PHP 会输出带 App 原生拦截参数的链接
+//     （差异只在 App UA，对比工具用桌面 UA 时两边一致）；待 fburl 补齐 App 分支后改回；
 //   - RemoveXSS / removeInvisibleCharacters 等入口清洗未复刻（同 adv 的口径）；
 //   - $customBottomButton 反序列化成非数组标量时，PHP 的字符串下标边缘行为未复刻，
 //     一律按「无自定义菜单」处理。
@@ -35,6 +36,7 @@ package siteconfig
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"math"
 	"net"
 	"strconv"
@@ -43,6 +45,17 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
+
+// phpLooseEqual 复刻 PHP 的宽松比较 `$a == "2.0"`：两边都是数字串时按数值比
+// （PHP 8：可有前后空白，如 "2"、"2.00"、"2.0 " 都等于 "2.0"），否则按字符串比。
+func phpLooseEqual(a, b string) bool {
+	fa, oka := strconv.ParseFloat(strings.TrimSpace(a), 64)
+	fb, okb := strconv.ParseFloat(strings.TrimSpace(b), 64)
+	if oka == nil && okb == nil {
+		return fa == fb
+	}
+	return a == b
+}
 
 // iOS 端暂不支持的原生页面 code 列表（2972/3016/4210 的同一串 || 链）。
 var iosBlockedCodes = map[string]bool{
@@ -139,7 +152,7 @@ func (s *Service) touchHomePageFooter(req *ajax.Request) ajax.Response {
 	}
 
 	var menu any
-	if version == "2.0" { // 严格等于 '2.0' 才走新版
+	if phpLooseEqual(version, "2.0") { // PHP `$version == '2.0'`：两边都是数字串时按数值比（"2"/"2.00" 也算新版）
 		if m, ok := cb.(*cbArr); ok && m.count() == 100 && module == "siteConfig" && !def {
 			// 平铺 100 项（2962-2987）：直接把 100 项当菜单，不走模块键。
 			menu = phpMenu(m, s.touchFlatMenu(ctx, m, cl, opts))
@@ -1267,10 +1280,19 @@ func (s *Service) getUrlPath(ctx context.Context, o fburl.Options, p fburl.Param
 		return ""
 	}
 	u, err := s.files.URL(ctx, p, o)
-	if err != nil {
-		return ""
+	if err == nil {
+		return u
 	}
-	return u
+	if errors.Is(err, fburl.ErrUnsupported) {
+		// fburl 未迁 App 端链接改写（article/job 在 isApp、tieba/job 在 isAndroidApp 时返回
+		// ErrUnsupported）：PHP 会输出带 appIndex/原生拦截参数的链接，这里退回 Web 链接，
+		// 至少保证 App 里底部菜单可点。App 原生拦截口径待 fburl 补齐（报备在文件头）。
+		o.IsApp, o.IsAndroidApp = false, false
+		if u, err = s.files.URL(ctx, p, o); err == nil {
+			return u
+		}
+	}
+	return ""
 }
 
 // memberURLPath 复刻 getUrlPath 的 member 分支（common.func.php:4859-4991）+ 尾部拼接。
@@ -1316,8 +1338,10 @@ func (s *Service) memberURLPath(ctx context.Context, o fburl.Options, p fburl.Pa
 			domain = scheme + row
 		case 1:
 			domain = scheme + row + "." + strings.ReplaceAll(host, "www.", "")
-		default:
+		case 2:
 			domain = base + "/" + row
+		default:
+			domain = row // 非法取值：PHP 保持 member.config 里的原值，不拼 base/子域
 		}
 		params = fbDel(p, "type") // 4888：成功路径 unset($params['type'])
 	} else {
