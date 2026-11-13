@@ -1,16 +1,18 @@
 package member
 
 import (
+	"crypto/md5"
+	"database/sql/driver"
+	"encoding/hex"
 	"errors"
 	"testing"
 	"time"
 
-	"database/sql/driver"
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 )
 
 // 迁移自 member.class.php:13866-13915 的 followMember（#255）。
-// 期望串是完整 SQL（QueryMatcherEqual），参数用 sqlmock 的精确匹配 + argEq 断言文案。
+// SQL 用 QueryMatcherEqual 全串匹配，参数用 sqlmock 精确值 + argEq 断言文案。
 
 const (
 	qFollowCount  = "SELECT COUNT(*) FROM `huoniao_member_follow` WHERE `tid` = ? AND `fid` = ?"
@@ -23,6 +25,10 @@ const (
 	okBody = `{"state":100,"info":"ok"}`
 	// fixedNow 的秒级时间戳（comment_test.go 里的 fixedNow = 1700000000）。
 	followNow = int64(1700000000)
+
+	// httptest.NewRequest 固定给的主机与来源地址，member_log 的 url / ip 列就取这两个值。
+	testLogIP  = "192.0.2.1:1234"
+	testLogURL = "http://example.com/include/ajax.php"
 )
 
 // argEq 断言某个字符串参数的具体取值（sqlmock 自带的匹配器只能全精确或全任意）。
@@ -31,6 +37,11 @@ type argEq string
 func (a argEq) Match(v driver.Value) bool {
 	s, ok := v.(string)
 	return ok && s == string(a)
+}
+
+func md5Hex(v string) string {
+	sum := md5.Sum([]byte(v))
+	return hex.EncodeToString(sum[:])
 }
 
 func newFollowService(t *testing.T, identity Identity) (*Service, sqlmock.Sqlmock) {
@@ -50,33 +61,41 @@ func newFollowService(t *testing.T, identity Identity) (*Service, sqlmock.Sqlmoc
 	return svc, mock
 }
 
-// logSQL 是 member_log.sql 列的期望值：实现里存的是 addslashes(SQL 原文)，转义本身由
-// TestAddSlashes 单独覆盖，这里复用同一个函数避免把每条用例都写成带反斜杠的字面量。
-func logSQL(sqlText string) argEq { return argEq(addSlashes(sqlText)) }
-
-// expectLog 期待 member_log 的去重查询 + 写入。
-func expectLog(m sqlmock.Sqlmock, uid string, seen int, action, note, sqlText string) {
+// expectLog 期待 member_log 的去重查询 + 写入；param 是该请求的 service/action/业务参数按字典序拼接。
+func expectLog(m sqlmock.Sqlmock, uid string, seen int, action, note, param, sqlText string) {
 	m.ExpectQuery(qLogCount).
-		WithArgs(sqlmock.AnyArg(), uid, sqlmock.AnyArg(), followNow).
+		WithArgs(md5Hex(note), uid, testLogIP, followNow).
 		WillReturnRows(count(seen))
 	if seen > 0 {
 		return
 	}
 	m.ExpectExec(qLogInsert).
-		WithArgs(uid, "member", "follow", int64(0), action, argEq(note), "", sqlmock.AnyArg(), "",
-			sqlmock.AnyArg(), logSQL(sqlText), followNow, sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(uid, "member", "follow", int64(0), action, argEq(note), "", testLogIP, "", "",
+			argEq(sqlText), followNow, md5Hex(note), testLogURL, argEq(param), "").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 }
 
-// id 经 ajax.php 归一后为空串 → 101 参数错误，且不碰数据库。
+// id 经 ajax.php 归一后为空串（或数组拼成的 "0"）→ 101 参数错误，且不碰数据库。
 func TestFollowMemberBadID(t *testing.T) {
-	for _, q := range []string{"", "&id=abc", "&id=0", "&id="} {
+	for _, q := range []string{"", "&id=abc", "&id=0", "&id=", "&id%5B%5D=0", "&id%5B%5D=abc"} {
 		svc, m := newFollowService(t, fakeIdentity(7))
 		got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember"+q, "")
 		eq(t, got, `{"state":101,"info":"参数错误"}`)
 		met(t, m)
 	}
+}
+
+// id[]=1&id[]=2 走数组分支，拼成 "1,2" 后不是空串。
+func TestFollowMemberArrayIDIsCommaString(t *testing.T) {
+	svc, m := newFollowService(t, fakeIdentity(7))
+	m.ExpectQuery(qFollowCount).WithArgs("7", "1,2").WillReturnRows(count(0))
+	m.ExpectExec(qFollowInsert).WithArgs("1,2", "7", followNow, "").WillReturnResult(sqlmock.NewResult(1, 1))
+	expectLog(m, "7", 0, "insert", "添加会员关注(1,2=>7=>)",
+		"action=followMember&id[]=1&id[]=2&service=member",
+		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('1,2', '7', '1700000000', '')")
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id%5B%5D=1&id%5B%5D=2", "")
+	eq(t, got, okBody)
+	met(t, m)
 }
 
 // 未登录（getMemberID 为 -1）→ 101 登录超时；handler 里的 200 被外层改写成 101。
@@ -96,12 +115,12 @@ func TestFollowMemberSelf(t *testing.T) {
 }
 
 // for=media：自媒体 id 命中且 userid 就是自己 → 101 不能关注自己的自媒体账号。
-func TestFollowMemberSelfMedia(self *testing.T) {
-	svc, m := newFollowService(self, fakeIdentity(7))
+func TestFollowMemberSelfMedia(t *testing.T) {
+	svc, m := newFollowService(t, fakeIdentity(7))
 	m.ExpectQuery(qSelfMedia).WithArgs("42").WillReturnRows(sqlmock.NewRows([]string{"userid"}).AddRow("7"))
-	got := do(self, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=42&for=media", "")
-	eq(self, got, `{"state":101,"info":"不能关注自己的自媒体账号"}`)
-	met(self, m)
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=42&for=media", "")
+	eq(t, got, `{"state":101,"info":"不能关注自己的自媒体账号"}`)
+	met(t, m)
 }
 
 // for=media 命中：关注目标改成自媒体的 userid，fortype 写 "media"。
@@ -111,6 +130,7 @@ func TestFollowMemberInsertByMedia(t *testing.T) {
 	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(0))
 	m.ExpectExec(qFollowInsert).WithArgs("9", "7", followNow, "media").WillReturnResult(sqlmock.NewResult(1, 1))
 	expectLog(m, "7", 0, "insert", "添加会员关注(9=>7=>media)",
+		"action=followMember&for=media&id=42&service=member",
 		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('9', '7', '1700000000', 'media')")
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=42&for=media", "")
 	eq(t, got, okBody)
@@ -124,7 +144,22 @@ func TestFollowMemberMediaMissingFallsBackToMemberID(t *testing.T) {
 	m.ExpectQuery(qFollowCount).WithArgs("7", "42").WillReturnRows(count(0))
 	m.ExpectExec(qFollowInsert).WithArgs("42", "7", followNow, "media").WillReturnResult(sqlmock.NewResult(1, 1))
 	expectLog(m, "7", 0, "insert", "添加会员关注(42=>7=>media)",
+		"action=followMember&for=media&id=42&service=member",
 		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('42', '7', '1700000000', 'media')")
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=42&for=media", "")
+	eq(t, got, okBody)
+	met(t, m)
+}
+
+// for=media 命中但 userid 为 NULL：PHP 无条件 `$id = null`，拼进 SQL 等同空串。
+func TestFollowMemberMediaNullUserID(t *testing.T) {
+	svc, m := newFollowService(t, fakeIdentity(7))
+	m.ExpectQuery(qSelfMedia).WithArgs("42").WillReturnRows(sqlmock.NewRows([]string{"userid"}).AddRow(nil))
+	m.ExpectQuery(qFollowCount).WithArgs("7", "").WillReturnRows(count(0))
+	m.ExpectExec(qFollowInsert).WithArgs("", "7", followNow, "media").WillReturnResult(sqlmock.NewResult(1, 1))
+	expectLog(m, "7", 0, "insert", "添加会员关注(=>7=>media)",
+		"action=followMember&for=media&id=42&service=member",
+		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('', '7', '1700000000', 'media')")
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=42&for=media", "")
 	eq(t, got, okBody)
 	met(t, m)
@@ -136,6 +171,7 @@ func TestFollowMemberToggleDelete(t *testing.T) {
 	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(1))
 	m.ExpectExec(qFollowDelete).WithArgs("7", "9").WillReturnResult(sqlmock.NewResult(0, 1))
 	expectLog(m, "7", 0, "delete", "删除会员关注(9=>7)",
+		"action=followMember&id=9&service=member",
 		"DELETE FROM `huoniao_member_follow` WHERE `tid` = '7' AND `fid` = '9'")
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", "")
 	eq(t, got, okBody)
@@ -148,13 +184,15 @@ func TestFollowMemberFromParamOverridesIdentity(t *testing.T) {
 	m.ExpectQuery(qFollowCount).WithArgs("9", "7").WillReturnRows(count(0))
 	m.ExpectExec(qFollowInsert).WithArgs("7", "9", followNow, "").WillReturnResult(sqlmock.NewResult(1, 1))
 	expectLog(m, "9", 0, "insert", "添加会员关注(7=>9=>)",
+		"action=followMember&from=9&id=7&service=member",
 		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('7', '9', '1700000000', '')")
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=7&from=9", "")
 	eq(t, got, okBody)
 	met(t, m)
 }
 
-// from 非数字串：PHP 松散比较把 'abc' 当 0 → 登录超时；'123abc' 当 123 → 继续，原串进 SQL。
+// from 非数字串：PHP 松散比较把 'abc' 当 0 → 登录超时；'123abc' 当 123 → 继续，
+// SQL 里用原串（MySQL 截断成 123），member_log 的 uid 是 (int) 后的 123。
 func TestFollowMemberFromLooseCompare(t *testing.T) {
 	svc, m := newFollowService(t, fakeIdentity(7))
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9&from=abc", "")
@@ -164,7 +202,8 @@ func TestFollowMemberFromLooseCompare(t *testing.T) {
 	svc, m = newFollowService(t, fakeIdentity(7))
 	m.ExpectQuery(qFollowCount).WithArgs("123abc", "9").WillReturnRows(count(0))
 	m.ExpectExec(qFollowInsert).WithArgs("9", "123abc", followNow, "").WillReturnResult(sqlmock.NewResult(1, 1))
-	expectLog(m, "123abc", 0, "insert", "添加会员关注(9=>123abc=>)",
+	expectLog(m, "123", 0, "insert", "添加会员关注(9=>123abc=>)",
+		"action=followMember&from=123abc&id=9&service=member",
 		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('9', '123abc', '1700000000', '')")
 	got = do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9&from=123abc", "")
 	eq(t, got, okBody)
@@ -177,6 +216,7 @@ func TestFollowMemberCommaIDGoesThrough(t *testing.T) {
 	m.ExpectQuery(qFollowCount).WithArgs("7", "1,2").WillReturnRows(count(0))
 	m.ExpectExec(qFollowInsert).WithArgs("1,2", "7", followNow, "").WillReturnResult(sqlmock.NewResult(1, 1))
 	expectLog(m, "7", 0, "insert", "添加会员关注(1,2=>7=>)",
+		"action=followMember&id=1,2&service=member",
 		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('1,2', '7', '1700000000', '')")
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=1,2", "")
 	eq(t, got, okBody)
@@ -189,6 +229,7 @@ func TestFollowMemberWriteFailureStillOK(t *testing.T) {
 	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(0))
 	m.ExpectExec(qFollowInsert).WithArgs("9", "7", followNow, "").WillReturnError(errors.New("boom"))
 	expectLog(m, "7", 0, "insert", "添加会员关注(9=>7=>)",
+		"action=followMember&id=9&service=member",
 		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('9', '7', '1700000000', '')")
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", "")
 	eq(t, got, okBody)
@@ -200,7 +241,7 @@ func TestFollowMemberLogDeduplicated(t *testing.T) {
 	svc, m := newFollowService(t, fakeIdentity(7))
 	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(1))
 	m.ExpectExec(qFollowDelete).WithArgs("7", "9").WillReturnResult(sqlmock.NewResult(0, 1))
-	expectLog(m, "7", 1, "delete", "", "")
+	expectLog(m, "7", 1, "delete", "删除会员关注(9=>7)", "", "")
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", "")
 	eq(t, got, okBody)
 	met(t, m)
@@ -212,9 +253,31 @@ func TestFollowMemberForIsNotWhitelisted(t *testing.T) {
 	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(0))
 	m.ExpectExec(qFollowInsert).WithArgs("9", "7", followNow, "live").WillReturnResult(sqlmock.NewResult(1, 1))
 	expectLog(m, "7", 0, "insert", "添加会员关注(9=>7=>live)",
+		"action=followMember&for=live&id=9&service=member",
 		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('9', '7', '1700000000', 'live')")
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9&for=live", "")
 	eq(t, got, okBody)
+	met(t, m)
+}
+
+// for 是数组时 PHP 会把它转成 "Array" 写进 fortype，而且 empty(array) 为假 → 不判「关注自己」。
+func TestFollowMemberArrayForBecomesArrayString(t *testing.T) {
+	svc, m := newFollowService(t, fakeIdentity(7))
+	m.ExpectQuery(qFollowCount).WithArgs("7", "7").WillReturnRows(count(0))
+	m.ExpectExec(qFollowInsert).WithArgs("7", "7", followNow, "Array").WillReturnResult(sqlmock.NewResult(1, 1))
+	expectLog(m, "7", 0, "insert", "添加会员关注(7=>7=>Array)",
+		"action=followMember&for[]=live&id=7&service=member",
+		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('7', '7', '1700000000', 'Array')")
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=7&for%5B%5D=live", "")
+	eq(t, got, okBody)
+	met(t, m)
+}
+
+// for=0 在 PHP 里 empty() 为真 → 仍会判「关注自己」，且 fortype 写 "0"。
+func TestFollowMemberForZeroIsEmpty(t *testing.T) {
+	svc, m := newFollowService(t, fakeIdentity(7))
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=7&for=0", "")
+	eq(t, got, `{"state":101,"info":"不能关注自己"}`)
 	met(t, m)
 }
 
@@ -235,16 +298,4 @@ func TestFollowMemberNoDB(t *testing.T) {
 	}
 	got = do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", "")
 	eq(t, got, `{"state":102,"info":"No data!"}`)
-}
-
-// addslashes 的四个字符（' " \\ 与 NUL）都要转义，其余原样——member_log.sql 列存的就是这个形态。
-func TestAddSlashes(t *testing.T) {
-	got := addSlashes(`a'b"c\d` + "\x00" + `e`)
-	want := `a\'b\"c\\d\0e`
-	if got != want {
-		t.Fatalf("addSlashes = %q\nwant       %q", got, want)
-	}
-	if addSlashes("普通 SQL (`t` = '1')") != "普通 SQL (`t` = \\'1\\')" {
-		t.Fatalf("引号没有转义: %q", addSlashes("普通 SQL (`t` = '1')"))
-	}
 }

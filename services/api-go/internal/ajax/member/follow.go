@@ -36,12 +36,17 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 
 	// ajax.php:76 已把 id 归一成「整数」或「逗号拼接的整数」；取整为 0 时是空串。
 	id := paramID(req, "id")
-	if id == "" {
+	// 数组分支（id[]=0）拼出来是 "0"，PHP 的 empty("0") 同样为真；只有 "0,0" 这类才是非空。
+	if id == "" || id == "0" {
 		return fail(infoParamError)
 	}
 
 	p := newParams(req)
 	forType := p.scalar("for")
+	if arr, ok := p.array("for"); ok && len(arr) > 0 {
+		// `$for` 是数组时：empty(array) 为假、== "media" 为假，插进 SQL 时 PHP 转成 "Array"。
+		forType = "Array"
+	}
 
 	// $userid = $this->param['from'] ? $this->param['from'] : $userLogin->getMemberID();
 	// from 存在时完全不校验 cookie（现有鉴权缺口，照搬；见 #255 规则评论「待 Arvin 确认 1」）。
@@ -82,12 +87,11 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 		case err != nil:
 			return noData()
 		default:
-			if selfMediaUserID.Valid && selfMediaUserID.String != "" {
-				if phpLooseEqual(selfMediaUserID.String, userid) {
-					return fail(infoSelfMedia)
-				}
-				id = selfMediaUserID.String
+			// PHP 命中就无条件 `$id = $auserid`（userid 为 NULL 时拼进 SQL 等同空串）。
+			if phpLooseEqual(selfMediaUserID.String, userid) {
+				return fail(infoSelfMedia)
 			}
+			id = selfMediaUserID.String
 		}
 	}
 
@@ -108,19 +112,20 @@ func (s *Service) followMember(req *ajax.Request) ajax.Response {
 	nowText := strconv.FormatInt(now, 10)
 	var sqlText, note, action string
 	if count == 0 {
-		sqlText = addSlashes("INSERT INTO " + s.followTable + " (`fid`, `tid`, `date`, `fortype`) VALUES ('" +
-			id + "', '" + userid + "', '" + nowText + "', '" + forType + "')")
+		sqlText = "INSERT INTO " + s.followTable + " (`fid`, `tid`, `date`, `fortype`) VALUES ('" +
+			id + "', '" + userid + "', '" + nowText + "', '" + forType + "')"
 		_, _ = s.db.ExecContext(ctx,
 			"INSERT INTO "+s.followTable+" (`fid`, `tid`, `date`, `fortype`) VALUES (?, ?, ?, ?)",
 			id, userid, now, forType)
 		action, note = "insert", "添加会员关注("+id+"=>"+userid+"=>"+forType+")"
 	} else {
-		sqlText = addSlashes("DELETE FROM " + s.followTable + " WHERE `tid` = '" + userid + "' AND `fid` = '" + id + "'")
+		sqlText = "DELETE FROM " + s.followTable + " WHERE `tid` = '" + userid + "' AND `fid` = '" + id + "'"
 		_, _ = s.db.ExecContext(ctx,
 			"DELETE FROM "+s.followTable+" WHERE `tid` = ? AND `fid` = ?", userid, id)
 		action, note = "delete", "删除会员关注("+id+"=>"+userid+")"
 	}
-	s.memberLog(ctx, httpReq, userid, "member", "follow", 0, action, note, "", sqlText)
+	// memberLog 里 `$uid = (int)$uid`：from=123abc 记 123，from=0.5 取整为 0 后整条不记。
+	s.memberLog(ctx, httpReq, strconv.Itoa(phpIntval(userid)), "member", "follow", 0, action, note, "", sqlText)
 
 	// handler 返回字符串 "ok"，外层包成 state=100 / info="ok"（handlers.class.php）。
 	return ajax.Response{State: ajax.StateOK, Info: "ok"}
@@ -157,21 +162,4 @@ func phpLooseEqual(a, b string) bool {
 		return leadingNumber(a) == leadingNumber(b)
 	}
 	return a == b
-}
-
-// addSlashes 复刻 addslashes：memberLog 把 SQL 原文存进 member_log.sql 列时用过一次。
-func addSlashes(v string) string {
-	var b strings.Builder
-	b.Grow(len(v))
-	for _, r := range v {
-		switch r {
-		case '\'', '"', '\\':
-			b.WriteByte('\\')
-		case 0:
-			b.WriteString(`\0`)
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
 }
