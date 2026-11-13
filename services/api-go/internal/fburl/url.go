@@ -244,6 +244,10 @@ func rewriteJob(params Params) Params {
 
 // encodeParam url-encodes values containing Chinese characters, like PHP: each "k=v" is
 // rebuilt as k=<v part before a second '='> (anything after it is dropped, as in PHP).
+// EncodeParam 复刻 getUrlPath 对 `param` 的重新编码（parse_str + http_build_query 口径：
+// 没有 `=` 的键会补成 `k=`，中文值再 urlencode）。未走 URL() 的调用方（member 链接）用它保持同一口径。
+func EncodeParam(params Params) Params { return encodeParam(params) }
+
 func encodeParam(params Params) Params {
 	v := params.get("param")
 	if phpEmpty(v) {
