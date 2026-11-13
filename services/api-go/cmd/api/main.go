@@ -567,6 +567,8 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		WebLogo:       envOr("FB_SITE_WEB_LOGO", defaultSharePic),
 		Hotline:       os.Getenv("FB_SITE_HOTLINE"),
 		StaticVersion: os.Getenv("FB_STATIC_VERSION"),
+		// $cfg_advMarkState / $cfg_advMarkPostion（canary siteConfig.inc.php:167-168）。
+		AdvMarkState: 1, AdvMarkPostion: 3,
 	})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
