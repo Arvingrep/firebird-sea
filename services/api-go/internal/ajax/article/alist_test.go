@@ -286,6 +286,52 @@ func TestAlistMediaFilter(t *testing.T) {
 	})
 }
 
+// state 参数只在 u=1 生效，且 $where1 只进子查询、不进 COUNT（口径分裂，照搬）。
+func TestAlistStateOnlyInSubquery(t *testing.T) {
+	where := " AND lt.`admin` = ? AND lt.`cityid` != 0"
+	svc, mock := newService(t)
+	svc.members = sdFakeMember(4)
+	mock.ExpectQuery(alCount + where).WithArgs(int64(4)).WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("1"))
+	for _, cond := range []string{" AND lt.`arcrank` = 0", " AND lt.`arcrank` = 1", " AND lt.`arcrank` = 2"} {
+		mock.ExpectQuery(alCount + where + cond).WithArgs(int64(4)).
+			WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("1"))
+	}
+	// state=0 会被 ajax.php 的 convertArrToStrWithComma 吃掉（(int)0 → 不入数组 → ""），
+	// 所以传 state=1 才能进 $where1。
+	mock.ExpectQuery(alListSQL(alFields, where, " AND lt.`arcrank` = 1"+alOrder, " LIMIT 0, 10")).
+		WithArgs(int64(4)).WillReturnRows(sqlmock.NewRows(alRowCols))
+
+	got := alGet(t, svc, "&u=1&state=1")
+	// COUNT 没带 arcrank（全量），子查询带了 —— 上面的 ExpectQuery 顺序就是断言本身。
+	if !strings.Contains(got, `"totalCount":"1"`) {
+		t.Fatalf("响应体 = %s", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// get_zan：查 public_up_all（type=0、action=detail、module=article、ruid=登录 uid），无行 → 0。
+func TestAlistGetZan(t *testing.T) {
+	const zanSQL = "SELECT `id` FROM `huoniao_public_up_all` WHERE `type` = 0 AND `action` = 'detail' " +
+		"AND `module` = 'article' AND `tid` = ? AND `ruid` = ?"
+	svc, mock := newService(t)
+	mock.ExpectQuery(alCount + alAnonWhere).WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("1"))
+	mock.ExpectQuery(alListSQL(alFields, alAnonWhere, alOrder, " LIMIT 0, 10")).WillReturnRows(alRow())
+	mock.ExpectQuery(alTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(alRewardCnt).WithArgs(9).WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("0"))
+	mock.ExpectQuery(zanSQL).WithArgs(9, int64(-1)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+	got := alGet(t, svc, "&get_zan=1")
+	if !strings.Contains(got, `"source":"新华社","zan":0,"zannum":5`) {
+		t.Fatalf("响应体 = %s", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // group_img + mold=2：图集、附件宽高、时长、播放地址都按 PHP 口径输出。
 func TestAlistGroupImgAndVideo(t *testing.T) {
 	cols := append([]string{}, alRowCols...)

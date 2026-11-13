@@ -551,11 +551,7 @@ func (s *Service) alist(req *ajax.Request) ajax.Response {
 			}
 			continue
 		}
-		item, err := s.alistItem(ctx, req, host, val, uIs1, loginUid, groupImg, getZan, mediaCache, &videotimeOut, &realVideoURL)
-		if err != nil {
-			return ajax.Response{State: stateZhuantiFailed, Info: infoZhuantiFailed}
-		}
-		list = append(list, item)
+		list = append(list, s.alistItem(ctx, req, host, val, uIs1, loginUid, groupImg, getZan, mediaCache, &videotimeOut, &realVideoURL))
 	}
 
 	var info any = pageInfo
@@ -566,11 +562,15 @@ func (s *Service) alist(req *ajax.Request) ajax.Response {
 }
 
 // alistItem 复刻 article.class.php:797-1070 单条列表项。字段必须按 PHP 的赋值顺序输出。
+//
+// fburl 解析失败（App UA 等尚未移植的链接分支、或查库失败）时该字段退化为空串并继续：
+// PHP 的 getUrlPath/getFilePath 没有错误出口，最坏情况是 url=false / 图片原样返回，
+// 列表本身照常输出；这里不能让一条链接把整页降级成 101。
 func (s *Service) alistItem(
 	ctx context.Context, req *ajax.Request, host string, val alistRow,
 	uIs1 bool, loginUid int64, groupImgParam, getZan string,
 	mediaCache map[string]any, videotimeOut *any, realVideoURL *string,
-) (*alistObj, error) {
+) *alistObj {
 	pid := phpInt(val.str("id"))
 	flagVal := strings.ToLower(val.str("flag"))
 	moldVal := val.str("mold")
@@ -607,14 +607,11 @@ func (s *Service) alistItem(
 	if len(chain) > 0 {
 		topTypeID = chain[0].id
 	}
-	typeURL, err := s.zlURL(ctx, host, fburl.Params{
+	typeURL, _ := s.zlURL(ctx, host, fburl.Params{
 		{Key: "service", Value: "article"},
 		{Key: "template", Value: "list"},
 		{Key: "typeid", Value: topTypeID},
 	})
-	if err != nil {
-		return nil, err
-	}
 	item.set("typeUrl", []string{typeURL})
 
 	item.set("flag", flagVal)
@@ -634,9 +631,7 @@ func (s *Service) alistItem(
 	item.set("redirecturl", val.get("redirecturl"))
 	litpicOut := ""
 	if val.truthy("litpic") {
-		if litpicOut, err = s.zlFile(ctx, host, val.str("litpic")); err != nil {
-			return nil, err
-		}
+		litpicOut, _ = s.zlFile(ctx, host, val.str("litpic"))
 	}
 	item.set("litpic", litpicOut)
 	item.set("color", val.get("color"))
@@ -654,7 +649,7 @@ func (s *Service) alistItem(
 	item.set("pubdate", val.get("pubdate"))
 	item.set("common", val.get("total"))
 
-	detailURL, err := s.zlURL(ctx, host, fburl.Params{
+	detailURL, _ := s.zlURL(ctx, host, fburl.Params{
 		{Key: "service", Value: "article"},
 		{Key: "template", Value: "detail"},
 		{Key: "id", Value: val.str("id")},
@@ -662,9 +657,6 @@ func (s *Service) alistItem(
 		{Key: "redirecturl", Value: val.str("redirecturl")},
 		{Key: "typeid", Value: val.str("typeid")},
 	})
-	if err != nil {
-		return nil, err
-	}
 	item.set("url", detailURL)
 
 	// 图集：$group_img 为真值或 mold=1 才查，最多 6 张。
@@ -674,10 +666,7 @@ func (s *Service) alistItem(
 		if len(pics) > 0 {
 			imgs := make([]groupImg, 0, len(pics))
 			for _, p := range pics {
-				path, err := s.zlFile(ctx, host, sdStr(p["picPath"]))
-				if err != nil {
-					return nil, err
-				}
+				path, _ := s.zlFile(ctx, host, sdStr(p["picPath"]))
 				imgs = append(imgs, groupImg{path: path, info: p["picInfo"]})
 			}
 			item.set("group_img", imgs)
@@ -736,8 +725,8 @@ func (s *Service) alistItem(
 		if sdTruthy(videotype) && alistIsMobile(req) {
 			videourl = val.str("videourl")
 			*realVideoURL = alistRealVideoURL(videourl)
-		} else if videourl, err = s.zlFile(ctx, host, val.str("videourl")); err != nil {
-			return nil, err
+		} else {
+			videourl, _ = s.zlFile(ctx, host, val.str("videourl"))
 		}
 		// 真实播放地址不是 MP4、或站点开了 HTTPS 但地址不是 HTTPS 时不用它。
 		if *realVideoURL != "" && alistIsMobile(req) && strings.Contains(*realVideoURL, ".mp4") &&
@@ -760,13 +749,11 @@ func (s *Service) alistItem(
 		if cached, ok := mediaCache[mediaID]; ok {
 			mediaObj = cached
 		} else {
-			params := url.Values{}
-			for k, v := range req.Params {
-				params[k] = append([]string(nil), v...)
-			}
-			params.Set("aid", mediaID)
+			// PHP 是 $this->selfmediaDetail(0, $mediaid)：uid 固定 0、只带 aid。
+			// 请求里的 uid/type 等参数不能透传，否则会按 uid 查到别的自媒体号。
 			resp := s.selfmediaDetail(&ajax.Request{
-				Service: "article", Action: "selfmediaDetail", Params: params, HTTP: req.HTTP,
+				Service: "article", Action: "selfmediaDetail",
+				Params: url.Values{"aid": {mediaID}}, HTTP: req.HTTP,
 			})
 			if resp.State == ajax.StateOK {
 				mediaObj = resp.Info
@@ -802,14 +789,11 @@ func (s *Service) alistItem(
 		rows, ok := s.sdScanRows(ctx, "SELECT zt.`id`, zt.`typename` FROM "+s.zhuantiTable+
 			" z LEFT JOIN "+s.zhuantiTable+" zt ON zt.`id` = z.`parentid` WHERE z.`id` = ?", phpInt(val.str("zhuanti")))
 		if ok && len(rows) > 0 {
-			ztURL, err := s.zlURL(ctx, host, fburl.Params{
+			ztURL, _ := s.zlURL(ctx, host, fburl.Params{
 				{Key: "service", Value: "article"},
 				{Key: "template", Value: "zt_detail"},
 				{Key: "id", Value: sdStr(rows[0]["id"])},
 			})
-			if err != nil {
-				return nil, err
-			}
 			zt := newSdMap()
 			zt.set("url", ztURL)
 			zt.set("title", rows[0]["typename"])
@@ -818,7 +802,7 @@ func (s *Service) alistItem(
 	}
 	item.set("zhuanti", zhuantiVal)
 
-	return item, nil
+	return item
 }
 
 // alistFields 是主查询的字段列表（article.class.php:637 / 667 原样）。
