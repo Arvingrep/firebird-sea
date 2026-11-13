@@ -91,6 +91,8 @@ type Service struct {
 
 	logTable, letterTable, upTable, commentTable, memberTable string
 	paotuiTable, tiebaTable, followTable                      string
+	// collectTable 是 member_collect（member.collect 的收藏表）。
+	collectTable string
 	// behaviorTable 是 member_log（memberLog 写的行为日志），selfMediaTable 是文章自媒体号表。
 	behaviorTable, selfMediaTable string
 
@@ -126,6 +128,7 @@ func New(dep Dep) (*Service, error) {
 		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
 		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
 		paotuiTable: t("paotui_order"), tiebaTable: t("tieba_list"), followTable: t("member_follow"),
+		collectTable:  t("member_collect"),
 		behaviorTable: t("member_log"), selfMediaTable: t("article_selfmedia"),
 		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath,
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
@@ -139,6 +142,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
 	router.Register("member", "getComment", s.getComment)
 	router.Register("member", "followMember", s.followMember)
+	router.Register("member", "collect", s.collect)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。
