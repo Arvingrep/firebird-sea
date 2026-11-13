@@ -64,7 +64,9 @@ func osGetenv(k string) string { return os.Getenv(k) }
 // customDataShare 对应 PHP config/article.inc.php 的 $customDataShare，由
 // FB_ARTICLE_CUSTOM_DATA_SHARE 控制：未设置 / 非 "0" 取 1（canary 现状，不按城市过滤）；"0" 关闭共享。
 func articleDep(db *sql.DB, prefix string, files *fburl.Resolver, identity ajaxmember.Identity, getenv func(string) string) article.Dep {
-	dep := article.Dep{DB: db, TablePrefix: prefix, Files: files, CookiePrefix: strings.TrimSpace(getenv("COOKIE_PREFIX"))}
+	dep := article.Dep{DB: db, TablePrefix: prefix, Files: files, CookiePrefix: strings.TrimSpace(getenv("COOKIE_PREFIX")),
+		// 站点运行期配置，与 siteConfig 同一组环境变量；未设置时 article 包回落到 canary 现状值。
+		SharePic: getenv("FB_SITE_SHARE_PIC"), WebLogo: getenv("FB_SITE_WEB_LOGO"), Hotline: getenv("FB_SITE_HOTLINE")}
 	if identity != nil {
 		dep.Members = identity // Identity 与 article.MemberResolver 方法集相同
 	}

@@ -43,6 +43,9 @@ type Dep struct {
 	CustomDataShare *bool
 	// CookiePrefix 是 PHP $cfg_cookiePre（COOKIE_PREFIX，默认 HN_），用于读 siteCityInfo cookie。空串取 HN_。
 	CookiePrefix string
+	// SharePic / WebLogo / Hotline 对应 PHP $cfg_sharePic / $cfg_weblogo / $cfg_hotline（article.config 用）。
+	// 空串分别回落到 canary 现状值。
+	SharePic, WebLogo, Hotline string
 }
 
 // Service 是 article 服务的实现。
@@ -62,6 +65,7 @@ type Service struct {
 	members                             MemberResolver
 	dataShare                           bool
 	cookiePrefix                        string
+	sharePic, webLogo, hotline          string
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -91,6 +95,9 @@ func New(dep Dep) (*Service, error) {
 		members:        dep.Members,
 		dataShare:      dep.CustomDataShare == nil || *dep.CustomDataShare,
 		cookiePrefix:   cookiePrefix,
+		sharePic:       orDefault(dep.SharePic, defaultPic),
+		webLogo:        orDefault(dep.WebLogo, defaultPic),
+		hotline:        orDefault(dep.Hotline, DefaultHotline),
 	}, nil
 }
 
@@ -102,6 +109,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "zhuantiList", s.zhuantiList)
 	router.Register("article", "selfmediaDetail", s.selfmediaDetail)
 	router.Register("article", "selfmedia", s.selfmedia)
+	router.Register("article", "config", s.config)
 }
 
 // fieldItem 是 selfmedia_field 返回的一行。字段顺序与 PHP 数组一致
@@ -398,4 +406,14 @@ func (s *Service) zhuantiDetail(req *ajax.Request) ajax.Response {
 		return ajax.Response{State: stateNoData, Info: infoNoData}
 	}
 	return ajax.Response{State: ajax.StateOK, Info: info}
+}
+
+// defaultPic 是 canary 现状的 $cfg_sharePic / $cfg_weblogo。
+const defaultPic = "https://storage.googleapis.com/fbird-sea-uploads/siteConfig/logo/fbird_logo.png"
+
+func orDefault(v, d string) string {
+	if v == "" {
+		return d
+	}
+	return v
 }
