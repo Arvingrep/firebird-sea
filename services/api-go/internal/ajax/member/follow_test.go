@@ -351,6 +351,28 @@ func TestFollowMemberLogCleanupThrottled(t *testing.T) {
 	met(t, m)
 }
 
+// DELETE 失败也照样节流：PHP 的 cache_write 不看 dsqlOper 结果，第二次请求不应重试 DELETE。
+func TestFollowMemberLogCleanupFailureStillThrottled(t *testing.T) {
+	days := 30
+	svc, m := newFollowServiceWith(t, fakeIdentity(7), func(d *Dep) { d.MemberLogSaveDays = &days })
+	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(0))
+	m.ExpectExec(qFollowInsert).WithArgs("9", "7", followNow, "").WillReturnResult(sqlmock.NewResult(1, 1))
+	m.ExpectExec("DELETE FROM `huoniao_member_log` WHERE `pubdate` < ?").
+		WithArgs(int64(1700000000 - 30*86400)).
+		WillReturnError(errors.New("table is locked"))
+	expectLog(m, "7", 0, "insert", "添加会员关注(9=>7=>)",
+		"action=followMember&id=9&service=member",
+		"INSERT INTO `huoniao_member_follow` (`fid`, `tid`, `date`, `fortype`) VALUES ('9', '7', '1700000000', '')")
+	eq(t, do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", ""), okBody)
+	met(t, m)
+
+	m.ExpectQuery(qFollowCount).WithArgs("7", "9").WillReturnRows(count(1))
+	m.ExpectExec(qFollowDelete).WithArgs("7", "9").WillReturnResult(sqlmock.NewResult(0, 1))
+	expectLog(m, "7", 1, "delete", "删除会员关注(9=>7)", "", "")
+	eq(t, do(t, svc, "GET", "/include/ajax.php?service=member&action=followMember&id=9", ""), okBody)
+	met(t, m)
+}
+
 // 去重查询失败时 PHP 仍会写日志（if($ret && ...) 不成立），Go 同样继续 INSERT。
 func TestFollowMemberLogCountErrorStillWrites(t *testing.T) {
 	svc, m := newFollowService(t, fakeIdentity(7))

@@ -70,16 +70,18 @@ func (s *Service) cleanMemberLog(ctx context.Context, now int64) {
 		return
 	}
 	s.logCleanMu.Lock()
-	defer s.logCleanMu.Unlock()
 	// PHP 是 `($lastClearTime + 6h) < $time` 才清理：正好 6 小时的那一刻不清理。
 	if !s.logCleanedAt.IsZero() && s.logCleanedAt.Add(6*time.Hour).Unix() >= now {
+		s.logCleanMu.Unlock()
 		return
 	}
-	deadline := now - int64(s.logSaveDays)*86400
-	if _, err := s.db.ExecContext(ctx, "DELETE FROM "+s.behaviorTable+" WHERE `pubdate` < ?", deadline); err != nil {
-		return
-	}
+	// 先置节流时间再删：PHP 无论 DELETE 成败都会 cache_write，失败也不该每个请求重试。
+	// 不持锁执行 DELETE：PHP 侧这些请求是并发的，大表清理不该把其它请求堵在 memberLog 里。
 	s.logCleanedAt = time.Unix(now, 0)
+	s.logCleanMu.Unlock()
+
+	deadline := now - int64(s.logSaveDays)*86400
+	_, _ = s.db.ExecContext(ctx, "DELETE FROM "+s.behaviorTable+" WHERE `pubdate` < ?", deadline)
 }
 
 // requestIP 复刻 GetIP() + getRemotePort()：优先 X-Forwarded-For 的第一个非 unknown，
