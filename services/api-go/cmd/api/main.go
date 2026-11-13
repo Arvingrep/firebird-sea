@@ -542,7 +542,6 @@ func buildAjax(db *sql.DB) *ajax.Router {
 	router := ajax.NewRouter(func(line string) {
 		writeLog(os.Stderr, "ajax_error", map[string]any{"error": line})
 	})
-	siteconfig.Register(router)
 	prefix := envOr("DB_PREFIX", "huoniao_")
 	var files *fburl.Resolver
 	if db != nil {
@@ -560,6 +559,19 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
 	}
 	article.Register(router, articleSvc)
+	siteSvc, err := siteconfig.New(siteconfig.Dep{
+		DB: db, TablePrefix: prefix, Files: files,
+		Members: siteMembers(identity),
+		// 站点运行期配置（$cfg_sharePic / $cfg_weblogo / $cfg_hotline / $cfg_staticVersion）不在仓库里。
+		SharePic:      envOr("FB_SITE_SHARE_PIC", defaultSharePic),
+		WebLogo:       envOr("FB_SITE_WEB_LOGO", defaultSharePic),
+		Hotline:       os.Getenv("FB_SITE_HOTLINE"),
+		StaticVersion: os.Getenv("FB_STATIC_VERSION"),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
+	}
+	siteconfig.Register(router, siteSvc)
 	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))

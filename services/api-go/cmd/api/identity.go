@@ -8,6 +8,7 @@ import (
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/article"
 	ajaxmember "github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/member"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/siteconfig"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fbidentity"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
@@ -72,4 +73,15 @@ func articleDep(db *sql.DB, prefix string, files *fburl.Resolver, identity ajaxm
 		dep.CustomDataShare = &off
 	}
 	return dep
+}
+
+// defaultSharePic 是 canary 现状的分享图（$cfg_sharePic / $cfg_weblogo），可用 FB_SITE_SHARE_PIC / FB_SITE_WEB_LOGO 覆盖。
+const defaultSharePic = "https://storage.googleapis.com/fbird-sea-uploads/siteConfig/logo/fbird_logo.png"
+
+// siteMembers 保持「无类型 nil」：nil 的 Identity 不能被包装成非 nil 接口。
+func siteMembers(identity ajaxmember.Identity) siteconfig.MemberResolver {
+	if identity == nil {
+		return nil
+	}
+	return identity
 }
