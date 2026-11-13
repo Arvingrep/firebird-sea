@@ -42,9 +42,12 @@ func (s *Service) memberLog(ctx context.Context, req *http.Request, uid, module,
 	sumHex := hex.EncodeToString(sum[:])
 
 	// 相同动作一秒钟以内记录过一次，就不再重复记录（1954-1971）。
+	// 去重查询出错时 PHP 的 $ret 为 false，`if($ret && ...)` 不成立，仍会往下写；这里同样只在「确实查到」时跳过。
+	// 注：PHP 还有一条 note 含「用户退出登录」时按 5 分钟去重的分支（1955-1962），followMember 的 note 不会命中，
+	// 等其它 action 复用 memberLog 时再补。
 	seen, err := s.count(ctx, "SELECT COUNT(*) FROM "+s.behaviorTable+
 		" WHERE `md5` = ? AND `uid` = ? AND `ip` = ? AND `pubdate` = ?", sumHex, uid, ip, now)
-	if err != nil || seen > 0 {
+	if err == nil && seen > 0 {
 		return
 	}
 
@@ -64,7 +67,8 @@ func (s *Service) cleanMemberLog(ctx context.Context, now int64) {
 	}
 	s.logCleanMu.Lock()
 	defer s.logCleanMu.Unlock()
-	if !s.logCleanedAt.IsZero() && s.logCleanedAt.Add(6*time.Hour).Unix() > now {
+	// PHP 是 `($lastClearTime + 6h) < $time` 才清理：正好 6 小时的那一刻不清理。
+	if !s.logCleanedAt.IsZero() && s.logCleanedAt.Add(6*time.Hour).Unix() >= now {
 		return
 	}
 	deadline := now - int64(s.logSaveDays)*86400
@@ -76,6 +80,8 @@ func (s *Service) cleanMemberLog(ctx context.Context, now int64) {
 
 // requestIP 复刻 GetIP() + getRemotePort()：优先 X-Forwarded-For 的第一个非 unknown，
 // 其次 Client-IP，最后 RemoteAddr；带端口时写成「ip:port」。
+// 已知偏差：X-Forwarded-For 全为 unknown 时 PHP 不会落到后面的分支（$realip 仍是 NULL），
+// 这里会继续用 Client-IP / RemoteAddr；只影响审计字段。
 func requestIP(req *http.Request) (ip, ipaddr string) {
 	for _, v := range strings.Split(req.Header.Get("X-Forwarded-For"), ",") {
 		v = strings.TrimSpace(v)
