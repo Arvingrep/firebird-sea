@@ -58,6 +58,17 @@ type Dep struct {
 	// （用来判断 userType，决定是否带 type=user）。为 nil 时 url 输出空串。
 	// 等 #330 落地后接上；对比用例里 url 暂时在 ignoreFields 中。
 	URLPath func(caller int64, id string) string
+
+	// 以下可选依赖只给 member.reward 用（对应 PHP 的 getUrlPath / getFilePath / getAttachemntFile / getIpHome
+	// 和 cfg_cookiePre / cfg_pointState / 已安装模块）。为 nil / 零值时 url 输出空串，文件路径原样输出。
+	// ModuleURL 对应 getUrlPath(['service'=>service,'template'=>template,'id'=>id])。
+	ModuleURL      func(service, template string, id int64) string
+	FilePath       func(path string) string
+	AttachmentFile func(path string) string
+	IPHome         func(ipaddr string) string
+	CookiePre      string
+	PointState     bool
+	DatingEnabled  bool
 }
 
 // Service 是 member 服务的实现。
@@ -65,6 +76,13 @@ type Service struct {
 	db       *sql.DB
 	identity Identity
 	urlPath  func(caller int64, id string) string
+
+	prefix                    string
+	moduleURL                 func(service, template string, id int64) string
+	filePath, attachmentFile  func(path string) string
+	ipHome                    func(ipaddr string) string
+	cookiePre                 string
+	pointState, datingEnabled bool
 
 	logTable, letterTable, upTable, commentTable, memberTable string
 }
@@ -76,7 +94,9 @@ func New(dep Dep) (*Service, error) {
 	}
 	t := func(name string) string { return "`" + dep.TablePrefix + name + "`" }
 	return &Service{
-		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath,
+		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath, prefix: dep.TablePrefix,
+		moduleURL: dep.ModuleURL, filePath: dep.FilePath, attachmentFile: dep.AttachmentFile, ipHome: dep.IPHome,
+		cookiePre: dep.CookiePre, pointState: dep.PointState, datingEnabled: dep.DatingEnabled,
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
 	}, nil
@@ -85,6 +105,7 @@ func New(dep Dep) (*Service, error) {
 // Register 注册本服务的全部 action。
 func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
+	router.Register("member", "reward", s.reward)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。
