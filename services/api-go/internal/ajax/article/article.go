@@ -73,6 +73,7 @@ type Service struct {
 	cookiePrefix                                                                     string
 	sharePic, webLogo, hotline                                                       string
 	detail                                                                           func(req *ajax.Request) ajax.Response
+	payTable, rewardTbl, listTable                                                   string
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -112,6 +113,9 @@ func New(dep Dep) (*Service, error) {
 		webLogo:           orDefault(dep.WebLogo, defaultPic),
 		hotline:           orDefault(dep.Hotline, DefaultHotline),
 		detail:            dep.Detail,
+		payTable:          "`" + dep.TablePrefix + "pay_log`",
+		rewardTbl:         "`" + dep.TablePrefix + "member_reward`",
+		listTable:         "`" + dep.TablePrefix + "articlelist_all`",
 	}, nil
 }
 
@@ -125,6 +129,68 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "selfmedia", s.selfmedia)
 	router.Register("article", "config", s.config)
 	router.Register("article", "alist", s.alist)
+	router.Register("article", "orderDetail", s.orderDetail)
+}
+
+// orderInfo 是 orderDetail 的返回数组，字段顺序与 PHP 一致（article.class.php:3025-3071）。
+// Ordernum/Date 用指针：PHP 原样输出，库里为 NULL 时是 null。
+type orderInfo struct {
+	State    int     `json:"state"`
+	Ordernum *string `json:"ordernum"`
+	Title    string  `json:"title"`
+	URL      string  `json:"url"`
+	Date     *string `json:"date"`
+	Amount   string  `json:"amount"`
+}
+
+// orderDetail 迁移自 article.class.php:3025-3071（分发器 handlers.class.php:63-92）：
+//
+//	ordernum 空/缺/"0"（PHP falsy，if($ordernum)）→ 102；主查询（pay_log.body = member_reward.ordernum）无结果 → 102；
+//	r.state == 200 或 101 → 外层 101 + info:null；否则 100 + info 为整个数组（含 state 键）。
+//
+// url 按 #242 裁决 A 固定返回 ""（getUrlPath 待 #330 迁移后补），对比用例 ignoreFields。
+func (s *Service) orderDetail(req *ajax.Request) ajax.Response {
+	noData := ajax.Response{State: stateNoData, Info: infoNoData}
+	ordernum := req.Params.Get("ordernum")
+	if s.db == nil || ordernum == "" || ordernum == "0" {
+		return noData
+	}
+
+	ctx := req.HTTP.Context()
+	query := "SELECT r.`ordernum`, r.`aid`, r.`date`, r.`state`, l.`amount` FROM " + s.payTable +
+		" l LEFT JOIN " + s.rewardTbl + " r ON r.`ordernum` = l.`body` WHERE r.`module` = 'article' AND l.`ordernum` = ?"
+	var (
+		rowOrdernum, rowDate *string
+		aid                  sql.NullInt64
+		state                sql.NullInt64
+		amount               sql.NullFloat64
+	)
+	// 只取第一行（PHP 的 $ret[0]）。
+	if err := s.db.QueryRowContext(ctx, query, ordernum).Scan(&rowOrdernum, &aid, &rowDate, &state, &amount); err != nil {
+		// sql.ErrNoRows 与查询失败同口径：dsqlOper 返回空/false → 102。
+		return noData
+	}
+
+	// handlers.class.php 的宽松比较：state == 200 || state == 101 → 101 + null。
+	if state.Int64 == 200 || state.Int64 == 101 {
+		return ajax.Response{State: 101, Info: nil}
+	}
+
+	// 文章已删查不到 → ""。
+	title := ""
+	var t sql.NullString
+	if err := s.db.QueryRowContext(ctx, "SELECT `title` FROM "+s.listTable+" WHERE `id` = ?", aid.Int64).Scan(&t); err == nil {
+		title = t.String
+	}
+
+	return ajax.Response{State: ajax.StateOK, Info: orderInfo{
+		State:    int(state.Int64),
+		Ordernum: rowOrdernum,
+		Title:    title,
+		URL:      "",
+		Date:     rowDate,
+		Amount:   fmt.Sprintf("%.2f", amount.Float64),
+	}}
 }
 
 // fieldItem 是 selfmedia_field 返回的一行。字段顺序与 PHP 数组一致
