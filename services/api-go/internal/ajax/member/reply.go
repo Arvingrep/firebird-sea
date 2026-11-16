@@ -88,22 +88,36 @@ func (s *Service) replyComment(req *ajax.Request) ajax.Response {
 	content, contentOK := p.phpRaw("content")
 	checkTruthy := p.phpTruthy("check") // PHP 真值：'' / '0' / 缺失 / 空数组为假
 
+	// 4. 参数门禁：empty((int)$id) → 参数错误；empty($content)（'0' 也是空）→ 请填写回复内容。
+	if id == 0 {
+		return fail(infoParamError)
+	}
+	if !contentOK {
+		return fail(infoReplyEmptyContent)
+	}
+
 	if s.db == nil {
-		// 本地无数据库（DB=nil）时按「查不到数据」降级：登录已过，接下来必然要读写评论表。
+		// 本地无数据库（DB=nil）时按「查不到数据」降级：登录与参数已过，接下来必然要读写评论表。
 		return noData()
 	}
 
-	// 4. 实名认证 / 手机认证（getMemberInfo → member.detail 的门禁字段投影）。
+	// 5. 实名认证 / 手机认证（getMemberInfo → member.detail 的门禁字段投影）。
 	// 开关全关时不查询（PHP 算了 $userinfo 但门禁不拦，输出等价）。
 	if s.memberVerified != 0 || s.memberBindPhone != 0 {
 		gi, err := s.gateFields(ctx, userid)
 		if err != nil {
 			return noData()
 		}
-		if s.memberVerified != 0 {
+		if s.memberVerified != 0 && !gi.missing {
 			// (userType==1 && certifyState!=1) || (userType==2 && licenseState!=1)（PHP 松散比较）。
+			// 会员行缺失时 $userinfo 是 "No data!" 字符串，offset 取首字母 "N" → 两个分支都不命中。
 			licenseOne := isNumeric(gi.license) && leadingNumber(gi.license) == 1
 			if (gi.userType == 1 && gi.certify != 1) || (gi.userType == 2 && !licenseOne) {
+				// info 非空（isset 为真）时 201/202 原样透传；info 是 null（cfg 未配置）时
+				// isset 为假 → 外层按「无 state 键」包成 {state:100, info:{state:201, info:null}}。
+				if s.memberVerifiedInfo == nil {
+					return ajax.Response{State: ajax.StateOK, Info: ajax.Response{State: 201}}
+				}
 				return ajax.Response{State: 201, Info: s.memberVerifiedInfo}
 			}
 		}
@@ -111,24 +125,29 @@ func (s *Service) replyComment(req *ajax.Request) ajax.Response {
 			// (!$phone || !$phoneCheck || (周期开关 && phoneBindTime && time()-phoneBindTime > cycle))
 			cycle := int64(s.periodicCheckCycle) * 86400
 			now := s.now().Unix()
-			periodicDue := s.periodicCheckPhone != 0 && gi.phoneBind != 0 && now-gi.phoneBind > cycle
-			if !truthyStr(gi.phone) || !truthyStr(gi.phoneCheck) || periodicDue {
-				info := s.memberBindPhoneInfo
-				if periodicDue {
+			if gi.missing {
+				// 会员行缺失：phone/phoneCheck 取首字母 "N"（真值），phoneBindTime "N" 数值化成 0
+				// → 周期开关开着时 time()-0 > cycle 恒真 → 202「请先验证手机号码」（info 非空，
+				// isset 为真 → 原样透传）；周期关着时门禁整体放行。
+				if s.periodicCheckPhone != 0 && now > cycle {
 					phoneDue := infoVerifyPhone
-					info = &phoneDue
+					return ajax.Response{State: 202, Info: &phoneDue}
 				}
-				return ajax.Response{State: 202, Info: info}
+			} else {
+				periodicDue := s.periodicCheckPhone != 0 && gi.phoneBind != 0 && now-gi.phoneBind > cycle
+				if !truthyStr(gi.phone) || !truthyStr(gi.phoneCheck) || periodicDue {
+					info := s.memberBindPhoneInfo
+					if periodicDue {
+						phoneDue := infoVerifyPhone
+						info = &phoneDue
+					}
+					if info == nil {
+						return ajax.Response{State: ajax.StateOK, Info: ajax.Response{State: 202}}
+					}
+					return ajax.Response{State: 202, Info: info}
+				}
 			}
 		}
-	}
-
-	// 5. 参数门禁：empty((int)$id) → 参数错误；empty($content)（'0' 也是空）→ 请填写回复内容。
-	if id == 0 {
-		return fail(infoParamError)
-	}
-	if !contentOK {
-		return fail(infoReplyEmptyContent)
 	}
 
 	// 6. 原评论：SELECT id,pid,rid,aid,type,masterid FROM public_comment_all WHERE id = $id。
@@ -259,9 +278,11 @@ func (s *Service) replyComment(req *ajax.Request) ajax.Response {
 }
 
 // gateFields 是 getMemberInfo($userid)（委托 member.detail）里实名/手机门禁用到的字段投影。
-// 会员不存在（state/mtype 不匹配）时 PHP 的 $userinfo 是空数组、字段全 null：
-// 实名两个分支都不命中、手机视为未绑定；license 为空串时 licenseOne 恒假。
+// 会员不存在（state/mtype 不匹配）时 member.detail 返回空数组 → 外层包成 102 "No data!"，
+// $userinfo 是字符串：offset 取首字母 "N"（真值、数值化为 0）——用 missing 表示这个状态，
+// 门禁按字符串语义走（见 replyComment 里的分支）；license 为空串时 licenseOne 恒假。
 type gateFields struct {
+	missing    bool
 	userType   int64  // busiState 真值 ? (int)mtype : 1（member.class.php:706）
 	certify    int64  // (int)certifyState
 	license    string // mtype==2 时是 (int) 后的字符串，否则原值
@@ -278,7 +299,7 @@ func (s *Service) gateFields(ctx context.Context, userid int64) (gateFields, err
 			" WHERE `state` = 1 AND `mtype` != 0 AND `mtype` != 3 AND `id` = ?", userid).
 		Scan(&mtype, &certify, &license, &phone, &phoneCheck, &phoneBind)
 	if err == sql.ErrNoRows {
-		return gi, nil
+		return gateFields{missing: true}, nil
 	}
 	if err != nil {
 		return gi, err
@@ -321,5 +342,8 @@ func isAndroidAppUA(req *http.Request) bool {
 		return false
 	}
 	ua := strings.ToLower(req.Header.Get("User-Agent"))
-	return strings.Contains(ua, "huoniao") && strings.Contains(ua, "android") && !strings.Contains(ua, "harmony")
+	// strpos(ua, 'harmony') == false 在 PHP 里命中「不存在」和「位置 0」两种情况，
+	// 只有 harmony 出现在位置 > 0 才排除安卓 App。
+	harmony := strings.Index(ua, "harmony")
+	return strings.Contains(ua, "huoniao") && strings.Contains(ua, "android") && (harmony < 0 || harmony == 0)
 }

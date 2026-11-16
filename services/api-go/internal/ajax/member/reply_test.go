@@ -220,6 +220,8 @@ func TestReplyAndroidArticleDetail(t *testing.T) {
 		{"huoniao_android_1.0", "article-detail", "0", `{"state":100,"info":{"message":"评论成功，将在审核后显示。","isCheck":0,"lastid":125}}`},
 		{"huoniao_android_1.0", "article-detail", "1", `{"state":100,"info":{"message":"评价成功！","isCheck":1,"lastid":125}}`},
 		{"huoniao_harmony_1.0", "article-detail", "0", `{"state":100,"info":"评价成功！"}`},
+		// strpos(ua,'harmony') == false 命中「位置 0」：UA 以 harmony 开头仍算安卓 App。
+		{"harmonyhuoniao_android", "article-detail", "0", `{"state":100,"info":{"message":"评论成功，将在审核后显示。","isCheck":0,"lastid":125}}`},
 		{"huoniao_android_1.0", "tieba-detail", "0", `{"state":100,"info":"评价成功！"}`},
 	} {
 		// 循环变量捕获：闭包取局部快照，避免拿到最后一个 tc。
@@ -409,7 +411,7 @@ func TestReplyVerified201(t *testing.T) {
 	m.ExpectQuery(qGateMember).WithArgs(int64(7)).
 		WillReturnRows(gateRow("1", "0", "0", "13800000000", "1", "1700000000"))
 	got = replyGet(t, svc, fakeIdentity(7), "id=5&content=hi")
-	eq(t, got, `{"state":201,"info":null}`)
+	eq(t, got, `{"state":100,"info":{"state":201,"info":null}}`)
 	met(t, m)
 }
 
@@ -490,7 +492,7 @@ func TestReplyPhoneGate(t *testing.T) {
 	m.ExpectQuery(qGateMember).WithArgs(int64(7)).
 		WillReturnRows(gateRow("1", "0", "0", "", "1", "1700000000"))
 	got := replyGet(t, svc, fakeIdentity(7), "id=5&content=hi")
-	eq(t, got, `{"state":202,"info":null}`)
+	eq(t, got, `{"state":100,"info":{"state":202,"info":null}}`)
 	met(t, m)
 
 	// phoneCheck "0" → 202。
@@ -531,6 +533,37 @@ func TestReplyPhoneGate(t *testing.T) {
 		sqlmock.NewRows([]string{"id", "pid", "rid", "aid", "type", "masterid"}))
 	got = replyGet(t, svc, fakeIdentity(7), "id=5&content=hi")
 	eq(t, got, `{"state":101,"info":"原评价不存在"}`)
+	met(t, m)
+}
+
+// 会员行缺失（state/mtype 不匹配）：$userinfo 是 "No data!" 字符串——phone/phoneCheck 取
+// 首字母 "N"（真值），周期开关关着时手机门禁整体放行；周期开关开着时 phoneBindTime "N"
+// 数值化为 0 → time()-0 > cycle 恒真 → 202「请先验证手机号码」（info 非空原样透传）。
+func TestReplyGateMissingMember(t *testing.T) {
+	// 周期关 → 放行 → 继续主流程。
+	svc, m := newFollowServiceWith(t, fakeIdentity(7), func(d *Dep) {
+		bind := 1
+		d.MemberBindPhone = &bind
+	})
+	m.ExpectQuery(qGateMember).WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"mtype", "certifyState", "licenseState", "phone", "phoneCheck", "phoneBindTime"}))
+	m.ExpectQuery(qOrigin).WithArgs(int64(5)).WillReturnRows(
+		sqlmock.NewRows([]string{"id", "pid", "rid", "aid", "type", "masterid"}))
+	got := replyGet(t, svc, fakeIdentity(7), "id=5&content=hi")
+	eq(t, got, `{"state":101,"info":"原评价不存在"}`)
+	met(t, m)
+
+	// 周期开 → 202 请先验证手机号码。
+	svc, m = newFollowServiceWith(t, fakeIdentity(7), func(d *Dep) {
+		bind, periodic, cycle := 1, 1, 7
+		d.MemberBindPhone = &bind
+		d.PeriodicCheckPhone = &periodic
+		d.PeriodicCheckPhoneCycle = &cycle
+	})
+	m.ExpectQuery(qGateMember).WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"mtype", "certifyState", "licenseState", "phone", "phoneCheck", "phoneBindTime"}))
+	got = replyGet(t, svc, fakeIdentity(7), "id=5&content=hi")
+	eq(t, got, `{"state":202,"info":"请先验证手机号码"}`)
 	met(t, m)
 }
 
