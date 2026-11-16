@@ -159,12 +159,14 @@ func (s *Service) getZan(req *ajax.Request) ajax.Response {
 	}
 
 	// INSERT 底账：PHP 不检查写库结果（lastid 也只用于 public_up 分表维护），失败照样返回 ok。
+	// puctime 只取一次，避免留档 sql 与实际写入跨秒不一致。
+	puctime := s.now().Unix()
 	insertSQL := "INSERT INTO " + s.upTable + " (`uid`, `tid`, `ruid`, `module`, `action`, `puctime`, `type`) VALUES ('" +
 		uid + "', '" + id + "', '" + strconv.FormatInt(userid, 10) + "', '" + module + "', '" + temp +
-		"', '" + strconv.FormatInt(s.now().Unix(), 10) + "', '" + strconv.Itoa(zanType) + "')"
+		"', '" + strconv.FormatInt(puctime, 10) + "', '" + strconv.Itoa(zanType) + "')"
 	_, _ = s.db.ExecContext(ctx,
 		"INSERT INTO "+s.upTable+" (`uid`, `tid`, `ruid`, `module`, `action`, `puctime`, `type`) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		uid, id, userid, module, temp, s.now().Unix(), zanType)
+		uid, id, userid, module, temp, puctime, zanType)
 
 	s.memberLog(ctx, httpReq, strconv.FormatInt(userid, 10), module, "", int64(phpIntval(id)),
 		"insert", "点赞("+title+" => "+content+")", "", insertSQL)
