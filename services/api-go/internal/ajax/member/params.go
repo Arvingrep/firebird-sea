@@ -82,6 +82,30 @@ func (p params) pageLike(key string, def int) int {
 	return v
 }
 
+// phpRaw 复刻 getZan 里 $param[key] 的取值与 empty()/真值判断：普通标量取 scalar；
+// 键名数组（key[]）返回字面量 "Array"（PHP 把数组拼进 SQL / 文案时的实际内容）。
+// 第二返回值为 false 表示 PHP empty() 为真（""、"0"、缺失、空数组），同时也是真值判断为假。
+func (p params) phpRaw(key string) (string, bool) {
+	if arr, ok := p.req.Params[key+"[]"]; ok {
+		if len(arr) == 0 {
+			return "", false
+		}
+		return "Array", true
+	}
+	v := p.scalar(key)
+	if v == "" || v == "0" {
+		return v, false
+	}
+	return v, true
+}
+
+// phpTruthy 对应 PHP 对 $param[key] 的真值判断（getZan 的 check）：与 phpRaw 的
+// empty() 判断同口径，空数组为假、非空数组为真。
+func (p params) phpTruthy(key string) bool {
+	_, ok := p.phpRaw(key)
+	return ok
+}
+
 // state 对应 convertArrToStrWithComma($value)；第二个返回值表示键是否出现。
 func (p params) state() (string, bool) {
 	if v, ok := p.req.Params["state"]; ok && len(v) > 0 {

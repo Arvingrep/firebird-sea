@@ -2,6 +2,7 @@
 package article
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -36,6 +37,19 @@ type Dep struct {
 	TablePrefix string
 	// Files 用于 getFilePath / getUrlPath（图片转绝对地址、专题链接）。nil 时图片原样输出、url 为空串。
 	Files *fburl.Resolver
+	// Members 识别当前会员（selfmedia / selfmediaDetail 的 isfollow / 本人段用）。nil 时一律按未登录（-1）。
+	Members MemberResolver
+	// CustomDataShare 对应 PHP config/article.inc.php 的 $customDataShare。nil 按 canary 现状取 1（共享，不按城市过滤）；
+	// 指向 false 时 selfmedia 走 getCityId 并加 cityid 条件。
+	CustomDataShare *bool
+	// CookiePrefix 是 PHP $cfg_cookiePre（COOKIE_PREFIX，默认 HN_），用于读 siteCityInfo cookie。空串取 HN_。
+	CookiePrefix string
+	// SharePic / WebLogo / Hotline 对应 PHP $cfg_sharePic / $cfg_weblogo / $cfg_hotline（article.config 用）。
+	// 空串分别回落到 canary 现状值。
+	SharePic, WebLogo, Hotline string
+	// Detail 对应 article.detail（#260，尚未迁移）。alist 的 dynamicid 分支会逐条转调它；
+	// nil 时该 action 直接返回 102 "No data!"（已知偏差，见 alist 注释）。
+	Detail func(req *ajax.Request) ajax.Response
 }
 
 // Service 是 article 服务的实现。
@@ -48,9 +62,18 @@ type Service struct {
 	zhuantiTable string
 	// zlListTable / zlNewsTable 是 zhuantiList 用到的关联表（已带前缀）。
 	zlListTable, zlNewsTable string
-	payTable                 string
-	rewardTbl                string
-	listTable                string
+	// sd* 是 selfmediaDetail 用到的表名（已带前缀）。
+	sdTable, sdManagerTable, sdNewsTable, sdFollowTable string
+	// sm* 是 selfmedia 用到的表名（已带前缀）。
+	smTable, smNewsTable, smFollowTable string
+	// al* 是 alist（#252）用到的表名（已带前缀）。
+	alTable, alPicTable, alCommentTable, alRewardTable, alUpTable, alAttachmentTable string
+	members                                                                          MemberResolver
+	dataShare                                                                        bool
+	cookiePrefix                                                                     string
+	sharePic, webLogo, hotline                                                       string
+	detail                                                                           func(req *ajax.Request) ajax.Response
+	payTable, rewardTbl, listTable                                                   string
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -58,17 +81,41 @@ func New(dep Dep) (*Service, error) {
 	if !prefixPattern.MatchString(dep.TablePrefix) {
 		return nil, fmt.Errorf("article: TablePrefix %q 含非法字符", dep.TablePrefix)
 	}
+	cookiePrefix := dep.CookiePrefix
+	if cookiePrefix == "" {
+		cookiePrefix = "HN_"
+	}
 	return &Service{
-		db:           dep.DB,
-		fieldTable:   "`" + dep.TablePrefix + "article_selfmedia_field`",
-		typeTable:    "`" + dep.TablePrefix + "articletype`",
-		zhuantiTable: "`" + dep.TablePrefix + "article_zhuanti`",
-		zlListTable:  "`" + dep.TablePrefix + "article_zhuantilist`",
-		zlNewsTable:  "`" + dep.TablePrefix + "articlelist_all`",
-		files:        dep.Files,
-		payTable:     "`" + dep.TablePrefix + "pay_log`",
-		rewardTbl:    "`" + dep.TablePrefix + "member_reward`",
-		listTable:    "`" + dep.TablePrefix + "articlelist_all`",
+		db:                dep.DB,
+		fieldTable:        "`" + dep.TablePrefix + "article_selfmedia_field`",
+		typeTable:         "`" + dep.TablePrefix + "articletype`",
+		zhuantiTable:      "`" + dep.TablePrefix + "article_zhuanti`",
+		zlListTable:       "`" + dep.TablePrefix + "article_zhuantilist`",
+		zlNewsTable:       "`" + dep.TablePrefix + "articlelist_all`",
+		files:             dep.Files,
+		sdTable:           "`" + dep.TablePrefix + "article_selfmedia`",
+		sdManagerTable:    "`" + dep.TablePrefix + "article_selfmedia_manager`",
+		sdNewsTable:       "`" + dep.TablePrefix + "articlelist_all`",
+		sdFollowTable:     "`" + dep.TablePrefix + "member_follow`",
+		smTable:           "`" + dep.TablePrefix + "article_selfmedia`",
+		smNewsTable:       "`" + dep.TablePrefix + "articlelist_all`",
+		smFollowTable:     "`" + dep.TablePrefix + "member_follow`",
+		alTable:           "`" + dep.TablePrefix + "articlelist_all`",
+		alPicTable:        "`" + dep.TablePrefix + "articlepic`",
+		alCommentTable:    "`" + dep.TablePrefix + "public_comment_all`",
+		alRewardTable:     "`" + dep.TablePrefix + "member_reward`",
+		alUpTable:         "`" + dep.TablePrefix + "public_up_all`",
+		alAttachmentTable: "`" + dep.TablePrefix + "attachment`",
+		members:           dep.Members,
+		dataShare:         dep.CustomDataShare == nil || *dep.CustomDataShare,
+		cookiePrefix:      cookiePrefix,
+		sharePic:          orDefault(dep.SharePic, defaultPic),
+		webLogo:           orDefault(dep.WebLogo, defaultPic),
+		hotline:           orDefault(dep.Hotline, DefaultHotline),
+		detail:            dep.Detail,
+		payTable:          "`" + dep.TablePrefix + "pay_log`",
+		rewardTbl:         "`" + dep.TablePrefix + "member_reward`",
+		listTable:         "`" + dep.TablePrefix + "articlelist_all`",
 	}, nil
 }
 
@@ -78,6 +125,10 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "type", s.typeList)
 	router.Register("article", "zhuantiDetail", s.zhuantiDetail)
 	router.Register("article", "zhuantiList", s.zhuantiList)
+	router.Register("article", "selfmediaDetail", s.selfmediaDetail)
+	router.Register("article", "selfmedia", s.selfmedia)
+	router.Register("article", "config", s.config)
+	router.Register("article", "alist", s.alist)
 	router.Register("article", "orderDetail", s.orderDetail)
 }
 
@@ -248,15 +299,30 @@ func (r orderedRow) MarshalJSON() ([]byte, error) {
 	return marshalPairs(r.keys, func(i int) any { return r.vals[i] })
 }
 
+// marshalPairs 按给定键顺序拼出 JSON 对象。值走 json.Encoder 且关闭 HTML 转义，
+// 与外层 encode 的口径一致（PHP json_encode 不转义 < > &，标题里的 <font>/<strong>
+// 必须原样输出）。
 func marshalPairs(keys []string, val func(i int) any) ([]byte, error) {
+	encodeValue := func(v any) ([]byte, error) {
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(v); err != nil {
+			return nil, err
+		}
+		return bytes.TrimRight(buf.Bytes(), "\n"), nil
+	}
 	var b strings.Builder
 	b.WriteByte('{')
 	for i, k := range keys {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		kb, _ := json.Marshal(k)
-		vb, err := json.Marshal(val(i))
+		kb, err := encodeValue(k)
+		if err != nil {
+			return nil, err
+		}
+		vb, err := encodeValue(val(i))
 		if err != nil {
 			return nil, err
 		}
@@ -380,15 +446,19 @@ const dsqlFailure = `{"state": 200, "info": "操作失败！"}`
 // normalizeIDParam 复刻 ajax.php 对 id 调用的 convertArrToStrWithComma($value)
 // （common.inc.php:1793，$int=true）。PHP 里 id=… 与 id[]=… 是同一个键 id，
 // 这里两种键都读（mergeParams 保证同名只留后来源的一种）。
-func normalizeIDParam(params url.Values) string {
-	if arr, ok := params["id[]"]; ok && len(arr) > 0 {
+func normalizeIDParam(params url.Values) string { return commaInts(params, "id") }
+
+// commaInts 是 convertArrToStrWithComma 的通用版：ajax.php 对
+// id / cityid / sid / state 四个键都做同样的强制转换。
+func commaInts(params url.Values, key string) string {
+	if arr, ok := params[key+"[]"]; ok && len(arr) > 0 {
 		out := make([]string, len(arr))
 		for i, v := range arr {
 			out[i] = strconv.Itoa(phpInt(v))
 		}
 		return strings.Join(out, ",")
 	}
-	raw := params.Get("id")
+	raw := params.Get(key)
 	if raw == "" || strings.Contains(raw, "Placeholder") {
 		return ""
 	}
@@ -436,4 +506,14 @@ func (s *Service) zhuantiDetail(req *ajax.Request) ajax.Response {
 		return ajax.Response{State: stateNoData, Info: infoNoData}
 	}
 	return ajax.Response{State: ajax.StateOK, Info: info}
+}
+
+// defaultPic 是 canary 现状的 $cfg_sharePic / $cfg_weblogo。
+const defaultPic = "https://storage.googleapis.com/fbird-sea-uploads/siteConfig/logo/fbird_logo.png"
+
+func orDefault(v, d string) string {
+	if v == "" {
+		return d
+	}
+	return v
 }

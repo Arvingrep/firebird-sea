@@ -542,25 +542,41 @@ func buildAjax(db *sql.DB) *ajax.Router {
 	router := ajax.NewRouter(func(line string) {
 		writeLog(os.Stderr, "ajax_error", map[string]any{"error": line})
 	})
-	siteconfig.Register(router)
 	prefix := envOr("DB_PREFIX", "huoniao_")
 	var files *fburl.Resolver
 	if db != nil {
 		// 构造失败（前缀非法）交给 article.New 统一报错。
 		files, _ = fburl.New(db, prefix, fburl.DefaultConfig())
 	}
-	articleSvc, err := article.New(article.Dep{DB: db, TablePrefix: prefix, Files: files})
+	// Identity：按 cookie `<COOKIE_PREFIX>login_user` 识别会员；构造失败（如 DB 未配置）
+	// 降级为 nil（匿名 -1），不阻止启动。article.selfmedia 与 member.message 共用同一个识别器。
+	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
+		writeLog(os.Stderr, event, fields)
+	})
+	articleSvc, err := article.New(articleDep(db, prefix, files, identity, osGetenv))
 	if err != nil {
 		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
 	}
 	article.Register(router, articleSvc)
-	// Identity：按 cookie `<COOKIE_PREFIX>login_user` 识别会员；构造失败（如 DB 未配置）
-	// 降级为 nil（匿名 -1），不阻止启动。
-	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
-		writeLog(os.Stderr, event, fields)
+	siteSvc, err := siteconfig.New(siteconfig.Dep{
+		DB: db, TablePrefix: prefix, Files: files,
+		Members: siteMembers(identity),
+		// 站点运行期配置（$cfg_sharePic / $cfg_weblogo / $cfg_hotline / $cfg_staticVersion）不在仓库里。
+		SharePic:      envOr("FB_SITE_SHARE_PIC", defaultSharePic),
+		WebLogo:       envOr("FB_SITE_WEB_LOGO", defaultSharePic),
+		Hotline:       os.Getenv("FB_SITE_HOTLINE"),
+		StaticVersion: os.Getenv("FB_STATIC_VERSION"),
+		// $cfg_advMarkState / $cfg_advMarkPostion（canary siteConfig.inc.php:167-168）。
+		AdvMarkState: 1, AdvMarkPostion: 3,
+		// $cfg_userSubDomain / $cfg_busiSubDomain（member.inc.php:2-3，canary 均为 2）。
+		UserSubDomain: envInt("FB_USER_SUBDOMAIN", 2), BusiSubDomain: envInt("FB_BUSI_SUBDOMAIN", 2),
 	})
-	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
+	}
+	siteconfig.Register(router, siteSvc)
+	memberSvc, err := ajaxmember.New(ajaxmember.Dep{DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity, Files: files})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
 	}
