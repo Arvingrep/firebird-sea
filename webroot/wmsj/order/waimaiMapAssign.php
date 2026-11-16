@@ -16,12 +16,22 @@ $huoniaoTag->template_dir = $tpl; //设置后台模板目录
 
 $templates = "waimaiMapAssign.html";
 
-header("location:/404.html");
-die;
+// 商家只能看到自己管理的店铺（$managerIds 由 wmsj/inc/config.inc.php 按登录账号生成）
+// 订单按店铺过滤（越权/隐私），骑手是平台运力（无 sid），按商家店铺所在城市过滤
+$courierCityWhere = "";
+$citySql = $dsql->SetQuery("SELECT DISTINCT `cityid` FROM `#@__waimai_shop` WHERE `id` in ($managerIds)");
+$cityRet = $dsql->dsqlOper($citySql, "results");
+if($cityRet){
+    $cityIds = array();
+    foreach ($cityRet as $key => $value) {
+        if((int)$value['cityid']) array_push($cityIds, (int)$value['cityid']);
+    }
+    if($cityIds) $courierCityWhere = " AND c.`cityid` in (".join(",", $cityIds).")";
+}
 
 //配送员信息
 $courier = array();
-$sql = $dsql->SetQuery("SELECT c.*, (SELECT count(`id`) FROM `#@__waimai_order` WHERE (`state` = 4 OR `state` = 5) AND `peisongid` = c.`id`) as count FROM `#@__waimai_courier` c WHERE c.`state` = 1 ORDER BY count ASC");
+$sql = $dsql->SetQuery("SELECT c.*, (SELECT count(`id`) FROM `#@__waimai_order_all` WHERE (`state` = 4 OR `state` = 5) AND `peisongid` = c.`id`) as count FROM `#@__waimai_courier` c WHERE c.`state` = 1 AND c.`quit` = 0 ".$courierCityWhere." ORDER BY count ASC");
 $ret = $dsql->dsqlOper($sql, "results");
 if($ret){
     foreach ($ret as $key => $value) {
@@ -40,7 +50,7 @@ $huoniaoTag->assign("courier", json_encode($courier));
 
 //已确认订单
 $order = array();
-$sql = $dsql->SetQuery("SELECT o.`id`, o.`uid`, o.`sid`, o.`ordernum`, o.`person`, o.`tel`, o.`address`, o.`lng`, o.`lat`, o.`confirmdate`, s.`shopname`, s.`address` address1, s.`coordX`, s.`coordY` FROM `#@__waimai_order` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`state` = 3");
+$sql = $dsql->SetQuery("SELECT o.`id`, o.`uid`, o.`sid`, o.`ordernum`, o.`person`, o.`tel`, o.`address`, o.`lng`, o.`lat`, o.`confirmdate`, s.`shopname`, s.`address` address1, s.`coordX`, s.`coordY` FROM `#@__waimai_order_all` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE o.`state` = 3 AND o.`sid` in ($managerIds)");
 $ret = $dsql->dsqlOper($sql, "results");
 if($ret){
     foreach ($ret as $key => $value) {
