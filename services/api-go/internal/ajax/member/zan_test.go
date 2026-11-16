@@ -21,7 +21,7 @@ const (
 	qTravelZanDown  = "UPDATE `huoniao_travel_video` SET `zan` = zan - 1 WHERE `id` = ?"
 	qTiebaUp        = "UPDATE `huoniao_tieba_list` SET `up` = up + 1 WHERE `id` = ?"
 	qTiebaUpDown    = "UPDATE `huoniao_tieba_list` SET `up` = up - 1 WHERE `id` = ?"
-	qUpDelete       = "DELETE FROM `huoniao_public_up_all` WHERE `type` = '0' and `action` = 'detail' and `module` = 'article' and `tid` = '5' and `ruid` = '7'"
+	qUpDelete       = "DELETE FROM `huoniao_public_up_all` WHERE `type` = ? and `action` = ? and `module` = ? and `tid` = ? and `ruid` = ?"
 )
 
 // zanGet 请求 getZan，query 形如 "id=5&module=article"（不含 service/action）。
@@ -220,9 +220,11 @@ func TestGetZanCancel(t *testing.T) {
 	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("tg_99990001"))
 	m.ExpectQuery(qSubTables).WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}))
 	m.ExpectExec(qArticleZanDown).WithArgs("5").WillReturnResult(sqlmock.NewResult(0, 1))
-	m.ExpectExec(qUpDelete).WillReturnResult(sqlmock.NewResult(0, 1))
+	m.ExpectExec(qUpDelete).WithArgs(0, "detail", "article", "5", int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	deleteSQLText := "DELETE FROM `huoniao_public_up_all` WHERE `type` = '0' and `action` = 'detail' and `module` = 'article' and `tid` = '5' and `ruid` = '7'"
 	expectLogZan(m, "7", 5, "article", "delete", "取消点赞(T => 资讯tg_99990001取消了点赞您的信息)",
-		"action=getZan&id=5&module=article&service=member&temp=detail&title=T&uid=3", qUpDelete)
+		"action=getZan&id=5&module=article&service=member&temp=detail&title=T&uid=3", deleteSQLText)
 	got := zanGet(t, svc, fakeIdentity(7), "id=5&module=article&temp=detail&uid=3&title=T")
 	eq(t, got, okBody)
 	met(t, m)
@@ -330,4 +332,76 @@ func (e errTest) Error() string {
 		return "sql: no rows in result set"
 	}
 	return "mock exec error"
+}
+
+// 取消路径的 tieba 计数（up-1）与 type=1 文案「取消了点赞您的评论」。
+func TestGetZanCancelTiebaType1(t *testing.T) {
+	svc, m := newZanService(t, fakeIdentity(7), nil)
+	m.ExpectQuery(qModuleTitle).WithArgs("tieba").WillReturnRows(moduleRows("贴吧", "社区"))
+	m.ExpectQuery(qUpCheck).WithArgs(1, "detail", "tieba", "5", int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(9))
+	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("op"))
+	m.ExpectExec(qTiebaUpDown).WithArgs("5").WillReturnResult(sqlmock.NewResult(0, 1))
+	m.ExpectExec(qUpDelete).WithArgs(1, "detail", "tieba", "5", int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	deleteSQL := "DELETE FROM `huoniao_public_up_all` WHERE `type` = '1' and `action` = 'detail' and `module` = 'tieba' and `tid` = '5' and `ruid` = '7'"
+	expectLogZan(m, "7", 5, "tieba", "delete", "取消点赞(T => 社区op取消了点赞您的评论)",
+		"action=getZan&id=5&module=tieba&service=member&temp=detail&title=T&type=1", deleteSQL)
+	eq(t, zanGet(t, svc, fakeIdentity(7), "id=5&module=tieba&temp=detail&type=1&title=T"), okBody)
+	met(t, m)
+}
+
+// 取消路径的 travel 计数（zan-1）。
+func TestGetZanCancelTravel(t *testing.T) {
+	svc, m := newZanService(t, fakeIdentity(7), nil)
+	m.ExpectQuery(qUpCheck).WithArgs(0, "video-detail", "travel", "5", int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(9))
+	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("op"))
+	m.ExpectExec(qTravelZanDown).WithArgs("5").WillReturnResult(sqlmock.NewResult(0, 1))
+	m.ExpectExec(qUpDelete).WithArgs(0, "video-detail", "travel", "5", int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	deleteSQL := "DELETE FROM `huoniao_public_up_all` WHERE `type` = '0' and `action` = 'video-detail' and `module` = 'travel' and `tid` = '5' and `ruid` = '7'"
+	expectLogZan(m, "7", 5, "travel", "delete", "取消点赞( => op取消了点赞您的信息)",
+		"action=getZan&id=5&module=travel&service=member&temp=video-detail", deleteSQL)
+	eq(t, zanGet(t, svc, fakeIdentity(7), "id=5&module=travel&temp=video-detail"), okBody)
+	met(t, m)
+}
+
+// 数组参数 module[]/temp[]：PHP 把数组拼进 SQL/文案是字面量 "Array"，门禁按非空通过。
+func TestGetZanArrayModule(t *testing.T) {
+	svc, m := newZanService(t, fakeIdentity(7), nil)
+	m.ExpectQuery(qModuleTitle).WithArgs("Array").WillReturnRows(sqlmock.NewRows([]string{"title", "subject"}))
+	m.ExpectQuery(qUpCheck).WithArgs(0, "Array", "Array", "5", int64(7)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("op"))
+	m.ExpectExec(qUpInsert).WithArgs("", "5", int64(7), "Array", "Array", followNow, 0).
+		WillReturnResult(sqlmock.NewResult(9, 1))
+	insertSQL := "INSERT INTO `huoniao_public_up_all` (`uid`, `tid`, `ruid`, `module`, `action`, `puctime`, `type`) VALUES ('', '5', '7', 'Array', 'Array', '1700000000', '0')"
+	expectLogZan(m, "7", 5, "Array", "insert", "点赞( => op点赞了您的信息)",
+		"action=getZan&id=5&module[]=article&service=member&temp[]=detail", insertSQL)
+	eq(t, zanGet(t, svc, fakeIdentity(7), "id=5&module%5B%5D=article&temp%5B%5D=detail"), okBody)
+	met(t, m)
+}
+
+// module=0 是 PHP empty() 真值 → 101 参数错误，且 getModuleTitle 不查库。
+func TestGetZanZeroModule(t *testing.T) {
+	svc, m := newZanService(t, fakeIdentity(7), nil)
+	eq(t, zanGet(t, svc, fakeIdentity(7), "id=5&module=0&temp=detail"), `{"state":101,"info":"参数错误"}`)
+	met(t, m)
+}
+
+// module 带引号/注释：DELETE 走参数化执行，拼接串只进 memberLog 的 sql 字段留档（不执行）。
+func TestGetZanInjectionModule(t *testing.T) {
+	evil := "x' OR 1=1 -- "
+	svc, m := newZanService(t, fakeIdentity(7), nil)
+	m.ExpectQuery(qModuleTitle).WithArgs(evil).WillReturnRows(sqlmock.NewRows([]string{"title", "subject"}))
+	m.ExpectQuery(qUpCheck).WithArgs(0, "detail", evil, "5", int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(9))
+	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("op"))
+	m.ExpectExec(qUpDelete).WithArgs(0, "detail", evil, "5", int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	deleteSQL := "DELETE FROM `huoniao_public_up_all` WHERE `type` = '0' and `action` = 'detail' and `module` = '" + evil + "' and `tid` = '5' and `ruid` = '7'"
+	expectLogZan(m, "7", 5, evil, "delete", "取消点赞( => op取消了点赞您的信息)",
+		"action=getZan&id=5&module=x' OR 1=1 -- &service=member&temp=detail", deleteSQL)
+	eq(t, zanGet(t, svc, fakeIdentity(7), "id=5&module=x%27+OR+1%3D1+--+&temp=detail"), okBody)
+	met(t, m)
 }

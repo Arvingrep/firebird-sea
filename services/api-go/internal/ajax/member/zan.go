@@ -96,6 +96,8 @@ func (s *Service) getZan(req *ajax.Request) ajax.Response {
 		"SELECT `id` FROM "+s.upTable+" WHERE `type` = ? and `action` = ? and `module` = ? and `tid` = ? and `ruid` = ?",
 		zanType, temp, module, id, userid).Scan(&recID)
 	if err != nil && err != sql.ErrNoRows {
+		// 已知偏差：PHP 的 dsqlOper 查询异常时返回 false，empty() 为真 → 继续走点赞分支
+		// （随后 INSERT 同样失败，最终仍返回 ok）。这里沿用 #255/#256 的口径，库异常按 102 降级。
 		return noData()
 	}
 	exists := err == nil
@@ -131,8 +133,11 @@ func (s *Service) getZan(req *ajax.Request) ajax.Response {
 		deleteSQL := "DELETE FROM " + s.upTable + " WHERE `type` = '" + strconv.Itoa(zanType) +
 			"' and `action` = '" + temp + "' and `module` = '" + module +
 			"' and `tid` = '" + id + "' and `ruid` = '" + strconv.FormatInt(userid, 10) + "'"
-		// DELETE 删 0 行也不影响返回，写失败同样忽略（PHP 不检查返回值）。
-		_, _ = s.db.ExecContext(ctx, deleteSQL)
+		// 执行走参数化（PHP 侧靠 ajax.php 入口 addslashes，Go 没有这层，拼接串只给 memberLog 的
+		// sql 字段留档）。DELETE 删 0 行也不影响返回，写失败同样忽略（PHP 不检查返回值）。
+		_, _ = s.db.ExecContext(ctx,
+			"DELETE FROM "+s.upTable+" WHERE `type` = ? and `action` = ? and `module` = ? and `tid` = ? and `ruid` = ?",
+			zanType, temp, module, id, userid)
 
 		// 缓存清理（checkCache/clearCache）Go 侧无对应层，跳过；取消路径不通知（PHP 已注释死代码）。
 		s.memberLog(ctx, httpReq, strconv.FormatInt(userid, 10), module, "", int64(phpIntval(id)),
