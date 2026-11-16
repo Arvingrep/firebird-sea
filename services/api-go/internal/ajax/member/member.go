@@ -79,6 +79,10 @@ type Dep struct {
 	// MemberLogSaveDays 对应 $max_memberBehaviorLog_save_day（member_log 保留天数）。
 	// nil / 0 表示未配置，memberLog 不做过期清理（与 PHP 一致）。
 	MemberLogSaveDays *int
+	// DisableLikeState 对应 $cfg_disableLikeState（禁止点赞开关，getZan 用）；nil 取 canary 的 0。
+	DisableLikeState *int
+	// DisableLikeInfo 对应 $cfg_disableLikeInfo（禁止点赞提示语）；nil / 空串取 PHP 默认文案。
+	DisableLikeInfo *string
 	// Clock 仅测试用；nil 取 time.Now。
 	Clock func() time.Time
 }
@@ -93,6 +97,9 @@ type Service struct {
 	paotuiTable, tiebaTable, followTable                      string
 	// behaviorTable 是 member_log（memberLog 写的行为日志），selfMediaTable 是文章自媒体号表。
 	behaviorTable, selfMediaTable string
+	// siteModuleTable（getModuleTitle）、subTableListTable / articleListTable / travelVideoTable
+	// 是 getZan 用的表：分表清单、文章主表、travel_video 计数表。
+	siteModuleTable, subTableListTable, articleListTable, travelVideoTable string
 
 	files            *fburl.Resolver
 	userDetail       UserDetailFunc
@@ -101,6 +108,9 @@ type Service struct {
 	courierID        func(ctx context.Context, req *http.Request) (int64, error)
 	ipHomeMode       int
 	clock            func() time.Time
+	// getZan 的禁止点赞开关与提示语（cfg_disableLikeState / cfg_disableLikeInfo）。
+	disableLikeState int
+	disableLikeInfo  string
 
 	// memberLog 的过期清理状态：logSaveDays>0 时每 6 小时最多清理一次（PHP 用 cache 节流）。
 	logSaveDays  int
@@ -122,6 +132,14 @@ func New(dep Dep) (*Service, error) {
 	if dep.MemberLogSaveDays != nil {
 		logSaveDays = *dep.MemberLogSaveDays
 	}
+	disableLikeState := 0
+	if dep.DisableLikeState != nil {
+		disableLikeState = *dep.DisableLikeState
+	}
+	disableLikeInfo := ""
+	if dep.DisableLikeInfo != nil {
+		disableLikeInfo = *dep.DisableLikeInfo
+	}
 	return &Service{
 		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
 		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
@@ -130,7 +148,9 @@ func New(dep Dep) (*Service, error) {
 		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath,
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
-		logSaveDays: logSaveDays,
+		siteModuleTable: t("site_module"), subTableListTable: t("site_sub_tablelist"),
+		articleListTable: t("articlelist"), travelVideoTable: t("travel_video"),
+		logSaveDays: logSaveDays, disableLikeState: disableLikeState, disableLikeInfo: disableLikeInfo,
 	}, nil
 }
 
@@ -139,6 +159,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
 	router.Register("member", "getComment", s.getComment)
 	router.Register("member", "followMember", s.followMember)
+	router.Register("member", "getZan", s.getZan)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。
