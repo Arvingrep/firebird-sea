@@ -435,24 +435,18 @@ if($_POST){
                 `billingtype`       = '$billingtype',
                 `thingcategory`     = '$thingcategory',
                 `business_license_img` = '$business_license_img',
-                `reservestatus` = '$reservestatus'
+                `reservestatus` = '$reservestatus',
+                `delivery_fee_mode` = '$delivery_fee_mode',
+                `service_area_data` = '$service_area_data',
+                `basicprice`    = '$basicprice',
+                `delivery_fee`  = '$delivery_fee',
+                `delivery_fee_type`     = '$delivery_fee_type',
+                `delivery_fee_value`    = '$delivery_fee_value',
+                `open_range_delivery_fee`   = '$open_range_delivery_fee',
+                `range_delivery_fee_value`  = '$range_delivery_fee_value'
               WHERE `id` = $id
             ");
         }
-        //         -- `is_first_discount` = '$is_first_discount',
-        // -- `first_discount` = '$first_discount',
-        //         -- `open_fullcoupon` = '$open_fullcoupon',
-        // -- `fullcoupon` = '$fullcoupon',
-        /*`delivery_radius`   = '$delivery_radius',
-           `delivery_area`     = '$delivery_area',
-           `delivery_fee_mode` = '$delivery_fee_mode',
-           `service_area_data` = '$service_area_data',
-           `basicprice`    = '$basicprice',
-           `delivery_fee`  = '$delivery_fee',
-           `delivery_fee_type`     = '$delivery_fee_type',
-           `delivery_fee_value`    = '$delivery_fee_value',
-           `open_range_delivery_fee`   = '$open_range_delivery_fee',
-           `range_delivery_fee_value`  = '$range_delivery_fee_value',*/
         if ($module == 'jbinfo' || $module == '') {
             /*优闪添加店铺*/
             $yssql = $dsql->SetQuery("SELECT `ysshop_id` FROM `#@__$dbname` WHERE `id` = $id");

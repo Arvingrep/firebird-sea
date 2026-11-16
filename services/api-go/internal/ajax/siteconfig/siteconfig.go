@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
@@ -40,6 +41,13 @@ type Dep struct {
 	// SharePic / WebLogo / Hotline / StaticVersion 对应 PHP 的 $cfg_sharePic / $cfg_weblogo /
 	// $cfg_hotline / $cfg_staticVersion（运行期站点配置，不在仓库里）。
 	SharePic, WebLogo, Hotline, StaticVersion string
+	// AdvMarkState / AdvMarkPostion 对应 $cfg_advMarkState / $cfg_advMarkPostion（adv 用）。
+	AdvMarkState, AdvMarkPostion int
+	// UserSubDomain / BusiSubDomain 对应 $cfg_userSubDomain / $cfg_busiSubDomain
+	// （touchHomePageFooter 的 member 链接按 member.class.php:73-94 复刻时用）。
+	UserSubDomain, BusiSubDomain int
+	// Now 为 nil 时用 time.Now，测试注入固定时间。
+	Now func() time.Time
 }
 
 // Service 是 siteConfig 服务的实现。
@@ -49,6 +57,11 @@ type Service struct {
 	files                                              *fburl.Resolver
 	members                                            MemberResolver
 	sharePic, webLogo, hotline, staticVersion          string
+	advTable, advCityTable                             string
+	advMarkState, advMarkPostion                       int
+	domainTable                                        string
+	userSubDomain, busiSubDomain                       int
+	now                                                func() time.Time
 }
 
 // New 校验依赖并预拼表名。
@@ -57,7 +70,19 @@ func New(dep Dep) (*Service, error) {
 		return nil, fmt.Errorf("siteconfig: TablePrefix %q 含非法字符", dep.TablePrefix)
 	}
 	p := dep.TablePrefix
+	now := dep.Now
+	if now == nil {
+		now = time.Now
+	}
 	return &Service{
+		advTable:       "`" + p + "advlist`",
+		advCityTable:   "`" + p + "advlist_city`",
+		advMarkState:   dep.AdvMarkState,
+		advMarkPostion: dep.AdvMarkPostion,
+		domainTable:    "`" + p + "domain`",
+		userSubDomain:  dep.UserSubDomain,
+		busiSubDomain:  dep.BusiSubDomain,
+		now:            now,
 		db:             dep.DB,
 		moduleTable:    "`" + p + "site_module`",
 		cityTable:      "`" + p + "site_city`",
@@ -77,6 +102,8 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("siteConfig", "ping", ping)
 	if s != nil {
 		router.Register("siteConfig", "siteModule", s.siteModule)
+		router.Register("siteConfig", "adv", s.adv)
+		router.Register("siteConfig", "touchHomePageFooter", s.touchHomePageFooter)
 	}
 }
 

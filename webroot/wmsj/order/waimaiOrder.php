@@ -807,7 +807,7 @@ if ( $action == "setCourier" ) {
             $sub         = new SubTable( 'waimai_order' , '#@__waimai_order' );
             $break_table = $sub->getSubTableById( $value );
 
-            $sql = $dsql->SetQuery( "SELECT o.`sid`, o.`ordernum`, o.`food`, o.`ordernumstore`, o.`peisongid`, o.`peisongidlog`, s.`shopname`,s.`cityid` FROM `" . $break_table . "` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE  o.`id` = '" . $value . "' AND o.`ordertype` = 0 AND `selftime` = 0" );
+            $sql = $dsql->SetQuery( "SELECT o.`sid`, o.`ordernum`, o.`food`, o.`ordernumstore`, o.`peisongid`, o.`peisongidlog`, s.`shopname`,s.`cityid` FROM `" . $break_table . "` o LEFT JOIN `#@__waimai_shop` s ON s.`id` = o.`sid` WHERE  o.`id` = '" . $value . "' AND o.`ordertype` = 0 AND `selftime` = 0 AND o.`sid` in ($managerIds)" );
             $ret = $dsql->dsqlOper( $sql , "results" );
             if ( !$ret )
                 break;

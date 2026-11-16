@@ -263,7 +263,7 @@ func (s *Service) rewardItem(ctx context.Context, uid int64, r rewardRow, titles
 		modName := strPtr("")
 		switch r.module.String {
 		case "article", "circle", "tieba", "dating":
-			modName = s.moduleTitle(ctx, r.module.String, titles)
+			modName = s.rewardModuleTitle(ctx, r.module.String, titles)
 		case "chat":
 			modName = strPtr("在线聊天")
 		}
@@ -301,11 +301,11 @@ func (s *Service) rewardItem(ctx context.Context, uid int64, r rewardRow, titles
 			fee = strconv.Itoa(liveFee) + "%"
 		}
 		out = obj{{"url", liveURL}, {"id", aid}, {"type", typ}, {"title", title}, {"amount", amountS}, {"fee", fee},
-			{"module", s.moduleTitle(ctx, "live", titles)}}
+			{"module", s.rewardModuleTitle(ctx, "live", titles)}}
 	default: // hongbao
 		_, nickname = s.memberInfo(ctx, uid, rid)
 		out = obj{{"id", aid}, {"url", liveURL}, {"type", 0}, {"title", "直播:" + liveTitle + "中获得红包"},
-			{"amount", fmt2(phpFloatval(r.amount.String))}, {"module", s.moduleTitle(ctx, "live", titles)}}
+			{"amount", fmt2(phpFloatval(r.amount.String))}, {"module", s.rewardModuleTitle(ctx, "live", titles)}}
 	}
 	out = append(out, kv{"reward_userid", rid}, kv{"user", nickname})
 	if r.kind.String == "member" {
@@ -323,8 +323,8 @@ func (s *Service) url(service, template string, id int64) string {
 
 func strPtr(v string) *string { return &v }
 
-// moduleTitle 对应 getModuleTitle(['name'=>x])：subject 优先，查不到返回 nil（JSON null）。
-func (s *Service) moduleTitle(ctx context.Context, name string, cache map[string]*string) *string {
+// rewardModuleTitle 对应 getModuleTitle(['name'=>x])：subject 优先，查不到返回 nil（JSON null）。
+func (s *Service) rewardModuleTitle(ctx context.Context, name string, cache map[string]*string) *string {
 	if v, ok := cache[name]; ok {
 		return v
 	}
