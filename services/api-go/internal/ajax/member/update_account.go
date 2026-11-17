@@ -526,13 +526,13 @@ func (s *Service) updateNick(ctx context.Context, httpReq *http.Request, p param
 	}
 
 	// dsqlOper type=update 无论影响 0 行都返回 "ok"，只有 SQL 异常才失败。
-		if s.nicknameEditAudit != 0 {
-			if _, err := s.db.ExecContext(ctx,
-				"UPDATE "+s.memberTable+" SET `nickname_audit` = ?, `nickname_state` = ? WHERE `id` = ?",
-				nick, "审核中", id); err != nil {
-				return fail(infoModifyFail)
-			}
-		} else if mi.userType == 2 {
+	if s.nicknameEditAudit != 0 {
+		if _, err := s.db.ExecContext(ctx,
+			"UPDATE "+s.memberTable+" SET `nickname_audit` = ?, `nickname_state` = ? WHERE `id` = ?",
+			nick, "审核中", id); err != nil {
+			return fail(infoModifyFail)
+		}
+	} else if mi.userType == 2 {
 		if _, err := s.db.ExecContext(ctx,
 			"UPDATE "+s.memberTable+" SET `nickname` = ?, `company` = ? WHERE `id` = ?", nick, nick, id); err != nil {
 			return fail(infoModifyFail)
