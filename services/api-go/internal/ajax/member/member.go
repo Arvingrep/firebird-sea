@@ -120,8 +120,16 @@ type Dep struct {
 	PeriodicCheckPhone      *int
 	PeriodicCheckPhoneCycle *int
 	// ModuleCommentCheck 对应 include/config/<module>.inc.php 的 $customCommentCheck
-	// （replyComment 的 ischeck）；nil 按 0（待审核）处理。
+	// （replyComment / sendComment 的 ischeck）；nil 时按仓库配置文件现值（见 defaultCommentCheck）。
 	ModuleCommentCheck func(module string) int
+	// —— sendComment（#262）的依赖 ——
+	// ReturnInteractionComment 对应 $cfg_returnInteraction_comment（评论返积分数量）；
+	// ReturnInteractionCommentDay 对应 $cfg_returnInteraction_commentDay（每天上限）。
+	// 仓库 pointsConfig.inc.php 没有这两个键 → nil 取 0 = 不发放。
+	ReturnInteractionComment    *int
+	ReturnInteractionCommentDay *int
+	// PointName 对应 $cfg_pointName（默认「积分」）。
+	PointName *string
 	// Clock 仅测试用；nil 取 time.Now。
 	Clock func() time.Time
 }
@@ -179,6 +187,11 @@ type Service struct {
 	periodicCheckPhone  int
 	periodicCheckCycle  int
 	moduleCommentCheck  func(module string) int
+
+	// sendComment（#262）的积分配置：评论返积分数量 / 每天上限 / 积分名。
+	returnInteractionComment int
+	returnInteractionDay     int
+	pointName                string
 
 	// memberLog 的过期清理状态：logSaveDays>0 时每 6 小时最多清理一次（PHP 用 cache 节流）。
 	logSaveDays  int
@@ -244,6 +257,22 @@ func New(dep Dep) (*Service, error) {
 	if len(cryptKey) == 0 {
 		cryptKey = []byte(phpEncryptKey)
 	}
+	returnInteractionComment := 0
+	if dep.ReturnInteractionComment != nil {
+		returnInteractionComment = *dep.ReturnInteractionComment
+	}
+	returnInteractionDay := 0
+	if dep.ReturnInteractionCommentDay != nil {
+		returnInteractionDay = *dep.ReturnInteractionCommentDay
+	}
+	pointName := infoPointName
+	if dep.PointName != nil && *dep.PointName != "" {
+		pointName = *dep.PointName
+	}
+	moduleCommentCheck := dep.ModuleCommentCheck
+	if moduleCommentCheck == nil {
+		moduleCommentCheck = func(module string) int { return defaultCommentCheck[module] }
+	}
 	svc := &Service{
 		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath, prefix: dep.TablePrefix,
 		moduleURL: dep.ModuleURL, filePath: dep.FilePath, attachmentFile: dep.AttachmentFile, ipHome: dep.IPHome,
@@ -263,8 +292,10 @@ func New(dep Dep) (*Service, error) {
 		memberVerified: memberVerified, memberVerifiedInfo: dep.MemberVerifiedInfo,
 		memberBindPhone: memberBindPhone, memberBindPhoneInfo: dep.MemberBindPhoneInfo,
 		periodicCheckPhone: periodicCheckPhone, periodicCheckCycle: periodicCheckCycle,
-		moduleCommentCheck: dep.ModuleCommentCheck,
-		cookiePrefix:       cookiePrefix, detailPointState: detailPointState, cryptKey: cryptKey,
+		moduleCommentCheck:       moduleCommentCheck,
+		returnInteractionComment: returnInteractionComment, returnInteractionDay: returnInteractionDay,
+		pointName:    pointName,
+		cookiePrefix: cookiePrefix, detailPointState: detailPointState, cryptKey: cryptKey,
 		friendTable: t("member_friend"),
 		levelTable:  t("member_level"), businessTable: t("business_list"), staffTable: t("staff"),
 		securityTable: t("member_security"), datingTable: t("dating_member"), areaTable: t("site_area"),
@@ -289,6 +320,16 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "getZan", s.getZan)
 	router.Register("member", "replyComment", s.replyComment)
 	router.Register("member", "dingComment", s.dingComment)
+	router.Register("member", "sendComment", s.sendComment)
+}
+
+// defaultCommentCheck 是 include/config/<module>.inc.php 里 $customCommentCheck 的仓库现值
+// （sendComment/replyComment 的 ischeck）。没有配置文件或未列出的模块按 0（发表后待审核）。
+var defaultCommentCheck = map[string]int{
+	"article": 0, "awardlegou": 0, "circle": 1, "huodong": 1, "image": 1, "info": 0,
+	"live": 0, "marry": 1, "paimai": 0, "pension": 1, "quanjing": 1, "sfcar": 0,
+	"shop": 0, "tieba": 0, "travel": 1, "video": 1, "vote": 1,
+	// tuan / homemaking / business / waimai：仓库内无配置（waimai 只有 .example）→ 0。
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。

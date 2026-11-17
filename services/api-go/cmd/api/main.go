@@ -582,6 +582,10 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		// cookiePre 与 userid_encode。
 		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
 		CryptKey:     resolveCryptKey(osGetenv),
+		// sendComment(#262) 新增的依赖全部有仓库默认值，这里不覆盖：
+		// $cfg_returnInteraction_comment / $cfg_returnInteraction_commentDay 在 pointsConfig.inc.php
+		// 里没有定义 → 0（不发评论积分）；$cfg_pointName = 积分；
+		// $customCommentCheck 取 include/config/<module>.inc.php 的现值（member.New 内置默认表）。
 	})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
