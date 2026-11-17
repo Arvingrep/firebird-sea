@@ -744,12 +744,14 @@ new Vue({
 				 	// state≠4（已取货）：骑手→顾客 单线。原来这里把线算给了 directionsRenderer1
 				 	// 却又去重建了（没上图的）directionsRenderer，导致这条线永远不显示
 				 	directionsRenderer.setMap(null);
+				 	// 订单由 4 变 5 时清掉上一条骑手腿蓝线，避免残留
+				 	if (directionsRenderer1) { directionsRenderer1.setMap(null); }
 				 	directionsRenderer = new google.maps.DirectionsRenderer({
 				 		suppressMarkers:true  ,
 				 	});
 				 	directionsRenderer.setOptions({
 				 		polylineOptions: {
-				 		   strokeColor: '#027CFF'
+				 		   strokeColor: '#F5B120'   // 送达腿沿用 map_show 的黄色，同一条腿颜色恒定
 				 		},
 				 	});
 				 	directionsRenderer.setMap(map);
