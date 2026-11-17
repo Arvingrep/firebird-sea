@@ -443,7 +443,7 @@ func (s *Service) memberInfo(ctx context.Context, uid, rid int64) (any, *string)
 		"photo": photo, "photoSource": str(cPhoto), "sex": str(cSex), "wechat_subscribe": str(cSubscribe), "online": str(cOnline),
 		"cityid": str(cCityid), "addrid": str(cAddr),
 		"description":     strings.NewReplacer("\r\n", "<br />", "\r", "<br />", "\n", "<br />").Replace(m[cDesc].String),
-		"addrName":        s.addrName(ctx, phpIntval(m[cAddr].String)),
+		"addrName":        s.rewardAddrName(ctx, phpIntval(m[cAddr].String)),
 		"zhaopin_company": phpIntval(m[cZCompany].String), "zhaopin_resume": phpIntval(m[cZResume].String),
 	}
 	if mtype == 2 {
@@ -500,8 +500,8 @@ func fmtAny(v any) string {
 	return "0"
 }
 
-// addrName 对应 getParentArr("site_area") + parent_foreach("typename") + array_reverse + join(" > ")。
-func (s *Service) addrName(ctx context.Context, addr int) string {
+// rewardAddrName 对应 getParentArr("site_area") + parent_foreach("typename") + array_reverse + join(" > ")。
+func (s *Service) rewardAddrName(ctx context.Context, addr int) string {
 	var names []string
 	seen := map[int]bool{}
 	for id := addr; id != 0 && !seen[id] && len(seen) < 32; {

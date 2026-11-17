@@ -86,6 +86,12 @@ type Dep struct {
 	CourierID func(ctx context.Context, req *http.Request) (int64, error)
 	// IPHomeMode 对应 $cfg_iphome（0 不显示 1 省 2 市 3 省+市）；nil 取仓库配置的 3。
 	IPHomeMode *int
+	// CookiePrefix 对应 $cfg_cookiePre（member.detail 的 login cookie 前缀）；空取 HN_。
+	CookiePrefix string
+	// DetailPointState 对应 $cfg_pointState（member.detail 用）；nil 取仓库配置（开启）。
+	DetailPointState *bool
+	// CryptKey 是 RenrenCrypt 密钥（userid_encode 用）；nil 取 PHP 常量。
+	CryptKey []byte
 	// MemberLogSaveDays 对应 $max_memberBehaviorLog_save_day（member_log 保留天数）。
 	// nil / 0 表示未配置，memberLog 不做过期清理（与 PHP 一致）。
 	MemberLogSaveDays *int
@@ -135,6 +141,9 @@ type Service struct {
 
 	logTable, letterTable, upTable, commentTable, memberTable string
 	paotuiTable, tiebaTable, followTable                      string
+	friendTable                                               string
+	levelTable, businessTable, staffTable, securityTable      string
+	datingTable, areaTable, bonusTable, paymentTable          string
 	// collectTable 是 member_collect（member.collect 的收藏表）。
 	collectTable string
 	// publicCommentTable 是 replyComment 的 INSERT 目标（public_comment_all 是它的 MRG 合并表）；
@@ -152,6 +161,9 @@ type Service struct {
 	decodeAttachment func(string) string
 	courierID        func(ctx context.Context, req *http.Request) (int64, error)
 	ipHomeMode       int
+	cookiePrefix     string
+	detailPointState bool
+	cryptKey         []byte
 	clock            func() time.Time
 	// getZan 的禁止点赞开关与提示语（cfg_disableLikeState / cfg_disableLikeInfo）。
 	disableLikeState int
@@ -220,7 +232,19 @@ func New(dep Dep) (*Service, error) {
 	if dep.PeriodicCheckPhoneCycle != nil {
 		periodicCheckCycle = *dep.PeriodicCheckPhoneCycle
 	}
-	return &Service{
+	cookiePrefix := dep.CookiePrefix
+	if cookiePrefix == "" {
+		cookiePrefix = "HN_"
+	}
+	detailPointState := true
+	if dep.DetailPointState != nil {
+		detailPointState = *dep.DetailPointState
+	}
+	cryptKey := dep.CryptKey
+	if len(cryptKey) == 0 {
+		cryptKey = []byte(phpEncryptKey)
+	}
+	svc := &Service{
 		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath, prefix: dep.TablePrefix,
 		moduleURL: dep.ModuleURL, filePath: dep.FilePath, attachmentFile: dep.AttachmentFile, ipHome: dep.IPHome,
 		cookiePre: dep.CookiePre, pointState: dep.PointState, datingEnabled: dep.DatingEnabled,
@@ -240,7 +264,18 @@ func New(dep Dep) (*Service, error) {
 		memberBindPhone: memberBindPhone, memberBindPhoneInfo: dep.MemberBindPhoneInfo,
 		periodicCheckPhone: periodicCheckPhone, periodicCheckCycle: periodicCheckCycle,
 		moduleCommentCheck: dep.ModuleCommentCheck,
-	}, nil
+		cookiePrefix:       cookiePrefix, detailPointState: detailPointState, cryptKey: cryptKey,
+		friendTable: t("member_friend"),
+		levelTable:  t("member_level"), businessTable: t("business_list"), staffTable: t("staff"),
+		securityTable: t("member_security"), datingTable: t("dating_member"), areaTable: t("site_area"),
+		bonusTable: t("member_bonus"), paymentTable: t("site_payment"),
+	}
+	// member.detail 已迁移：默认把自身投影接到 getComment 的 userDetail 钩子上，
+	// 消除此前 nil → 102 的回退（Dep.UserDetail 仍可覆盖，测试用）。
+	if svc.userDetail == nil {
+		svc.userDetail = svc.userDetailHook
+	}
+	return svc, nil
 }
 
 // Register 注册本服务的全部 action。
@@ -248,6 +283,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
 	router.Register("member", "reward", s.reward)
 	router.Register("member", "getComment", s.getComment)
+	router.Register("member", "detail", s.detail)
 	router.Register("member", "followMember", s.followMember)
 	router.Register("member", "collect", s.collect)
 	router.Register("member", "getZan", s.getZan)
