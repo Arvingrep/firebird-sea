@@ -138,8 +138,14 @@ new Vue({
 			// true 表示地图是在“没有骑手坐标”的前提下建出来的：此时 map_show 没有启动轮询，
 			// 由下面的 sync 负责在定位到手后补画骑手标记并持续刷新（避免与 map_show 的 interval 双重轮询）
 			var pendingCourier = false;
+			// 原生 App（huoniao UA / bridge 已注入）走原有 bridge 回调建图，这条兜底只能作用于 Web：
+			// 否则 mounted 会抢在 getGeocoder 回调之前以“无骑手坐标”建图，原生端反而丢掉骑手段路线。
+			var nativeBridgeLikely = function () {
+				return !!window.WebViewJavascriptBridge || /huoniao/i.test(navigator.userAgent || '');
+			};
 			var drawInitial = function (ps) {
 				if (!vm.mapshow || vm.order_finished || !vm.orderTop) { return false; }
+				if (!ps && nativeBridgeLikely()) { return false; }   // 原生 App：等 bridge 回调，路径完全不变
 				var shop = window.shoplnglat, user = window.userlnglat;
 				if (!shop || !user) { return false; }
 				if (num(shop.lat) === null || num(shop.lng) === null ||
