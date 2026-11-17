@@ -288,6 +288,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "collect", s.collect)
 	router.Register("member", "getZan", s.getZan)
 	router.Register("member", "replyComment", s.replyComment)
+	router.Register("member", "dingComment", s.dingComment)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。
