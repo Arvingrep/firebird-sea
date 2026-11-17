@@ -107,12 +107,16 @@ $(function(){
         var points = [], LatLngList = [];
 
         if(first){
+              // renderingType: RASTER——矢量渲染依赖 WebGL，部分环境（硬件加速关闭/被扩展干扰）
+              // WebGL 失败时表现为灰底+标注正常+零瓦片请求；栅格用 <img> 无此依赖。
+              // key 若无栅格权限，API 会警告并回退矢量，无副作用。
               map = new google.maps.Map(document.getElementById('map'), {
               zoom: 14,
               center: new google.maps.LatLng(30, 120),
               zoomControl: true,
               mapTypeControl: false,
-              streetViewControl: false
+              streetViewControl: false,
+              renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined
             });
         }else{
             for (var i = 0; i < gOverlays.length; i++) {
