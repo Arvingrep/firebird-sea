@@ -131,11 +131,18 @@ new Vue({
 
 		// Web 端（Telegram / 浏览器）没有原生 bridge：用 webgeo.js 的浏览器定位补上骑手坐标，
 		// 否则 ps_lnglat 恒为空、地图不显示骑手位置（AD-14 最小补丁，原生 App 不生效）
+		// 2026-11-17 修复：原来只同步坐标不触发画图 —— map_show 只有 bridge 回调（原生 App）
+		// 和 rechange 按钮（也走 bridge）会调，Web 里两者都永远不会执行，#map 恒为空白。
+		// 这里在首次拿到有效定位时补一次 map_show（与 bridge 回调行为一致），
+		// map_show 末尾会置 mapshow=0，天然防重复建图。
 		(function (vm) {
 			var sync = function () {
 				var wg = window.__webGeo;
 				if (wg && wg.lng !== '' && wg.lat !== '' && wg.lng != null && wg.lat != null) {
 					vm.ps_lnglat = {'lng': wg.lng, 'lat': wg.lat};
+					if (vm.mapshow && !vm.order_finished && vm.orderTop && window.shoplnglat && window.userlnglat) {
+						vm.map_show(window.shoplnglat, window.userlnglat, vm.ps_lnglat);
+					}
 				}
 			};
 			sync();
@@ -723,6 +730,25 @@ new Vue({
 		},
 		rechange:function(){
 			var tt = this;
+			// Web 端回退（TG/浏览器，无原生 bridge）：bridge 回调永远不会执行，
+			// created() 里的自动调用和定位按钮此前都静默失效。webgeo.js 已提供
+			// __webGeo（并对原生 App UA 自动退出），这里直接用它画图/居中。
+			// 上报由 webgeo.js 自带节流上报负责，无需重复。
+			if (!window.WebViewJavascriptBridge && window.__webGeo) {
+				var wg = window.__webGeo;
+				tt.ps_lnglat = {'lng': wg.lng, 'lat': wg.lat};
+				tt.rotation = wg.rotation || 0;
+				if(tt.mapshow){
+					tt.map_show(window.shoplnglat, window.userlnglat, tt.ps_lnglat);
+				}else if(typeof map != 'undefined' && map){
+					if(site_map == 'google'){
+						map.panTo({'lat': Number(wg.lat), 'lng': Number(wg.lng)});
+					}else{
+						map.panTo(new BMap.Point(tt.ps_lnglat.lng, tt.ps_lnglat.lat));
+					}
+				}
+				return;
+			}
 			setupWebViewJavascriptBridge(function(bridge) {
 			    bridge.callHandler("getGeocoder", {}, function(responseData){
 					var data = JSON.parse(responseData)

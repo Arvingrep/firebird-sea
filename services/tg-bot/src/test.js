@@ -234,6 +234,15 @@ async function run() {
   if (!out8.includes(`"web_app":{"url":"${APP_BASE_URL}/tg/entry.php?role=merchant"}`)) {
     throw new Error(`/merchant 未生成 web_app 入口按钮，stdout=${out8}`);
   }
+  // 商户中心入口：同一落地页 + &to=member，落 /member?action=workPlatform 而不是 /wmsj/。
+  // 钉住这个参数是因为它一旦丢，商户中心按钮会静默变成「又一个接单后台」，用户点进去
+  // 还是看不到员工管理 —— 正是这次要修的原始症状。
+  if (!out8.includes(`"web_app":{"url":"${APP_BASE_URL}/tg/entry.php?role=merchant&to=member"}`)) {
+    throw new Error(`/merchant 未生成「商户中心」入口按钮（缺 to=member），stdout=${out8}`);
+  }
+  if (!out8.includes('商户中心')) {
+    throw new Error(`/merchant 按钮文案未含「商户中心」，stdout=${out8}`);
+  }
   if (!out8.includes('"request_contact":true') || !out8.includes('分享手机号完成绑定')) {
     throw new Error(`/merchant 未追加 request_contact 键盘，stdout=${out8}`);
   }

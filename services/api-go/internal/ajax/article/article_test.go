@@ -515,3 +515,123 @@ func TestZhuantiDetailLowerQueryFails(t *testing.T) {
 		t.Fatalf("响应体 = %s\nwant     %s", got, want)
 	}
 }
+
+const orderMainQuery = "SELECT r.`ordernum`, r.`aid`, r.`date`, r.`state`, l.`amount` FROM `huoniao_pay_log` l LEFT JOIN `huoniao_member_reward` r ON r.`ordernum` = l.`body` WHERE r.`module` = 'article' AND l.`ordernum` = ?"
+const orderTitleQuery = "SELECT `title` FROM `huoniao_articlelist_all` WHERE `id` = ?"
+
+var orderCols = []string{"ordernum", "aid", "date", "state", "amount"}
+
+// 正常：外层 100，info 为嵌套对象（含 state 键），date 为字符串，amount 两位小数，url 恒 ""。
+func TestOrderDetailNormal(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(orderMainQuery).WithArgs("PAY1").WillReturnRows(
+		sqlmock.NewRows(orderCols).AddRow("R1", 8, "1794014028", 1, 5.5))
+	mock.ExpectQuery(orderTitleQuery).WithArgs(8).WillReturnRows(
+		sqlmock.NewRows([]string{"title"}).AddRow("标题"))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=orderDetail&ordernum=PAY1")
+	want := `{"state":100,"info":{"state":1,"ordernum":"R1","title":"标题","url":"","date":"1794014028","amount":"5.50"}}`
+	if got != want {
+		t.Fatalf("响应体 = %s\nwant     %s", got, want)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("SQL 期望未满足: %v", err)
+	}
+}
+
+// r.state 为 200 / 101 → 外层 101、info:null，不再查 title。
+func TestOrderDetailState200And101(t *testing.T) {
+	for _, st := range []int{200, 101} {
+		svc, mock := newService(t)
+		mock.ExpectQuery(orderMainQuery).WithArgs("PAY1").WillReturnRows(
+			sqlmock.NewRows(orderCols).AddRow("R1", 8, "1794014028", st, 5.5))
+		got := serve(t, svc, "/include/ajax.php?service=article&action=orderDetail&ordernum=PAY1")
+		if got != `{"state":101,"info":null}` {
+			t.Fatalf("state=%d 响应体 = %s", st, got)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("SQL 期望未满足: %v", err)
+		}
+	}
+}
+
+func TestOrderDetailEmptyResult(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(orderMainQuery).WithArgs("NOPE").WillReturnRows(sqlmock.NewRows(orderCols))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=orderDetail&ordernum=NOPE")
+	if got != `{"state":102,"info":"No data!"}` {
+		t.Fatalf("响应体 = %s", got)
+	}
+}
+
+// 缺参 / 空参 / "0"（PHP falsy）→ 102，且不触发任何 SQL。
+func TestOrderDetailMissingOrdernum(t *testing.T) {
+	for _, target := range []string{
+		"/include/ajax.php?service=article&action=orderDetail",
+		"/include/ajax.php?service=article&action=orderDetail&ordernum=",
+		"/include/ajax.php?service=article&action=orderDetail&ordernum=0", // PHP "0" falsy
+	} {
+		svc, mock := newService(t)
+		got := serve(t, svc, target)
+		if got != `{"state":102,"info":"No data!"}` {
+			t.Fatalf("%s 响应体 = %s", target, got)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("不应有 SQL: %v", err)
+		}
+	}
+}
+
+// ordernum="0" 是 PHP falsy → 102 且不触发 SQL。
+// 设置一条本会命中的期望：若 handler 误发查询，期望被消费，下面的断言会失败。
+func TestOrderDetailOrdernumZeroNoQuery(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(orderMainQuery).WithArgs("0").WillReturnRows(
+		sqlmock.NewRows(orderCols).AddRow("R1", 8, "1794014028", 1, 5.5))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=orderDetail&ordernum=0")
+	if got != `{"state":102,"info":"No data!"}` {
+		t.Fatalf("响应体 = %s", got)
+	}
+	if err := mock.ExpectationsWereMet(); err == nil {
+		t.Fatal("ordernum=0 不应触发任何 SQL，但期望的查询已被消费")
+	}
+}
+
+// 文章已删（title 查不到）→ title 为 ""；amount 为 NULL → "0.00"。
+func TestOrderDetailTitleMissingAndNullAmount(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(orderMainQuery).WithArgs("PAY1").WillReturnRows(
+		sqlmock.NewRows(orderCols).AddRow("R1", 8, "1794014028", 0, nil))
+	mock.ExpectQuery(orderTitleQuery).WithArgs(8).WillReturnRows(sqlmock.NewRows([]string{"title"}))
+	got := serve(t, svc, "/include/ajax.php?service=article&action=orderDetail&ordernum=PAY1")
+	want := `{"state":100,"info":{"state":0,"ordernum":"R1","title":"","url":"","date":"1794014028","amount":"0.00"}}`
+	if got != want {
+		t.Fatalf("响应体 = %s\nwant     %s", got, want)
+	}
+}
+
+func TestOrderDetailAmountFormat(t *testing.T) {
+	cases := map[float64]string{1: "1.00", 0.1: "0.10", 12.345: "12.35", 100.999: "101.00"}
+	for in, want := range cases {
+		svc, mock := newService(t)
+		mock.ExpectQuery(orderMainQuery).WithArgs("P").WillReturnRows(
+			sqlmock.NewRows(orderCols).AddRow("R", 1, "1", 0, in))
+		mock.ExpectQuery(orderTitleQuery).WithArgs(1).WillReturnRows(sqlmock.NewRows([]string{"title"}))
+		got := serve(t, svc, "/include/ajax.php?service=article&action=orderDetail&ordernum=P")
+		if !strings.Contains(got, `"amount":"`+want+`"`) {
+			t.Fatalf("amount %v: 响应体 = %s，want %s", in, got, want)
+		}
+	}
+}
+
+// 主查询出错 / 无库 → 102。
+func TestOrderDetailDBErrorAndNoDB(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery(orderMainQuery).WithArgs("P").WillReturnError(fmt.Errorf("mock db error"))
+	if got := serve(t, svc, "/include/ajax.php?service=article&action=orderDetail&ordernum=P"); got != `{"state":102,"info":"No data!"}` {
+		t.Fatalf("响应体 = %s", got)
+	}
+	nodb, _ := New(Dep{DB: nil, TablePrefix: "huoniao_"})
+	if got := serve(t, nodb, "/include/ajax.php?service=article&action=orderDetail&ordernum=P"); got != `{"state":102,"info":"No data!"}` {
+		t.Fatalf("响应体 = %s", got)
+	}
+}

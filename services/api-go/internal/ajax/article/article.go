@@ -2,6 +2,7 @@
 package article
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -46,6 +47,9 @@ type Dep struct {
 	// SharePic / WebLogo / Hotline 对应 PHP $cfg_sharePic / $cfg_weblogo / $cfg_hotline（article.config 用）。
 	// 空串分别回落到 canary 现状值。
 	SharePic, WebLogo, Hotline string
+	// Detail 对应 article.detail（#260，尚未迁移）。alist 的 dynamicid 分支会逐条转调它；
+	// nil 时该 action 直接返回 102 "No data!"（已知偏差，见 alist 注释）。
+	Detail func(req *ajax.Request) ajax.Response
 }
 
 // Service 是 article 服务的实现。
@@ -62,10 +66,14 @@ type Service struct {
 	sdTable, sdManagerTable, sdNewsTable, sdFollowTable string
 	// sm* 是 selfmedia 用到的表名（已带前缀）。
 	smTable, smNewsTable, smFollowTable string
-	members                             MemberResolver
-	dataShare                           bool
-	cookiePrefix                        string
-	sharePic, webLogo, hotline          string
+	// al* 是 alist（#252）用到的表名（已带前缀）。
+	alTable, alPicTable, alCommentTable, alRewardTable, alUpTable, alAttachmentTable string
+	members                                                                          MemberResolver
+	dataShare                                                                        bool
+	cookiePrefix                                                                     string
+	sharePic, webLogo, hotline                                                       string
+	detail                                                                           func(req *ajax.Request) ajax.Response
+	payTable, rewardTbl, listTable                                                   string
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -78,26 +86,36 @@ func New(dep Dep) (*Service, error) {
 		cookiePrefix = "HN_"
 	}
 	return &Service{
-		db:             dep.DB,
-		fieldTable:     "`" + dep.TablePrefix + "article_selfmedia_field`",
-		typeTable:      "`" + dep.TablePrefix + "articletype`",
-		zhuantiTable:   "`" + dep.TablePrefix + "article_zhuanti`",
-		zlListTable:    "`" + dep.TablePrefix + "article_zhuantilist`",
-		zlNewsTable:    "`" + dep.TablePrefix + "articlelist_all`",
-		files:          dep.Files,
-		sdTable:        "`" + dep.TablePrefix + "article_selfmedia`",
-		sdManagerTable: "`" + dep.TablePrefix + "article_selfmedia_manager`",
-		sdNewsTable:    "`" + dep.TablePrefix + "articlelist_all`",
-		sdFollowTable:  "`" + dep.TablePrefix + "member_follow`",
-		smTable:        "`" + dep.TablePrefix + "article_selfmedia`",
-		smNewsTable:    "`" + dep.TablePrefix + "articlelist_all`",
-		smFollowTable:  "`" + dep.TablePrefix + "member_follow`",
-		members:        dep.Members,
-		dataShare:      dep.CustomDataShare == nil || *dep.CustomDataShare,
-		cookiePrefix:   cookiePrefix,
-		sharePic:       orDefault(dep.SharePic, defaultPic),
-		webLogo:        orDefault(dep.WebLogo, defaultPic),
-		hotline:        orDefault(dep.Hotline, DefaultHotline),
+		db:                dep.DB,
+		fieldTable:        "`" + dep.TablePrefix + "article_selfmedia_field`",
+		typeTable:         "`" + dep.TablePrefix + "articletype`",
+		zhuantiTable:      "`" + dep.TablePrefix + "article_zhuanti`",
+		zlListTable:       "`" + dep.TablePrefix + "article_zhuantilist`",
+		zlNewsTable:       "`" + dep.TablePrefix + "articlelist_all`",
+		files:             dep.Files,
+		sdTable:           "`" + dep.TablePrefix + "article_selfmedia`",
+		sdManagerTable:    "`" + dep.TablePrefix + "article_selfmedia_manager`",
+		sdNewsTable:       "`" + dep.TablePrefix + "articlelist_all`",
+		sdFollowTable:     "`" + dep.TablePrefix + "member_follow`",
+		smTable:           "`" + dep.TablePrefix + "article_selfmedia`",
+		smNewsTable:       "`" + dep.TablePrefix + "articlelist_all`",
+		smFollowTable:     "`" + dep.TablePrefix + "member_follow`",
+		alTable:           "`" + dep.TablePrefix + "articlelist_all`",
+		alPicTable:        "`" + dep.TablePrefix + "articlepic`",
+		alCommentTable:    "`" + dep.TablePrefix + "public_comment_all`",
+		alRewardTable:     "`" + dep.TablePrefix + "member_reward`",
+		alUpTable:         "`" + dep.TablePrefix + "public_up_all`",
+		alAttachmentTable: "`" + dep.TablePrefix + "attachment`",
+		members:           dep.Members,
+		dataShare:         dep.CustomDataShare == nil || *dep.CustomDataShare,
+		cookiePrefix:      cookiePrefix,
+		sharePic:          orDefault(dep.SharePic, defaultPic),
+		webLogo:           orDefault(dep.WebLogo, defaultPic),
+		hotline:           orDefault(dep.Hotline, DefaultHotline),
+		detail:            dep.Detail,
+		payTable:          "`" + dep.TablePrefix + "pay_log`",
+		rewardTbl:         "`" + dep.TablePrefix + "member_reward`",
+		listTable:         "`" + dep.TablePrefix + "articlelist_all`",
 	}, nil
 }
 
@@ -110,6 +128,69 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "selfmediaDetail", s.selfmediaDetail)
 	router.Register("article", "selfmedia", s.selfmedia)
 	router.Register("article", "config", s.config)
+	router.Register("article", "alist", s.alist)
+	router.Register("article", "orderDetail", s.orderDetail)
+}
+
+// orderInfo 是 orderDetail 的返回数组，字段顺序与 PHP 一致（article.class.php:3025-3071）。
+// Ordernum/Date 用指针：PHP 原样输出，库里为 NULL 时是 null。
+type orderInfo struct {
+	State    int     `json:"state"`
+	Ordernum *string `json:"ordernum"`
+	Title    string  `json:"title"`
+	URL      string  `json:"url"`
+	Date     *string `json:"date"`
+	Amount   string  `json:"amount"`
+}
+
+// orderDetail 迁移自 article.class.php:3025-3071（分发器 handlers.class.php:63-92）：
+//
+//	ordernum 空/缺/"0"（PHP falsy，if($ordernum)）→ 102；主查询（pay_log.body = member_reward.ordernum）无结果 → 102；
+//	r.state == 200 或 101 → 外层 101 + info:null；否则 100 + info 为整个数组（含 state 键）。
+//
+// url 按 #242 裁决 A 固定返回 ""（getUrlPath 待 #330 迁移后补），对比用例 ignoreFields。
+func (s *Service) orderDetail(req *ajax.Request) ajax.Response {
+	noData := ajax.Response{State: stateNoData, Info: infoNoData}
+	ordernum := req.Params.Get("ordernum")
+	if s.db == nil || ordernum == "" || ordernum == "0" {
+		return noData
+	}
+
+	ctx := req.HTTP.Context()
+	query := "SELECT r.`ordernum`, r.`aid`, r.`date`, r.`state`, l.`amount` FROM " + s.payTable +
+		" l LEFT JOIN " + s.rewardTbl + " r ON r.`ordernum` = l.`body` WHERE r.`module` = 'article' AND l.`ordernum` = ?"
+	var (
+		rowOrdernum, rowDate *string
+		aid                  sql.NullInt64
+		state                sql.NullInt64
+		amount               sql.NullFloat64
+	)
+	// 只取第一行（PHP 的 $ret[0]）。
+	if err := s.db.QueryRowContext(ctx, query, ordernum).Scan(&rowOrdernum, &aid, &rowDate, &state, &amount); err != nil {
+		// sql.ErrNoRows 与查询失败同口径：dsqlOper 返回空/false → 102。
+		return noData
+	}
+
+	// handlers.class.php 的宽松比较：state == 200 || state == 101 → 101 + null。
+	if state.Int64 == 200 || state.Int64 == 101 {
+		return ajax.Response{State: 101, Info: nil}
+	}
+
+	// 文章已删查不到 → ""。
+	title := ""
+	var t sql.NullString
+	if err := s.db.QueryRowContext(ctx, "SELECT `title` FROM "+s.listTable+" WHERE `id` = ?", aid.Int64).Scan(&t); err == nil {
+		title = t.String
+	}
+
+	return ajax.Response{State: ajax.StateOK, Info: orderInfo{
+		State:    int(state.Int64),
+		Ordernum: rowOrdernum,
+		Title:    title,
+		URL:      "",
+		Date:     rowDate,
+		Amount:   fmt.Sprintf("%.2f", amount.Float64),
+	}}
 }
 
 // fieldItem 是 selfmedia_field 返回的一行。字段顺序与 PHP 数组一致
@@ -218,15 +299,30 @@ func (r orderedRow) MarshalJSON() ([]byte, error) {
 	return marshalPairs(r.keys, func(i int) any { return r.vals[i] })
 }
 
+// marshalPairs 按给定键顺序拼出 JSON 对象。值走 json.Encoder 且关闭 HTML 转义，
+// 与外层 encode 的口径一致（PHP json_encode 不转义 < > &，标题里的 <font>/<strong>
+// 必须原样输出）。
 func marshalPairs(keys []string, val func(i int) any) ([]byte, error) {
+	encodeValue := func(v any) ([]byte, error) {
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(v); err != nil {
+			return nil, err
+		}
+		return bytes.TrimRight(buf.Bytes(), "\n"), nil
+	}
 	var b strings.Builder
 	b.WriteByte('{')
 	for i, k := range keys {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		kb, _ := json.Marshal(k)
-		vb, err := json.Marshal(val(i))
+		kb, err := encodeValue(k)
+		if err != nil {
+			return nil, err
+		}
+		vb, err := encodeValue(val(i))
 		if err != nil {
 			return nil, err
 		}
@@ -350,15 +446,19 @@ const dsqlFailure = `{"state": 200, "info": "操作失败！"}`
 // normalizeIDParam 复刻 ajax.php 对 id 调用的 convertArrToStrWithComma($value)
 // （common.inc.php:1793，$int=true）。PHP 里 id=… 与 id[]=… 是同一个键 id，
 // 这里两种键都读（mergeParams 保证同名只留后来源的一种）。
-func normalizeIDParam(params url.Values) string {
-	if arr, ok := params["id[]"]; ok && len(arr) > 0 {
+func normalizeIDParam(params url.Values) string { return commaInts(params, "id") }
+
+// commaInts 是 convertArrToStrWithComma 的通用版：ajax.php 对
+// id / cityid / sid / state 四个键都做同样的强制转换。
+func commaInts(params url.Values, key string) string {
+	if arr, ok := params[key+"[]"]; ok && len(arr) > 0 {
 		out := make([]string, len(arr))
 		for i, v := range arr {
 			out[i] = strconv.Itoa(phpInt(v))
 		}
 		return strings.Join(out, ",")
 	}
-	raw := params.Get("id")
+	raw := params.Get(key)
 	if raw == "" || strings.Contains(raw, "Placeholder") {
 		return ""
 	}
