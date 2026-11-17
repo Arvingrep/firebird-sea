@@ -355,6 +355,7 @@ $(function(){
 		//加载地图事件
 		function initialize() {
 			var map = new google.maps.Map(document.getElementById('map'), {
+				renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
 				zoom: 14,
 				center: new google.maps.LatLng(parseFloat(lnglat[1]), parseFloat(lnglat[0])),
 				zoomControl: true,

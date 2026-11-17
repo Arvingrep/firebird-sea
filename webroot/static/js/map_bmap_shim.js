@@ -800,6 +800,7 @@
         this._el = el;
 
         this._gmap = new googleMaps.Map(el, {
+            renderingType: googleMaps.RenderingType ? googleMaps.RenderingType.RASTER : undefined,
             center: new googleMaps.LatLng(DEFAULT_LAT, DEFAULT_LNG),
             zoom: 15,
             zoomControl: true,            // 对应 :445 的 NavigationControl（百度小号缩放）

@@ -75,6 +75,7 @@ $(function () {
         setMap();
         function setMap() {
             var map = new google.maps.Map(document.getElementById('allmap'), {
+                renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
                 center: uluru,
                 zoom: 18,
                 gestureHandling: 'none',

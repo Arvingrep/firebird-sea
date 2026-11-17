@@ -477,6 +477,7 @@ new Vue({
 			 }else if(site_map=='google'){
 				 // 初始化地图
 				 map = new google.maps.Map(document.getElementById("map"), {
+					   renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
 					   zoom: 14,
 					   center: {
 						 lat: qishou.lat,
