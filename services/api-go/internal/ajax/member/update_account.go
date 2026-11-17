@@ -1070,7 +1070,9 @@ func (s *Service) updateChphone(ctx context.Context, httpReq *http.Request, p pa
 	}
 	changeUid := int64(0)
 	if total > 0 {
-		// changeUidByPhone：RenrenCrypt 令牌（php_decrypt 内部还有一次 base64 → 双层解码）。
+		// changeUidByPhone：RenrenCrypt 令牌。PHP 链路是 php_decrypt(base64_decode(token))，
+		// php_decrypt 内部还有一次 base64 → 双层解码（member 本地 renrenDecrypt 只做 XOR，
+		// 入参须是已解码的 raw bytes）。
 		// 仓库内没有生成方（令牌可伪造，密钥硬编码），只用于「解绑持有同号码的另一个账号」。
 		token := p.norm("changeUidByPhone")
 		if truthyStr(token) {
