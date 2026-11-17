@@ -148,8 +148,9 @@ type Dep struct {
 	// WxPhoneNumber 对应 do=chphone 的微信小程序支路（getuserphonenumber，需要 access_token
 	// 服务）；nil 时按「手机号码解析失败」返回。errCode 非空时返回 ErrCode/ErrMsg 文案。
 	WxPhoneNumber func(ctx context.Context, code string) (errCode, errMsg, areaCode, phone string)
-	// DyPhoneNumber 对应抖音小程序支路（jscode2session + WXBizDataCrypt）；nil 同上。
-	DyPhoneNumber func(ctx context.Context, code, encryptedData, iv string) (errNo, errTips, areaCode, phone string)
+	// DyPhoneNumber 对应抖音小程序支路（jscode2session + WXBizDataCrypt）；decErrCode 是
+	// 解密错误码（PHP WXBizDataCrypt::decryptData 的返回值，空手机号提示会拼上它）；nil 同上。
+	DyPhoneNumber func(ctx context.Context, code, encryptedData, iv string) (errNo, errTips, decErrCode, areaCode, phone string)
 	// 以下三个对应 cfg_cardState=1 的阿里云 OCR / 实名核验（zid.market.alicloudapi.com，
 	// AppCode 取 unserialize($cfg_juhe)['aliyun']）。nil 表示 AppCode 为空 / 服务未接入，
 	// PHP 侧此时 json_decode 返回 null、error_code 判 0 后因缺少 result 走解析失败分支，
@@ -234,7 +235,7 @@ type Service struct {
 	notifyVars        map[string]string
 	sendMail          func(ctx context.Context, to, title, body string) string
 	wxPhoneNumber     func(ctx context.Context, code string) (errCode, errMsg, areaCode, phone string)
-	dyPhoneNumber     func(ctx context.Context, code, encryptedData, iv string) (errNo, errTips, areaCode, phone string)
+	dyPhoneNumber     func(ctx context.Context, code, encryptedData, iv string) (errNo, errTips, decErrCode, areaCode, phone string)
 	identCardPositive func(ctx context.Context, imageURL string) (int, string, string)
 	identCardContrary func(ctx context.Context, imageURL string) (int, string, string, string)
 	idCheck           func(ctx context.Context, idcard, realname string) (int, bool)

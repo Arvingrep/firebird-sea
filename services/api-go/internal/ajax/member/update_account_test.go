@@ -224,6 +224,65 @@ func TestUpdatePasswordAddslashesQuote(t *testing.T) {
 	met(t, m)
 }
 
+func TestUpdatePasswordAddslashesBackslash(t *testing.T) {
+	// 反斜杠：PHP 入口是 addslashes(stripslashes(v))，stripslashes 会把 \ 连同下一个
+	// 字符一起剥掉（\0 → NUL），所以 ab\cd12345 归一后是 abcd12345，哈希的是它。
+	svc, m := newUpdateService(t, fakeIdentity(7), func(d *Dep) {
+		d.UserDetail = stubDetail("老王", 1, 0)
+	})
+	escaped := `abcd12345`
+	want := hashOf(escaped)
+	m.ExpectExec(qUpdPassword).WithArgs(argEq(want), int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	expectUpdateLog(m, "7", "修改登录密码",
+		"action=updateAccount&confirm=ab\\cd12345&do=password&new=ab\\cd12345&service=member",
+		"UPDATE `huoniao_member` SET `password` = '"+want+"' WHERE `id` = 7")
+	got := updGet(t, svc, `do=password&new=ab\cd12345&confirm=ab\cd12345`)
+	eq(t, got, `{"state":100,"info":"修改成功！"}`)
+	met(t, m)
+
+	// \\ 与 \' 成对剥反斜杠：a\\b → a\b → 再加回去 a\\b；\' → ' → a\'b。
+	svc, m = newUpdateService(t, fakeIdentity(7), func(d *Dep) {
+		d.UserDetail = stubDetail("老王", 1, 0)
+	})
+	escaped2 := `a\\b123456`
+	want2 := hashOf(escaped2)
+	m.ExpectExec(qUpdPassword).WithArgs(argEq(want2), int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	expectUpdateLog(m, "7", "修改登录密码",
+		"action=updateAccount&confirm=a\\\\b123456&do=password&new=a\\\\b123456&service=member",
+		"UPDATE `huoniao_member` SET `password` = '"+want2+"' WHERE `id` = 7")
+	got = updGet(t, svc, `do=password&new=a\\b123456&confirm=a\\b123456`)
+	eq(t, got, `{"state":100,"info":"修改成功！"}`)
+	met(t, m)
+}
+
+func TestPhpStripslashesSemantics(t *testing.T) {
+	// 对照 docker PHP 实测：stripslashes("ab\\cd")→"abcd"、("a\\\\b")→"a\\b"、
+	// ("a\\\\\\\\")→"a\\\\"、("a\\")→"a"、addslashes("a\\0b")→"a\\\\0b"。
+	cases := [][2]string{
+		{`ab\cd`, "abcd"},
+		{`a\'b`, "a'b"},
+		{`a\nb`, "anb"},
+		{"a\\0b", "a\x00b"},
+		{`a\`, "a"},
+		{`\\\`, `\`},
+		{`a\\b`, `a\b`},
+		{`a\\`, `a\`},
+	}
+	for _, c := range cases {
+		if got := phpStripslashes(c[0]); got != c[1] {
+			t.Fatalf("phpStripslashes(%q) = %q, want %q", c[0], got, c[1])
+		}
+	}
+	if got := phpAddslashes("a\x00b"); got != `a\0b` {
+		t.Fatalf("phpAddslashes NUL = %q, want a\\0b", got)
+	}
+	if got := phpAddslashes(`a\0b`); got != `a\\0b` {
+		t.Fatalf("phpAddslashes backslash-0 = %q, want a\\\\0b", got)
+	}
+}
+
 // —— 用例 8：paypwdAdd —— pay1 5 位 → 101；pay1≠pay2 但都 ≥6 → 100（固化 bug） ——
 
 func TestUpdatePaypwdAdd(t *testing.T) {
@@ -468,12 +527,21 @@ func TestUpdateCertifyCompany(t *testing.T) {
 
 // userType 非 1/2（管理员等）：$archives 未定义 → SQL 异常 → 101「设置失败！」。
 func TestUpdateCertifyUnknownUserType(t *testing.T) {
+	// userType 非 1/2（管理员/城市管理员）：PHP 的 $archives 仍是身份证占用 SELECT，
+	// dsqlOper("update") 恒 "ok" → 无 UPDATE，只写 memberLog + updateAdminNotice → 100。
 	svc, m := newUpdateService(t, fakeIdentity(7), func(d *Dep) {
 		d.UserDetail = stubDetail("管理员", 0, 0)
 	})
 	m.ExpectQuery(qIdcardDup).WithArgs("110101199001011234", int64(7)).WillReturnRows(count(0))
+	expectUpdateLog(m, "7", "实名认证",
+		"action=updateAccount&back=b.jpg&do=certify&front=f.jpg&idcard=110101199001011234&realname=张三&service=member",
+		"SELECT `id` FROM `huoniao_member` WHERE `idcard` = '110101199001011234' AND `id` != 7")
+	wantParam := notifyParam("管理员")
+	m.ExpectQuery(qUpdatemsgDup).WithArgs(argEq(wantParam)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	m.ExpectExec(qUpdatemsgInsert).WithArgs("member", "certify", argEq(wantParam), followNow).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 	got := updGet(t, svc, "do=certify&"+certifyBase)
-	eq(t, got, `{"state":101,"info":"设置失败！"}`)
+	eq(t, got, `{"state":100,"info":"提交成功，请等待工作人员审核！"}`)
 	met(t, m)
 }
 

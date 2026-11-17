@@ -103,7 +103,7 @@ var (
 	removeInvisiblePattern = regexp.MustCompile(
 		`[\x{007f}-\x{009f}]|\x{00ad}|[\x{0483}-\x{0489}]|[\x{0559}-\x{055a}]|\x{058a}|[\x{0591}-\x{05bd}]|\x{05bf}|` +
 			`[\x{05c1}-\x{05c2}]|[\x{05c4}-\x{05c7}]|[\x{0606}-\x{060a}]|[\x{063b}-\x{063f}]|\x{0674}|[\x{06e5}-\x{06e6}]|\x{070f}|` +
-			`[\x{076e}-\x{077f}]|\x{0a51}|\x{0a75}|\x{0b44}|[\x{0b62}-\x{0b63}]|[\x{0ce2}-\x{0ce3}]|[\x{0d62}-\x{0d63}]|\x{135f}|` +
+			`[\x{076e}-\x{077f}]|\x{0a51}|\x{0a75}|\x{0b44}|[\x{0b62}-\x{0b63}]|[\x{0c62}-\x{0c63}]|[\x{0ce2}-\x{0ce3}]|[\x{0d62}-\x{0d63}]|\x{135f}|` +
 			`[\x{200b}-\x{200f}]|[\x{2028}-\x{202e}]|\x{2044}|\x{2071}|[\x{f701}-\x{f70e}]|[\x{f710}-\x{f71a}]|\x{fb1e}|` +
 			`[\x{fc5e}-\x{fc62}]|\x{feff}|\x{fffc}`)
 )
@@ -180,13 +180,14 @@ func ajaxEntryNormalize(v string) string {
 	return phpAddslashes(phpStripslashes(removeInvisiblePattern.ReplaceAllString(v, "")))
 }
 
-// phpAddslashes 迁移 PHP addslashes：' " \ 与 NUL 前加反斜杠。
+// phpAddslashes 迁移 PHP addslashes（ext/standard/string.c php_addslashes）：
+// ' " \ 与 NUL 前加反斜杠；NUL 写成「反斜杠 + 字符 0」（不是 NUL 字节）。
 func phpAddslashes(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
 		switch s[i] {
 		case 0:
-			b.WriteString(`\` + "\x00")
+			b.WriteString(`\0`)
 		case '\'', '"', '\\':
 			b.WriteByte('\\')
 			b.WriteByte(s[i])
@@ -197,17 +198,22 @@ func phpAddslashes(s string) string {
 	return b.String()
 }
 
-// phpStripslashes 迁移 PHP stripslashes：只剥 \' \" \\ 与 \0 的反斜杠，其它保留。
+// phpStripslashes 迁移 PHP stripslashes（php_stripslashes）：遇到反斜杠就跳过它，
+// 下一个字符是 '0' 输出 NUL，否则原样输出该字符（\n → n，\x → x）；末尾孤立的反斜杠丢弃。
 func phpStripslashes(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
-		if s[i] == '\\' && i+1 < len(s) {
-			switch s[i+1] {
-			case '\\', '\'', '"', 0:
-				b.WriteByte(s[i+1])
-				i++
-				continue
+		if s[i] == '\\' {
+			i++
+			if i >= len(s) {
+				break
 			}
+			if s[i] == '0' {
+				b.WriteByte(0)
+			} else {
+				b.WriteByte(s[i])
+			}
+			continue
 		}
 		b.WriteByte(s[i])
 	}
@@ -715,8 +721,10 @@ func (s *Service) certifyManual(ctx context.Context, httpReq *http.Request, id i
 		}
 	}
 
-	// userType 既不是 1 也不是 2 时 PHP 的 $archives 未定义 → SQL 异常 → 101「设置失败！」
-	// （管理员/城市管理员账号会命中）。注意写的是 certifyState=3（待审），不是 OCR 分支的 1。
+	// userType 既不是 1 也不是 2 时 PHP 的 $archives 仍是第 3267 行的身份证占用
+	// SELECT（两条 UPDATE 都在 userType==1/2 的 if 里赋值）→ dsqlOper($archives,"update")
+	// 执行该 SELECT 恒返回 "ok"（dsql.class.php:1016）→ memberLog + updateAdminNotice +
+	// 100「提交成功」，全程无 UPDATE（管理员/城市管理员账号会命中）。照搬。
 	var sqlText string
 	switch mi.userType {
 	case 1:
@@ -727,7 +735,10 @@ func (s *Service) certifyManual(ctx context.Context, httpReq *http.Request, id i
 			"', `idcardFront` = '" + front + "', `idcardBack` = '" + back + "', `license` = '" + license +
 			"', `certifyState` = 3, `licenseState` = 3 WHERE `id` = " + uid
 	default:
-		return fail(infoSetFail)
+		sqlText = "SELECT `id` FROM `" + s.prefix + "member` WHERE `idcard` = '" + idcard + "' AND `id` != " + uid
+		s.memberLog(ctx, httpReq, uid, "member", "", 0, "update", "实名认证", "", sqlText)
+		s.updateAdminNotice(ctx, httpReq, "member", "certify", mi, id)
+		return ajax.Response{State: ajax.StateOK, Info: infoCertSubmitted}
 	}
 	var err error
 	if mi.userType == 1 {
@@ -847,7 +858,11 @@ func (s *Service) certifyOCR(ctx context.Context, httpReq *http.Request, id int6
 			"UPDATE "+s.memberTable+" SET `realname` = ?, `idcard` = ?, `idcardFront` = ?, `idcardBack` = ?, `license` = ?, `certifyState` = 3, `licenseState` = 1, `birthday` = ?, `sex` = ? WHERE `id` = ?",
 			rn, ic, fr, bk, lc, birthday, sex, id)
 	default:
-		return fail(infoSetFail)
+		// userType 非 1/2：$archives 仍是身份证占用 SELECT → 恒 "ok" → 日志 + 通知 + 100「审核通过」。
+		sqlText = "SELECT `id` FROM `" + s.prefix + "member` WHERE `idcard` = '" + idcard + "' AND `id` != " + uid
+		s.memberLog(ctx, httpReq, uid, "member", "", 0, "update", "实名认证", "", sqlText)
+		s.updateAdminNotice(ctx, httpReq, "member", "certify", mi, id)
+		return ajax.Response{State: ajax.StateOK, Info: infoCertPassed}
 	}
 	if err != nil {
 		return fail(infoSetFail)
@@ -1027,13 +1042,13 @@ func (s *Service) updateChphone(ctx context.Context, httpReq *http.Request, p pa
 			if s.dyPhoneNumber == nil {
 				return fail(infoPhoneParseFail)
 			}
-			errNo, errTips, a, ph := s.dyPhoneNumber(ctx, code, encryptedData, iv)
+			errNo, errTips, decErrCode, a, ph := s.dyPhoneNumber(ctx, code, encryptedData, iv)
 			if errNo != "" {
 				return fail("ErrCode:" + errNo + "，ErrMsg:" + errTips)
 			}
 			areaCode, phone = a, ph
 			if phpEmptyString(phone) {
-				return fail(infoPhoneParseFail)
+				return fail(infoPhoneParseFail + decErrCode)
 			}
 		default:
 			// 【必读】phoneData 非空但既不是微信也不是抖音：$areaCode/$phone 未定义（null）
@@ -1045,15 +1060,13 @@ func (s *Service) updateChphone(ctx context.Context, httpReq *http.Request, p pa
 		phone = p.norm("phone")
 		vdimgck = p.norm("vdimgck")
 
-		// sitesms.international：不支持国际区号时丢弃区号（+86）。
+		// sitesms.international：不支持国际区号时丢弃区号（+86）。PHP 侧 dsqlOper 异常时
+		// $results 同样为 falsy → 与查不到行一样返回 101「短信平台未配置」。
 		var international sql.NullString
 		err := s.db.QueryRowContext(ctx,
 			"SELECT `international` FROM "+s.smsTable+" WHERE `state` = 1").Scan(&international)
 		if err != nil {
-			if err == sql.ErrNoRows {
-				return fail(infoSmsNotConfigured)
-			}
-			return noData()
+			return fail(infoSmsNotConfigured)
 		}
 		if !truthyPHP(international) {
 			areaCode = ""
@@ -1091,11 +1104,10 @@ func (s *Service) updateChphone(ctx context.Context, httpReq *http.Request, p pa
 		}
 		if changeUid == 0 {
 			// 删掉「别人的」验证码记录（type='phone' lei='verify'），照搬。
-			if _, err := s.db.ExecContext(ctx,
+			// PHP 不检查 dsqlOper 结果，写失败也继续返回 101 占用提示。
+			_, _ = s.db.ExecContext(ctx,
 				"DELETE FROM "+s.msgLogTable+" WHERE `type` = 'phone' AND `lei` = 'verify' AND `user` = ?",
-				storedOf(areaCode+phone)); err != nil {
-				return noData()
-			}
+				storedOf(areaCode+phone))
 			return fail(infoPhoneTaken)
 		}
 	}
@@ -1117,9 +1129,8 @@ func (s *Service) updateChphone(ctx context.Context, httpReq *http.Request, p pa
 	}
 
 	if isPhoneData {
-		if err := bindExec(); err != nil {
-			return noData()
-		}
+		// PHP 对写结果不检查（dsqlOper 返回值被丢弃），异常也继续返回「验证通过！」。
+		_ = bindExec()
 		s.memberLog(ctx, httpReq, uid, "member", "", 0, "update", "账号绑定手机(小程序端)", "", bindSQL)
 		if changeUid != 0 {
 			_ = unbindExec()
@@ -1128,28 +1139,23 @@ func (s *Service) updateChphone(ctx context.Context, httpReq *http.Request, p pa
 	}
 
 	// —— 验证码支路 ——
+	// PHP 侧 dsqlOper 异常时 $results 为 falsy → 与查不到行一样返回 101「验证码输入错误」。
 	var rowID, pubdate sql.NullString
 	err := s.db.QueryRowContext(ctx,
 		"SELECT `id`, `pubdate` FROM "+s.msgLogTable+" WHERE `type` = 'phone' AND `lei` = 'verify' AND `user` = ? AND `code` = ?",
 		storedOf(areaCode+phone), storedOf(vdimgck)).Scan(&rowID, &pubdate)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return fail(infoVerifyCodeWrong)
-		}
-		return noData()
+		return fail(infoVerifyCodeWrong)
 	}
 	// 5 分钟有效期（GetMkTime(time()) 是纯 Unix 秒，pubdate 同口径）。
 	if now-phpInt64(pubdate.String) > 300 {
 		return fail(infoVerifyCodeStale)
 	}
-	if _, err := s.db.ExecContext(ctx,
+	// PHP 对 DELETE / UPDATE 的 dsqlOper 返回值一律不检查，写失败也继续返回「验证通过！」。
+	_, _ = s.db.ExecContext(ctx,
 		"DELETE FROM "+s.msgLogTable+" WHERE `type` = 'phone' AND `lei` = 'verify' AND `user` = ? AND `code` = ?",
-		storedOf(areaCode+phone), storedOf(vdimgck)); err != nil {
-		return noData()
-	}
-	if err := bindExec(); err != nil {
-		return noData()
-	}
+		storedOf(areaCode+phone), storedOf(vdimgck))
+	_ = bindExec()
 	s.memberLog(ctx, httpReq, uid, "member", "", 0, "update", "账号绑定手机", "", bindSQL)
 	if changeUid != 0 {
 		_ = unbindExec()
@@ -1209,21 +1215,21 @@ func (s *Service) updateChemail(ctx context.Context, httpReq *http.Request, p pa
 			sendState = 1
 		}
 	}
+	// PHP 口径：messageLog 内部对 body addslashes 一次、MySQL 字面量再解一次 → sendmail
+	// 那条（传原文）落库是原文；分支里那条调用方先 addslashes 过 → 落库是转义一次的值。
 	s.messageLog(ctx, httpReq, "email", "", emailEff, title, content, id, sendState)
 	if replay != "" {
-		s.messageLog(ctx, httpReq, "email", "bind", emailEff, title, content, id, 1)
+		s.messageLog(ctx, httpReq, "email", "bind", emailEff, title, phpAddslashes(content), id, 1)
 		return fail(infoMailSendFail)
 	}
 
-	// 邮箱「立即写入」：点链接只是仪式，不需要确认（照搬）。
+	// 邮箱「立即写入」：点链接只是仪式，不需要确认（照搬）。PHP 不检查 UPDATE 结果。
 	sqlText := "UPDATE `" + s.prefix + "member` SET `email` = '" + email + "' WHERE `id` = '" + uid + "'"
-	if _, err := s.db.ExecContext(ctx,
-		"UPDATE "+s.memberTable+" SET `email` = ? WHERE `id` = ?", emailEff, id); err != nil {
-		return noData()
-	}
+	_, _ = s.db.ExecContext(ctx,
+		"UPDATE "+s.memberTable+" SET `email` = ? WHERE `id` = ?", emailEff, id)
 	s.memberLog(ctx, httpReq, uid, "member", "", 0, "update", "账号绑定邮箱", "", sqlText)
 	// messageLog 双写：sendmail 成功路径里 PHP 还会再写一条 state=0（site_messagelog 同内容两行）。
-	s.messageLog(ctx, httpReq, "email", "bind", emailEff, title, content, id, 0)
+	s.messageLog(ctx, httpReq, "email", "bind", emailEff, title, phpAddslashes(content), id, 0)
 	return ajax.Response{State: ajax.StateOK, Info: infoMailSent}
 }
 
@@ -1258,9 +1264,9 @@ func (s *Service) mailTemplate(ctx context.Context, req *http.Request, notify st
 	return title, content
 }
 
-// messageLog 迁移 common.func.php:2454：INSERT site_messagelog。
-// PHP 侧 body 在调用方与函数内各 addslashes 一次、MySQL 字面量再解一次 → 落库等于
-// addslashes 一次的值，这里直接存 phpAddslashes(body)。
+// messageLog 迁移 common.func.php:2454：INSERT site_messagelog。body 是最终落库值
+// （PHP 的 messageLog 内部 addslashes + MySQL 字面量解析互相抵消 → 落库 = 调用方传入值），
+// 调用方按 PHP 各调用点的 addslashes 口径传最终值。
 func (s *Service) messageLog(ctx context.Context, req *http.Request, typ, lei, user, title, body string, by int64, state int) {
 	if s.db == nil {
 		return
@@ -1268,7 +1274,7 @@ func (s *Service) messageLog(ctx context.Context, req *http.Request, typ, lei, u
 	_, _ = s.db.ExecContext(ctx,
 		"INSERT INTO "+s.msgLogTable+
 			" (`type`, `lei`, `user`, `title`, `body`, `code`, `tempid`, `byid`, `state`, `pubdate`, `ip`, `reason`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		typ, lei, user, title, phpAddslashes(body), "", "", by, state, s.now().Unix(), plainIP(req), "")
+		typ, lei, user, title, body, "", "", by, state, s.now().Unix(), plainIP(req), "")
 }
 
 // —— do=question（member.class.php:3769-3798）——
