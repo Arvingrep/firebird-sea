@@ -303,3 +303,65 @@ func TestDingCommentNoDB(t *testing.T) {
 	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=dingComment&id=1&type=add", "")
 	eq(t, got, `{"state":102,"info":"No data!"}`)
 }
+
+// type 只有字面量 "add" 是点赞：ADD / 1 / type[]=add 都走取消分支（用户不在 zan_user → 直接成功，不写库）。
+func TestDingCommentTypeMustBeExactAdd(t *testing.T) {
+	for _, q := range []string{"type=ADD", "type=1", "type%5B%5D=add", "type="} {
+		svc, m := newFollowServiceWith(t, fakeIdentity(7), nil)
+		m.ExpectQuery(qDingComment).WithArgs(1).WillReturnRows(dingCommentRow("9", "8", "article-detail"))
+		got := do(t, svc, "GET", "/include/ajax.php?service=member&action=dingComment&id=1&"+q, "")
+		eq(t, got, okDing)
+		met(t, m)
+	}
+}
+
+// 取消命中中间位置：unset 后 join 保留其余元素与原始顺序。
+func TestDingCommentCancelMiddle(t *testing.T) {
+	svc, m := newFollowServiceWith(t, fakeIdentity(7), nil)
+	m.ExpectQuery(qDingComment).WithArgs(1).WillReturnRows(dingCommentRow("9", "8,7,9", "article-detail"))
+	expectDingModuleTitle(m, "article", "文章")
+	expectDingUpCheck(m, "article-detail", "article", "1", 7, true)
+	expectDingUsername(m, 7, "小明")
+	m.ExpectExec(qUpDelete).WithArgs(1, "article-detail", "article", "1", int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	expectLogZan(m, "7", 1, "article", "delete", "取消点赞( => 文章小明取消了点赞您的评论)",
+		"action=dingComment&id=1&service=member",
+		"DELETE FROM `huoniao_public_up_all` WHERE `type` = '1' and `action` = 'article-detail' "+
+			"and `module` = 'article' and `tid` = '1' and `ruid` = '7'")
+	m.ExpectExec(qDingUpdate).WithArgs(2, "8,9", 1).WillReturnResult(sqlmock.NewResult(0, 1))
+
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=dingComment&id=1", "")
+	eq(t, got, okDing)
+	met(t, m)
+}
+
+// 评论 type 为空：module/temp 都是空 → getZan 走参数门禁（不发任何 SQL），dingComment 仍 UPDATE。
+func TestDingCommentEmptyCommentType(t *testing.T) {
+	svc, m := newFollowServiceWith(t, fakeIdentity(7), nil)
+	m.ExpectQuery(qDingComment).WithArgs(1).WillReturnRows(dingCommentRow("9", "", nil))
+	m.ExpectExec(qDingUpdate).WithArgs(1, "7", 1).WillReturnResult(sqlmock.NewResult(0, 1))
+
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=dingComment&id=1&type=add", "")
+	eq(t, got, okDing)
+	met(t, m)
+}
+
+// paotui-order 恒真判断（两边都 !=）：module 取第一段 paotui，temp 是整个 action。
+func TestDingCommentPaotuiOrderModule(t *testing.T) {
+	svc, m := newFollowServiceWith(t, fakeIdentity(7), nil)
+	m.ExpectQuery(qDingComment).WithArgs(1).WillReturnRows(dingCommentRow("9", "", "paotui-order"))
+	expectDingModuleTitle(m, "paotui", "跑腿")
+	expectDingUpCheck(m, "paotui-order", "paotui", "1", 7, false)
+	expectDingUsername(m, 7, "小明")
+	m.ExpectExec(qUpInsert).WithArgs("9", "1", int64(7), "paotui", "paotui-order",
+		int64(1700000000), 1).WillReturnResult(sqlmock.NewResult(1, 1))
+	expectLogZan(m, "7", 1, "paotui", "insert", "点赞( => 跑腿小明点赞了您的评论)",
+		"action=dingComment&id=1&service=member&type=add",
+		"INSERT INTO `huoniao_public_up_all` (`uid`, `tid`, `ruid`, `module`, `action`, `puctime`, `type`) "+
+			"VALUES ('9', '1', '7', 'paotui', 'paotui-order', '1700000000', '1')")
+	m.ExpectExec(qDingUpdate).WithArgs(1, "7", 1).WillReturnResult(sqlmock.NewResult(0, 1))
+
+	got := do(t, svc, "GET", "/include/ajax.php?service=member&action=dingComment&id=1&type=add", "")
+	eq(t, got, okDing)
+	met(t, m)
+}
