@@ -143,9 +143,11 @@ new Vue({
 			var nativeBridgeLikely = function () {
 				return !!window.WebViewJavascriptBridge || /huoniao/i.test(navigator.userAgent || '');
 			};
+			// 逃逸阀：原生端 bridge 在场但 getGeocoder 永不回调（如定位权限被拒）时，10s 后照样兜底出图
+			var bridgeGraceExpired = false;
 			var drawInitial = function (ps) {
 				if (!vm.mapshow || vm.order_finished || !vm.orderTop) { return false; }
-				if (!ps && nativeBridgeLikely()) { return false; }   // 原生 App：等 bridge 回调，路径完全不变
+				if (!ps && nativeBridgeLikely() && !bridgeGraceExpired) { return false; }   // 原生 App：等 bridge 回调，路径完全不变
 				var shop = window.shoplnglat, user = window.userlnglat;
 				if (!shop || !user) { return false; }
 				if (num(shop.lat) === null || num(shop.lng) === null ||
@@ -156,19 +158,29 @@ new Vue({
 				return true;
 			};
 			var sync = function () {
-				var wg = window.__webGeo, ps = null;
-				if (wg && num(wg.lng) !== null && num(wg.lat) !== null) {
-					ps = {'lng': num(wg.lng), 'lat': num(wg.lat)};
-					vm.ps_lnglat = ps;
-					vm.rotation = wg.rotation || 0;
-				}
-				if (vm.mapshow) { drawInitial(ps); return; }           // 首次建图（map_show 末尾会置 mapshow=0）
-				if (pendingCourier && ps && typeof map !== 'undefined' && map) {   // 地图已在、定位刚到手：补画骑手标记+重算路线
-					vm.change_qishou(window.shoplnglat, window.userlnglat, ps);
+				// 建图已经抛过错：不再自动重试（否则每 5s 重建一次、全局 map 被覆盖），
+				// mapshow 仍为 1，用户手动点定位浮标（rechange）还有机会重建
+				if (vm.__mapBootFailed) { return; }
+				try {
+					var wg = window.__webGeo, ps = null;
+					if (wg && num(wg.lng) !== null && num(wg.lat) !== null) {
+						ps = {'lng': num(wg.lng), 'lat': num(wg.lat)};
+						vm.ps_lnglat = ps;
+						vm.rotation = wg.rotation || 0;
+					}
+					if (vm.mapshow) { drawInitial(ps); return; }           // 首次建图（map_show 末尾会置 mapshow=0）
+					if (pendingCourier && ps && typeof map !== 'undefined' && map) {   // 地图已在、定位刚到手：补画骑手标记+重算路线
+						vm.change_qishou(window.shoplnglat, window.userlnglat, ps);
+					}
+				} catch (e) {
+					// map_show 抛错不能中断 mounted（滚动吸顶、bridge 注册），失败只记一次
+					vm.__mapBootFailed = true;
+					console.warn('[courier-map] init failed:', e && e.message);
 				}
 			};
 			sync();
 			setTimeout(sync, 3000);   // 双保险：mounted 时容器尺寸/数据可能未就绪
+			setTimeout(function () { bridgeGraceExpired = true; sync(); }, 10000);   // 原生端 10s 无回调 → 也兜底出图
 			setInterval(sync, 5000);
 		})(this);
 
@@ -729,17 +741,19 @@ new Vue({
 				 	directionsRenderer1.setMap(map);
 				 	calculateAndDisplayRoute(directionsService1, directionsRenderer1,pslnglat,slnglat);
 				 }else{
+				 	// state≠4（已取货）：骑手→顾客 单线。原来这里把线算给了 directionsRenderer1
+				 	// 却又去重建了（没上图的）directionsRenderer，导致这条线永远不显示
 				 	directionsRenderer.setMap(null);
 				 	directionsRenderer = new google.maps.DirectionsRenderer({
 				 		suppressMarkers:true  ,
 				 	});
 				 	directionsRenderer.setOptions({
 				 		polylineOptions: {
-				 		   strokeColor: '#F5B120'
+				 		   strokeColor: '#027CFF'
 				 		},
 				 	});
-				 	directionsRenderer1.setMap(map);
-				 	calculateAndDisplayRoute(directionsService1, directionsRenderer1,pslnglat,ulnglat);
+				 	directionsRenderer.setMap(map);
+				 	calculateAndDisplayRoute(directionsService, directionsRenderer,pslnglat,ulnglat);
 				 }
 			}
 		},
@@ -761,7 +775,7 @@ new Vue({
 				// map.setCenter(qs);
 			}else if(site_map == 'google'){
 				cposition = new google.maps.LatLng(Number(tt.ps_lnglat.lat),Number(tt.ps_lnglat.lng));
-				qishouIcon.setMap(null);
+				if (qishouIcon) { qishouIcon.setMap(null); }   // 兜底建图（noCourier）时未创建骑手标记
 				qishouIcon = new MarkerWithLabel({
 				   position: cposition,
 				   draggable: true,
@@ -800,8 +814,13 @@ new Vue({
 					tt.rotation = data.rotation;
 					if(tt.mapshow){
 						tt.map_show(shoplnglat,userlnglat,tt.ps_lnglat)
-					}else{
-						map.panTo(new BMap.Point(tt.ps_lnglat.lng, tt.ps_lnglat.lat));
+					}else if(typeof map != 'undefined' && map){
+						// site_map=google 时用 BMap.Point 会抛 BMap is not defined，按 site_map 分派
+						if(site_map == 'google'){
+							map.panTo({'lat': Number(tt.ps_lnglat.lat), 'lng': Number(tt.ps_lnglat.lng)});
+						}else{
+							map.panTo(new BMap.Point(tt.ps_lnglat.lng, tt.ps_lnglat.lat));
+						}
 					}
 					let param = new URLSearchParams();
 						param.append('lng', data.lng)
