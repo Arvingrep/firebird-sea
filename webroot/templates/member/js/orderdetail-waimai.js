@@ -339,7 +339,7 @@ $(function(){
 				   streetViewControl: false,
 				   fullscreenControl: false,
 				 }
-				 map = new google.maps.Map(document.getElementById('map'), mapOptions);
+				 map = new google.maps.Map(document.getElementById('map'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 			 	 // 店铺坐标
 			 	 marker = new google.maps.Marker({
 			 	   position: new google.maps.LatLng(x.lat,x.lng),
@@ -355,7 +355,7 @@ $(function(){
 				   streetViewControl: false,
 				   fullscreenControl: false
 				 }
-				 map = new google.maps.Map(document.getElementById('map'), mapOptions);
+				 map = new google.maps.Map(document.getElementById('map'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 			 	// 店铺坐标
 			 	marker = new google.maps.Marker({
 			 	  position: new google.maps.LatLng(x.lat,x.lng),
@@ -379,7 +379,7 @@ $(function(){
 		          streetViewControl: false,
 		          fullscreenControl: false
 		        }
-		        map = new google.maps.Map(document.getElementById('map'), mapOptions);
+		        map = new google.maps.Map(document.getElementById('map'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 		        // 店铺坐标
 			     shop_marker = new google.maps.Marker({
 			        position: new google.maps.LatLng(x.lat, x.lng),

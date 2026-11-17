@@ -134,7 +134,7 @@ $(function(){
 
 	//设置标注
 	function setMark(){
-		map = new google.maps.Map(document.getElementById('map'), mapOptions);
+		map = new google.maps.Map(document.getElementById('map'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 
 		var input = document.getElementById('keyword');
     var autocomplete = new google.maps.places.Autocomplete(input, {placeIdOnly: true});

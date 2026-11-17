@@ -24,7 +24,7 @@ $(function(){
         fillOpacity: 0.4       //填充的透明度，取值范围0 - 1。
     }
 
-    var map = new google.maps.Map(document.getElementById('map'), mapOptions);
+    var map = new google.maps.Map(document.getElementById('map'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 
     var marker = new google.maps.Marker({
             position: mapOptions.center,

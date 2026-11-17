@@ -30,7 +30,7 @@
 	              style: google.maps.ZoomControlStyle.SMALL
 	            }
 	        }
-			map = new google.maps.Map(document.getElementById('topMap'), mapOptions);
+			map = new google.maps.Map(document.getElementById('topMap'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 			google.maps.event.addListener(map, "tilesloaded", init.tilesloaded); //地图加载完毕执行
 
 		}
