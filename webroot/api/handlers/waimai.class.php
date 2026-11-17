@@ -6161,6 +6161,18 @@ class waimai
         }
 
         $ret    = $dsql->dsqlOper($sql, "results");
+
+        // 骑手+会员双身份兜底：会员 cookie 与骑手 cookie 同域共存（TMA 登录桥种会员 cookie、
+        // ql.html 种骑手 cookie）时，上方会员分支按 uid 过滤会漏掉「指派给本骑手、但下单人是
+        // 其他会员」的订单，骑手端订单详情因此 302 → 404.html?v=3（2026-11-17 canary 实测：
+        // 订单 13 uid=17，登录者 member 9 + courier 1，工作台点开即 404）。
+        // 会员分支查不到且骑手已登录时，改用骑手口径重查；口径与原骑手分支完全一致
+        // （不限 uid），纯会员视角不受影响。
+        if ((!$ret || empty($ret)) && $did > -1 && $userid > -1) {
+            $sql = $dsql->SetQuery("SELECT * FROM `" . $break_table . "` WHERE `id` = $id");
+            $ret = $dsql->dsqlOper($sql, "results");
+        }
+
         $return = array ();
         if ($ret) {
             $now = GetMkTime(time());
@@ -12473,6 +12485,16 @@ class waimai
             }
         }
         $ret    = $dsql->dsqlOper($sql, "results");
+
+        // 骑手+会员双身份兜底：会员 cookie 与骑手 cookie 同域共存时，会员分支按 uid 过滤
+        // 会漏掉「指派给本骑手、但下单人是其他会员」的订单，骑手端跑腿详情因此 302 →
+        // 404.html?v=3（同 waimai orderDetail 的 2026-11-17 canary 实测问题）。
+        // 会员分支查不到且骑手已登录时，改用骑手口径重查，口径与原骑手分支一致。
+        if ((!$ret || empty($ret)) && $did > -1 && $userid > -1) {
+            $sql = $dsql->SetQuery("SELECT * FROM `#@__paotui_order` WHERE `id` = $id");
+            $ret = $dsql->dsqlOper($sql, "results");
+        }
+
         $return = array ();
         if ($ret) {
             $now = GetMkTime(time());
