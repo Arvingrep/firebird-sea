@@ -8,6 +8,11 @@
  * @link           https://www.ihuoniao.cn/
  */
 require_once(HUONIAOADMIN.'../include/common.inc.php');
+//TG 专用站点守卫。注意 business 目前是**产品裁决放行**的（商家要用网页后台接单），
+//所以这道调用现在等于空操作。保留它不是冗余：将来若把 business 移出白名单，
+//wmsj 下 36 个页面会跟着自动关掉，不需要再回来改 40 个文件。
+require_once(HUONIAOADMIN.'../include/tgWhitelist.inc.php');
+fbsTgServiceGuard('business');
 require_once(HUONIAOADMIN.'function/waimai.fun.php');
 $huoniaoTag->caching         = FALSE;                             //是否使用缓存，后台不需要开启
 $huoniaoTag->compile_dir     = HUONIAOROOT."/templates_c/admin";  //设置编译目录
@@ -58,7 +63,20 @@ if($userid==-1){
 
 // 判断用户权限
 }else{
-    if(!verifyModuleAuth(array('module'=>'waimai','type'=>'')) && !$app)
+    // AD-14 最小补丁（2026-11-07）：本部署 $cfg_BusinessJoinConfig 恒为空 ——
+    // include/common.inc.php:1334 的取值语句连同 getBusinessJoinConfig() 里的
+    // 'package' 一起被注释掉了，memberPackage 因此拿不到任何模块，
+    // verifyModuleAuth('waimai') 恒为 false，商家中心对所有会员都不放行，
+    // 只有原生 App 靠 ?app=1&appuid= 参数通道能进（Web 侧没有任何可用入口）。
+    // 这里按「店铺归属即授权」补一条：waimai_shop_manager 存在该会员记录即视为有权限。
+    // 不新增/修改权限数据，套餐鉴权一旦恢复仍按原逻辑生效（OR 关系）。
+    $fbsHasShopAuth = false;
+    if((int)$userid > 0){
+        $fbsAuthSql = $dsql->SetQuery("SELECT `shopid` FROM `#@__waimai_shop_manager` WHERE `userid` = ".(int)$userid);
+        $fbsAuthRet = $dsql->dsqlOper($fbsAuthSql, "results");
+        $fbsHasShopAuth = (bool)$fbsAuthRet;
+    }
+    if(!verifyModuleAuth(array('module'=>'waimai','type'=>'')) && !$app && !$fbsHasShopAuth)
     {
 			$html = <<<eot
 <!DOCTYPE html>

@@ -348,7 +348,7 @@ $('body').addClass('googleBody');//自动检索弹窗加样式
           }
 
         $('.im-mapcenter').remove();
-        map = new google.maps.Map(document.getElementById('im-mapdiv'), mapOptions);
+        map = new google.maps.Map(document.getElementById('im-mapdiv'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 
         marker = new google.maps.Marker({
           position: mapOptions.center,

@@ -7,6 +7,33 @@ metadata:
     site: {{ .Values.siteId }}
 data:
   default.conf: |
+    # ---- Telegram Mini App (TMA) 注入开关 ----
+    # 只有请求带 HN_tg=1 标记 cookie（PHP 网关登录成功后种下；火鸟 cookie 前缀 HN_ 是硬编码的）才注入
+    # Telegram WebApp SDK 与站内 shim：无 cookie 时替换串与匹配串完全相同，等于原样输出。
+    # map 必须写在 server{} 之前（http 上下文）——本文件被 include 进 nginx.conf 的 http 块。
+    # 注入串里一个 $ 都不能有（nginx 单引号不阻止变量展开），也不能内联 JS。
+    map $cookie_HN_tg $fbs_tg_head {
+        default "</head>";
+        "1"     '<script src="https://telegram.org/js/telegram-web-app.js"></script><script src="/static/js/tg-shim.js?v=3"></script></head>';
+    }
+
+    {{- if .Values.go.actions }}
+    {{- if not .Values.api.enabled }}{{ fail "go.actions 需要 api.enabled=true（分流的上游是 firebird-api-<siteId>，api 未启用时上游 Service 不存在）" }}{{ end }}
+    {{- end }}
+    {{- if .Values.go.actions }}
+    # ---- PHP→Go 迁移分流（go.actions 白名单，#234）----
+    # 以 "service.action" 组合串为键：命中白名单 → $fbs_go_action=1 → /include/ajax.php 转 api-go。
+    # 判定只看 URL 查询参数（$arg_service / $arg_action），POST body 与 cookie 不参与判定。
+    # map 必须在 http 上下文（本文件被 include 进 http 块），与上面 $fbs_tg_head 同理。
+    # 注意键里是 action 的原样大小写；service/action 不在 URL 上的请求组合串为 "."，落 default 走 PHP。
+    map "$arg_service.$arg_action" $fbs_go_action {
+        default 0;
+        {{- range .Values.go.actions }}
+        "{{ . }}" 1;
+        {{- end }}
+    }
+    {{- end }}
+
     server {
         listen 80;
         server_name {{ range .Values.ingress.hosts }}{{ .host }} {{ end }}localhost;
@@ -45,9 +72,31 @@ data:
             fastcgi_read_timeout 5;
         }
 
+        # 骑手派单 TG 通知通路（T7）：集群内 PHP（fb_tg_dispatch → http://firebird-<site>/tg-api/…）
+        # 经本服务转发到 Node api 的 /tg-api/internal/dispatch。公网 /tg-api 流量由 Traefik
+        # IngressRoute 直达 api 服务，不经过这里；api 未启用时该 location 不渲染。
+        {{- if .Values.api.enabled }}
+        location /tg-api/ {
+            proxy_pass http://firebird-api-{{ .Values.siteId }}:{{ .Values.api.service.port | default 3000 }};
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            # 客户端真实地址原样透传：api 的限流桶键与审计表 ip 列都取 req.ip，
+            # 不透传时全站共用 nginx 的内网地址一个桶（限流形同不存在、审计也查不到来源）。
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        {{- end }}
+
         # 火鸟伪静态重写
         location / {
             try_files $uri $uri/ /index.php?$args;
+        }
+
+        # TG 登录入口短链（BotFather 菜单按钮 / bot 按钮用 /tg/entry?role=customer）
+        # 实际文件是 /tg/entry.php；rewrite 后重新匹配 location，落到下面通用 PHP location
+        location = /tg/entry {
+            rewrite ^ /tg/entry.php last;
         }
 
         # 静态资源缓存加速
@@ -56,6 +105,12 @@ data:
             add_header Cache-Control "public, no-transform";
         }
 
+        # 安装向导下线：源码树里有 webroot/install/（含 db_default.txt 5.1MB），
+        # 仅靠 .dockerignore:31 构建期排除是"副作用"而非策略，此处显式 404 兜底。
+        # 必须用 ^~ 前缀匹配（优先于下方正则 php location），否则 /install/index.php 会被正则抢走。
+        location ^~ /install/ { return 404; }
+        location = /install { return 404; }
+
         {{- if .Values.configLock.enabled }}
         {{- if or (contains "'" .Values.configLock.message) (contains "'" .Values.configLock.messageJson) }}{{ fail "configLock.message / messageJson 不能包含单引号" }}{{ end }}
         # GitOps 配置锁：/admin/ 下 PHP 响应里，应用自己的"写入失败，请检查权限"被替换为"该配置由 Git 管理变更并发布"。
@@ -63,15 +118,47 @@ data:
         location ~ ^/admin/.*\.php$ {
             {{- include "firebird.nginxPhpBody" . | nindent 12 }}
             sub_filter_once off;
-            sub_filter_types application/json text/html text/plain;
+            # text/html 不能列在这里：它是 sub_filter_types 的默认值，重复声明会让 nginx 在每个
+            # worker 启动时打 duplicate MIME type "text/html"，且被 canary 的 configLock 掩盖过一轮。
+            # sub_filter_types 是"追加"语义，不写 text/html 也照样过滤 HTML 响应。
+            sub_filter_types application/json text/plain;
             sub_filter '{{ .Values.configLock.matchJson | replace "\\" "\\\\" }}' '{{ .Values.configLock.messageJson | replace "\\" "\\\\" }}';
             sub_filter '{{ .Values.configLock.matchRaw }}' '{{ .Values.configLock.message }}';
+        }
+
+        {{- end }}
+
+        {{- if .Values.go.actions }}
+        # ---- PHP→Go 分流入口：/include/ajax.php（#234）----
+        # 白名单内的 service+action → api-go（现有 firebird-api-<siteId> Service，canary 上 engine=go），
+        # 其余（含白名单外的 action、无 service/action 参数的请求）照旧走 PHP。
+        # 正则 location 按出现顺序匹配，必须位于下方通用 php location 之前才会被本段截获。
+        # if 里只放 proxy_pass（无 URI 部分）——这是 nginx 在 if 上下文里允许的安全用法之一：
+        # 命中 if 的请求按内层配置代理，未命中的继续走外层 fastcgi，不会出现 "proxy_pass 带变量" 类报错。
+        location ~ ^/include/ajax\.php$ {
+            if ($fbs_go_action = 1) {
+                proxy_pass http://firebird-api-{{ .Values.siteId }}:{{ .Values.api.service.port | default 3000 }};
+            }
+            {{- include "firebird.nginxPhpBody" . | nindent 12 }}
         }
 
         {{- end }}
         # PHP-FPM 反向代理（拆分拓扑时指向 firebird-php-<site> Service）
         location ~ \.php$ {
             {{- include "firebird.nginxPhpBody" . | nindent 12 }}
+            # TMA 注入：只写在这里（/admin/ 的 location 复用同一个 helper，写进 helper 会双重注入）。
+            # 仅在 $fbs_tg_head 由 map 换成带 script 的串时生效；无 cookie 时替换串与匹配串相同，等于是原样输出。
+            # 不写 sub_filter_types：text/html 本就是默认值，重复声明只会换来一条 duplicate MIME type 告警。
+            # sub_filter_once 必须是 on：站内有 12 个模板的 HTML 里 </head> 出现不止一次（内嵌模板/注释），
+            #   off 会逐个替换，导致 telegram-web-app.js 与 tg-shim.js 被注入多遍、SDK 初始化两次。
+            # shim 带 ?v=：上面 *.js 有 30d expires，不带版本号升不上去；**改了 tg-shim.js 行为就必须升版本**。
+            # 副作用备忘：启用 sub_filter 后 nginx 必须把整个响应体收完才开始发（无法预知 Content-Length，
+            #   响应头会变成 Transfer-Encoding: chunked）。只影响本 location 下的 PHP 页面，
+            #   /tg-api 与派单的长连接走 Node，不经这里。
+            # configLock=false 的站点上 /admin/ 也会落到这个 location，但浏览器不带 HN_tg，
+            #   map 取 default 分支 → 注入串与匹配串相同 → 等于是空操作，行为差异仅此一点。
+            sub_filter_once on;
+            sub_filter '</head>' $fbs_tg_head;
         }
 
         # 禁止访问敏感隐藏文件

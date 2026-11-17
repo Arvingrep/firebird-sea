@@ -4274,9 +4274,23 @@ function isPc(){
 
 /**
  * 判断是否为手机端
+ *
+ * Telegram Mini App 用户一律走 H5：登录桥（webroot/api/fbs）成功后种 HN_tg=1 标记 cookie
+ * （30 天，域与登录 cookie 同取，canary 上是 .fbird.men）。桌面版 Telegram 的 WebView 上报
+ * 的是桌面浏览器 UA，纯 UA 判定会让 TG 用户落到 PC 模板（topInfo w1200），与「Mini App 套用
+ * 火鸟 H5」的需求相悖；cookie 优先于 UA，非 TG 用户没有这个 cookie，行为完全不变。
+ * cookiePre 硬编码 'HN_'：与 common.inc.php 的下发口径一致，标记 cookie 不跟随站点自定义前缀。
+ *
+ * 值守卫必须是 === '1'：HN_tg=0 或任何其它值都不触发，避免被随手写成空值/调试值劫持到 H5。
+ *
+ * 注意（不要"修"）：下面的正则没有 /i 标志、而主体已经 strtolower，所以模式里的大写词
+ * （AppleWebKit、Windows\s+Phone、Nokia、Symbian、MQQBrowser 等）是死词，永远匹配不上。
+ * 这是历史行为，改动会波及线上全站的模板选择，本次只加 cookie 短路，正则一行不动。
+ *
  * @return bool
  */
 function isMobile(){
+    if (isset($_COOKIE['HN_tg']) && $_COOKIE['HN_tg'] === '1') return true;
     $useragent = strtolower($_SERVER['HTTP_USER_AGENT']);
     if (preg_match("/iphone|ios|android|mini|mobile|mobi|Nokia|Symbian|iPod|iPad|Windows\s+Phone|MQQBrowser|wp7|wp8|UCBrowser7|UCWEB|360\s+Aphone\s+Browser|AppleWebKit|cfnetwork|harmony/", $useragent)) {
         return true;
@@ -6633,6 +6647,76 @@ function getWechatMsgErrCode($code){
 
 
 /**
+ * 骑手 Telegram 派单通知（T7）：把派单事件转交集群内 Node(services/api) 的
+ * POST /tg-api/internal/dispatch，由 Node 查 fbs_courier_map 并用 bot token 发消息。
+ * 为什么不让 PHP 直发 Telegram：PHP 容器不注入 bot token（密钥面收敛），且不能让派单等待外网。
+ * 验签算法与 services/api/src/gatewayClient.js 完全一致（action 常量 'dispatch'）：
+ * HMAC-SHA256(FBS_GATEWAY_SECRET, ts\ndispatch\nbody)，头 X-Fbs-Timestamp / X-Fbs-Signature。
+ *
+ * 超时预算（修复轮 2 · M3）：Node 侧已改成「收下即返回」——验签 + 去重占位写库后立刻回 202，
+ * Telegram 发送与重试都在响应之后异步做。所以这里只要 800ms 就够，且**不再重试**：
+ * 原来 1.2s + 重试 会与 Node 的 5s 发送超时倒挂（PHP 先放弃、Node 还在发），日志里全是
+ * 「超时失败」而骑手其实收到了消息，排障时完全误导。失败的语义统一为：只记日志，不影响派单。
+ *
+ * 不调用 fastcgi_finish_request：三处挂点都在响应生成中途（后台页/接口 JSON 输出中段），
+ * 提前结束请求会截断后续输出。
+ * @param $event     事件：new_order 派单 / grab 抢单 / reassign 改派给另一骑手 / reclaim 订单被客服收回（改派第三方平台）
+ * @param $orderId   订单 id
+ * @param $courierId 骑手 id（须已通过 /tg-api/rider/bind 绑定 Telegram）
+ * @return bool 仅表示「Node 已受理」，不代表已送达（送达失败只有 Node 侧日志知道）
+ */
+function fb_tg_dispatch($event, $orderId, $courierId){
+    $secret = getenv('FBS_GATEWAY_SECRET');
+    if (!$secret) {
+        // 配置缺失要留痕：M1 后本变量对 4 个 site 无条件注入，取不到说明 secret 没建（optional: true）
+        error_log(sprintf('[fb_tg_dispatch] skipped event=%s order_id=%d courier_id=%d reason=FBS_GATEWAY_SECRET missing',
+            (string)$event, (int)$orderId, (int)$courierId));
+        return false;
+    }
+    if (!in_array($event, array('new_order', 'grab', 'reassign', 'reclaim'))) {
+        error_log(sprintf('[fb_tg_dispatch] skipped event=%s order_id=%d courier_id=%d reason=unknown event',
+            (string)$event, (int)$orderId, (int)$courierId));
+        return false;
+    }
+    // 目标地址：默认经站点 nginx 服务转发到 Node api（helm configmap 的 /tg-api/ location）；
+    // 特殊拓扑用 TG_DISPATCH_URL 覆盖（与 gatewayClient 的 FBS_GATEWAY_URL 同一配置模式）
+    $url = getenv('TG_DISPATCH_URL');
+    if (!$url) {
+        $site = getenv('SITE_ID');
+        if (!$site) {
+            error_log(sprintf('[fb_tg_dispatch] skipped event=%s order_id=%d courier_id=%d reason=SITE_ID missing',
+                (string)$event, (int)$orderId, (int)$courierId));
+            return false;
+        }
+        $url = 'http://firebird-' . $site . '/tg-api/internal/dispatch';
+    }
+    $body = json_encode(array('event' => $event, 'order_id' => (int)$orderId, 'courier_id' => (int)$courierId));
+    $ts   = (string)time();
+    $sig  = hash_hmac('sha256', $ts . "\ndispatch\n" . $body, $secret);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, array(
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $body,
+        CURLOPT_HTTPHEADER     => array('Content-Type: application/json', 'X-Fbs-Timestamp: ' . $ts, 'X-Fbs-Signature: ' . $sig),
+        CURLOPT_CONNECTTIMEOUT_MS => 300,
+        CURLOPT_TIMEOUT_MS     => 800,
+        CURLOPT_NOSIGNAL       => true,
+        CURLOPT_RETURNTRANSFER => true,
+    ));
+    curl_exec($ch);
+    $code   = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $errno  = curl_errno($ch);
+    $errmsg = $errno ? curl_error($ch) : '';
+    curl_close($ch);
+    if ($code >= 200 && $code < 300) return true;
+    // 失败只记日志（派单/抢单/改派事务不受影响）。日志固定带 event/order_id/courier_id，
+    // 线上按订单号 grep 就能定位是哪一单、哪个骑手、哪个事件没通知出去；不记 body/签名（含密钥材料）。
+    error_log(sprintf('[fb_tg_dispatch] failed event=%s order_id=%d courier_id=%d http=%d errno=%d err=%s',
+        $event, (int)$orderId, (int)$courierId, $code, $errno, $errmsg));
+    return false;
+}
+
+/**
  * APP推送消息
  * @param $uid     会员id
  * @param $title   消息标题
@@ -8694,10 +8778,14 @@ function getDistance($lng1, $lat1, $lng2, $lat2){
     $_dituReport->DEBUG("data:" . $lng1 .','. $lat1 .'    '. $lng2 .','. $lat2);
 
     global $cfg_map;
-    $originlat      = $cfg_map != 1 && $lat1 > $lng1 ? $lng1 : $lat1;
-    $originlng      = $cfg_map != 1 && $lng1 < $lat1 ? $lat1 : $lng1;
-    $destinationlat = $cfg_map != 1 && $lat2 > $lng2 ? $lng2 : $lat2;
-    $destinationlng = $cfg_map != 1 && $lng2 < $lat2 ? $lat2 : $lng2;
+    // 经纬度顺序纠正原本只在百度/高德模式（$cfg_map != 1）生效；Google 模式（$cfg_map == 1）
+    // 直接取原始参数。而调用方（waimai.class.php 等 46 处）按国内惯例「纬度在前」传参，
+    // Google/海外部署下两个数当纬经度用反，距离算出几千公里（2026-11-06 canary 实测
+    // 「距离店铺 7660 公里」）。菲律宾/中国均为纬度<经度，统一做纠正对三种地图口径都正确。
+    $originlat      = $lat1 > $lng1 ? $lng1 : $lat1;
+    $originlng      = $lng1 < $lat1 ? $lat1 : $lng1;
+    $destinationlat = $lat2 > $lng2 ? $lng2 : $lat2;
+    $destinationlng = $lng2 < $lat2 ? $lat2 : $lng2;
     if ($originlng == '' || $originlat == '' || $destinationlng == '' || $destinationlat == '') {
         return;
     }

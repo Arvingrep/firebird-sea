@@ -12,4 +12,21 @@ spec:
   ipAllowList:
     sourceRange:
       - 127.0.0.1/32
+---
+# T7：派单内部通知端点 /tg-api/internal/ 同样只允许集群内调用（M6，与上面 AD-19 同思路）。
+# 调用方是集群内的 PHP（fb_tg_dispatch → Service firebird-<site> → nginx → firebird-api-<site>），
+# 全程不经过 Traefik，因此这里只放行回环——外部经 Traefik 打进来一律 403。
+# 不在这里加 10/172.16/192.168 私有网段：Traefik 默认不信任 X-Forwarded-For，客户端地址取的是
+# 前置 LB 的地址，若 LB 位于私有网段，加进去等于把这道门直接打开。
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: firebird-deny-internal-{{ .Values.siteId }}
+  labels:
+    app: firebird-site
+    site: {{ .Values.siteId }}
+spec:
+  ipAllowList:
+    sourceRange:
+      - 127.0.0.1/32
 {{- end }}

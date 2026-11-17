@@ -684,6 +684,7 @@ function mapShow(x,y,z,id,ortype,ostate,obuyfrom,ttime){
 	    }
 		// 初始化地图
 		mapPath = new google.maps.Map(document.getElementById('map'+id), {
+		   	renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
 		   	zoom: 14,
 		   	center: centerPoint,
 		   	zoomControl: true,

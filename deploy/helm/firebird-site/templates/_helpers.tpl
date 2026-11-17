@@ -51,21 +51,20 @@
 - name: MEMORY_CACHE_REDIS_DB
   value: "{{ .Values.memoryCache.redis.db | default 1 }}"
 {{- end }}
+{{- if .Values.fileCache.queryBypass }}
+# AD-20：dsql.class.php::cache 内开关——跳过 FileDataCache 直查 DB（多副本缓存永不收敛，一致性优先）
+- name: HN_DSQL_CACHE_SKIP
+  value: "1"
+{{- end }}
 - name: DEFAULT_CURRENCY
   value: "{{ .Values.localization.defaultCurrency }}"
 - name: SITE_ID
   value: "{{ .Values.siteId }}"
 - name: SITE_BASEHOST
   value: "{{ .Values.domain | default "fbird.men" }}"
-{{- if .Values.tma.enabled }}
-# TMA 网关验签密钥（只引用 secretName，值由运维在集群中创建；缺失时网关返回 503）
-- name: FBS_GATEWAY_SECRET
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.api.secretRef | default "firebird-api-secret" }}
-      key: FBS_GATEWAY_SECRET
-      optional: true
-{{- end }}
+# FBS_GATEWAY_SECRET 注入见下方 gateway.secretRef / gateway.secretKey 条目（canary 29334cf7 形态）。
+# 移植轮丢弃了旧分支里 api.secretRef 版的重复注入（N2）：否则同容器会出现两条同名 env，
+# 最后一个生效、来源不可审计。
 - name: GCS_KEY_ID
   valueFrom:
     secretKeyRef:
@@ -84,11 +83,64 @@
       name: firebird-storage-secret
       key: resend-key
       optional: true
+{{- if .Values.gateway.secretRef }}
+# TG 登录网关的 HMAC 密钥（api 侧同值）。PHP 读取顺序：$_SERVER['FBS_GATEWAY_SECRET'] → getenv()
+# （webroot/api/fbs/index.php:103-108）。两处能取到都依赖官方 php:*-fpm 镜像自带的
+# /usr/local/etc/php-fpm.d/docker.conf 里的 clear_env = no —— 若换基座镜像把 pool 改成 clear_env = yes，
+# worker 将看不到容器 env，网关会一律 503（不要把该文件改回清空环境）。
+# optional：Secret 未建时 Pod 照常启动，网关自身返回 503，不放大成 CrashLoop。
+- name: FBS_GATEWAY_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.gateway.secretRef }}
+      key: {{ .Values.gateway.secretKey | default "FBS_GATEWAY_SECRET" }}
+      optional: true
+{{- end }}
+# TG 专用站点的 service 白名单总开关（webroot/index.php 的 fbsTgServiceWhitelistEnabled()）。
+# 默认 "1"：全站只放行 waimai / article / travel / member / siteConfig，其余 302 回首页。
+# 紧急退回把 values 的 tgApp.serviceWhitelist 改成 "0" 重启 php 即可，不需要重建镜像。
+# 取值语义：trim 转小写后命中 0|false|off|no 才关，其余（含未设置）一律视为开 —— 漏配时宁可收紧。
+# 与 FBS_GATEWAY_SECRET 同一前提：靠官方 php:*-fpm 镜像 docker.conf 的 clear_env = no 才读得到。
+# 这里不能用 `| default "1"`：Sprig 的 default 把整数 0 当空值，values 里写成不带引号的
+# serviceWhitelist: 0 会被静默渲染成 "1" —— 运营以为关了、实际还开着，且没有任何可见差异。
+# 用 hasKey 显式判存在、printf "%v" 保值，0 就渲染成 "0"。
+{{- $whitelist := "1" }}
+{{- if and .Values.tgApp (hasKey .Values.tgApp "serviceWhitelist") }}
+{{- $whitelist = printf "%v" .Values.tgApp.serviceWhitelist }}
+{{- end }}
+- name: FBS_TG_SERVICE_WHITELIST
+  value: {{ $whitelist | quote }}
+# 网关 cookieDomain 兜底：data/cache/config.php 缺失（baked 模式 emptyDir 每次 Pod 重建清空）
+# 或文件里没有 $cfg_cookieDomain（新版火鸟已移除该配置项）时，网关用它签发跨域 cookie。
+# 只在 php-fpm 注入：cookie 由 PHP 签发，Node 侧只透传 set_cookies。
+# 留空则不注入 → 网关保持原 fail-closed（两级都拿不到才 500，绝不回落 host-only）。
+{{- if .Values.gateway.cookieDomain }}
+- name: FBS_GATEWAY_COOKIE_DOMAIN
+  value: {{ .Values.gateway.cookieDomain | quote }}
+{{- end }}
 - name: GOOGLE_MAPS_API_KEY
   valueFrom:
     secretKeyRef:
       name: firebird-storage-secret
       key: google-maps-api-key
+      optional: true
+# 员工免密落地页（webroot/tg/staff.php）在**进程内**校验 Telegram initData 签名，需要 bot token：
+# fbs_bridge_get_bot_token() 的取值顺序是 data/cache/config.php 的 $cfg_telegramBotToken → env
+# FBS_TG_BOT_TOKEN → 占位常量。baked 模式下 data/ 挂 emptyDir、config.php 每次 Pod 重建就消失，
+# 缓存里也不会有这个值，所以只能靠 env。
+#
+# 为什么之前没配：商家链路（/tg/entry.php?role=merchant）把验签放在 Node（api 部署有该 Secret），
+# 员工链路是纯 PHP，没有 Node 中转 —— 少这一条，落地页 POST 恒 500
+# "Telegram bot token is not configured"，绑定能成但拿不到会话 Cookie，免密进工作台整条不可用。
+# 与 api / tgbot 复用同一枚 Secret key，不在 values 里新造配置项。
+#
+# optional：Secret 未建时 Pod 照常启动（站点其余功能不受影响），落地页 POST 返回结构化 500，
+# 不放大成 CrashLoop —— 与 FBS_GATEWAY_SECRET 同一取舍。
+- name: FBS_TG_BOT_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.api.secretRef | default "firebird-api-secret" }}
+      key: TELEGRAM_BOT_TOKEN
       optional: true
 {{- end -}}
 

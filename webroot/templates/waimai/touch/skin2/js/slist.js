@@ -105,13 +105,29 @@ $(function(){
 	    	}
 	    	else {
 	    		alert('failed'+this.getStatus());
+	    		getlist();   // 定位失败也要出城市级结果，否则整页空白
 	    	}
 	    },{enableHighAccuracy: true})
 
 			// 谷歌地图
 			}else if (site_map == 'google') {
 
-				if (navigator.geolocation) {
+				/* 未加载 Google Maps SDK（真实浏览器常态：边缘侧把 maps 脚本替换掉了）时，
+				   下面的 new google.maps.LatLng 会抛 ReferenceError 且 getCurrentPosition 回调不返回 →
+				   一个 shopList 请求都不发、页面 0 家店。改用原生坐标直接出结果，跳过逆地理。 */
+				if (typeof google === 'undefined') {
+					if (navigator.geolocation) {
+						navigator.geolocation.getCurrentPosition(function(position) {
+							lat = position.coords.latitude;
+							lng = position.coords.longitude;
+							getlist();
+						}, function() {
+							lat = ''; lng = ''; getlist();   /* 拒绝授权也要出城市级结果 */
+						}, {timeout: 8000, maximumAge: 60000});
+					} else {
+						getlist();
+					}
+				} else if (navigator.geolocation) {
 
 					//获取当前地理位置
 					navigator.geolocation.getCurrentPosition(function(position) {
@@ -143,6 +159,8 @@ $(function(){
 
 									} else {
 										alert('Geocode was not successful for the following reason: ' + status);
+										/* 逆地理失败（配额/网络）也是失败出口，不能停在加载态 */
+										lat = ''; lng = ''; getlist();
 									}
 							});
 
@@ -160,9 +178,11 @@ $(function(){
 								default:
 										 break;
 							}
+							getlist();   // 定位失败/被拒绝也要出城市级结果，否则整页空白
 				 })
 			 }else {
 				alert(langData['waimai'][3][72])    /* 不支持 */
+				getlist();   // 浏览器不支持定位时同样降级为城市级结果
 			 }
 			}
 
@@ -272,7 +292,9 @@ $(function(){
 
 
     function getlist(selecttype){
-    	if(!lat || !lng) return;
+    	// 无坐标（URL 没带、没选过地址、拒绝定位）也照常请求：后端 shopList 支持不带坐标的城市级查询，
+    	// 早退只会让整页空白。此时不拼 lng/lat 参数。lat/lng 是隐式全局，未赋值时用 typeof 守卫。
+    	var hasGeo = (typeof lat !== 'undefined' && lat) && (typeof lng !== 'undefined' && lng);
 		var sx = '';
 		if(selecttype){
 			sx = selecttype;
@@ -306,15 +328,19 @@ $(function(){
       utils.setStorage('wm_history_search', JSON.stringify(history));
 		}
 		
+		var reqData = {
+			page: page,
+			keywords: keywords,
+			pageSize: 10
+		};
+		if(hasGeo){
+			reqData.lng = lng;
+			reqData.lat = lat;
+		}
+
 		$.ajax({
             url: '/include/ajax.php?service=waimai&action=shopList&'+sx,
-            data: {
-                lng: lng,
-                lat: lat,
-                page: page,
-				keywords:keywords,
-                pageSize: 10
-            },
+            data: reqData,
             type: 'get',
             dataType: 'json',
             success: function(data){
@@ -381,11 +407,15 @@ $(function(){
 
 
                 }else{
+                    /* state≠100 也是终态：必须复位 shop_load，否则后续滚动分页永久不发请求 */
+                    shop_load = 0;
                     $('.ul_box .loading').html(data.info);
                 }
 
             },
             error: function(){
+                /* 网络错误同样要复位，否则一次抖动后下拉不再加载 */
+                shop_load = 0;
                 $('.ul_box.loading').html(langData['siteConfig'][20][227]);   /* 网络错误，加载失败！*/
             }
         })

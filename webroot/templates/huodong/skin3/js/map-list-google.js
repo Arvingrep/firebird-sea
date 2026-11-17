@@ -22,6 +22,7 @@ $(function () {
 			centerPoint = new google.maps.LatLng(parseFloat(data.lat), parseFloat(data.lng));
 			
 			map = new google.maps.Map(document.getElementById('allmap'), {
+			    renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
 			    zoom: 14,
 			    center: centerPoint,
 			    zoomControl: true,

@@ -1,7 +1,17 @@
 var route = 0; //首次进入渲染第一条路线
 var map,blbale3 ;
-var xhtime = 5000; //循环时间	
+var xhtime = 5000; //循环时间
 var interval;  //设置循环变量
+// 等 Google Maps JS API 就绪再渲染，避免与 axios 竞态导致 google undefined
+function hnWaitGoogleMap(cb){
+	if(window.google && window.google.maps && window.google.maps.Map){ cb(); return; }
+	var n = 0;
+	var t = setInterval(function(){
+		n++;
+		if(window.google && window.google.maps && window.google.maps.Map){ clearInterval(t); cb(); }
+		else if(n > 120){ clearInterval(t); }  // 最多等 60s，超时放弃（弱网/SDK 加载失败场景）
+	}, 500);
+}
 var pageVue = new Vue({
 	el: "#page",
 	data:{
@@ -34,6 +44,17 @@ var pageVue = new Vue({
 			$("#mapbox .tab_all li[data-type=waimai],#mapbox .tab_all li[data-type=paotui]").remove();
 		}
 		var tt = this;
+		// 非 APP 环境（TG WebView / 普通浏览器）没有 WebViewJavascriptBridge，
+		// 回调永远不会触发，loading 会永久转圈 —— 这里做兜底启动（幂等）
+		var hnListStarted = false;
+		tt.hnStartList = function(){
+			if(hnListStarted) return;
+			hnListStarted = true;
+			// 坐标兜底：APP 定位未就绪或浏览器无定位推送时，用马尼拉市中心，避免 NaN 坐标让渲染链路抛错
+			if(!tt.myPosition.lng){ tt.myPosition = {'lng':120.9842,'lat':14.5995}; }
+			tt.loading = false;
+			tt.getList();
+		};
 		// 监听app传到变量
 		setupWebViewJavascriptBridge(function(bridge) {
 			  //获取方向
@@ -44,10 +65,20 @@ var pageVue = new Vue({
 				 tt.changePosi()
 			 });
 			setTimeout(function(){
-				tt.loading = false;
-				tt.getList();
+				tt.hnStartList();
 			},100)
 		})
+		// 浏览器兜底：800ms 后 bridge 仍未接管则直接启动；
+		// TG/浏览器里没有 APP 定位推送，改用原生 geolocation 兜底（拒绝/失败则保持默认中心）
+		setTimeout(function(){
+			tt.hnStartList();
+			if(!window.WebViewJavascriptBridge && navigator.geolocation){
+				navigator.geolocation.getCurrentPosition(function(p){
+					tt.myPosition = {'lng':p.coords.longitude,'lat':p.coords.latitude};
+					if(map){ tt.changePosi(); tt.changecenter(); }
+				}, function(){}, {timeout:8000, maximumAge:60000});
+			}
+		},800)
 		
 		
 		if(site_map=='amap'){ 
@@ -325,7 +356,7 @@ var pageVue = new Vue({
 					}else if(site_map == 'amap'){
 						tt.amapMap(tt.myPosition,tt.posiArray,0);
 					}else if(site_map == 'google'){
-						tt.google_map(tt.myPosition,tt.posiArray,0);
+						hnWaitGoogleMap(function(){ tt.google_map(tt.myPosition,tt.posiArray,0); });
 					}
 					if(tt.myPosition.lng == '' || tt.myPosition.lat == ''){
 						tt.loading = true;
@@ -350,7 +381,7 @@ var pageVue = new Vue({
 					}else if(site_map == 'amap'){
 						tt.amapMap(tt.myPosition,tt.posiArray,0);
 					}else if(site_map == 'google'){
-						tt.google_map(tt.myPosition,tt.posiArray,0);
+						hnWaitGoogleMap(function(){ tt.google_map(tt.myPosition,tt.posiArray,0); });
 					}
 					tt.changePosi();
 					interval = setInterval(function(){
@@ -358,6 +389,14 @@ var pageVue = new Vue({
 						tt.changecenter()
 					},xhtime);
 					tt.loading = false;
+				}
+			}).catch(function(){
+				// 网络异常等 rejection 路径也必须收敛 loading，否则永久转圈
+				tt.loading = false;
+				if(site_map == 'google'){
+					hnWaitGoogleMap(function(){
+						try{ tt.google_map(tt.myPosition,tt.posiArray,0); }catch(e){}
+					});
 				}
 			});
 		},
@@ -394,6 +433,7 @@ var pageVue = new Vue({
 				})
 				 map.setCenter([tt.myPosition.lng,tt.myPosition.lat]); //设置地图中心点
 			}else if(site_map=="google"){
+				if(!map){ return; }
 				var cposition = new google.maps.LatLng(Number(tt.myPosition.lat),Number(tt.myPosition.lng));
 				if(blbale3){blbale3.setMap(null);}
 				blbale3  = new MarkerWithLabel({
@@ -657,6 +697,7 @@ var pageVue = new Vue({
 			}else if(site_map=='amap'){
 				blbale3.setAngle(tt.rotation);
 			}else if(site_map=='google'){
+				if(!map){ return; }
 				var cposition = new google.maps.LatLng(Number(tt.myPosition.lat),Number(tt.myPosition.lng));
 				if(blbale3){blbale3.setMap(null);}
 				blbale3  = new MarkerWithLabel({
@@ -674,6 +715,7 @@ var pageVue = new Vue({
 		google_map:function(ps,arr,num,type){
 		   var tt = this;
 		   map = new google.maps.Map(document.getElementById("map"), {
+		       renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
 				zoom: 14,
 				center: {
 				lat: ps.lat,

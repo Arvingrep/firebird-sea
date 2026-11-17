@@ -1,5 +1,8 @@
 $(function(){
 
+    // 谷歌地图：每 5 秒刷新一次，旧标记/气泡要先摘掉（原来用的 marker 变量在 update 里根本不存在）。
+    // 必须声明在 update(1) 之前，否则首次调用时它还是 undefined。
+    var gOverlays = [];
 
     update(1);
 
@@ -101,20 +104,26 @@ $(function(){
       // 谷歌地图
       }else if (site_map == "google") {
 
-        var points = [], LatLngList = [], markerList = [];
+        var points = [], LatLngList = [];
 
         if(first){
+              // renderingType: RASTER——矢量渲染依赖 WebGL，部分环境（硬件加速关闭/被扩展干扰）
+              // WebGL 失败时表现为灰底+标注正常+零瓦片请求；栅格用 <img> 无此依赖。
+              // div+google.maps.Map 默认即为 RASTER，此处显式声明防个别 SDK 版本走矢量路径；
+              // 老版本 SDK 缺 RenderingType 常量时传 undefined 等价默认，无副作用。
               map = new google.maps.Map(document.getElementById('map'), {
               zoom: 14,
               center: new google.maps.LatLng(30, 120),
               zoomControl: true,
               mapTypeControl: false,
-              streetViewControl: false
+              streetViewControl: false,
+              renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined
             });
         }else{
-            for (var i = 0; i < marker.length; i++) {
-    		    marker[i].setMap(null);
-    		}
+            for (var i = 0; i < gOverlays.length; i++) {
+                gOverlays[i].setMap ? gOverlays[i].setMap(null) : gOverlays[i].close();
+            }
+            gOverlays = [];
         }
 
         //骑手
@@ -138,7 +147,7 @@ $(function(){
             infoWindow.open(map, marker);
 
             LatLngList.push(new google.maps.LatLng(o.lng, o.lat))
-            markerList.push(marker);
+            gOverlays.push(marker, infoWindow);
 
         });
 
@@ -153,19 +162,25 @@ $(function(){
             });
 
             var infoWindow = new google.maps.InfoWindow({
-              content: '<p class="cour_google'+state+' store">'+o.name+'</p>'
+              content: '<p class="cour_google store">'+o.name+'</p>'
             });
             infoWindow.open(map, marker);
 
+            LatLngList.push(poi);
+            gOverlays.push(marker, infoWindow);
         });
 
         // 调整到合适的视野
-        if(first){
+        if(first && LatLngList.length > 0){
             var bounds = new google.maps.LatLngBounds ();
             for (var i = 0, LtLgLen = LatLngList.length; i < LtLgLen; i++) {
               bounds.extend (LatLngList[i]);
             }
             map.fitBounds (bounds);
+            // 只有一个点时 fitBounds 会放到最大级别，Google 在很多地方没有那么高的底图，会是一片灰
+            google.maps.event.addListenerOnce(map, 'idle', function(){
+                if(map.getZoom() > 16) map.setZoom(16);
+            });
         }
 
       }else if(site_map == 'amap'){

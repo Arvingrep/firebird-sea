@@ -186,7 +186,7 @@ $(function(){
 				  mapTypeId: google.maps.MapTypeId.ROADMAP
 				  };
 				  
-				var map=new google.maps.Map(document.getElementById("smap"),mapProp);
+				var map=new google.maps.Map(document.getElementById("smap"),Object.assign({}, mapProp, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 				var marker=new google.maps.Marker({
 				  position:centerPoint,
 				  icon: cenicon,

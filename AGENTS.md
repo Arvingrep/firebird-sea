@@ -27,15 +27,15 @@ Run workspace commands from the current Git worktree root. Do not `cd` into the 
 
 ## Required Local Agent
 
-A VS Code and GitHub Copilot-compatible agent is generated here:
+`n8nac update-ai` 会在本地生成一份 VS Code / Copilot 兼容的 agent 定义，
+以及一份给「不读 workspace agent 的运行时」用的 skill 兜底。
 
-- `.github/agents/n8n-architect.agent.md`
+**这两份产物不随仓库提交**（每次按需生成，位置以命令输出为准），所以在本仓库里
+找不到它们不是缺陷——别去 `git ls-files` 里翻。
 
-A portable skill fallback is also generated for runtimes that do not read `.github/agents`:
-
-- `.agents/skills/n8n-architect/SKILL.md`
-
-If your agent runtime supports workspace agents, use the `.github/agents/*.agent.md` file. If it supports skills instead, load the skill file. Otherwise, treat these files as mandatory instructions.
+如果你的运行时支持 workspace agent / skill，先跑一次 `n8nac update-ai` 再加载；
+否则以 `AGENTS.md`、`.agents/RULES.md`、[`docs/internal/AGENT_PIPELINE.md`](docs/internal/AGENT_PIPELINE.md)
+三份文件为准。
 
 ---
 
@@ -70,3 +70,12 @@ Do not reconstruct `workflowsPath` from environment name/id, instance identifier
 
 Never write `n8nac-config.json`, `~/.n8n-manager`, or n8n-manager secret files by hand.
 <!-- n8n-as-code-end -->
+
+---
+
+## 多 agent 协作规则
+1. 你在独立的 git worktree 里工作，只修改当前目录下的文件，不要动其他 worktree 或主目录。
+2. 不要切换分支，不要 merge、rebase 或 push，除非我明确要求。
+3. 改动完成后做小而清楚的 commit，提交信息写明改了什么。
+4. 不要修改锁文件和公共配置（如 package-lock.json、.env、数据库迁移），需要改时先问我。
+5. 完成后汇报：改了哪些文件、怎么测试、有没有未完成的事项。

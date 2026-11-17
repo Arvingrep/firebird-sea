@@ -518,6 +518,12 @@ var pageVue = new Vue({
 		// 获取定位
 		getLoaction:function(){
 			var tt = this;
+			// Web 端（Telegram / 浏览器）没有原生 bridge，回退用 webgeo.js 暴露的浏览器定位；
+			// 原生 App 下 __webGeo 不存在，这段不生效，仍以 bridge 为准（AD-14 最小补丁）
+			var wg = window.__webGeo;
+			if (wg && wg.lng !== '' && wg.lat !== '' && wg.lng != null && wg.lat != null) {
+				tt.ps_lnglat = {'lng':wg.lng, 'lat':wg.lat};
+			}
 			setupWebViewJavascriptBridge(function(bridge) {
 			    bridge.callHandler("getGeocoder", {}, function(responseData){
 					var data = JSON.parse(responseData)

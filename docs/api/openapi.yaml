@@ -73,6 +73,28 @@ paths:
         '401': { description: initData 无效或过期 }
         '503': { description: 鉴权模块未配置（AUTH_NOT_CONFIGURED） }
         '502': { description: 登录服务暂不可用（LOGIN_FAILED） }
+  /tg-api/auth/telegram-web:
+    post:
+      summary: Telegram 顾客免密登录桥（方案甲：Node 中转 PHP 网关）
+      description: 校验 initData 后经集群内 PHP 网关（/api/fbs/index.php）种火鸟登录态 Cookie。
+        initData 只在内存流转，不写日志。网关地址/密钥缺失时返回 500（静态配置错，重试无用）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string }
+      responses:
+        '200': { description: 登录成功，PHP 网关已下发火鸟会话 Cookie }
+        '400': { description: 缺少 initData（MISSING_PARAM） }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA / EXPIRED_INIT_DATA） }
+        '403': { description: 会员被禁用或已申请注销（MEMBER_DISABLED / MEMBER_CANCELLED） }
+        '429': { description: 触发网关防重放记账限制 }
+        '500': { description: 网关地址/密钥未配置（GATEWAY_SECRET_NOT_CONFIGURED）或网关 5xx }
+        '502': { description: PHP 网关不可达或返回非契约响应（GATEWAY_UNAVAILABLE / GATEWAY_TIMEOUT） }
   /tg-api/auth/logout:
     post:
       summary: 注销当前令牌
@@ -83,6 +105,228 @@ paths:
         '200': { description: 已吊销 }
         '401': { description: 无令牌或已失效 }
         '503': { description: 鉴权模块未配置 }
+  /tg-api/auth/bridge:
+    get:
+      summary: 登录桥落地页（TAPD 0002）
+      description: |
+        Telegram 内打开的内联 HTML：加载 telegram-web-app.js，取 `Telegram.WebApp.initData`
+        后以真实表单 POST（非 fetch）提交到本路径，字段 `initData`，另带隐藏字段 `to`（目标页）。
+        无 initData（非 TG 环境）显示提示不提交。响应自带 CSP（script-src 限自身与 telegram.org + nonce、
+        frame-ancestors 限 Telegram 域）与 `Cache-Control: no-store`。配置缺失返回 503。
+      responses:
+        '200': { description: 落地页 HTML }
+        '503': { description: 登录桥未配置（BRIDGE_NOT_CONFIGURED） }
+    post:
+      summary: 登录桥端点：验签 → issue_session → Set-Cookie + 302
+      description: |
+        `application/x-www-form-urlencoded`，字段 `initData`、`to`（可选）。复用登录编排（验签/限频/
+        防重放/会员查建/审计）取得 memberId，经网关 `issue_session` 换火鸟进程内签发的会话凭证
+        （如 `HN_login_user=<base64>`），`302` 跳站内目标页并下发该 Cookie
+        （`Path=/; Domain=TMA_BRIDGE_COOKIE_DOMAIN; Max-Age=86400; SameSite=Lax[; Secure]`，无 HttpOnly）。
+        `Location` 只允许站内相对路径（以单个 `/` 开头，拒 `//`、`/\`、`\`、协议、`@`、控制字符，≤200 字符），
+        否则回落 `TMA_BRIDGE_TARGET_DEFAULT`（默认 `/`）。不返回 Node 自签 token。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string, description: Telegram WebApp initData 原始串 }
+                to: { type: string, description: 站内相对路径目标页，可选 }
+      responses:
+        '302': { description: 登录成功，Set-Cookie + Location 跳站内目标页 }
+        '403': { description: 来源闸门拒绝（CROSS_SITE_BLOCKED）：Origin 非本站 / Sec-Fetch-Site cross-site / 两者全缺 fail-closed，无 Cookie 无 302 }
+        '401': { description: initData 无效或过期（HTML 错误页，无 Cookie） }
+        '429': { description: 限频或同一 initData 重放超限（HTML 错误页，无 Cookie） }
+        '502': { description: 网关/凭证签发失败（BRIDGE_FAILED，无 Cookie） }
+        '503': { description: 登录桥未配置（BRIDGE_NOT_CONFIGURED） }
+  /tg-api/rider/bind:
+    get:
+      summary: 骑手绑定落地页（T6）
+      description: |
+        Telegram 内打开的内联 HTML：输入骑手手机号，取 `Telegram.WebApp.initData` 后表单 POST
+        到本路径。无 initData（非 TG 环境）显示提示不提交。响应自带 CSP（script-src 限自身与
+        telegram.org + nonce、frame-ancestors 限 Telegram 域）与 `Cache-Control: no-store`。
+        配置缺失返回 503。
+      responses:
+        '200': { description: 落地页 HTML }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+    post:
+      summary: 骑手绑定：initData 验签 → 手机号归一 → 网关 rider_bind → rider_ql → 302 工作台
+      description: |
+        字段 `initData`、`phone`。手机号先归一（去空格/横线/括号/点号 → 前导 `+63`/`63` 转 `0` →
+        必须为 `0` 开头 10–11 位），再交 PHP 网关查唯一可用骑手（quit != 1 且 status = 1）。
+        绑定冲突**绝不静默顶替**：骑手已被他人绑定 → 409 `COURIER_ALREADY_BOUND`；当前 Telegram
+        已绑其他骑手 → 409 `TG_ALREADY_BOUND`；同一对重复提交按幂等成功处理。PHP 侧另有按
+        `tg_user_id`（5 次/60 秒）、`phone`（3 次/300 秒）与来源 `ip`（20 次/300 秒）的三维度限频
+        （超限 429 `BIND_RATE_LIMITED`；被拒请求不计入额度），每次尝试（成功/冲突/限频/审计不可用）
+        均写 `fbs_bind_audit` 审计行；审计或限频计数不可用时 fail-closed 拒绝（503
+        `AUDIT_UNAVAILABLE`）。网关契约（canary 新形态）：成功 200 `{success:true,data}`，业务失败
+        非 2xx `{success:false,error:{code,message}}`，Node 侧由 gatewayClient reject 还原为
+        409/429/404/503。成功时签
+        10 分钟一次性工作台直达 URL（`/ql.html?token=...`，落地种骑手 cookie 后 302 进
+        `/?service=waimai&do=courier` 工作台）；302 目标还须落在 `CORS_ORIGINS` 域名白名单内。
+        Node 不接触任何骑手凭证。Node 侧限频 10 次/分钟/IP。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [initData, phone]
+              properties:
+                initData: { type: string, description: Telegram WebApp initData 原始串 }
+                phone: { type: string, description: 骑手手机号（09171234567 / +639171234567 等，归一后 0 开头 10-11 位） }
+      responses:
+        '302': { description: 绑定成功，Location 为 PHP 签出的一次性工作台直达 URL }
+        '400': { description: 手机号格式非法（INVALID_PHONE，HTML 错误页含可接受格式提示） }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA，HTML 错误页） }
+        '404': { description: 手机号未匹配骑手（COURIER_NOT_FOUND） }
+        '409': { description: 绑定冲突（COURIER_ALREADY_BOUND / TG_ALREADY_BOUND，引导先解绑，不顶替原绑定） }
+        '429': { description: 限频（RATE_LIMITED / BIND_RATE_LIMITED：tg 5 次/60s、phone 3 次/300s、网关 ip 20 次/300s、Node 侧 IP 10 次/60s） }
+        '502': { description: 网关失败（RIDER_FAILED）；或绑定已生效但换工作台 URL 失败（WORKBENCH_URL_FAILED，文案提示稍后从 bot 重新打开，勿重复绑定） }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED）或网关审计不可用 fail-closed（AUDIT_UNAVAILABLE） }
+  /tg-api/rider/session:
+    post:
+      summary: 已绑定骑手换工作台直达 URL（T6，供 bot/n8n 侧对接）
+      description: |
+        仅 POST（不接受 query 传 initData——短期凭证不应进 URL/访问日志），响应带
+        `Cache-Control: no-store`。已绑定的返回 `{success:true, data:{bound:true, courier_id, url}}`，
+        `url` 为 PHP 签出的 10 分钟一次性工作台直达 URL（须通过 `CORS_ORIGINS` 域名白名单）；
+        未绑定返回 `{success:true, data:{bound:false}}`。
+      responses:
+        '200': { description: bound:true（含 courier_id 与 url）或 bound:false }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA） }
+        '502': { description: 网关失败（RIDER_FAILED） }
+        '503': { description: 骑手绑定未配置（RIDER_NOT_CONFIGURED） }
+  /tg-api/merchant/bind:
+    get:
+      summary: 商家绑定落地页（方案 A）
+      description: |
+        Telegram 内打开的内联 HTML：输入入驻时登记的会员手机号，取 `Telegram.WebApp.initData`
+        后表单 POST 到本路径。无 initData（非 TG 环境）显示提示不提交。响应自带 CSP
+        （script-src 限自身与 telegram.org + nonce、frame-ancestors 限 Telegram 域）与
+        `Cache-Control: no-store`。配置缺失返回 503。
+      responses:
+        '200': { description: 落地页 HTML }
+        '503': { description: 商家入口未配置（MERCHANT_NOT_CONFIGURED） }
+    post:
+      summary: 商家绑定：initData 验签 → 手机号归一 → 网关 merchant_bind → merchant_session → Set-Cookie + 302 /wmsj/
+      description: |
+        字段 `initData`、`phone`。手机号归一口径与骑手一致（去空格/横线/括号/点号 → 前导
+        `+63`/`63` 转 `0` → 必须为 `0` 开头 10–11 位）。PHP 网关按 `member.phone`（两侧归一、
+        0/63/+63 三写法）唯一命中商家会员（`mtype` 只认 1/2），并要求 `waimai_shop_manager`
+        存在且店铺未删（`del=0`；`status=0` 休息不拦）。绑定冲突**绝不静默顶替**：会员已被
+        他人绑定 → 409 `MERCHANT_ALREADY_BOUND`；当前 Telegram 已绑其他会员 → 409
+        `TG_ALREADY_BOUND`；同一对重复提交按幂等成功处理；同一手机号命中多个会员 → 409
+        `MERCHANT_AMBIGUOUS`。三维限频（tg 5 次/60s、phone 3 次/300s、ip 20 次/300s）超限
+        429 `BIND_RATE_LIMITED`，每次尝试写 `fbs_merchant_audit`，底账不可用 fail-closed
+        503 `AUDIT_UNAVAILABLE`。绑定成功后调网关 `merchant_session`（**只读** `fbs_merchant_map`
+        解析既有会员、绝不建号）签火鸟会员 Cookie（`HN_login_user`/`HN_userid`/`HN_tg`，由
+        PHP 生成后原样透传），`302` 到 `/wmsj/`（商家后台首页自跳订单页，多店在页面内切换）。
+        **商家链路绝不写 `fbs_member_map`**（收银台归属校验的唯一依据）。Node 侧限频
+        10 次/分钟/IP。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [initData, phone]
+              properties:
+                initData: { type: string, description: Telegram WebApp initData 原始串 }
+                phone: { type: string, description: 商家会员手机号（09178889999 / +639178889999 等，归一后 0 开头 10-11 位） }
+      responses:
+        '302': { description: 绑定并登录成功，Set-Cookie + Location 为 /wmsj/ }
+        '400': { description: 手机号格式非法（INVALID_PHONE，HTML 错误页含可接受格式提示） }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA，HTML 错误页） }
+        '403': { description: 会员被停用或已申请注销（MEMBER_DISABLED / MEMBER_CANCELLED） }
+        '404': { description: 手机号未匹配商家会员（MERCHANT_NOT_FOUND）或会员无店铺归属（MERCHANT_NO_SHOP） }
+        '409': { description: 绑定冲突（MERCHANT_ALREADY_BOUND / TG_ALREADY_BOUND / MERCHANT_AMBIGUOUS，不顶替原绑定） }
+        '429': { description: 限频（RATE_LIMITED / BIND_RATE_LIMITED） }
+        '502': { description: 网关失败（MERCHANT_FAILED）；或绑定已生效但换会话失败（MERCHANT_SESSION_FAILED，文案提示稍后重新打开，勿重复绑定） }
+        '503': { description: 商家入口未配置（MERCHANT_NOT_CONFIGURED）或网关审计不可用 fail-closed（AUDIT_UNAVAILABLE） }
+  /tg-api/merchant/session:
+    post:
+      summary: 已绑定商家换会员会话（供 bot/n8n 侧对接）
+      description: |
+        仅 POST（不接受 query 传 initData——短期凭证不应进 URL/访问日志），响应带
+        `Cache-Control: no-store`。body 为 JSON `{initData}`。已绑定返回 `Set-Cookie`
+        + `{success:true, data:{bound:true, member_id, shop_ids, redirect:'/wmsj/'}}`；
+        未绑定返回 `{success:true, data:{bound:false}}`；会员无店铺归属返回 403
+        `MERCHANT_NO_SHOP`。网关侧走 `merchant_session`（紧窗 ±15s，按 init_data_hash
+        记账防重放 5 次/2h），只读解析既有会员、绝不建号。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [initData]
+              properties:
+                initData: { type: string }
+      responses:
+        '200': { description: bound:true（含 member_id/shop_ids/redirect 与 Set-Cookie）或 bound:false }
+        '401': { description: initData 无效或过期（INVALID_INIT_DATA） }
+        '403': { description: 会员无店铺归属（MERCHANT_NO_SHOP）或账号停用/注销（MEMBER_DISABLED / MEMBER_CANCELLED） }
+        '404': { description: 未绑定（以 200 bound:false 表达；会员行缺失的陈旧绑定同口径） }
+        '429': { description: 触发网关防重放记账限制（REPLAY_LIMITED） }
+        '502': { description: 网关失败（MERCHANT_FAILED） }
+        '503': { description: 商家入口未配置（MERCHANT_NOT_CONFIGURED） }
+  /tg-api/internal/dispatch:
+    post:
+      summary: 骑手派单 Telegram 通知（T7，仅集群内 PHP 调用）
+      description: |
+        PHP 派单挂点（`fb_tg_dispatch`，waimaiOrder.php 派单/改派、waimai.class.php 抢单）转交的
+        通知入口。**收下即返回**：HMAC 验签 + 去重占位写库后立刻 `202 {accepted:true}`，
+        sendMessage 与重试全部在响应之后异步执行——挂点在派单/抢单/改派关键路径上，同步等
+        Telegram 会顶穿 PHP 的 800ms 预算并产出「日志说超时、骑手其实收到了」的假失败。
+
+        `202` 只代表**已受理**，不代表已送达。之后的查绑定 / 换直达 URL / 发消息失败只落日志
+        （每条带 `event=` / `order_id=` / `courier_id=`，线上按订单号 grep 即可定位），最终失败
+        会释放去重占位以便下次同键事件重发；PHP 侧不再得知发送结果，业务事务因此完全解耦。
+
+        HMAC 与 gatewayClient 同算法同密钥（方向反转：
+        `HMAC-SHA256(FBS_GATEWAY_SECRET, ts\ndispatch\nbody)`，头 `X-Fbs-Timestamp` /
+        `X-Fbs-Signature`，60 秒窗口）。查 `fbs_courier_map` 得 tg_user_id，按 `TELEGRAM_BOT_TOKEN`
+        发 sendMessage；inline 按钮「查看订单」为网关 `rider_notify_url` 签出的一次性工作台直达
+        URL（打开即该订单详情）。事件四种：`new_order`（派单）、`grab`（抢单）、`reassign`
+        （改派给另一骑手）带按钮；`reclaim`（订单被客服收回，如改派第三方平台）不带按钮。
+        去重 `fbs_dispatch_dedup`（键 = event + order_id + courier_id，TTL 1 天，语义等同
+        Redis SETNX EX 86400——同单改派给另一位骑手不会被吞通知）。发送失败重试 1 次，
+        429 按其 `retry_after` 退避（上限 5s）。因此本端点的投递保证是 **at-most-once**：
+        硬崩溃时在飞通知可能丢失（残余靠带 order_id 的日志定位补发）；进程收 SIGTERM
+        （RollingUpdate 发版）会先排空在飞任务（上限 8s）再退出（N3）。网关 `rider_notify_url`
+        走 canary 新契约：成功 200 `{success:true,data:{url}}`，失败由 gatewayClient reject
+        ——无论哪种失败都降级为无按钮纯文本继续投递。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event, order_id, courier_id]
+              properties:
+                event: { type: string, enum: [new_order, grab, reassign, reclaim] }
+                order_id: { type: integer }
+                courier_id: { type: integer }
+      responses:
+        '202':
+          description: 已受理（dedup:false 本次负责投递；dedup:true 同键已在投递/已投递，本次跳过）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  accepted: { type: boolean }
+                  dedup: { type: boolean }
+        '400': { description: event / order_id / courier_id 非法（INVALID_EVENT / INVALID_PARAM） }
+        '401': { description: 时间戳过期或验签失败（BAD_SIGNATURE） }
+        '503': { description: 派单通知未配置（DISPATCH_NOT_CONFIGURED） }
   /tg-api/services:
     get:
       summary: 四大核心模块元数据

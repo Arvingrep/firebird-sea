@@ -11,14 +11,11 @@ COPY services/api/package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi \
     && npm cache clean --force
 
-# Stage 1b: TMA 前端构建（有 index.html 才构建；产物由 api 在 /tma/ 托管，不新增部署单元）
-# VITE_GOOGLE_MAPS_API_KEY：构建期注入前端（Google Places 地址联想）；CI 用 secret 传入，缺省时前端自动降级为纯手输
-FROM node:20-alpine AS tma-build
-WORKDIR /tma
-ARG VITE_GOOGLE_MAPS_API_KEY=""
-ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
-COPY apps/tma/ ./
-RUN if [ -f index.html ]; then npm ci --no-audit --no-fund && npm run build; else mkdir -p dist; fi
+# 注：TMA（Telegram Mini App）前端已于 2026-11-04 整体归档（docs/archive/tma-legacy-2026-11-04.tar.gz），
+# 原 Stage 1b（COPY apps/tma/ + vite build）随之移除。这里不是「暂时注释掉」：
+# apps/tma 目录已不存在，任何 COPY apps/tma 都会在 COPY 这一步直接失败，
+# 后面那句 `if [ -f index.html ]` 的回退逻辑跑不到（COPY 先报错）——#189 的 blocker 就是这个。
+# 前端如需复活，从归档包解出后需连同 tma-build 阶段一起恢复，不能只恢复目录。
 
 # Stage 2: Minimal Runtime (安全无特权运行时)
 FROM node:20-alpine AS runner
@@ -36,8 +33,9 @@ COPY --chown=node:node services/api/src ./src
 # 迁移脚本必须随镜像走：启动前自动执行，防止新环境缺表导致登录 502（2026-10-26 canary 实测）
 COPY --chown=node:node services/api/migrations ./migrations
 COPY --chown=node:node services/api/package.json ./
-COPY --chown=node:node --from=tma-build /tma/dist ./tma
-ENV TMA_STATIC_DIR=/app/tma
+# TMA_STATIC_DIR 不再设置：镜像里没有 /app/tma。server.js 的静态托管有 existsSync 守卫，
+# 目录不存在就不挂载 /tma 路由 —— 即 /tma 返回 404 而不是 500，API 其余端点不受影响。
+# 保留守卫而不是删掉那段代码，是因为前端复活时只需恢复构建阶段，不必再改 server.js。
 
 # 切换为标准无特权账号
 USER node

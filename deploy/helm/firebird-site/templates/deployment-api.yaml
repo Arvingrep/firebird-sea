@@ -1,4 +1,16 @@
 {{- if .Values.api.enabled -}}
+{{- /* 引擎选择：node = services/api，go = services/api-go。
+       拼错的值必须 fail 而不是 default "node"：静默回落会让「切到 Go」变成
+       「什么都没变」，灰度验证全绿而实际仍在跑旧实现。
+       两个镜像的 tag 也分开取，见 values.yaml api.goImage 的注释。 */ -}}
+{{- $engine := .Values.api.engine | default "node" -}}
+{{- if not (has $engine (list "node" "go")) -}}
+{{- fail (printf "api.engine 非法：%q（只允许 node / go）" $engine) -}}
+{{- end -}}
+{{- $apiImage := .Values.api.image -}}
+{{- if eq $engine "go" -}}
+{{- $apiImage = .Values.api.goImage | default dict -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,12 +32,16 @@ spec:
     spec:
       containers:
         - name: api
-          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
-          imagePullPolicy: {{ .Values.api.image.pullPolicy | default "IfNotPresent" }}
+          image: "{{ $apiImage.repository }}:{{ $apiImage.tag }}"
+          imagePullPolicy: {{ $apiImage.pullPolicy | default "IfNotPresent" }}
           ports:
             - containerPort: 3000
               name: http
+          # 引擎只影响镜像来源；下面所有 env 两套实现读的是同一批变量名
+          # （Go 版 main.go 逐个对齐了 server.js 的 process.env 清单）。
           env:
+            - name: API_ENGINE
+              value: "{{ $engine }}"
             - name: NODE_ENV
               value: "production"
             - name: PORT
@@ -34,18 +50,37 @@ spec:
               value: "{{ .Values.siteId }}"
             - name: DEFAULT_CURRENCY
               value: "{{ .Values.localization.defaultCurrency }}"
-            {{- if .Values.tma.enabled }}
-            # TMA 登录桥接与白名单代理（docs/internal/TMA_LOGIN_BRIDGE.md）。密钥只引用 secretName，值由运维创建
-            - name: TMA_ENV
-              value: "{{ .Values.tma.env | default .Values.siteId }}"
-            - name: FBS_GATEWAY_URL
-              value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/api/fbs/index.php"
-            - name: FB_UPSTREAM_URL
-              value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/include/ajax.php"
+            # 以下两项不属于 TMA 专属：/checkout 与 /auth/telegram-web 的限流按 req.ip 计数
+            # （缺 TRUST_PROXY_HOPS 时所有用户共用入口 IP 的额度），浏览器跨域调用依赖 CORS_ORIGINS。
+            # 2026-11-06 从 `tma.enabled` 守卫里移出：关掉 canary 孤儿 TMA 桥（KI-005）不能连坐这两项。
             - name: TRUST_PROXY_HOPS
               value: "{{ .Values.tma.trustProxyHops | default 1 }}"
             - name: CORS_ORIGINS
               value: "{{ range $i, $h := .Values.ingress.hosts }}{{ if $i }},{{ end }}https://{{ $h.host }}{{ end }}"
+            {{- if .Values.tma.enabled }}
+            # TMA 登录桥接与白名单代理（docs/internal/TMA_LOGIN_BRIDGE.md）。密钥只引用 secretName，值由运维创建
+            - name: TMA_ENV
+              value: "{{ .Values.tma.env | default .Values.siteId }}"
+            {{- /* FBS_GATEWAY_URL 不在此重复定义：下方守卫外有一条 baseUrl 版本（gatewayClient.js 自己拼
+                   GATEWAY_PATH）。这里若再给一条带 /api/fbs/index.php 的，K8s 后写者胜、前者永远看不到，
+                   反而误导下一个人。*/}}
+            - name: FB_UPSTREAM_URL
+              value: "http://firebird-{{ .Values.siteId }}:{{ .Values.service.port | default 80 }}/include/ajax.php"
+            {{- /* 登录桥（TAPD 0002）：明文配置，无密钥。缺任一变量桥端点即 503（fail-closed）。
+                   forceSecure 用 hasKey 判定，因为 | default 会把显式 false 当空值而误取 true。 */}}
+            {{- $bridge := .Values.tma.bridge | default dict }}
+            - name: TMA_BRIDGE_COOKIE_DOMAIN
+              value: "{{ $bridge.cookieDomain | default (index .Values.ingress.hosts 0).host }}"
+            - name: TMA_BRIDGE_COOKIE_MAX_AGE
+              value: "{{ $bridge.cookieMaxAge | default 86400 }}"
+            - name: TMA_BRIDGE_TARGET_DEFAULT
+              value: "{{ $bridge.targetDefault | default "/" }}"
+            - name: TMA_BRIDGE_FORCE_SECURE
+              value: "{{ if hasKey $bridge "forceSecure" }}{{ $bridge.forceSecure }}{{ else }}true{{ end }}"
+            {{- end }}
+            # 数据库与网关密钥不属于 TMA 专属（/checkout、/auth/telegram-web 及本轮 TG 登录都要用），
+            # 2026-11-06 从 `tma.enabled` 守卫里移出。TMA_TOKEN_SECRET 留在这里是 optional，
+            # tma.enabled=false 时 buildAuth() 因缺 TMA_ENV 返回 null，孤儿链自然降级为 503。
             - name: DB_HOST
               value: "{{ .Values.database.host }}"
             - name: DB_PORT
@@ -59,7 +94,9 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.database.passwordSecretRef | default "firebird-db-secret" }}
                   key: {{ .Values.database.passwordSecretKey | default "password" }}
-            {{- range $name := list "TMA_TOKEN_SECRET" "FBS_GATEWAY_SECRET" }}
+            # FBS_GATEWAY_SECRET 不放进这个 list：下面有专属条目（用 gateway.secretRef/gateway.secretKey，
+            # 可配置），两处并存时后者静默覆盖前者，且 secretName 不同时会让人误判取的是哪个。
+            {{- range $name := list "TMA_TOKEN_SECRET" }}
             - name: {{ $name }}
               valueFrom:
                 secretKeyRef:
@@ -67,11 +104,25 @@ spec:
                   key: {{ $name }}
                   optional: true
             {{- end }}
+            {{- if and .Values.api.goCompat .Values.api.goCompat.enabled }}
+            - name: GO_COMPAT_ENABLED
+              value: "true"
             {{- end }}
             {{- with .Values.api.callTestUrl }}
             - name: CALL_TEST_URL
               value: {{ . | quote }}
             {{- end }}
+            # Telegram 免密登录桥：Node → 集群内 nginx → /api/fbs/index.php（HMAC 签名，两侧同密钥）
+            # baseUrl 只到域名/端口：路径由 gatewayClient.js 固定拼，带路径会拼错（见该文件注释）
+            - name: FBS_GATEWAY_URL
+              value: {{ .Values.gateway.url | default (printf "http://firebird-%s:%v" .Values.siteId .Values.service.port) | quote }}
+            # optional：Secret 未建时 Pod 照常启动，该路由自身返回 500（不把登录桥故障放大成 CrashLoop）
+            - name: FBS_GATEWAY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.secretRef | default "firebird-api-secret" }}
+                  key: {{ .Values.gateway.secretKey | default "FBS_GATEWAY_SECRET" }}
+                  optional: true
             {{- range $name := list "TELEGRAM_BOT_TOKEN" "COINS_PH_API_KEY" "COINS_PH_API_SECRET" "TRON_MASTER_RECEIVE_ADDRESS" "TRONGRID_API_KEY" }}
             - name: {{ $name }}
               valueFrom:

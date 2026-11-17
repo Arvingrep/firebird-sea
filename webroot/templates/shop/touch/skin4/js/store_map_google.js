@@ -81,6 +81,7 @@ $(function(){
               var location = results[0].geometry.location;
               // var latLng = (oldlat && oldllng) ? (oldlat +','+oldlng) : (g_conf.lat +','+g_conf.lng)
               map = new google.maps.Map(document.getElementById('map'), {
+                renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
                 zoom: 13,
                 center: new google.maps.LatLng(location.lat(), location.lng()),
                 zoomControl: true,

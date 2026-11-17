@@ -42,6 +42,11 @@ fileCache:
     enabled: true
     maxAgeMinutes: 5
     intervalSeconds: 60
+  # AD-20：跳过 FileDataCache SQL 结果缓存（dsql.class.php::cache 内开关，HN_DSQL_CACHE_SKIP）。
+  # 原因：缓存 TTL=0 永不过期且全仓库无失效调用（delete/clearAll 零调用方），多副本下后台改
+  # site_module/site_payment 后各 Pod 永不收敛，sweeper 只清本地文件救不了跨 Pod。
+  # 打开后相关 SELECT 直查 DB：一致性恢复，代价是每请求数次配置表点查（canary 先行实测 DB 影响）。
+  queryBypass: false
 
 # ② 应用层内存缓存（$HN_memory：多语言包等）声明式指向 Redis。
 # 原先只能在后台"站点缓存"页保存，写进 dbinfo.inc.php，而 entrypoint 每次启动都会重写该文件 → 设置必丢。
@@ -113,22 +118,43 @@ smokeTest:
   paths:
     - "/"
   timeoutSeconds: 300
+  # API 冒烟（templates/job-smoke-api.yaml，PostSync hook）：直连 api service 验
+  # /tg-api 的状态码 + 页面指纹。默认关，只在 canary 开——其它站点尚未移植骑手路由，
+  # 打开会把正常的 404 误判成发布失败。
+  api:
+    enabled: false
+    timeoutSeconds: 180
 
 service:
   type: ClusterIP
   port: 80
 
-# 伴生 Node.js 扩展微服务 (firebird-api)
+# 伴生 API 微服务 (firebird-api)
 api:
   enabled: true
+  # 引擎选择：node = services/api（Node 版，当前生产在用）；go = services/api-go（Go 移植版）。
+  # 灰度路径：先在 values-canary.yaml 里覆盖成 go 验收，稳定后再改这里的默认值。
+  # 非法值由 templates/deployment-api.yaml 用 fail 拦下 —— 拼错就静默回落 node 的话，
+  # 「切引擎」会变成「什么都没变」，灰度看着成功而实际还在跑旧实现。
+  engine: node
   replicaCount: 2
   image:
     repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-api"
     tag: "latest"
     pullPolicy: Always
+  # Go 版镜像。单独一段而不是复用 image：两套镜像由 CI 分别构建推送，
+  # tag 可能不同步；混用会让「切引擎」顺带把版本也换掉，出问题时分不清是哪个变量导致的。
+  goImage:
+    repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-api-go"
+    tag: "latest"
+    pullPolicy: Always
   service:
     port: 3000
   callTestUrl: ""  # Call test 语音通道端点；空则 /tg-api/call-test 返回 503
+  # /go-compat/include/ajax.php：把 Go 兼容层暴露出来和 PHP 对比（#231、#235）。
+  # 打开时注入 GO_COMPAT_ENABLED 并加一条 Traefik 路由，只在 values-canary.yaml 打开，且要求 engine=go。
+  goCompat:
+    enabled: false
   resources:
     limits:
       cpu: 300m
@@ -136,6 +162,58 @@ api:
     requests:
       cpu: 50m
       memory: 64Mi
+
+# ⑥ Telegram 顾客免密登录接线：Node(api) → 集群内 nginx → PHP 网关 webroot/api/fbs/index.php
+# 密钥不进 Git、不进 ConfigMap（明文），只从 Secret 以 env 注入；api 与 php 两侧同值同 key（HMAC）。
+gateway:
+  # api 侧 FBS_GATEWAY_URL。必须直连 nginx Service，不要用对外域名：
+  # 外部经 Traefik 访问 /api/fbs 会被 ipAllowList 拒绝（middleware-deny-gateway.yaml，第一道防线）。
+  # 只到域名/端口，路径由 gatewayClient.js 固定拼 /api/fbs/index.php。
+  # 留空 → 渲染为 http://firebird-<siteId>:<service.port>（各站无需单独配置）。
+  url: ""
+  # 存密钥的 Secret 名 / key（api 与 php-fpm 共用）。Secret 缺失时：
+  #   api → /tg-api/auth/telegram-web 返回 500（登录桥不可用，进程照常启动）
+  #   php → /api/fbs/index.php 一律 503（fail-closed，没有"没配密钥就放行"的分支）
+  secretRef: "firebird-api-secret"
+  secretKey: "FBS_GATEWAY_SECRET"
+  # 网关 cookieDomain 兜底（渲染成 php-fpm 的 FBS_GATEWAY_COOKIE_DOMAIN）。
+  # 空 = 不注入 env，网关只认 data/cache/config.php 里的 $cfg_cookieDomain，缺了照旧 500 fail-closed。
+  # 非空 = 缓存文件缺失、或文件里没有 $cfg_cookieDomain 时用它兜底（仍然 fail-closed：两级都没有才 500）。
+  # 适用场景：baked 模式 data/ 是 emptyDir（Pod 重建即清空），且新版火鸟已移除 cookieDomain 配置项，
+  # 缓存路径在部分站点天然走不通。非空值必须与站点对外的父域一致（如 fbird.men），
+  # 否则 cookie 种到别的域上，表现为"换个子域就变游客"。只注入 php-fpm：cookie 由 PHP 签发，
+  # Node 只透传 set_cookies，不需要这个值。
+  cookieDomain: ""
+
+# Telegram web_app 按钮的对外站点，同时是 chart 内 tg-bot 的 TG_APP_BASE_URL。
+tgApp:
+  # /start 的「打开商店」web_app 按钮地址 = ${baseUrl}/tg/entry.php?role=customer。
+  # 必须是 https（Telegram 只接受 https，否则整条 sendMessage 被拒）。留空则按钮不出、仅 stderr 告警。
+  # 取各站自己的 ingress.hosts 主域名（fh580.net 不属于本 chart，不要填它）。
+  baseUrl: ""
+  # 全站 service 白名单总闸（webroot/index.php）。"1" = 只放行 waimai/article/travel/member/siteConfig，
+  # 其余 service 一律 302 回首页；"0" = 完全退回改造前的行为。
+  # 这是一个逃生阀，正常运营期间不要关：关掉等于把商家端、自助建站等模块重新对公网开放。
+  serviceWhitelist: "1"
+
+# ⑦ Telegram 前哨 Bot（长轮询 getUpdates）。默认关闭：同一个 bot token 只允许一个 poller，
+# 多站共用同一个 token 时只能在一个站点置 true，否则 getUpdates 会 409、机器人随机不响应。
+tgBot:
+  enabled: false
+  image:
+    repository: "asia-southeast1-docker.pkg.dev/fh580-70533/containers/firebird-tg-bot"
+    tag: "latest"
+    pullPolicy: Always
+  # 随笔消息转发到 n8n 的 webhook（集群内直连）。镜像不含 scripts/ 与 .agents/，
+  # server.js 的"本地派单兜底"在集群内不可用，转发这条通道才是生效的那条。留空则跳过转发。
+  n8nWebhookUrl: "http://n8n.n8n.svc.cluster.local:5678/webhook/tg-input"
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 20m
+      memory: 32Mi
 
 # USDT 付款监听器（单实例 + Recreate）。镜像由 CI 构建（deploy/docker/Dockerfile.payment-listener）后再置 enabled: true
 paymentListener:
@@ -160,6 +238,13 @@ tma:
   enabled: false
   env: ""            # 令牌的环境声明；留空则取 siteId
   trustProxyHops: 1  # 位于 Traefik 之后
+  # 登录桥（TAPD 0002）：TG 内打开 → Set-Cookie + 302 落火鸟 H5 页。
+  # 四个变量都是明文配置，不含密钥；未注入时桥端点一律 503（fail-closed，不会下发 host-only Cookie）。
+  bridge:
+    cookieDomain: ""     # 会话 Cookie 的父域（如 fbird.men）；留空回落 ingress.hosts[0]
+    cookieMaxAge: 86400  # 秒；应与火鸟后台在线时长对齐，否则「以为还在登录」
+    targetDefault: "/"   # to 参数不合法时的落地页，只能是站内相对路径
+    forceSecure: true    # 强制 Secure；仅纯 http 本地调试才设 false（prod 会打 WARN）
 
 # Traefik IngressRoute 路由定义
 ingressRoute:
@@ -249,3 +334,14 @@ uploads:
 configOverrides:
   enabled: false
   files: {}
+
+# ⑦ PHP→Go 迁移分流（总方案 #298 / 分流 #234）：nginx 按 URL 查询参数 service+action
+# 把 webroot/include/ajax.php 的请求转给现有 api-go Service（firebird-api-<siteId>），
+# 其余请求照旧走 PHP。默认全空：什么都不分流，渲染结果与未引入本段之前完全一致。
+go:
+  # 白名单：形如 "article.config" 的 "service.action" 串。命中才转 Go，其余一律 PHP。
+  # 判定只看 URL 查询参数（$arg_service / $arg_action），POST body 与 cookie 不参与判定。
+  # 回滚 = 把该 action 从列表删掉（ArgoCD 同步后立即回 PHP，无需重启）。
+  # 第一批 action 加入前须 Arvin 审批（改变真实用户流量走向）。
+  actions: []
+  # /go-compat 对比入口不在这里：由 api.goCompat（#231）经 Traefik 直连 api-go。

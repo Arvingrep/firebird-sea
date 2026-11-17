@@ -1,6 +1,8 @@
 <?php
 //系统核心配置文件
 require_once(dirname(__FILE__).'/include/common.inc.php');
+//TG 专用站点的 service 白名单守卫（与 website.php / special.php / wmsj/ 共用同一份实现）
+require_once(dirname(__FILE__).'/include/tgWhitelist.inc.php');
 
 //域名检测
 $httpHost  = $_SERVER['HTTP_HOST'];  //来访域名
@@ -733,6 +735,9 @@ if($service != "siteConfig" && $service != "member" && $service != "business"){
         }
 	}
 }
+
+//Telegram 专用站点：只放行五个业务块，其余 service 一律回首页（需求文档验收第 2 条）
+fbsTgServiceGuard($service);
 
 //关闭PC端
 if(!isMobile() && $template != "mobile" && $cfg_pcState && $service != 'member' && $template != "protocol" && $template != "about" && $template != "help" && $template != "feedback" && $template != "help-detail" && $template != "notice" && $template != "notice-detail" && $template != "middlejump" && $template != "wmsj" && $template != "qishou"){

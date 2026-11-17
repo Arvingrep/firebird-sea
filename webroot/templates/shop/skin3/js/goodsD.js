@@ -1415,7 +1415,7 @@ $(function () {
 					fullscreenControl: false
 				}
 
-			mapPath = new google.maps.Map(document.getElementById('allmap'), mapOptions);
+			mapPath = new google.maps.Map(document.getElementById('allmap'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 
 			// 店铺坐标
 			marker = new google.maps.Marker({

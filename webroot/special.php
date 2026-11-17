@@ -8,6 +8,9 @@
  * @link           http://www.huoniao.co/
  */
 require_once('./include/common.inc.php');
+//TG 专用站点：专题展示不在五个业务块内，整站关闭
+require_once(dirname(__FILE__).'/include/tgWhitelist.inc.php');
+fbsTgServiceGuard('special');
 global $cfg_softname;
 $dsql  = new dsql($dbo);
 $cycle = "aaab";

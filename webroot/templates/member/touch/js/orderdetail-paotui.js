@@ -186,6 +186,7 @@ $(function(){
         centerPoint = new google.maps.LatLng(parseFloat(pslat), parseFloat(pslng));
       }
       smallMap = new google.maps.Map(document.getElementById('map'), {
+        renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
         zoom: 14,
         center: centerPoint,
         zoomControl: true,
@@ -572,6 +573,7 @@ $(function(){
             centerPoint = new google.maps.LatLng(parseFloat(pslat), parseFloat(pslng));
           }
           mapPath = new google.maps.Map(document.getElementById('mapPath'), {
+            renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
             zoom: 12,
             center: centerPoint,
             zoomControl: true,

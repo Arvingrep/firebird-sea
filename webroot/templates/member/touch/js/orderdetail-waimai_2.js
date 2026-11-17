@@ -80,7 +80,7 @@ if(state==3 ){
 			 }else if(state==4){
 				 icon = '/static/images/courier_local_google.png?v=2';
 			 }
-			 mapPath = new google.maps.Map(document.getElementById('map'), mapOptions);
+			 mapPath = new google.maps.Map(document.getElementById('map'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 			 	
 			 // 店铺坐标
 			 marker = new google.maps.Marker({

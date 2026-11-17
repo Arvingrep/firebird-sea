@@ -19,6 +19,16 @@ var isDebug = false;
 var HN_Location = {
     init: function (func, notApp, force,debug) {
         isDebug = debug ? debug : false
+        // 各定位分支失败时回调的是 ''（见 fail/cancel/h5 的 func(isDebug ? err : '')），
+        // 而页面里的失败判断是 `data == undefined || data.address == ""`：''.address 是 undefined，
+        // undefined == "" 为 false，于是失败被当成成功，页面永远停在「定位中…」/ 地图画不出来。
+        // 在入口统一把「不是对象」的结果规整成 undefined，页面原有的失败分支才会生效。
+        if (typeof func === 'function' && !isDebug) {
+            var rawFunc = func;
+            func = function (d) {
+                rawFunc(d && typeof d === 'object' ? d : undefined);
+            };
+        }
         if (force) {
             var cookieData = this.cookie('get');
             if (cookieData) {

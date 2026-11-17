@@ -1,0 +1,25 @@
+{
+  "$schema": "./schema.json",
+  "service": "member",
+  "action": "detail",
+  "cases": [
+    {"name": "正常：匿名查看个人会员 id=2", "method": "GET", "params": {"id": "2"}, "requiresLogin": false, "ignoreFields": ["info.photo", "info.levelIcon"]},
+    {"name": "正常：登录态不传 id（回落到当前登录者）", "method": "GET", "params": {}, "requiresLogin": true, "ignoreFields": ["info.userid_encode", "info.photo", "info.levelIcon", "info.idcardFrontSource", "info.idcardBackSource"]},
+    {"name": "正常：登录态查看自己 id=2（含 userid_encode / 身份证字段）", "method": "GET", "params": {"id": "2"}, "requiresLogin": true, "ignoreFields": ["info.userid_encode", "info.photo", "info.levelIcon", "info.idcardFrontSource", "info.idcardBackSource"]},
+    {"name": "正常：simple=1 跳过地址/等级/消费金等可选块", "method": "GET", "params": {"id": "2", "simple": "1"}, "requiresLogin": false, "ignoreFields": ["info.photo", "info.levelIcon"]},
+    {"name": "正常：friend=1 好友校验（isfriend）", "method": "GET", "params": {"id": "2", "friend": "1"}, "requiresLogin": false, "ignoreFields": ["info.photo", "info.levelIcon"]},
+    {"name": "正常：friend=1&from=2 指定验证方向", "method": "GET", "params": {"id": "2", "friend": "1", "from": "2"}, "requiresLogin": false, "ignoreFields": ["info.photo", "info.levelIcon"]},
+    {"name": "正常：from=1 进入参数分支（id 仍是标量）", "method": "GET", "params": {"id": "2", "from": "1"}, "requiresLogin": false, "ignoreFields": ["info.photo", "info.levelIcon"]},
+    {"name": "正常：id[]=2 数组参数（convertArrToStrWithComma 后取整）", "method": "GET", "params": {"id[]": "2"}, "requiresLogin": false, "ignoreFields": ["info.photo", "info.levelIcon"]},
+    {"name": "空结果：id 不存在", "method": "GET", "params": {"id": "99999999"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "空结果：id=1 但 state=0 / mtype=0 被主表过滤", "method": "GET", "params": {"id": "1"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "空结果：id 不存在 + friend=1 仍返回 isfriend（外层不改写 102）", "method": "GET", "params": {"id": "99999999", "friend": "1"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "参数错误：id 为空串", "method": "GET", "params": {"id": ""}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "参数错误：id=abc", "method": "GET", "params": {"id": "abc"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "参数错误：id=0", "method": "GET", "params": {"id": "0"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "未登录：无 id 无 Cookie → 登录超时", "method": "GET", "params": {}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "未登录：need_data=quan 不触发降级", "method": "GET", "params": {"id": "2", "need_data": "quan"}, "requiresLogin": false, "ignoreFields": ["info.photo", "info.levelIcon"]},
+    {"name": "参数错误：userkey 非法（PHP 解出空 openid → 空结果）", "method": "GET", "params": {"userkey": "abc"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "参数错误：userkey=+++（base64 无有效字符 → 空结果）", "method": "GET", "params": {"userkey": "+++"}, "requiresLogin": false, "ignoreFields": []}
+  ]
+}

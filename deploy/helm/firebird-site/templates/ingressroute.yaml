@@ -22,16 +22,32 @@ spec:
         - name: firebird-{{ .Values.siteId }}
           port: {{ .Values.service.port }}
     {{- end }}
-    {{- if and .Values.api.enabled .Values.tma.enabled }}
-    # TMA 静态资源由 api 服务托管（AD-16：不新增部署单元）。/api/fbs 的 403 规则优先级更高，不受影响
+    # 2026-11-05：`/tma` 路由已删除。TMA 前端 2026-11-04 归档（见 docs/internal/TMA-LEGACY-NOTES.md），
+    # 镜像里不再有 /app/tma，server.js 的静态挂载有 existsSync 守卫、目录不存在就不挂。
+    # 这条 route 留着只会把 /tma/* 转给 api 再返 404 —— 路由应当反映真实存在的服务，
+    # 而不是记录一个曾经存在过的服务。`tma.enabled` 仍然有效：它还给 api 注入登录桥的环境变量。
+    {{- if .Values.api.enabled }}
+    {{- if .Values.ingressRoute.denyGateway }}
+    # T7：内部派单通知只允许集群内调用。priority 必须高于下面的 /tg-api（100），否则通用路由
+    # 先接走请求，这道 middleware 等于不存在（同 AD-19 的 200 vs 通用路由）。
     - kind: Rule
-      match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tma`)
+      match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tg-api/internal`)
+      priority: 200
+      middlewares:
+        - name: firebird-deny-internal-{{ .Values.siteId }}
+      services:
+        - name: firebird-api-{{ .Values.siteId }}
+          port: {{ .Values.api.service.port | default 3000 }}
+    {{- end }}
+    {{- if and .Values.api.goCompat .Values.api.goCompat.enabled }}
+    # Go 兼容层对比入口（#231）：不走 nginx，不影响 /include/ajax.php 的现有流量。
+    - kind: Rule
+      match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/go-compat`)
       priority: 100
       services:
         - name: firebird-api-{{ .Values.siteId }}
           port: {{ .Values.api.service.port | default 3000 }}
     {{- end }}
-    {{- if .Values.api.enabled }}
     - kind: Rule
       match: ({{ range $i, $host := .Values.ingress.hosts }}{{ if $i }} || {{ end }}Host(`{{ $host.host }}`){{ end }}) && PathPrefix(`/tg-api`)
       priority: 100

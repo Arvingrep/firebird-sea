@@ -1,0 +1,26 @@
+# ==============================================================================
+# Telegram 前哨 Bot（长轮询 getUpdates，零依赖原生 Node）
+# 源码只有 services/tg-bot/src/*，package.json 无 dependencies → 不做 npm install。
+# 运行方式与 docker-compose 里一致：node src/server.js（compose 是挂载仓库跑，这里把源码打进镜像）。
+# 注意：镜像里没有 scripts/ 与 .agents/（仓库根的内容），所以 server.js 的"本地派单兜底"不可用，
+# 集群内请让 N8N_WEBHOOK_URL 指向 n8n（见 templates/deployment-tgbot.yaml 头部说明）。
+# ==============================================================================
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    TG_BOT_PORT=3001
+
+COPY --chown=node:node services/tg-bot/src ./src
+COPY --chown=node:node services/tg-bot/package.json ./
+
+USER node
+
+EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/health || exit 1
+
+CMD ["node", "src/server.js"]

@@ -70,13 +70,25 @@ test('非法 tg id 被拒绝（防 SQL 拼接）', async () => {
   }
 });
 
-test('PHP 网关：先验签再加载火鸟、仅动作白名单、不改核心', () => {
+test('PHP 网关：常量时间验签、时间窗 fail-closed、仅动作白名单、不加载火鸟内核、参数全预处理', () => {
   const src = fs.readFileSync(path.join(__dirname, '../../../webroot/api/fbs/index.php'), 'utf8');
-  assert.ok(src.indexOf('hash_equals') < src.indexOf("require_once dirname(__FILE__) . '/../../include/common.inc.php'"));
+  // HMAC-SHA256 + 常量时间比较（canary 版是「先验签再 require common.inc.php」；
+  // 我方网关更强：整个文件没有任何 require/include 语句，火鸟内核零引导（注释里提及 common.inc.php 不算加载）
   assert.match(src, /hash_hmac\('sha256'/);
-  assert.match(src, /abs\(time\(\) - \(int\)\$ts\) > \$window/);
-  assert.match(src, /\$window = \(\$action === 'issue_session'\) \? 15 : 60;/);
-  assert.match(src, /\$action !== 'member_find_or_create' && \$action !== 'issue_session'/);
-  assert.match(src, /preg_match\('\/\^\[1-9\]\[0-9\]\{0,18\}\$\/', \$tgId\)/);
+  assert.match(src, /hash_equals\(\$expected, strtolower\(\$signature\)\)/);
+  assert.doesNotMatch(src, /(?:require|include)(?:_once)?[^\n;]*common\.inc\.php/);
+  assert.doesNotMatch(src, /(?:require|include)(?:_once)?\s*\(/);
+  // 时间窗 fail-closed：$now 可注入，语义同 canary 的 time() 版；未传 window 用常量兜底
+  assert.match(src, /abs\(\$now - \(int\)\$timestamp\) > \$window/);
+  assert.match(src, /if \(\$window === null\) \$window = FBS_GATEWAY_TIME_WINDOW;/);
+  // 动作白名单：member_find_or_create / issue_session + 三个 rider 动作（移植轮 3 注册进注册表）
+  // + merchant_bind / merchant_session（商家方案 A），其余 UNKNOWN_ACTION；
+  // 每支在 dispatch 里显式 return，绝不直落 issue_session 兜底
+  assert.match(src, /return array\(\s*'member_find_or_create', 'issue_session',\s*'rider_bind', 'rider_ql', 'rider_notify_url',\s*'merchant_bind', 'merchant_session',\s*\);/);
+  assert.match(src, /in_array\(\$action, fbs_gateway_actions\(\), true\)/);
+  assert.match(src, /if \(\$action === 'rider_bind'\) return fbs_gateway_action_rider_bind\(\$params, \$context\);/);
+  // tg_user_id 只接受 1~20 位正整数（杜绝 "1 OR 1=1" / 负数 / 科学计数法）
+  assert.match(src, /preg_match\('\/\^\\d\{1,20\}\$\/', \$text\)/);
+  // nickname/username/password 不从请求超全局变量直接取（一律走 JSON body 的 $params）
   assert.doesNotMatch(src, /\$_(GET|POST|REQUEST)\['(nickname|username|password)'\]/);
 });

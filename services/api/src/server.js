@@ -10,16 +10,24 @@ const {
 const { CoinsPhClient } = require('./coinsPhClient');
 const { runCallTest } = require('./callTest');
 const { createCheckoutRouter } = require('./checkoutRoute');
+const { createTgLoginRouter } = require('./tgLogin');
+const gatewayClient = require('./gatewayClient');
 const { coinsRateSource } = require('./checkout');
 const { cliConn } = require('./migrate');
 const { DEMO_BOT_TOKEN, assertProductionConfig } = require('./config');
 const { createTokenService, createLimiter } = require('./tmaToken');
 const { createMemberMap } = require('./memberMap');
 const { createLoginService } = require('./loginService');
-const gatewayClient = require('./gatewayClient');
+// gatewayClient 已在文件顶部 require（第 14 行），此处不重复引入：
+// merge feat/tg-tma × canary 时两侧各自新增了同一条 gatewayClient 的 const 声明，
+// 按行拼接未去重 → 重复声明 SyntaxError，api 启动即退（见本次修复的 commit message）。
 const { createFbProxy } = require('./fbProxy');
 const { createAddrShareRouter } = require('./addrShareRoute');
 const { createCredentialProvider } = require('./credentialProvider');
+const { createBridgeRoute } = require('./bridgeRoute');
+const { createRiderRoute } = require('./riderRoute');
+const { createMerchantRoute } = require('./merchantRoute');
+const { createDispatchRoute } = require('./dispatchRoute');
 const { createRevocationStore, createReplayCounter, createIdempotencyStore } = require('./sharedState');
 
 assertProductionConfig();
@@ -38,7 +46,11 @@ app.use(cors(corsOrigins.length ? { origin: corsOrigins } : undefined));
 // （fbClient.js:57），缺 urlencoded 时 req.body 恒为 {}，所有写接口（地址/下单/取消）字段全部丢失，
 // 上游只会回「请输入联系人」一类误导性错误（2026-10-26 canary 实测）。
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// 内部派单通知（T7）的 HMAC 签名覆盖原始字节：PHP 的 json_encode 与 JSON.stringify 重序列化
+// 不保证同形（转义/空格差异），故只对 /tg-api/internal/* 留一份原文，其余路径不额外占内存。
+app.use(express.json({
+  verify: (req, res, buf) => { if (req.path.startsWith('/tg-api/internal/')) req.rawBody = buf; },
+}));
 
 // AD-9：Node 路由统一挂在 /tg-api，/api 前缀留给火鸟 PHP（含 /api/payment/notify.php）
 const router = express.Router();
@@ -289,6 +301,16 @@ router.post('/checkout', createCheckoutRouter({
   coinsClient,
 }));
 
+// 4c. Telegram 顾客免密登录桥（方案甲：Node 中转 PHP 网关，种火鸟登录态）
+// 网关地址/密钥缺失时该路由自身返回 503（不阻断进程启动，生产自检必填项不含二者）。
+router.post('/auth/telegram-web', createTgLoginRouter({
+  env: process.env,
+  validateInitData: validateTelegramInitData,
+  botToken: BOT_TOKEN,
+  gateway: gatewayClient,
+  conn: cliConn,
+}));
+
 // 5. 轮询支付状态
 router.get('/payment/status/:chargeId', (req, res) => {
   const charge = getCharge(req.params.chargeId);
@@ -400,7 +422,106 @@ router.post('/call-test', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// 2f. 登录桥（TAPD 0002）：TG 内打开 → 落地页表单 POST → 复用登录编排取 memberId →
+// 网关 issue_session 换火鸟会话凭证 → Set-Cookie + 302 站内跳转。
+// 挂在路由尾部：fb-proxy-ownership 的防回归测试把「fb 代理块 → 3. 东南亚」切片断言为
+// 不含 cookie 字样，桥天然要写 Set-Cookie，故置于该切片之后。
+// 配置不齐时由处理器内部返回 503，不影响其他路由；auth 为 null 时同理降级。
+const bridge = createBridgeRoute({
+  botToken: BOT_TOKEN,
+  loginService: auth ? auth.loginService : null,
+  credentialProvider: auth ? auth.credentialProvider : null,
+  cookieDomain: process.env.TMA_BRIDGE_COOKIE_DOMAIN,
+  maxAgeSeconds: Number(process.env.TMA_BRIDGE_COOKIE_MAX_AGE) || 86400,
+  // 默认强制 Secure（无 HttpOnly 的长会话凭证不允许因代理配置失误裸奔）；显式 'false' 仅供本地 http 调试
+  forceSecure: process.env.TMA_BRIDGE_FORCE_SECURE !== 'false',
+  defaultTarget: process.env.TMA_BRIDGE_TARGET_DEFAULT || '/',
+});
+// n-5 守卫：生产环境显式关闭强制 Secure 必须留痕，不能静默降级（行为不变，仅告警）
+if (process.env.TMA_BRIDGE_FORCE_SECURE === 'false' && process.env.TMA_ENV === 'prod') {
+  console.warn('[auth/bridge] 警告：TMA_BRIDGE_FORCE_SECURE=false 且 TMA_ENV=prod，Set-Cookie 将按 req.secure 判定，代理配置错误时凭证可能无 Secure 下发');
+}
+router.get('/auth/bridge', bridge.getLanding);
+router.post('/auth/bridge', bridge.postBridge);
+
+// 2g. 骑手绑定与工作台直达（T6）：TG 落地页输手机号 → initData 验签 → 网关 rider_bind（PHP
+// 查 waimai_courier、冲突 409、双维度限频、写审计）→ 网关 rider_ql（10 分钟直达 URL）→ 302 进
+// H5 工作台；/rider/session（仅 POST）供 bot/n8n 侧换工作台 URL。配置不齐时处理器内部返回 503。
+// 302 目标域名白名单复用 CORS_ORIGINS（与对外 CORS 同一份站点域名清单）。
+const riderGateway = process.env.FBS_GATEWAY_URL && process.env.FBS_GATEWAY_SECRET ? {
+  riderBind: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_bind', p),
+  riderQl: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_ql', p),
+} : null;
+const rider = createRiderRoute({
+  botToken: BOT_TOKEN,
+  validateInitData: validateTelegramInitData,
+  gateway: riderGateway,
+  conn: cliConn(),
+  allow: createLimiter({ max: Number(process.env.TMA_RIDER_MAX || 10), windowSeconds: 60 }),
+  allowedHosts: corsOrigins.map((o) => { try { return new URL(o).host; } catch (e) { return ''; } }).filter(Boolean),
+});
+router.get('/rider/bind', rider.getLanding);
+router.post('/rider/bind', rider.postBind);
+// 只挂 POST：initData 是短期凭证，不接受 query 传参（避免进访问日志/Referer/浏览器历史）
+router.post('/rider/session', rider.session);
+
+// 2g-2. 商家免密入口（方案 A）：TG 落地页输手机号 → initData 验签 → 网关 merchant_bind（按
+// member.phone 查唯一商家会员 + waimai_shop_manager 归属校验 + 冲突 409 + 三维限频 + 审计）→
+// 网关 merchant_session（只读 fbs_merchant_map 签会员 cookie）→ Set-Cookie + 302 /wmsj/。
+// 与顾客登录桥（/auth/telegram-web?role=merchant）互补：本段是「首次绑定」入口，
+// 已绑定商家走顾客桥那条路即可。铁律：商家分支绝不写 fbs_member_map（收银台归属底账），
+// cookie 由 PHP 生成后原样透传，Node 不拼任何属性。配置不齐时处理器内部返回 503。
+const merchantGateway = process.env.FBS_GATEWAY_URL && process.env.FBS_GATEWAY_SECRET ? {
+  merchantBind: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'merchant_bind', p),
+  merchantSession: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'merchant_session', p),
+} : null;
+const merchant = createMerchantRoute({
+  botToken: BOT_TOKEN,
+  validateInitData: validateTelegramInitData,
+  gateway: merchantGateway,
+  allow: createLimiter({ max: Number(process.env.TMA_MERCHANT_MAX || 10), windowSeconds: 60 }),
+});
+router.get('/merchant/bind', merchant.getLanding);
+router.post('/merchant/bind', merchant.postBind);
+// 只挂 POST：同 rider/session 的 m5 口径（initData 不进 URL/访问日志）
+router.post('/merchant/session', merchant.session);
+
+// 2h. 派单 Telegram 通知（T7）：PHP 挂点 fb_tg_dispatch（common.func.php）→ 集群内站点 nginx →
+// POST /tg-api/internal/dispatch。HMAC 验签（复用 FBS_GATEWAY_SECRET，action 常量 'dispatch'，
+// 不引入新密钥）→ 去重占位写库 → **立刻 202 accepted** → 响应之后异步查绑定 / 换一次性直达 URL /
+// 发 sendMessage（失败重试 1 次，429 按其 retry_after 退避）。
+// 异步化原因：PHP 挂点在派单/抢单/改派关键路径上，同步等 Telegram 会顶穿 PHP 的 800ms 预算，
+// 产出「日志说超时但骑手收到了」的假失败。202 只代表已受理，投递失败只落日志（带 event/order_id/
+// courier_id 便于按单号定位）并释放去重占位，业务事务侧完全不受影响。
+const dispatch = createDispatchRoute({
+  secret: process.env.FBS_GATEWAY_SECRET,
+  botToken: BOT_TOKEN,
+  conn: cliConn(),
+  gateway: process.env.FBS_GATEWAY_URL && process.env.FBS_GATEWAY_SECRET ? {
+    riderNotifyUrl: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'rider_notify_url', p),
+  } : null,
+});
+router.post('/internal/dispatch', dispatch.postDispatch);
+
+const httpServer = app.listen(PORT, () => {
   console.log(`🚀 Firebird SEA Core API is listening on port ${PORT}`);
   console.log(`📍 Serving Metro Manila (PHP & USDT Settlements)`);
+});
+
+// N3 优雅退出：202 = at-most-once（硬崩溃时在飞通知会丢、去重占位剩 1 天）。
+// RollingUpdate 发版必发 SIGTERM——不接线的话在飞 Telegram 发送会被直接杀死且去重位占满 1 天。
+// 先等在飞任务排空（上限 8s，给 pod terminationGracePeriod 留余量），再关 HTTP 监听退出。
+// 残余（超 8s 仍没发完的）靠带 event/order_id/courier_id 的日志定位补发。
+const SIGTERM_DRAIN_MS = 8000;
+process.on('SIGTERM', () => {
+  console.error('[server] SIGTERM received: draining in-flight dispatch tasks...'); // 生命周期事件走 stderr（门禁禁新增 stdout 日志）
+  Promise.race([
+    dispatch.drain(),
+    new Promise((resolve) => setTimeout(resolve, SIGTERM_DRAIN_MS)),
+  ]).then(() => {
+    console.error('[server] drain done (or timed out), closing server');
+    httpServer.close(() => process.exit(0));
+    // close 回调只在无连接时触发；兜底强制退出，防悬挂进程拖住滚动更新
+    setTimeout(() => process.exit(0), 2000).unref();
+  });
 });

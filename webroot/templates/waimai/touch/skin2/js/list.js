@@ -1,4 +1,20 @@
 $(function(){
+	/* 定位降级守卫：site_map 指向 google 但 Google Maps JS SDK 实际没加载时，
+	   HN_Location.googleMap() 会在 new google.maps.LatLng 抛 ReferenceError 且不回调，
+	   列表永久停在「加载中」。此时用原生定位拿坐标（跳过逆地理）后直接回调。
+	   返回 true 表示已接管定位流程，调用方必须 return。 */
+	function HN_geoUnavailable(cb){
+	  if(typeof site_map === 'undefined' || site_map != 'google' || typeof google !== 'undefined'){
+	    return false;
+	  }
+	  if(!navigator.geolocation){ cb(null); return true; }
+	  navigator.geolocation.getCurrentPosition(
+	    function(p){ cb(p.coords); },
+	    function(){ cb(null); },
+	    {timeout: 8000, maximumAge: 60000}
+	  );
+	  return true;
+	}
 	var page = 1,shop_load = 0; 
 	var str = window.location.search;
 	var strArrary = str.split('?');
@@ -219,10 +235,38 @@ $(function(){
 	}else{
 		
 		var time = Date.parse(new Date())/1000;
+		/* 同 index.js：site_map=google 但 SDK 未加载时 HN_Location 会抛 ReferenceError 且不回调，
+		   列表永久停在「加载中」。退化为原生定位（跳过逆地理）后直接出列表。 */
+		/* 注意：这里不能用 `if(...) return;` —— 本段在 $(function(){}) 的 ready 回调里，
+		   return 会把后面所有绑定（滚动分页 :282、快捷筛选 :309、排序 :322）全部截断。
+		   必须用 else 包住原流程。 */
+		var geoHandled = HN_geoUnavailable(function(coords){
+			if(coords){
+				lat = coords.latitude;
+				lng = coords.longitude;
+				address = '当前位置';
+			}else{
+				/* 拒绝授权也要给地址栏一个终态，别停在初始串 */
+				address = langData['siteConfig'][27][136];    /* 定位失败 */
+			}
+			if(id!=0){
+				swiper1.slideTo($('.fenlei_box ul li[data-id="'+id+'"]').index())
+			}else{
+				getlist();
+			}
+		});
+		if(!geoHandled){
 		HN_Location.init(function(data){
 			if (data == undefined || data.address == "" || data.name == "" || data.lat == "" || data.lng == "") {
 				address = langData['siteConfig'][27][136];
 			  // $('.posiChose span').html(langData['siteConfig'][27][136]);    /* 定位失败 */
+			  /* 定位失败/被拒时也要放行请求：后端 shopList 支持无坐标的城市级查询，
+			     否则整页没有商家（TG 内嵌 WebView 常拿不到定位权限）。不放坐标参数。 */
+			  if(id!=0){
+				swiper1.slideTo($('.fenlei_box ul li[data-id="'+id+'"]').index())
+			  }else{
+				getlist();
+			  }
 			  $('.loading').html(langData['siteConfig'][27][137]).show();    /* 定位失败，请重新刷新页面！ */
 			}else{
 			  lat = data.lat;
@@ -237,6 +281,7 @@ $(function(){
 	
 			}
 			}, device.indexOf('huoniao') > -1 ? false : true);
+		}
 
 	} 
 
@@ -368,7 +413,9 @@ $(function(){
     	if(cityid_link){
 			cityidParam = '&cityid=' + cityid_link
     	}
-    	if(!lat || !lng) return;
+    	/* 原为 if(!lat || !lng) return;（无坐标即早退，整页无商家）。
+    	   后端 shopList 已支持无坐标的城市级查询，改为放行：有坐标才带 lng/lat 参数。 */
+    	var hasGeo = (typeof lat !== 'undefined' && lat) && (typeof lng !== 'undefined' && lng);
 		var sx = '';
 		if(selecttype){
 			sx = '&'+selecttype;
@@ -384,15 +431,18 @@ $(function(){
 		}	
 		$('.ulbox.show .loading').remove();
 		$('.ulbox.show').append('<div class="loading">'+langData['siteConfig'][20][184]+'...</div>');   //加载中，请稍候
+		var postData = {
+			orderby: orderby,
+			page: page,
+			pageSize: 6
+		};
+		if(hasGeo){          /* 无坐标时不拼参数，交给后端走城市级查询 */
+			postData.lng = lng;
+			postData.lat = lat;
+		}
 		$.ajax({
             url: '/include/ajax.php?service=waimai&action=shopList&' + typeid + sx + cityidParam,
-            data: {
-                lng: lng,
-                lat: lat,
-				orderby: orderby,
-                page: page,
-                pageSize: 6
-            },
+            data: postData,
             type: 'get',
             dataType: 'json',
             success: function(data){
@@ -460,11 +510,15 @@ $(function(){
 
                    
                 }else{
+                    /* state≠100 是终态：必须复位 shop_load，否则此后滚动分页永久不发请求 */
+                    shop_load = 0;
                     $('.ulbox.show .loading').html(data.info);
                 }
 				
             },
             error: function(){
+                /* 网络错误同样复位，否则一次抖动后下拉不再加载 */
+                shop_load = 0;
                 $('.ulbox.show.loading').html(langData['siteConfig'][20][227]);    /* 网络错误，加载失败！*/
             }
         })
