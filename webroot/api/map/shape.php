@@ -44,7 +44,7 @@ $jsApiFile = "";
 if($cfg_map == 1){
 	global $cfg_map_google;
 	$dituType = 'google';
-	$jsApiFile = '//maps.google.cn/maps/api/js?key='.$cfg_map_google.'&sensor=false&language=zh-CN';
+	$jsApiFile = '//maps.googleapis.com/maps/api/js?key='.$cfg_map_google.'&sensor=false&language=zh-CN';
 ?>
 <style type="text/css">
 html, body {height:100%;margin:0px;padding:0px}

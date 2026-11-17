@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -60,6 +61,16 @@ type Dep struct {
 	// 等 #330 落地后接上；对比用例里 url 暂时在 ignoreFields 中。
 	URLPath func(caller int64, id string) string
 
+	// 以下可选依赖只给 member.reward 用（对应 PHP 的 getUrlPath / getFilePath / getAttachemntFile / getIpHome
+	// 和 cfg_cookiePre / cfg_pointState / 已安装模块）。为 nil / 零值时 url 输出空串，文件路径原样输出。
+	// ModuleURL 对应 getUrlPath(['service'=>service,'template'=>template,'id'=>id])。
+	ModuleURL      func(service, template string, id int64) string
+	FilePath       func(path string) string
+	AttachmentFile func(path string) string
+	IPHome         func(ipaddr string) string
+	CookiePre      string
+	PointState     bool
+	DatingEnabled  bool
 	// —— getComment（#251）的依赖。member.detail / 各模块 detail / checkCourierAccount 尚未迁移，
 	// 为 nil 且请求确实用到时，getComment 返回 102 而不是编造数据。——
 
@@ -75,12 +86,42 @@ type Dep struct {
 	CourierID func(ctx context.Context, req *http.Request) (int64, error)
 	// IPHomeMode 对应 $cfg_iphome（0 不显示 1 省 2 市 3 省+市）；nil 取仓库配置的 3。
 	IPHomeMode *int
-	// CookiePrefix 对应 $cfg_cookiePre（login cookie 前缀）；nil 取 HN_。
+	// CookiePrefix 对应 $cfg_cookiePre（member.detail 的 login cookie 前缀）；空取 HN_。
 	CookiePrefix string
-	// PointState 对应 $cfg_pointState；nil 取仓库配置（开启）。
-	PointState *bool
+	// DetailPointState 对应 $cfg_pointState（member.detail 用）；nil 取仓库配置（开启）。
+	DetailPointState *bool
 	// CryptKey 是 RenrenCrypt 密钥（userid_encode 用）；nil 取 PHP 常量。
 	CryptKey []byte
+	// MemberLogSaveDays 对应 $max_memberBehaviorLog_save_day（member_log 保留天数）。
+	// nil / 0 表示未配置，memberLog 不做过期清理（与 PHP 一致）。
+	MemberLogSaveDays *int
+	// DisableLikeState 对应 $cfg_disableLikeState（禁止点赞开关，getZan 用）；nil 取 canary 的 0。
+	DisableLikeState *int
+	// DisableLikeInfo 对应 $cfg_disableLikeInfo（禁止点赞提示语）；nil / 空串取 PHP 默认文案。
+	DisableLikeInfo *string
+
+	// —— replyComment（#259）的依赖。配置源是站点运行期配置，不在仓库里；
+	// nil 时取 canary 的关态（0 / 空串 / 默认文案），与 main.go 未装配的 DisableLike* 同口径。——
+
+	// DisableCommentState 对应 $cfg_disableCommentState（禁止评论开关）；nil 取 0。
+	DisableCommentState *int
+	// DisableCommentInfo 对应 $cfg_disableCommentInfo；nil / 空串取 PHP 默认文案。
+	DisableCommentInfo *string
+	// MemberVerified 对应 $cfg_memberVerified（实名认证开关）；nil 取 0。
+	MemberVerified *int
+	// MemberVerifiedInfo 对应 $cfg_memberVerifiedInfo（实名不过时 201 的 info）；nil 输出 null。
+	MemberVerifiedInfo *string
+	// MemberBindPhone 对应 $cfg_memberBindPhone（手机认证开关）；nil 取 0。
+	MemberBindPhone *int
+	// MemberBindPhoneInfo 对应 $cfg_memberBindPhoneInfo（手机不过时 202 的 info）；nil 输出 null。
+	MemberBindPhoneInfo *string
+	// PeriodicCheckPhone 对应 $cfg_periodicCheckPhone（手机周期检查开关）；PeriodicCheckPhoneCycle
+	// 对应 $cfg_periodicCheckPhoneCycle（天，×86400 换算成秒）。
+	PeriodicCheckPhone      *int
+	PeriodicCheckPhoneCycle *int
+	// ModuleCommentCheck 对应 include/config/<module>.inc.php 的 $customCommentCheck
+	// （replyComment 的 ischeck）；nil 按 0（待审核）处理。
+	ModuleCommentCheck func(module string) int
 	// Clock 仅测试用；nil 取 time.Now。
 	Clock func() time.Time
 }
@@ -91,10 +132,28 @@ type Service struct {
 	identity Identity
 	urlPath  func(caller int64, id string) string
 
+	prefix                    string
+	moduleURL                 func(service, template string, id int64) string
+	filePath, attachmentFile  func(path string) string
+	ipHome                    func(ipaddr string) string
+	cookiePre                 string
+	pointState, datingEnabled bool
+
 	logTable, letterTable, upTable, commentTable, memberTable string
-	paotuiTable, tiebaTable, followTable, friendTable         string
+	paotuiTable, tiebaTable, followTable                      string
+	friendTable                                               string
 	levelTable, businessTable, staffTable, securityTable      string
 	datingTable, areaTable, bonusTable, paymentTable          string
+	// collectTable 是 member_collect（member.collect 的收藏表）。
+	collectTable string
+	// publicCommentTable 是 replyComment 的 INSERT 目标（public_comment_all 是它的 MRG 合并表）；
+	// businessListTable 是实名门禁推导 busiState 用的商家表。
+	publicCommentTable, businessListTable string
+	// behaviorTable 是 member_log（memberLog 写的行为日志），selfMediaTable 是文章自媒体号表。
+	behaviorTable, selfMediaTable string
+	// siteModuleTable（getModuleTitle）、subTableListTable / articleListTable / travelVideoTable
+	// 是 getZan 用的表：分表清单、文章主表、travel_video 计数表。
+	siteModuleTable, subTableListTable, articleListTable, travelVideoTable string
 
 	files            *fburl.Resolver
 	userDetail       UserDetailFunc
@@ -103,9 +162,28 @@ type Service struct {
 	courierID        func(ctx context.Context, req *http.Request) (int64, error)
 	ipHomeMode       int
 	cookiePrefix     string
-	pointState       bool
+	detailPointState bool
 	cryptKey         []byte
 	clock            func() time.Time
+	// getZan 的禁止点赞开关与提示语（cfg_disableLikeState / cfg_disableLikeInfo）。
+	disableLikeState int
+	disableLikeInfo  string
+
+	// replyComment 的禁止评论开关与实名/手机门禁配置（nil 取 canary 关态）。
+	disableCommentState int
+	disableCommentInfo  string
+	memberVerified      int
+	memberVerifiedInfo  *string
+	memberBindPhone     int
+	memberBindPhoneInfo *string
+	periodicCheckPhone  int
+	periodicCheckCycle  int
+	moduleCommentCheck  func(module string) int
+
+	// memberLog 的过期清理状态：logSaveDays>0 时每 6 小时最多清理一次（PHP 用 cache 节流）。
+	logSaveDays  int
+	logCleanMu   sync.Mutex
+	logCleanedAt time.Time
 }
 
 // New 校验依赖并预拼表名。
@@ -118,30 +196,79 @@ func New(dep Dep) (*Service, error) {
 	if dep.IPHomeMode != nil {
 		mode = *dep.IPHomeMode
 	}
+	logSaveDays := 0
+	if dep.MemberLogSaveDays != nil {
+		logSaveDays = *dep.MemberLogSaveDays
+	}
+	disableLikeState := 0
+	if dep.DisableLikeState != nil {
+		disableLikeState = *dep.DisableLikeState
+	}
+	disableLikeInfo := ""
+	if dep.DisableLikeInfo != nil {
+		disableLikeInfo = *dep.DisableLikeInfo
+	}
+	disableCommentState := 0
+	if dep.DisableCommentState != nil {
+		disableCommentState = *dep.DisableCommentState
+	}
+	disableCommentInfo := ""
+	if dep.DisableCommentInfo != nil {
+		disableCommentInfo = *dep.DisableCommentInfo
+	}
+	memberVerified := 0
+	if dep.MemberVerified != nil {
+		memberVerified = *dep.MemberVerified
+	}
+	memberBindPhone := 0
+	if dep.MemberBindPhone != nil {
+		memberBindPhone = *dep.MemberBindPhone
+	}
+	periodicCheckPhone := 0
+	if dep.PeriodicCheckPhone != nil {
+		periodicCheckPhone = *dep.PeriodicCheckPhone
+	}
+	periodicCheckCycle := 0
+	if dep.PeriodicCheckPhoneCycle != nil {
+		periodicCheckCycle = *dep.PeriodicCheckPhoneCycle
+	}
 	cookiePrefix := dep.CookiePrefix
 	if cookiePrefix == "" {
 		cookiePrefix = "HN_"
 	}
-	pointState := true
-	if dep.PointState != nil {
-		pointState = *dep.PointState
+	detailPointState := true
+	if dep.DetailPointState != nil {
+		detailPointState = *dep.DetailPointState
 	}
 	cryptKey := dep.CryptKey
 	if len(cryptKey) == 0 {
 		cryptKey = []byte(phpEncryptKey)
 	}
 	svc := &Service{
+		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath, prefix: dep.TablePrefix,
+		moduleURL: dep.ModuleURL, filePath: dep.FilePath, attachmentFile: dep.AttachmentFile, ipHome: dep.IPHome,
+		cookiePre: dep.CookiePre, pointState: dep.PointState, datingEnabled: dep.DatingEnabled,
 		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
-		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode,
-		cookiePrefix: cookiePrefix, pointState: pointState, cryptKey: cryptKey, clock: dep.Clock,
+		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
 		paotuiTable: t("paotui_order"), tiebaTable: t("tieba_list"), followTable: t("member_follow"),
+		collectTable:  t("member_collect"),
+		behaviorTable: t("member_log"), selfMediaTable: t("article_selfmedia"),
+		logTable: t("member_letter_log"), letterTable: t("member_letter"),
+		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
+		siteModuleTable: t("site_module"), subTableListTable: t("site_sub_tablelist"),
+		articleListTable: t("articlelist"), travelVideoTable: t("travel_video"),
+		publicCommentTable: t("public_comment"), businessListTable: t("business_list"),
+		logSaveDays: logSaveDays, disableLikeState: disableLikeState, disableLikeInfo: disableLikeInfo,
+		disableCommentState: disableCommentState, disableCommentInfo: disableCommentInfo,
+		memberVerified: memberVerified, memberVerifiedInfo: dep.MemberVerifiedInfo,
+		memberBindPhone: memberBindPhone, memberBindPhoneInfo: dep.MemberBindPhoneInfo,
+		periodicCheckPhone: periodicCheckPhone, periodicCheckCycle: periodicCheckCycle,
+		moduleCommentCheck: dep.ModuleCommentCheck,
+		cookiePrefix:       cookiePrefix, detailPointState: detailPointState, cryptKey: cryptKey,
 		friendTable: t("member_friend"),
 		levelTable:  t("member_level"), businessTable: t("business_list"), staffTable: t("staff"),
 		securityTable: t("member_security"), datingTable: t("dating_member"), areaTable: t("site_area"),
 		bonusTable: t("member_bonus"), paymentTable: t("site_payment"),
-		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath,
-		logTable: t("member_letter_log"), letterTable: t("member_letter"),
-		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
 	}
 	// member.detail 已迁移：默认把自身投影接到 getComment 的 userDetail 钩子上，
 	// 消除此前 nil → 102 的回退（Dep.UserDetail 仍可覆盖，测试用）。
@@ -154,8 +281,13 @@ func New(dep Dep) (*Service, error) {
 // Register 注册本服务的全部 action。
 func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
+	router.Register("member", "reward", s.reward)
 	router.Register("member", "getComment", s.getComment)
 	router.Register("member", "detail", s.detail)
+	router.Register("member", "followMember", s.followMember)
+	router.Register("member", "collect", s.collect)
+	router.Register("member", "getZan", s.getZan)
+	router.Register("member", "replyComment", s.replyComment)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。

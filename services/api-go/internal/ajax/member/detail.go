@@ -418,7 +418,7 @@ func (s *Service) buildDetail(ctx context.Context, req *http.Request, id int64, 
 	f["freeze"] = phpFloatValue(r.s("freeze"))
 	f["bonus"] = phpFloatValue(r.s("bonus"))
 	point := 0
-	if s.pointState {
+	if s.detailPointState {
 		point = phpIntval(r.s("point"))
 	}
 	f["point"] = point
