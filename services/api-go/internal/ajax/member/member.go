@@ -135,6 +135,8 @@ type Service struct {
 
 	logTable, letterTable, upTable, commentTable, memberTable string
 	paotuiTable, tiebaTable, followTable                      string
+	// collectTable 是 member_collect（member.collect 的收藏表）。
+	collectTable string
 	// publicCommentTable 是 replyComment 的 INSERT 目标（public_comment_all 是它的 MRG 合并表）；
 	// businessListTable 是实名门禁推导 busiState 用的商家表。
 	publicCommentTable, businessListTable string
@@ -225,6 +227,7 @@ func New(dep Dep) (*Service, error) {
 		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
 		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
 		paotuiTable: t("paotui_order"), tiebaTable: t("tieba_list"), followTable: t("member_follow"),
+		collectTable:  t("member_collect"),
 		behaviorTable: t("member_log"), selfMediaTable: t("article_selfmedia"),
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
@@ -246,6 +249,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "reward", s.reward)
 	router.Register("member", "getComment", s.getComment)
 	router.Register("member", "followMember", s.followMember)
+	router.Register("member", "collect", s.collect)
 	router.Register("member", "getZan", s.getZan)
 	router.Register("member", "replyComment", s.replyComment)
 }
