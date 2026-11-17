@@ -61,6 +61,16 @@ type Dep struct {
 	// 等 #330 落地后接上；对比用例里 url 暂时在 ignoreFields 中。
 	URLPath func(caller int64, id string) string
 
+	// 以下可选依赖只给 member.reward 用（对应 PHP 的 getUrlPath / getFilePath / getAttachemntFile / getIpHome
+	// 和 cfg_cookiePre / cfg_pointState / 已安装模块）。为 nil / 零值时 url 输出空串，文件路径原样输出。
+	// ModuleURL 对应 getUrlPath(['service'=>service,'template'=>template,'id'=>id])。
+	ModuleURL      func(service, template string, id int64) string
+	FilePath       func(path string) string
+	AttachmentFile func(path string) string
+	IPHome         func(ipaddr string) string
+	CookiePre      string
+	PointState     bool
+	DatingEnabled  bool
 	// —— getComment（#251）的依赖。member.detail / 各模块 detail / checkCourierAccount 尚未迁移，
 	// 为 nil 且请求确实用到时，getComment 返回 102 而不是编造数据。——
 
@@ -115,6 +125,13 @@ type Service struct {
 	db       *sql.DB
 	identity Identity
 	urlPath  func(caller int64, id string) string
+
+	prefix                    string
+	moduleURL                 func(service, template string, id int64) string
+	filePath, attachmentFile  func(path string) string
+	ipHome                    func(ipaddr string) string
+	cookiePre                 string
+	pointState, datingEnabled bool
 
 	logTable, letterTable, upTable, commentTable, memberTable string
 	paotuiTable, tiebaTable, followTable                      string
@@ -202,11 +219,13 @@ func New(dep Dep) (*Service, error) {
 		periodicCheckCycle = *dep.PeriodicCheckPhoneCycle
 	}
 	return &Service{
+		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath, prefix: dep.TablePrefix,
+		moduleURL: dep.ModuleURL, filePath: dep.FilePath, attachmentFile: dep.AttachmentFile, ipHome: dep.IPHome,
+		cookiePre: dep.CookiePre, pointState: dep.PointState, datingEnabled: dep.DatingEnabled,
 		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
 		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
 		paotuiTable: t("paotui_order"), tiebaTable: t("tieba_list"), followTable: t("member_follow"),
 		behaviorTable: t("member_log"), selfMediaTable: t("article_selfmedia"),
-		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath,
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
 		siteModuleTable: t("site_module"), subTableListTable: t("site_sub_tablelist"),
@@ -224,6 +243,7 @@ func New(dep Dep) (*Service, error) {
 // Register 注册本服务的全部 action。
 func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "message", s.message)
+	router.Register("member", "reward", s.reward)
 	router.Register("member", "getComment", s.getComment)
 	router.Register("member", "followMember", s.followMember)
 	router.Register("member", "getZan", s.getZan)
