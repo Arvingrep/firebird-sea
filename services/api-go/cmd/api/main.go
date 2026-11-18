@@ -553,29 +553,8 @@ func buildAjax(db *sql.DB) *ajax.Router {
 	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
 		writeLog(os.Stderr, event, fields)
 	})
-	articleSvc, err := article.New(articleDep(db, prefix, files, identity, osGetenv))
-	if err != nil {
-		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
-		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
-	}
-	article.Register(router, articleSvc)
-	siteSvc, err := siteconfig.New(siteconfig.Dep{
-		DB: db, TablePrefix: prefix, Files: files,
-		Members: siteMembers(identity),
-		// 站点运行期配置（$cfg_sharePic / $cfg_weblogo / $cfg_hotline / $cfg_staticVersion）不在仓库里。
-		SharePic:      envOr("FB_SITE_SHARE_PIC", defaultSharePic),
-		WebLogo:       envOr("FB_SITE_WEB_LOGO", defaultSharePic),
-		Hotline:       os.Getenv("FB_SITE_HOTLINE"),
-		StaticVersion: os.Getenv("FB_STATIC_VERSION"),
-		// $cfg_advMarkState / $cfg_advMarkPostion（canary siteConfig.inc.php:167-168）。
-		AdvMarkState: 1, AdvMarkPostion: 3,
-		// $cfg_userSubDomain / $cfg_busiSubDomain（member.inc.php:2-3，canary 均为 2）。
-		UserSubDomain: envInt("FB_USER_SUBDOMAIN", 2), BusiSubDomain: envInt("FB_BUSI_SUBDOMAIN", 2),
-	})
-	if err != nil {
-		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
-	}
-	siteconfig.Register(router, siteSvc)
+	// member 先装配：article.detail 的跨 action 依赖（member.detail / collect / getZan）要拿到
+	// 已经构造好的 member 服务（#260）。
 	memberSvc, err := ajaxmember.New(ajaxmember.Dep{
 		DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity, Files: files,
 		// $cfg_cookiePre / RenrenCrypt 密钥：与 identity 同源，供 member.detail 输出
@@ -608,6 +587,43 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
 	}
 	ajaxmember.Register(router, memberSvc)
+
+	// article.detail 依赖自身（alist 的 dynamicid 分支转调 detail），构造期拿不到自己，
+	// 用闭包在运行期取。
+	var articleSvc *article.Service
+	adep := articleDep(db, prefix, files, identity, osGetenv)
+	adep.MemberDetail = memberSvc.DetailHandler()
+	adep.CollectCheck = memberSvc.CollectCheck
+	adep.ZanCheck = memberSvc.ZanCheck
+	adep.Detail = func(r *ajax.Request) ajax.Response {
+		if articleSvc == nil {
+			return ajax.Response{State: 102, Info: "No data!"}
+		}
+		return articleSvc.Detail(r)
+	}
+	articleSvc, err = article.New(adep)
+	if err != nil {
+		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
+		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
+	}
+	article.Register(router, articleSvc)
+	siteSvc, err := siteconfig.New(siteconfig.Dep{
+		DB: db, TablePrefix: prefix, Files: files,
+		Members: siteMembers(identity),
+		// 站点运行期配置（$cfg_sharePic / $cfg_weblogo / $cfg_hotline / $cfg_staticVersion）不在仓库里。
+		SharePic:      envOr("FB_SITE_SHARE_PIC", defaultSharePic),
+		WebLogo:       envOr("FB_SITE_WEB_LOGO", defaultSharePic),
+		Hotline:       os.Getenv("FB_SITE_HOTLINE"),
+		StaticVersion: os.Getenv("FB_STATIC_VERSION"),
+		// $cfg_advMarkState / $cfg_advMarkPostion（canary siteConfig.inc.php:167-168）。
+		AdvMarkState: 1, AdvMarkPostion: 3,
+		// $cfg_userSubDomain / $cfg_busiSubDomain（member.inc.php:2-3，canary 均为 2）。
+		UserSubDomain: envInt("FB_USER_SUBDOMAIN", 2), BusiSubDomain: envInt("FB_BUSI_SUBDOMAIN", 2),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
+	}
+	siteconfig.Register(router, siteSvc)
 	return router
 }
 
