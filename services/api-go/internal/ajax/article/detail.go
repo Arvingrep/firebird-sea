@@ -18,6 +18,17 @@ import (
 // action 返回 state=200，外层 handlers::getHandle 统一改写成 101（只改码不改文案）。
 const detailInfoParamError = "格式错误！"
 
+// detailEmpty 复刻 PHP empty() 对字符串的判定："" 与 "0" 都算空。
+func detailEmpty(s string) bool { return s == "" || s == "0" }
+
+// quoteTable 给表名补反引号（表名来自 site_sub_tablelist，拼进 SQL 前统一加引号）。
+func quoteTable(name string) string {
+	if strings.HasPrefix(name, "`") {
+		return name
+	}
+	return "`" + strings.Trim(name, "`") + "`"
+}
+
 // detailNumeric 复刻 PHP is_numeric()（去掉首尾空白后可选的符号 + 十进制/科学计数法）。
 // ajax.php 已把 id 归一成整数串，这里再兜一层，免得脏输入直接进 SQL。
 var detailNumeric = regexp.MustCompile(`^[ \t\n\r\v\f]*[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$`)
@@ -25,7 +36,7 @@ var detailNumeric = regexp.MustCompile(`^[ \t\n\r\v\f]*[+-]?([0-9]+(\.[0-9]*)?|\
 // detailAttachmentRe 复刻 article.class.php:1207 的 preg_match_all("/$attachment(.*)[\"|'|&| ]/isU", $body)：
 // $attachment 是去掉域名与前导斜杠的 "/include/attachment.php?f="（1200-1205），
 // /isU 下 (.*) 变成惰性匹配，遇到引号、单引号、&、竖线或空格结束。
-var detailAttachmentRe = regexp.MustCompile(`(?s)include/attachment\.php\?f=(.*?)["'|& ]`)
+var detailAttachmentRe = regexp.MustCompile(`(?is)include/attachment\.php\?f=(.*?)["'|& ]`)
 
 // detailOut 是按 PHP 赋值顺序输出的 info 数组。PHP 的关联数组保序，
 // Go 的 map 会按键排序，所以这里自己维护 keys/vals；重复 set 同一键只改值不动位置
@@ -211,10 +222,10 @@ func (s *Service) detailAction(req *ajax.Request) ajax.Response {
 		" WHERE `module` = 'article' AND `aid` = ? AND `state` = 1", id))
 
 	admin := sdStr(row["admin"])
-	out.set("member", s.detailMemberField(req, httpReq, admin))
+	out.set("member", s.detailMemberField(req, httpReq, admin, login))
 	media := s.detailMedia(req, httpReq, admin)
 	out.set("media", media)
-	if writer == "" {
+	if detailEmpty(writer) {
 		name := ""
 		if v, ok := alistMediaName(media).(string); ok {
 			name = v
@@ -299,13 +310,24 @@ func (s *Service) detailCount(ctx context.Context, query, id string) int {
 
 // detailMember 对应 $userLogin->getMemberInfo($admin, 1)：转调 member.detail（simple=1），
 // info 原样透传；取不到（102/101，或 admin 为空）时给空数组。
-func (s *Service) detailMemberField(req *ajax.Request, httpReq *http.Request, admin string) any {
-	if s.memberDetail == nil || admin == "" || admin == "0" {
+func (s *Service) detailMemberField(req *ajax.Request, httpReq *http.Request, admin string, login int64) any {
+	if s.memberDetail == nil {
+		return []any{}
+	}
+	// getMemberInfo($uid, 1)：empty($uid) 时改用当前登录会员；$mid > -1 才查，匿名直接空数组。
+	uid := admin
+	if detailEmpty(uid) {
+		if login <= -1 {
+			return []any{}
+		}
+		uid = strconv.FormatInt(login, 10)
+	}
+	if uid == "" || uid == "0" {
 		return []any{}
 	}
 	sub := &ajax.Request{
 		Service: "member", Action: "detail", HTTP: httpReq,
-		Params: url.Values{"id": {admin}, "simple": {"1"}},
+		Params: url.Values{"id": {uid}, "simple": {"1"}},
 	}
 	if resp := s.memberDetail(sub); resp.State == ajax.StateOK {
 		return resp.Info
@@ -395,7 +417,7 @@ func (s *Service) detailBody(ctx context.Context, host string, httpReq *http.Req
 	body = s.detailRewriteAttachmentURLs(ctx, host, httpReq, body)
 	mbody = s.detailRewriteAttachmentURLs(ctx, host, httpReq, mbody)
 
-	if mbody == "" {
+	if detailEmpty(mbody) {
 		return nl2br(body), nl2br(body)
 	}
 	return nl2br(body), nl2br(mbody)
@@ -540,7 +562,7 @@ func detailSkipClick(req *http.Request) bool {
 // 定位，命中不到用主表 articlelist），保证计数真的会累加。
 func (s *Service) detailClick(ctx context.Context, id string, row map[string]any, login int64) {
 	if table, err := s.articleListSubTable(ctx, id); err == nil {
-		_, _ = s.db.ExecContext(ctx, "UPDATE "+table+" SET `click` = `click` + 1 WHERE `id` = ?", id)
+		_, _ = s.db.ExecContext(ctx, "UPDATE "+quoteTable(table)+" SET `click` = `click` + 1 WHERE `id` = ?", id)
 	}
 
 	admin := sdStr(row["admin"])

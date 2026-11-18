@@ -501,3 +501,172 @@ func containsJSON(body, want string) bool {
 		return false
 	})()
 }
+
+func TestDetailMold4OnlyBaseFields(t *testing.T) {
+	svc, mock := dtSvc(t, 0)
+	mock.ExpectQuery(dtMainAnon).WillReturnRows(dtRowMod(func(v []driver.Value) { v[14] = "4" }))
+	mock.ExpectQuery(dtTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(dtCommon).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtReward).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	expectWrites(mock)
+
+	_, decoded := dtGet(t, svc, "&id=9")
+	info := decoded["info"].(map[string]any)
+	for _, k := range []string{"body", "mbody", "imglist", "video", "videoSource"} {
+		if _, has := info[k]; has {
+			t.Fatalf("mold=4 不应输出 %s: %v", k, info)
+		}
+	}
+	if info["id"] != "9" {
+		t.Fatalf("基础字段仍要输出: %v", info)
+	}
+}
+
+func TestDetailPropAndNicknameAndEntities(t *testing.T) {
+	svc, mock := dtSvc(t, 0)
+	mock.ExpectQuery(dtMainAnon).WillReturnRows(dtRowMod(func(v []driver.Value) {
+		v[1] = "a & b"
+		v[12] = "阿文"
+		v[13] = "1"
+	}))
+	mock.ExpectQuery(dtTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(dtBody).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(""))
+	mock.ExpectQuery(dtCommon).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtReward).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	expectWrites(mock)
+
+	_, decoded := dtGet(t, svc, "&id=9")
+	info := decoded["info"].(map[string]any)
+	if info["title"] != "a & b" {
+		t.Fatalf("title 不做 htmlentities（PHP 原样输出）: %v", info["title"])
+	}
+	if info["prop"].(float64) != 1 || info["article_prop"].(float64) != 0 {
+		t.Fatalf("prop/article_prop 必须相反: %v/%v", info["prop"], info["article_prop"])
+	}
+	if info["admin_nickname"] != "阿文" {
+		t.Fatalf("admin_nickname 取 m.nickname: %v", info["admin_nickname"])
+	}
+}
+
+func TestDetailWriterFallsBackWhenZero(t *testing.T) {
+	svc, mock := dtSvc(t, 0)
+	mock.ExpectQuery(dtMainAnon).WillReturnRows(dtRowMod(func(v []driver.Value) { v[9] = "0" }))
+	mock.ExpectQuery(dtTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(dtBody).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(""))
+	mock.ExpectQuery(dtCommon).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtReward).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	expectWrites(mock)
+
+	_, decoded := dtGet(t, svc, "&id=9")
+	// PHP empty("0") 为真 → 回退 media.ac_name；没有媒体号 → ''。
+	if got := decoded["info"].(map[string]any)["writer"]; got != "" {
+		t.Fatalf(`writer="0" 应走 empty() 回退，最终是空串: %v`, got)
+	}
+}
+
+func TestDetailMbodyZeroFallsBackToBody(t *testing.T) {
+	svc, mock := dtSvc(t, 0)
+	mock.ExpectQuery(dtMainAnon).WillReturnRows(dtRowMod(func(v []driver.Value) { v[23] = "0" }))
+	mock.ExpectQuery(dtTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(dtBody).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow("PC 正文"))
+	mock.ExpectQuery(dtCommon).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtReward).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	expectWrites(mock)
+
+	_, decoded := dtGet(t, svc, "&id=9")
+	info := decoded["info"].(map[string]any)
+	if info["mbody"] != "PC 正文" {
+		t.Fatalf(`mbody="0" 时 PHP empty() 为真，应回退 body: %v`, info["mbody"])
+	}
+}
+
+func TestDetailMemberFallsBackToLoginUser(t *testing.T) {
+	svc, mock := dtSvc(t, 2)
+	var gotID string
+	svc.memberDetail = func(r *ajax.Request) ajax.Response {
+		gotID = r.Params.Get("id")
+		return ajax.Response{State: ajax.StateOK, Info: map[string]any{"id": gotID}}
+	}
+	mock.ExpectQuery(dtMainMine).WillReturnRows(dtRow())
+	mock.ExpectQuery(dtTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(dtBody).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(""))
+	mock.ExpectQuery(dtCommon).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtReward).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	expectWrites(mock)
+
+	_, decoded := dtGet(t, svc, "&id=9")
+	if gotID != "2" {
+		t.Fatalf("admin=0 时 getMemberInfo 用当前登录会员（实测取到 %q）", gotID)
+	}
+	if m := decoded["info"].(map[string]any)["member"].(map[string]any); m["id"] != "2" {
+		t.Fatalf("member 应是登录者本人: %v", m)
+	}
+}
+
+func TestDetailSkipsClickOnUpList(t *testing.T) {
+	svc, mock := dtSvc(t, 0)
+	mock.ExpectQuery(dtMainAnon).WillReturnRows(dtRow())
+	mock.ExpectQuery(dtTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(dtBody).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(""))
+	mock.ExpectQuery(dtCommon).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtReward).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+
+	req := httptest.NewRequest(http.MethodGet, "/include/ajax.php?service=article&action=upList&id=9", nil)
+	_ = svc.Detail(&ajax.Request{Service: "article", Action: "detail", Params: req.URL.Query(), HTTP: req})
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("upList 回调详情不应计数: %v", err)
+	}
+}
+
+func TestDetailHistoryUpdatesExistingRow(t *testing.T) {
+	svc, mock := dtSvc(t, 2)
+	mock.ExpectQuery(dtMainMine).WillReturnRows(dtRowMod(func(v []driver.Value) { v[11] = "3" }))
+	mock.ExpectQuery(dtTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(dtBody).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(""))
+	mock.ExpectQuery(dtCommon).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtReward).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtSubList).WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}))
+	mock.ExpectExec(dtClickArt).WithArgs("9").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(dtClickSd).WithArgs("3").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(dtHistoryQ).WithArgs(int64(2), "3", "9").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("77"))
+	mock.ExpectExec("UPDATE `huoniao_article_historyclick` SET `date` = ? WHERE `uid` = ? AND `fuid` = ? AND `aid` = ?").
+		WithArgs(sqlmock.AnyArg(), int64(2), "3", "9").WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if _, decoded := dtGet(t, svc, "&id=9"); decoded["state"].(float64) != 100 {
+		t.Fatalf("应成功: %v", decoded)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("已有足迹时应 UPDATE 而不是 INSERT: %v", err)
+	}
+}
+
+func TestDetailClickToSubTable(t *testing.T) {
+	svc, mock := dtSvc(t, 0)
+	mock.ExpectQuery(dtMainAnon).WillReturnRows(dtRow())
+	mock.ExpectQuery(dtTypeChain).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight"}).AddRow("7", "0", "新闻", "1"))
+	mock.ExpectQuery(dtBody).WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(""))
+	mock.ExpectQuery(dtCommon).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	mock.ExpectQuery(dtReward).WithArgs("9").WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow("0"))
+	// begin_id=5 命中 id=9 的前一档 → 写分表（不加前导反引号也接受，见 quoteTable）。
+	mock.ExpectQuery(dtSubList).WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}).
+		AddRow("huoniao_articlelist_5", "5"))
+	mock.ExpectExec("UPDATE `huoniao_articlelist_5` SET `click` = `click` + 1 WHERE `id` = ?").
+		WithArgs("9").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(dtClickSd).WithArgs("0").WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if _, decoded := dtGet(t, svc, "&id=9"); decoded["state"].(float64) != 100 {
+		t.Fatalf("应成功: %v", decoded)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("分表存在时应写分表而不是 _all: %v", err)
+	}
+}
