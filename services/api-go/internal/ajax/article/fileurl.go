@@ -128,9 +128,9 @@ func (s *Service) attachmentPath(file string) string {
 	if s.db == nil {
 		return ""
 	}
-	query := "SELECT `path` FROM " + s.attachTable + " WHERE `path` = ? LIMIT 1"
+	query := "SELECT `path` FROM " + s.alAttachmentTable + " WHERE `path` = ? LIMIT 1"
 	if isNumeric(file) {
-		query = "SELECT `path` FROM " + s.attachTable + " WHERE `id` = ? LIMIT 1"
+		query = "SELECT `path` FROM " + s.alAttachmentTable + " WHERE `id` = ? LIMIT 1"
 	}
 	var path string
 	err := s.db.QueryRowContext(context.Background(), query, file).Scan(&path)
