@@ -28,6 +28,7 @@ $(function(){
 					var location = results[0].geometry.location;
 
 					map = new google.maps.Map(document.getElementById('map'), {
+						renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
 						zoom: 14,
 						center: new google.maps.LatLng(location.lat(), location.lng()),
 						zoomControl: true,

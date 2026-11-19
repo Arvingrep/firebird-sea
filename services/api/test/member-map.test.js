@@ -81,9 +81,10 @@ test('PHP 网关：常量时间验签、时间窗 fail-closed、仅动作白名�
   // 时间窗 fail-closed：$now 可注入，语义同 canary 的 time() 版；未传 window 用常量兜底
   assert.match(src, /abs\(\$now - \(int\)\$timestamp\) > \$window/);
   assert.match(src, /if \(\$window === null\) \$window = FBS_GATEWAY_TIME_WINDOW;/);
-  // 动作白名单：member_find_or_create / issue_session + 三个 rider 动作（移植轮 3 注册进注册表），
-  // 其余 UNKNOWN_ACTION；rider 分支在 dispatch 里显式 return，绝不直落 issue_session 兜底
-  assert.match(src, /return array\('member_find_or_create', 'issue_session', 'rider_bind', 'rider_ql', 'rider_notify_url'\);/);
+  // 动作白名单：member_find_or_create / issue_session + 三个 rider 动作（移植轮 3 注册进注册表）
+  // + merchant_bind / merchant_session（商家方案 A），其余 UNKNOWN_ACTION；
+  // 每支在 dispatch 里显式 return，绝不直落 issue_session 兜底
+  assert.match(src, /return array\(\s*'member_find_or_create', 'issue_session',\s*'rider_bind', 'rider_ql', 'rider_notify_url',\s*'merchant_bind', 'merchant_session',\s*\);/);
   assert.match(src, /in_array\(\$action, fbs_gateway_actions\(\), true\)/);
   assert.match(src, /if \(\$action === 'rider_bind'\) return fbs_gateway_action_rider_bind\(\$params, \$context\);/);
   // tg_user_id 只接受 1~20 位正整数（杜绝 "1 OR 1=1" / 负数 / 科学计数法）

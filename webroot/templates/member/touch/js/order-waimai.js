@@ -515,7 +515,7 @@ function getList(is){
 		 	  icon: "/static/images/courier_local_google.png?v=1"
 		 	});
 		 }
-		  mapPath = new google.maps.Map(document.getElementById('map'+id), mapOptions);
+		  mapPath = new google.maps.Map(document.getElementById('map'+id), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 		 }else if(site_map == "amap"){
 		 	var marker1,marker2,amap
 

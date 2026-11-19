@@ -368,3 +368,74 @@ test('白名单同源守卫：shim 适配的 service 必须都在 PHP 白名单�
   assert.ok(phpSet.has('member') && phpSet.has('siteConfig'));
   assert.ok(!shimSet.has('member') && !shimSet.has('siteConfig'));
 });
+
+// ---------------------------------------------------------------------------
+// 定位桥接：Telegram LocationManager → W3C Geolocation 子集
+// ---------------------------------------------------------------------------
+function fakeTimers() {
+  let fn = null;
+  return {
+    setTimeout: (f) => { fn = f; return 1; },
+    clearTimeout: () => { fn = null; },
+    fire: () => { const f = fn; fn = null; if (f) f(); }
+  };
+}
+
+test('定位桥接：没有 LocationManager 时返回 null（保持原生行为）', () => {
+  assert.strictEqual(shim.createGeolocation({}, null), null);
+  assert.strictEqual(shim.createGeolocation({ LocationManager: {} }, null), null);
+});
+
+test('定位桥接：授权后返回标准 coords', () => {
+  const LM = {
+    isInited: false,
+    init(cb) { this.isInited = true; cb(); },
+    getLocation(cb) { cb({ latitude: 14.5176, longitude: 120.9795, horizontal_accuracy: 12 }); }
+  };
+  const geo = shim.createGeolocation({ LocationManager: LM }, null, fakeTimers());
+  let got = null;
+  geo.getCurrentPosition((p) => { got = p; }, () => assert.fail('不应走错误回调'));
+  assert.strictEqual(got.coords.latitude, 14.5176);
+  assert.strictEqual(got.coords.longitude, 120.9795);
+  assert.strictEqual(got.coords.accuracy, 12);
+});
+
+test('定位桥接：用户拒绝（getLocation 回 null）→ PERMISSION_DENIED(1)', () => {
+  const LM = { isInited: true, getLocation(cb) { cb(null); } };
+  const geo = shim.createGeolocation({ LocationManager: LM }, null, fakeTimers());
+  let err = null;
+  geo.getCurrentPosition(() => assert.fail('不应成功'), (e) => { err = e; });
+  assert.strictEqual(err.code, 1);
+});
+
+test('定位桥接：客户端明确无定位能力 → 交回原生实现', () => {
+  const LM = { isInited: true, isLocationAvailable: false, getLocation() { assert.fail('不应再调 Telegram'); } };
+  let usedNative = false;
+  const nativeGeo = { getCurrentPosition() { usedNative = true; } };
+  const geo = shim.createGeolocation({ LocationManager: LM }, nativeGeo, fakeTimers());
+  geo.getCurrentPosition(() => {}, () => {});
+  assert.strictEqual(usedNative, true);
+});
+
+test('定位桥接：Telegram 一直不回调 → 兜底超时 TIMEOUT(3)，不会永远转圈', () => {
+  const LM = { isInited: true, getLocation() { /* 永不回调 */ } };
+  const timers = fakeTimers();
+  const geo = shim.createGeolocation({ LocationManager: LM }, null, timers);
+  let err = null;
+  geo.getCurrentPosition(() => assert.fail('不应成功'), (e) => { err = e; });
+  timers.fire();
+  assert.strictEqual(err.code, 3);
+});
+
+test('定位桥接：成功与超时只回调一次', () => {
+  let cb;
+  const LM = { isInited: true, getLocation(c) { cb = c; } };
+  const timers = fakeTimers();
+  const geo = shim.createGeolocation({ LocationManager: LM }, null, timers);
+  let n = 0;
+  geo.getCurrentPosition(() => { n++; }, () => { n++; });
+  cb({ latitude: 1, longitude: 2 });
+  cb({ latitude: 3, longitude: 4 });
+  timers.fire();
+  assert.strictEqual(n, 1);
+});

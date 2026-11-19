@@ -33,6 +33,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/addrshare"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/article"
+	ajaxmember "github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/member"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/siteconfig"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/bridge"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/checkout"
@@ -41,9 +42,11 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/credential"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/dispatch"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fbproxy"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/gateway"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpapi"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/member"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/merchant"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/migrate"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/payment"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/rider"
@@ -192,6 +195,7 @@ func run() error {
 		Addr:           addrRouter,
 		FBProxy:        proxy,
 		Rider:          buildRider(db, botToken, hops, now),
+		Merchant:       buildMerchant(botToken, hops, now),
 		Dispatch:       buildDispatch(db, botToken, now),
 		Ajax:           buildAjax(db),
 		TMAStaticDir:   os.Getenv("TMA_STATIC_DIR"),
@@ -473,6 +477,31 @@ func buildRider(db *sql.DB, botToken string, hops int, now func() time.Time) *ri
 	return rider.New(dep)
 }
 
+// buildMerchant 构造商家免密入口处理器（方案 A，与 buildRider 并列同语义装配）。
+//
+// 与骑手的装配差异（都有意为之，不许"顺手对齐"）：
+//   - **无 DB 参数**：映射查询全在 PHP（fbs_merchant_map 读、fbs_member_map 绝不写），
+//     Go 侧直查会绕过 waimai_shop_manager 鉴权；
+//   - **无白名单**：302 目标是站内路径 /wmsj/，过 merchant.SafeRedirect 校验，
+//     不需要 CORS_ORIGINS 推导的域名白名单；
+//   - 限频：`TMA_MERCHANT_MAX || 10` 次/分钟（Node 的 createLimiter 同值）。
+//
+// 缺配置不阻断启动：merchant.New 只把端点标成 notConfigured，由各端点自己 503。
+func buildMerchant(botToken string, hops int, now func() time.Time) *merchant.Route {
+	dep := merchant.Dep{
+		BotToken: botToken,
+		// 限流分桶键必须与 httpapi 的 clientKey 同源（TRUST_PROXY_HOPS），理由同 buildRider。
+		TrustProxyHops: hops,
+		Allow:          token.NewLimiter(envInt("TMA_MERCHANT_MAX", 10), time.Minute, now),
+	}
+	gatewayURL := os.Getenv("FBS_GATEWAY_URL")
+	secret := os.Getenv("FBS_GATEWAY_SECRET")
+	if gatewayURL != "" && secret != "" {
+		dep.Gateway = gatewayAdapter{cfg: gateway.Config{BaseURL: gatewayURL, Secret: secret, Now: now}}
+	}
+	return merchant.New(dep)
+}
+
 // buildDispatch 构造派单 Telegram 通知处理器（T7，server.js 2h 的等价装配）。
 //
 // 三组配置按 Node 的取法各自独立降级：
@@ -508,23 +537,56 @@ func buildDispatch(db *sql.DB, botToken string, now func() time.Time) *dispatch.
 //
 // 需要数据库的 service 在这里接上业务连接池；DB_HOST 未配置时 db 为 nil，
 // 相关 action 按「查不到数据」降级，与本地纯内存模式的其它路由同口径。
-// 表前缀沿用 PHP 侧的同名环境变量（entrypoint-web.sh: `${DB_PREFIX:-huoniao_}`）；
-// 站点标量（域名、附件存储）默认取 siteConfig.inc.php 的现值，可用 SITE_* 覆盖。
+// 表前缀沿用 PHP 侧的同名环境变量（entrypoint-web.sh: `${DB_PREFIX:-huoniao_}`）。
 func buildAjax(db *sql.DB) *ajax.Router {
 	router := ajax.NewRouter(func(line string) {
 		writeLog(os.Stderr, "ajax_error", map[string]any{"error": line})
 	})
-	siteconfig.Register(router)
-	articleSvc, err := article.New(article.Dep{
-		DB:          db,
-		TablePrefix: envOr("DB_PREFIX", "huoniao_"),
-		Site:        article.SiteFromEnv(os.Getenv),
+	prefix := envOr("DB_PREFIX", "huoniao_")
+	var files *fburl.Resolver
+	if db != nil {
+		// 构造失败（前缀非法）交给 article.New 统一报错。
+		files, _ = fburl.New(db, prefix, fburl.DefaultConfig())
+	}
+	// Identity：按 cookie `<COOKIE_PREFIX>login_user` 识别会员；构造失败（如 DB 未配置）
+	// 降级为 nil（匿名 -1），不阻止启动。article.selfmedia 与 member.message 共用同一个识别器。
+	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
+		writeLog(os.Stderr, event, fields)
 	})
+	articleSvc, err := article.New(articleDep(db, prefix, files, identity, osGetenv))
 	if err != nil {
-		// 表前缀含非法字符、附件存储模式没迁移：都是配置错误，启动期直接失败。
+		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
 	}
 	article.Register(router, articleSvc)
+	siteSvc, err := siteconfig.New(siteconfig.Dep{
+		DB: db, TablePrefix: prefix, Files: files,
+		Members: siteMembers(identity),
+		// 站点运行期配置（$cfg_sharePic / $cfg_weblogo / $cfg_hotline / $cfg_staticVersion）不在仓库里。
+		SharePic:      envOr("FB_SITE_SHARE_PIC", defaultSharePic),
+		WebLogo:       envOr("FB_SITE_WEB_LOGO", defaultSharePic),
+		Hotline:       os.Getenv("FB_SITE_HOTLINE"),
+		StaticVersion: os.Getenv("FB_STATIC_VERSION"),
+		// $cfg_advMarkState / $cfg_advMarkPostion（canary siteConfig.inc.php:167-168）。
+		AdvMarkState: 1, AdvMarkPostion: 3,
+		// $cfg_userSubDomain / $cfg_busiSubDomain（member.inc.php:2-3，canary 均为 2）。
+		UserSubDomain: envInt("FB_USER_SUBDOMAIN", 2), BusiSubDomain: envInt("FB_BUSI_SUBDOMAIN", 2),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
+	}
+	siteconfig.Register(router, siteSvc)
+	memberSvc, err := ajaxmember.New(ajaxmember.Dep{
+		DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity, Files: files,
+		// $cfg_cookiePre / RenrenCrypt 密钥：与 identity 同源，供 member.detail 输出
+		// cookiePre 与 userid_encode。
+		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
+		CryptKey:     resolveCryptKey(osGetenv),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
+	}
+	ajaxmember.Register(router, memberSvc)
 	return router
 }
 
@@ -637,6 +699,11 @@ func validateAssembly(bundle *authBundle, dep httpapi.Dep) error {
 	if dep.Ajax == nil {
 		missing = append(missing, "Ajax")
 	}
+	// 商家入口同理：只依赖 botToken / 网关（无 DB / 无白名单），漏接的表现是
+	// 三条 /tg-api/merchant/* 路由静默 404。
+	if dep.Merchant == nil {
+		missing = append(missing, "Merchant")
+	}
 	if bundle != nil {
 		// auth 装配成功时，登录编排 / 令牌 / 凭证三者缺一都会让相关端点静默 503 或恒 401。
 		if bundle.login == nil {
@@ -676,7 +743,8 @@ func validateAssembly(bundle *authBundle, dep httpapi.Dep) error {
 }
 
 // gatewayAdapter 把网关包的包级函数收成一个对象，同时满足
-// member.MemberGateway / credential.Gateway / tglogin.Gateway 三个最小接口。
+// member.MemberGateway / credential.Gateway / tglogin.Gateway / rider.Gateway /
+// dispatch.Gateway / merchant.Gateway 各最小接口。
 type gatewayAdapter struct{ cfg gateway.Config }
 
 func (g gatewayAdapter) MemberFindOrCreate(ctx context.Context, params map[string]any) (map[string]any, error) {
@@ -701,6 +769,16 @@ func (g gatewayAdapter) RiderBind(ctx context.Context, params map[string]any) (m
 // （dispatch.Gateway 接口，动作名与 PHP 端白名单一致）。
 func (g gatewayAdapter) RiderNotifyURL(ctx context.Context, params map[string]any) (map[string]any, error) {
 	return gateway.Call(ctx, g.cfg, "rider_notify_url", params)
+}
+
+// MerchantBind 是商家绑定动作（merchant.Route 的 Gateway 接口）。
+func (g gatewayAdapter) MerchantBind(ctx context.Context, params map[string]any) (map[string]any, error) {
+	return gateway.MerchantBind(ctx, g.cfg, params)
+}
+
+// MerchantSession 是商家换会话动作（merchant.Route 与 tglogin.Gateway 共用）。
+func (g gatewayAdapter) MerchantSession(ctx context.Context, params map[string]any) (map[string]any, error) {
+	return gateway.MerchantSession(ctx, g.cfg, params)
 }
 
 // —— 数据库 ——

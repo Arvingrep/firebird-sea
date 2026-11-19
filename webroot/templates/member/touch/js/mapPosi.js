@@ -482,7 +482,7 @@ var pagePosi = new Vue({
       }
       $(".loadImg").hide();
       $('.mapcenter').hide();
-       map = new google.maps.Map(document.getElementById('mapdiv'), mapOptions);
+       map = new google.maps.Map(document.getElementById('mapdiv'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
        marker = new google.maps.Marker({
             position: mapOptions.center,
             map: map,

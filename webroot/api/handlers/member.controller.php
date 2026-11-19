@@ -10677,6 +10677,65 @@ eot;
             }
             /*查詢該用戶是否綁定店鋪或者是否是店鋪管理員*/
         }
+    } elseif ($action == 'staffInvite') {
+        /*商家后台：生成员工 Telegram 邀请链接（JSON 接口，供员工管理页「Telegram 邀请」卡片调用）
+         *鉴权复用本文件既有写法：$userLogin->checkUserIsLogin()（同 workPlatform :10683）
+         *+ $userLogin->getMemberID() / getMemberInfo() 的 $userid / $userinfo（函数头 :58 :108）。
+         *签名契约归 A 线（include/fbs_staff_invite.func.php），这里按冻结签名调用；
+         *A 线尚未落地时返回 NOT_READY 降级，绝不 fatal，原有微信扫码绑定不受影响。*/
+        header('Content-Type: application/json; charset=utf-8');
+
+        if ($userid < 0 || !isset($userinfo['userType']) || $userinfo['userType'] != 2) {
+            echo json_encode(array('success' => false, 'error' => array('code' => 'FORBIDDEN', 'message' => '仅商家账号可生成员工邀请链接')));
+            die;
+        }
+
+        $busSql = $dsql->SetQuery("SELECT `id`,`title` FROM `#@__business_list` WHERE `uid` = " . (int)$userid . " LIMIT 1");
+        $busRes = $dsql->dsqlOper($busSql, "results");
+        if (empty($busRes) || !is_array($busRes)) {
+            echo json_encode(array('success' => false, 'error' => array('code' => 'NO_SHOP', 'message' => '未找到你的店铺')));
+            die;
+        }
+
+        $inviteFile = dirname(__DIR__, 2) . '/include/fbs_staff_invite.func.php';
+        if (!is_file($inviteFile)) {
+            echo json_encode(array('success' => false, 'error' => array('code' => 'NOT_READY', 'message' => '邀请功能尚未就绪，请稍后再试')));
+            die;
+        }
+        require_once $inviteFile;
+        if (!function_exists('fbs_staff_invite_link') || !function_exists('fbs_staff_invite_bot_username')) {
+            echo json_encode(array('success' => false, 'error' => array('code' => 'NOT_READY', 'message' => '邀请功能尚未就绪，请稍后再试')));
+            die;
+        }
+
+        $inviteTtl = 86400;
+        $inviteSid = (int)$busRes[0]['id'];
+        $inviteBot = fbs_staff_invite_bot_username();
+        $inviteLink = fbs_staff_invite_link($inviteSid, $inviteBot, $inviteTtl);
+        if ($inviteLink === '') {
+            echo json_encode(array('success' => false, 'error' => array('code' => 'SERVER_ERROR', 'message' => '邀请链接生成失败，请稍后再试')));
+            die;
+        }
+
+        // link 格式（冻结契约）：https://t.me/<bot>?start=staff_<token>
+        $inviteToken = '';
+        $staffMark = strpos($inviteLink, 'staff_');
+        if ($staffMark !== false) {
+            $inviteToken = substr($inviteLink, $staffMark + strlen('staff_'));
+        }
+
+        echo json_encode(array(
+            'success' => true,
+            'data' => array(
+                'sid' => $inviteSid,
+                'title' => (string)$busRes[0]['title'],
+                'link' => $inviteLink,
+                'token' => $inviteToken,
+                'exp' => time() + $inviteTtl,
+                'bot_username' => $inviteBot,
+            ),
+        ));
+        die;
     } elseif ($action == 'workPlatform') {
         /*员工工作台*/
 

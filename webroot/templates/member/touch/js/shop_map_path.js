@@ -110,6 +110,7 @@ var pathInit = {
 			var ulnglat = {"lng":Number(sqLng),"lat":Number(sqLat)}; //收货坐标
 			// 初始化地图
 			ordermap = new google.maps.Map(document.getElementById("orderMap"), {
+			   	renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
 			   	zoom: 14,
 			   	center: {
 				 lat: parseFloat(sqLat),

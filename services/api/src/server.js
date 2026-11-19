@@ -26,6 +26,7 @@ const { createAddrShareRouter } = require('./addrShareRoute');
 const { createCredentialProvider } = require('./credentialProvider');
 const { createBridgeRoute } = require('./bridgeRoute');
 const { createRiderRoute } = require('./riderRoute');
+const { createMerchantRoute } = require('./merchantRoute');
 const { createDispatchRoute } = require('./dispatchRoute');
 const { createRevocationStore, createReplayCounter, createIdempotencyStore } = require('./sharedState');
 
@@ -463,6 +464,27 @@ router.get('/rider/bind', rider.getLanding);
 router.post('/rider/bind', rider.postBind);
 // 只挂 POST：initData 是短期凭证，不接受 query 传参（避免进访问日志/Referer/浏览器历史）
 router.post('/rider/session', rider.session);
+
+// 2g-2. 商家免密入口（方案 A）：TG 落地页输手机号 → initData 验签 → 网关 merchant_bind（按
+// member.phone 查唯一商家会员 + waimai_shop_manager 归属校验 + 冲突 409 + 三维限频 + 审计）→
+// 网关 merchant_session（只读 fbs_merchant_map 签会员 cookie）→ Set-Cookie + 302 /wmsj/。
+// 与顾客登录桥（/auth/telegram-web?role=merchant）互补：本段是「首次绑定」入口，
+// 已绑定商家走顾客桥那条路即可。铁律：商家分支绝不写 fbs_member_map（收银台归属底账），
+// cookie 由 PHP 生成后原样透传，Node 不拼任何属性。配置不齐时处理器内部返回 503。
+const merchantGateway = process.env.FBS_GATEWAY_URL && process.env.FBS_GATEWAY_SECRET ? {
+  merchantBind: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'merchant_bind', p),
+  merchantSession: (p) => gatewayClient.call(process.env.FBS_GATEWAY_URL, process.env.FBS_GATEWAY_SECRET, 'merchant_session', p),
+} : null;
+const merchant = createMerchantRoute({
+  botToken: BOT_TOKEN,
+  validateInitData: validateTelegramInitData,
+  gateway: merchantGateway,
+  allow: createLimiter({ max: Number(process.env.TMA_MERCHANT_MAX || 10), windowSeconds: 60 }),
+});
+router.get('/merchant/bind', merchant.getLanding);
+router.post('/merchant/bind', merchant.postBind);
+// 只挂 POST：同 rider/session 的 m5 口径（initData 不进 URL/访问日志）
+router.post('/merchant/session', merchant.session);
 
 // 2h. 派单 Telegram 通知（T7）：PHP 挂点 fb_tg_dispatch（common.func.php）→ 集群内站点 nginx →
 // POST /tg-api/internal/dispatch。HMAC 验签（复用 FBS_GATEWAY_SECRET，action 常量 'dispatch'，

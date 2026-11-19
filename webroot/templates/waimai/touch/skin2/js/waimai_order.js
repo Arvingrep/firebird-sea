@@ -918,7 +918,7 @@ $(function(){
 
 
 			    $('.mapcenter').remove();
-			    map = new google.maps.Map(document.getElementById('map'), mapOptions);
+			    map = new google.maps.Map(document.getElementById('map'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 
 
 

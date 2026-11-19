@@ -340,6 +340,104 @@ function fbs_bridge_load_site_config()
     return $cached = $cfg;
 }
 
+/**
+ * 严格版站点配置解析（登录签发链路专用，语义与网关 fbs_gateway_load_site_config()
+ * 的非注入路径逐行对齐，见 webroot/api/fbs/index.php:290-408 的设计说明）：
+ *
+ * 取值顺序（fail-closed：绝不静默回落成 cookieDomain='' 的 host-only）：
+ *   1. `data/cache/config.php` 里的 `$cfg_cookieDomain`（站点一致性优先，env 不覆盖）；
+ *   2. 文件缺失 **或** 文件里没写 cookieDomain → `FBS_GATEWAY_COOKIE_DOMAIN`（chart 注入，
+ *      与网关同一处 env，同名同源，不会出现两套口径）；
+ *   3. 两级都拿不到 → 返回 error=CONFIG_MISSING（消息里给出 env 变量名），**绝不签 Cookie**。
+ *
+ * 为什么登录页不能复用上面的 fbs_bridge_load_site_config()：它在文件缺失时静默回落成
+ * cookieDomain=''（host-only）。canary 是 baked 模式（data/ 挂 emptyDir，Pod 重建后
+ * config.php 即消失，且新版火鸟缓存里永远不会有 $cfg_cookieDomain），只认缓存的写法
+ * 在 canary 上必然回落成 host-only：员工从子域/www. 入口进工作台 cookie 命不中被踢回
+ * 登录页，且 host-only 与 domain 双 Cookie 并存会互相顶替会话——HTTP 200 + 日志「成功」
+ * 但实际是游客，没有任何信号。所以与网关同口径 fail-closed。
+ *
+ * cookiePath / onlinetime / httpSecureAccess 三项仍按「cache → 火鸟默认值」，不强制
+ * （它们最多影响有效期与 secure 标记，不会造成「看着登录成功、跨域却变游客」的错位）。
+ *
+ * 测试注入：$context['config_file'] 或 define('FBS_BRIDGE_SITE_CONFIG_FILE', ...) 可把
+ * 配置文件指到夹具（与 FBS_BRIDGE_DBINFO_FILE / FBS_BRIDGE_REPLAY_DIR 同款开关风格）。
+ *
+ * @param  array $context 可注入 config_file
+ * @return array [cfg|null, error|null]  error = ['code'=>..,'message'=>..]
+ */
+function fbs_bridge_site_config_strict(array $context = array())
+{
+    $file = null;
+    if (isset($context['config_file']) && is_string($context['config_file']) && $context['config_file'] !== '') {
+        $file = $context['config_file'];
+    } elseif (defined('FBS_BRIDGE_SITE_CONFIG_FILE')) {
+        $file = FBS_BRIDGE_SITE_CONFIG_FILE;
+    } else {
+        $file = dirname(__DIR__, 2) . '/data/cache/config.php';
+    }
+
+    $loaded = null;
+    if (is_file($file) && is_readable($file)) {
+        $loaded = (static function ($__file) {
+            $cfg_cookiePath = $cfg_cookieDomain = $cfg_onlinetime = $cfg_httpSecureAccess = null;
+            include $__file;
+            return array(
+                'cookiePath'       => $cfg_cookiePath,
+                'cookieDomain'     => $cfg_cookieDomain,
+                'onlinetime'       => $cfg_onlinetime,
+                'httpSecureAccess' => $cfg_httpSecureAccess,
+            );
+        })($file);
+    } else {
+        error_log('[fbs_bridge] site config missing/unreadable: ' . $file);
+    }
+
+    $cookiePath = (is_array($loaded) && is_string($loaded['cookiePath']) && $loaded['cookiePath'] !== '')
+        ? $loaded['cookiePath'] : '/';
+    $onlinetime = (is_array($loaded) && is_numeric($loaded['onlinetime']) && (int)$loaded['onlinetime'] > 0)
+        ? (int)$loaded['onlinetime'] : 100;
+    $httpSecureAccess = (is_array($loaded) && $loaded['httpSecureAccess'] !== null && $loaded['httpSecureAccess'] !== '')
+        ? (int)$loaded['httpSecureAccess'] : 1;
+
+    // 第一优先：缓存文件里的 $cfg_cookieDomain（与网关一致：env 不得覆盖站点自声明口径）
+    if (is_array($loaded) && array_key_exists('cookieDomain', $loaded)
+        && $loaded['cookieDomain'] !== null && $loaded['cookieDomain'] !== '') {
+        return array(array(
+            'cookiePath'       => $cookiePath,
+            'cookieDomain'     => (string)$loaded['cookieDomain'],
+            // 与 common.inc.php:86 一致：原生在加载配置后仍硬编码 $cfg_cookiePre='HN_'
+            'cookiePre'        => 'HN_',
+            'onlinetime'       => $onlinetime,
+            'httpSecureAccess' => $httpSecureAccess,
+        ), null);
+    }
+
+    // 第二优先：env 兜底，与网关同一处 chart 注入（FBS_GATEWAY_COOKIE_DOMAIN），同名同源
+    $envDomain = getenv('FBS_GATEWAY_COOKIE_DOMAIN');
+    if (is_string($envDomain) && trim($envDomain) !== '') {
+        return array(array(
+            'cookiePath'       => $cookiePath,
+            'cookieDomain'     => trim($envDomain),
+            'cookiePre'        => 'HN_',
+            'onlinetime'       => $onlinetime,
+            'httpSecureAccess' => $httpSecureAccess,
+        ), null);
+    }
+
+    // 两级都拿不到：fail-closed，绝不回落成 host-only。错误串与网关逐字一致，运维自查口径统一
+    if (!is_array($loaded)) {
+        return array(null, array(
+            'code'    => 'CONFIG_MISSING',
+            'message' => 'data/cache/config.php not found and FBS_GATEWAY_COOKIE_DOMAIN is not set',
+        ));
+    }
+    return array(null, array(
+        'code'    => 'CONFIG_MISSING',
+        'message' => 'cookieDomain is not configured (set $cfg_cookieDomain in data/cache/config.php or FBS_GATEWAY_COOKIE_DOMAIN)',
+    ));
+}
+
 /* ============================== 数据库配置读取 ============================== */
 
 /**

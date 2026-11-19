@@ -8,7 +8,22 @@
 
 <script src="https://res.wx.qq.com/open/js/jweixin-1.3.2.js?v={#$cfg_staticVersion#}"></script>
 
-{#if ($site_map!="google"&&$http_domestic==1)||$http_domestic==0 || $template == 'mapPosi'#}
+{#*
+  地图 API 脚本加载条件。
+
+  原条件：($site_map!="google" && $http_domestic==1) || $http_domestic==0 || $template=='mapPosi'
+  其中 $http_domestic 取的是**浏览器语言**是否含 zh-CN（common.inc.php:563），不是 IP：
+      $http_domestic = strstr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 'zh-CN') ? 1 : 0;
+
+  火鸟是中文站设计，默认「中文用户在国内用百度/高德，外语用户用 Google」。但本站
+  （fbird.men）是菲律宾站、地图配置为 google（siteConfig $cfg_map=1），于是中文手机
+  （Accept-Language: zh-CN，TG 中文界面即是）会命中 $site_map=="google" + $http_domestic==1
+  → 三个子条件全 false → 整个 <script> 不输出 → window.google 不存在 →
+  骑手端/商家订单详情/顾客下单页地图纯白，且连降级桩都没有（控制台 google is not defined）。
+
+  修复：$site_map=="google" 时无条件加载。对配 baidu/amap/qq 的站点零影响（分支不进）。
+*#}
+{#if $site_map=="google" || ($site_map!="google"&&$http_domestic==1)||$http_domestic==0 || $template == 'mapPosi'#}
 <script type="text/javascript" src="{#if $pageMapType == 'webgl' && $site_map == 'baidu'#}{#$site_map_apiFile|replace:'2.0':'1.0'#}&type=webgl{#else#}{#$site_map_apiFile#}{#/if#}"></script>
 {#/if#}
 

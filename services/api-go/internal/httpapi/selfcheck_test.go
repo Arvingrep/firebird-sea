@@ -80,8 +80,8 @@ func postJSON(server *Server, target, body string) *httptest.ResponseRecorder {
 func TestSelfCheckRouteTableIsExact(t *testing.T) {
 	server := newServer(t, nil)
 	routes := server.Routes()
-	if len(routes) != 29 {
-		t.Fatalf("路由表应为 29 条，实际 %d 条：%v", len(routes), routes)
+	if len(routes) != 32 {
+		t.Fatalf("路由表应为 32 条，实际 %d 条：%v", len(routes), routes)
 	}
 	seen := map[string]bool{}
 	for _, route := range routes {

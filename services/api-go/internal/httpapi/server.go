@@ -27,6 +27,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/dispatch"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fbproxy"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/httpbody"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/merchant"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/payment"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/rider"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/tgauth"
@@ -82,6 +83,11 @@ type Dep struct {
 	// （POST，三条都是 rider.New 的产物）。配置不齐时它自己返回 503，与 Node
 	// 「无条件挂载、端点内降级」一致；为 nil 表示未装配（测试场景）。
 	Rider *rider.Route
+	// Merchant 是 /tg-api/merchant/bind（GET 落地页 + POST 绑定）与
+	// /tg-api/merchant/session（POST，三条都是 merchant.New 的产物）。
+	// 同样是无条件挂载、缺配置端点内 503；**无 DB 字段**（映射查询全在 PHP 网关，
+	// Go 侧直查 fbs_merchant_map 会绕过 waimai_shop_manager 鉴权）；nil 仅测试场景。
+	Merchant *merchant.Route
 	// Dispatch 是 /tg-api/internal/dispatch（POST，PHP 派单挂点调用的内部通知口，
 	// dispatch.New 的产物）。同样是无条件挂载、缺配置时端点内 503；为 nil 表示未装配。
 	Dispatch *dispatch.Route
@@ -121,6 +127,7 @@ type Server struct {
 	addr        *addrshare.Router
 	fbProxy     *fbproxy.Proxy
 	rider       *rider.Route
+	merchant    *merchant.Route
 	dispatch    *dispatch.Route
 	ajax        *ajax.Router
 	staticDir   string
@@ -173,6 +180,7 @@ func NewServer(d Dep) *Server {
 		addr:        d.Addr,
 		fbProxy:     d.FBProxy,
 		rider:       d.Rider,
+		merchant:    d.Merchant,
 		dispatch:    d.Dispatch,
 		ajax:        d.Ajax,
 		staticDir:   d.TMAStaticDir,
@@ -208,6 +216,9 @@ func (s *Server) Routes() []Route {
 		{Method: "GET", Path: "/tg-api/rider/bind"},
 		{Method: "POST", Path: "/tg-api/rider/bind"},
 		{Method: "POST", Path: "/tg-api/rider/session"},
+		{Method: "GET", Path: "/tg-api/merchant/bind"},
+		{Method: "POST", Path: "/tg-api/merchant/bind"},
+		{Method: "POST", Path: "/tg-api/merchant/session"},
 		{Method: "POST", Path: "/tg-api/internal/dispatch"},
 		{Method: "GET", Path: "/tg-api/services"},
 		{Method: "POST", Path: "/tg-api/payment/create-charge"},
@@ -325,6 +336,18 @@ func (s *Server) build() http.Handler {
 		mux.HandleFunc("GET /tg-api/rider/bind", s.rider.GetLanding)
 		mux.HandleFunc("POST /tg-api/rider/bind", s.rider.PostBind)
 		mux.HandleFunc("POST /tg-api/rider/session", s.rider.Session)
+	}
+
+	// 9b. 商家免密入口（方案 A，与骑手段并列同语义）：
+	//   - GET  /tg-api/merchant/bind 是 TG 落地页；
+	//   - POST /tg-api/merchant/bind 是表单提交：验签 → 手机号归一 → 网关 merchant_bind →
+	//     merchant_session → Set-Cookie 原样透传 + 302 /wmsj/；
+	//   - POST /tg-api/merchant/session 只挂 POST（initData 不进 URL/访问日志）。
+	// 无条件挂载、缺配置端点内 503；nil 判断只影响「测试里没注入」的场景。
+	if s.merchant != nil {
+		mux.HandleFunc("GET /tg-api/merchant/bind", s.merchant.GetLanding)
+		mux.HandleFunc("POST /tg-api/merchant/bind", s.merchant.PostBind)
+		mux.HandleFunc("POST /tg-api/merchant/session", s.merchant.Session)
 	}
 
 	// 10. 派单 Telegram 通知（T7，server.js 2h）：PHP 派单挂点经 nginx 调的内部端点。

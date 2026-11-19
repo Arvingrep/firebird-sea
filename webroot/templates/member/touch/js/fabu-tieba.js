@@ -1177,7 +1177,7 @@ $(function () {
             style: google.maps.ZoomControlStyle.SMALL
           }
         }
-        map = new google.maps.Map(document.getElementById('container'), mapOptions);
+        map = new google.maps.Map(document.getElementById('container'), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
         getLocation(mapOptions.center, map)
       } else {
         setTimeout(s, 1000)

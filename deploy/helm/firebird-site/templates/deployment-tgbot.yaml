@@ -68,6 +68,18 @@ spec:
             - name: N8N_WEBHOOK_URL
               value: {{ . | quote }}
             {{- end }}
+            # request_contact 一键绑定：bot 直连 PHP 网关（HMAC），只调 rider_bind / merchant_bind（宽窗）。
+            # URL 与 api 侧同源（gatewayClient.js 自拼 /api/fbs/index.php 路径，这里同样只给到域名/端口）。
+            - name: FBS_GATEWAY_URL
+              value: {{ .Values.gateway.url | default (printf "http://firebird-%s:%v" .Values.siteId .Values.service.port) | quote }}
+            # optional：Secret 未建时 bot 照常启动，一键绑定回复「绑定通道未配置」并引导走落地页手输路径，
+            # 不把绑定故障放大成 CrashLoop（与 deployment-api 的 FBS_GATEWAY_SECRET 同一注入模式）。
+            - name: FBS_GATEWAY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.secretRef | default "firebird-api-secret" }}
+                  key: {{ .Values.gateway.secretKey | default "FBS_GATEWAY_SECRET" }}
+                  optional: true
           readinessProbe:
             httpGet:
               path: /health

@@ -2,7 +2,12 @@
 /**
  * Telegram 顾客免密登录落地页（方案甲：Node 中转）
  *
- * 路由：/tg/entry?role=customer（nginx 未加 try_files 前用 /tg/entry.php?role=customer）
+ * 路由：/tg/entry?role=customer|merchant（nginx 未加 try_files 前用 /tg/entry.php?role=…）
+ *
+ * role=merchant（方案 A）：直接用网关 merchant_session 签出的会员 cookie 进 /wmsj/，
+ * **必须跳过顾客分支的 /api/login.php?action=back 二次签 cookie**（那一步按 username=tg_<id>
+ * 查/建会员，会把商家会话覆盖成顾客空号）。未绑定（MERCHANT_NOT_BOUND）时无缝跳
+ * /tg-api/merchant/bind 绑定页。
  *
  * 刻意保持轻量：不 include 火鸟 common.inc.php。
  * 原因：common.inc.php 强依赖 swoole_loader 扩展且要求 PHP 恰好 7.4，而本页只需要
@@ -17,7 +22,26 @@ header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
 
 $role = isset($_GET['role']) ? (string)$_GET['role'] : 'customer';
-if ($role !== 'customer') $role = 'customer';
+// 白名单：customer（顾客）/ merchant（商家）。其余值静默归一成 customer，绝不透传给下游。
+if ($role !== 'customer' && $role !== 'merchant') $role = 'customer';
+
+/*
+ * 落点（仅 merchant 生效）：
+ *   ''（缺省）→ 跟随后端 redirect，即 /wmsj/ 外卖接单后台 —— 原行为，一个字不动
+ *   'member'  → 商户中心 /b/business-staff.html（员工管理页，侧边栏可回首页）
+ *
+ * 为什么不是 /member?action=workPlatform：
+ *   workPlatform 是「员工工作台」（member.controller.php:10739 起），侧边栏没有员工管理；
+ *   /b 才是商户中心（company 模板），它的侧边栏才有「员工管理」。
+ *   /b 是火鸟自己生成的 busiDomain（common.func.php:4975，无 template 时直接返回 $domain），
+ *   取 /b/business-staff.html 是因为这页已验证可达，而 /b 首页无法离线确认。
+ *
+ * 为什么用参数而不改后端 redirect：老板日常是来接单的，把默认落点改成商户中心会让
+ * 每次接单多点两下；而管店是低频动作。两个入口各带各的参数，互不影响。
+ * 白名单归一：其余值一律当 ''，这个参数绝不拼进 location。
+ */
+$to = isset($_GET['to']) ? (string)$_GET['to'] : '';
+if ($to !== 'member') $to = '';
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -50,8 +74,8 @@ if ($role !== 'customer') $role = 'customer';
 <div class="box">
   <div id="loading">
     <div class="spinner"></div>
-    <p class="title">正在登录…</p>
-    <p class="desc">请稍候，正在为你准备账户</p>
+    <p class="title"><?php echo $role === 'merchant' ? '正在进入商家后台…' : '正在登录…'; ?></p>
+    <p class="desc"><?php echo $role === 'merchant' ? '请稍候，正在为你准备商家账号' : '请稍候，正在为你准备账户'; ?></p>
   </div>
   <div id="error" class="hidden">
     <p class="title">登录失败</p>
@@ -65,6 +89,12 @@ if ($role !== 'customer') $role = 'customer';
 <script>
 (function () {
   var ROLE = <?php echo json_encode($role, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+  var TO = <?php echo json_encode($to, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+  // 商户中心落点：硬编码目标页而非复用后端 redirect —— 后端那枚是「接单后台」的语义，
+  // 混用会让两处口径互相牵制。改这里只影响 to=member 的入口。
+  // 落员工管理页而不是商户中心首页 /b：这页已验证可达（200），侧边栏能回首页；
+  // 且 member.controller.php:5301 会把 is_staff=1 的员工从这里跳去个人中心，不会越权。
+  var MEMBER_HOME = '/b/business-staff.html';
   var loadingEl = document.getElementById('loading');
   var errorEl = document.getElementById('error');
   var errorTextEl = document.getElementById('error-text');
@@ -111,6 +141,16 @@ if ($role !== 'customer') $role = 'customer';
         // 接口契约（对象形）：{success:true,data:{redirect}} / {success:false,error:{code,message}}
         if (res.ok && data && data.success === true) {
           var go = (data.data && data.data.redirect) || '/';
+          if (ROLE === 'merchant') {
+            // 商家分支**必须跳过**下面的二次签 cookie：/api/login.php?action=back 走的是
+            // 旧直连桥（按 username=tg_<id> 查/建会员），会把刚签好的「商家会员」会话覆盖成
+            // 顾客空号 —— 表现为「登录成功 → /wmsj 弹『您没有外卖店铺权限』」，日志两边都是 200。
+            // 商家后台 /wmsj 认的就是网关刚种的这枚会员 cookie，直接跳转即可。
+            // to=member：同一枚 cookie 天然通行商户中心（/b/ 与 /wmsj/ 认的是同一份会员态），
+            // 这里只换落点，不需要二次登录。
+            location.replace(TO === 'member' ? MEMBER_HOME : go);
+            return;
+          }
           // 同时登录火鸟站点会话：入口页拿得到真实 initData，站内页面（如「我的」）之后再跳转时不一定还带着它。
           // 用 fetch 提交即可（Set-Cookie 照常生效）；后台没装「Telegram快捷登录」或失败都不影响进入首页。
           fetch('/api/login.php?action=back&type=telegram', {
@@ -123,6 +163,12 @@ if ($role !== 'customer') $role = 'customer';
           return;
         }
         var err = (data && data.error) || {};
+        if (ROLE === 'merchant' && err.code === 'MERCHANT_NOT_BOUND') {
+          // 首次使用的商家：无缝跳到绑定页（同一 WebView 内 initData 仍然可用），
+          // 不要让用户自己找 /merchant 命令。
+          location.replace('/tg-api/merchant/bind');
+          return;
+        }
         fail('请关闭本页面，在 Telegram 中重新打开', err.message || '', err.code || ('HTTP_' + res.status));
       });
     }).catch(function () {

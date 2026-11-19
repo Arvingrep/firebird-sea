@@ -300,10 +300,11 @@ test('源码约束：三维度阈值/窗口写在网关内且只排除 rate_limi
 
 // ---- 窗口分类 + 紧窗重放计数（Ray 裁决，最终移植轮）----
 
-test('源码约束：紧窗档三动作走 FBS_GATEWAY_TIGHT_WINDOW，rider_bind 维持宽窗；重放账本阈值=1；凭证动作查绑定', () => {
+test('源码约束：紧窗档凭证动作走 FBS_GATEWAY_TIGHT_WINDOW，rider_bind 维持宽窗；重放账本阈值=1；凭证动作查绑定', () => {
   const src = fs.readFileSync(GATEWAY, 'utf8');
-  assert.match(src, /in_array\(\$action, array\('issue_session', 'rider_ql', 'rider_notify_url'\), true\)/,
-    '紧窗档必须是 issue_session / rider_ql / rider_notify_url 三个凭证动作');
+  // merchant_session（商家方案 A）同样返回活凭证，已并入紧窗档（见 MERCHANT_TG_HOOKS.md）
+  assert.match(src, /in_array\(\$action, array\('issue_session', 'merchant_session', 'rider_ql', 'rider_notify_url'\), true\)/,
+    '紧窗档必须是 issue_session / merchant_session / rider_ql / rider_notify_url 几个凭证动作');
   assert.match(src, /\? FBS_GATEWAY_TIGHT_WINDOW : FBS_GATEWAY_TIME_WINDOW/,
     '分类一行：紧窗档 15s，其余 300s');
   assert.match(src, /fbs_gateway_verify\(\$secret, \$timestamp, \$signature, \$action, \$rawBody, \$now, \$window\)/,

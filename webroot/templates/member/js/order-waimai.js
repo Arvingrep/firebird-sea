@@ -465,7 +465,7 @@ function mapShow(x,y,z,id,state,path){	//x 店铺坐标 y 配送员坐标 z 收�
 			   streetViewControl: false,
 			   fullscreenControl: false,
 			 }
-			 map = new google.maps.Map(document.getElementById('listMap'+id), mapOptions);
+			 map = new google.maps.Map(document.getElementById('listMap'+id), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 		 	 // 店铺坐标
 		 	 marker = new google.maps.Marker({
 		 	   position: new google.maps.LatLng(x.lat,x.lng),
@@ -481,7 +481,7 @@ function mapShow(x,y,z,id,state,path){	//x 店铺坐标 y 配送员坐标 z 收�
 			   streetViewControl: false,
 			   fullscreenControl: false
 			 }
-			 map = new google.maps.Map(document.getElementById('listMap'+id), mapOptions);
+			 map = new google.maps.Map(document.getElementById('listMap'+id), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 		 	// 店铺坐标
 		 	marker = new google.maps.Marker({
 		 	  position: new google.maps.LatLng(x.lat,x.lng),
@@ -505,7 +505,7 @@ function mapShow(x,y,z,id,state,path){	//x 店铺坐标 y 配送员坐标 z 收�
 	          streetViewControl: false,
 	          fullscreenControl: false
 	        }
-	        map = new google.maps.Map(document.getElementById('listMap'+id), mapOptions);
+	        map = new google.maps.Map(document.getElementById('listMap'+id), Object.assign({}, mapOptions, {renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined}));
 	        // 店铺坐标
 		     shop_marker = new google.maps.Marker({
 		        position: new google.maps.LatLng(x.lat, x.lng),

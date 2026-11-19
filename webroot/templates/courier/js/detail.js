@@ -129,16 +129,58 @@ new Vue({
 	},
 	mounted(){
 
-		// Web 端（Telegram / 浏览器）没有原生 bridge：用 webgeo.js 的浏览器定位补上骑手坐标，
-		// 否则 ps_lnglat 恒为空、地图不显示骑手位置（AD-14 最小补丁，原生 App 不生效）
+		// Web 端兜底建图（Telegram / 浏览器）：没有原生 JSBridge 时 map_show 没有任何触发者，
+		// #map 会整块空白（iOS WKWebView 不支持网页 geolocation，TG 定位失败时 webgeo.js 静默退出）。
+		// 这里做两件事：① 有 __webGeo 就用真实骑手坐标建图；② 拿不到定位也先以店铺为中心出图，
+		// 定位到手之后再由 sync 的 else 分支补画骑手标记与路线。原生 App 有 bridge，不走这条路径。
 		(function (vm) {
+			var num = function (v) { var n = Number(v); return (isFinite(n) && n !== 0) ? n : null; };
+			// true 表示地图是在“没有骑手坐标”的前提下建出来的：此时 map_show 没有启动轮询，
+			// 由下面的 sync 负责在定位到手后补画骑手标记并持续刷新（避免与 map_show 的 interval 双重轮询）
+			var pendingCourier = false;
+			// 原生 App（huoniao UA / bridge 已注入）走原有 bridge 回调建图，这条兜底只能作用于 Web：
+			// 否则 mounted 会抢在 getGeocoder 回调之前以“无骑手坐标”建图，原生端反而丢掉骑手段路线。
+			var nativeBridgeLikely = function () {
+				return !!window.WebViewJavascriptBridge || /huoniao/i.test(navigator.userAgent || '');
+			};
+			// 逃逸阀：原生端 bridge 在场但 getGeocoder 永不回调（如定位权限被拒）时，10s 后照样兜底出图
+			var bridgeGraceExpired = false;
+			var drawInitial = function (ps) {
+				if (!vm.mapshow || vm.order_finished || !vm.orderTop) { return false; }
+				if (!ps && nativeBridgeLikely() && !bridgeGraceExpired) { return false; }   // 原生 App：等 bridge 回调，路径完全不变
+				var shop = window.shoplnglat, user = window.userlnglat;
+				if (!shop || !user) { return false; }
+				if (num(shop.lat) === null || num(shop.lng) === null ||
+					num(user.lat) === null || num(user.lng) === null) { return false; }
+				// ps 为 null 时传 shop 占位并置 noCourier=true：不画骑手标记、不自画骑手段路线
+				vm.map_show(shop, user, ps || shop, !ps);
+				pendingCourier = !ps;
+				return true;
+			};
 			var sync = function () {
-				var wg = window.__webGeo;
-				if (wg && wg.lng !== '' && wg.lat !== '' && wg.lng != null && wg.lat != null) {
-					vm.ps_lnglat = {'lng': wg.lng, 'lat': wg.lat};
+				// 建图已经抛过错：不再自动重试（否则每 5s 重建一次、全局 map 被覆盖），
+				// mapshow 仍为 1，用户手动点定位浮标（rechange）还有机会重建
+				if (vm.__mapBootFailed) { return; }
+				try {
+					var wg = window.__webGeo, ps = null;
+					if (wg && num(wg.lng) !== null && num(wg.lat) !== null) {
+						ps = {'lng': num(wg.lng), 'lat': num(wg.lat)};
+						vm.ps_lnglat = ps;
+						vm.rotation = wg.rotation || 0;
+					}
+					if (vm.mapshow) { drawInitial(ps); return; }           // 首次建图（map_show 末尾会置 mapshow=0）
+					if (pendingCourier && ps && typeof map !== 'undefined' && map) {   // 地图已在、定位刚到手：补画骑手标记+重算路线
+						vm.change_qishou(window.shoplnglat, window.userlnglat, ps);
+					}
+				} catch (e) {
+					// map_show 抛错不能中断 mounted（滚动吸顶、bridge 注册），失败只记一次
+					vm.__mapBootFailed = true;
+					console.warn('[courier-map] init failed:', e && e.message);
 				}
 			};
 			sync();
+			setTimeout(sync, 3000);   // 双保险：mounted 时容器尺寸/数据可能未就绪
+			setTimeout(function () { bridgeGraceExpired = true; sync(); }, 10000);   // 原生端 10s 无回调 → 也兜底出图
 			setInterval(sync, 5000);
 		})(this);
 
@@ -224,10 +266,13 @@ new Vue({
 		change_fixed:function(){
 			 this.bottomfixed = false;
 		},
-		map_show:function(slnglat,ulnglat,pslnglat){ //店铺坐标  用户坐标  骑手坐标
-			var qishou = {"lng":pslnglat.lng,"lat":pslnglat.lat} ;  //骑手坐标
+		map_show:function(slnglat,ulnglat,pslnglat,noCourier){ //店铺坐标  用户坐标  骑手坐标  无骑手坐标（仅建图）
 			 slnglat = {"lng":Number(slnglat.lng),"lat":Number(slnglat.lat)}
 			 ulnglat = {"lng":Number(ulnglat.lng),"lat":Number(ulnglat.lat)}
+			var psLng = Number(pslnglat && pslnglat.lng), psLat = Number(pslnglat && pslnglat.lat);
+			var qishou = (isFinite(psLng) && psLng !== 0 && isFinite(psLat) && psLat !== 0)
+				? {"lng": psLng, "lat": psLat}
+				: {"lng": slnglat.lng, "lat": slnglat.lat};   // 无骑手坐标时占位为店铺，仅用于建图中心
 			var tt = this;
 			if (site_map == "baidu") {
 				map = new BMap.Map('map');
@@ -470,6 +515,7 @@ new Vue({
 			 }else if(site_map=='google'){
 				 // 初始化地图
 				 map = new google.maps.Map(document.getElementById("map"), {
+					   renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
 					   zoom: 14,
 					   center: {
 						 lat: qishou.lat,
@@ -483,6 +529,7 @@ new Vue({
 				sposition = new google.maps.LatLng(Number(slnglat.lat),Number(slnglat.lng));
 				uposition = new google.maps.LatLng(Number(ulnglat.lat),Number(ulnglat.lng));
 				cposition = new google.maps.LatLng(Number(qishou.lat),Number(qishou.lng));
+				if (noCourier) { map.setCenter(sposition); }   // 无骑手坐标：以店铺为中心出图
 
 				directionsService = new google.maps.DirectionsService();
 				directionsService1 = new google.maps.DirectionsService();
@@ -508,17 +555,27 @@ new Vue({
 					labelContent: '<div class="bubble user"><span class="bg_bub"><em>收</em></span></div>',
 					icon:'/static/images/blank.gif',
 				  });
-				qishouIcon = new MarkerWithLabel({
-				   position: cposition,
-				   draggable: true,
-				   map: map,
-				   labelAnchor: new google.maps.Point(16, 28),
-				   labelContent: '<div class="courier"><span style="transform:rotate('+tt.rotation+'deg)"></span></div>',
-				   icon:'/static/images/blank.gif',
-				 });
+				if (!noCourier) {   // 无骑手坐标时不画骑手标记（等定位到手由 change_qishou 补画）
+					qishouIcon = new MarkerWithLabel({
+					   position: cposition,
+					   draggable: true,
+					   map: map,
+					   labelAnchor: new google.maps.Point(16, 28),
+					   labelContent: '<div class="courier"><span style="transform:rotate('+tt.rotation+'deg)"></span></div>',
+					   icon:'/static/images/blank.gif',
+					 });
+				}
 
 
-				 if(state==4 && (slnglat.lng!='' ||slnglat.latg!='')){
+				 if(noCourier){   // 无骑手坐标：只画店铺→顾客（黄线），不请求骑手段路线
+					 directionsRenderer.setOptions({
+						polylineOptions: {
+						  strokeColor: '#F5B120'
+						}
+					});
+					directionsRenderer.setMap(map);
+					calculateAndDisplayRoute(directionsService, directionsRenderer,slnglat,ulnglat);
+				 }else if(state==4 && (slnglat.lng!='' ||slnglat.lat!='')){
 					 directionsRenderer.setOptions({
 						polylineOptions: {
 						  strokeColor: '#F5B120'
@@ -581,12 +638,18 @@ new Vue({
 				});
 			 }
 			tt.mapshow = 0;
-			interval = setInterval(function(){
-				tt.change_qishou(slnglat,ulnglat,tt.ps_lnglat)
-			},xhtime);
+			// 无骑手坐标时不启动轮询：反复以占位起点请求 Directions 只会失败（弹窗/日志风暴）
+			if (!noCourier) {
+				interval = setInterval(function(){
+					tt.change_qishou(slnglat,ulnglat,tt.ps_lnglat)
+				},xhtime);
+			}
 		},
 		change_qishou:function(slnglat,ulnglat,pslnglat){  //更改路线
 			var tt = this;
+			var psLng = Number(pslnglat && pslnglat.lng), psLat = Number(pslnglat && pslnglat.lat);
+			if (typeof map === 'undefined' || !map) { return; }
+			if (!isFinite(psLng) || psLng === 0 || !isFinite(psLat) || psLat === 0) { return; }
 			if(site_map =='baidu'){
 				var qs = new BMap.Point(pslnglat.lng, pslnglat.lat);
 				var shop = new BMap.Point(slnglat.lng, slnglat.lat);  //店铺坐标
@@ -605,7 +668,7 @@ new Vue({
 					riding1.clearResults();
 					riding1.search(qs,user);  //店铺~顾客
 				}
-				map.removeOverlay(qishouIcon);
+				if (qishouIcon) { map.removeOverlay(qishouIcon); }
 				// qishouIcon = new BMap.Label('<div class="courier" ><div class="bubble_tip"><div class="juli_tip">距取货点1.1km</div></div><span style="transform:rotate('+tt.rotation+'deg)"></span></div>', {
 				//    position: pslnglat,
 				//    offset: new BMap.Size(-20, -30)
@@ -655,7 +718,7 @@ new Vue({
 				map.setCenter(qs);
 			}else if(site_map == 'google'){
 				cposition = new google.maps.LatLng(Number(pslnglat.lat),Number(pslnglat.lng));
-				qishouIcon.setMap(null);
+				if (qishouIcon) { qishouIcon.setMap(null); }   // noCourier 建图时未创建骑手标记
 				qishouIcon = new MarkerWithLabel({
 				   position: cposition,
 				   draggable: true,
@@ -678,17 +741,21 @@ new Vue({
 				 	directionsRenderer1.setMap(map);
 				 	calculateAndDisplayRoute(directionsService1, directionsRenderer1,pslnglat,slnglat);
 				 }else{
+				 	// state≠4（已取货）：骑手→顾客 单线。原来这里把线算给了 directionsRenderer1
+				 	// 却又去重建了（没上图的）directionsRenderer，导致这条线永远不显示
 				 	directionsRenderer.setMap(null);
+				 	// 订单由 4 变 5 时清掉上一条骑手腿蓝线，避免残留
+				 	if (directionsRenderer1) { directionsRenderer1.setMap(null); }
 				 	directionsRenderer = new google.maps.DirectionsRenderer({
 				 		suppressMarkers:true  ,
 				 	});
 				 	directionsRenderer.setOptions({
 				 		polylineOptions: {
-				 		   strokeColor: '#F5B120'
+				 		   strokeColor: '#F5B120'   // 送达腿沿用 map_show 的黄色，同一条腿颜色恒定
 				 		},
 				 	});
-				 	directionsRenderer1.setMap(map);
-				 	calculateAndDisplayRoute(directionsService1, directionsRenderer1,pslnglat,ulnglat);
+				 	directionsRenderer.setMap(map);
+				 	calculateAndDisplayRoute(directionsService, directionsRenderer,pslnglat,ulnglat);
 				 }
 			}
 		},
@@ -710,7 +777,7 @@ new Vue({
 				// map.setCenter(qs);
 			}else if(site_map == 'google'){
 				cposition = new google.maps.LatLng(Number(tt.ps_lnglat.lat),Number(tt.ps_lnglat.lng));
-				qishouIcon.setMap(null);
+				if (qishouIcon) { qishouIcon.setMap(null); }   // 兜底建图（noCourier）时未创建骑手标记
 				qishouIcon = new MarkerWithLabel({
 				   position: cposition,
 				   draggable: true,
@@ -723,6 +790,25 @@ new Vue({
 		},
 		rechange:function(){
 			var tt = this;
+			// Web 端回退（TG/浏览器，无原生 bridge）：bridge 回调永远不会执行，
+			// created() 里的自动调用和定位按钮此前都静默失效。webgeo.js 已提供
+			// __webGeo（并对原生 App UA 自动退出），这里直接用它画图/居中。
+			// 上报由 webgeo.js 自带节流上报负责，无需重复。
+			if (!window.WebViewJavascriptBridge && window.__webGeo) {
+				var wg = window.__webGeo;
+				tt.ps_lnglat = {'lng': wg.lng, 'lat': wg.lat};
+				tt.rotation = wg.rotation || 0;
+				if(tt.mapshow){
+					tt.map_show(window.shoplnglat, window.userlnglat, tt.ps_lnglat);
+				}else if(typeof map != 'undefined' && map){
+					if(site_map == 'google'){
+						map.panTo({'lat': Number(wg.lat), 'lng': Number(wg.lng)});
+					}else{
+						map.panTo(new BMap.Point(tt.ps_lnglat.lng, tt.ps_lnglat.lat));
+					}
+				}
+				return;
+			}
 			setupWebViewJavascriptBridge(function(bridge) {
 			    bridge.callHandler("getGeocoder", {}, function(responseData){
 					var data = JSON.parse(responseData)
@@ -730,8 +816,13 @@ new Vue({
 					tt.rotation = data.rotation;
 					if(tt.mapshow){
 						tt.map_show(shoplnglat,userlnglat,tt.ps_lnglat)
-					}else{
-						map.panTo(new BMap.Point(tt.ps_lnglat.lng, tt.ps_lnglat.lat));
+					}else if(typeof map != 'undefined' && map){
+						// site_map=google 时用 BMap.Point 会抛 BMap is not defined，按 site_map 分派
+						if(site_map == 'google'){
+							map.panTo({'lat': Number(tt.ps_lnglat.lat), 'lng': Number(tt.ps_lnglat.lng)});
+						}else{
+							map.panTo(new BMap.Point(tt.ps_lnglat.lng, tt.ps_lnglat.lat));
+						}
 					}
 					let param = new URLSearchParams();
 						param.append('lng', data.lng)
@@ -981,7 +1072,7 @@ function showErr(data) {
 	  if (status === "OK") {
 		directionsRenderer.setDirections(response);
 	  } else {
-		window.alert("Directions request failed due to " + status);
+		console.warn('[courier-map] Directions failed:', status);
 	  }
 	}
   );

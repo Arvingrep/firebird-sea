@@ -129,9 +129,12 @@ func mergeParams(sources ...url.Values) url.Values {
 			case "service", "action", "callback", "_":
 				continue
 			}
-			if strings.HasSuffix(key, "[]") {
+			// PHP 里 k 与 k[] 是同一个键 k，后来源整体覆盖先来源。
+			if base, isArray := strings.CutSuffix(key, "[]"); isArray {
+				delete(params, base)
 				params[key] = append([]string(nil), values...)
 			} else {
+				delete(params, key+"[]")
 				params[key] = []string{values[len(values)-1]}
 			}
 		}

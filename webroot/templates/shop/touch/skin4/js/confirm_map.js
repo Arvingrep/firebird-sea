@@ -95,6 +95,7 @@ $(function(){
             var centerPoint = new google.maps.LatLng(parseFloat(sqLat), parseFloat(sqLng));
 
             var map = new google.maps.Map(document.getElementById('busmap'), {
+                renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
                 zoom: 14,
                 center: centerPoint,
                 zoomControl: true,

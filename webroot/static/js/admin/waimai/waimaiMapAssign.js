@@ -39,6 +39,7 @@ $(function(){
     }else if (site_map == "google") {
 
       map = new google.maps.Map(document.getElementById('map'), {
+        renderingType: google.maps.RenderingType ? google.maps.RenderingType.RASTER : undefined,
         zoom: 14,
         center: new google.maps.LatLng(30, 120),
         zoomControl: true,
