@@ -210,19 +210,23 @@ func (s *Service) zanCounter(ctx context.Context, id, module, temp string, delta
 // quoteIdent 给表名补反引号；已经带反引号的（Service 里预拼好的表名）先去掉再补，避免重复。
 func quoteIdent(name string) string { return "`" + strings.Trim(name, "`") + "`" }
 
-// articleSubTable 复刻 SubTable('articlelist', '#@__articlelist')->getSubTableById($id)：
-// 分表清单来自 site_sub_tablelist（service='articlelist'，ORDER BY id desc），末尾补一张
+// articleSubTable 复刻 SubTable('articlelist', '#@__articlelist')->getSubTableById($id)。
+func (s *Service) articleSubTable(ctx context.Context, id string) (string, error) {
+	return s.subTableByID(ctx, "articlelist", s.articleListTable, id)
+}
+
+// subTableByID 复刻 SubTable::getSubTableById()（SubTable.class.php:359-380）：
+// 分表清单来自 site_sub_tablelist（service 匹配，ORDER BY id desc），末尾补一张
 // begin_id 为空的原始表。begin_id 命中（PHP 松散比较）直接用该表；否则把 id 与 0 混入
 // begin_id 列排序后取 id 的前一个值：前值为 0（含空）用原始表，否则用该 begin_id 对应的
-// 分表（PHP array_search 找不到时下标 false 会取第 0 行）。canary 该表当前为空，恒返回
-// 原始表 huoniao_articlelist。
-func (s *Service) articleSubTable(ctx context.Context, id string) (string, error) {
+// 分表（PHP array_search 找不到时下标 false 会取第 0 行）。
+func (s *Service) subTableByID(ctx context.Context, service, oldTable, id string) (string, error) {
 	type subEntry struct {
 		table   string
 		beginID *string
 	}
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT `table_name`, `begin_id` FROM "+s.subTableListTable+" WHERE `service` = 'articlelist' ORDER BY `id` DESC")
+		"SELECT `table_name`, `begin_id` FROM "+s.subTableListTable+" WHERE `service` = ? ORDER BY `id` DESC", service)
 	if err != nil {
 		return "", err
 	}
@@ -245,7 +249,7 @@ func (s *Service) articleSubTable(ctx context.Context, id string) (string, error
 		return "", err
 	}
 	// PHP $ret[] = ['table_name' => old_table]：补在末尾，无 begin_id。
-	entries = append(entries, subEntry{table: s.articleListTable})
+	entries = append(entries, subEntry{table: oldTable})
 
 	// 第一轮：array_search($id, begin_id 列)（松散比较），命中直接用。
 	for _, e := range entries {
@@ -280,7 +284,7 @@ func (s *Service) articleSubTable(ctx context.Context, id string) (string, error
 	}
 	// $search_begin_id == 0 是 PHP 7.4 松散比较：null/空串/"0"/"abc" 都按 0 处理 → 原始表。
 	if leadingNumber(searchBegin) == 0 {
-		return s.articleListTable, nil
+		return oldTable, nil
 	}
 	for _, e := range entries {
 		if e.beginID != nil && looseEqual(*e.beginID, searchBegin) {
