@@ -45,7 +45,7 @@ $(function(){
             }
 
             bubbleLabel = new BMap.Label('<p class="bubble-3 bubble'+state+'"><i class="num">'+o.name+'</i><i class="arrow-up"><i class="arrow"></i><i></p>', {
-                position: new BMap.Point(o.lat, o.lng),
+                position: new BMap.Point(o.lng, o.lat),
                 offset: new BMap.Size(-46, -46)
             });
 
@@ -60,7 +60,7 @@ $(function(){
         		});
             map.addOverlay(bubbleLabel);
 
-            points.push(new BMap.Point(o.lat, o.lng));
+            points.push(new BMap.Point(o.lng, o.lat));
 
         });
 
@@ -70,7 +70,7 @@ $(function(){
             var bubbleLabel, r = [];
 
             bubbleLabel = new BMap.Label('<p class="bubble-3 bubble store"><i class="num">'+o.name+'</i><i class="arrow-up"><i class="arrow"></i><i></p>', {
-                position: new BMap.Point(o.lat, o.lng),
+                position: new BMap.Point(o.lng, o.lat),
                 offset: new BMap.Size(-46, -46)
             });
 
@@ -86,7 +86,7 @@ $(function(){
             map.addOverlay(bubbleLabel);
             
             if(points.length == 0){
-                sjPoints.push(new BMap.Point(o.lat, o.lng));
+                sjPoints.push(new BMap.Point(o.lng, o.lat));
                 
             }
 
@@ -135,7 +135,7 @@ $(function(){
                 state = " closed";
             }
 
-            var poi = new google.maps.LatLng(o.lng, o.lat);
+            var poi = new google.maps.LatLng(o.lat, o.lng);
             var marker = new google.maps.Marker({
               position: poi,
               map: map
@@ -146,7 +146,7 @@ $(function(){
             });
             infoWindow.open(map, marker);
 
-            LatLngList.push(new google.maps.LatLng(o.lng, o.lat))
+            LatLngList.push(new google.maps.LatLng(o.lat, o.lng))
             gOverlays.push(marker, infoWindow);
 
         });
@@ -155,7 +155,7 @@ $(function(){
         $.each(storelist, function(e, o) {
             var bubbleLabel, r = [];
 
-            var poi = new google.maps.LatLng(o.lng, o.lat);
+            var poi = new google.maps.LatLng(o.lat, o.lng);
             var marker = new google.maps.Marker({
               position: poi,
               map: map
@@ -205,9 +205,9 @@ $(function(){
                     state = " closed";
                 }
                 if(o.lng!='' && o.lat!=''){
-                    points.push(new AMap.LngLat(o.lat, o.lng));
+                    points.push(new AMap.LngLat(o.lng, o.lat));
                     bubbleLabel = new AMap.Marker({
-                        position: ([o.lat, o.lng]),
+                        position: ([o.lng, o.lat]),
                         draggable: false,    // 允许拖动
                         content: '<p class="bubble-3 bubble'+state+'" style="color:#fff;background:transparent;font-family:\'microsoft yahei\';white-space:nowrap;"><i class="num">'+o.name+'</i><i class="arrow-up"><i class="arrow"></i><i></p>',
                         offset: new AMap.Pixel(-46,-46)
@@ -218,7 +218,7 @@ $(function(){
                         bubbleLabel.setContent('<p class="bubble-3 bubble'+state+'" style="color:#fff;background:transparent;font-family:\'microsoft yahei\';white-space:nowrap;"><i class="num" style="background:#ccc;">'+o.name+' 3秒后回到实际位置</i><i class="arrow-up"><i class="arrow"></i><i></p>');
                         setTimeout(function(){
                             bubbleLabel.show();
-                            bubbleLabel.moveTo(new AMap.LngLat(o.lat, o.lng), 100000);
+                            bubbleLabel.moveTo(new AMap.LngLat(o.lng, o.lat), 100000);
                             bubbleLabel.setContent('<p class="bubble-3 bubble'+state+'" style="color:#fff;background:transparent;font-family:\'microsoft yahei\';white-space:nowrap;"><i class="num">'+o.name+'</i><i class="arrow-up"><i class="arrow"></i><i></p>');
                         },3000)
                     })
@@ -235,7 +235,7 @@ $(function(){
 
                 if(o.lng!='' && o.lat!=''){
                     bubbleLabel = new AMap.Marker({
-                        position: ([o.lat, o.lng]),
+                        position: ([o.lng, o.lat]),
                         draggable: false,    // 允许拖动
                         content: '<p class="bubble-3 bubble store" style="color:#fff;background:transparent;font-family:\'microsoft yahei\';white-space:nowrap;"><i class="num">'+o.name+'</i><i class="arrow-up"><i class="arrow"></i><i></p>',
                         offset: new AMap.Pixel(-46,-46)
