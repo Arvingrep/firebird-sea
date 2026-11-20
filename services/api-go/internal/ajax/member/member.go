@@ -122,6 +122,42 @@ type Dep struct {
 	// ModuleCommentCheck 对应 include/config/<module>.inc.php 的 $customCommentCheck
 	// （replyComment 的 ischeck）；nil 按 0（待审核）处理。
 	ModuleCommentCheck func(module string) int
+
+	// —— updateAccount（#261）的依赖。站点运行期配置不在仓库里，nil / 零值取 canary 关态。——
+
+	// NicknameEditState 对应 $cfg_nicknameEditState（昵称修改开关）；nil 取 canary 的 0。
+	NicknameEditState *int
+	// NicknameEditInfo 对应 $cfg_nicknameEditInfo；nil / 空串取 PHP 默认文案。
+	NicknameEditInfo *string
+	// NicknameEditAudit 对应 $cfg_nicknameEditAudit（昵称审核开关）；nil 取 canary 的 0。
+	NicknameEditAudit *int
+	// PwdLevel 对应 $cfg_pwdLevel（密码复杂度 0-3）；canary 未配置 → nil 取 0（不校验）。
+	PwdLevel *int
+	// CardState 对应 $cfg_cardState（身份证 OCR 开关）；nil 取 canary 的 0（人工审核）。
+	CardState *int
+	// SiteCityName / SiteCityID 对应 $siteCityInfo['name'] / ['cityid']（certify 的管理员
+	// 通知参数）；空串时按「站点数组为空」序列化为 null。
+	SiteCityName string
+	SiteCityID   string
+	// NotifyVars 对应邮件模板（getInfoTempContent）的 $cfg_webname / $cfg_shortname /
+	// $cfg_attachment.$cfg_weblogo / $cfg_hotline / $cfg_basehost 替换变量；nil 时这些
+	// 占位符原样保留（$link / $time 由实现内部给出）。
+	NotifyVars map[string]string
+	// SendMail 对应 sendmail()（chemail）；返回非空串表示失败原因。nil 视为发送失败。
+	SendMail func(ctx context.Context, to, title, body string) string
+	// WxPhoneNumber 对应 do=chphone 的微信小程序支路（getuserphonenumber，需要 access_token
+	// 服务）；nil 时按「手机号码解析失败」返回。errCode 非空时返回 ErrCode/ErrMsg 文案。
+	WxPhoneNumber func(ctx context.Context, code string) (errCode, errMsg, areaCode, phone string)
+	// DyPhoneNumber 对应抖音小程序支路（jscode2session + WXBizDataCrypt）；decErrCode 是
+	// 解密错误码（PHP WXBizDataCrypt::decryptData 的返回值，空手机号提示会拼上它）；nil 同上。
+	DyPhoneNumber func(ctx context.Context, code, encryptedData, iv string) (errNo, errTips, decErrCode, areaCode, phone string)
+	// 以下三个对应 cfg_cardState=1 的阿里云 OCR / 实名核验（zid.market.alicloudapi.com，
+	// AppCode 取 unserialize($cfg_juhe)['aliyun']）。nil 表示 AppCode 为空 / 服务未接入，
+	// PHP 侧此时 json_decode 返回 null、error_code 判 0 后因缺少 result 走解析失败分支，
+	// Go 按 error_code 非 0 处理，行为一致（分支标注 untested，canary 未开通）。
+	IdentCardPositive func(ctx context.Context, imageURL string) (errorCode int, name, idcardNo string)
+	IdentCardContrary func(ctx context.Context, imageURL string) (errorCode int, imageStatus, startDate, endDate string)
+	IDCheck           func(ctx context.Context, idcard, realname string) (errorCode int, isok bool)
 	// Clock 仅测试用；nil 取 time.Now。
 	Clock func() time.Time
 }
@@ -146,6 +182,9 @@ type Service struct {
 	datingTable, areaTable, bonusTable, paymentTable          string
 	// collectTable 是 member_collect（member.collect 的收藏表）。
 	collectTable string
+	// sitesmsTable / notifyTable / msgLogTable / updateMsgTable 是 updateAccount 的表：
+	// 短信平台配置、通知模板、验证码与邮件日志、管理员通知队列。
+	smsTable, notifyTable, msgLogTable, updateMsgTable string
 	// publicCommentTable 是 replyComment 的 INSERT 目标（public_comment_all 是它的 MRG 合并表）；
 	// businessListTable 是实名门禁推导 busiState 用的商家表。
 	publicCommentTable, businessListTable string
@@ -184,6 +223,22 @@ type Service struct {
 	logSaveDays  int
 	logCleanMu   sync.Mutex
 	logCleanedAt time.Time
+
+	// updateAccount 的开关与依赖（nil 取 canary 关态）。
+	nicknameEditState int
+	nicknameEditInfo  string
+	nicknameEditAudit int
+	pwdLevel          int
+	cardState         int
+	siteCityName      string
+	siteCityID        string
+	notifyVars        map[string]string
+	sendMail          func(ctx context.Context, to, title, body string) string
+	wxPhoneNumber     func(ctx context.Context, code string) (errCode, errMsg, areaCode, phone string)
+	dyPhoneNumber     func(ctx context.Context, code, encryptedData, iv string) (errNo, errTips, decErrCode, areaCode, phone string)
+	identCardPositive func(ctx context.Context, imageURL string) (int, string, string)
+	identCardContrary func(ctx context.Context, imageURL string) (int, string, string, string)
+	idCheck           func(ctx context.Context, idcard, realname string) (int, bool)
 }
 
 // New 校验依赖并预拼表名。
@@ -244,6 +299,26 @@ func New(dep Dep) (*Service, error) {
 	if len(cryptKey) == 0 {
 		cryptKey = []byte(phpEncryptKey)
 	}
+	nicknameEditState := 0
+	if dep.NicknameEditState != nil {
+		nicknameEditState = *dep.NicknameEditState
+	}
+	nicknameEditInfo := ""
+	if dep.NicknameEditInfo != nil {
+		nicknameEditInfo = *dep.NicknameEditInfo
+	}
+	nicknameEditAudit := 0
+	if dep.NicknameEditAudit != nil {
+		nicknameEditAudit = *dep.NicknameEditAudit
+	}
+	pwdLevel := 0
+	if dep.PwdLevel != nil {
+		pwdLevel = *dep.PwdLevel
+	}
+	cardState := 0
+	if dep.CardState != nil {
+		cardState = *dep.CardState
+	}
 	svc := &Service{
 		db: dep.DB, identity: dep.Identity, urlPath: dep.URLPath, prefix: dep.TablePrefix,
 		moduleURL: dep.ModuleURL, filePath: dep.FilePath, attachmentFile: dep.AttachmentFile, ipHome: dep.IPHome,
@@ -251,7 +326,9 @@ func New(dep Dep) (*Service, error) {
 		files: dep.Files, userDetail: dep.UserDetail, moduleDetail: dep.ModuleDetail,
 		decodeAttachment: dep.DecodeAttachment, courierID: dep.CourierID, ipHomeMode: mode, clock: dep.Clock,
 		paotuiTable: t("paotui_order"), tiebaTable: t("tieba_list"), followTable: t("member_follow"),
-		collectTable:  t("member_collect"),
+		collectTable: t("member_collect"),
+		smsTable:     t("sitesms"), notifyTable: t("site_notify"),
+		msgLogTable: t("site_messagelog"), updateMsgTable: t("updatemessage"),
 		behaviorTable: t("member_log"), selfMediaTable: t("article_selfmedia"),
 		logTable: t("member_letter_log"), letterTable: t("member_letter"),
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
@@ -265,6 +342,11 @@ func New(dep Dep) (*Service, error) {
 		periodicCheckPhone: periodicCheckPhone, periodicCheckCycle: periodicCheckCycle,
 		moduleCommentCheck: dep.ModuleCommentCheck,
 		cookiePrefix:       cookiePrefix, detailPointState: detailPointState, cryptKey: cryptKey,
+		nicknameEditState: nicknameEditState, nicknameEditInfo: nicknameEditInfo,
+		nicknameEditAudit: nicknameEditAudit, pwdLevel: pwdLevel, cardState: cardState,
+		siteCityName: dep.SiteCityName, siteCityID: dep.SiteCityID, notifyVars: dep.NotifyVars,
+		sendMail: dep.SendMail, wxPhoneNumber: dep.WxPhoneNumber, dyPhoneNumber: dep.DyPhoneNumber,
+		identCardPositive: dep.IdentCardPositive, identCardContrary: dep.IdentCardContrary, idCheck: dep.IDCheck,
 		friendTable: t("member_friend"),
 		levelTable:  t("member_level"), businessTable: t("business_list"), staffTable: t("staff"),
 		securityTable: t("member_security"), datingTable: t("dating_member"), areaTable: t("site_area"),
@@ -289,6 +371,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "getZan", s.getZan)
 	router.Register("member", "replyComment", s.replyComment)
 	router.Register("member", "dingComment", s.dingComment)
+	router.Register("member", "updateAccount", s.updateAccount)
 }
 
 // phpFloat 复刻 PHP 7.1+ json_encode 对 float 的输出：整数值带 ".0"（ceil() 返回 float），-0 写 "-0.0"。

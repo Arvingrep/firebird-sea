@@ -582,6 +582,23 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		// cookiePre 与 userid_encode。
 		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
 		CryptKey:     resolveCryptKey(osGetenv),
+		// updateAccount（#261）的站点运行期配置：canary siteConfig.inc.php 里
+		// cfg_nicknameEditState='0' / cfg_nicknameEditInfo='' / cfg_nicknameEditAudit='0'，
+		// cfg_pwdLevel / cfg_cardState 未配置（0），$siteCityInfo 由请求上下文决定（Go 暂空）。
+		NicknameEditState: envIntPtr("FB_NICKNAME_EDIT_STATE", 0),
+		NicknameEditInfo:  envStrPtr("FB_NICKNAME_EDIT_INFO", ""),
+		NicknameEditAudit: envIntPtr("FB_NICKNAME_EDIT_AUDIT", 0),
+		PwdLevel:          envIntPtr("FB_PWD_LEVEL", 0),
+		CardState:         envIntPtr("FB_CARD_STATE", 0),
+		SiteCityName:      os.Getenv("FB_SITE_CITY_NAME"),
+		SiteCityID:        os.Getenv("FB_SITE_CITY_ID"),
+		NotifyVars: map[string]string{
+			"basehost":  envOr("FB_BASEHOST", ""),
+			"webname":   envOr("FB_WEBNAME", ""),
+			"shortname": envOr("FB_SHORTNAME", ""),
+			"weblogo":   envOr("FB_WEBLOGO", ""),
+			"hotline":   os.Getenv("FB_SITE_HOTLINE"),
+		},
 	})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
@@ -867,6 +884,18 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// envIntPtr / envStrPtr 把 envOr/envInt 包成 *int / *string，供 member.Dep 这类
+// 「nil 取仓库默认口径」的可选配置使用。
+func envIntPtr(key string, fallback int) *int {
+	v := envInt(key, fallback)
+	return &v
+}
+
+func envStrPtr(key, fallback string) *string {
+	v := envOr(key, fallback)
+	return &v
 }
 
 // envInt 复刻 Node 的 `Number(process.env.X) || fallback`：非数字一律回落默认值。
