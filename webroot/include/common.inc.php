@@ -174,6 +174,12 @@ if(@filesize($m_file) > 0){
   $fp = @fopen($m_file,'r');
   $cfg_staticVersion = @fread($fp,filesize($m_file));
   fclose($fp);
+  //文件可能由 shell 写入（如 `date +%s >`），尾随换行一旦带进模板内联 JS 字符串
+  //即造成 SyntaxError 并中断整页 ready 链（2026-11-20 员工管理页整页瘫痪）
+  $cfg_staticVersion = trim((string)$cfg_staticVersion);
+  if($cfg_staticVersion === '' || !preg_match('/^\d+$/', $cfg_staticVersion)){
+    $cfg_staticVersion = time();
+  }
 }
 
 //php5.1版本以上时区设置
