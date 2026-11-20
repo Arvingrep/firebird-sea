@@ -637,36 +637,46 @@ func (s *Service) rewardList(req *ajax.Request) ajax.Response {
 	}
 	defer func() { _ = rows.Close() }()
 
-	list := make([]articleRewardItem, 0, 8)
+	// 先把结果集读完再解析 photo：fileURL 在「数字 ID / 加密串」形态下要回查附件表，
+	// 若在 rows 未关闭时发起第二次查询，连接池被占满时会把请求卡死（PHP 也是先取
+	// results 再循环，common.func.php 的 getFilePath 不在结果集上叠加查询）。
+	type rewardRow struct {
+		id       sql.NullString
+		nickname sql.NullString
+		photo    sql.NullString
+		amount   sql.NullString
+		date     sql.NullString
+	}
+	raw := make([]rewardRow, 0, 8)
 	for rows.Next() {
-		var (
-			id       sql.NullString
-			nickname sql.NullString
-			photo    sql.NullString
-			amount   sql.NullString
-			date     sql.NullString
-		)
-		if err := rows.Scan(&id, &nickname, &photo, &amount, &date); err != nil {
+		var r rewardRow
+		if err := rows.Scan(&r.id, &r.nickname, &r.photo, &r.amount, &r.date); err != nil {
 			return emptyArticleRewardResponse()
 		}
+		raw = append(raw, r)
+	}
+	if err := rows.Err(); err != nil {
+		return emptyArticleRewardResponse()
+	}
+	_ = rows.Close()
+
+	list := make([]articleRewardItem, 0, len(raw))
+	for _, r := range raw {
 		item := articleRewardItem{
-			ID:       nullableString(id),
-			Username: nullableString(nickname),
-			Photo:    s.fileURL(photo.String),
-			Amount:   amount.String,
-			Date:     date.String,
+			ID:       nullableString(r.id),
+			Username: nullableString(r.nickname),
+			Photo:    s.fileURL(r.photo.String),
+			Amount:   r.amount.String,
+			Date:     r.date.String,
 		}
 		// PHP 是字符串拼接：$cfg_secureAccess.$cfg_basehost."/user/".$val['id']，
 		// id 为 NULL 时拼成 ".../user/"（不是跳过该字段）。
 		userID := ""
-		if id.Valid {
-			userID = id.String
+		if r.id.Valid {
+			userID = r.id.String
 		}
 		item.URL = s.site.SecureAccess + s.site.BaseHost + "/user/" + userID
 		list = append(list, item)
-	}
-	if err := rows.Err(); err != nil {
-		return emptyArticleRewardResponse()
 	}
 
 	return ajax.Response{State: ajax.StateOK, Info: articleRewardInfo{

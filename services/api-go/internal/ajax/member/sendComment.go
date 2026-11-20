@@ -535,15 +535,17 @@ func (s *Service) sendComment(req *ajax.Request) ajax.Response {
 }
 
 // contentEmpty 复刻 empty($content)：'0' 算空；shop-order 的 content 是数组，看数组/标量是否非空。
+//
+// PHP 的顺序是 17070 先清洗（非 shop-order 走 trim + 去 &nbsp;，circle-dynamic 再 strip_tags），
+// 17101 才 empty($content) —— 所以判空看的是**清洗后**的值：全空格、"&nbsp;"、纯标签在 PHP
+// 里都算空。a.content 正是清洗后的结果（见 parseSendComment），这里直接用它，不能拿原始
+// $_REQUEST 再判一次，否则会放行 PHP 会拒的空壳评论。
 func (s *Service) contentEmpty(p params, a *sendCommentArgs) bool {
 	if a.shop {
 		return !p.phpTruthy("content") && len(a.shopContent) == 0
 	}
-	if _, isArr := p.req.Params["content[]"]; isArr {
-		return true // addslashes(array) 是 null → 空内容
-	}
-	raw, ok := p.phpRaw("content")
-	return !ok && raw != "Array" // phpRaw 对数组返回 "Array"，此处 content[] 已单独处理
+	// content[] 走数组时 addslashes(array) 是 null，a.content 恒为 ""，同样落到这里判空。
+	return a.content == "" || a.content == "0"
 }
 
 // commentMessage 对应 ischeck==1 ? 评价成功！ : 评论成功，将在审核后显示。

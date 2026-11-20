@@ -187,6 +187,10 @@ func TestSendParamGates(t *testing.T) {
 	eq(t, scGet(t, svc, "type=article-detail&content=hi"), `{"state":101,"info":"参数错误"}`)
 	eq(t, scGet(t, svc, "type=article-detail&aid=1"), `{"state":101,"info":"评价内容为空"}`)
 	eq(t, scGet(t, svc, "type=article-detail&aid=1&content=0"), `{"state":101,"info":"评价内容为空"}`)
+	// 17101 的 empty($content) 判的是 17070 清洗后的值：全空格 / 纯 &nbsp; / 纯标签都算空。
+	eq(t, scGet(t, svc, "type=article-detail&aid=1&content=%20%20%20"), `{"state":101,"info":"评价内容为空"}`)
+	eq(t, scGet(t, svc, "type=article-detail&aid=1&content=&nbsp;"), `{"state":101,"info":"评价内容为空"}`)
+	eq(t, scGet(t, svc, "type=circle-dynamic&aid=1&content=%3Cb%3E%3C/b%3E"), `{"state":101,"info":"评价内容为空"}`)
 	eq(t, scGet(t, svc, "type=huodong-detail&aid=1&content=hi"), `{"state":101,"info":"请选择评分"}`)
 	eq(t, scGet(t, svc, "type=tieba-detail&aid=1&content=hi"), `{"state":101,"info":"验证码输入错误"}`)
 	eq(t, scGet(t, svc, "type=waimai-order&aid=1&content=hi"), `{"state":101,"info":"请给店铺打分！"}`)
