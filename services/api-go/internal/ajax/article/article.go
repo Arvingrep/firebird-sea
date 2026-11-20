@@ -47,9 +47,25 @@ type Dep struct {
 	// SharePic / WebLogo / Hotline 对应 PHP $cfg_sharePic / $cfg_weblogo / $cfg_hotline（article.config 用）。
 	// 空串分别回落到 canary 现状值。
 	SharePic, WebLogo, Hotline string
-	// Detail 对应 article.detail（#260，尚未迁移）。alist 的 dynamicid 分支会逐条转调它；
+	// Detail 对应 article.detail。alist 的 dynamicid 分支会逐条转调它；
 	// nil 时该 action 直接返回 102 "No data!"（已知偏差，见 alist 注释）。
 	Detail func(req *ajax.Request) ajax.Response
+
+	// —— detail（#260）的跨 action 依赖。PHP 的 detail() 内部走完整 handler 派发去调
+	// member.detail / article.selfmediaDetail / member.collect / member.getZan；
+	// Go 侧没有全局派发器，按函数注入（nil 时对应字段降级，见 detail.go）。——
+
+	// MemberDetail 对应 $userLogin->getMemberInfo($admin, 1) → handlers("member","detail")。
+	// nil 时 member 字段恒为 []。
+	MemberDetail func(req *ajax.Request) ajax.Response
+	// CollectCheck 对应 checkIsCollect()：模块/模板/动作/ID 由调用方给，登录态取自同一个请求。
+	// 返回 member.collect 的 info（"has" / "no" / "ok"），状态非 100 时返回空串。
+	CollectCheck func(req *ajax.Request, module, temp, action, id string) string
+	// ZanCheck 对应 checkIsZan()：返回 member.getZan 的 info（"has" / "no"），非 100 时空串。
+	ZanCheck func(req *ajax.Request, module, temp, id string) string
+	// RealVideoURL 对应 getRealVideoUrl()（腾讯视频要外部 HTTP，仓库里不发起外部请求）。
+	// nil 时按「解析失败」原样返回（与 alist 同口径）。
+	RealVideoURL func(ctx context.Context, raw string) string
 }
 
 // Service 是 article 服务的实现。
@@ -68,12 +84,20 @@ type Service struct {
 	smTable, smNewsTable, smFollowTable string
 	// al* 是 alist（#252）用到的表名（已带前缀）。
 	alTable, alPicTable, alCommentTable, alRewardTable, alUpTable, alAttachmentTable string
-	members                                                                          MemberResolver
-	dataShare                                                                        bool
-	cookiePrefix                                                                     string
-	sharePic, webLogo, hotline                                                       string
-	detail                                                                           func(req *ajax.Request) ajax.Response
-	payTable, rewardTbl, listTable                                                   string
+	// dt* 是 detail（#260）用到的表名（已带前缀）。
+	dtMemberTable, dtArticle, dtPic, dtCommentAll, dtReward, dtSdArctype, dtHistory string
+	dtSubTableList, dtArticleList                                                   string
+	members                                                                         MemberResolver
+	dataShare                                                                       bool
+	cookiePrefix                                                                    string
+	sharePic, webLogo, hotline                                                      string
+	detail                                                                          func(req *ajax.Request) ajax.Response
+	payTable, rewardTbl, listTable                                                  string
+	// detail 的跨 action 依赖（见 Dep）。
+	memberDetail func(req *ajax.Request) ajax.Response
+	collectCheck func(req *ajax.Request, module, temp, action, id string) string
+	zanCheck     func(req *ajax.Request, module, temp, id string) string
+	realVideoURL func(ctx context.Context, raw string) string
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -106,6 +130,19 @@ func New(dep Dep) (*Service, error) {
 		alRewardTable:     "`" + dep.TablePrefix + "member_reward`",
 		alUpTable:         "`" + dep.TablePrefix + "public_up_all`",
 		alAttachmentTable: "`" + dep.TablePrefix + "attachment`",
+		dtMemberTable:     "`" + dep.TablePrefix + "member`",
+		dtArticle:         "`" + dep.TablePrefix + "article`",
+		dtPic:             "`" + dep.TablePrefix + "articlepic`",
+		dtCommentAll:      "`" + dep.TablePrefix + "public_comment_all`",
+		dtReward:          "`" + dep.TablePrefix + "member_reward`",
+		dtSdArctype:       "`" + dep.TablePrefix + "article_selfmedia_arctype`",
+		dtHistory:         "`" + dep.TablePrefix + "article_historyclick`",
+		dtSubTableList:    "`" + dep.TablePrefix + "site_sub_tablelist`",
+		dtArticleList:     "`" + dep.TablePrefix + "articlelist`",
+		memberDetail:      dep.MemberDetail,
+		collectCheck:      dep.CollectCheck,
+		zanCheck:          dep.ZanCheck,
+		realVideoURL:      dep.RealVideoURL,
 		members:           dep.Members,
 		dataShare:         dep.CustomDataShare == nil || *dep.CustomDataShare,
 		cookiePrefix:      cookiePrefix,
@@ -130,6 +167,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "config", s.config)
 	router.Register("article", "alist", s.alist)
 	router.Register("article", "orderDetail", s.orderDetail)
+	router.Register("article", "detail", s.detailAction)
 }
 
 // orderInfo 是 orderDetail 的返回数组，字段顺序与 PHP 一致（article.class.php:3025-3071）。
