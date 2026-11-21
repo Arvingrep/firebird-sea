@@ -109,7 +109,9 @@ func parseSendComment(p params, httpReq *http.Request, now int64) *sendCommentAr
 	} else {
 		a.module, _, _ = strings.Cut(a.typ, "-")
 	}
-	a.ip, _ = requestIP(httpReq) // ipaddr（getIpAddr）需要 IP 库，Go 侧写空串
+	// public_comment.ip 用 GetIP()（不带端口）；只有 memberLog 的 ip 列才拼 :port。
+	a.ip = plainIP(httpReq)
+	// ipaddr（getIpAddr）需要 IP 库，Go 侧写空串
 	a.dtime = now
 	return a
 }

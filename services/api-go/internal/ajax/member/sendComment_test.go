@@ -56,6 +56,10 @@ const (
 	qPointInsert = "INSERT INTO `huoniao_member_point` (`userid`, `type`, `amount`, `info`, `date`, `ctype`, `interaction`, `balance`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
+// testCommentIP 是 public_comment.ip 的期望值：PHP 这里用 GetIP()，不带端口。
+// memberLog 的 ip 列才拼端口（common.func.php:1944-1952），所以仍用 testLogIP。
+const testCommentIP = "192.0.2.1"
+
 // sendRow 是主路径 INSERT 的参数集合（顺序同 qSendInsert）。
 type sendRow struct {
 	masterid           string
@@ -75,7 +79,7 @@ type sendRow struct {
 
 func (r sendRow) args() []driver.Value {
 	return []driver.Value{r.masterid, r.pid, r.typ, r.aid, r.oid, r.userid, r.rating, r.sco1, r.content,
-		r.pics, r.audio, r.video, followNow, testLogIP, "", r.ischeck, 0, "", r.sco2, r.sco3, "", "",
+		r.pics, r.audio, r.video, followNow, testCommentIP, "", r.ischeck, 0, "", r.sco2, r.sco3, "", "",
 		r.peisongid, r.star, r.starps, "", r.isanony, r.timeVal}
 }
 
@@ -374,7 +378,7 @@ func TestSendTuanOrderUpdateExisting(t *testing.T) {
 	m.ExpectQuery(qSendTuanStore).WithArgs("4").WillReturnRows(rowsOf("uid").AddRow("9"))
 	m.ExpectQuery(qSendExisting).WithArgs("tuan-order", 66).WillReturnRows(rowsOf("id").AddRow("70"))
 	m.ExpectExec(qSendUpdate).
-		WithArgs("9", 0, "", testLogIP, followNow, "hi", "", 0, 0, 5, 0, 0, 0, 0, "", 0, 66).
+		WithArgs("9", 0, "", testCommentIP, followNow, "hi", "", 0, 0, 5, 0, 0, 0, 0, "", 0, 66).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	expectSendLog(m, "7", 0, "update", "修改评价(tuan-order=>66)",
 		"action=sendComment&aid=3&content=hi&sco1=5&service=member&type=tuan-order")
@@ -434,7 +438,7 @@ func TestSendShopOrderInsert(t *testing.T) {
 		WillReturnRows(rowsOf("proid", "orderid", "speid", "specation").AddRow("55", "7", "0", "红色"))
 	m.ExpectExec(qShopIns).
 		WithArgs(0, "shop-order", "55", "7", int64(7), "3", "5", "hi", "a.jpg", "", "",
-			followNow, testLogIP, "", 0, 0, "", "4", "3", "0", "红色", 0, 0).
+			followNow, testCommentIP, "", 0, 0, "", "4", "3", "0", "红色", 0, 0).
 		WillReturnResult(sqlmock.NewResult(329, 1))
 	expectSendLog(m, "7", 329, "insert", "发表评价(shop=>7)",
 		"action=sendComment&aid=7&content[55_0]=hi&pics[55_0]=a.jpg&rating[55_0]=3&sco1[55_0]=5&sco2[55_0]=4&sco3[55_0]=3&service=member&type=shop-order")
@@ -452,7 +456,7 @@ func TestSendShopOrderUpdate(t *testing.T) {
 	m.ExpectQuery(qShopProds).WithArgs(int64(7)).
 		WillReturnRows(rowsOf("proid", "orderid", "speid", "specation").AddRow("55", "7", "0", ""))
 	m.ExpectExec(qShopUpd).
-		WithArgs("", 0, "", testLogIP, followNow, "hi", "", "3", "4", "5", "3", 0, 7).
+		WithArgs("", 0, "", testCommentIP, followNow, "hi", "", "3", "4", "5", "3", 0, 7).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	expectSendLog(m, "7", 0, "update", "修改评价(shop=>7)",
 		"action=sendComment&aid=7&content[55_0]=hi&rating[55_0]=3&sco1[55_0]=5&sco2[55_0]=4&sco3[55_0]=3&service=member&type=shop-order")
@@ -491,7 +495,7 @@ func TestSendHomemakingOrderInsert(t *testing.T) {
 	m.ExpectQuery(qHmsOrder).WithArgs("11", int64(7), int64(7), int64(55)).
 		WillReturnRows(rowsOf("userid", "orderstate").AddRow("7", "11"))
 	m.ExpectExec(qHmsIns).
-		WithArgs(0, "homemaking-order", 3, 55, int64(7), 0, 0, "hi", "", "", "", followNow, testLogIP, "", 0, 0, "", 0, 0, "0", "0", 0).
+		WithArgs(0, "homemaking-order", 3, 55, int64(7), 0, 0, "hi", "", "", "", followNow, testCommentIP, "", 0, 0, "", 0, 0, "0", "0", 0).
 		WillReturnResult(sqlmock.NewResult(330, 1))
 	// INSERT 分支的 memberLog 传的是 'update'（照搬）。
 	expectSendLog(m, "7", 330, "update", "发表评价(homemaking=>55)",
