@@ -102,52 +102,8 @@ func (s *Service) replyComment(req *ajax.Request) ajax.Response {
 	}
 
 	// 5. 实名认证 / 手机认证（getMemberInfo → member.detail 的门禁字段投影）。
-	// 开关全关时不查询（PHP 算了 $userinfo 但门禁不拦，输出等价）。
-	if s.memberVerified != 0 || s.memberBindPhone != 0 {
-		gi, err := s.gateFields(ctx, userid)
-		if err != nil {
-			return noData()
-		}
-		if s.memberVerified != 0 && !gi.missing {
-			// (userType==1 && certifyState!=1) || (userType==2 && licenseState!=1)（PHP 松散比较）。
-			// 会员行缺失时 $userinfo 是 "No data!" 字符串，offset 取首字母 "N" → 两个分支都不命中。
-			licenseOne := isNumeric(gi.license) && leadingNumber(gi.license) == 1
-			if (gi.userType == 1 && gi.certify != 1) || (gi.userType == 2 && !licenseOne) {
-				// info 非空（isset 为真）时 201/202 原样透传；info 是 null（cfg 未配置）时
-				// isset 为假 → 外层按「无 state 键」包成 {state:100, info:{state:201, info:null}}。
-				if s.memberVerifiedInfo == nil {
-					return ajax.Response{State: ajax.StateOK, Info: ajax.Response{State: 201}}
-				}
-				return ajax.Response{State: 201, Info: s.memberVerifiedInfo}
-			}
-		}
-		if s.memberBindPhone != 0 {
-			// (!$phone || !$phoneCheck || (周期开关 && phoneBindTime && time()-phoneBindTime > cycle))
-			cycle := int64(s.periodicCheckCycle) * 86400
-			now := s.now().Unix()
-			if gi.missing {
-				// 会员行缺失：phone/phoneCheck 取首字母 "N"（真值），phoneBindTime "N" 数值化成 0
-				// → 周期开关开着时 time()-0 > cycle 恒真 → 202「请先验证手机号码」（info 非空，
-				// isset 为真 → 原样透传）；周期关着时门禁整体放行。
-				if s.periodicCheckPhone != 0 && now > cycle {
-					phoneDue := infoVerifyPhone
-					return ajax.Response{State: 202, Info: &phoneDue}
-				}
-			} else {
-				periodicDue := s.periodicCheckPhone != 0 && gi.phoneBind != 0 && now-gi.phoneBind > cycle
-				if !truthyStr(gi.phone) || !truthyStr(gi.phoneCheck) || periodicDue {
-					info := s.memberBindPhoneInfo
-					if periodicDue {
-						phoneDue := infoVerifyPhone
-						info = &phoneDue
-					}
-					if info == nil {
-						return ajax.Response{State: ajax.StateOK, Info: ajax.Response{State: 202}}
-					}
-					return ajax.Response{State: 202, Info: info}
-				}
-			}
-		}
+	if resp, blocked := s.verifiedPhoneGate(ctx, userid); blocked {
+		return resp
 	}
 
 	// 6. 原评论：SELECT id,pid,rid,aid,type,masterid FROM public_comment_all WHERE id = $id。
@@ -275,6 +231,65 @@ func (s *Service) replyComment(req *ajax.Request) ajax.Response {
 		return ajax.Response{State: ajax.StateOK, Info: info}
 	}
 	return ajax.Response{State: ajax.StateOK, Info: infoReplySuccess}
+}
+
+// verifiedPhoneGate 是 sendComment / replyComment 共用的门禁 3、4（member.class.php:17042-17060 /
+// 17831-17849）：实名认证不过 → 201；手机未绑定或周期校验过期 → 202。两个开关全关时不查库、
+// 直接放行（PHP 仍会算 $userinfo，但门禁不拦，输出等价）。
+// 返回 blocked=true 时调用方原样返回 resp；外部包装对 201/202 不改码（handlers.class.php:66-73）。
+func (s *Service) verifiedPhoneGate(ctx context.Context, userid int64) (resp ajax.Response, blocked bool) {
+	if s.memberVerified == 0 && s.memberBindPhone == 0 {
+		return ajax.Response{}, false
+	}
+	if s.db == nil {
+		// 本地无数据库（DB=nil）时门禁字段无从查起，按「缺依赖」降级。
+		return noData(), true
+	}
+	gi, err := s.gateFields(ctx, userid)
+	if err != nil {
+		return noData(), true
+	}
+	if s.memberVerified != 0 && !gi.missing {
+		// (userType==1 && certifyState!=1) || (userType==2 && licenseState!=1)（PHP 松散比较）。
+		// 会员行缺失时 $userinfo 是 "No data!" 字符串，offset 取首字母 "N" → 两个分支都不命中。
+		licenseOne := isNumeric(gi.license) && leadingNumber(gi.license) == 1
+		if (gi.userType == 1 && gi.certify != 1) || (gi.userType == 2 && !licenseOne) {
+			// info 非空（isset 为真）时 201/202 原样透传；info 是 null（cfg 未配置）时
+			// isset 为假 → 外层按「无 state 键」包成 {state:100, info:{state:201, info:null}}。
+			if s.memberVerifiedInfo == nil {
+				return ajax.Response{State: ajax.StateOK, Info: ajax.Response{State: 201}}, true
+			}
+			return ajax.Response{State: 201, Info: s.memberVerifiedInfo}, true
+		}
+	}
+	if s.memberBindPhone != 0 {
+		// (!$phone || !$phoneCheck || (周期开关 && phoneBindTime && time()-phoneBindTime > cycle))
+		cycle := int64(s.periodicCheckCycle) * 86400
+		now := s.now().Unix()
+		if gi.missing {
+			// 会员行缺失：phone/phoneCheck 取首字母 "N"（真值），phoneBindTime "N" 数值化成 0
+			// → 周期开关开着时 time()-0 > cycle 恒真 → 202「请先验证手机号码」（info 非空，
+			// isset 为真 → 原样透传）；周期关着时门禁整体放行。
+			if s.periodicCheckPhone != 0 && now > cycle {
+				phoneDue := infoVerifyPhone
+				return ajax.Response{State: 202, Info: &phoneDue}, true
+			}
+		} else {
+			periodicDue := s.periodicCheckPhone != 0 && gi.phoneBind != 0 && now-gi.phoneBind > cycle
+			if !truthyStr(gi.phone) || !truthyStr(gi.phoneCheck) || periodicDue {
+				info := s.memberBindPhoneInfo
+				if periodicDue {
+					phoneDue := infoVerifyPhone
+					info = &phoneDue
+				}
+				if info == nil {
+					return ajax.Response{State: ajax.StateOK, Info: ajax.Response{State: 202}}, true
+				}
+				return ajax.Response{State: 202, Info: info}, true
+			}
+		}
+	}
+	return ajax.Response{}, false
 }
 
 // gateFields 是 getMemberInfo($userid)（委托 member.detail）里实名/手机门禁用到的字段投影。

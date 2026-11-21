@@ -14,7 +14,7 @@ const (
 	qUpInsert       = "INSERT INTO `huoniao_public_up_all` (`uid`, `tid`, `ruid`, `module`, `action`, `puctime`, `type`) VALUES (?, ?, ?, ?, ?, ?, ?)"
 	qUsername       = "SELECT `username` FROM `huoniao_member` WHERE `state` = 1 AND `mtype` != 0 AND `mtype` != 3 AND `id` = ?"
 	qModuleTitle    = "SELECT `title`, `subject` FROM `huoniao_site_module` WHERE `name` = ?"
-	qSubTables      = "SELECT `table_name`, `begin_id` FROM `huoniao_site_sub_tablelist` WHERE `service` = 'articlelist' ORDER BY `id` DESC"
+	qSubTables      = "SELECT `table_name`, `begin_id` FROM `huoniao_site_sub_tablelist` WHERE `service` = ? ORDER BY `id` DESC"
 	qArticleZan     = "UPDATE `huoniao_articlelist` SET `zan` = zan + 1 WHERE `id` = ?"
 	qArticleZanDown = "UPDATE `huoniao_articlelist` SET `zan` = zan - 1 WHERE `id` = ?"
 	qTravelZan      = "UPDATE `huoniao_travel_video` SET `zan` = zan + 1 WHERE `id` = ?"
@@ -141,7 +141,7 @@ func TestGetZanArticleFirstLike(t *testing.T) {
 	m.ExpectQuery(qModuleTitle).WithArgs("article").WillReturnRows(moduleRows("资讯", nil))
 	m.ExpectQuery(qUpCheck).WithArgs(0, "detail", "article", "5", int64(7)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("tg_99990001"))
-	m.ExpectQuery(qSubTables).WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}))
+	m.ExpectQuery(qSubTables).WithArgs("articlelist").WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}))
 	m.ExpectExec(qArticleZan).WithArgs("5").WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectExec(qUpInsert).WithArgs("3", "5", int64(7), "article", "detail", followNow, 0).
 		WillReturnResult(sqlmock.NewResult(9, 1))
@@ -218,7 +218,7 @@ func TestGetZanCancel(t *testing.T) {
 	m.ExpectQuery(qUpCheck).WithArgs(0, "detail", "article", "5", int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(9))
 	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("tg_99990001"))
-	m.ExpectQuery(qSubTables).WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}))
+	m.ExpectQuery(qSubTables).WithArgs("articlelist").WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}))
 	m.ExpectExec(qArticleZanDown).WithArgs("5").WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectExec(qUpDelete).WithArgs(0, "detail", "article", "5", int64(7)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -261,7 +261,7 @@ func TestGetZanArticleSubTable(t *testing.T) {
 	svc, m := newZanService(t, fakeIdentity(7), nil)
 	m.ExpectQuery(qUpCheck).WithArgs(0, "detail", "article", "5", int64(7)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("op"))
-	m.ExpectQuery(qSubTables).WillReturnRows(subRows())
+	m.ExpectQuery(qSubTables).WithArgs("articlelist").WillReturnRows(subRows())
 	m.ExpectExec(qArticleZan).WithArgs("5").WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectExec(qUpInsert).WithArgs("", "5", int64(7), "article", "detail", followNow, 0).
 		WillReturnResult(sqlmock.NewResult(9, 1))
@@ -275,7 +275,7 @@ func TestGetZanArticleSubTable(t *testing.T) {
 	svc, m = newZanService(t, fakeIdentity(7), nil)
 	m.ExpectQuery(qUpCheck).WithArgs(0, "detail", "article", "150", int64(7)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("op"))
-	m.ExpectQuery(qSubTables).WillReturnRows(subRows())
+	m.ExpectQuery(qSubTables).WithArgs("articlelist").WillReturnRows(subRows())
 	m.ExpectExec("UPDATE `huoniao_articlelist_1` SET `zan` = zan + 1 WHERE `id` = ?").WithArgs("150").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectExec(qUpInsert).WithArgs("", "150", int64(7), "article", "detail", followNow, 0).
@@ -290,7 +290,7 @@ func TestGetZanArticleSubTable(t *testing.T) {
 	svc, m = newZanService(t, fakeIdentity(7), nil)
 	m.ExpectQuery(qUpCheck).WithArgs(0, "detail", "article", "100", int64(7)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"username"}).AddRow("op"))
-	m.ExpectQuery(qSubTables).WillReturnRows(subRows())
+	m.ExpectQuery(qSubTables).WithArgs("articlelist").WillReturnRows(subRows())
 	m.ExpectExec("UPDATE `huoniao_articlelist_1` SET `zan` = zan + 1 WHERE `id` = ?").WithArgs("100").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectExec(qUpInsert).WithArgs("", "100", int64(7), "article", "detail", followNow, 0).
@@ -308,7 +308,7 @@ func TestGetZanUsernameMissing(t *testing.T) {
 	svc, m := newZanService(t, fakeIdentity(7), nil)
 	m.ExpectQuery(qUpCheck).WithArgs(0, "detail", "article", "5", int64(7)).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	m.ExpectQuery(qUsername).WithArgs(int64(7)).WillReturnError(errNoRows)
-	m.ExpectQuery(qSubTables).WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}))
+	m.ExpectQuery(qSubTables).WithArgs("articlelist").WillReturnRows(sqlmock.NewRows([]string{"table_name", "begin_id"}))
 	m.ExpectExec(qArticleZan).WithArgs("5").WillReturnResult(sqlmock.NewResult(0, 1))
 	m.ExpectExec(qUpInsert).WithArgs("", "5", int64(7), "article", "detail", followNow, 0).
 		WillReturnResult(sqlmock.NewResult(9, 1))
