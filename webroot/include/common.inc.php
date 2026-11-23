@@ -8,7 +8,7 @@
  * @link           官网：https://www.kumanyun.com  演示站：https://www.ihuoniao.cn/
  */
 ob_start();
-error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED); // 生产屏蔽 Warning：stderr 输出会被 GKE 标成 ERROR
 
 // xhprof
 // xhprof_enable();
