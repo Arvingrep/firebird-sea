@@ -43,19 +43,36 @@ function get_cpu_usage(){
     }
 }
 function get_cpu_usage_linux() {
-    // 获取当前 PHP 进程的 PID
+    // 不依赖 `ps -p`：容器基础镜像为 Alpine/BusyBox，其 ps 不支持 -p（会向 stderr 报 "ps: unrecognized option: p"，被 GKE 标成 ERROR）
+    // 改读 /proc：CPU% = 进程累计 CPU 时间 / 进程已运行时间（与 ps 的 %cpu 定义一致）
     $pid = getmypid();
-    
-    // 使用 ps 命令获取 CPU 占用率
-    $output = shell_exec("ps -p $pid -o %cpu");
-    
-    // 解析输出结果
-    $lines = explode("\n", trim($output));
-    if (count($lines) >= 2) {
-        return floatval(trim($lines[1])) . '%';
+    $statFile = "/proc/$pid/stat";
+    if (!is_dir("/proc/$pid") || !is_readable($statFile) || !is_readable('/proc/uptime')) {
+        return 'N/A';
     }
-    
-    return 'N/A';
+    $stat = @file_get_contents($statFile);
+    $uptime = @file_get_contents('/proc/uptime');
+    if ($stat === false || $uptime === false) {
+        return 'N/A';
+    }
+    // comm 字段可能含空格/括号，从最后一个 ")" 之后再切分；之后第 1 个字段为 state(第3项)
+    $rp = strrpos($stat, ')');
+    if ($rp === false) {
+        return 'N/A';
+    }
+    $f = preg_split('/\s+/', trim(substr($stat, $rp + 1)));
+    // 此时 $f[0]=state(3)，故 utime(14)=$f[11]，stime(15)=$f[12]，starttime(22)=$f[19]
+    if (count($f) < 20) {
+        return 'N/A';
+    }
+    $hz = 100; // Linux USER_HZ，容器内固定为 100
+    $cpuSec = ($f[11] + $f[12]) / $hz;
+    $up = floatval(explode(' ', trim($uptime))[0]);
+    $elapsed = $up - ($f[19] / $hz);
+    if ($elapsed <= 0) {
+        return 'N/A';
+    }
+    return round($cpuSec / $elapsed * 100, 1) . '%';
 }
 
 function get_cpu_usage_windows() {
