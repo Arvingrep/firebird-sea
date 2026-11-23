@@ -46,10 +46,14 @@ RUN { \
         echo 'memory_limit = 256M'; \
         echo 'log_errors = On'; \
         echo 'error_log = /proc/self/fd/2'; \
+        echo 'display_errors = Off'; \
+        echo 'error_reporting = E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED'; \
     } > /usr/local/etc/php/conf.d/production.ini \
     && { \
         echo '[www]'; \
         echo 'catch_workers_output = yes'; \
+        echo '; 访问日志走 stdout：官方镜像 zz-docker.conf 默认写 /proc/self/fd/2(stderr)，会被 GKE 全标成 severity=ERROR'; \
+        echo 'access.log = /proc/self/fd/1'; \
     } > /usr/local/etc/php-fpm.d/zz-stdout.conf
 
 # 3. 固化底层火鸟/Swoole Loader 扩展到系统扩展目录，实现不可变基座
