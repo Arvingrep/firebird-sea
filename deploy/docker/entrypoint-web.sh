@@ -107,7 +107,7 @@ if [ -n "$REDIS_HOST" ] && php -m 2>/dev/null | grep -qi '^redis$'; then
             echo "session.save_path = \"tcp://${REDIS_HOST}:${REDIS_PORT:-6379}?timeout=2&prefix=PHPREDIS_SESSION_${SITE_ID:-site}:${REDIS_PASSWORD:+&auth=${REDIS_PASSWORD}}\""
         } > /usr/local/etc/php/conf.d/zz-session-redis.ini
     else
-        echo ">>> [WARN] Redis ${REDIS_HOST}:${REDIS_PORT:-6379} 不可达或认证失败（REDIS_PASSWORD 未配置/不正确？），会话回退为文件存储" >&2
+        echo ">>> [WARN] Redis ${REDIS_HOST}:${REDIS_PORT:-6379} 不可达或认证失败（REDIS_PASSWORD 未配置/不正确？），会话回退为文件存储(已知并接受:INFO 级,走 stdout 避免被 GKE 标成 ERROR)"
     fi
 fi
 
@@ -128,7 +128,7 @@ if [ "${CONFIG_LOCK:-0}" = "1" ]; then
         chown root:root "$f" 2>/dev/null && chmod 0644 "$f" 2>/dev/null && locked=$((locked+1))
     done
     chown root:root "$CFG_DIR" 2>/dev/null && chmod 0755 "$CFG_DIR" 2>/dev/null
-    echo ">>> [Config Lock] 已锁定 ${locked} 个配置文件（root 只读），配置变更请走 Git" >&2
+    echo ">>> [Config Lock] 已锁定 ${locked} 个配置文件（root 只读），配置变更请走 Git"
 fi
 
 # 启动 PHP-FPM
