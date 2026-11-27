@@ -458,21 +458,28 @@ func phpNl2br(s string) string {
 	return b.String()
 }
 
-// cnSubstrR 复刻 cn_substrR：按显示宽度截断（CJK/高位字节=1、大写字母=1、
-// 小写字母/半角标点=0.5），超出不加省略号。
+// cnSubstrR 复刻 cn_substrR（string.class.php:24）：宽度按「字符首字节」计——
+// PHP ord(mb_substr($str,$i,1)) 取的是该字符 UTF-8 编码的首字节（≥224 三/四字节
+// 字符计 1、≥192 双字节字符计 1、A-Z 计 1、其余计 0.5）。注意 U+0080–U+00BF
+// 段（如 ©）码点 < 192 但首字节是 C2/C3 → 计 1，不能按码点判断（#372 评审修正）。
+// 超出宽度不加省略号。
 func cnSubstrR(s string, slen int) string {
 	var b strings.Builder
 	n := 0.0
+	var buf [4]byte
 	for _, r := range s {
 		if n >= float64(slen) {
 			break
 		}
 		b.WriteRune(r)
-		if r >= 192 {
+		l := utf8.EncodeRune(buf[:], r)
+		first := buf[0]
+		switch {
+		case l > 1 && first >= 192: // 多字节字符按首字节（≥224 或 ≥192 均计 1）
 			n++
-		} else if r >= 'A' && r <= 'Z' {
+		case first >= 'A' && first <= 'Z':
 			n++
-		} else {
+		default:
 			n += 0.5
 		}
 	}
