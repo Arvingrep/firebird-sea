@@ -21,11 +21,12 @@ func main() {
 	dir := flag.String("cases", "testdata/compare", "用例目录")
 	cookie := flag.String("cookie", os.Getenv("COMPARE_COOKIE"), "requiresLogin 用例使用的 Cookie（默认读 COMPARE_COOKIE）")
 	only := flag.String("only", "", "只跑某个 <service>.<action>")
+	goHost := flag.String("go-host", os.Getenv("COMPARE_GO_HOST"), "改写 Go 侧请求 Host 头（本地 PHP 经 nginx 强制 HTTP_HOST 时对齐两侧基座 URL）")
 	flag.Parse()
 	if *gov == "" {
 		*gov = *php
 	}
-	res, err := compare.Run(compare.Options{PHPBase: *php, GoBase: *gov, GoPrefix: *prefix, Dir: *dir, Cookie: *cookie, Only: *only})
+	res, err := compare.Run(compare.Options{PHPBase: *php, GoBase: *gov, GoPrefix: *prefix, Dir: *dir, Cookie: *cookie, Only: *only, GoHost: *goHost})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "错误:", err)
 		os.Exit(2)

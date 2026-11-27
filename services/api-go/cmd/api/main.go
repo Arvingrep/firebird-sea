@@ -635,6 +635,13 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		CollectCheck: func(req *ajax.Request, module, temp, action, id string) string {
 			return memberSvc.CollectCheck(req, module, temp, action, id)
 		},
+		// 批次2（#371）：storeDetail 的 member 投影与 videoDetail 的点赞校验
+		// 走 member 服务（与 article 同口径）；getCityId 的 cookie 前缀同 identity。
+		ZanCheck: func(req *ajax.Request, module, temp, id string) string {
+			return memberSvc.ZanCheck(req, module, temp, id)
+		},
+		MemberDetail: memberSvc.DetailHandler(),
+		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
 	})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: travel 服务装配失败: %v", err))

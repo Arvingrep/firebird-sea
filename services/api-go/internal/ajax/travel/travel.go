@@ -43,6 +43,9 @@ const (
 // prefixPattern 约束表前缀：前缀会被拼进 SQL，必须防注入（口径同 article）。
 var prefixPattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 
+// ZanCheckFunc 对应 checkIsZan()（member 服务注入）：module/temp/id，返回 "has"/"no"。
+type ZanCheckFunc func(req *ajax.Request, module, temp, id string) string
+
 // Identity 对应 userLogin->getMemberID()：未登录返回 -1（fbidentity.Resolver 满足该接口）。
 type Identity interface {
 	MemberID(ctx context.Context, req *http.Request) (int64, error)
@@ -68,6 +71,13 @@ type Dep struct {
 	SameAddrState int
 	// CollectCheck 对应 checkIsCollect()（countryDetail 的收藏校验）。nil 时按未登录处理。
 	CollectCheck CollectCheckFunc
+	// ZanCheck 对应 checkIsZan()（videoDetail 的点赞校验）。nil 时按未点赞处理。
+	ZanCheck ZanCheckFunc
+	// MemberDetail 对应 getMemberDetail() → handlers("member","detail")：storeDetail 的
+	// member 投影。nil 时输出空数组 []。
+	MemberDetail ajax.Handler
+	// CookiePrefix 是 $cfg_cookiePre（getCityId 的 siteCityInfo cookie 键前缀）。
+	CookiePrefix string
 }
 
 // Service 是 travel 服务的运行期对象。
@@ -79,6 +89,9 @@ type Service struct {
 	logo         string
 	hot          string
 	collectCheck CollectCheckFunc
+	zanCheck     ZanCheckFunc
+	memberDetail ajax.Handler
+	cookiePrefix string
 }
 
 // defaultTravelLogo / defaultTravelHotline 是 canary 的 $cfg_weblogo / $cfg_hotline
@@ -109,6 +122,9 @@ func New(dep Dep) (*Service, error) {
 		logo:         logo,
 		hot:          hot,
 		collectCheck: dep.CollectCheck,
+		zanCheck:     dep.ZanCheck,
+		memberDetail: dep.MemberDetail,
+		cookiePrefix: dep.CookiePrefix,
 	}, nil
 }
 
@@ -135,4 +151,25 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("travel", "gettypename", s.gettypenameAction)
 	router.Register("travel", "moduleType", s.moduleTypeWeek)
 	router.Register("travel", "getname", s.getnameAction)
+
+	// 批次2（#371）：商家列表/详情读 19 个。
+	router.Register("travel", "storeList", s.storeList)
+	router.Register("travel", "storeDetail", s.storeDetailAction)
+	router.Register("travel", "hotelList", s.hotelList)
+	router.Register("travel", "hotelDetail", s.hotelDetail)
+	router.Register("travel", "ticketList", s.ticketList)
+	router.Register("travel", "ticketDetail", s.ticketDetail)
+	router.Register("travel", "rentcarList", s.rentcarList)
+	router.Register("travel", "rentcarDetail", s.rentcarDetail)
+	router.Register("travel", "visaList", s.visaList)
+	router.Register("travel", "visaDetail", s.visaDetail)
+	router.Register("travel", "agencyList", s.agencyList)
+	router.Register("travel", "agencyDetail", s.agencyDetail)
+	router.Register("travel", "videoList", s.videoList)
+	router.Register("travel", "videoDetail", s.videoDetail)
+	router.Register("travel", "strategyList", s.strategyList)
+	router.Register("travel", "strategyDetail", s.strategyDetail)
+	router.Register("travel", "companyAllDataList", s.companyAllDataList)
+	router.Register("travel", "getAlldata", s.getAlldata)
+	router.Register("travel", "searchTravel", s.searchTravel)
 }

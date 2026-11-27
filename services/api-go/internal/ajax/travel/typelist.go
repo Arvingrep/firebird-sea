@@ -78,7 +78,7 @@ type typeRow struct {
 	Latitude  *string `json:"latitude,omitempty"`
 	Title     string  `json:"title"`
 	// Note 仅当表有 note 列时输出（PHP isset($results[$kk]['note'])）。
-	Note *string `json:"note,omitempty"`
+	Note   *string `json:"note,omitempty"`
 	Litpic *string `json:"litpic,omitempty"`
 	// IconURL / Icon 仅当表有 icon 列时输出（PHP isset($v['icon'])）：
 	// iconturl = empty(icon) ? '' : getFilePath(icon)；icon = iconturl（API 侧 HUONIAOADMIN=''）。
