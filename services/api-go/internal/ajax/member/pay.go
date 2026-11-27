@@ -32,16 +32,21 @@
 // 已知偏离（都写在这里，不写进正文以外的地方）：
 //   - `ordertype=pay` 在 PHP 里是无限递归，实测 HTTP 500 + 空响应体；Go 直接按未知方法处理
 //     （操作错误），复刻一个 500 崩溃没有意义，也不会把它写进对比用例。
-//   - 分发参数（array_merge 的结果）**不会再过一遍 ajax.php 的入口归一**，这一点与 PHP 相同；
-//     但当前 handler 内部仍在复刻入口归一（如 params.detailID 对 id 做 convertArrToStrWithComma），
-//     于是 body 里「归一后会被改写」的值（id/cityid/sid/state 的数值化、addslashes）会被二次处理。
-//     body 的类型保真也只到 url.Values 为止：PHP 的 true/false 落在 "true"/""（保 is_numeric 为假、
-//     empty 为真），数组落在 key[]（保 (int)非空数组 = 1），关联键名丢失。这几条都由 #364
-//     （入口 normaliser）统一收口，落地后分发子请求自动与 PHP 一致。
-//   - **上述参数差异目前不可达**：要被分发到白名单目标，pay_log.body 的 type 必须是
-//     message/detail/collect/... 这类名字，而仓库里 19 处 createPayForm("member", ...) 只写
-//     deposit / recharge / join_pay / promotion / fabu / fenxiaoJoin / 模块名（见
-//     TestPayRealBodyTypesAllDie），全在排除名单里或根本不是 member 方法。
+//   - 分发参数的类型保真只到 url.Values 为止：PHP 的 true/false 落在 "true"/""（保 is_numeric
+//     为假、empty 为真），数组落在 key[]（保 (int)非空数组 = 1），关联键名丢失；数字键的重排
+//     见下一条。
+//   - **分发参数的可达性与残留差异（重要，别当成不可达）**：`article.pay` 在余额支付分支会把
+//     整个请求参数 `serialize($this->param)` 写进 `pay_log.body`（article.class.php:2994-2995，
+//     ordertype='article'），而 member.pay 的回查**不按 ordertype 过滤**（Q4：照 PHP）→ body 里的
+//     `type` 是请求方可控的，可以构造成白名单里的任意名字。所以这条路径是**可达**的。
+//     走到之后，PHP 的分发子请求**不过入口归一**（body 值原样给目标方法），而 Go 的 handler 目前
+//     仍在内部复刻入口归一（params.detailID 的 convertArrToStrWithComma、nickname 链的
+//     removeInvisibleCharacters 等）→ body 里「归一后会变」的值两侧不同。典型触发面是 POST：
+//     ajax.php 的 POST 块不调 removeInvisibleCharacters（行 120），GET 块调（行 90），Go 侧 helpers
+//     没有这个 verb 区分 —— 这正是 #364 在修的 verb 不对称，不在本 issue 的施工面内（改 helpers
+//     会与在审的 #368 撞文件）。#364 合入后分发子请求会自动与 PHP 一致，本条即可删除。
+//     在该差异收口前，白名单里带写副作用的方法（sendComment / updateAccount）的**参数取值**可能与
+//     PHP 不同；两侧都会执行同一个方法、走同一套登录门禁，不引入 PHP 侧没有的能力。
 //   - unserialize 只覆盖 N/b/i/d/s/a（复用 detail.go 的解析器）。body 是对象（O/C）时 PHP
 //     的 is_array($bodyArr) 为假 → 不回填 → 操作错误，与 Go 解析失败后的走向一致。
 //   - `array_merge` 的数字键：PHP 按**插入顺序**把数字键重排成 0..n-1。Go 的 url.Values 是 map，

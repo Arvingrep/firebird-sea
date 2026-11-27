@@ -338,9 +338,11 @@ func TestPHPIntKey(t *testing.T) {
 	}
 }
 
-// 仓库里 19 处 createPayForm("member", ...) 实际写进 body 的 type 只有下面这些
-// （webroot/api/handlers/member.class.php 逐处扫描）。它们全都不是 member 的方法名，
-// 或者落在资金排除名单里 —— 所以「带 array_merge 参数派到白名单目标」在真实数据里不可达。
+// createPayForm("member", ...) 的 19 处调用点实际写进 body 的 type 只有下面这些
+// （webroot/api/handlers/member.class.php 逐处扫描）：全都不是 member 的方法名，或落在资金排除名单里。
+// 注意这只是**其中一个**写入方：article.pay 的余额分支会把请求参数整包 serialize 进 body
+// （article.class.php:2994），那条路的 type 请求方可控，能派到白名单目标 —— 见 pay.go 文件头
+// 「分发参数的可达性」一节。
 func TestPayRealBodyTypesAllDie(t *testing.T) {
 	for _, typ := range []string{
 		"deposit", "recharge", "join_pay", "promotion", "fabu", "fabuPay",
