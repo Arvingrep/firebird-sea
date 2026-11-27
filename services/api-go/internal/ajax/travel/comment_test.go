@@ -426,3 +426,22 @@ func timeNow(t *testing.T) time.Time {
 	t.Helper()
 	return time.Now()
 }
+
+func TestCnSubstrRLatin1Width(t *testing.T) {
+	// ©（U+00A9）首字节 C2=194 → PHP ord() 计宽 1：300 个截为 250 个（评审修正点）。
+	if got := cnSubstrR(strings.Repeat("©", 300), 250); got != strings.Repeat("©", 250) {
+		t.Errorf("cnSubstrR © 宽度不符：len(runes)=%d", len([]rune(got)))
+	}
+	// 小写 ASCII 每字符 0.5 → 250 宽度 = 500 字符。
+	if got := cnSubstrR(strings.Repeat("a", 600), 250); got != strings.Repeat("a", 500) {
+		t.Errorf("cnSubstrR ASCII 宽度不符：len=%d", len(got))
+	}
+	// 中文（首字节 ≥224）计 1。
+	if got := cnSubstrR(strings.Repeat("旅", 300), 250); got != strings.Repeat("旅", 250) {
+		t.Errorf("cnSubstrR CJK 宽度不符：len(runes)=%d", len([]rune(got)))
+	}
+	// 大写字母计 1。
+	if got := cnSubstrR(strings.Repeat("A", 600), 250); got != strings.Repeat("A", 250) {
+		t.Errorf("cnSubstrR A-Z 宽度不符：len=%d", len(got))
+	}
+}
