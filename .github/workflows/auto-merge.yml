@@ -2,6 +2,9 @@
 # 跑在 Arvin 的 MacBook（self-hosted runner）上，用本机 gh 登录态合并：
 # GITHUB_TOKEN 做的合并不会触发后续 workflow（关 issue、构建部署 canary 都会断）。
 # 仓库公开：只响应 Arvingrep 自己的评论；只执行默认分支上的脚本，从不检出 PR 代码。
+# 注意：on.issue_comment 是承重触发器，不能移除——PR 上的评审 pass 评论靠它即时触发合并（#363 即由此合并）。
+# [API][Tracker] 进度评论的 run 仍会被创建（GitHub 触发器无 issue 级过滤），但 job 层显式跳过，
+# 不执行任何步骤、不占用 runner（#366）。
 name: auto-merge
 on:
   issue_comment:
@@ -23,6 +26,7 @@ jobs:
     if: >-
       (github.event_name != 'issue_comment' ||
        (github.event.issue.pull_request && github.event.sender.login == 'Arvingrep')) &&
+      (github.event_name != 'issue_comment' || !contains(github.event.issue.title, '[API][Tracker]')) &&
       (github.event_name != 'workflow_run' || github.event.workflow_run.actor.login == 'Arvingrep')
     runs-on: [self-hosted, firebird-agent]
     timeout-minutes: 10
