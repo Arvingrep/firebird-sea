@@ -136,8 +136,13 @@ func (s *Service) companyAllDataList(req *ajax.Request) ajax.Response {
 // omapField 取 omap 项的字段字符串（非 omap → ""）。
 func omapField(v any, key string) string {
 	if om, ok := v.(*omap); ok {
-		if s, ok := om.vals[key].(string); ok {
-			return s
+		switch t := om.vals[key].(type) {
+		case string:
+			return t
+		case int:
+			return strconv.Itoa(t)
+		case int64:
+			return strconv.FormatInt(t, 10)
 		}
 	}
 	return ""
@@ -146,7 +151,7 @@ func omapField(v any, key string) string {
 // getAlldata（travel.class.php:9755-9826）。
 //
 // 口径要点（PHP bug 照抄）：
-//   - `$uid` 先取登录态后被 param['uid'] 覆盖（可缺失 → null）；
+//   - `$uid` 先取登录态后被 param['uid'] 无条件覆盖（缺失 → null → SQL 语法错误 → 暂无数据）；
 //   - `$userid` 引用未定义的 $param 恒 null 且从未进 SQL；
 //   - UNION（video 含 zan，strategy 补 ”）LEFT JOIN member；COUNT 是 rowCount(int)；
 //   - 无 ORDER BY；list 每条先重复赋 user{photo, username}。
@@ -165,14 +170,15 @@ func (s *Service) getAlldata(req *ajax.Request) ajax.Response {
 	}
 
 	uidRaw := p.Get("uid")
-	// PHP：$uid = param['uid']（缺失 → null）。null 时拼出 `userid = `（SQL 语法错误
-	// → dsqlOper 错误 → rowCount 0 → 暂无数据）。Go：缺失按 -1（登录态语义等价：
-	// 未登录时 getMemberID 亦为 -1；有登录态且未传 uid 时 PHP 用 null → 错误 → 0 行，
-	// Go 按同响应「暂无数据」降级——#371 规则评论留档）。
-	uid := uidRaw
-	if !truthy(uidRaw) {
-		uid = strconv.FormatInt(s.viewerID(ctx, req), 10)
+	// PHP：$uid = param['uid']（缺失 → null），直接拼 SQL。
+	//   - 缺失/非数字 → `userid = ` / `userid = abc` 语法错误 → dsqlOper totalCount 0
+	//     → 200 暂无数据！（包成 101）
+	//   - uid="0" → `userid = 0` 合法 → 0 行 → 同上。
+	//   （此前按登录态 viewerID 回退是错的——PHP 从不回退，有数据时响应不等价。）
+	if !isNumericString(uidRaw) {
+		return respFail(infoGetAlldataNoData)
 	}
+	uid := uidRaw
 
 	pageSize := phpDefaultPage(p.Get("pageSize"), 10)
 	page := phpDefaultPage(p.Get("page"), 1)
@@ -253,7 +259,9 @@ func (s *Service) searchTravel(req *ajax.Request) ajax.Response {
 	lng, lat := p.Get("lng"), p.Get("lat")
 	hasGeo := truthy(lng) && truthy(lat)
 
-	where := " AND `title` like '%" + keywords + "%' "
+	// keywords LIKE 用占位符绑定（PHP 原样拼接；绑定对合法输入结果一致，封死注入面）。
+	where := " AND `title` like ? "
+	whereArgs := []any{"%" + keywords + "%"}
 	var dist string
 	var distArgs []any
 	if hasGeo {
@@ -304,7 +312,7 @@ func (s *Service) searchTravel(req *ajax.Request) ajax.Response {
 	// 景点门票
 	if rows, ok := s.queryRows(ctx, "SELECT `id`, `title`, `flag`, `rec`, `userid`, `company`, `address`, `pics`, `video`, `opentime`, `tag`, `cityid`, `travelname`, `addrid`, `click`, `pubdate`,"+dist+"`state`, (SELECT min(c.`price`) FROM `"+s.prefix+
 		"travel_ticketinfo` c WHERE c.`ticketid` = l.`id` AND c.`typeid` = '0' ) AS price, (SELECT sum(c.`sale`) FROM `"+s.prefix+
-		"travel_ticketinfo` c WHERE c.`ticketid` = l.`id` AND c.`typeid` = '0' ) AS sale  FROM `"+s.prefix+"travel_ticket` l WHERE 1 = 1"+where, distArgs...); ok {
+		"travel_ticketinfo` c WHERE c.`ticketid` = l.`id` AND c.`typeid` = '0' ) AS sale  FROM `"+s.prefix+"travel_ticket` l WHERE 1 = 1"+where, append(append([]any{}, distArgs...), whereArgs...)...); ok {
 		for _, val := range rows {
 			m := val.omapOf()
 			flagname := ""
@@ -319,7 +327,7 @@ func (s *Service) searchTravel(req *ajax.Request) ajax.Response {
 
 	// 旅行社（未 SELECT distance）
 	if rows, ok := s.queryRows(ctx, "SELECT `bind_module`, `title`, `pubdate`, `pics`, `video`, `license`, `lat`, `lng`, `id`,`userid`, `address`, `tel`, `addrid`, `contact`,`flag` FROM `"+
-		s.prefix+"travel_store` WHERE 1 = 1"+where); ok {
+		s.prefix+"travel_store` WHERE 1 = 1"+where, whereArgs...); ok {
 		for _, val := range rows {
 			m := val.omapOf()
 			m.set("distance", "0.0m") // $val['distance'] 未定义 → sprintf(null)="0.0"+米 → "0.0m"（有坐标时 PHP 同样因列缺失输出 0.0m）
@@ -347,7 +355,7 @@ func (s *Service) searchTravel(req *ajax.Request) ajax.Response {
 
 	// 酒店民宿
 	if rows, ok := s.queryRows(ctx, "SELECT `id`, `title`, `userid`, `company`, `address`, `pics`, `video`, `price`, `tag`, `cityid`, `typeid`, `addrid`, `click`, `pubdate`,"+dist+" `state`,`lng`,`lat`,`factag` FROM `"+
-		s.prefix+"travel_hotel` WHERE 1 = 1"+where, distArgs...); ok {
+		s.prefix+"travel_hotel` WHERE 1 = 1"+where, append(append([]any{}, distArgs...), whereArgs...)...); ok {
 		for _, val := range rows {
 			m := val.omapOf()
 			if hasGeo {
@@ -438,7 +446,7 @@ func (s *Service) searchTravel(req *ajax.Request) ajax.Response {
 
 	// 租车
 	if rows, ok := s.queryRows(ctx, "SELECT `id`, `price`, `title`, `userid`, `company`, `address`, `pics`, `video`, `typeid`, `tag`, `cityid`, `addrid`, `click`, `pubdate`, `state`  FROM `"+
-		s.prefix+"travel_rentcar` WHERE 1 = 1"+where); ok {
+		s.prefix+"travel_rentcar` WHERE 1 = 1"+where, whereArgs...); ok {
 		for _, val := range rows {
 			m := val.omapOf()
 			if truthy(val.str("addrid")) {
@@ -465,7 +473,7 @@ func (s *Service) searchTravel(req *ajax.Request) ajax.Response {
 
 	// 签证（typename 覆盖、url template 误用 rentcar-detail——照抄）
 	if rows, ok := s.queryRows(ctx, "SELECT `id`, `price`, `title`, `sale`,`subtitle`, `userid`, `company`, `pics`, `video`, `typeid`, `country`, `click`, `pubdate`, `state`  FROM `"+
-		s.prefix+"travel_visa` WHERE 1 = 1"+where); ok {
+		s.prefix+"travel_visa` WHERE 1 = 1"+where, whereArgs...); ok {
 		for _, val := range rows {
 			m := val.omapOf()
 			typename := ""

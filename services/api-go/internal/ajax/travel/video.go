@@ -43,6 +43,7 @@ func (s *Service) videoList(req *ajax.Request) ajax.Response {
 	// staff/companyuid 分支未复刻（#371 规则评论）。
 
 	where := ""
+	var wargs []any // 与 where 片段占位符一一对应
 	where1 := ""
 	zjState := ""
 	if u != 1 {
@@ -72,14 +73,21 @@ func (s *Service) videoList(req *ajax.Request) ajax.Response {
 			where += " AND s.`usertype` = 0 AND s.`userid` = " + itoa64(uid)
 		}
 		if state != "" {
+			// PHP 无引号拼 $state：非数字 → 语法错误面（验证口径：按空结果降级）。
+			if !isNumericString(state) {
+				return respFail(infoNoDataCnt)
+			}
 			where += " AND s.`state` = " + state
 		}
 	}
 	if usertype != "" {
-		where += " AND s.`usertype` = '" + usertype + "'"
+		where += " AND s.`usertype` = ?"
+		wargs = append(wargs, usertype)
 	}
-	if truthy(noid) {
-		where += " AND s.`id` not in (" + noid + ")"
+	if ids, ok := phpIntList(noid); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND s.`id` not in (" + strings.Join(ids, ",") + ")"
 	}
 	if !truthy(search) {
 		search = keywords
@@ -91,7 +99,8 @@ func (s *Service) videoList(req *ajax.Request) ajax.Response {
 			if seg == "" {
 				continue
 			}
-			conds = append(conds, "s.`title` like '%"+seg+"%'")
+			conds = append(conds, "s.`title` like ?")
+			wargs = append(wargs, "%"+seg+"%")
 		}
 		if len(conds) > 0 {
 			where += " AND (" + strings.Join(conds, " OR ") + ")"
@@ -104,21 +113,21 @@ func (s *Service) videoList(req *ajax.Request) ajax.Response {
 		s.prefix + "travel_video` s LEFT JOIN `" + s.prefix + "travel_store` z ON z.`id` = s.`userid` WHERE " + fixed + " " + where
 
 	totalCount := s.countTotal(ctx, "SELECT COUNT(s.`id`) total FROM `"+s.prefix+"travel_video` s LEFT JOIN `"+s.prefix+
-		"travel_store` z ON z.`id` = s.`userid` WHERE "+fixed+" "+where)
+		"travel_store` z ON z.`id` = s.`userid` WHERE "+fixed+" "+where, wargs...)
 	if looseZero(totalCount) {
 		return respFail(infoNoDataCnt)
 	}
 
 	pageinfo := basePageinfo(page, pageSize, totalCount)
 	if u == 1 && uid > -1 {
-		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "s.`state`", nil)
+		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "s.`state`", wargs)
 		pageinfo.set("gray", gray)
 		pageinfo.set("audit", audit)
 		pageinfo.set("refuse", refuse)
 	}
 
 	q := archives + videoListOrderby(p.Get("orderby")) + limitClause(page, pageSize)
-	rows, ok := s.queryRows(ctx, q)
+	rows, ok := s.queryRows(ctx, q, wargs...)
 	if !ok {
 		return respOK(pagedPayloadList(pageinfo, []any{}))
 	}
@@ -188,7 +197,8 @@ func (s *Service) videoList(req *ajax.Request) ajax.Response {
 				userArr.set("photo", photo)
 			}
 		}
-		item.set("user", userArr)
+		// PHP 值语义：赋给条目的是 $userArr 的拷贝（残留延续、后续更新不回写）。
+		item.set("user", cloneOmap(userArr))
 
 		list = append(list, item)
 	}
@@ -276,44 +286,42 @@ func (s *Service) videoDetail(req *ajax.Request) ajax.Response {
 	d.set("videotype", r.get("videotype"))
 
 	// user 投影。
-	// usertype==1：member+store 联查；else：仅 member。
+	// usertype==1：member+store 联查（PHP travel.class.php:5269-5289）；else：仅 member。
 	// PHP 的 `$member[0]['x']` 在 dsqlOper 出错（SQL 语法错误，即 userid 为 NULL/空
 	// 拼出 `id = `）时返回错误字符串，字符串下标取到首字符 `{`——照抄。
+	// 两个分支都无条件输出 userArr；$uid 被查出的会员 uid 覆盖（未命中保持 ""）。
 	if r.str("usertype") == "1" {
-		u2 := newOmap()
+		memberUID, zjcomid, title, nickname, photo := "", "", "", "", ""
 		if uid == "" {
-			u2.set("uid", "{")
-			u2.set("photo", "")
-			u2.set("title", "{")
-			u2.set("nickname", "{")
-			u2.set("url", s.urlOf(ctx, host, "store-detail", "{"))
-			d.set("user", u2)
-		} else if rr, ok2 := s.queryRows(ctx, "SELECT m.`nickname`, m.`company`, m.`photo`, zjcom.`title`, zjcom.`pics`, zjcom.`id` zjcomid FROM `"+
+			// SQL 语法错误 → $member[0]['x'] 首字符 '{'；getFilePath("{") 落空 → photo ""。
+			memberUID, title, zjcomid, nickname = "{", "{", "{", "{"
+		} else if rr, ok2 := s.queryRows(ctx, "SELECT m.`id` uid, m.`nickname`, m.`company`, m.`photo`, zjcom.`title`, zjcom.`pics`, zjcom.`id` zjcomid FROM `"+
 			s.prefix+"member` m LEFT JOIN `"+s.prefix+"travel_store` zjcom ON m.`id` = zjcom.`userid` WHERE zjcom.`state` = 1 AND zjcom.`id` = "+uid); ok2 && len(rr) > 0 {
 			m := rr[0]
-			u2 := newOmap()
-			u2.set("uid", m.get("uid"))
-			photo := ""
+			memberUID = m.str("uid")
+			title = m.str("title")
+			zjcomid = m.str("zjcomid")
+			nickname = m.str("nickname")
+			if truthy(m.str("company")) {
+				nickname = m.str("company")
+			}
 			if truthy(m.str("photo")) {
 				photo = s.filePath(ctx, host, m.str("photo"))
 			} else {
 				pics := strings.Split(m.str("pics"), ",")
-				if truthy(pics[0]) {
-					photo = s.filePath(ctx, host, pics[0])
-				} else {
-					photo = m.str("photo")
-				}
+				photo = s.filePath(ctx, host, pics[0])
 			}
-			u2.set("photo", photo)
-			u2.set("title", m.get("title"))
-			nickname := m.str("nickname")
-			if truthy(m.str("company")) {
-				nickname = m.str("company")
-			}
-			u2.set("nickname", nickname)
-			u2.set("url", s.urlOf(ctx, host, "store-detail", m.str("zjcomid")))
-			d.set("user", u2)
 		}
+		u2 := newOmap()
+		// 键序 = PHP 赋值序：url, uid, photo, title, nickname。
+		u2.set("url", s.urlOf(ctx, host, "store-detail", zjcomid))
+		u2.set("uid", memberUID)
+		u2.set("photo", photo)
+		u2.set("title", title)
+		u2.set("nickname", nickname)
+		d.set("user", u2)
+		// $uid = $member[0]['uid']：后续 follow/isfollow 用会员 id（错误串 "{" → (int) → 0）。
+		uid = memberUID
 	} else {
 		// $uid = $nickname = $photo = "" 起始；member 命中则覆盖，userArr 无条件赋值。
 		memberUID, nickname, photo := "", "", ""

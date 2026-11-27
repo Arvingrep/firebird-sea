@@ -37,14 +37,19 @@ func (s *Service) ticketList(req *ajax.Request) ajax.Response {
 	viewer := s.viewerID(ctx, req)
 
 	where := ""
+	var wargs []any // 与 where 片段占位符一一对应
 	if truthy(p.Get("rec")) {
 		where += " AND `rec` = 1"
 	}
-	if truthy(flag) {
-		where += " AND `flag` in (" + flag + ")"
+	if ids, ok := phpIntList(flag); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND `flag` in (" + strings.Join(ids, ",") + ")"
 	}
-	if truthy(noid) {
-		where += " AND `id` not in (" + noid + ")"
+	if ids, ok := phpIntList(noid); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND `id` not in (" + strings.Join(ids, ",") + ")"
 	}
 	if phpInt(p.Get("u")) != 1 {
 		where += " AND `state` = 1"
@@ -56,7 +61,8 @@ func (s *Service) ticketList(req *ajax.Request) ajax.Response {
 		where += s.listMemberOwn(ctx, viewer)
 	}
 	if truthy(store) {
-		where += " AND `company` = '" + store + "'"
+		where += " AND `company` = ?"
+		wargs = append(wargs, store)
 	}
 	// business 覆盖 addrid。
 	addrid := p.Get("addrid")
@@ -64,9 +70,16 @@ func (s *Service) ticketList(req *ajax.Request) ajax.Response {
 		addrid = p.Get("business")
 	}
 	if truthy(addrid) {
-		where += " AND `addrid` in (" + s.lowerAddrs(ctx, addrid) + ")"
+		lower := s.lowerAddrs(ctx, addrid)
+		if lower == "" {
+			// 非数字 addrid → PHP 语法错误面（验证口径：按空结果降级）。
+			return respFail(infoNoDataCnt)
+		}
+		where += " AND `addrid` in (" + lower + ")"
 	}
-	where += s.listLikeSearch(ctx, search, "`title`")
+	frag, sargs := s.listLikeSearch(ctx, search, "`title`")
+	where += frag
+	wargs = append(wargs, sargs...)
 
 	lng, lat := p.Get("lng"), p.Get("lat")
 	hasGeo := truthy(lng) && truthy(lat)
@@ -87,7 +100,7 @@ func (s *Service) ticketList(req *ajax.Request) ajax.Response {
 		"  FROM `" + s.prefix + "travel_ticket` l WHERE 1 = 1" + where
 
 	// (int) 强转：ticketList 的 totalCount 是 JSON 数字。
-	totalCount := phpInt(s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_ticket` l WHERE 1 = 1"+where))
+	totalCount := phpInt(s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_ticket` l WHERE 1 = 1"+where, wargs...))
 	if totalCount == 0 {
 		return respFail(infoNoDataCnt)
 	}
@@ -99,19 +112,23 @@ func (s *Service) ticketList(req *ajax.Request) ajax.Response {
 	pageinfo.set("totalCount", totalCount)
 
 	if phpInt(p.Get("u")) == 1 && viewer > -1 {
-		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", extraArgs)
+		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", wargs)
 		pageinfo.set("gray", gray)
 		pageinfo.set("audit", audit)
 		pageinfo.set("refuse", refuse)
 	}
 
 	// `$state != ''`：追加进 $archives（列表 SQL；gray 统计在其之前）。
+	// PHP 无引号拼 `$state`：非数字 → SQL 语法错误 → 查询错误面（按空列表降级）。
 	if state != "" {
+		if !isNumericString(state) {
+			return respOK(pagedPayloadList(pageinfo, []any{}))
+		}
 		archives += " AND `state` = " + state
 	}
 	orderBy := ticketListOrderby(p.Get("orderby"), hasGeo)
 	q := archives + orderBy + limitClause(page, pageSize)
-	rows, ok := s.queryRows(ctx, q, extraArgs...)
+	rows, ok := s.queryRows(ctx, q, append(extraArgs, wargs...)...)
 	if !ok {
 		return respOK(pagedPayloadList(pageinfo, []any{}))
 	}

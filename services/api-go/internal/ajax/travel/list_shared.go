@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"sync"
 	"fmt"
 	"math"
 	"regexp"
@@ -29,6 +30,17 @@ type omap struct {
 }
 
 func newOmap() *omap { return &omap{vals: map[string]any{}} }
+
+// cloneOmap 浅拷贝（键序保持）。PHP 数组赋值是值语义：把 $userArr 赋给条目时是
+// 拷贝，后续对 $userArr 的修改不影响已赋出的条目；但残留字段仍跨条目延续。
+// 共享 *omap 指针会把"后来的用户"回写进历史条目——每个条目落库前快照一份。
+func cloneOmap(m *omap) *omap {
+	c := &omap{keys: append([]string(nil), m.keys...), vals: make(map[string]any, len(m.vals))}
+	for k, v := range m.vals {
+		c.vals[k] = v
+	}
+	return c
+}
 
 func (m *omap) set(k string, v any) {
 	if _, ok := m.vals[k]; !ok {
@@ -292,6 +304,11 @@ func (s *Service) areaDescendants(ctx context.Context, id int) []int {
 
 // lowerAddrs 复刻 `$lower = addrid.",".join(',',arr_foreach(...))`（无子级 → addrid 原样）。
 func (s *Service) lowerAddrs(ctx context.Context, addrid string) string {
+	// 非数字 addrid 直接拒绝：PHP 把原始 $addrid 拼进 `in (...)`（无引号），
+	// 非数字 → SQL 语法错误 → 查询错误面。返回 "" 由调用方按 #371 验证口径降级。
+	if !isNumericString(addrid) {
+		return ""
+	}
 	kids := s.areaDescendants(ctx, phpInt(addrid))
 	if len(kids) == 0 {
 		return addrid
@@ -313,10 +330,12 @@ func (s *Service) lowerAddrs(ctx context.Context, addrid string) string {
 //go:embed pinyin_table.txt
 var pinyinData string
 
+// pinyinOnce 保证并发首次调用只初始化一次（HTTP 并发可同时触发 getPinyin）。
+var pinyinOnce sync.Once
 var pinyinMap map[string]string
 
-func getPinyin(str string) string {
-	if pinyinMap == nil {
+func pinyinTable() map[string]string {
+	pinyinOnce.Do(func() {
 		m := make(map[string]string)
 		for _, line := range strings.Split(pinyinData, "\n") {
 			line = strings.TrimRight(line, "\r")
@@ -325,7 +344,12 @@ func getPinyin(str string) string {
 			}
 		}
 		pinyinMap = m
-	}
+	})
+	return pinyinMap
+}
+
+func getPinyin(str string) string {
+	pinyinMap := pinyinTable()
 	s := strings.TrimSpace(str)
 	// PHP：GBK 字节数 < 2（空串或单 ASCII 字符）原样返回，不走 strtolower。
 	if utf8.RuneCountInString(s) < 2 && len(s) < 2 {

@@ -35,16 +35,16 @@ func (s *Service) listFrontCity(ctx context.Context, cityid int) string {
 
 // listLikeSearch 复刻 search=keywords 回退 + store.title/address 子查询 + siteSearchLog 跳过：
 // 有 sidArr → " AND (title like OR company in (ids))"；无 → " AND title like"。
-// storeList 特有口径（member.title 子查询）不在此列。
-func (s *Service) listLikeSearch(ctx context.Context, search string, titleCol string) string {
+// search 用占位符绑定（返回片段与按序参数）；storeList 特有口径（member.title 子查询）不在此列。
+func (s *Service) listLikeSearch(ctx context.Context, search string, titleCol string) (string, []any) {
 	if !truthy(search) {
-		return ""
+		return "", nil
 	}
 	sids := s.storeLikeSids(ctx, search)
 	if len(sids) > 0 {
-		return " AND (" + titleCol + " like '%" + search + "%' OR `company` in (" + strings.Join(sids, ",") + "))"
+		return " AND (" + titleCol + " like ? OR `company` in (" + strings.Join(sids, ",") + "))", []any{"%" + search + "%"}
 	}
-	return " AND " + titleCol + " like '%" + search + "%'"
+	return " AND " + titleCol + " like ?", []any{"%" + search + "%"}
 }
 
 // grayAuditRefuse 复刻 u==1 && uid>-1 时对 state=0/1/2 的三条 rowCount 统计

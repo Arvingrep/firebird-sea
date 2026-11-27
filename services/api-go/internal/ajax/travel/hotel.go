@@ -40,11 +40,16 @@ func (s *Service) hotelList(req *ajax.Request) ajax.Response {
 	noid := commaJoin(p, "noid")
 
 	where := ""
-	if truthy(typeid) {
-		where += " AND `typeid` in (" + typeid + ")"
+	var wargs []any // 与 where 片段占位符一一对应
+	if ids, ok := phpIntList(typeid); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND `typeid` in (" + strings.Join(ids, ",") + ")"
 	}
-	if truthy(noid) {
-		where += " AND `id` not in (" + noid + ")"
+	if ids, ok := phpIntList(noid); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND `id` not in (" + strings.Join(ids, ",") + ")"
 	}
 	if u != 1 {
 		where += " AND `state` = 1"
@@ -60,7 +65,12 @@ func (s *Service) hotelList(req *ajax.Request) ajax.Response {
 		where += " AND `company` = '" + strconv.Itoa(store) + "'"
 	}
 	if truthy(p.Get("addrid")) {
-		where += " AND `addrid` in (" + s.lowerAddrs(ctx, p.Get("addrid")) + ")"
+		lower := s.lowerAddrs(ctx, p.Get("addrid"))
+		if lower == "" {
+			// 非数字 addrid → PHP 语法错误面（验证口径：按空结果降级）。
+			return respFail(infoNoDataCnt)
+		}
+		where += " AND `addrid` in (" + lower + ")"
 	}
 	price := commaJoin(p, "price")
 	if truthy(price) {
@@ -72,12 +82,14 @@ func (s *Service) hotelList(req *ajax.Request) ajax.Response {
 		if len(pr) > 1 {
 			p1 = pr[1]
 		}
+		// PHP empty() 语义：",200" → commaJoin "0,200" → empty("0") 为真 → 走仅上限分支
+		// （不是 BETWEEN）；"200," → 仅下限。用 truthy（"0" 为 falsy）选分支。
 		switch {
-		case p0 == "" && truthy(p1):
+		case !truthy(p0):
 			where += " AND `price` < " + p1
-		case p1 == "" && truthy(p0):
+		case !truthy(p1):
 			where += " AND `price` > " + p0
-		case p0 != "" && p1 != "":
+		default:
 			where += " AND `price` BETWEEN " + p0 + " AND " + p1
 		}
 	}
@@ -85,7 +97,9 @@ func (s *Service) hotelList(req *ajax.Request) ajax.Response {
 	if !truthy(search) {
 		search = p.Get("keywords")
 	}
-	where += s.listLikeSearch(ctx, search, "`title`")
+	frag, sargs := s.listLikeSearch(ctx, search, "`title`")
+	where += frag
+	wargs = append(wargs, sargs...)
 
 	lng, lat := p.Get("lng"), p.Get("lat")
 	hasGeo := truthy(lng) && truthy(lat)
@@ -99,27 +113,31 @@ func (s *Service) hotelList(req *ajax.Request) ajax.Response {
 	archives := "SELECT `id`, `title`, `userid`, `company`, `address`, `pics`, `video`, `price`, `tag`, `cityid`, `typeid`, `addrid`, `click`, `pubdate`, " +
 		selectExtra + "`state`, `lng`, `lat`, `factag` FROM `" + s.prefix + "travel_hotel` WHERE 1 = 1" + where
 
-	totalCount := s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_hotel` WHERE 1 = 1"+where)
+	totalCount := s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_hotel` WHERE 1 = 1"+where, wargs...)
 	if looseZero(totalCount) {
 		return respFail(infoNoDataCnt)
 	}
 
 	pageinfo := basePageinfo(page, pageSize, totalCount)
 	if u == 1 && viewer > -1 {
-		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", extraArgs)
+		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", wargs)
 		pageinfo.set("gray", gray)
 		pageinfo.set("audit", audit)
 		pageinfo.set("refuse", refuse)
 	}
 
 	// `$state != ''` 只对列表 SQL 生效（gray/audit/refuse 已统计完）。
+	// PHP 无引号拼 `$state`：非数字 → SQL 语法错误 → 查询错误面（按空列表降级）。
 	where1 := ""
 	if state != "" {
+		if !isNumericString(state) {
+			return respOK(pagedPayloadList(pageinfo, []any{}))
+		}
 		where1 = " AND `state` = " + state
 	}
 	orderBy := hotelListOrderby(p.Get("orderby"))
 	q := archives + where1 + orderBy + limitClause(page, pageSize)
-	rows, ok := s.queryRows(ctx, q, extraArgs...)
+	rows, ok := s.queryRows(ctx, q, append(extraArgs, wargs...)...)
 	if !ok {
 		return respOK(pagedPayloadList(pageinfo, []any{}))
 	}

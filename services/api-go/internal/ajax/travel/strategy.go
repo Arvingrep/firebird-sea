@@ -36,11 +36,14 @@ func (s *Service) strategyList(req *ajax.Request) ajax.Response {
 	}
 
 	where := ""
+	var wargs []any // 与 where 片段占位符一一对应
 	if truthy(typeid) {
-		where += " AND s.`typeid` = '" + typeid + "' "
+		where += " AND s.`typeid` = ? "
+		wargs = append(wargs, typeid)
 	}
 	if truthy(keywords) {
-		where += " AND s.`title` like '%" + keywords + "%'"
+		where += " AND s.`title` like ?"
+		wargs = append(wargs, "%"+keywords+"%")
 	}
 
 	zjState := ""
@@ -59,8 +62,10 @@ func (s *Service) strategyList(req *ajax.Request) ajax.Response {
 			for _, r := range rows {
 				ids = append(ids, r.str("id"))
 			}
+			// PHP bug 照抄：无括号 OR 追加在 AND 链之后，破坏整条 WHERE。
 			if truthy(typeid) {
-				where += " OR ( s.`typeid` = '" + typeid + "' AND s.`usertype` = 1 AND s.`userid` in(" + strings.Join(ids, ",") + "))"
+				where += " OR ( s.`typeid` = ? AND s.`usertype` = 1 AND s.`userid` in(" + strings.Join(ids, ",") + "))"
+				wargs = append(wargs, typeid)
 			} else {
 				where += " OR ( s.`usertype` = 1 AND s.`userid` in(" + strings.Join(ids, ",") + "))"
 			}
@@ -73,17 +78,23 @@ func (s *Service) strategyList(req *ajax.Request) ajax.Response {
 			where += " AND s.`usertype` = 0 AND s.`userid` = " + itoa64(uid)
 		}
 		if state != "" {
+			// PHP 无引号拼 $state：非数字 → 语法错误面（验证口径：按空结果降级）。
+			if !isNumericString(state) {
+				return respFail(infoNoDataCnt)
+			}
 			where += " AND s.`state` = " + state
 		}
 	}
 	if usertype != "" {
-		where += " AND s.`usertype` = '" + usertype + "'"
+		where += " AND s.`usertype` = ?"
+		wargs = append(wargs, usertype)
 	}
 	if truthy(search) {
 		conds := []string{}
 		for _, seg := range strings.Split(search, " ") {
 			if seg != "" {
-				conds = append(conds, " s.`title` like '%"+seg+"%'")
+				conds = append(conds, " s.`title` like ?")
+				wargs = append(wargs, "%"+seg+"%")
 			}
 		}
 		where += " AND (" + strings.Join(conds, " OR ") + ")"
@@ -94,21 +105,21 @@ func (s *Service) strategyList(req *ajax.Request) ajax.Response {
 		s.prefix + "travel_strategy` s LEFT JOIN `" + s.prefix + "travel_store` z ON z.`id` = s.`userid` WHERE " + fixed + " " + where
 
 	totalCount := s.countTotal(ctx, "SELECT COUNT(s.`id`) total FROM `"+s.prefix+"travel_strategy` s LEFT JOIN `"+
-		s.prefix+"travel_store` z ON z.`id` = s.`userid` WHERE "+fixed+" "+where)
+		s.prefix+"travel_store` z ON z.`id` = s.`userid` WHERE "+fixed+" "+where, wargs...)
 	if looseZero(totalCount) {
 		return respFail(infoNoDataCnt)
 	}
 
 	pageinfo := basePageinfo(page, pageSize, totalCount)
 	if u == 1 && uid > -1 {
-		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "s.`state`", nil)
+		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "s.`state`", wargs)
 		pageinfo.set("gray", gray)
 		pageinfo.set("audit", audit)
 		pageinfo.set("refuse", refuse)
 	}
 
 	q := archives + videoListOrderby(p.Get("orderby")) + limitClause(page, pageSize)
-	rows, ok := s.queryRows(ctx, q)
+	rows, ok := s.queryRows(ctx, q, wargs...)
 	if !ok {
 		return respOK(pagedPayloadList(pageinfo, []any{}))
 	}
@@ -169,7 +180,8 @@ func (s *Service) strategyList(req *ajax.Request) ajax.Response {
 				userArr.set("photo", photo)
 			}
 		}
-		item.set("user", userArr)
+		// PHP 值语义：赋给条目的是 $userArr 的拷贝（残留延续、后续更新不回写）。
+		item.set("user", cloneOmap(userArr))
 		list = append(list, item)
 	}
 	return respOK(pagedPayloadList(pageinfo, list))

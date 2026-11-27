@@ -208,6 +208,23 @@ func isNumericString(s string) bool {
 	return digits
 }
 
+// phpIntList 校验逗号分隔的 id 列表（PHP 把 typeid/noid/flag 等原始值不加引号拼进
+// `in (...)`——合法数字列表结果一致；任一项非数字 → PHP SQL 语法错误 → dsqlOper 报错
+// → 暂无数据。Go 侧逐项 numeric 校验，ok=false 时调用方按同一口径返回 102，
+// 既保语义又封死注入面。空串视为「无此参数」，ok=true。
+func phpIntList(v string) ([]string, bool) {
+	if !truthy(v) {
+		return nil, true
+	}
+	parts := strings.Split(v, ",")
+	for _, p := range parts {
+		if !isNumericString(p) {
+			return nil, false
+		}
+	}
+	return parts, true
+}
+
 // stateOmap 是 PHP `return array("state"=>200,"info"=>...)` 的原始形态。
 func stateOmap(info string) *omap {
 	m := newOmap()
@@ -301,18 +318,26 @@ func (s *Service) storeList(req *ajax.Request) ajax.Response {
 	pageSize := phpDefaultPage(p.Get("pageSize"), 10)
 
 	where := " AND `state` = 1"
+	var wargs []any // 与 where 片段中占位符顺序一一对应
 
 	// dataShare：$customDataShare 在 canary travel.inc.php 未定义 → 恒 0（cityid 生效）。
 	if cityid := s.cityID(ctx, req, p.Get("cityid")); cityid > 0 {
-		where += " AND `cityid` = '" + strconv.Itoa(cityid) + "'"
+		where += " AND `cityid` = ?"
+		wargs = append(wargs, cityid)
 	}
 
 	if truthy(filter) {
-		where += " AND FIND_IN_SET('" + filter + "', `bind_module`)"
+		where += " AND FIND_IN_SET(?, `bind_module`)"
+		wargs = append(wargs, filter)
 	}
 
 	if truthy(addrid) {
 		lower := s.lowerAddrs(ctx, addrid)
+		if lower == "" {
+			// 非数字 addrid：PHP 拼出 `in (1abc,...)` 语法错误 → 查询错误面（#371
+			// 规则评论「验证口径」：统一按空结果降级）。
+			return ajax.Response{State: stateParamFailed, Info: infoNoDataCnt}
+		}
 		where += " AND `addrid` in (" + lower + ")"
 	}
 
@@ -320,18 +345,19 @@ func (s *Service) storeList(req *ajax.Request) ajax.Response {
 		// siteSearchLog("travel", $search)：写操作，按 #355 口径不迁移。
 		sids := s.storeSearchSids(ctx, search)
 		if len(sids) > 0 {
-			where += " AND (`title` like '%" + search + "%' OR `address` like '%" + search +
-				"%' OR `userid` in (" + strings.Join(sids, ",") + "))"
+			where += " AND (`title` like ? OR `address` like ? OR `userid` in (" + strings.Join(sids, ",") + "))"
+			wargs = append(wargs, "%"+search+"%", "%"+search+"%")
 		} else {
-			where += " AND (`title` like '%" + search + "%' OR `address` like '%" + search + "%')"
+			where += " AND (`title` like ? OR `address` like ?)"
+			wargs = append(wargs, "%"+search+"%", "%"+search+"%")
 		}
 	}
 
 	hasGeo := truthy(lng) && truthy(lat)
 	if truthy(p.Get("max_longitude")) && truthy(p.Get("min_longitude")) &&
 		truthy(p.Get("max_latitude")) && truthy(p.Get("min_latitude")) {
-		where += " AND `lng` <= '" + p.Get("max_longitude") + "' AND `lng` >= '" + p.Get("min_longitude") +
-			"' AND `lat` <= '" + p.Get("max_latitude") + "' AND `lat` >= '" + p.Get("min_latitude") + "'"
+		where += " AND `lng` <= ? AND `lng` >= ? AND `lat` <= ? AND `lat` >= ?"
+		wargs = append(wargs, p.Get("max_longitude"), p.Get("min_longitude"), p.Get("max_latitude"), p.Get("min_latitude"))
 	}
 
 	var selectExtra string
@@ -342,7 +368,7 @@ func (s *Service) storeList(req *ajax.Request) ajax.Response {
 	}
 	orderBy := storeListOrderby(p.Get("orderby"), hasGeo)
 
-	totalCount := s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_store` WHERE 1 = 1"+where)
+	totalCount := s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_store` WHERE 1 = 1"+where, wargs...)
 	if looseZero(totalCount) {
 		return ajax.Response{State: stateParamFailed, Info: infoNoDataCnt}
 	}
@@ -357,7 +383,7 @@ func (s *Service) storeList(req *ajax.Request) ajax.Response {
 	q := "SELECT `bind_module`, `title`, `pubdate`, `pics`, `video`, `license`, `lat`, `lng`, `id`,`userid`, `address`, `tel`, `addrid`, " +
 		selectExtra + " `contact`,`flag` FROM `" + s.prefix + "travel_store` WHERE 1 = 1" + where +
 		orderBy + " LIMIT " + strconv.Itoa(atpage) + ", " + strconv.Itoa(pageSize)
-	rows, ok := s.queryRows(ctx, q, extraArgs...)
+	rows, ok := s.queryRows(ctx, q, append(extraArgs, wargs...)...)
 	if !ok {
 		// dsqlOper 错误 → $results falsy → list 空数组（外层 102）。
 		return ajax.Response{State: ajax.StateOK, Info: pagedPayloadList(pageinfo, []any{})}

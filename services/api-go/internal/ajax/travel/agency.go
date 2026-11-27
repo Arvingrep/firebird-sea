@@ -40,35 +40,50 @@ func (s *Service) agencyList(req *ajax.Request) ajax.Response {
 	viewer := s.viewerID(ctx, req)
 
 	where := ""
+	var wargs []any // 与 where 片段占位符一一对应
 	if phpInt(p.Get("u")) != 1 {
 		where += " AND `state` = 1"
 		if cityid := s.cityID(ctx, req, p.Get("cityid")); cityid > 0 {
 			where += s.listFrontCity(ctx, cityid)
 		}
 	} else {
-		// 会员态商家鉴权未复刻；state 过滤在该分支内。
+		// 会员态商家鉴权未复刻；state 过滤在该分支内（无引号拼 $state → 非数字
+		// 在 PHP 是语法错误面，按验证口径降级为空结果）。
 		where += s.listMemberOwn(ctx, viewer)
 		if state != "" {
+			if !isNumericString(state) {
+				return respFail(infoNoDataCnt)
+			}
 			where += " AND `state` = " + state
 		}
 	}
 	if truthy(store) {
-		where += " AND `company` = '" + store + "'"
+		where += " AND `company` = ?"
+		wargs = append(wargs, store)
 	}
 	if typeid != "" {
-		where += " AND `typeid` = '" + typeid + "'"
+		where += " AND `typeid` = ?"
+		wargs = append(wargs, typeid)
 	}
-	if truthy(noid) {
-		where += " AND `id` not in (" + noid + ")"
+	if ids, ok := phpIntList(noid); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND `id` not in (" + strings.Join(ids, ",") + ")"
 	}
-	if truthy(flag) {
-		where += " AND `flag` in (" + flag + ")"
+	if ids, ok := phpIntList(flag); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND `flag` in (" + strings.Join(ids, ",") + ")"
 	}
 	if ywday != 0 {
 		where += " AND `ywday`  = " + strconv.Itoa(ywday)
 	}
 	if truthy(p.Get("addrid")) {
-		where += " AND `addrid` in (" + s.lowerAddrs(ctx, p.Get("addrid")) + ")"
+		lower := s.lowerAddrs(ctx, p.Get("addrid"))
+		if lower == "" {
+			return respFail(infoNoDataCnt)
+		}
+		where += " AND `addrid` in (" + lower + ")"
 	}
 
 	const avgSub = "(SELECT avg(c.`price`) FROM `__T__travel_ticketinfo` c WHERE c.`ticketid` = l.`id` AND c.`typeid` = '1')"
@@ -85,10 +100,11 @@ func (s *Service) agencyList(req *ajax.Request) ajax.Response {
 		}
 		sub1 := strings.Replace(avgSub, "__T__", s.prefix, 1)
 		sub2 := strings.Replace(avgSub+" AND c.`price`", "__T__", s.prefix, 1)
+		// PHP empty() 语义："0" 为空 → ",200" 走仅上限、"200," 走仅下限（不是 BETWEEN）。
 		switch {
-		case p0 == "":
+		case !truthy(p0):
 			where += " AND ( (" + sub1 + ") is null or (" + sub2 + " < " + p1 + "))"
-		case p1 == "":
+		case !truthy(p1):
 			where += " AND (" + sub2 + " > " + p0 + ")"
 		default:
 			where += " AND (" + sub2 + " BETWEEN " + p0 + " AND " + p1 + ")"
@@ -97,10 +113,11 @@ func (s *Service) agencyList(req *ajax.Request) ajax.Response {
 	if truthy(search) {
 		sids := s.storeLikeSids(ctx, search)
 		if len(sids) > 0 {
-			where += " AND (`title` like '%" + search + "%' OR `company` in (" + strings.Join(sids, ",") + "))"
+			where += " AND (`title` like ? OR `company` in (" + strings.Join(sids, ",") + "))"
 		} else {
-			where += " AND `title` like '%" + search + "%'"
+			where += " AND `title` like ?"
 		}
+		wargs = append(wargs, "%"+search+"%")
 	}
 
 	archives := "SELECT `id`, `title`, `userid`, `company`, `flag`, `address`, `missiontime`, `pics`, `video`, `travelservice`, `tag`, `cityid`, `typeid`, `addrid`, `click`, `pubdate`, `ywday`,(" +
@@ -108,21 +125,21 @@ func (s *Service) agencyList(req *ajax.Request) ajax.Response {
 		"travel_ticketinfo` c WHERE c.`ticketid` = l.`id` AND c.`typeid` = '1' ) AS sale, `state`  FROM `" +
 		s.prefix + "travel_agency` l WHERE 1 = 1" + where
 
-	totalCount := s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_agency` l WHERE 1 = 1"+where)
+	totalCount := s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_agency` l WHERE 1 = 1"+where, wargs...)
 	if looseZero(totalCount) {
 		return respFail(infoNoDataCnt)
 	}
 
 	pageinfo := basePageinfo(page, pageSize, totalCount)
 	if phpInt(p.Get("u")) == 1 && viewer > -1 {
-		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", nil)
+		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", wargs)
 		pageinfo.set("gray", gray)
 		pageinfo.set("audit", audit)
 		pageinfo.set("refuse", refuse)
 	}
 
 	q := archives + agencyListOrderby(p.Get("orderby")) + limitClause(page, pageSize)
-	rows, ok := s.queryRows(ctx, q)
+	rows, ok := s.queryRows(ctx, q, wargs...)
 	if !ok {
 		return respOK(pagedPayloadList(pageinfo, []any{}))
 	}

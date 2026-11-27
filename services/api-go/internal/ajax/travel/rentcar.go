@@ -38,6 +38,7 @@ func (s *Service) rentcarList(req *ajax.Request) ajax.Response {
 	viewer := s.viewerID(ctx, req)
 
 	where := ""
+	var wargs []any // 与 where 片段占位符一一对应
 	if phpInt(p.Get("u")) != 1 {
 		where += " AND `state` = 1"
 		if cityid := s.cityID(ctx, req, p.Get("cityid")); cityid > 0 {
@@ -53,13 +54,18 @@ func (s *Service) rentcarList(req *ajax.Request) ajax.Response {
 		where += s.listMemberOwn(ctx, viewer)
 	}
 	if truthy(store) {
-		where += " AND `company` = '" + store + "'"
+		where += " AND `company` = ?"
+		wargs = append(wargs, store)
 	}
-	if truthy(typeid) {
-		where += " AND `typeid` IN (" + typeid + ")"
+	if ids, ok := phpIntList(typeid); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND `typeid` IN (" + strings.Join(ids, ",") + ")"
 	}
-	if truthy(noid) {
-		where += " AND `id` NOT IN (" + noid + ")"
+	if ids, ok := phpIntList(noid); !ok {
+		return respFail(infoNoDataCnt)
+	} else if ids != nil {
+		where += " AND `id` NOT IN (" + strings.Join(ids, ",") + ")"
 	}
 	price := commaJoin(p, "price")
 	if truthy(price) {
@@ -71,17 +77,22 @@ func (s *Service) rentcarList(req *ajax.Request) ajax.Response {
 		if len(pr) > 1 {
 			p1 = pr[1]
 		}
+		// PHP empty() 语义："0" 为空 → ",200" 走仅上限、"200," 走仅下限（不是 BETWEEN）。
 		switch {
-		case p0 == "" && truthy(p1):
+		case !truthy(p0):
 			where += " AND `price` < " + p1
-		case p1 == "" && truthy(p0):
+		case !truthy(p1):
 			where += " AND `price` > " + p0
-		case p0 != "" && p1 != "":
+		default:
 			where += " AND `price` BETWEEN " + p0 + " AND " + p1
 		}
 	}
 	if truthy(p.Get("addrid")) {
 		lower := s.lowerAddrs(ctx, p.Get("addrid"))
+		if lower == "" {
+			// 非数字 addrid → PHP 语法错误面（验证口径：按空结果降级）。
+			return respFail(infoNoDataCnt)
+		}
 		sids := s.storeAddrSids(ctx, lower)
 		if len(sids) > 0 {
 			where += " AND (`company` in (" + strings.Join(sids, ",") + ") OR `addrid` in (" + lower + "))"
@@ -92,36 +103,41 @@ func (s *Service) rentcarList(req *ajax.Request) ajax.Response {
 	if truthy(search) {
 		sids := s.storeLikeSids(ctx, search)
 		if len(sids) > 0 {
-			where += " AND (`title` like '%" + search + "%' OR `company` in (" + strings.Join(sids, ",") + "))"
+			where += " AND (`title` like ? OR `company` in (" + strings.Join(sids, ",") + "))"
 		} else {
-			where += " AND `title` like '%" + search + "%'"
+			where += " AND `title` like ?"
 		}
+		wargs = append(wargs, "%"+search+"%")
 	}
 
 	archives := "SELECT `id`, `price`, `title`, `userid`, `company`, `address`, `pics`, `video`, `typeid`, `tag`, `cityid`, `addrid`, `click`, `pubdate`, `state` FROM `" +
 		s.prefix + "travel_rentcar` WHERE 1 = 1" + where
 
-	totalCount := s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_rentcar` WHERE 1 = 1"+where)
+	totalCount := s.countTotal(ctx, "SELECT COUNT(`id`) total FROM `"+s.prefix+"travel_rentcar` WHERE 1 = 1"+where, wargs...)
 	if looseZero(totalCount) {
 		return respFail(infoNoDataCnt)
 	}
 
 	pageinfo := basePageinfo(page, pageSize, totalCount)
 	if phpInt(p.Get("u")) == 1 && viewer > -1 {
-		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", nil)
+		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", wargs)
 		pageinfo.set("gray", gray)
 		pageinfo.set("audit", audit)
 		pageinfo.set("refuse", refuse)
 	}
 
 	// $where1：state 过滤只对列表 SQL 生效（PHP：$archives.$where1.$orderby_.$where）。
+	// PHP 无引号拼 `$state`：非数字 → SQL 语法错误 → 查询错误面（按空列表降级）。
 	where1 := ""
 	if phpInt(p.Get("u")) == 1 && state != "" {
+		if !isNumericString(state) {
+			return respOK(pagedPayloadList(pageinfo, []any{}))
+		}
 		where1 = " AND `state` = " + state
 	}
 	orderBy := rentcarListOrderby(p.Get("orderby"))
 	q := archives + where1 + orderBy + limitClause(page, pageSize)
-	rows, ok := s.queryRows(ctx, q)
+	rows, ok := s.queryRows(ctx, q, wargs...)
 	if !ok {
 		return respOK(pagedPayloadList(pageinfo, []any{}))
 	}
