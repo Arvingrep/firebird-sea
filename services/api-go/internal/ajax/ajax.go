@@ -30,6 +30,18 @@ var callbackPattern = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$.]{0,127}$`)
 type Response struct {
 	State int `json:"state"`
 	Info  any `json:"info"`
+	// Raw 非空时 Router 直接输出 Body，不再做 JSON / JSONP 编码。
+	// 对应 PHP 里 die() 的分支：die 会立刻结束请求、只打印那段文本，
+	// 走不到 ajax.php 末尾的 header("Content-type: application/json") + json_encode。
+	// 实测 PHP 7.4 此时发的是 Content-Type: text/html; charset=utf-8。
+	Raw *Raw `json:"-"`
+}
+
+// Raw 是原样输出体（对应 PHP die() 的纯文本响应）。
+type Raw struct {
+	Body string
+	// ContentType 为空取 PHP 的默认值 text/html; charset=utf-8。
+	ContentType string
 }
 
 // Request 是处理函数看到的请求。
@@ -88,6 +100,16 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	callback := requestValue(req, "callback")
 
 	response := handler(&Request{Service: service, Action: action, Params: params, HTTP: req})
+	// die() 分支：原样输出，不做 JSON 编码、也不套 JSONP 回调（PHP 在 die 时走不到回调包装）。
+	if response.Raw != nil {
+		contentType := response.Raw.ContentType
+		if contentType == "" {
+			contentType = "text/html; charset=utf-8"
+		}
+		w.Header().Set("Content-Type", contentType)
+		_, _ = w.Write([]byte(response.Raw.Body))
+		return
+	}
 	payload, err := encode(response)
 	if err != nil {
 		r.logf(fmt.Sprintf("ajax: %s.%s 返回值无法编码: %v", service, action, err))
