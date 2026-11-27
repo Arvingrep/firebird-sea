@@ -1,0 +1,23 @@
+{
+  "$schema": "./schema.json",
+  "service": "member",
+  "action": "pay",
+  "cases": [
+    {"name": "无参数：没有 ordertype / ordernum → die 纯文本", "method": "GET", "params": {}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype 显式空串 → die", "method": "GET", "params": {"ordertype": ""}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype=0（PHP empty） → die", "method": "GET", "params": {"ordertype": "0"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype 未知方法 → die", "method": "GET", "params": {"ordertype": "nosuch"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype=_filter_x（截断后为空） → die", "method": "GET", "params": {"ordertype": "_filter_x"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype 是数组 → die", "method": "GET", "params": {"ordertype[]": "message"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype=message 命中白名单 → 分发后落 102", "method": "GET", "params": {"ordertype": "message"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype=message_filter_user（截断） → 102", "method": "GET", "params": {"ordertype": "message_filter_user"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype=detail（另一个白名单目标） → 102", "method": "GET", "params": {"ordertype": "detail"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype=updateAccount（白名单内，目标自返 101 被丢弃） → 102", "method": "GET", "params": {"ordertype": "updateAccount"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype=MESSAGE（方法名不区分大小写） → 102", "method": "GET", "params": {"ordertype": "MESSAGE"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordertype=message_FILTER_user（标记区分大小写） → die", "method": "GET", "params": {"ordertype": "message_FILTER_user"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordernum 在 pay_log 里查不到 → die", "method": "GET", "params": {"ordernum": "__no_such_ordernum__"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "ordernum=0（empty，不回查） → die", "method": "GET", "params": {"ordernum": "0"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "POST ordertype 未知方法 → die", "method": "POST", "params": {"ordertype": "nosuch"}, "requiresLogin": false, "ignoreFields": []},
+    {"name": "POST ordertype=message → 102", "method": "POST", "params": {"ordertype": "message"}, "requiresLogin": false, "ignoreFields": []}
+  ]
+}
