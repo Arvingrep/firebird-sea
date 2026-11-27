@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -334,5 +335,40 @@ func TestPHPIntKey(t *testing.T) {
 		if _, ok := phpIntKey(in); ok != want {
 			t.Fatalf("phpIntKey(%q) = %v, want %v", in, ok, want)
 		}
+	}
+}
+
+// 仓库里 19 处 createPayForm("member", ...) 实际写进 body 的 type 只有下面这些
+// （webroot/api/handlers/member.class.php 逐处扫描）。它们全都不是 member 的方法名，
+// 或者落在资金排除名单里 —— 所以「带 array_merge 参数派到白名单目标」在真实数据里不可达。
+func TestPayRealBodyTypesAllDie(t *testing.T) {
+	for _, typ := range []string{
+		"deposit", "recharge", "join_pay", "promotion", "fabu", "fabuPay",
+		"fenxiaoJoin", "waimai", "shop", "house", "user",
+	} {
+		svc, m := newService(t, nil)
+		body := `a:1:{s:4:"type";s:` + strconv.Itoa(len(typ)) + `:"` + typ + `";}`
+		m.ExpectQuery(qPayLog).WithArgs("SN12").
+			WillReturnRows(sqlmock.NewRows([]string{"body"}).AddRow(body))
+		if got := do(t, svc, "GET", payURL("&ordernum=SN12"), ""); got != payDieBody {
+			t.Fatalf("type=%s 响应体 = %q, want %q", typ, got, payDieBody)
+		}
+		met(t, m)
+	}
+}
+
+// body 里的布尔值按 PHP 的类型语义落成 "true"/""：is_numeric 为假、empty 为真。
+func TestPayScalarKeepsBoolSemantics(t *testing.T) {
+	if got := payScalar(true); got != "true" {
+		t.Fatalf("payScalar(true) = %q", got)
+	}
+	if got := payScalar(false); got != "" {
+		t.Fatalf("payScalar(false) = %q", got)
+	}
+	if isNumeric(payScalar(true)) {
+		t.Fatalf("true 不应被当成数字（PHP is_numeric(true) 为假）")
+	}
+	if !isNumeric(payScalar(int64(9))) {
+		t.Fatalf("int 应转成数字字符串")
 	}
 }

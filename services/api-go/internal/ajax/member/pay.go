@@ -32,10 +32,16 @@
 // 已知偏离（都写在这里，不写进正文以外的地方）：
 //   - `ordertype=pay` 在 PHP 里是无限递归，实测 HTTP 500 + 空响应体；Go 直接按未知方法处理
 //     （操作错误），复刻一个 500 崩溃没有意义，也不会把它写进对比用例。
-//   - `ordertype=updateAccount` 在白名单内（Q2 字面口径：已注册、不在资金名单）；但它只有
-//     在 pay_log.body 的 type 写成 updateAccount 时才会被命中，而仓库里没有任何写入方
-//     会产出这种 type（createPayForm 的 member 调用只写 deposit/recharge/join_pay/promotion/
-//     fabuPay/fenxiaoJoin/模块名），因此实际不可达。可否达的判断权留给后续真机验证。
+//   - 分发参数（array_merge 的结果）**不会再过一遍 ajax.php 的入口归一**，这一点与 PHP 相同；
+//     但当前 handler 内部仍在复刻入口归一（如 params.detailID 对 id 做 convertArrToStrWithComma），
+//     于是 body 里「归一后会被改写」的值（id/cityid/sid/state 的数值化、addslashes）会被二次处理。
+//     body 的类型保真也只到 url.Values 为止：PHP 的 true/false 落在 "true"/""（保 is_numeric 为假、
+//     empty 为真），数组落在 key[]（保 (int)非空数组 = 1），关联键名丢失。这几条都由 #364
+//     （入口 normaliser）统一收口，落地后分发子请求自动与 PHP 一致。
+//   - **上述参数差异目前不可达**：要被分发到白名单目标，pay_log.body 的 type 必须是
+//     message/detail/collect/... 这类名字，而仓库里 19 处 createPayForm("member", ...) 只写
+//     deposit / recharge / join_pay / promotion / fabu / fenxiaoJoin / 模块名（见
+//     TestPayRealBodyTypesAllDie），全在排除名单里或根本不是 member 方法。
 //   - unserialize 只覆盖 N/b/i/d/s/a（复用 detail.go 的解析器）。body 是对象（O/C）时 PHP
 //     的 is_array($bodyArr) 为假 → 不回填 → 操作错误，与 Go 解析失败后的走向一致。
 //   - `array_merge` 的数字键：PHP 按**插入顺序**把数字键重排成 0..n-1。Go 的 url.Values 是 map，
@@ -289,8 +295,16 @@ func clearPayParam(param url.Values, key string) {
 // 标量沿用 phpScalarString（与 PHP 的隐式转字符串一致）；数组/对象 url.Values 表达不了，
 // 置空——分发目标只读命名标量键，深层结构在这里不参与业务。
 func payScalar(v any) string {
-	if a, ok := v.(*phpArray); ok {
-		_ = a
+	switch x := v.(type) {
+	case *phpArray:
+		// 数组统一落到 key[]，这里只处理「数组套数组」的内层值。
+		return ""
+	case bool:
+		// PHP 里 true 在 is_numeric 下为假、在 empty 下为真；用 "1" 会让 is_numeric 变真，
+		// 用 "true" 才能保住这两条判断（字符串拼接场景会差，但那条路无人使用）。
+		if x {
+			return "true"
+		}
 		return ""
 	}
 	return phpScalarString(v)
