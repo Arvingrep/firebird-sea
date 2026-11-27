@@ -372,9 +372,9 @@ func (s *Service) dingCommon(req *ajax.Request) ajax.Response {
 		return ajax.Response{State: ajax.StateOK, Info: infoAlreadyDing}
 	}
 
-	// 附加会员ID：duser 空 → nuser = memberID（int 拼 SQL）；否则 duser.uid。
+	// 附加会员ID：empty($duser)（含 "0"）→ nuser = memberID（int 拼 SQL）；否则 duser.uid。
 	nuser := duser.String
-	if nuser == "" {
+	if !truthy(nuser) {
 		nuser = strconv.FormatInt(viewer, 10)
 	} else {
 		nuser = nuser + "," + strconv.FormatInt(viewer, 10)
@@ -406,15 +406,17 @@ func (s *Service) sendCommon(req *ajax.Request) ajax.Response {
 	floor := req.Params.Get("id") // PHP $id = $param['id'] → INSERT 的 floor 列
 	typ := phpInt(req.Params.Get("type"))
 
-	// PHP: $content = addslashes($param['content']) —— $param 是入口转义视图，
-	// PHPAddslashes(Params) 还原（口径同 member.sendComment）。
-	content := ajax.PHPAddslashes(req.Params.Get("content"))
+	// PHP: $content = addslashes($param['content']) —— $param 是入口转义视图
+	// （ParamsEscaped），action 自身的 addslashes 再叠一层；filter 内部的
+	// addslashes(stripslashes()) 把它原样保回来，INSERT 字面量被 MySQL 解析后
+	// 存的是「转义视图」（引号前带一层反斜杠，同 member.sendComment 的 A(P) 口径）。
+	content := ajax.PHPAddslashes(req.ParamsEscaped.Get("content"))
 	if !truthy(aid) || content == "" || content == "0" { // PHP empty()
 		return ajax.Response{State: stateParamFailed, Info: infoTravelFieldEmpty}
 	}
 	content = cnSubstrR(content, 250)
 	content = ajax.FilterSensitiveWords(content, true)
-	// INSERT 字面量 '$content' 被 MySQL 再解一层反斜杠 → 存「原文」口径。
+	// INSERT 字面量 '$content' 被 MySQL 再解一层反斜杠 → 存转义视图。
 	content = ajax.PHPStripslashes(content)
 
 	viewer := s.viewerID(ctx, req)
@@ -496,8 +498,10 @@ func (s *Service) commentDetail(req *ajax.Request) ajax.Response {
 	r := rows[0]
 
 	d := newOmap()
-	d.set("id", r.str("id"))
-	d.set("aid", r.str("aid"))
+	// 原始列直接透传（r.get 保留 SQL NULL → JSON null，同 PHP FETCH_ASSOC 的 null）；
+	// 当前表所有列 NOT NULL，实测均为字符串。
+	d.set("id", r.get("id"))
+	d.set("aid", r.get("aid"))
 
 	// 父级内容（floor>0 时）：parcontent/parusername 插在 floor 键之前。
 	floorVal := r.str("floor")
@@ -512,25 +516,25 @@ func (s *Service) commentDetail(req *ajax.Request) ajax.Response {
 		d.set("parcontent", parcontent)
 		d.set("parusername", parusername)
 	}
-	d.set("floor", floorVal)
-	d.set("userid", r.str("userid"))
-	d.set("content", r.str("content"))
-	d.set("dtime", r.str("dtime"))
-	d.set("ip", r.str("ip"))
-	d.set("ipaddr", r.str("ipaddr"))
-	d.set("good", r.str("good"))
-	d.set("bad", r.str("bad"))
-	d.set("ischeck", r.str("ischeck"))
+	d.set("floor", r.get("floor"))
+	d.set("userid", r.get("userid"))
+	d.set("content", r.get("content"))
+	d.set("dtime", r.get("dtime"))
+	d.set("ip", r.get("ip"))
+	d.set("ipaddr", r.get("ipaddr"))
+	d.set("good", r.get("good"))
+	d.set("bad", r.get("bad"))
+	d.set("ischeck", r.get("ischeck"))
 
 	// zan_userArr 插在 duser 键之前。
 	duserVal := r.str("duser")
-	zanUserArr := s.zanUserArr(ctx, host, duserVal)
+	zanUserArr, zanResTruthy := s.zanUserArr(ctx, host, duserVal)
 	d.set("zan_userArr", zanUserArr)
-	d.set("duser", duserVal)
-	d.set("type", r.str("type"))
+	d.set("duser", r.get("duser"))
+	d.set("type", r.get("type"))
 
-	// zan_has：uid != -1 且 uid ∈ duser。
-	if viewer != -1 && inNumList(viewer, duserVal) {
+	// zan_has：在 `if($res){ ... }` 内 → 查询结果 truthy（有行）且 uid != -1 且 uid ∈ duser。
+	if zanResTruthy && viewer != -1 && inNumList(viewer, duserVal) {
 		d.set("zan_has", 1)
 	} else {
 		d.set("zan_has", 0)
@@ -603,15 +607,21 @@ func phpIntStrList(raw string) string {
 
 // zanUserArr 复刻 duser 键的赞用户列表：duser 非空 → member IN(duser)，按 explode
 // 段与行 id 数值匹配（未匹配段跳过）；photo truthy → getFilePath，否则 ""。
-func (s *Service) zanUserArr(ctx context.Context, host string, duser string) []*omap {
+// 第二个返回值对应 PHP `$res` 的 truthy（有行 → true；查询错误串 truthy → true，
+// 但 foreach 不迭代 → 空数组），zan_has 判定依赖它。
+func (s *Service) zanUserArr(ctx context.Context, host string, duser string) ([]*omap, bool) {
 	out := []*omap{}
 	if !truthy(duser) {
-		return out
+		return out, false
 	}
 	mem, ok := s.queryRows(ctx,
 		"SELECT `id`, `mtype`, `nickname`, `company`, `photo` FROM `"+s.prefix+"member` WHERE `id` IN ("+phpIntStrList(duser)+")")
 	if !ok {
-		return out
+		// dsqlOper 错误串 truthy：$res 为真 → zan_has 判定可进，foreach 不迭代。
+		return out, true
+	}
+	if len(mem) == 0 {
+		return out, false
 	}
 	for _, v := range strings.Split(duser, ",") {
 		for _, m := range mem {
@@ -632,5 +642,5 @@ func (s *Service) zanUserArr(ctx context.Context, host string, duser string) []*
 			}
 		}
 	}
-	return out
+	return out, true
 }

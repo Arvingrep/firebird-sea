@@ -217,6 +217,15 @@ func TestDingCommonSuccessAndAlready(t *testing.T) {
 		t.Fatalf("dingCommon 已顶 = %s", got)
 	}
 
+	// duser="0" → PHP empty("0") → nuser 只写 uid（不带 "0," 前缀）。
+	mock.ExpectQuery("SELECT `duser` FROM `huoniao_travelcommon` WHERE `id` = ?").WithArgs("7").
+		WillReturnRows(sqlmock.NewRows([]string{"duser"}).AddRow("0"))
+	mock.ExpectExec("UPDATE `huoniao_travelcommon` SET `good` = `good` + 1 WHERE `id` = ?").WithArgs("7").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE `huoniao_travelcommon` SET `duser` = ? WHERE `id` = ?").WithArgs("1", "7").WillReturnResult(sqlmock.NewResult(0, 1))
+	if got := serve(t, svc, "/include/ajax.php?service=travel&action=dingCommon&id=7"); got != `{"state":100,"info":"ok"}` {
+		t.Fatalf("dingCommon duser=0 = %s", got)
+	}
+
 	// 行不存在 → 评论不存在或已删除！。
 	mock.ExpectQuery("SELECT `duser` FROM `huoniao_travelcommon` WHERE `id` = ?").WithArgs("9").
 		WillReturnError(sql.ErrNoRows)
@@ -280,7 +289,8 @@ func TestSendCommonContentQuoteRoundTrip(t *testing.T) {
 	// 带引号内容走 addslashes/strip 往返：入库内容 = 原文（S(A(x))=x）。
 	svc, mock := newCommentService(t, 1)
 	mock.ExpectExec("INSERT INTO `huoniao_travelcommon` (`aid`, `floor`, `userid`, `content`, `dtime`, `ip`, `ipaddr`, `good`, `bad`, `ischeck`, `duser`, `type`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
-		WithArgs("5", "", int64(1), `it's "ok"`, sqlmock.AnyArg(), sqlmock.AnyArg(), "", 0, 0, 1, "", 0).
+		// 入库 = 转义视图（PHP addslashes($param) 叠层后 filter 保回，MySQL 解析后剩一层）。
+		WithArgs("5", "", int64(1), `it\'s \"ok\"`, sqlmock.AnyArg(), sqlmock.AnyArg(), "", 0, 0, 1, "", 0).
 		WillReturnResult(sqlmock.NewResult(0, 1)) // lastid=0 → 评论失败！
 	got := serve(t, svc, "/include/ajax.php?service=travel&action=sendCommon&aid=5&content=it%27s+%22ok%22")
 	if got != `{"state":101,"info":"评论失败！"}` {
@@ -385,6 +395,26 @@ func TestCommentDetailAnonAndMissingMember(t *testing.T) {
 	wantSub := `"zan_userArr":[],"duser":"","type":"0","zan_has":0,"user":null}`
 	if !strings.Contains(got, wantSub) || strings.Contains(got, `"parcontent"`) {
 		t.Fatalf("commentDetail floor=0 形态不符 = %s", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("SQL 期望未满足: %v", err)
+	}
+}
+
+func TestCommentDetailZanHasNeedsMemberRow(t *testing.T) {
+	// duser 含 uid=1，但 member 查询无行 → PHP `$res` falsy → zan_has=0。
+	svc, mock := newCommentService(t, 1)
+	mock.ExpectQuery("SELECT `id`, `aid`, `floor`, `userid`, `content`, `dtime`, `ip`, `ipaddr`, `good`, `bad`, `ischeck`, `duser`, `type` FROM `huoniao_travelcommon` WHERE `id` = ? AND `isCheck` = 1").
+		WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"id", "aid", "floor", "userid", "content", "dtime", "ip", "ipaddr", "good", "bad", "ischeck", "duser", "type"}).
+		AddRow("2", "1", "0", "1", "顶层", "1795808691", "127.0.0.1", "", "11", "1", "1", "1", "2"))
+	mock.ExpectQuery("SELECT `id`, `mtype`, `nickname`, `company`, `photo` FROM `huoniao_member` WHERE `id` IN (1)").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "mtype", "nickname", "company", "photo"}))
+	mock.ExpectQuery("SELECT `id`, `mtype`, `nickname`, `company`, `photo` FROM `huoniao_member` WHERE `id` = ?").
+		WithArgs("1").WillReturnRows(sqlmock.NewRows([]string{"id", "mtype", "nickname", "company", "photo"}).AddRow("1", "0", "admin", "", ""))
+
+	got := serve(t, svc, "/include/ajax.php?service=travel&action=commentDetail&id=2")
+	if !strings.Contains(got, `"zan_has":0`) {
+		t.Fatalf("commentDetail 会员行缺失 zan_has=0 不符 = %s", got)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("SQL 期望未满足: %v", err)
