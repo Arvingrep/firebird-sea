@@ -9,8 +9,8 @@ import (
 	"context"
 	"database/sql"
 	"math"
-	"net"
 	"net/http"
+	"regexp"
 	"net/url"
 	"strconv"
 	"strings"
@@ -69,26 +69,36 @@ func floorTime(sec int64, now time.Time) string {
 	return times
 }
 
-// plainIP 复刻 GetIP()（common.func.php:282）：X-Forwarded-For 第一个非 unknown
-// 段 → HTTP_CLIENT_IP → REMOTE_ADDR（去端口）→ "0.0.0.0"。
+// ipExtractRe 复刻 GetIP 收尾的 preg_match("/[\d\.]{7,15}/")：取第一段 7–15 位的
+// 数字/点串（IPv4 提取；IPv6/畸形值不命中 → "0.0.0.0"）。
+var ipExtractRe = regexp.MustCompile(`[\d\.]{7,15}`)
+
+// plainIP 复刻 GetIP()（common.func.php:282-331）：X-Forwarded-For 头存在时只看它
+//（取第一个 trim 后 != "unknown" 的段，全 unknown → 空串），否则 HTTP_CLIENT_IP
+//（isset 即取，含空串），否则 REMOTE_ADDR（Go 带 ":port"，由末尾正则剥掉），否则
+// "0.0.0.0"；最后统一过 [\d\.]{7,15} 提取，不命中 → "0.0.0.0"。
 func plainIP(req *http.Request) string {
+	realip := ""
 	if req == nil {
 		return "0.0.0.0"
 	}
-	for _, v := range strings.Split(req.Header.Get("X-Forwarded-For"), ",") {
-		v = strings.TrimSpace(v)
-		if v != "" && v != "unknown" {
-			return v
+	if xff, ok := req.Header[http.CanonicalHeaderKey("X-Forwarded-For")]; ok {
+		for _, seg := range strings.Split(strings.Join(xff, ","), ",") {
+			seg = strings.TrimSpace(seg)
+			if seg != "unknown" {
+				realip = seg
+				break
+			}
 		}
+	} else if ci, ok := req.Header[http.CanonicalHeaderKey("Client-IP")]; ok {
+		realip = strings.Join(ci, ",")
+	} else if req.RemoteAddr != "" {
+		realip = req.RemoteAddr
+	} else {
+		realip = "0.0.0.0"
 	}
-	if ip := req.Header.Get("Client-IP"); ip != "" {
-		return ip
-	}
-	if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-		return host
-	}
-	if req.RemoteAddr != "" {
-		return req.RemoteAddr
+	if m := ipExtractRe.FindString(realip); m != "" {
+		return m
 	}
 	return "0.0.0.0"
 }
@@ -116,12 +126,30 @@ func (s *Service) userInfoOf(req *ajax.Request, uid string) any {
 	return s.memberDetail(sub).Info
 }
 
-// inNumList 复刻 in_array($memberID, $userArr)（needle 为 int，haystack 为字符串）：
-// PHP 8 数值字符串与 int 松散相等按数值比较，非数值字符串恒 false。
+// phpNumericRe 复刻 PHP 8 的数值字符串判定（is_numeric 语义）：首尾空白（空格/
+// \t\n\r\v\f）允许，可选符号、整数/小数、科学计数法。十六进制等不算。
+var phpNumericRe = regexp.MustCompile(`^[ \t\n\r\v\f]*[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?[ \t\n\r\v\f]*$`)
+
+// looseStrEqual 复刻 PHP 8 的字符串松散相等（`==`）：两侧都是数值字符串时按数值
+// 比较（"01" == "1"、"1e0" == "1" 为真），否则按字节比较。
+func looseStrEqual(a, b string) bool {
+	if phpNumericRe.MatchString(a) && phpNumericRe.MatchString(b) {
+		fa, _ := strconv.ParseFloat(strings.TrimSpace(a), 64)
+		fb, _ := strconv.ParseFloat(strings.TrimSpace(b), 64)
+		return fa == fb
+	}
+	return a == b
+}
+
+// inNumList 复刻 in_array($memberID(int), explode(",", $duser))：needle 为 int，
+// PHP 8 字符串与 int 比较只在字符串是数值串时按数值比较，否则恒 false
+//（"1e0"、"+1"、首尾空白均按 is_numeric 语义处理）。
 func inNumList(uid int64, raw string) bool {
 	for _, seg := range strings.Split(raw, ",") {
-		if isNumericString(seg) && phpLooseFloat(seg) == float64(uid) {
-			return true
+		if phpNumericRe.MatchString(seg) {
+			if f, err := strconv.ParseFloat(strings.TrimSpace(seg), 64); err == nil && f == float64(uid) {
+				return true
+			}
 		}
 	}
 	return false
@@ -625,7 +653,7 @@ func (s *Service) zanUserArr(ctx context.Context, host string, duser string) ([]
 	}
 	for _, v := range strings.Split(duser, ",") {
 		for _, m := range mem {
-			if isNumericString(v) && phpLooseFloat(v) == phpLooseFloat(m.str("id")) {
+			if looseStrEqual(v, m.str("id")) {
 				nickname := m.str("nickname")
 				if m.str("mtype") == "2" && truthy(m.str("company")) {
 					nickname = m.str("company")

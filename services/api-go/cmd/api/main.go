@@ -549,6 +549,10 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		// 构造失败（前缀非法）交给 article.New 统一报错。
 		files, _ = fburl.New(db, prefix, fburl.DefaultConfig())
 	}
+	// $cfg_replacestr（siteConfig.inc.php:215 现值 '傻子'，canary/本地一致）注入
+	// filterSensitiveWords 的敏感词替换（member.sendComment / travel.sendCommon 等
+	// 共用），env 可覆盖。strtr 语义在 ajax.FilterSensitiveWords 内实现。
+	ajax.ReplaceWords = envOr("FB_REPLACE_WORDS", "傻子")
 	// Identity：按 cookie `<COOKIE_PREFIX>login_user` 识别会员；构造失败（如 DB 未配置）
 	// 降级为 nil（匿名 -1），不阻止启动。article.selfmedia 与 member.message 共用同一个识别器。
 	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
