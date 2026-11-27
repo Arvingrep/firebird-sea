@@ -642,6 +642,9 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		},
 		MemberDetail: memberSvc.DetailHandler(),
 		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
+		// sendCommon（#372）的 $customCommentCheck：include/config/travel.inc.php 现值 1
+		//（仓库/本地容器/canary 一致），env 可覆盖。
+		CommentCheck: *envIntPtr("FB_TRAVEL_COMMENT_CHECK", 1),
 	})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: travel 服务装配失败: %v", err))

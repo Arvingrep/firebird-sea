@@ -78,6 +78,10 @@ type Dep struct {
 	MemberDetail ajax.Handler
 	// CookiePrefix 是 $cfg_cookiePre（getCityId 的 siteCityInfo cookie 键前缀）。
 	CookiePrefix string
+	// CommentCheck 对应 include/config/travel.inc.php 的 $customCommentCheck
+	// （sendCommon 的 ischeck；仓库/本地/canary 均为 1，main.go 默认 1）。
+	CommentCheck int
+	// Identity 识别当前会员（countryDetail 的 collect 校验用）。nil 时一律按未登录（-1）。
 }
 
 // Service 是 travel 服务的运行期对象。
@@ -92,6 +96,7 @@ type Service struct {
 	zanCheck     ZanCheckFunc
 	memberDetail ajax.Handler
 	cookiePrefix string
+	commentCheck int
 }
 
 // defaultTravelLogo / defaultTravelHotline 是 canary 的 $cfg_weblogo / $cfg_hotline
@@ -125,6 +130,7 @@ func New(dep Dep) (*Service, error) {
 		zanCheck:     dep.ZanCheck,
 		memberDetail: dep.MemberDetail,
 		cookiePrefix: dep.CookiePrefix,
+		commentCheck: dep.CommentCheck,
 	}, nil
 }
 
@@ -172,4 +178,12 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("travel", "companyAllDataList", s.companyAllDataList)
 	router.Register("travel", "getAlldata", s.getAlldata)
 	router.Register("travel", "searchTravel", s.searchTravel)
+
+	// 批次3（#372）：评论互动 5 个（common/getCommonList 读，sendCommon/dingCommon
+	// 写仅 L1，commentDetail 读）。
+	router.Register("travel", "common", s.common)
+	router.Register("travel", "getCommonList", s.getCommonList)
+	router.Register("travel", "dingCommon", s.dingCommon)
+	router.Register("travel", "sendCommon", s.sendCommon)
+	router.Register("travel", "commentDetail", s.commentDetail)
 }
