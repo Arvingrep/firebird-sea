@@ -35,18 +35,23 @@ func TestRemoveXSS(t *testing.T) {
 
 // 包含 '{'/'}'/'<p'/'<img'/'document.write'/'text/javascript' 时跳过 addslashes(stripslashes)。
 func TestRemoveXSSSkipList(t *testing.T) {
-	// 反斜杠成对：跳过 A(S(·)) 时保留原样，不跳过时 S 会剥一次
-	if got := RemoveXSS(`a\b`); got != `a\b` { // 含 '{'？不含——走 A(S)：S → ab → A → ab
-		t.Logf("a\\b → %q（走 addslashes 分支，S 剥掉反斜杠）", got)
+	// 跳过 A(S(·))：反斜杠原样保留
+	if got := RemoveXSS(`a{b\c`); got != `a{b\c` {
+		t.Fatalf("含 {{ 时应跳过 A(S(·))：got %q", got)
 	}
-	if got := RemoveXSS(`a{b`); got != `a{b` {
-		t.Fatalf("含 { 时应跳过 A(S(·))：got %q", got)
-	}
-	if got := RemoveXSS(`a\<b`); got != `a<b` { // 不含 '<p'/'<img'，走 A(S)
-		t.Logf("a\\<b → %q", got)
-	}
-	if got := RemoveXSS(`a<pb`); got != `a<pb` {
+	if got := RemoveXSS(`a<pb\c`); got != `a<pb\c` {
 		t.Fatalf("含 <p 时应跳过 A(S(·))：got %q", got)
+	}
+	if got := RemoveXSS(`a<imgb\c`); got != `a<imgb\c` {
+		t.Fatalf("含 <img 时应跳过 A(S(·))：got %q", got)
+	}
+	// 不在跳过名单：A(S(·)) 会把 a\b 的反斜杠连同下一字符剥掉
+	if got := RemoveXSS(`a\b`); got != "ab" {
+		t.Fatalf("RemoveXSS(%q) = %q, want ab（走 addslashes(stripslashes) 分支）", `a\b`, got)
+	}
+	// 实体解码发生在 A(S(·)) 之后：&#39; 解出的裸引号不会再被转义
+	if got := RemoveXSS(`abc&#39;def`); got != `abc'def` {
+		t.Fatalf("RemoveXSS(%q) = %q, want abc'def", `abc&#39;def`, got)
 	}
 }
 

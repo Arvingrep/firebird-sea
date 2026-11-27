@@ -45,8 +45,11 @@ import (
 var gpcPrefixRe = regexp.MustCompile(`^(_GET|_POST|_COOKIE)`)
 
 // NormaliseParams 复刻 ajax.php 的入口归一（见包注释）。blocked=true 表示
-// PHP 会 exit('Request var not allow!')。
-func NormaliseParams(req *http.Request) (params url.Values, blocked bool) {
+// PHP 会 exit('Request var not allow!')。第二个返回值是「PHP handler 所见的
+// $param 转义视图」（Request.ParamsEscaped）：大多数键与 params 相同，只有
+// 终态 else / rsaDecrypt 分支二者不同——PHP 的转义值在实体解码后可能含有
+// 裸引号，无法从剥过反斜杠的 params 还原，所以两份一起产出。
+func NormaliseParams(req *http.Request) (params, escaped url.Values, blocked bool) {
 	query := req.URL.Query()
 	// 解析错误不拦截：畸形的键值对被跳过，其余照常可用，与 PHP 解析 $_GET/$_POST 的宽松行为一致。
 	// 只解析 urlencoded 请求体；multipart 等第一个上传类 action 迁移时再加。
@@ -62,7 +65,7 @@ func NormaliseParams(req *http.Request) (params url.Values, blocked bool) {
 	// PHP 在 bootstrap 里对原始 GPC（含 Cookie）做 CheckRequest + _RunMagicQuotes，
 	// 键名或值（任意深度）以 _GET/_POST/_COOKIE 开头直接 exit。
 	if gpcBlocked(query, post, cookieNames, cookieValues) {
-		return nil, true
+		return nil, nil, true
 	}
 
 	// rsaEncrypt 取 $_REQUEST（GET < POST < COOKIE，后者覆盖；同名取最后一个值）。
@@ -73,9 +76,9 @@ func NormaliseParams(req *http.Request) (params url.Values, blocked bool) {
 		getAction = vs[len(vs)-1]
 	}
 
-	getPart := entryPass(query, true, rsaActive, getAction)
-	postPart := entryPass(post, false, rsaActive, "")
-	return mergeParams(getPart, postPart), false
+	getValue, getEsc := entryPass(query, true, rsaActive, getAction)
+	postValue, postEsc := entryPass(post, false, rsaActive, "")
+	return mergeParams(getValue, postValue), mergeParams(getEsc, postEsc), false
 }
 
 func gpcBlocked(query, post url.Values, cookieNames, cookieValues []string) bool {
@@ -145,13 +148,18 @@ func JSONDecodesToArray(v string) bool {
 
 // entryPass 迁移 ajax.php:54-122 的入口循环（生成 $param）。isGET 决定三处 verb
 // 不对称：terminal else 的 removeInvisibleCharacters、page/pageSize 默认值、
-// rsaEncrypt 的 resetpwd 守卫。
-func entryPass(src url.Values, isGET bool, rsaActive bool, action string) url.Values {
-	out := url.Values{}
+// rsaEncrypt 的 resetpwd 守卫。分支是 PHP 的 if/elseif 链：page/pageSize 最先，
+// rsaEncrypt 命中即写入 rsaDecrypt 结果并跳过后续分支，amount/id/... 依次排后。
+// 返回值分别是「MySQL 字面量解析后口径」（value）与「PHP handler 所见转义视图」
+// （escaped），绝大多数键二者相同。
+func entryPass(src url.Values, isGET bool, rsaActive bool, action string) (out, outEsc url.Values) {
+	out = url.Values{}
+	outEsc = url.Values{}
 	for key, values := range src {
 		// PHP 的键名是 page（page[] 在 $_GET 里也是 'page'），所以键名归一基于 base。
 		base := strings.TrimSuffix(key, "[]")
-		// 键名归一：description 之外做 htmlspecialchars(RemoveXSS(key))。
+		// 键名归一：description 之外做 htmlspecialchars(RemoveXSS(key))。后续分支
+		// 一律按归一后的键派发（PHP 的 $key 也是先归一再比较，如 %70age → page）。
 		newKey := base
 		if base != "description" {
 			newKey = phpHTMLSpecialChars74(RemoveXSS(base))
@@ -167,18 +175,12 @@ func entryPass(src url.Values, isGET bool, rsaActive bool, action string) url.Va
 		}
 		v := values[len(values)-1]
 
-		// rsaEncrypt 分支：GET 带 resetpwd 守卫，POST 没有。
-		if rsaActive && (len(v) == 172 || strings.Contains(v, "||rsa||")) {
-			if !isGET || action != "resetpwd" || newKey != "data" {
-				v = rsaDecryptValue(v)
-			}
-		}
-
+		var escaped, value string
 		switch {
-		case (base == "page" || base == "pageSize") && v != "touchHome":
+		case (newKey == "page" || newKey == "pageSize") && v != "touchHome":
 			n := phpIntval(v)
 			if isGET && n <= 0 { // POST 只做上限（<=0 留给 handler 的 empty() 兜，负数保留）
-				if base == "page" {
+				if newKey == "page" {
 					n = 1
 				} else {
 					n = 10
@@ -187,33 +189,42 @@ func entryPass(src url.Values, isGET bool, rsaActive bool, action string) url.Va
 			if n > 50000 {
 				n = 50000
 			}
-			v = strconv.Itoa(n)
-		case base == "amount":
-			v = phpFloatString(phpFloatVal(v))
-		case base == "id" || base == "cityid" || base == "sid" || base == "state":
-			v = ConvertArrToStrWithComma(v, nil, false)
-		case (base == "lng" || base == "lat" || base == "userlng" || base == "userlat") && v == "undefined":
-			v = ""
-		case base == "price" && v == "pricePlaceholder":
-			v = ""
+			escaped, value = strconv.Itoa(n), strconv.Itoa(n)
+		case rsaActive && (len(v) == 172 || strings.Contains(v, "||rsa||")) &&
+			(!isGET || action != "resetpwd" || newKey != "data"):
+			// PHP 的 elseif：命中即 $param[$key] = rsaDecrypt($value)，不再走后面分支；
+			// GET 带 resetpwd 守卫，POST 没有。rsaDecrypt 返回的是转义口径。
+			escaped = rsaDecryptValue(v)
+			value = PHPStripslashes(escaped)
+		case newKey == "amount":
+			escaped = phpFloatString(phpFloatVal(v))
+			value = escaped
+		case newKey == "id" || newKey == "cityid" || newKey == "sid" || newKey == "state":
+			escaped = ConvertArrToStrWithComma(v, nil, false)
+			value = escaped
+		case (newKey == "lng" || newKey == "lat" || newKey == "userlng" || newKey == "userlat") && v == "undefined":
+			escaped, value = "", ""
+		case newKey == "price" && v == "pricePlaceholder":
+			escaped, value = "", ""
 		case v == "undefined":
-			v = ""
+			escaped, value = "", ""
 		default:
-			// JSON 透传；否则终态 else 的 RemoveXSS 链，末尾按 MySQL 字面量解析口径
-			// 剥一次反斜杠（见包注释）。
+			// JSON 透传；否则终态 else 的 RemoveXSS 链。escaped 是 PHP 所见的转义值；
+			// value 按 MySQL 字面量解析口径再剥一次反斜杠（见包注释）。
 			if strings.Contains(v, "[{") || JSONDecodesToArray(v) {
-				// 原样保留
+				escaped, value = v, v // 原样保留
 			} else if isGET {
-				x := PHPAddslashes(PHPStripslashes(RemoveInvisibleCharacters(v)))
-				v = PHPStripslashes(RemoveXSS(x))
+				escaped = RemoveXSS(PHPAddslashes(PHPStripslashes(RemoveInvisibleCharacters(v))))
+				value = PHPStripslashes(escaped)
 			} else {
-				x := PHPAddslashes(PHPStripslashes(v))
-				v = PHPStripslashes(RemoveXSS(x))
+				escaped = RemoveXSS(PHPAddslashes(PHPStripslashes(v)))
+				value = PHPStripslashes(escaped)
 			}
 		}
-		out[newKey] = []string{v}
+		out[newKey] = []string{value}
+		outEsc[newKey] = []string{escaped}
 	}
-	return out
+	return out, outEsc
 }
 
 // entryPassArray 处理数组值：PHP 入口对数组值在特殊键分支里按 (int)/(float) 数组强转

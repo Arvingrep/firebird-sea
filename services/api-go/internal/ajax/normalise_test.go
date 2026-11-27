@@ -11,7 +11,7 @@ import (
 func normalise(t *testing.T, target string) Params {
 	t.Helper()
 	req := httptest.NewRequest("GET", target, nil)
-	got, blocked := NormaliseParams(req)
+	got, _, blocked := NormaliseParams(req)
 	if blocked {
 		t.Fatalf("%s 意外 blocked", target)
 	}
@@ -56,7 +56,7 @@ func TestPagePageSizeVerbAsymmetry(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequest("POST", "/x", strings.NewReader(form))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			got, blocked := NormaliseParams(req)
+			got, _, blocked := NormaliseParams(req)
 			if blocked {
 				t.Fatal("意外 blocked")
 			}
@@ -86,7 +86,7 @@ func TestRsaEncryptResetpwdGuard(t *testing.T) {
 	RSADecrypt = func(s string) string { return "DEC:" + s }
 
 	req := httptest.NewRequest("GET", "/x?action=resetpwd&rsaEncrypt=1&data="+payload+"&phone="+payload, nil)
-	got, _ := NormaliseParams(req)
+	got, _, _ := NormaliseParams(req)
 	if vs := got["data"]; len(vs) == 0 || vs[0] != payload {
 		t.Fatalf("GET resetpwd 的 data 不应解密: %v", vs)
 	}
@@ -95,23 +95,74 @@ func TestRsaEncryptResetpwdGuard(t *testing.T) {
 	}
 
 	req = httptest.NewRequest("GET", "/x?action=other&rsaEncrypt=1&data="+payload, nil)
-	got, _ = NormaliseParams(req)
+	got, _, _ = NormaliseParams(req)
 	if vs := got["data"]; len(vs) == 0 || vs[0] != "DEC:"+payload {
 		t.Fatalf("非 resetpwd 时 data 应解密: %v", vs)
 	}
 
 	req = httptest.NewRequest("POST", "/x?action=resetpwd", strings.NewReader("rsaEncrypt=1&data="+payload))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	got, _ = NormaliseParams(req)
+	got, _, _ = NormaliseParams(req)
 	if vs := got["data"]; len(vs) == 0 || vs[0] != "DEC:"+payload {
 		t.Fatalf("POST 无守卫，data 应解密: %v", vs)
 	}
 
 	// rsaEncrypt != 1 时整个分支不生效。
 	req = httptest.NewRequest("GET", "/x?action=other&rsaEncrypt=0&data="+payload, nil)
-	got, _ = NormaliseParams(req)
+	got, _, _ = NormaliseParams(req)
 	if vs := got["data"]; len(vs) == 0 || vs[0] != payload {
 		t.Fatalf("rsaEncrypt=0 时不应解密: %v", vs)
+	}
+}
+
+// rsaEncrypt 分支是 PHP 的 elseif：命中即写入 rsaDecrypt 结果，后面的 amount/id/
+// undefined/RemoveXSS 分支都不再处理（解密结果原样保留）。
+func TestRsaDecryptWinsOverLaterBranches(t *testing.T) {
+	defer func(orig func(string) string) { RSADecrypt = orig }(RSADecrypt)
+	RSADecrypt = func(string) string { return "9,9,abc" }
+
+	payload := strings.Repeat("a", 172)
+	req := httptest.NewRequest("GET", "/x?rsaEncrypt=1&id="+payload+"&amount="+payload+"&foo="+payload, nil)
+	got, _, blocked := NormaliseParams(req)
+	if blocked {
+		t.Fatal("意外 blocked")
+	}
+	// PHP：id/amount 的分支排在 rsa 之后，rsa 命中时解密结果不做整数/浮点转换
+	for _, key := range []string{"id", "amount", "foo"} {
+		if vs := got[key]; len(vs) == 0 || vs[0] != "9,9,abc" {
+			t.Fatalf("%s = %v, want 解密结果原样保留 [9,9,abc]", key, vs)
+		}
+	}
+}
+
+// 特殊键派发用归一后的键名：PHP 先做 htmlspecialchars(RemoveXSS($key)) 再比较，
+// %70age 经 RemoveXSS 的 rawurldecode 变成 page，命中 GET 默认值分支。
+func TestSpecialKeyDispatchUsesSanitisedKey(t *testing.T) {
+	if got := normalise(t, "/x?%2570age=0").get("page"); got != "1" {
+		t.Fatalf("page = %q, want 1（%%70age 归一后按 page 派发）", got)
+	}
+}
+
+// 转义视图（ParamsEscaped）：终态 else 分支的 PHP 所见值与 MySQL 解析口径并列产出。
+func TestEscapedView(t *testing.T) {
+	req := httptest.NewRequest("GET", "/x?a=ab%27cd&b="+url.QueryEscape(`abc&#39;def`), nil)
+	params, escaped, blocked := NormaliseParams(req)
+	if blocked {
+		t.Fatal("意外 blocked")
+	}
+	// ab'cd → PHP 转义视图 ab\'cd；MySQL 解析口径 ab'cd
+	if vs := escaped["a"]; len(vs) == 0 || vs[0] != `ab\'cd` {
+		t.Fatalf("escaped a = %v, want [ab\\'cd]", vs)
+	}
+	if vs := params["a"]; len(vs) == 0 || vs[0] != `ab'cd` {
+		t.Fatalf("params a = %v, want [ab'cd]", vs)
+	}
+	// 实体解码出的裸引号不会再被转义（PHP 同款），两个视图一致
+	if vs := escaped["b"]; len(vs) == 0 || vs[0] != `abc'def` {
+		t.Fatalf("escaped b = %v, want [abc'def]", vs)
+	}
+	if vs := params["b"]; len(vs) == 0 || vs[0] != `abc'def` {
+		t.Fatalf("params b = %v, want [abc'def]", vs)
 	}
 }
 
@@ -193,7 +244,7 @@ func TestMergeAndExcludedKeys(t *testing.T) {
 	req := httptest.NewRequest("POST", "/x?service=member&action=ping&callback=cb&_=1&a=1&list[]=x&list[]=y",
 		strings.NewReader("service=evil&a=2&list[]=z"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	got, blocked := NormaliseParams(req)
+	got, _, blocked := NormaliseParams(req)
 	if blocked {
 		t.Fatal("意外 blocked")
 	}
@@ -213,20 +264,20 @@ func TestMergeAndExcludedKeys(t *testing.T) {
 // blocked：键名或值以 _GET/_POST/_COOKIE 开头 → PHP exit('Request var not allow!')。
 func TestGPCBlocked(t *testing.T) {
 	req := httptest.NewRequest("GET", "/x?a=_GETfoo", nil)
-	if _, blocked := NormaliseParams(req); !blocked {
+	if _, _, blocked := NormaliseParams(req); !blocked {
 		t.Fatal("值以 _GET 开头应 blocked")
 	}
 	req = httptest.NewRequest("GET", "/x?_GETx=1", nil)
-	if _, blocked := NormaliseParams(req); !blocked {
+	if _, _, blocked := NormaliseParams(req); !blocked {
 		t.Fatal("键名以 _GET 开头应 blocked")
 	}
 	req = httptest.NewRequest("GET", "/x?a=ok", nil)
 	req.Header.Set("Cookie", "sid=_COOKIEv")
-	if _, blocked := NormaliseParams(req); !blocked {
+	if _, _, blocked := NormaliseParams(req); !blocked {
 		t.Fatal("Cookie 值以 _COOKIE 开头应 blocked")
 	}
 	req = httptest.NewRequest("GET", "/x?a=GETxxx", nil)
-	if _, blocked := NormaliseParams(req); blocked {
+	if _, _, blocked := NormaliseParams(req); blocked {
 		t.Fatal("前缀必须完整匹配 _GET/_POST/_COOKIE")
 	}
 }

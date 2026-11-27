@@ -38,8 +38,13 @@ type Request struct {
 	Service string
 	Action  string
 	// Params 对应 ajax.php 的 $param：GET 与 POST 合并，同名时 POST 优先（Cookie 不进入），
-	// 不含 service、action、callback、_。值未做 RemoveXSS 等处理。
+	// 不含 service、action、callback、_。值取「MySQL 字面量解析后」口径（#364），
+	// 与参数化 SQL 的存原文约定一致；需要 PHP 所见的转义视图时用 ParamsEscaped。
 	Params url.Values
+	// ParamsEscaped 是 PHP handler 所见的转义口径（#364）。绝大多数键与 Params 相同，
+	// 差异只在终态 else / rsaDecrypt 分支——转义值经实体解码后可能带裸引号/反斜杠，
+	// 无法从 Params 还原。需要比较、哈希、拼 PHP 同款字面量时读它。
+	ParamsEscaped url.Values
 	// HTTP 是原始请求，处理函数从它取 context、cookie。
 	HTTP *http.Request
 }
@@ -75,7 +80,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// 参数归一对应 common.inc.php bootstrap + ajax.php 入口循环（#364）。PHP 的 bootstrap
 	// 在 service 分发之前跑完，_GET/_POST/_COOKIE 里出现 _GET/_POST/_COOKIE 前缀的键名或
 	// 值会直接 exit，所以归一（含 blocked 判定）放在路由查找之前。
-	params, blocked := NormaliseParams(req)
+	params, escaped, blocked := NormaliseParams(req)
 	if blocked {
 		// PHP exit('Request var not allow!')：正文就是这段文本，HTTP 200。
 		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
@@ -95,7 +100,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	callback := requestValue(req, "callback")
 
-	response := handler(&Request{Service: service, Action: action, Params: params, HTTP: req})
+	response := handler(&Request{Service: service, Action: action, Params: params, ParamsEscaped: escaped, HTTP: req})
 	payload, err := encode(response)
 	if err != nil {
 		r.logf(fmt.Sprintf("ajax: %s.%s 返回值无法编码: %v", service, action, err))

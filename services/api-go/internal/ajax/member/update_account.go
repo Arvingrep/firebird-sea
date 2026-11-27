@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
@@ -157,16 +158,29 @@ func (s *Service) updateAccount(req *ajax.Request) ajax.Response {
 // norm 对应 updateAccount 用到的标量参数口径；数组形态（key[]）取不到值按空串处理
 // （PHP 里是数组，进函数后按 "Array"/TypeError 处理的极端形态不在覆盖范围）。
 //
-// #364 起入口归一在 Router 层完成：Params 保存的是「MySQL 字面量解析后」口径（E）。
-// PHP handler 看到的 $param 是转义值 X，且 S(X)=E、S(A(x))=x，所以 X = phpAddslashes(E)
-// 恒成立——这里直接加回反斜杠即可，不能再走一遍 A(S(rem(·)))（对含反斜杠的值
-// stripslashes 会被应用两次，与 PHP 不一致）。JSON 透传值入口未转义，同样原样返回。
+// #364 起入口归一在 Router 层完成：Params 保存「MySQL 字面量解析后」口径，PHP handler
+// 所见的转义视图由 ParamsEscaped 直接给出（转义值经实体解码后可能带裸引号，无法从
+// Params 还原，见 ajax.normalise.go）。norm 优先读转义视图；handler 单测直接构造
+// Request 时没有该字段，退化到 pre-#364 的 A(S(rem(·))) 口径。
 func (p params) norm(key string) string {
-	v := p.req.Params.Get(key)
+	if p.req.ParamsEscaped != nil {
+		return p.req.ParamsEscaped.Get(key)
+	}
+	return normalizeRawFallback(p.req.Params.Get(key))
+}
+
+func normalizeRawFallback(v string) string {
+	if v == "undefined" {
+		return ""
+	}
 	if strings.Contains(v, "[{") || ajax.JSONDecodesToArray(v) {
 		return v
 	}
-	return phpAddslashes(v)
+	if !utf8.ValidString(v) {
+		// preg_replace(/u) 在非法 UTF-8 上返回 null → 后续所有处理都是空串。
+		return ""
+	}
+	return phpAddslashes(phpStripslashes(removeInvisiblePattern.ReplaceAllString(v, "")))
 }
 
 // phpAddslashes 迁移 PHP addslashes（ext/standard/string.c php_addslashes）：
