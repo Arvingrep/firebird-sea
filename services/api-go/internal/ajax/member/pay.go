@@ -48,7 +48,10 @@
 //     **不保证 #364 合入后自动收敛**：#364 只把归一搬到 Router 入口，并给 Request 新增
 //     ParamsEscaped；本文件是直接构造子请求、不带 ParamsEscaped，handler 仍会走 raw fallback
 //     再归一一次（#368 的 updateAccount.norm 即如此，params.detailID 也未改动）。
-//     后续项：等 #364 合入后给子请求补上 ParamsEscaped（TODO 见 dispatch 处），差异才真正收口。
+//     后续项 ①：等 #364 合入后给子请求补上 ParamsEscaped（TODO 见 dispatch 处）——它只解决
+//     「按 ParamsEscaped 分支取值」的那批 helper（#368 的 updateAccount.norm 即是）；像
+//     params.detailID 这种无条件归一的 helper 不受影响，仍需后续项 ②：让分发子请求旁路这些
+//     helper，或把它们改成读「已归一」口径。两条都做完，差异才算收口。
 //     在该差异收口前，白名单里带写副作用的方法（sendComment / updateAccount）的**参数取值**可能与
 //     PHP 不同；两侧都会执行同一个方法、走同一套登录门禁，不引入 PHP 侧没有的能力。
 //   - unserialize 只覆盖 N/b/i/d/s/a（复用 detail.go 的解析器）。body 是对象（O/C）时 PHP

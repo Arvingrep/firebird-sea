@@ -262,7 +262,8 @@ func TestPayPayLogUsesFirstRow(t *testing.T) {
 	met(t, m)
 }
 
-// —— mergePayBody 的白盒用例：这些形态走不到分发目标，只能直接断言 ——
+// —— mergePayBody 的白盒用例：这些键形态在对比用例里覆盖不到（对比用例只走 GET/POST 的
+// 标量参数），只能直接断言；可达性见 pay.go 文件头的 article.pay 一节 ——
 
 // 字符串键覆盖：body 的同名键要清掉请求里的 key / key[] / key[sub] 三种形态。
 func TestMergePayBodyStringKeyOverridesAllShapes(t *testing.T) {
