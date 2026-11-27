@@ -201,6 +201,10 @@ type Service struct {
 	// siteModuleTable（getModuleTitle）、subTableListTable / articleListTable / travelVideoTable
 	// 是 getZan 用的表：分表清单、文章主表、travel_video 计数表。
 	siteModuleTable, subTableListTable, articleListTable, travelVideoTable string
+	// payLogTable 是 member.pay 回查 ordertype 的支付流水表。
+	payLogTable string
+	// payRoutes 是 pay() 允许分发到的目标（见 pay.go）：小写方法名 → handler。
+	payRoutes map[string]ajax.Handler
 
 	files            *fburl.Resolver
 	userDetail       UserDetailFunc
@@ -363,6 +367,7 @@ func New(dep Dep) (*Service, error) {
 		upTable: t("public_up_all"), commentTable: t("public_comment_all"), memberTable: t("member"),
 		siteModuleTable: t("site_module"), subTableListTable: t("site_sub_tablelist"),
 		articleListTable: t("articlelist"), travelVideoTable: t("travel_video"),
+		payLogTable:        t("pay_log"),
 		publicCommentTable: t("public_comment"), businessListTable: t("business_list"),
 		logSaveDays: logSaveDays, disableLikeState: disableLikeState, disableLikeInfo: disableLikeInfo,
 		disableCommentState: disableCommentState, disableCommentInfo: disableCommentInfo,
@@ -388,6 +393,8 @@ func New(dep Dep) (*Service, error) {
 	if svc.userDetail == nil {
 		svc.userDetail = svc.userDetailHook
 	}
+	// pay() 的分发白名单在这里一次性建好（只读表，Register 之后不再变）。
+	svc.payRoutes = svc.buildPayRoutes()
 	return svc, nil
 }
 
@@ -404,6 +411,7 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("member", "dingComment", s.dingComment)
 	router.Register("member", "sendComment", s.sendComment)
 	router.Register("member", "updateAccount", s.updateAccount)
+	router.Register("member", "pay", s.pay)
 }
 
 // defaultCommentCheck 是 include/config/<module>.inc.php 里 $customCommentCheck 的仓库现值
