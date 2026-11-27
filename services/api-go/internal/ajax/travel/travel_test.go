@@ -315,3 +315,78 @@ func TestTypeListValueParamErrorQuirk(t *testing.T) {
 		t.Fatalf("value=1 错误路径应为空 body，got %q", got)
 	}
 }
+
+// —— codex P2 修复回归 ——
+
+// P2-3：phpInt 应复刻 PHP 7.4 (int) 全语义（整体数字串含科学计数法完整转换，
+// 否则前缀截断；docker php7.4 实测口径）。
+func TestPhpIntFullSemantics(t *testing.T) {
+	cases := map[string]int{
+		"1e2": 100, "1e2abc": 100, "12abc": 12, "abc": 0, "": 0,
+		"1.9": 1, "-3": -3, "  5 ": 5, "0x1A": 0, "1e20": 9223372036854775807,
+		"9223372036854775807": 9223372036854775807,
+	}
+	for in, want := range cases {
+		if got := phpInt(in); got != want {
+			t.Fatalf("phpInt(%q) = %d, want %d", in, got, want)
+		}
+	}
+}
+
+// P2-4：value=1 错误路径带 callback → PHP 输出 cb()（json_encode(false) 拼接为空串）。
+func TestTypeListValueParamErrorQuirkWithCallback(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery("SELECT * FROM `huoniao_travel_rentcartype` WHERE `parentid` = 5 ORDER BY `weight` LIMIT 0, 1000").
+		WillReturnError(sql.ErrConnDone)
+	got := serve(t, svc, "/include/ajax.php?service=travel&action=rentcartype&type=5&value=1&callback=cb")
+	if got != "cb()" {
+		t.Fatalf("value=1 + callback 应输出 cb()，got %q", got)
+	}
+}
+
+// P2-5：countrytype hot="0" 走 PHP empty() 语义 → 不加 hot 过滤；typeid="0" 保持
+// != '' 语义 → 仍加过滤。
+func TestCountrytypeEmptySemantics(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery("SELECT COUNT(`id`) total FROM `huoniao_travel_visacountrytype` WHERE 1 = 1").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("0"))
+	got := serve(t, svc, "/include/ajax.php?service=travel&action=countrytype&hot=0&continent=0")
+	if got != `{"state":101,"info":"暂无数据！"}` {
+		t.Fatalf("hot=0&continent=0 应跳过过滤（empty 语义），got %s", got)
+	}
+
+	mock.ExpectQuery("SELECT COUNT(`id`) total FROM `huoniao_travel_visacountrytype` WHERE 1 = 1 AND `typeid` = '0' or `typeid` = 2").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("0"))
+	got = serve(t, svc, "/include/ajax.php?service=travel&action=countrytype&typeid=0")
+	if got != `{"state":101,"info":"暂无数据！"}` {
+		t.Fatalf("typeid=0 应保持 != '' 过滤，got %s", got)
+	}
+}
+
+// P2-1：pageinfo 数字化——page/pageSize/totalPage 数字、totalCount 字符串
+// （PDO emulated prepares 恒字符串，canary 实测 "totalCount":"2"）。
+func TestTravelitemPageinfoTypes(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery("SELECT COUNT(`id`) total FROM `huoniao_travelitem` WHERE 1 = 1").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("2"))
+	mock.ExpectQuery("SELECT  `id`, `parentid`, `typename`, `weight`, `description`, `pubdate`, `typeid` FROM `huoniao_travelitem` WHERE 1=1  ORDER BY `weight` DESC, `pubdate` DESC, `id` DESC LIMIT 0, 10").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "parentid", "typename", "weight", "description", "pubdate", "typeid"}).
+			AddRow("9001", "0", "测试甲", "5", "desc1", "1700000000", "1"))
+	got := serve(t, svc, "/include/ajax.php?service=travel&action=travelitem")
+	want := `{"state":100,"info":{"pageInfo":{"page":1,"pageSize":10,"totalPage":1,"totalCount":"2"},` +
+		`"list":[{"id":"9001","parentid":"0","typename":"测试甲","weight":"5","pubdate":"1700000000","typeid":"1","typeidname":"原件","description":"desc1"}]}}`
+	if got != want {
+		t.Fatalf("pageinfo 类型不符\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+// P2-5：travelitem aid="0" 是 PHP falsy → 不加过滤。
+func TestTravelitemAidZeroSkipsFilter(t *testing.T) {
+	svc, mock := newService(t)
+	mock.ExpectQuery("SELECT COUNT(`id`) total FROM `huoniao_travelitem` WHERE 1 = 1").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow("0"))
+	got := serve(t, svc, "/include/ajax.php?service=travel&action=travelitem&aid=0")
+	if got != `{"state":101,"info":"暂无数据！"}` {
+		t.Fatalf("aid=0 应跳过过滤，got %s", got)
+	}
+}

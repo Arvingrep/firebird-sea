@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,36 +13,45 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
 )
 
-// phpInt 复刻 PHP (int) 截断转换：取前导数字，无数字为 0（口径同 article.phpInt）。
+// phpInt 复刻 PHP 7.4 对字符串的 (int)：整体为数字串（允许首尾空白、科学计数法）时
+// 按浮点解析后截断（"1e2"→100、"1e2abc"→100、"1.9"→1、"  5 "→5、"0x1A"→0、"abc"→0），
+// 溢出饱和到 int64 极值。口径与 ajax.phpIntval 一致（docker php7.4 实测核对）。
 func phpInt(raw string) int {
-	trimmed := strings.TrimLeft(raw, " \t\n\r\x0B\x0C")
-	i, negative := 0, false
-	if i < len(trimmed) && (trimmed[i] == '+' || trimmed[i] == '-') {
-		negative = trimmed[i] == '-'
-		i++
-	}
-	start := i
-	value := 0
-	for ; i < len(trimmed) && trimmed[i] >= '0' && trimmed[i] <= '9'; i++ {
-		value = value*10 + int(trimmed[i]-'0')
-		if value > 1<<31 {
-			value = 1 << 31
-			break
-		}
-	}
-	if i == start {
+	m := leadingNumber.FindString(raw)
+	if m == "" {
 		return 0
 	}
-	if negative {
-		return -value
+	m = strings.TrimLeft(m, " \t\n\r\x0B\x0C")
+	if intPrefix.MatchString(m) {
+		n, err := strconv.ParseInt(m, 10, 64)
+		if err != nil {
+			if strings.HasPrefix(m, "-") {
+				return -9223372036854775808
+			}
+			return 9223372036854775807
+		}
+		return int(n)
 	}
-	return value
+	f, err := strconv.ParseFloat(m, 64)
+	if err != nil && !math.IsInf(f, 0) {
+		return 0
+	}
+	switch {
+	case f >= 9223372036854775807:
+		return 9223372036854775807
+	case f <= -9223372036854775808:
+		return -9223372036854775808
+	}
+	return int(f)
 }
 
 // phpSon 复刻 `$param['son'] == 0 ? false : true`（PHP 7.4：字符串与 0 比较时
 // 取前导数字，无数字为 0）。缺参 null==0 → false；"abc"、""、"0" → false。
 // 口径同 article.phpSon（leadingNumber 正则 + ParseFloat）。
 var leadingNumber = regexp.MustCompile(`^[ \t\n\r\x0B\x0C]*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?`)
+
+// intPrefix 是 phpInt 的纯整数串判定（前缀解析后为 \d+ 才走整型路径）。
+var intPrefix = regexp.MustCompile(`^[+-]?[0-9]+$`)
 
 func phpSon(raw string) bool {
 	m := leadingNumber.FindString(raw)
@@ -67,7 +77,13 @@ type typeRow struct {
 	Longitude *string `json:"longitude,omitempty"`
 	Latitude  *string `json:"latitude,omitempty"`
 	Title     string  `json:"title"`
-	Litpic    *string `json:"litpic,omitempty"`
+	// Note 仅当表有 note 列时输出（PHP isset($results[$kk]['note'])）。
+	Note *string `json:"note,omitempty"`
+	Litpic *string `json:"litpic,omitempty"`
+	// IconURL / Icon 仅当表有 icon 列时输出（PHP isset($v['icon'])）：
+	// iconturl = empty(icon) ? '' : getFilePath(icon)；icon = iconturl（API 侧 HUONIAOADMIN=''）。
+	IconURL *string `json:"iconturl,omitempty"`
+	Icon    *string `json:"icon,omitempty"`
 	// Pinyin / WeatherCode 仅 site_area 输出（PHP 恒写，空值也是 ""）；其它表不写键 → nil。
 	Pinyin      *string `json:"pinyin,omitempty"`
 	WeatherCode *string `json:"weather_code,omitempty"`
@@ -161,6 +177,23 @@ func (s *Service) getTypeList(ctx context.Context, host, tab string, id int, son
 			}
 			item.Litpic = &pic
 		}
+		// note：PHP isset($results[$kk]['note']) → 列存在才写键（值原样）。
+		if v, ok := r["note"]; ok {
+			note := v
+			item.Note = &note
+		}
+		// iconturl/icon：PHP isset($v['icon']) → 列存在才写键；iconturl = empty(icon)
+		// ? '' : getFilePath(icon)；icon = iconturl（API 侧 HUONIAOADMIN 恒空）。
+		if v, ok := r["icon"]; ok {
+			iu := ""
+			if v != "" && v != "0" && s.files != nil {
+				if u, ferr := s.files.File(ctx, v, fburl.Options{Host: host}); ferr == nil {
+					iu = u
+				}
+			}
+			item.IconURL = &iu
+			item.Icon = &iu
+		}
 		if tab == "site_area" {
 			py := strings.ToLower(r["pinyin"])
 			item.Pinyin = &py
@@ -223,9 +256,15 @@ func (s *Service) typeListAction(req *ajax.Request, tab string) ajax.Response {
 		// PHP：getTypeList catch 返回 array(state=200, info=...) —— 真值数组。
 		// value=0 时原样返回 → getHandle 命中 state==200 → 101 分类获取失败！；
 		// value=1 时 foreach 把错误数组当行集遍历，info 文案被字符串下标切成单个字节
-		// （非法 UTF-8）→ json_encode 失败 → 空 body（HTTP 200）。canary 实测一致。
+		// （非法 UTF-8）→ json_encode 失败 → false。输出段 echo $callback."(".json_encode(...)
+		// 把 false 拼成空串 → 有 callback 输出 cb()（4 字节）、无 callback 空 body
+		// （HTTP 200，canary 实测一致）。JSONP 包装口径见 ajax.CallbackName。
 		if value != 0 {
-			return ajax.Response{Raw: &ajax.Raw{Body: ""}}
+			body := ""
+			if cb := ajax.CallbackName(req.HTTP); cb != "" {
+				body = cb + "()"
+			}
+			return ajax.Response{Raw: &ajax.Raw{Body: body}}
 		}
 		return ajax.Response{State: stateParamFailed, Info: infoTypeFailed}
 	}

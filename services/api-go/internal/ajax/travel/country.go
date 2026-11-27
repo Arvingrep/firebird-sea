@@ -25,10 +25,14 @@ type travelItemRow struct {
 }
 
 // pageinfo 是 travelitem / countrytype 的分页头（PHP 数组顺序一致）。
+// page/pageSize 来自入口 normaliser 的 (int) 强转（ajax.php:59-61）、totalPage 是
+// ceil() 结果（json_encode 后同为数字）——三者 JSON 数字；totalCount 经 getCache →
+// dsqlOper（PDO emulated prepares 恒返回字符串）→ $results[0]['total'] 保持字符串
+// —— JSON 字符串（canary 实测 "totalCount":"2"）。
 type pageinfo struct {
-	Page       string `json:"page"`
-	PageSize   string `json:"pageSize"`
-	TotalPage  string `json:"totalPage"`
+	Page       int    `json:"page"`
+	PageSize   int    `json:"pageSize"`
+	TotalPage  int    `json:"totalPage"`
 	TotalCount string `json:"totalCount"`
 }
 
@@ -79,7 +83,8 @@ func (s *Service) travelitem(req *ajax.Request) ajax.Response {
 		ctx = req.HTTP.Context()
 	}
 	where := ""
-	if aid := req.Params.Get("aid"); aid != "" {
+	// PHP if($aid)：PHP 真值判断，""/"0" 都是 falsy（"0" 不加过滤）。
+	if aid := req.Params.Get("aid"); aid != "" && aid != "0" {
 		if !aidPattern.MatchString(aid) {
 			// PHP 拼进 SQL 会直接报错 → count 失败 → 暂无数据。Go 同响应。
 			return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
@@ -87,6 +92,8 @@ func (s *Service) travelitem(req *ajax.Request) ajax.Response {
 		where = " AND `id` in (" + aid + ")"
 	}
 
+	// 入口 normaliser 已把 page/pageSize (int) 强转（GET ≤0 取默认 1/10、上限 50000）；
+	// 这里只兜 POST 直传或缺参的 0/""（PHP empty()）。
 	pageSize := req.Params.Get("pageSize")
 	if pageSize == "" || pageSize == "0" {
 		pageSize = "10"
@@ -95,6 +102,8 @@ func (s *Service) travelitem(req *ajax.Request) ajax.Response {
 	if page == "" || page == "0" {
 		page = "1"
 	}
+	pageN := phpInt(page)
+	pageSizeN := phpInt(pageSize)
 
 	if s.db == nil {
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
@@ -106,13 +115,13 @@ func (s *Service) travelitem(req *ajax.Request) ajax.Response {
 		// PHP：dsqlOper 异常返回错误串（==0 为 true）或真 0 → 暂无数据。
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
 	}
-	totalPage := int(math.Ceil(phpLooseFloat(totalCount) / phpLooseFloat(pageSize)))
+	totalPage := int(math.Ceil(phpLooseFloat(totalCount) / phpLooseFloat(strconv.Itoa(pageSizeN))))
 
-	atpage := int(phpLooseFloat(pageSize) * (phpLooseFloat(page) - 1))
+	atpage := pageSizeN * (pageN - 1)
 	order := " ORDER BY `weight` DESC, `pubdate` DESC, `id` DESC"
 	q := "SELECT  `id`, `parentid`, `typename`, `weight`, `description`, `pubdate`, `typeid` FROM `" +
 		s.prefix + "travelitem` WHERE 1=1 " + where + order +
-		" LIMIT " + strconv.Itoa(atpage) + ", " + pageSize
+		" LIMIT " + strconv.Itoa(atpage) + ", " + strconv.Itoa(pageSizeN)
 	rows, qerr := s.db.QueryContext(ctx, q)
 	if qerr != nil {
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
@@ -138,7 +147,7 @@ func (s *Service) travelitem(req *ajax.Request) ajax.Response {
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
 	}
 	return ajax.Response{State: ajax.StateOK, Info: pagedPayload{
-		PageInfo: pageinfo{Page: page, PageSize: pageSize, TotalPage: strconv.Itoa(totalPage), TotalCount: totalCount},
+		PageInfo: pageinfo{Page: pageN, PageSize: pageSizeN, TotalPage: totalPage, TotalCount: totalCount},
 		List:     list,
 	}}
 }
@@ -178,15 +187,19 @@ func (s *Service) countrytype(req *ajax.Request) ajax.Response {
 		ctx = req.HTTP.Context()
 	}
 	where := ""
-	if hot := req.Params.Get("hot"); hot != "" {
+	// PHP !empty($hot)：""/"0" 跳过过滤；其它真值（含非数字）→ `hot` = 1。
+	if hot := req.Params.Get("hot"); hot != "" && hot != "0" {
 		where = " AND `hot` = 1"
 	}
-	if continent := req.Params.Get("continent"); continent != "" {
+	// PHP !empty($continent)：""/"0" 跳过；非数字串 PHP 拼进 SQL 比较得 0 行 → 暂无数据，
+	// Go 白名单拒绝 → 同响应（偏差已报备）。
+	if continent := req.Params.Get("continent"); continent != "" && continent != "0" {
 		if !numericPattern.MatchString(continent) {
 			return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
 		}
 		where = " AND `continent` = '" + continent + "'"
 	}
+	// PHP $typeid != ''：与 hot/continent 源码写法不同，"0" 也走过滤（typeid = '0'）。
 	typeid := req.Params.Get("typeid")
 	if typeid != "" {
 		if !numericPattern.MatchString(typeid) {
@@ -205,6 +218,7 @@ func (s *Service) countrytype(req *ajax.Request) ajax.Response {
 		order = " ORDER BY `py` ASC, `hot` DESC"
 	}
 
+	// 入口 normaliser 已把 page/pageSize (int) 强转；这里只兜 POST 直传或缺参的 0/""。
 	pageSize := req.Params.Get("pageSize")
 	if pageSize == "" || pageSize == "0" {
 		pageSize = "10"
@@ -213,6 +227,8 @@ func (s *Service) countrytype(req *ajax.Request) ajax.Response {
 	if page == "" || page == "0" {
 		page = "1"
 	}
+	pageN := phpInt(page)
+	pageSizeN := phpInt(pageSize)
 
 	if s.db == nil {
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
@@ -223,12 +239,12 @@ func (s *Service) countrytype(req *ajax.Request) ajax.Response {
 	if err != nil || totalCount == "0" {
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
 	}
-	totalPage := int(math.Ceil(phpLooseFloat(totalCount) / phpLooseFloat(pageSize)))
+	totalPage := int(math.Ceil(phpLooseFloat(totalCount) / phpLooseFloat(strconv.Itoa(pageSizeN))))
 
-	atpage := int(phpLooseFloat(pageSize) * (phpLooseFloat(page) - 1))
+	atpage := pageSizeN * (pageN - 1)
 	q := "SELECT  `id`, `parentid`, `typename`, `weight`, `pubdate`, `icon`, `pinyin`, `py`, `hot`, `price`, `continent`, `typeid` FROM `" +
 		s.prefix + "travel_visacountrytype` WHERE 1=1 " + where + order +
-		" LIMIT " + strconv.Itoa(atpage) + ", " + pageSize
+		" LIMIT " + strconv.Itoa(atpage) + ", " + strconv.Itoa(pageSizeN)
 	rows, qerr := s.db.QueryContext(ctx, q)
 	if qerr != nil {
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
@@ -267,7 +283,7 @@ func (s *Service) countrytype(req *ajax.Request) ajax.Response {
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
 	}
 	return ajax.Response{State: ajax.StateOK, Info: pagedPayload{
-		PageInfo: pageinfo{Page: page, PageSize: pageSize, TotalPage: strconv.Itoa(totalPage), TotalCount: totalCount},
+		PageInfo: pageinfo{Page: pageN, PageSize: pageSizeN, TotalPage: totalPage, TotalCount: totalCount},
 		List:     list,
 	}}
 }

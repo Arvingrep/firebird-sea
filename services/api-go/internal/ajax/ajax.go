@@ -27,6 +27,22 @@ const StateOK = 100
 // 真实前端（jQuery 生成的 jQuery123_456 和手写函数名）都能通过。
 var callbackPattern = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$.]{0,127}$`)
 
+// CallbackName 返回白名单口径的 JSONP 回调名（口径同 JSONP 包装路径；不匹配为空串）。
+// 供 Raw 路径复刻 PHP「json_encode 失败 → false 拼接为空 → 输出 cb()」的分支：
+// ajax.php 是 echo $callback."(".json_encode($return).")"，json_encode 返回 false
+// 时字符串拼接得到 callback + "()"（canary 实测 4 字节），而不是 cb(false)。
+// 偏差：PHP 对回调名只做黑名单清洗（非法名也会原样拼出），Go 侧沿用白名单。
+func CallbackName(req *http.Request) string {
+	if req == nil {
+		return ""
+	}
+	cb := requestValue(req, "callback")
+	if callbackPattern.MatchString(cb) {
+		return cb
+	}
+	return ""
+}
+
 // Response 是 ajax.php 的返回结构；字段顺序与 PHP 数组一致。
 type Response struct {
 	State int `json:"state"`
