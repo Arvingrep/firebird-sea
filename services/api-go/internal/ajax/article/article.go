@@ -47,9 +47,28 @@ type Dep struct {
 	// SharePic / WebLogo / Hotline 对应 PHP $cfg_sharePic / $cfg_weblogo / $cfg_hotline（article.config 用）。
 	// 空串分别回落到 canary 现状值。
 	SharePic, WebLogo, Hotline string
-	// Detail 对应 article.detail（#260，尚未迁移）。alist 的 dynamicid 分支会逐条转调它；
+	// Detail 对应 article.detail。alist 的 dynamicid 分支会逐条转调它；
 	// nil 时该 action 直接返回 102 "No data!"（已知偏差，见 alist 注释）。
 	Detail func(req *ajax.Request) ajax.Response
+
+	// —— detail（#260）的跨 action 依赖。PHP 的 detail() 内部走完整 handler 派发去调
+	// member.detail / article.selfmediaDetail / member.collect / member.getZan；
+	// Go 侧没有全局派发器，按函数注入（nil 时对应字段降级，见 detail.go）。——
+
+	// MemberDetail 对应 $userLogin->getMemberInfo($admin, 1) → handlers("member","detail")。
+	// nil 时 member 字段恒为 []。
+	MemberDetail func(req *ajax.Request) ajax.Response
+	// CollectCheck 对应 checkIsCollect()：模块/模板/动作/ID 由调用方给，登录态取自同一个请求。
+	// 返回 member.collect 的 info（"has" / "no" / "ok"），状态非 100 时返回空串。
+	CollectCheck func(req *ajax.Request, module, temp, action, id string) string
+	// ZanCheck 对应 checkIsZan()：返回 member.getZan 的 info（"has" / "no"），非 100 时空串。
+	ZanCheck func(req *ajax.Request, module, temp, id string) string
+	// RealVideoURL 对应 getRealVideoUrl()（腾讯视频要外部 HTTP，仓库里不发起外部请求）。
+	// nil 时按「解析失败」原样返回（与 alist 同口径）。
+	RealVideoURL func(ctx context.Context, raw string) string
+	// Site 是 rewardList 拼「/user/<id>」链接需要的站点标量（见 site.go）。
+	// 零值按 DefaultSite 处理：它只影响 URL 前缀，不该让整个服务起不来。
+	Site Site
 }
 
 // Service 是 article 服务的实现。
@@ -68,12 +87,24 @@ type Service struct {
 	smTable, smNewsTable, smFollowTable string
 	// al* 是 alist（#252）用到的表名（已带前缀）。
 	alTable, alPicTable, alCommentTable, alRewardTable, alUpTable, alAttachmentTable string
-	members                                                                          MemberResolver
-	dataShare                                                                        bool
-	cookiePrefix                                                                     string
-	sharePic, webLogo, hotline                                                       string
-	detail                                                                           func(req *ajax.Request) ajax.Response
-	payTable, rewardTbl, listTable                                                   string
+	// dt* 是 detail（#260）用到的表名（已带前缀）。
+	dtMemberTable, dtArticle, dtPic, dtCommentAll, dtReward, dtSdArctype, dtHistory string
+	dtSubTableList, dtArticleList                                                   string
+	members                                                                         MemberResolver
+	dataShare                                                                       bool
+	cookiePrefix                                                                    string
+	sharePic, webLogo, hotline                                                      string
+	detail                                                                          func(req *ajax.Request) ajax.Response
+	payTable, rewardTbl, listTable                                                  string
+	// detail 的跨 action 依赖（见 Dep）。
+	memberDetail func(req *ajax.Request) ajax.Response
+	collectCheck func(req *ajax.Request, module, temp, action, id string) string
+	zanCheck     func(req *ajax.Request, module, temp, id string) string
+	realVideoURL func(ctx context.Context, raw string) string
+	// memberTable 是 #@__member，rewardList 靠它 LEFT JOIN 出打赏人昵称/头像。
+	memberTable string
+	// site 是拼打赏人主页链接用的站点标量。
+	site Site
 }
 
 // New 校验依赖并预拼表名（#@__article_selfmedia_field）。
@@ -84,6 +115,10 @@ func New(dep Dep) (*Service, error) {
 	cookiePrefix := dep.CookiePrefix
 	if cookiePrefix == "" {
 		cookiePrefix = "HN_"
+	}
+	site := dep.Site
+	if site.BaseHost == "" {
+		site = DefaultSite()
 	}
 	return &Service{
 		db:                dep.DB,
@@ -106,6 +141,19 @@ func New(dep Dep) (*Service, error) {
 		alRewardTable:     "`" + dep.TablePrefix + "member_reward`",
 		alUpTable:         "`" + dep.TablePrefix + "public_up_all`",
 		alAttachmentTable: "`" + dep.TablePrefix + "attachment`",
+		dtMemberTable:     "`" + dep.TablePrefix + "member`",
+		dtArticle:         "`" + dep.TablePrefix + "article`",
+		dtPic:             "`" + dep.TablePrefix + "articlepic`",
+		dtCommentAll:      "`" + dep.TablePrefix + "public_comment_all`",
+		dtReward:          "`" + dep.TablePrefix + "member_reward`",
+		dtSdArctype:       "`" + dep.TablePrefix + "article_selfmedia_arctype`",
+		dtHistory:         "`" + dep.TablePrefix + "article_historyclick`",
+		dtSubTableList:    "`" + dep.TablePrefix + "site_sub_tablelist`",
+		dtArticleList:     "`" + dep.TablePrefix + "articlelist`",
+		memberDetail:      dep.MemberDetail,
+		collectCheck:      dep.CollectCheck,
+		zanCheck:          dep.ZanCheck,
+		realVideoURL:      dep.RealVideoURL,
 		members:           dep.Members,
 		dataShare:         dep.CustomDataShare == nil || *dep.CustomDataShare,
 		cookiePrefix:      cookiePrefix,
@@ -116,6 +164,8 @@ func New(dep Dep) (*Service, error) {
 		payTable:          "`" + dep.TablePrefix + "pay_log`",
 		rewardTbl:         "`" + dep.TablePrefix + "member_reward`",
 		listTable:         "`" + dep.TablePrefix + "articlelist_all`",
+		memberTable:       "`" + dep.TablePrefix + "member`",
+		site:              site,
 	}, nil
 }
 
@@ -130,6 +180,8 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("article", "config", s.config)
 	router.Register("article", "alist", s.alist)
 	router.Register("article", "orderDetail", s.orderDetail)
+	router.Register("article", "detail", s.detailAction)
+	router.Register("article", "rewardList", s.rewardList)
 }
 
 // orderInfo 是 orderDetail 的返回数组，字段顺序与 PHP 一致（article.class.php:3025-3071）。
@@ -516,4 +568,136 @@ func orDefault(v, d string) string {
 		return d
 	}
 	return v
+}
+
+// infoBadRequest 是 rewardList 参数非法时的固定文案（article.class.php:2416）。
+const infoBadRequest = "格式错误！"
+
+// articleRewardItem 是 rewardList 返回的一行，字段顺序与 PHP 数组一致
+// （article.class.php:2431-2437）。
+//
+// id / username 来自 LEFT JOIN 的 member 表：游客打赏（uid=-1）或会员已删时
+// join 不到，PHP 侧是 NULL，这里保持 null 而不是空串。
+type articleRewardItem struct {
+	ID       *string `json:"id"`
+	Username *string `json:"username"`
+	Photo    string  `json:"photo"`
+	Amount   string  `json:"amount"`
+	Date     string  `json:"date"`
+	URL      string  `json:"url"`
+}
+
+// articleRewardPageInfo 是 pageInfo 对象（article.class.php:2444）。
+type articleRewardPageInfo struct {
+	TotalCount int `json:"totalCount"`
+}
+
+// articleRewardInfo 是 rewardList 的 info 结构。
+type articleRewardInfo struct {
+	PageInfo articleRewardPageInfo `json:"pageInfo"`
+	List     []articleRewardItem   `json:"list"`
+}
+
+// rewardList 迁移自 article.class.php:2413-2447：
+//
+//	$aid = (int)$param['aid'];                       // 缺参/非数字 → 0
+//	if(!$aid) return array("state" => 200, "info" => '格式错误！');   // 外层改写为 101
+//	SELECT m.id, m.nickname, m.photo, r.amount, r.date
+//	  FROM member_reward r LEFT JOIN member m ON m.id = r.uid
+//	 WHERE r.module = 'article' AND r.aid = $aid AND r.state = 1
+//	 ORDER BY r.id ASC
+//	$totalCount > 0 才取 results；photo 走 getFilePath；url = 域名 + "/user/" + id
+//
+// 注意两个与其它读接口不同的点：
+//   - 返回数组恒含 pageInfo / list 两个键（非空数组），所以**查无记录也是 100**，
+//     不是 102 "No data!"（handlers.class.php:84-87 的判据是「返回值为假」）。
+//   - 不读 page / pageSize：SQL 没有 LIMIT，一次返回该文章的全部打赏记录。
+func (s *Service) rewardList(req *ajax.Request) ajax.Response {
+	// PHP 的 (int) 是截断转换（"3abc"→3、"abc"→0、"-1"→-1），不是严格解析；
+	// "-1" 截断后非 0，PHP 会照常查询并返回空列表，不能当参数错误。
+	aid := phpInt(req.Params.Get("aid"))
+	if aid == 0 {
+		return ajax.Response{State: stateParamError, Info: infoBadRequest}
+	}
+
+	if s.db == nil {
+		// 本地纯内存模式没有火鸟库：PHP 侧无库时 dsqlOper 返回 false、rowCount 记 0，
+		// 可观测结果就是「100 + 空列表」，这里保持同一形状。
+		return emptyArticleRewardResponse()
+	}
+
+	query := "SELECT m.`id`, m.`nickname`, m.`photo`, r.`amount`, r.`date` FROM " +
+		s.rewardTbl + " r LEFT JOIN " + s.memberTable + " m ON m.`id` = r.`uid`" +
+		" WHERE r.`module` = 'article' AND r.`aid` = ? AND r.`state` = 1 ORDER BY r.`id` ASC"
+
+	rows, err := s.db.QueryContext(context.Background(), query, aid)
+	if err != nil {
+		// PHP 查询失败时 rowCount 为 0，前端看到的就是空列表（不是 5xx）。
+		return emptyArticleRewardResponse()
+	}
+	defer func() { _ = rows.Close() }()
+
+	// 先把结果集读完再解析 photo：fileURL 在「数字 ID / 加密串」形态下要回查附件表，
+	// 若在 rows 未关闭时发起第二次查询，连接池被占满时会把请求卡死（PHP 也是先取
+	// results 再循环，common.func.php 的 getFilePath 不在结果集上叠加查询）。
+	type rewardRow struct {
+		id       sql.NullString
+		nickname sql.NullString
+		photo    sql.NullString
+		amount   sql.NullString
+		date     sql.NullString
+	}
+	raw := make([]rewardRow, 0, 8)
+	for rows.Next() {
+		var r rewardRow
+		if err := rows.Scan(&r.id, &r.nickname, &r.photo, &r.amount, &r.date); err != nil {
+			return emptyArticleRewardResponse()
+		}
+		raw = append(raw, r)
+	}
+	if err := rows.Err(); err != nil {
+		return emptyArticleRewardResponse()
+	}
+	_ = rows.Close()
+
+	list := make([]articleRewardItem, 0, len(raw))
+	for _, r := range raw {
+		item := articleRewardItem{
+			ID:       nullableString(r.id),
+			Username: nullableString(r.nickname),
+			Photo:    s.fileURL(r.photo.String),
+			Amount:   r.amount.String,
+			Date:     r.date.String,
+		}
+		// PHP 是字符串拼接：$cfg_secureAccess.$cfg_basehost."/user/".$val['id']，
+		// id 为 NULL 时拼成 ".../user/"（不是跳过该字段）。
+		userID := ""
+		if r.id.Valid {
+			userID = r.id.String
+		}
+		item.URL = s.site.SecureAccess + s.site.BaseHost + "/user/" + userID
+		list = append(list, item)
+	}
+
+	return ajax.Response{State: ajax.StateOK, Info: articleRewardInfo{
+		PageInfo: articleRewardPageInfo{TotalCount: len(list)},
+		List:     list,
+	}}
+}
+
+// emptyArticleRewardResponse 是「查无数据」时的固定响应。
+func emptyArticleRewardResponse() ajax.Response {
+	return ajax.Response{State: ajax.StateOK, Info: articleRewardInfo{
+		PageInfo: articleRewardPageInfo{TotalCount: 0},
+		List:     []articleRewardItem{},
+	}}
+}
+
+// nullableString 把可空列转成 JSON 的 string | null。
+func nullableString(v sql.NullString) *string {
+	if !v.Valid {
+		return nil
+	}
+	out := v.String
+	return &out
 }

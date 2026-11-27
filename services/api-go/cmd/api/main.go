@@ -553,7 +553,55 @@ func buildAjax(db *sql.DB) *ajax.Router {
 	identity := buildIdentity(db, osGetenv, func(event string, fields map[string]any) {
 		writeLog(os.Stderr, event, fields)
 	})
-	articleSvc, err := article.New(articleDep(db, prefix, files, identity, osGetenv))
+	// member 先装配：article.detail 的跨 action 依赖（member.detail / collect / getZan）要拿到
+	// 已经构造好的 member 服务（#260）。
+	memberSvc, err := ajaxmember.New(ajaxmember.Dep{
+		DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity, Files: files,
+		// $cfg_cookiePre / RenrenCrypt 密钥：与 identity 同源，供 member.detail 输出
+		// cookiePre 与 userid_encode。
+		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
+		CryptKey:     resolveCryptKey(osGetenv),
+		// sendComment(#262) 新增的依赖全部有仓库默认值，这里不覆盖：
+		// $cfg_returnInteraction_comment / $cfg_returnInteraction_commentDay 在 pointsConfig.inc.php
+		// 里没有定义 → 0（不发评论积分）；$cfg_pointName = 积分；
+		// $customCommentCheck 取 include/config/<module>.inc.php 的现值（member.New 内置默认表）。
+		// updateAccount（#261）的站点运行期配置：canary siteConfig.inc.php 里
+		// cfg_nicknameEditState='0' / cfg_nicknameEditInfo='' / cfg_nicknameEditAudit='0'，
+		// cfg_pwdLevel / cfg_cardState 未配置（0），$siteCityInfo 由请求上下文决定（Go 暂空）。
+		NicknameEditState: envIntPtr("FB_NICKNAME_EDIT_STATE", 0),
+		NicknameEditInfo:  envStrPtr("FB_NICKNAME_EDIT_INFO", ""),
+		NicknameEditAudit: envIntPtr("FB_NICKNAME_EDIT_AUDIT", 0),
+		PwdLevel:          envIntPtr("FB_PWD_LEVEL", 0),
+		CardState:         envIntPtr("FB_CARD_STATE", 0),
+		SiteCityName:      os.Getenv("FB_SITE_CITY_NAME"),
+		SiteCityID:        os.Getenv("FB_SITE_CITY_ID"),
+		NotifyVars: map[string]string{
+			"basehost":  envOr("FB_BASEHOST", ""),
+			"webname":   envOr("FB_WEBNAME", ""),
+			"shortname": envOr("FB_SHORTNAME", ""),
+			"weblogo":   envOr("FB_WEBLOGO", ""),
+			"hotline":   os.Getenv("FB_SITE_HOTLINE"),
+		},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
+	}
+	ajaxmember.Register(router, memberSvc)
+
+	// article.detail 依赖自身（alist 的 dynamicid 分支转调 detail），构造期拿不到自己，
+	// 用闭包在运行期取。
+	var articleSvc *article.Service
+	adep := articleDep(db, prefix, files, identity, osGetenv)
+	adep.MemberDetail = memberSvc.DetailHandler()
+	adep.CollectCheck = memberSvc.CollectCheck
+	adep.ZanCheck = memberSvc.ZanCheck
+	adep.Detail = func(r *ajax.Request) ajax.Response {
+		if articleSvc == nil {
+			return ajax.Response{State: 102, Info: "No data!"}
+		}
+		return articleSvc.Detail(r)
+	}
+	articleSvc, err = article.New(adep)
 	if err != nil {
 		// 前缀含非法字符是配置错误：启动期直接失败，不带病上线。
 		panic(fmt.Sprintf("ajax: article 服务装配失败: %v", err))
@@ -576,17 +624,6 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
 	}
 	siteconfig.Register(router, siteSvc)
-	memberSvc, err := ajaxmember.New(ajaxmember.Dep{
-		DB: db, TablePrefix: envOr("DB_PREFIX", "huoniao_"), Identity: identity, Files: files,
-		// $cfg_cookiePre / RenrenCrypt 密钥：与 identity 同源，供 member.detail 输出
-		// cookiePre 与 userid_encode。
-		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
-		CryptKey:     resolveCryptKey(osGetenv),
-	})
-	if err != nil {
-		panic(fmt.Sprintf("ajax: member 服务装配失败: %v", err))
-	}
-	ajaxmember.Register(router, memberSvc)
 	return router
 }
 
@@ -867,6 +904,18 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// envIntPtr / envStrPtr 把 envOr/envInt 包成 *int / *string，供 member.Dep 这类
+// 「nil 取仓库默认口径」的可选配置使用。
+func envIntPtr(key string, fallback int) *int {
+	v := envInt(key, fallback)
+	return &v
+}
+
+func envStrPtr(key, fallback string) *string {
+	v := envOr(key, fallback)
+	return &v
 }
 
 // envInt 复刻 Node 的 `Number(process.env.X) || fallback`：非数字一律回落默认值。

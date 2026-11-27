@@ -66,7 +66,10 @@ func osGetenv(k string) string { return os.Getenv(k) }
 func articleDep(db *sql.DB, prefix string, files *fburl.Resolver, identity ajaxmember.Identity, getenv func(string) string) article.Dep {
 	dep := article.Dep{DB: db, TablePrefix: prefix, Files: files, CookiePrefix: strings.TrimSpace(getenv("COOKIE_PREFIX")),
 		// 站点运行期配置，与 siteConfig 同一组环境变量；未设置时 article 包回落到 canary 现状值。
-		SharePic: getenv("FB_SITE_SHARE_PIC"), WebLogo: getenv("FB_SITE_WEB_LOGO"), Hotline: getenv("FB_SITE_HOTLINE")}
+		SharePic: getenv("FB_SITE_SHARE_PIC"), WebLogo: getenv("FB_SITE_WEB_LOGO"), Hotline: getenv("FB_SITE_HOTLINE"),
+		// 站点标量（域名 / 附件存储）供 rewardList 拼「/user/<id>」与图片绝对地址；
+		// 默认值取 siteConfig.inc.php 现值，可用 SITE_* 覆盖。
+		Site: article.SiteFromEnv(getenv)}
 	if identity != nil {
 		dep.Members = identity // Identity 与 article.MemberResolver 方法集相同
 	}

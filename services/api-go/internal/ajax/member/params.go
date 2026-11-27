@@ -106,6 +106,24 @@ func (p params) phpTruthy(key string) bool {
 	return ok
 }
 
+// keyedArray 收集 key[<下标>] 形式的参数：PHP 把 rating[123_0]=5 解析成 $param['rating']
+// 的数组，下标是 "pid_speid"（shop-order 的逐商品评价字段）。
+func (p params) keyedArray(key string) map[string]string {
+	out := map[string]string{}
+	prefix := key + "["
+	for k, v := range p.req.Params {
+		if !strings.HasPrefix(k, prefix) || !strings.HasSuffix(k, "]") {
+			continue
+		}
+		idx := k[len(prefix) : len(k)-1]
+		if idx == "" || len(v) == 0 {
+			continue
+		}
+		out[idx] = v[len(v)-1]
+	}
+	return out
+}
+
 // state 对应 convertArrToStrWithComma($value)；第二个返回值表示键是否出现。
 func (p params) state() (string, bool) {
 	if v, ok := p.req.Params["state"]; ok && len(v) > 0 {
