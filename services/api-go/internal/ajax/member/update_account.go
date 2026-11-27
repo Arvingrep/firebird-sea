@@ -26,13 +26,12 @@ import (
 // 未命中（含缺失、数组）→ 函数无 return → 102 "No data!"。101 是绝大多数错误的实际码
 // （外层 handlers 把 state 200 统一改写成 101），只有 do 未命中才是 102。
 //
-// 入参口径（ajax.php:54-123，本文件 p.norm 复刻）：
+// 入参口径（ajax.php:54-123，#364 起入口归一在 Router 层完成，本文件 p.norm 取转义视图）：
 //   - 'undefined' 在入口已被换成空串（函数里的 == "undefined" 判断全是死代码，不实现）；
-//   - 值 = addslashes(stripslashes(removeInvisibleCharacters(v)))；RemoveXSS 黑名单过滤
-//     与现有各 action 保持一致未实现（常规字符不受影响）；
+//   - 值经入口 RemoveXSS(addslashes(stripslashes(...))) 链（GET 带 removeInvisibleCharacters），
+//     Params 保存 MySQL 字面量解析后的口径；转义视图用 p.norm（phpAddslashes）还原；
 //   - 含 '[{' 或能解码成 PHP 数组的 JSON 原样保留（phoneData 通常是 URL 编码串 → 会被转义）；
-//   - PHP 把归一后的值拼进 SQL，MySQL 字面量再解一次反斜杠 → 落库/比较的最终值是
-//     再 stripslashes 一次的结果（见 storedOf）；password/paypwd 哈希的输入则是转义后的值。
+//   - password/paypwd 哈希的输入是转义后的值（p.norm），落库/比较用 storedOf 剥回。
 //
 // 已知偏差（不影响响应口径，同 #255/#259 的注记）：
 //   - member_log 的 ipaddr（getIpAddr 需要 IP 库）写空串；
@@ -158,20 +157,24 @@ func (s *Service) updateAccount(req *ajax.Request) ajax.Response {
 
 // norm 对应 updateAccount 用到的标量参数口径；数组形态（key[]）取不到值按空串处理
 // （PHP 里是数组，进函数后按 "Array"/TypeError 处理的极端形态不在覆盖范围）。
-func (p params) norm(key string) string { return ajaxEntryNormalize(p.req.Params.Get(key)) }
+//
+// #364 起入口归一在 Router 层完成：Params 保存「MySQL 字面量解析后」口径，PHP handler
+// 所见的转义视图由 ParamsEscaped 直接给出（转义值经实体解码后可能带裸引号，无法从
+// Params 还原，见 ajax.normalise.go）。norm 优先读转义视图；handler 单测直接构造
+// Request 时没有该字段，退化到 pre-#364 的 A(S(rem(·))) 口径。
+func (p params) norm(key string) string {
+	if p.req.ParamsEscaped != nil {
+		return p.req.ParamsEscaped.Get(key)
+	}
+	return normalizeRawFallback(p.req.Params.Get(key))
+}
 
-func ajaxEntryNormalize(v string) string {
+func normalizeRawFallback(v string) string {
 	if v == "undefined" {
 		return ""
 	}
-	if strings.Contains(v, "[{") {
+	if strings.Contains(v, "[{") || ajax.JSONDecodesToArray(v) {
 		return v
-	}
-	var arr []any
-	var obj map[string]any
-	if json.Unmarshal([]byte(v), &arr) == nil && arr != nil ||
-		json.Unmarshal([]byte(v), &obj) == nil && obj != nil {
-		return v // json_decode 成数组/对象 → 原样保留
 	}
 	if !utf8.ValidString(v) {
 		// preg_replace(/u) 在非法 UTF-8 上返回 null → 后续所有处理都是空串。

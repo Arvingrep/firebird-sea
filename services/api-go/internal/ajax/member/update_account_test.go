@@ -255,6 +255,21 @@ func TestUpdatePasswordAddslashesBackslash(t *testing.T) {
 	got = updGet(t, svc, `do=password&new=a\\b123456&confirm=a\\b123456`)
 	eq(t, got, `{"state":100,"info":"修改成功！"}`)
 	met(t, m)
+
+	// 实体编码的引号：入口 RemoveXSS 的实体解码发生在转义之后，PHP handler 视图是
+	// 裸引号 abc'def12345（不会再被转义）。哈希走 ParamsEscaped 转义视图，与 PHP 一致。
+	svc, m = newUpdateService(t, fakeIdentity(7), func(d *Dep) {
+		d.UserDetail = stubDetail("老王", 1, 0)
+	})
+	want3 := hashOf(`abc'def12345`)
+	m.ExpectExec(qUpdPassword).WithArgs(argEq(want3), int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	expectUpdateLog(m, "7", "修改登录密码",
+		"action=updateAccount&confirm=abc&#39;def12345&do=password&new=abc&#39;def12345&service=member",
+		"UPDATE `huoniao_member` SET `password` = '"+want3+"' WHERE `id` = 7")
+	got = updGet(t, svc, `do=password&new=abc%26%2339%3Bdef12345&confirm=abc%26%2339%3Bdef12345`)
+	eq(t, got, `{"state":100,"info":"修改成功！"}`)
+	met(t, m)
 }
 
 func TestPhpStripslashesSemantics(t *testing.T) {
