@@ -288,15 +288,21 @@ func (s *Service) videoDetail(req *ajax.Request) ajax.Response {
 	// user 投影。
 	// usertype==1：member+store 联查（PHP travel.class.php:5269-5289）；else：仅 member。
 	// PHP 的 `$member[0]['x']` 在 dsqlOper 出错（SQL 语法错误，即 userid 为 NULL/空
-	// 拼出 `id = `）时返回错误字符串，字符串下标取到首字符 `{`——照抄。
-	// 两个分支都无条件输出 userArr；$uid 被查出的会员 uid 覆盖（未命中保持 ""）。
+	// 拼出 `id = `）时返回错误字符串——truthy → 走命中分支，字符串下标取首字符 '{'。
+	// $userArr 从未初始化：命中/错误 → url,uid,photo,title,nickname（PHP 赋值序）；
+	// 空结果（店未过审/已删）→ $member falsy → 不设 url，且 $title/$member[0]['company']
+	// 均未定义 → JSON null（照抄，见第二轮评审 P2-3）。
 	if r.str("usertype") == "1" {
 		memberUID, zjcomid, title, nickname, photo := "", "", "", "", ""
+		memberTruthy := false
 		if uid == "" {
-			// SQL 语法错误 → $member[0]['x'] 首字符 '{'；getFilePath("{") 落空 → photo ""。
+			// SQL 语法错误 → $member 是错误串（truthy）→ 各下标取首字符 '{'；
+			// getFilePath("{") 落空 → photo ""。
 			memberUID, title, zjcomid, nickname = "{", "{", "{", "{"
+			memberTruthy = true
 		} else if rr, ok2 := s.queryRows(ctx, "SELECT m.`id` uid, m.`nickname`, m.`company`, m.`photo`, zjcom.`title`, zjcom.`pics`, zjcom.`id` zjcomid FROM `"+
 			s.prefix+"member` m LEFT JOIN `"+s.prefix+"travel_store` zjcom ON m.`id` = zjcom.`userid` WHERE zjcom.`state` = 1 AND zjcom.`id` = "+uid); ok2 && len(rr) > 0 {
+			memberTruthy = true
 			m := rr[0]
 			memberUID = m.str("uid")
 			title = m.str("title")
@@ -313,14 +319,21 @@ func (s *Service) videoDetail(req *ajax.Request) ajax.Response {
 			}
 		}
 		u2 := newOmap()
-		// 键序 = PHP 赋值序：url, uid, photo, title, nickname。
-		u2.set("url", s.urlOf(ctx, host, "store-detail", zjcomid))
+		// 键序 = PHP 赋值序：url（仅 $member truthy 时）、uid、photo、title、nickname。
+		if memberTruthy {
+			u2.set("url", s.urlOf(ctx, host, "store-detail", zjcomid))
+		}
 		u2.set("uid", memberUID)
 		u2.set("photo", photo)
-		u2.set("title", title)
-		u2.set("nickname", nickname)
+		if memberTruthy {
+			u2.set("title", title)
+			u2.set("nickname", nickname)
+		} else {
+			u2.set("title", nil)
+			u2.set("nickname", nil)
+		}
 		d.set("user", u2)
-		// $uid = $member[0]['uid']：后续 follow/isfollow 用会员 id（错误串 "{" → (int) → 0）。
+		// $uid = $member[0]['uid']：后续 follow/isfollow 用会员 id（错误串 "{" / 未命中 "" → (int) → 0）。
 		uid = memberUID
 	} else {
 		// $uid = $nickname = $photo = "" 起始；member 命中则覆盖，userArr 无条件赋值。
@@ -347,6 +360,9 @@ func (s *Service) videoDetail(req *ajax.Request) ajax.Response {
 		u2.set("photo", photo)
 		u2.set("url", s.userPageURL(ctx, host, memberUID))
 		d.set("user", u2)
+		// PHP：$uid 在本分支开头被重置为 ""（member 命中 → 覆盖为会员 uid；未命中/错误 → "" 或 "{"）。
+		// 后续 $uid = (int)$uid 供 follow/isfollow 使用——必须回写（第二轮评审 P2-4）。
+		uid = memberUID
 	}
 
 	// $uid = (int)$uid：后续 follow / isfollow 查询均用整型化后的 uid（如 "{" → 0）。

@@ -391,7 +391,7 @@ func (s *Service) searchTravel(req *ajax.Request) ajax.Response {
 			s.prefix + "travel_ticketinfo` c WHERE c.`ticketid` = l.`id` AND c.`typeid` = '1' ) AS price, (SELECT sum(c.`sale`) FROM `" + s.prefix +
 			"travel_ticketinfo` c WHERE c.`ticketid` = l.`id` AND c.`typeid` = '1' ) AS sale, `state`  FROM `" + s.prefix + "travel_agency` l WHERE `typeid` = " + typeid + where
 	}
-	if rows, ok := s.queryRows(ctx, agencyQ("0")); ok {
+	if rows, ok := s.queryRows(ctx, agencyQ("0"), whereArgs...); ok {
 		for _, val := range rows {
 			m := val.omapOf()
 			flagname := ""
@@ -420,7 +420,7 @@ func (s *Service) searchTravel(req *ajax.Request) ajax.Response {
 			list = append(list, m)
 		}
 	}
-	if rows, ok := s.queryRows(ctx, agencyQ("1")); ok {
+	if rows, ok := s.queryRows(ctx, agencyQ("1"), whereArgs...); ok {
 		for _, val := range rows {
 			m := val.omapOf()
 			flagname := ""

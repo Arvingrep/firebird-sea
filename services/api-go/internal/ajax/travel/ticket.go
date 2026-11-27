@@ -112,7 +112,8 @@ func (s *Service) ticketList(req *ajax.Request) ajax.Response {
 	pageinfo.set("totalCount", totalCount)
 
 	if phpInt(p.Get("u")) == 1 && viewer > -1 {
-		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", wargs)
+		// archives 的占位符顺序 = SELECT（distance 3 个）→ WHERE（wargs）。
+		gray, audit, refuse := s.grayAuditRefuse(ctx, archives, "`state`", append(append([]any{}, extraArgs...), wargs...))
 		pageinfo.set("gray", gray)
 		pageinfo.set("audit", audit)
 		pageinfo.set("refuse", refuse)

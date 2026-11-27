@@ -209,18 +209,23 @@ func isNumericString(s string) bool {
 }
 
 // phpIntList 校验逗号分隔的 id 列表（PHP 把 typeid/noid/flag 等原始值不加引号拼进
-// `in (...)`——合法数字列表结果一致；任一项非数字 → PHP SQL 语法错误 → dsqlOper 报错
-// → 暂无数据。Go 侧逐项 numeric 校验，ok=false 时调用方按同一口径返回 102，
-// 既保语义又封死注入面。空串视为「无此参数」，ok=true。
+// `in (...)`。这里逐项做 numeric 校验（MySQL 接受项内空格，PHP 拼接后同样合法，
+// 故先 TrimSpace），任一项非数字时 PHP 会产生 SQL 语法错误。
+// 注意：PHP 错误面并非统一 102——实测 hotelList/ticketList/storeList 等列表类
+// action 经 totalCount 模式落到 101「暂无数据！」（与 respFail 一致），个别 action
+// 可能落到 102「格式错误」；未逐一实测的 action 属已报备兼容性差异（见 PR #377）。
+// 空串视为「无此参数」，ok=true。
 func phpIntList(v string) ([]string, bool) {
 	if !truthy(v) {
 		return nil, true
 	}
 	parts := strings.Split(v, ",")
-	for _, p := range parts {
+	for i, p := range parts {
+		p = strings.TrimSpace(p)
 		if !isNumericString(p) {
 			return nil, false
 		}
+		parts[i] = p
 	}
 	return parts, true
 }
