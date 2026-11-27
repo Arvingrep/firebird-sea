@@ -3,9 +3,10 @@
 // 每个 service 一个子包（internal/ajax/siteconfig、internal/ajax/article……），
 // 子包导出 Register(*Router)，由 cmd/api 统一注册。未注册的 service/action 一律 404。
 //
-// 这里只做入口的通用部分：分发、合并参数、输出 JSON/JSONP。ajax.php 里其余的通用逻辑
-// （RemoveXSS、page/pageSize 归一、rsaEncrypt、站点关闭、pageInfo、dataType=html）
-// 没有在骨架里实现，等第一个依赖它们的 action 带着业务规则一起加。
+// 这里做入口的通用部分：分发、参数归一（NormaliseParams，#364：bootstrap + 入口两层，
+// 含 RemoveXSS、page/pageSize 归一、rsaEncrypt 分支）、输出 JSON/JSONP。ajax.php 里
+// 其余的通用逻辑（站点关闭、pageInfo、dataType=html）没有在骨架里实现，
+// 等第一个依赖它们的 action 带着业务规则一起加。
 package ajax
 
 import (
@@ -71,6 +72,17 @@ func (r *Router) Register(service, action string, handler Handler) {
 
 // ServeHTTP 实现 http.Handler。
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// 参数归一对应 common.inc.php bootstrap + ajax.php 入口循环（#364）。PHP 的 bootstrap
+	// 在 service 分发之前跑完，_GET/_POST/_COOKIE 里出现 _GET/_POST/_COOKIE 前缀的键名或
+	// 值会直接 exit，所以归一（含 blocked 判定）放在路由查找之前。
+	params, blocked := NormaliseParams(req)
+	if blocked {
+		// PHP exit('Request var not allow!')：正文就是这段文本，HTTP 200。
+		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+		_, _ = w.Write([]byte("Request var not allow!"))
+		return
+	}
+
 	// service/action 只认 URL，且取第一个同名参数，与 nginx 分流的 $arg_service/$arg_action
 	// 同一口径（#234）。如果也认请求体，URL 写白名单里的 action、请求体写别的，就能绕过白名单。
 	query := req.URL.Query()
@@ -81,10 +93,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// 解析错误不拦截：畸形的键值对被跳过，其余照常可用，与 PHP 解析 $_GET/$_POST 的宽松行为一致。
-	// 只解析 urlencoded 请求体；multipart 等第一个上传类 action 迁移时再加。
-	_ = req.ParseForm()
-	params := mergeParams(query, req.PostForm)
 	callback := requestValue(req, "callback")
 
 	response := handler(&Request{Service: service, Action: action, Params: params, HTTP: req})

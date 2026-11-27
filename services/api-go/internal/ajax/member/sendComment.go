@@ -66,9 +66,9 @@ type sendCommentArgs struct {
 	specation string
 }
 
-// parseSendComment 复刻 sendComment 开头的参数读取。content 的清洗口径见规则 ⑤：
-// filterSensitiveWords 只做 addslashes+RemoveXSS 等价清洗，Go 侧参数化入库存原文，
-// 因此这里只做 trim + 去 &nbsp;（circle-dynamic 再 strip_tags）。
+// parseSendComment 复刻 sendComment 开头的参数读取。content 的清洗链见下方分支注释
+// （PHP 17070-17073：filterSensitiveWords(addslashes(...)) → trim + 去 &nbsp; →
+// circle-dynamic 再 strip_tags；#364 起入口归一已带 RemoveXSS）。
 func parseSendComment(p params, httpReq *http.Request, now int64) *sendCommentArgs {
 	a := &sendCommentArgs{}
 	a.typ, _ = p.phpRaw("type")
@@ -90,11 +90,28 @@ func parseSendComment(p params, httpReq *http.Request, now int64) *sendCommentAr
 		if _, isArr := p.req.Params["content[]"]; !isArr {
 			raw, _ = p.phpRaw("content")
 		}
-		content := strings.Trim(strings.ReplaceAll(raw, "&nbsp;", ""), phpTrimChars)
-		if a.typ == "circle-dynamic" {
-			content = stripTagsRe.ReplaceAllString(content, "")
+		// PHP 17070-17073：content = $type=='shop-order' ? $param['content']
+		//   : filterSensitiveWords(addslashes($param['content']))，
+		// 随后非 shop-order 做 trim + 去 &nbsp;，circle-dynamic 再 strip_tags。
+		// $param['content'] 是入口归一的转义值；Params 保存的是 MySQL 解析后口径，
+		// 先 addslashes 还原成转义值，再走 PHP 的 handler 链，存储前按 MySQL 字面量
+		// 解析口径剥回（S(A(x))=x，往返无损）。
+		if a.typ != "shop-order" && raw != "" {
+			escaped := ajax.PHPAddslashes(raw)
+			escaped = ajax.FilterSensitiveWords(ajax.PHPAddslashes(escaped), true)
+			escaped = strings.Trim(strings.ReplaceAll(escaped, "&nbsp;", ""), phpTrimChars)
+			if a.typ == "circle-dynamic" {
+				escaped = stripTagsRe.ReplaceAllString(escaped, "")
+			}
+			raw = ajax.PHPStripslashes(escaped)
+		} else {
+			content := strings.Trim(strings.ReplaceAll(raw, "&nbsp;", ""), phpTrimChars)
+			if a.typ == "circle-dynamic" {
+				content = stripTagsRe.ReplaceAllString(content, "")
+			}
+			raw = content
 		}
-		a.content = content
+		a.content = raw
 	}
 	a.pics, _ = p.phpRaw("pics")
 	a.audio, _ = p.phpRaw("audio")
@@ -147,8 +164,9 @@ func sco1Optional(typ string) bool {
 //   - clearCache('tieba_detail'/'tieba_list') 是站点侧缓存清理，Go 侧无缓存层，跳过；
 //   - INSERT 后 dsqlOper lastid 的 public_comment 分表 checkCreateTable 是建表维护动作，跳过；
 //   - getIpAddr 需要 IP 库，ipaddr 写空串（check 输出里的 ipaddr/iphome 因此为空）；
-//   - filterSensitiveWords 的华为云/阿里云内容审核不复刻，只做 addslashes+RemoveXSS 等价清洗
-//     （参数化入库存原文，与 #255 的 memberLog 口径一致）；
+//   - filterSensitiveWords 的华为云/阿里云内容审核经 ajax.SensitiveWordsModerator 注入
+//     （本地 cfg_moderationWB=0 关闭）；$cfg_replacestr 经 ajax.ReplaceWords（本地 '傻子'），
+//     17070 的清洗链已按 PHP 原文复刻（#364）
 //   - 改评价路径（shop/homemaking/commentid>0）按默认口径写 public_comment 真表，而不是照搬
 //     MRG 表 UPDATE 失败的线上行为；
 //   - 改评价 UPDATE 失败时 PHP 仍会发通知/发积分再返回「评价失败」，Go 直接返回 101；
