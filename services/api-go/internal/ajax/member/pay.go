@@ -44,7 +44,11 @@
 //     removeInvisibleCharacters 等）→ body 里「归一后会变」的值两侧不同。典型触发面是 POST：
 //     ajax.php 的 POST 块不调 removeInvisibleCharacters（行 120），GET 块调（行 90），Go 侧 helpers
 //     没有这个 verb 区分 —— 这正是 #364 在修的 verb 不对称，不在本 issue 的施工面内（改 helpers
-//     会与在审的 #368 撞文件）。#364 合入后分发子请求会自动与 PHP 一致，本条即可删除。
+//     会与在审的 #368 撞文件）。
+//     **不保证 #364 合入后自动收敛**：#364 只把归一搬到 Router 入口，并给 Request 新增
+//     ParamsEscaped；本文件是直接构造子请求、不带 ParamsEscaped，handler 仍会走 raw fallback
+//     再归一一次（#368 的 updateAccount.norm 即如此，params.detailID 也未改动）。
+//     后续项：等 #364 合入后给子请求补上 ParamsEscaped（TODO 见 dispatch 处），差异才真正收口。
 //     在该差异收口前，白名单里带写副作用的方法（sendComment / updateAccount）的**参数取值**可能与
 //     PHP 不同；两侧都会执行同一个方法、走同一套登录门禁，不引入 PHP 侧没有的能力。
 //   - unserialize 只覆盖 N/b/i/d/s/a（复用 detail.go 的解析器）。body 是对象（O/C）时 PHP
@@ -159,6 +163,8 @@ func (s *Service) pay(req *ajax.Request) ajax.Response {
 	if !ok {
 		return payDie()
 	}
+	// TODO(#364): #364 合入后给子请求带上 ParamsEscaped（表示参数已是 PHP 所见口径），
+	// 否则 handler 会走 raw fallback 再归一一次，与 PHP「分发子请求不过入口归一」不一致。
 	_ = handler(&ajax.Request{
 		Service: "member", Action: ordertype, Params: merged, HTTP: req.HTTP,
 	})
