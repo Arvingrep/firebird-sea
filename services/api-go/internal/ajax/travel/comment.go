@@ -189,8 +189,11 @@ func (s *Service) common(req *ajax.Request) ajax.Response {
 		pageSize = 10
 	}
 
-	// newsid 非数字 → PHP SQL 语法错误 → 已知偏差按空结果降级。
-	if !isNumericString(newsid) {
+	// newsid 原样拼 SQL（无强转）：is_numeric 口径的数值字面量（含科学计数法/
+	// 首尾空白）在 MySQL 里合法（aid = 1e0 → 1），照常用原始值参数化；其余
+	//（含注入面）PHP 会产生 SQL 语法错误（dsqlOper 返回错误串的怪面，不可复刻），
+	// 统一按「暂无数据」101 降级（已知偏差，#372 第四轮评审放宽）。
+	if !phpNumericRe.MatchString(newsid) {
 		return ajax.Response{State: stateParamFailed, Info: infoNoTravelItem}
 	}
 
