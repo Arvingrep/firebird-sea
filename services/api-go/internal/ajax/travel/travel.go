@@ -1,0 +1,138 @@
+// Package travel 是 ajax.php 的 travel 服务（#370 批次1：21 个类型/字典只读 action）。
+package travel
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"net/http"
+	"regexp"
+
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/fburl"
+)
+
+// errInvalidPrefix 是表前缀含非法字符时的启动期错误。
+var errInvalidPrefix = errors.New("ajax: travel 表前缀含非法字符")
+
+const (
+	// stateNoData 对应 handlers.class.php:84-87：action 返回 falsy（空数组 / null / ""）时
+	// 外层包装固定为 state=102、info="No data!"。
+	stateNoData = 102
+	infoNoData  = "No data!"
+
+	// stateParamFailed 是 action 返回 array("state"=>200,...) 时 handlers::getHandle 的
+	// 改写结果（handlers.class.php:62-64：200/101 → 101，info 原样）。
+	stateParamFailed = 101
+
+	// infoTypeFailed 是 dsql::getTypeList catch 分支的固定文案（dsql.class.php getTypeList 末尾）。
+	infoTypeFailed = "分类获取失败！"
+
+	// infoNoTravelItem / infoNoCountry 是 travelitem / countrytype 在总条数为 0 时的文案
+	// （$langData['siteConfig'][21][64]，运行时 zh-CN 语言包取值）。
+	infoNoTravelItem = "暂无数据！"
+
+	// infoNoCountryDetail 是 countryDetail 缺 id 时的文案（$langData['travel'][12][13]）。
+	infoNoCountryDetail = "请填写联系人"
+
+	// infoAddrFormat 是 addr 参数非数组时的文案（$langData['travel'][12][23]）；
+	// 该分支在 ajax 入口下是死代码（$this->param 恒为数组），保留仅为对齐源码。
+	infoAddrFormat = "格式错误"
+)
+
+// prefixPattern 约束表前缀：前缀会被拼进 SQL，必须防注入（口径同 article）。
+var prefixPattern = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
+// Identity 对应 userLogin->getMemberID()：未登录返回 -1（fbidentity.Resolver 满足该接口）。
+type Identity interface {
+	MemberID(ctx context.Context, req *http.Request) (int64, error)
+}
+
+// Dep 是 travel 服务的依赖。
+type Dep struct {
+	// DB 是业务连接池。nil 表示「DB_HOST 未配置、本地纯内存模式」，
+	// 此时 DB 类 action 按「查不到数据」降级（state=102 / 101），不让启动失败。
+	DB *sql.DB
+	// TablePrefix 是火鸟表前缀，对应 PHP 的 $DB_PREFIX。
+	TablePrefix string
+	// Files 用于 getFilePath（图片转绝对地址）。nil 时路径原样输出、iconSource 恒为空串。
+	Files *fburl.Resolver
+	// Identity 识别当前会员（countryDetail 的 collect 校验用）。nil 时一律按未登录（-1）。
+	Identity Identity
+	// WebLogo / Hotline 对应 PHP 的 $cfg_weblogo / $cfg_hotline（config 用）。
+	// Hotline 为空时按 canary 现状值回落。
+	WebLogo, Hotline string
+	// SameAddrState 对应 $cfg_sameAddr_state（siteConfig.inc.php:180 canary = 1）。
+	// getTypeList 的 hideSameCity 分支只在它为 0 时生效；canary 上恒为 1 → 分支不生效，
+	// 这里保留常量语义以便后续接入运行时配置。
+	SameAddrState int
+	// CollectCheck 对应 checkIsCollect()（countryDetail 的收藏校验）。nil 时按未登录处理。
+	CollectCheck CollectCheckFunc
+}
+
+// Service 是 travel 服务的运行期对象。
+type Service struct {
+	db           *sql.DB
+	prefix       string
+	files        *fburl.Resolver
+	ident        Identity
+	logo         string
+	hot          string
+	collectCheck CollectCheckFunc
+}
+
+// defaultTravelLogo / defaultTravelHotline 是 canary 的 $cfg_weblogo / $cfg_hotline
+// 运行期值（不在仓库里；与 article 的 defaultPic / DefaultHotline 同源快照）。
+const (
+	defaultTravelLogo    = "https://storage.googleapis.com/fbird-sea-uploads/siteConfig/logo/fbird_logo.png"
+	defaultTravelHotline = "Telegram / WhatsApp 在线客服支持"
+)
+
+// New 构造 travel 服务；表前缀含非法字符是配置错误，返回错误让启动期失败。
+func New(dep Dep) (*Service, error) {
+	if !prefixPattern.MatchString(dep.TablePrefix) {
+		return nil, errInvalidPrefix
+	}
+	logo := dep.WebLogo
+	if logo == "" {
+		logo = defaultTravelLogo
+	}
+	hot := dep.Hotline
+	if hot == "" {
+		hot = defaultTravelHotline
+	}
+	return &Service{
+		db:           dep.DB,
+		prefix:       dep.TablePrefix,
+		files:        dep.Files,
+		ident:        dep.Identity,
+		logo:         logo,
+		hot:          hot,
+		collectCheck: dep.CollectCheck,
+	}, nil
+}
+
+// Register 把 21 个 action 注册进 router（批次1 全量清单见 #370）。
+func Register(router *ajax.Router, s *Service) {
+	router.Register("travel", "config", s.config)
+	router.Register("travel", "addr", s.addr)
+	router.Register("travel", "rentcartype", s.rentcartype)
+	router.Register("travel", "visatype", s.visatype)
+	router.Register("travel", "strategytype", s.strategytype)
+	router.Register("travel", "travelitem", s.travelitem)
+	router.Register("travel", "countrytype", s.countrytype)
+	router.Register("travel", "countryDetail", s.countryDetail)
+	router.Register("travel", "module_type", s.moduleTypeList)
+	router.Register("travel", "iswindow_type", s.iswindowType)
+	router.Register("travel", "visa_type", s.visaTypeList)
+	router.Register("travel", "room_type", s.roomType)
+	router.Register("travel", "breakfast_type", s.breakfastType)
+	router.Register("travel", "travelhotel_type", s.travelhotelType)
+	router.Register("travel", "travelagency_type", s.travelagencyType)
+	router.Register("travel", "star_type", s.starType)
+	router.Register("travel", "continent_type", s.continentType)
+	router.Register("travel", "typeid_type", s.typeidType)
+	router.Register("travel", "gettypename", s.gettypenameAction)
+	router.Register("travel", "moduleType", s.moduleTypeWeek)
+	router.Register("travel", "getname", s.getnameAction)
+}

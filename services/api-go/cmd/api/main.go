@@ -35,6 +35,7 @@ import (
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/article"
 	ajaxmember "github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/member"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/siteconfig"
+	ajaxtravel "github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/travel"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/bridge"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/checkout"
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/coins"
@@ -624,6 +625,21 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		panic(fmt.Sprintf("ajax: siteConfig 服务装配失败: %v", err))
 	}
 	siteconfig.Register(router, siteSvc)
+
+	// travel（#370 批次1）：类型/字典只读 21 个 action。countryDetail 的收藏校验
+	// 走 member 服务的 CollectCheck（与 article.detail 同口径）。
+	travelSvc, err := ajaxtravel.New(ajaxtravel.Dep{
+		DB: db, TablePrefix: prefix, Files: files, Identity: identity,
+		WebLogo: envOr("FB_SITE_WEB_LOGO", ""),
+		Hotline: os.Getenv("FB_SITE_HOTLINE"),
+		CollectCheck: func(req *ajax.Request, module, temp, action, id string) string {
+			return memberSvc.CollectCheck(req, module, temp, action, id)
+		},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("ajax: travel 服务装配失败: %v", err))
+	}
+	ajaxtravel.Register(router, travelSvc)
 	return router
 }
 
