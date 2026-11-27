@@ -23,6 +23,11 @@ type Options struct {
 	Cookie   string // requiresLogin 用例带上的 Cookie 头
 	Only     string // 非空时只跑 <service>.<action>
 	Client   *http.Client
+	// GoHost 非空时改写 Go 侧请求的 Host 头。PHP 侧若经网关强制 HTTP_HOST
+	// （本地 firebird-nginx 硬编码 HTTP_HOST=fh580.net），而 Go 直接监听
+	// localhost，模块无关的基座 URL（cfg_basehost 派生）会因 Host 不同产生
+	// 环境性差异；用本参数让两侧看到一致的 Host。PHP 侧不受影响。
+	GoHost string
 }
 
 // CaseResult 是单条用例的结果。
@@ -110,7 +115,7 @@ func Run(o Options) (*Result, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s / %s: 请求 PHP 失败: %w", base, c.Name, err)
 			}
-			gb, err := fetch(o, o.GoBase, o.GoPrefix, f, c)
+			gb, err := fetchHost(o, o.GoBase, o.GoPrefix, o.GoHost, f, c)
 			if err != nil {
 				return nil, fmt.Errorf("%s / %s: 请求 Go 失败: %w", base, c.Name, err)
 			}
@@ -153,6 +158,11 @@ func fetch(o Options, base, prefix string, f *CaseFile, c Case) ([]byte, error) 
 	if base == "" {
 		return nil, errors.New("站点地址为空")
 	}
+	// PHP 侧不改写 Host；仅 Go 侧调用方（fetchHost）按需传入 o.GoHost。
+	return fetchHost(o, base, prefix, "", f, c)
+}
+
+func fetchHost(o Options, base, prefix, host string, f *CaseFile, c Case) ([]byte, error) {
 	q := url.Values{}
 	q.Set("service", f.Service)
 	q.Set("action", f.Action)
@@ -181,6 +191,9 @@ func fetch(o Options, base, prefix string, f *CaseFile, c Case) ([]byte, error) 
 	req, err := http.NewRequest(c.Method, u, body)
 	if err != nil {
 		return nil, err
+	}
+	if host != "" {
+		req.Host = host
 	}
 	if c.Method == "POST" {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
