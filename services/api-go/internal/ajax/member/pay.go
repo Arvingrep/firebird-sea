@@ -32,17 +32,24 @@
 // 已知偏离（都写在这里，不写进正文以外的地方）：
 //   - `ordertype=pay` 在 PHP 里是无限递归，实测 HTTP 500 + 空响应体；Go 直接按未知方法处理
 //     （操作错误），复刻一个 500 崩溃没有意义，也不会把它写进对比用例。
-//   - `ordertype=updateAccount` 排除在白名单外：它会改密码/支付密码（凭证类），按 Q2
-//     「非资金」口径不进分发；PHP 侧会真的执行。
+//   - `ordertype=updateAccount` 在白名单内（Q2 字面口径：已注册、不在资金名单）；但它只有
+//     在 pay_log.body 的 type 写成 updateAccount 时才会被命中，而仓库里没有任何写入方
+//     会产出这种 type（createPayForm 的 member 调用只写 deposit/recharge/join_pay/promotion/
+//     fabuPay/fenxiaoJoin/模块名），因此实际不可达。可否达的判断权留给后续真机验证。
 //   - unserialize 只覆盖 N/b/i/d/s/a（复用 detail.go 的解析器）。body 是对象（O/C）时 PHP
 //     的 is_array($bodyArr) 为假 → 不回填 → 操作错误，与 Go 解析失败后的走向一致。
+//   - `array_merge` 的数字键：PHP 按**插入顺序**把数字键重排成 0..n-1。Go 的 url.Values 是 map，
+//     请求侧插入顺序在上游 mergeParams 里已经丢失，重排只能靠猜，所以这里保留每个既有数字键
+//     自己的下标、把 body 的数字键接在 max+1 之后（body 内部顺序可用，照 PHP 保留）。
+//     分发目标只读命名键（$param['xxx']），不读 $param[0]，因此这条差异目前不可观测；
+//     同理 body 里的关联数组退化成 key[] 后**键名丢失**（值顺序保留，`(int)$array` = 1 与 PHP 一致）。
 package member
 
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -57,14 +64,12 @@ const payFilterMarker = "_filter_"
 
 // payExcluded 是永久不入 pay 分发白名单的方法（全部小写）。
 //
-// 资金类依据 D-5/Q2 的显式名单；pay 自身与 updateAccount 是 Go 侧额外排除：
-//   - pay：PHP 无限递归 → 500（见文件头偏离说明）；
-//   - updateAccount：会写 paypwd / 登录密码，属凭证类，与「非资金才可分发」同口径。
+// 资金类依据 D-5/Q2 的显式名单；pay 是 Go 侧额外排除（PHP 无限递归 → 500，见文件头）。
 var payExcluded = map[string]bool{
 	"joinpay": true, "recharge": true, "withdraw": true, "transfer": true,
 	"convert": true, "deposit": true, "upgrade": true, "promotion": true,
 	"fabupay": true, "fenxiaojoinpay": true, "extract": true, "putforward": true,
-	"pay": true, "updateaccount": true,
+	"pay": true,
 }
 
 // buildPayRoutes 生成分发白名单：只收已注册的 member action，再剔除 payExcluded。
@@ -207,14 +212,11 @@ func cloneValues(in url.Values) url.Values {
 }
 
 // mergePayBody 复刻 array_merge($param, $body)：
-// 字符串键被 body 覆盖（原有 key / key[] / key[sub] 一并清掉），数字键追加到尾部并重排。
-// 只展开一层嵌套（key[] 顺序数组、key[sub] 关联数组），更深层的结构 url.Values 表达不了，
-// 置空并在此说明——分发目标（message/detail/getZan 等）只读命名键。
+// 字符串键被 body 覆盖（原有 key / key[] / key[sub] 一并清掉），数字键接在末尾。
+// 数字键的**重排顺序**见文件头的偏离说明：请求侧的插入顺序在 url.Values 里已不可得。
 func mergePayBody(param url.Values, body *phpArray) url.Values {
 	out := param
-
-	// 数字键：PHP 会按出现顺序重排成 0..n-1，body 的数字键接在后面。
-	nextIndex := renumberNumericKeys(out)
+	next := nextNumericIndex(out)
 	var numeric []any
 	for i, key := range body.keys {
 		name, isString := key.(string)
@@ -224,54 +226,40 @@ func mergePayBody(param url.Values, body *phpArray) url.Values {
 		}
 		setPayParam(out, name, body.vals[i])
 	}
-	for _, v := range numeric {
-		out[strconv.Itoa(nextIndex)] = []string{payScalar(v)}
-		nextIndex++
+	for i, v := range numeric {
+		out[strconv.Itoa(next+i)] = []string{payScalar(v)}
 	}
 	return out
 }
 
-// renumberNumericKeys 把纯数字键按原顺序压成 0..n-1，返回下一个可用下标。
-func renumberNumericKeys(param url.Values) int {
-	var keys []string
+// nextNumericIndex 返回 PHP 口径下「下一个可用的数字下标」（现有最大正下标 + 1）。
+func nextNumericIndex(param url.Values) int {
+	maxIndex := -1
 	for k := range param {
-		if _, err := strconv.Atoi(k); err == nil {
-			keys = append(keys, k)
+		if n, ok := phpIntKey(k); ok && n >= 0 && int(n) > maxIndex {
+			maxIndex = int(n)
 		}
 	}
-	if len(keys) == 0 {
-		return 0
-	}
-	// url.Values 无序，按数值升序模拟 PHP 数组的插入顺序。
-	sortNumericKeys(keys)
-	vals := make([]string, 0, len(keys))
-	for _, k := range keys {
-		vals = append(vals, param.Get(k))
-		delete(param, k)
-	}
-	for i, v := range vals {
-		param[strconv.Itoa(i)] = []string{v}
-	}
-	return len(vals)
+	return maxIndex + 1
 }
 
-func sortNumericKeys(keys []string) {
-	nums := make([]int, 0, len(keys))
-	for _, k := range keys {
-		n, _ := strconv.Atoi(k)
-		nums = append(nums, n)
+// phpNumericKey 是 PHP 会把字符串键转成 int 的形态：没有前导零、没有 '+'。
+// "01" / "+1" / "1.0" 在 PHP 里仍是字符串键，不能当数字处理（否则会改写键、丢数据）。
+var phpNumericKey = regexp.MustCompile(`^-?(0|[1-9][0-9]*)$`)
+
+func phpIntKey(k string) (int64, bool) {
+	if !phpNumericKey.MatchString(k) {
+		return 0, false
 	}
-	for i := 1; i < len(nums); i++ {
-		for j := i; j > 0 && nums[j] < nums[j-1]; j-- {
-			nums[j], nums[j-1] = nums[j-1], nums[j]
-		}
+	n, err := strconv.ParseInt(k, 10, 64)
+	if err != nil { // 溢出：PHP 也保持字符串键
+		return 0, false
 	}
-	for i, n := range nums {
-		keys[i] = strconv.Itoa(n)
-	}
+	return n, true
 }
 
 // setPayParam 写入一个 body 键，并清掉同名键的所有既有形态。
+// 数组统一落成 key[]：分发目标的 params.array(key) 能读到，且 (int)非空数组 = 1 与 PHP 一致。
 func setPayParam(param url.Values, key string, v any) {
 	clearPayParam(param, key)
 	arr, isArray := v.(*phpArray)
@@ -279,17 +267,11 @@ func setPayParam(param url.Values, key string, v any) {
 		param[key] = []string{payScalar(v)}
 		return
 	}
-	if phpArraySequential(arr) {
-		vals := make([]string, 0, len(arr.vals))
-		for _, item := range arr.vals {
-			vals = append(vals, payScalar(item))
-		}
-		param[key+"[]"] = vals
-		return
+	vals := make([]string, 0, len(arr.vals))
+	for _, item := range arr.vals {
+		vals = append(vals, payScalar(item))
 	}
-	for i, k := range arr.keys {
-		param[fmt.Sprintf("%s[%s]", key, phpScalarString(k))] = []string{payScalar(arr.vals[i])}
-	}
+	param[key+"[]"] = vals
 }
 
 func clearPayParam(param url.Values, key string) {
@@ -312,17 +294,6 @@ func payScalar(v any) string {
 		return ""
 	}
 	return phpScalarString(v)
-}
-
-// phpArraySequential 判断是不是 PHP 里的顺序数组（键为 0..n-1）。
-func phpArraySequential(a *phpArray) bool {
-	for i, k := range a.keys {
-		n, ok := k.(int64)
-		if !ok || n != int64(i) {
-			return false
-		}
-	}
-	return true
 }
 
 // get2 取字符串键的值；缺失时返回 nil（对应 PHP 的 $arr['type'] 未定义 → null）。

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -66,7 +67,6 @@ func TestPayDieWithoutDispatch(t *testing.T) {
 		"&ordertype=_filter_x",           // 截断后是空串
 		"&ordertype=message_FILTER_user", // 标记区分大小写 → 未知方法
 		"&ordertype=pay",                 // 自身：PHP 无限递归 500，Go 按未知方法处理
-		"&ordertype=updateAccount",       // 凭证类，排除在白名单外
 		"&ordertype=deposit",             // 资金类永久排除（D-5/Q2）
 		"&ordertype=joinPay",             // 资金类永久排除（D-5/Q2）
 	} {
@@ -223,6 +223,7 @@ func TestPayRoutesExcludeFundAndSelf(t *testing.T) {
 		"message": true, "reward": true, "getcomment": true, "detail": true,
 		"followmember": true, "collect": true, "getzan": true,
 		"replycomment": true, "dingcomment": true, "sendcomment": true,
+		"updateaccount": true,
 	}
 	if len(svc.payRoutes) != len(want) {
 		t.Fatalf("白名单大小 = %d, want %d: %v", len(svc.payRoutes), len(want), svc.payRoutes)
@@ -238,5 +239,100 @@ func TestPayRoutesExcludeFundAndSelf(t *testing.T) {
 func TestPayLangText(t *testing.T) {
 	if strings.TrimSpace(infoOperationError) != payLangText {
 		t.Fatalf("infoOperationError = %q", infoOperationError)
+	}
+}
+
+// updateAccount 已注册且不在资金名单 → 在白名单内。未登录时它自己返回 101 登录超时，
+// 但 pay 会丢弃这个返回值，最终仍是 102。
+func TestPayDispatchUpdateAccount(t *testing.T) {
+	svc, m := newService(t, nil)
+	eq(t, do(t, svc, "GET", payURL("&ordertype=updateAccount"), ""), payNoData)
+	met(t, m)
+}
+
+// pay_log 有多行时只取第一行（PHP 里 $results[0]，SQL 没有 LIMIT）。
+func TestPayPayLogUsesFirstRow(t *testing.T) {
+	svc, m := newService(t, nil)
+	m.ExpectQuery(qPayLog).WithArgs("SN11").
+		WillReturnRows(sqlmock.NewRows([]string{"body"}).
+			AddRow(`a:1:{s:4:"type";s:6:"waimai";}`).
+			AddRow(`a:1:{s:4:"type";s:7:"message";}`))
+	eq(t, do(t, svc, "GET", payURL("&ordernum=SN11"), ""), payDieBody)
+	met(t, m)
+}
+
+// —— mergePayBody 的白盒用例：这些形态走不到分发目标，只能直接断言 ——
+
+// 字符串键覆盖：body 的同名键要清掉请求里的 key / key[] / key[sub] 三种形态。
+func TestMergePayBodyStringKeyOverridesAllShapes(t *testing.T) {
+	param := url.Values{
+		"im":        {"0"},
+		"pics[]":    {"a", "b"},
+		"rating[1]": {"5"},
+	}
+	body := &phpArray{
+		keys: []any{"im", "pics", "rating"},
+		vals: []any{"1", "x", "y"},
+	}
+	got := mergePayBody(param, body)
+	if got.Get("im") != "1" {
+		t.Fatalf("im = %q", got.Get("im"))
+	}
+	if _, ok := got["pics[]"]; ok {
+		t.Fatalf("pics[] 应被清掉: %v", got)
+	}
+	if got.Get("pics") != "x" {
+		t.Fatalf("pics = %q", got.Get("pics"))
+	}
+	if _, ok := got["rating[1]"]; ok {
+		t.Fatalf("rating[1] 应被清掉: %v", got)
+	}
+	if got.Get("rating") != "y" {
+		t.Fatalf("rating = %q", got.Get("rating"))
+	}
+}
+
+// body 里的数组落成 key[]，值顺序保留（键名丢失见文件头偏离说明）。
+func TestMergePayBodyArrayBecomesBracketKey(t *testing.T) {
+	body := &phpArray{
+		keys: []any{"im"},
+		vals: []any{&phpArray{keys: []any{int64(2), int64(5)}, vals: []any{"x", "y"}}},
+	}
+	got := mergePayBody(url.Values{}, body)
+	if v := got["im[]"]; len(v) != 2 || v[0] != "x" || v[1] != "y" {
+		t.Fatalf("im[] = %v", v)
+	}
+	// PHP 的 (int)非空数组 = 1；params.intval 对非空 key[] 也返回 1。
+	if n := (params{req: &ajax.Request{Params: got}}).intval("im"); n != 1 {
+		t.Fatalf("intval(im) = %d, want 1", n)
+	}
+}
+
+// 数字键：既有的 "5" 保留原下标，body 的数字键接在 max+1，不因为排序去猜插入顺序。
+func TestMergePayBodyNumericKeys(t *testing.T) {
+	param := url.Values{"5": {"a"}, "01": {"keep"}}
+	body := &phpArray{keys: []any{int64(0), int64(1)}, vals: []any{"b", "c"}}
+	got := mergePayBody(param, body)
+	if got.Get("5") != "a" {
+		t.Fatalf("既有数字键被改动: %v", got)
+	}
+	if got.Get("01") != "keep" {
+		t.Fatalf("前导零键被当成数字: %v", got)
+	}
+	if got.Get("6") != "b" || got.Get("7") != "c" {
+		t.Fatalf("body 数字键未接在 max+1: %v", got)
+	}
+}
+
+// "+1" 不是 PHP 的数字键（PHP 只把无前导零的十进制字符串转 int）。
+func TestPHPIntKey(t *testing.T) {
+	for in, want := range map[string]bool{
+		"0": true, "12": true, "-3": true,
+		"01": false, "+1": false, "1.0": false, "abc": false, "": false,
+		"9999999999999999999999": false, // 溢出仍是字符串键
+	} {
+		if _, ok := phpIntKey(in); ok != want {
+			t.Fatalf("phpIntKey(%q) = %v, want %v", in, ok, want)
+		}
 	}
 }
