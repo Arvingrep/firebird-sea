@@ -696,9 +696,9 @@ func TestPhpMySQLRowID(t *testing.T) {
 		{"3.0", 3, true},
 		{"3e0", 3, true},
 		{" 3 ", 3, true},
-		{"3.5", 0, false},  // WHERE id = 3.5 命中 0 行
-		{"3,4", 0, false},  // 裸拼令 UPDATE 报 SQL 错误
-		{"abc", 0, false},  // 同上
+		{"3.5", 0, false}, // WHERE id = 3.5 命中 0 行
+		{"3,4", 0, false}, // 裸拼令 UPDATE 报 SQL 错误
+		{"abc", 0, false}, // 同上
 		{"", 0, false},
 		{"01", 1, true},
 	}
