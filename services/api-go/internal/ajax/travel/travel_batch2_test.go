@@ -291,7 +291,7 @@ func TestStoreDetailFull(t *testing.T) {
 
 	got := serve(t, svc, "/include/ajax.php?service=travel&action=storeDetail&id=11")
 	want := `{"state":100,"info":` +
-		`{"id":"11","cityid":"1","flag":"","title":"旅行社甲","userid":"5","address":"地址一","lng":"120.2","lat":"30.1","tel":"13812345678","telEncrypt":"138****5678","contact":"联系人","click":"9","state":"1","refuse":"0","license":"1",` +
+		`{"id":"11","cityid":"1","flag":"","title":"旅行社甲","userid":"5","address":"地址一","lng":"120.2","lat":"30.1","tel":"13812345678","telEncrypt":"138****5678","contact":"联系人","click":9,"state":"1","refuse":"0","license":"1",` +
 		`"servicetime":"1,2","openStart":"09:00","openEnd":"18:00","note":"<p>简介</p>","video":"v.mp4","videoSource":"","bind_module":"1,2",` +
 		`"bind_moduleArr":[{"id":"1","val":"酒店"},{"id":"2","val":"景点门票"}],"bind_moduleArr_":["1","2"],` +
 		`"weekk":"周一,周二","openweek":[{"id":"1","val":"周一"},{"id":"2","val":"周二"}],"openweek_":["1","2"],` +

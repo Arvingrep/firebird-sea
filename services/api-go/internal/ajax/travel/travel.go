@@ -78,6 +78,12 @@ type Dep struct {
 	MemberDetail ajax.Handler
 	// CookiePrefix 是 $cfg_cookiePre（getCityId 的 siteCityInfo cookie 键前缀）。
 	CookiePrefix string
+	// DefaultCityID 对应 PHP getCityId() 在「无 cityid 参数、无 siteCityInfo cookie」时的
+	// 兜底链：ajax.php 引导 → checkDefaultCity() → siteCity() 先读
+	// data/cache/system_site_city.json（本地/canary 该文件 expire_time 恒有效，
+	// 内置默认分站 cityid=10000）。由 cmd/api 在启动期解析 PHP_ROOT 环境变量注入；
+	// 0 表示无默认分站（等同 PHP 最终 (int)$cid = 0）。L1 测试不注入。
+	DefaultCityID int
 	// CommentCheck 对应 include/config/travel.inc.php 的 $customCommentCheck
 	// （sendCommon 的 ischeck；仓库/本地/canary 均为 1，main.go 默认 1）。
 	CommentCheck int
@@ -96,6 +102,7 @@ type Service struct {
 	zanCheck     ZanCheckFunc
 	memberDetail ajax.Handler
 	cookiePrefix string
+	defaultCity  int
 	commentCheck int
 }
 
@@ -130,6 +137,7 @@ func New(dep Dep) (*Service, error) {
 		zanCheck:     dep.ZanCheck,
 		memberDetail: dep.MemberDetail,
 		cookiePrefix: dep.CookiePrefix,
+		defaultCity:  dep.DefaultCityID,
 		commentCheck: dep.CommentCheck,
 	}, nil
 }
@@ -186,4 +194,13 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("travel", "dingCommon", s.dingCommon)
 	router.Register("travel", "sendCommon", s.sendCommon)
 	router.Register("travel", "commentDetail", s.commentDetail)
+
+	// 批次5（#374）：订单读与轻写 7 个（delOrder/oneKeyContinued 写仅 L1）。
+	router.Register("travel", "orderList", s.orderList)
+	router.Register("travel", "orderDetail", s.orderDetail)
+	router.Register("travel", "checkPayAmount", s.checkPayAmount)
+	router.Register("travel", "payCheck", s.payCheckAction)
+	router.Register("travel", "verifyQuan", s.verifyQuan)
+	router.Register("travel", "delOrder", s.delOrder)
+	router.Register("travel", "oneKeyContinued", s.oneKeyContinued)
 }

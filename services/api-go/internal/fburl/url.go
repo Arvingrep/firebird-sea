@@ -16,8 +16,7 @@ func (r *Resolver) URL(ctx context.Context, p Params, o Options) (string, error)
 	service := p.get("service")
 	switch {
 	case (service == "article" || service == "job") && o.IsApp,
-		(service == "tieba" || service == "job") && o.IsAndroidApp,
-		service == "member":
+		(service == "tieba" || service == "job") && o.IsAndroidApp:
 		return "", ErrUnsupported
 	}
 	params := p.clone()
@@ -61,9 +60,16 @@ func (r *Resolver) URL(ctx context.Context, p Params, o Options) (string, error)
 			return domain, nil
 		}
 		var err error
-		if service == "siteConfig" {
+		switch {
+		case service == "siteConfig":
 			domain = r.base(o)
-		} else {
+		case service == "member":
+			// 会员链接域名（getUrlPath 的 member else 分支 → member.config 的
+			// userDomain/busiDomain：secure + basehost + "/" + hn_domain 目录，
+			// 按参数 type=user/busi 取通道；cfg_userSubDomain/cfg_busiSubDomain
+			// 为 2（目录模式）时如此，0/1 同 member.class.php config 公式）。
+			domain = r.memberChannelDomain(ctx, mod, params.get("type"), o)
+		default:
 			domain, err = r.Domain(ctx, service, mod.SubDomain, true, o)
 		}
 		haveDomain = err == nil
@@ -106,11 +112,12 @@ func (r *Resolver) URL(ctx context.Context, p Params, o Options) (string, error)
 		} else {
 			param = append(param, kv.Key+"="+kv.Value)
 		}
-		if r.cfg.Rewrite && kv.Key != "service" && kv.Key != "param" {
+		if (r.cfg.Rewrite || service == "member") && kv.Key != "service" && kv.Key != "param" &&
+			!(service == "member" && kv.Key == "type") {
 			rewrite = append(rewrite, kv.Value)
 		}
 	}
-	if !r.cfg.Rewrite {
+	if !r.cfg.Rewrite && service != "member" {
 		return r.base(o) + "/index.php?" + strings.Join(param, "&"), nil
 	}
 	d, err := getDomain()
@@ -127,11 +134,61 @@ func (r *Resolver) URL(ctx context.Context, p Params, o Options) (string, error)
 		}
 		return d + sep + after, nil
 	}
+	// PHP（common.func.php:4973）：member chat 模板挂在 im/ 目录下。
+	if service == "member" && template == "chat" {
+		if !strings.HasSuffix(d, "/") {
+			d += "/"
+		}
+		d += "im"
+	}
 	ext := ".html"
 	if template == "announcement-detail" || (service == "job" && o.IsMobile) {
 		ext = ""
 	}
 	return d + sep + strings.Join(rewrite, "-") + ext + after, nil
+}
+
+// memberChannelDomain 复刻 member.config 的 userDomain/busiDomain
+// （handlers/member.class.php config）：
+//	cfg_userSubDomain/cfg_busiSubDomain == 0 → scheme + hn_domain 目录；
+//	== 1 → scheme + 目录 + "." + basehost（去 www.）；
+//	== 2 → scheme + basehost + "/" + 目录（canary/本地）。
+// 目录取 hn_domain WHERE module='member' AND part=<user|busi>。
+func (r *Resolver) memberChannelDomain(ctx context.Context, mod Module, typ string, o Options) string {
+	part := "busi"
+	sub := mod.BusiSubDomain
+	if typ == "user" {
+		part = "user"
+		sub = mod.UserSubDomain
+	}
+	dir, err := r.memberDomainDir(ctx, part)
+	if err != nil {
+		return ""
+	}
+	switch sub {
+	case 1:
+		return r.scheme() + dir + "." + strings.ReplaceAll(hostOf(r.base(o)), "www.", "")
+	case 2:
+		return r.base(o) + "/" + dir
+	default:
+		return r.scheme() + dir
+	}
+}
+
+// memberDomainDir 查 hn_domain 的 member 通道目录（part=busi/user）。
+func (r *Resolver) memberDomainDir(ctx context.Context, part string) (string, error) {
+	v, err := r.cached("domain:member:"+part, func() ([]string, error) {
+		var d sql.NullString
+		q := "SELECT `domain` FROM `" + r.prefix + "domain` WHERE `module` = 'member' AND `part` = ?"
+		if err := r.db.QueryRowContext(ctx, q, part).Scan(&d); err != nil {
+			return nil, err
+		}
+		return []string{d.String}, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return v[0], nil
 }
 
 // newsPath is the article/image custom-rule block. done=false falls through to the generic tail.

@@ -239,15 +239,22 @@ func areaNames(chain []areaRow) []any {
 // 非空但查不到 → []（空数组）；否则 splice 后的名称数组。
 func addrnameOf(ctx context.Context, s *Service, addrid string) any {
 	if !truthy(addrid) {
-		return ""
+		return "" // storeList 分支：addrid 空 → ""（storeDetail 是 []，见 addrnameFromChain）
 	}
-	return addrnameFromChain(addrid, s.areaChain(ctx, phpInt(addrid)))
+	return areaNames(addrnameChainOf(ctx, s, addrid))
 }
 
-// addrnameFromChain 是 addrnameOf 的链版（storeDetail 需要同一链算 city，避免二次查询）。
+// addrnameChainOf 拉取 addrid 的区域链。
+func addrnameChainOf(ctx context.Context, s *Service, addrid string) []areaRow {
+	return s.areaChain(ctx, phpInt(addrid))
+}
+
+// addrnameFromChain 是 addrname 链版（storeDetail 需要同一链算 city，避免二次查询）。
+// storeDetail 的 addrname 恒为数组（getParentArr → parent_foreach → array_reverse，
+// addrid=0 → 空数组 []；#374 compare 实证），与 storeList 的 "" 分支不同。
 func addrnameFromChain(addrid string, chain []areaRow) any {
 	if !truthy(addrid) {
-		return ""
+		return []any{}
 	}
 	return areaNames(chain)
 }

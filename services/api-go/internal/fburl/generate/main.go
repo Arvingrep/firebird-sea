@@ -74,6 +74,10 @@ func generate(root, out string) error {
 			}
 		}
 		modules[name] = map[string]any{"SubDomain": number(m, "customSubDomain"), "ListRule": number(m, "custom_listRule"), "DetailRule": number(m, "custom_detailRule"), "CustomFTP": m["customFtp"] == "1", "CustomUpload": m["customUpload"] == "1", "Storage": storage(m, "custom_")}
+		if name == "member" {
+			modules[name].(map[string]any)["UserSubDomain"] = number(m, "cfg_userSubDomain")
+			modules[name].(map[string]any)["BusiSubDomain"] = number(m, "cfg_busiSubDomain")
+		}
 	}
 	local := map[string]bool{}
 	for _, sub := range []string{"static", "uploads"} {
