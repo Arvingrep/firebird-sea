@@ -423,7 +423,7 @@ func mysqlExprParse(s string, wantValue bool) (val float64, divZero, ok bool) {
 			p++
 		}
 	}
-	var expr, term func() (float64, bool)
+	var expr, addmul, muldiv, term func() (float64, bool)
 	number := func() (float64, bool) {
 		start := p
 		digits := func() bool {
@@ -504,13 +504,14 @@ func mysqlExprParse(s string, wantValue bool) (val float64, divZero, ok bool) {
 		}
 		return number()
 	}
-	expr = func() (float64, bool) {
+	// 乘除同级先结合（MySQL 与 PHP 同为 * / % 高于 + -），再加减。
+	muldiv = func() (float64, bool) {
 		v, ok2 := term()
 		if !ok2 {
 			return 0, false
 		}
 		skip()
-		for p < len(s) && (s[p] == '+' || s[p] == '-' || s[p] == '*' || s[p] == '/' || s[p] == '%') {
+		for p < len(s) && (s[p] == '*' || s[p] == '/' || s[p] == '%') {
 			op := s[p]
 			p++
 			r, ok3 := term()
@@ -519,10 +520,6 @@ func mysqlExprParse(s string, wantValue bool) (val float64, divZero, ok bool) {
 			}
 			if wantValue {
 				switch op {
-				case '+':
-					v += r
-				case '-':
-					v -= r
 				case '*':
 					v *= r
 				case '/':
@@ -543,6 +540,31 @@ func mysqlExprParse(s string, wantValue bool) (val float64, divZero, ok bool) {
 		}
 		return v, true
 	}
+	addmul = func() (float64, bool) {
+		v, ok2 := muldiv()
+		if !ok2 {
+			return 0, false
+		}
+		skip()
+		for p < len(s) && (s[p] == '+' || s[p] == '-') {
+			op := s[p]
+			p++
+			r, ok3 := muldiv()
+			if !ok3 {
+				return 0, false
+			}
+			if wantValue {
+				if op == '+' {
+					v += r
+				} else {
+					v -= r
+				}
+			}
+			skip()
+		}
+		return v, true
+	}
+	expr = addmul
 	v, ok2 := expr()
 	if !ok2 {
 		return 0, divZero, false

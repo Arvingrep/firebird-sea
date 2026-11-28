@@ -698,6 +698,10 @@ func TestMysqlNumericExprValue(t *testing.T) {
 		{"3+0", 3, true},
 		{".5e1", 5, true},
 		{"(3+0)*2", 6, true},
+		{"1+2*3", 7, true}, // 乘除优先于加减（MySQL 语义）
+		{"2*3+1", 7, true},
+		{"8/2*2", 8, true}, // 同级左结合
+		{"(1+2)*3", 9, true},
 		{" 4 ", 4, true},
 		{"-3", -3, true},
 		{"01", 1, true},
@@ -817,8 +821,8 @@ func TestOperAgencyUpdateReinsertWithID(t *testing.T) {
 	// 反转序：第二天（无 id → 普通 INSERT，weight=0）→ 第一天（id=9 → 带 id INSERT，weight=1）。
 	mock.ExpectExec(qAInfoIns).WithArgs("第二天", int64(21), "200", "N;", sqlmock.AnyArg(), "0").
 		WillReturnResult(sqlmock.NewResult(10, 1))
-	// id 经 phpFloatVal 绑定（float64(9)）→ MySQL int 列收 9，与 PHP 裸拼字面量 9 一致。
-	mock.ExpectExec(qAInfoInsID).WithArgs(float64(9), "第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "1").
+	// id 是带引号的字符串字面量（VALUES ('9')）→ 绑定原串，MySQL 列转 int 收 9。
+	mock.ExpectExec(qAInfoInsID).WithArgs("9", "第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "1").
 		WillReturnResult(sqlmock.NewResult(9, 1))
 	got := serveParams(t, svc, "operAgency", url.Values{
 		"oper": {"update"}, "id": {"21"}, "title": {"周边游"}, "typeid": {"1"},

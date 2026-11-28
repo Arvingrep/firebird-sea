@@ -10,6 +10,7 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
@@ -169,14 +170,16 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 			specialtime := hotelRoomSpecialtime(itemStr(val, "specialtime"))
 			vid := itemStr(val, "id")
 			if vid != "" && vid != "0" { // PHP !empty($val['id'])
-				// VALUES 裸拼字面量：数值表达式按 MySQL 语义绑定（int 列舍入/表达式
-				// 求值与裸拼一致）；非数值 → 整条 INSERT 报 SQL 错误（dsqlOper 吞掉，
-				// 不插行）→ 跳过。
-				if rowid, rowok := mysqlNumericExprValue(vid); rowok {
+				// PHP 是 VALUES ('$val[id]')：带引号的字符串字面量 → MySQL 列转 int
+				//（前缀数值转换，"3+1"→3、".5e1"→5），不是表达式求值。绑定原串让
+				// MySQL 做同样的列转换；含引号/反斜杠的值会破坏 PHP 的字面量 → 整条
+				// INSERT 报 SQL 错误（dsqlOper 吞掉、不插行）→ 跳过即该错误面
+				//（注入形态不在 Go 复现，已知偏差记 #355）。
+				if !strings.ContainsAny(vid, "'\\") {
 					_, _ = s.db.ExecContext(ctx,
 						"INSERT INTO "+infoTable+
 							" (`id`, `typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`, `weight`) VALUES (?, '1', ?, ?, ?, ?, ?, ?)",
-						rowid, operRaw(itemStr(val, "title")), aid0,
+						vid, operRaw(itemStr(val, "title")), aid0,
 						operRaw(itemStr(val, "price")), specialtime, pubdate, item.key)
 				}
 			} else {
