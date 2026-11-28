@@ -268,32 +268,33 @@ func (s *Service) viewerID(ctx context.Context, req *ajax.Request) int64 {
 }
 
 // cityID 复刻 getCityId($cid)：param cityid 优先（(int)），否则 siteCityInfo cookie
-// （GetCookie 键 = $cfg_cookiePre . 'siteCityInfo'）。
+// （GetCookie 键 = $cfg_cookiePre . 'siteCityInfo'），再否则兜底站点默认分站
+// （ajax.php 引导 → checkDefaultCity → siteCity() 读 system_site_city.json，
+// 启动期注入 DefaultCityID；PHP 末级 HTTP_REFERER curl 链路 compare 不可达，不实现）。
 func (s *Service) cityID(ctx context.Context, req *ajax.Request, cid string) int {
 	if truthy(cid) {
 		return phpInt(cid)
 	}
-	if req.HTTP == nil {
-		return 0
-	}
-	name := "siteCityInfo"
-	if s.cookiePrefix != "" {
-		name = s.cookiePrefix + name
-	}
-	if c, err := req.HTTP.Cookie(name); err == nil && c.Value != "" {
-		var m map[string]any
-		if jsonUnmarshal([]byte(c.Value), &m) == nil {
-			if v, ok := m["cityid"]; ok {
-				switch t := v.(type) {
-				case float64:
-					return int(t)
-				case string:
-					return phpInt(t)
+	if req.HTTP != nil {
+		name := "siteCityInfo"
+		if s.cookiePrefix != "" {
+			name = s.cookiePrefix + name
+		}
+		if c, err := req.HTTP.Cookie(name); err == nil && c.Value != "" {
+			var m map[string]any
+			if jsonUnmarshal([]byte(c.Value), &m) == nil {
+				if v, ok := m["cityid"]; ok {
+					switch t := v.(type) {
+					case float64:
+						return int(t)
+					case string:
+						return phpInt(t)
+					}
 				}
 			}
 		}
 	}
-	return 0
+	return s.defaultCity
 }
 
 // —— storeList（travel.class.php:666-904）——
@@ -550,7 +551,8 @@ func (s *Service) storeDetailRaw(ctx context.Context, host string, param url.Val
 	d.set("tel", r.get("tel"))
 	d.set("telEncrypt", telEncrypt(r.str("tel")))
 	d.set("contact", r.get("contact"))
-	d.set("click", r.get("click"))
+	// click：PHP 实测输出数值（#374 compare 实证，历史 fixture 无数据未暴露）。
+	d.set("click", phpInt(r.str("click")))
 	d.set("state", r.get("state"))
 	d.set("refuse", r.get("refuse"))
 	d.set("license", r.get("license"))

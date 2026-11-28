@@ -377,7 +377,7 @@ func phpSerializeValue(v any) string {
 const dsqlOperErrorFace = `{"state": 200, "info": "操作失败！"}`
 
 // phpNumListValid 检查逗号 join 的 NOT IN 列表是否构成合法 SQL 数值列表
-//（PHP 裸拼语义：逐段数值字面量才合法；错误串/引号/花括号混入即整条非法）。
+// （PHP 裸拼语义：逐段数值字面量才合法；错误串/引号/花括号混入即整条非法）。
 func phpNumListValid(joined string) bool {
 	for _, part := range strings.Split(joined, ",") {
 		if !phpNumericRe.MatchString(part) {
@@ -557,7 +557,7 @@ func phpArrayReverse(items []phpItem) []phpItem {
 }
 
 // isPhpIntKey 是 PHP 数组整数键判定：规范整数字符串且落在 int64 域内
-//（PHP int 是 64 位；域外数字串保留字符串键）。
+// （PHP int 是 64 位；域外数字串保留字符串键）。
 func isPhpIntKey(k string) bool {
 	if !phpIntKeyRe.MatchString(k) {
 		return false

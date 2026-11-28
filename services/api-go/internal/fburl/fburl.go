@@ -15,7 +15,8 @@ import (
 //go:generate go run ./generate -root ../../../.. -out config_gen.go
 
 // ErrUnsupported is returned for PHP branches that are deliberately not ported yet
-// (App-only link rewriting, member links, website preview/site links).
+// (App-only link rewriting, website preview/site links).
+// member 链接自 #374 起已支持（busi/user 通道域名 + rewrite 尾段）。
 var ErrUnsupported = errors.New("fburl: unsupported URL branch")
 
 // Param is one entry of the PHP params array.
@@ -87,8 +88,11 @@ type Storage struct {
 // Module is the per-service config/*.inc.php literal set.
 type Module struct {
 	SubDomain, ListRule, DetailRule int
-	CustomFTP, CustomUpload         bool
-	Storage                         Storage
+	// UserSubDomain / BusiSubDomain 是 member.inc.php 的 cfg_userSubDomain /
+	// cfg_busiSubDomain（会员链接通道域名模式；仅 member 模块有值）。
+	UserSubDomain, BusiSubDomain int
+	CustomFTP, CustomUpload      bool
+	Storage                      Storage
 }
 
 // Config holds the build-time literals extracted from webroot/include/config.
