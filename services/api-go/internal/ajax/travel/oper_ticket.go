@@ -49,7 +49,7 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 	level := phpInt(req.Params.Get("level"))
 	note := operFiltered(req.ParamsEscaped.Get("body"))
 	jdnote := operFiltered(req.ParamsEscaped.Get("jdnote"))
-	ticketlist := listOf(jsonDecodeList(req.Params.Get("ticketlist")))
+	ticketlist := jsonDecodeList(req.Params.Get("ticketlist"))
 
 	if operUserTypeGate(m) {
 		return ajax.Response{State: stateParamFailed, Info: infoOperAuthFailBang} // travel[12][27]
@@ -70,7 +70,7 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 		if emptyStr(pics) {
 			return ajax.Response{State: stateParamFailed, Info: "请至少上传一张图片"} // travel[3][27]
 		}
-		if len(ticketlist) == 0 { // PHP !$ticketlist：null / 空数组都拦
+		if len(phpForeachItems(ticketlist)) == 0 { // PHP !$ticketlist：null / 空数组都拦
 			return ajax.Response{State: stateParamFailed, Info: infoOperTicketListNeed}
 		}
 	} else if oper == "del" {
@@ -120,8 +120,8 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 			"添加门票("+title+")", s.urlOf(ctx, host, "ticket-detail", strconv.FormatInt(aid, 10)),
 			interpolate(ins, args...))
 
-		for _, item := range ticketlist {
-			val, ok := item.(map[string]any)
+		for _, item := range phpForeachItems(ticketlist) { // PHP foreach：assoc 也迭代
+			val, ok := valMapOf(item.val)
 			if !ok {
 				continue
 			}
@@ -145,9 +145,10 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 		err := s.db.QueryRowContext(ctx,
 			"SELECT l.`id` FROM "+ticketTable+" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			tid).Scan(&eid)
-		if err == sql.ErrNoRows || err != nil {
+		if err == sql.ErrNoRows {
 			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
 		}
+		// SQL 错误面：dsqlOper 错误串 truthy → 继续走 UPDATE（报错则 [12][34]）。
 
 		upd := "UPDATE " + ticketTable +
 			" SET `note` = ?, `jdnote` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?"
@@ -171,10 +172,10 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 			"修改门票("+title+")", s.urlOf(ctx, host, "ticket-detail", id),
 			interpolate(upd, args...))
 
-		if len(ticketlist) > 0 {
-			notid := []string{} // PHP array_push 收集的保留 id
-			for _, item := range ticketlist {
-				val, ok := item.(map[string]any)
+		if len(phpForeachItems(ticketlist)) > 0 {
+			notid := []string{}                                // PHP array_push 收集的保留 id（无条件追加）
+			for _, item := range phpForeachItems(ticketlist) { // PHP foreach：assoc 也迭代
+				val, ok := valMapOf(item.val)
 				if !ok {
 					continue
 				}
@@ -188,21 +189,32 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 						specialtime, phpInt(vid))
 					notid = append(notid, vid)
 				} else {
-					res, err := s.db.ExecContext(ctx,
+					// PHP 无条件 array_push($notid, lastid)：INSERT 失败时 dsqlOper
+					// lastid 返回错误串，混进 NOT IN 列表 → 整条 DELETE 报 SQL 错误
+					// → 不删任何行、流程继续（最终仍是 修改成功）。
+					res, ierr := s.db.ExecContext(ctx,
 						"INSERT INTO "+infoTable+
 							" (`typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`) VALUES ('0', ?, ?, ?, ?, ?)",
 						operRaw(itemStr(val, "title")), tid, operRaw(itemStr(val, "price")),
 						specialtime, pubdate)
-					if err == nil {
-						lid, _ := res.LastInsertId()
-						notid = append(notid, strconv.FormatInt(lid, 10))
+					if ierr == nil {
+						if lid, lerr := res.LastInsertId(); lerr == nil {
+							notid = append(notid, strconv.FormatInt(lid, 10))
+						} else {
+							notid = append(notid, dsqlOperErrorFace)
+						}
+					} else {
+						notid = append(notid, dsqlOperErrorFace)
 					}
 				}
 			}
 			if len(notid) > 0 { // PHP if($notid)
-				_, _ = s.db.ExecContext(ctx,
-					"DELETE FROM "+infoTable+" WHERE `ticketid` = ? AND `id` NOT IN ("+
-						strings.Join(notid, ",")+")", tid)
+				if allNumericList(notid) {
+					_, _ = s.db.ExecContext(ctx,
+						"DELETE FROM "+infoTable+" WHERE `ticketid` = ? AND `id` NOT IN ("+
+							strings.Join(notid, ",")+")", tid)
+				}
+				// 含错误串 → DELETE 语句非法（dsqlOper 报错吞掉），不删行、继续。
 			}
 		}
 
@@ -214,8 +226,12 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 			"SELECT l.`id`, l.`title`, l.`pics`, l.`video`, s.`userid` FROM "+ticketTable+
 				" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			tid).Scan(&rid, &rtitle, &rpics, &rvideo, &ruserid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
+		}
+		if err != nil {
+			// SQL 错误面：$results[0]['userid'] 取到 '{' → 与 userid 不等 → [12][37]。
+			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm}
 		}
 		if !looseEqNumber(ruserid.String, userid) {
 			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm} // 101

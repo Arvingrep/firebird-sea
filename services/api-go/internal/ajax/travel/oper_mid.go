@@ -126,9 +126,10 @@ func (s *Service) operRentcar(req *ajax.Request) ajax.Response {
 		err := s.db.QueryRowContext(ctx,
 			"SELECT l.`id` FROM "+carTable+" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			rid).Scan(&eid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
 		}
+		// SQL 错误面：错误串 truthy → 继续走 UPDATE（报错则 [12][34]）。
 
 		upd := "UPDATE " + carTable +
 			" SET `typeid` = ?, `price` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `tag` = ?, `state` = ? WHERE `id` = ?"
@@ -150,8 +151,12 @@ func (s *Service) operRentcar(req *ajax.Request) ajax.Response {
 			"SELECT l.`id`, l.`title`, l.`pics`, l.`video`, s.`userid` FROM "+carTable+
 				" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			rid).Scan(&did, &dtitle, &dpics, &dvideo, &duserid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
+		}
+		if err != nil {
+			// SQL 错误面：$results[0]['userid'] 取到 '{' → 与 userid 不等 → [12][37]。
+			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm}
 		}
 		if !looseEqNumber(duserid.String, userid) {
 			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm} // 101
@@ -190,7 +195,7 @@ func (s *Service) operVisa(req *ajax.Request) ajax.Response {
 	typeid := phpInt(req.Params.Get("typeid"))
 	entrytimes := operRaw(req.ParamsEscaped.Get("entrytimes"))
 	staytimes := operRaw(req.ParamsEscaped.Get("staytimes"))
-	earliestdate := strToTime(req.ParamsEscaped.Get("earliestdate")) // GetMkTime(strtotime) 子集
+	earliestdate := getMkTime(req.ParamsEscaped.Get("earliestdate")) // GetMkTime 全语义
 	valid := operRaw(req.ParamsEscaped.Get("valid"))
 	processingtime := operRaw(req.ParamsEscaped.Get("processingtime"))
 	scope := operRaw(req.ParamsEscaped.Get("scope"))
@@ -299,9 +304,10 @@ func (s *Service) operVisa(req *ajax.Request) ajax.Response {
 		err := s.db.QueryRowContext(ctx,
 			"SELECT l.`id` FROM "+visaTable+" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			vid).Scan(&eid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
 		}
+		// SQL 错误面：错误串 truthy → 继续走 UPDATE（报错则 [12][34]）。
 
 		upd := "UPDATE " + visaTable +
 			" SET `userid` = ?, `company` = ?, `title` = ?, `subtitle` = ?, `country` = ?, `typeid` = ?, `price` = ?, `entrytimes` = ?, `staytimes` = ?, `earliestdate` = ?, `valid` = ?, `processingtime` = ?, `pics` = ?, `video` = ?, `scope` = ?, `materials` = ?, `serviceincludes` = ?, `incumbentsscience` = ?, `retireescience` = ?, `professionalscience` = ?, `studentsscience` = ?, `childrenscience` = ?, `others` = ?, `reminder` = ?, `notice` = ?, `processingflow` = ?, `state` = ?, `note` = ? WHERE `id` = ?"
@@ -325,8 +331,12 @@ func (s *Service) operVisa(req *ajax.Request) ajax.Response {
 			"SELECT l.`id`, l.`title`, l.`pics`, l.`video`, s.`userid` FROM "+visaTable+
 				" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			vid).Scan(&did, &dtitle, &dpics, &dvideo, &duserid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
+		}
+		if err != nil {
+			// SQL 错误面：$results[0]['userid'] 取到 '{' → 与 userid 不等 → [12][37]。
+			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm}
 		}
 		if !looseEqNumber(duserid.String, userid) {
 			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm} // 101

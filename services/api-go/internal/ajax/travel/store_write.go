@@ -175,9 +175,7 @@ func (s *Service) storeConfig(req *ajax.Request) ajax.Response {
 
 		return ajax.Response{State: ajax.StateOK, Info: operStoreOKNew}
 	}
-	if err != nil {
-		return ajax.Response{State: stateParamFailed, Info: infoOperSaveFail}
-	}
+	// SQL 错误面：$userResult 错误串 truthy → 走 UPDATE 分支（报错 → [12][20]）。
 	oldid := phpInt(storeID.String)
 
 	// 已有商铺：UPDATE（state 重置 0）。
@@ -244,9 +242,7 @@ func (s *Service) storeConfigModule(req *ajax.Request) ajax.Response {
 	if err == sql.ErrNoRows {
 		return ajax.Response{State: stateParamFailed, Info: infoOperStoreEmpty}
 	}
-	if err != nil {
-		return ajax.Response{State: stateParamFailed, Info: infoOperStoreEmpty}
-	}
+	// SQL 错误面：$userResult 错误串 truthy → 走 UPDATE 分支（报错 → [12][20]）。
 
 	bindModule := operRaw(req.ParamsEscaped.Get("bind_module"))
 	upd := "UPDATE " + storeTable + " SET `bind_module` = ? WHERE `userid` = ?"

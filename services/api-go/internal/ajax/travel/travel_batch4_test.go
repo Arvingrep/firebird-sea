@@ -4,6 +4,7 @@
 package travel
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,17 +13,29 @@ import (
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/member"
 )
 
 // newOperService 构造带身份与 member.info 桩的服务。info 为 getMemberInfo 的 info
 // 投影（userType/is_staff/autharr/companyuid 由用例给定）。
 func newOperService(t *testing.T, uid int64, info map[string]any) (*Service, sqlmock.Sqlmock) {
+	return newOperServiceInfo(t, uid, info)
+}
+
+// newOperServiceInfo 同 newOperService，但 info 形态不限（生产路径是 *member.Object）。
+func newOperServiceInfo(t *testing.T, uid int64, info any) (*Service, sqlmock.Sqlmock) {
 	t.Helper()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+	// 写路径防假绿：测试结束时校验全部期望命中（参数级校验见各 WithArgs）。
+	t.Cleanup(func() {
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("expectations not met: %v", err)
+		}
+	})
 	svc, err := New(Dep{
 		DB:          db,
 		TablePrefix: "huoniao_",
@@ -272,7 +285,11 @@ func TestOperHotelAddSuccessWithRooms(t *testing.T) {
 	rooms := `[{"title":"大床房","area":"30","iswindow":"1","typeid":"0","breakfast":"1","price":"199","specialtime":"[{\"date\":\"2025-01-01\",\"price\":\"299\"}]","imgpath":"/r.jpg"}]`
 	expectStoreOK(mock)
 	mock.ExpectExec(qHotelInsert).WillReturnResult(sqlmock.NewResult(42, 1))
-	mock.ExpectExec(qHotelRoomIns).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(qHotelRoomIns).WithArgs(
+		"大床房", int64(42), "30", "1", "0", "1", "199",
+		`a:1:{i:0;a:2:{s:4:"date";s:10:"2025-01-01";s:5:"price";s:3:"299";}}`,
+		sqlmock.AnyArg(), "/r.jpg").
+		WillReturnResult(sqlmock.NewResult(1, 1))
 	got := serveParams(t, svc, "operHotel", url.Values{
 		"oper": {"add"}, "title": {"测试酒店"}, "addrid": {"3"}, "pics": {"/a.jpg"},
 		"price": {"199.5"}, "roomlist": {rooms},
@@ -290,8 +307,12 @@ func TestOperHotelUpdateWithRoomDiff(t *testing.T) {
 	mock.ExpectQuery(qHotelExist).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 	mock.ExpectExec(qHotelUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qHotelRoomUpd).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qHotelRoomUpdIns).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(qHotelRoomUpd).WithArgs(
+		"改房", int64(11), "40", "0", "1", "0", "399", "N;", "/b.jpg", int64(3)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qHotelRoomUpdIns).WithArgs(
+		"新房", int64(11), "50", "1", "0", "1", "499", "N;", "/c.jpg", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 	got := serveParams(t, svc, "operHotel", url.Values{
 		"oper": {"update"}, "id": {"11"}, "title": {"测试酒店"}, "addrid": {"3"},
 		"pics": {"/a.jpg"}, "roomlist": {rooms},
@@ -414,8 +435,10 @@ func TestOperTicketAddSuccessReturnsAid(t *testing.T) {
 	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	mock.ExpectExec(qTicketInsert).WillReturnResult(sqlmock.NewResult(31, 1))
-	mock.ExpectExec(qTInfoIns).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(qTInfoIns).WillReturnResult(sqlmock.NewResult(2, 1))
+	mock.ExpectExec(qTInfoIns).WithArgs("成人票", int64(31), "80", "N;", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(2, 1))
 	got := serveParams(t, svc, "operTicket", ticketParams())
 	if got != `{"state":100,"info":31}` {
 		t.Fatalf("add = %s", got)
@@ -428,9 +451,11 @@ func TestOperTicketUpdateNotidDiff(t *testing.T) {
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qTInfoUpd).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qTInfoIns).WillReturnResult(sqlmock.NewResult(4, 1))
-	mock.ExpectExec(qTInfoNotIn).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", int64(3)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(4, 1))
+	mock.ExpectExec(qTInfoNotIn).WithArgs(int64(31)).WillReturnResult(sqlmock.NewResult(0, 1))
 	p := ticketParams()
 	p.Set("oper", "update")
 	p.Set("id", "31")
@@ -484,6 +509,9 @@ func TestOperRentcarAddSuccessReturnsAid(t *testing.T) {
 }
 
 func TestOperVisaEarliestdateInvalid(t *testing.T) {
+	// PHP GetMkTime("不是日期")：非数字 → mktime(0,0,0,1,1,0) 的年份映射 0→2000
+	// → 946656000（实测 docker PHP 7.4），empty 检查通过 → 走到 INSERT。
+	// mock 未配 INSERT 期望 → exec 报错 → [12][34]。
 	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	got := serveParams(t, svc, "operVisa", url.Values{
@@ -492,8 +520,25 @@ func TestOperVisaEarliestdateInvalid(t *testing.T) {
 		"staytimes": {"15"}, "earliestdate": {"不是日期"}, "valid": {"90"},
 		"processingtime": {"7"}, "pics": {"/a.jpg"},
 	})
-	if got != `{"state":101,"info":"请选择最早可预订时间"}` {
+	if got != `{"state":101,"info":"发布到数据时发生错误，请检查字段内容！"}` {
 		t.Fatalf("earliestdate = %s", got)
+	}
+}
+
+func TestGetMkTime(t *testing.T) {
+	// 期望值全部来自 docker firebird-php（PHP 7.4.33）实测 GetMkTime。
+	cases := map[string]int64{
+		"1768435200":    1768435200, // 纯数字原样透传
+		"2026-01-15":    1768406400, // 2026-01-15 00:00 UTC+8
+		"2026-1-5 8:30": 1767573000, // 2026-01-05 08:30 UTC+8
+		"不是日期":          946656000,  // 年份 0 → 2000 映射
+		"abc":           946656000,  // 同上
+		"":              0,          // PHP 返回 ""（空串拼 SQL 等价 0），Go 收敛为 0
+	}
+	for in, want := range cases {
+		if got := getMkTime(in); got != want {
+			t.Errorf("getMkTime(%q) = %d, want %d", in, got, want)
+		}
 	}
 }
 
@@ -553,8 +598,10 @@ func TestOperAgencyAddReversedWeights(t *testing.T) {
 	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	mock.ExpectExec(qAgencyInsert).WillReturnResult(sqlmock.NewResult(21, 1))
-	mock.ExpectExec(qAInfoIns).WillReturnResult(sqlmock.NewResult(1, 1)) // 第二天 weight=0
-	mock.ExpectExec(qAInfoIns).WillReturnResult(sqlmock.NewResult(2, 1)) // 第一天 weight=1
+	mock.ExpectExec(qAInfoIns).WithArgs("第二天", int64(21), "200", "N;", sqlmock.AnyArg(), "0").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(qAInfoIns).WithArgs("第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "1").
+		WillReturnResult(sqlmock.NewResult(2, 1))
 	got := serveParams(t, svc, "operAgency", url.Values{
 		"oper": {"add"}, "title": {"周边游"}, "typeid": {"1"}, "addrid": {"1"},
 		"address": {"路"}, "pics": {"/a.jpg"},
@@ -572,10 +619,12 @@ func TestOperAgencyUpdateReinsertWithID(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "level"}).AddRow(21, "4"))
 	mock.ExpectExec("UPDATE `huoniao_travel_agency` SET `tag` = ?, `imglist` = ?, `userid` = ?, `company` = ?, `title` = ?, `typeid` = ?, `cityid` = ?, `addrid` = ?, `address` = ?, `missiontime` = ?, `missiontype` = ?, `pics` = ?, `video` = ?, `travelservice` = ?, `note` = ?, `itinerary` = ?, `expense` = ?, `instructions` = ?, `state` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qAInfoDelAll).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qAInfoDelAll).WithArgs(int64(21)).WillReturnResult(sqlmock.NewResult(0, 1))
 	// 反转序：第二天（无 id → 普通 INSERT，weight=0）→ 第一天（id=9 → 带 id INSERT，weight=1）。
-	mock.ExpectExec(qAInfoIns).WillReturnResult(sqlmock.NewResult(10, 1))
-	mock.ExpectExec(qAInfoInsID).WillReturnResult(sqlmock.NewResult(9, 1))
+	mock.ExpectExec(qAInfoIns).WithArgs("第二天", int64(21), "200", "N;", sqlmock.AnyArg(), "0").
+		WillReturnResult(sqlmock.NewResult(10, 1))
+	mock.ExpectExec(qAInfoInsID).WithArgs(int64(9), "第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "1").
+		WillReturnResult(sqlmock.NewResult(9, 1))
 	got := serveParams(t, svc, "operAgency", url.Values{
 		"oper": {"update"}, "id": {"21"}, "title": {"周边游"}, "typeid": {"1"},
 		"addrid": {"1"}, "address": {"路"}, "pics": {"/a.jpg"},
@@ -607,6 +656,7 @@ func TestOperVideoAddStoreOwnerAndFallback(t *testing.T) {
 	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	mock.ExpectExec("INSERT INTO `huoniao_travel_video` (`usertype`, `userid`, `title`, `litpic`, `video`, `pubdate`, `state`) VALUES (?, ?, ?, ?, ?, ?, ?)").
+		WithArgs(int64(1), int64(7), "视频A", "/c.jpg", "/v.mp4", sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(77, 1))
 	got := serveParams(t, svc, "operVideo", url.Values{
 		"oper": {"add"}, "title": {"视频A"}, "litpic": {"/c.jpg"}, "video": {"/v.mp4"},
@@ -619,6 +669,7 @@ func TestOperVideoAddStoreOwnerAndFallback(t *testing.T) {
 	svc2, mock2 := newOperService(t, 5, operInfo(1, 0, 0))
 	mock2.ExpectQuery(qStoreGate).WillReturnRows(sqlmock.NewRows([]string{"id", "state"}))
 	mock2.ExpectExec("INSERT INTO `huoniao_travel_video` (`usertype`, `userid`, `title`, `litpic`, `video`, `pubdate`, `state`) VALUES (?, ?, ?, ?, ?, ?, ?)").
+		WithArgs(int64(0), int64(5), "视频A", "/c.jpg", "/v.mp4", sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(78, 1))
 	got2 := serveParams(t, svc2, "operVideo", url.Values{
 		"oper": {"add"}, "title": {"视频A"}, "litpic": {"/c.jpg"}, "video": {"/v.mp4"},
@@ -635,7 +686,7 @@ func TestOperVideoDelScopedToOwner(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "litpic", "video", "userid"}).
 			AddRow(77, "视频A", "/c.jpg", "/v.mp4", "7"))
 	mock.ExpectExec("DELETE FROM `huoniao_travel_video` WHERE `id` = ?").
-		WillReturnResult(sqlmock.NewResult(0, 1))
+		WithArgs(int64(77)).WillReturnResult(sqlmock.NewResult(0, 1))
 	got := serveParams(t, svc, "operVideo", url.Values{"oper": {"del"}, "id": {"77"}})
 	if got != `{"state":100,"info":"删除成功！"}` {
 		t.Fatalf("del = %s", got)
@@ -646,6 +697,7 @@ func TestOperStrategyAddAndDel(t *testing.T) {
 	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	mock.ExpectExec("INSERT INTO `huoniao_travel_strategy` (`typeid`, `usertype`, `userid`, `title`, `litpic`, `pics`, `note`, `pubdate`, `state`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").
+		WithArgs(int64(2), int64(1), int64(7), "攻略A", "", "/a.jpg", "正文", sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(88, 1))
 	got := serveParams(t, svc, "operStrategy", url.Values{
 		"oper": {"add"}, "title": {"攻略A"}, "typeid": {"2"}, "pics": {"/a.jpg"}, "note": {"正文"},
@@ -660,7 +712,7 @@ func TestOperStrategyAddAndDel(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "litpic", "pics", "userid"}).
 			AddRow(88, "攻略A", "", "/a.jpg", "7"))
 	mock2.ExpectExec("DELETE FROM `huoniao_travel_strategy` WHERE `id` = ?").
-		WillReturnResult(sqlmock.NewResult(0, 1))
+		WithArgs(int64(88)).WillReturnResult(sqlmock.NewResult(0, 1))
 	got2 := serveParams(t, svc2, "operStrategy", url.Values{"oper": {"del"}, "id": {"88"}})
 	if got2 != `{"state":100,"info":"删除成功！"}` {
 		t.Fatalf("del = %s", got2)
@@ -717,6 +769,9 @@ func TestPHPSerializeValue(t *testing.T) {
 		phpSerializeValue(jsonDecodeList(`{"a":1,"b":[2,3]}`)):                     `a:2:{s:1:"a";i:1;s:1:"b";a:2:{i:0;i:2;i:1;i:3;}}`,
 		phpSerializeValue(jsonDecodeList(`[1.5,"x"]`)):                             `a:2:{i:0;d:1.5;i:1;s:1:"x";}`,
 		phpSerializeValue(jsonDecodeList(`[2.0]`)):                                 `a:1:{i:0;d:2;}`,
+		// PHP 关联数组键的整数化：JSON "1" → int 键（serialize 出 i:1），插入序保持。
+		phpSerializeValue(jsonDecodeList(`{"1":2,"b":3}`)): `a:2:{i:1;i:2;s:1:"b";i:3;}`,
+		phpSerializeValue(jsonDecodeList(`{"01":2}`)):      `a:1:{s:2:"01";i:2;}`, // 前导零不整数化
 	}
 	for got, want := range cases {
 		if got != want {
@@ -738,5 +793,147 @@ func TestOperFilteredChain(t *testing.T) {
 	}
 	if got := operRaw(`a\'b`); got != "a'b" {
 		t.Errorf("operRaw 转义视图 = %q", got)
+	}
+}
+
+// —— 评审加固用例（codex R1）：assoc 列表 / 错误面 / member.Object 生产形态 ——
+
+// operInfoObject 构造生产路径的 *member.Object 桩（autharr 为有序对象）。
+func operInfoObject(ut int, staff int, staffComp int, authModules ...string) *member.Object {
+	o := member.NewObject()
+	o.Set("id", "5")
+	o.Set("userType", ut)
+	o.Set("is_staff", staff)
+	o.Set("companyuid", staffComp)
+	auth := member.NewObject()
+	arr := []any{}
+	for _, v := range authModules {
+		arr = append(arr, v)
+	}
+	auth.Set("travel", arr)
+	o.Set("autharr", auth)
+	return o
+}
+
+func TestOperStaffGateWithMemberObjectInfo(t *testing.T) {
+	// 生产形态：member.detail 返回 *member.Object，autharr 是嵌套有序对象。
+	// staff（type=2，autharr.travel 含 "2"）→ 门禁通过 → userid=companyuid=9；
+	// 店铺门禁命中 → INSERT 的 userid 是店铺 id（7）。
+	svc, mock := newOperServiceInfo(t, 5, operInfoObject(1, 1, 9, "2"))
+	expectStoreOK(mock)
+	mock.ExpectExec("INSERT INTO `huoniao_travel_video` (`usertype`, `userid`, `title`, `litpic`, `video`, `pubdate`, `state`) VALUES (?, ?, ?, ?, ?, ?, ?)").
+		WithArgs(int64(1), int64(7), "视频A", "/c.jpg", "/v.mp4", sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(79, 1))
+	got := serveParams(t, svc, "operVideo", url.Values{
+		"oper": {"add"}, "title": {"视频A"}, "litpic": {"/c.jpg"}, "video": {"/v.mp4"},
+	})
+	if got != `{"state":100,"info":79}` {
+		t.Fatalf("member.Object staff = %s", got)
+	}
+
+	// 同形态但 autharr.travel 无 "2" → 商家权限验证失败！
+	svc2, _ := newOperServiceInfo(t, 5, operInfoObject(1, 1, 9, "1"))
+	got2 := serveParams(t, svc2, "operVideo", url.Values{
+		"oper": {"add"}, "title": {"视频A"}, "litpic": {"/c.jpg"}, "video": {"/v.mp4"},
+	})
+	if got2 != `{"state":101,"info":"商家权限验证失败！"}` {
+		t.Fatalf("member.Object no auth = %s", got2)
+	}
+}
+
+func TestOperHotelAssocRoomlistIterates(t *testing.T) {
+	// assoc 形态 roomlist：PHP foreach 对关联数组也迭代（键被丢弃）。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	rooms := `{"r1":{"title":"大床房","area":"30","iswindow":"1","typeid":"0","breakfast":"1","price":"199","specialtime":"","imgpath":"/r.jpg"}}`
+	expectStoreOK(mock)
+	mock.ExpectExec(qHotelInsert).WillReturnResult(sqlmock.NewResult(42, 1))
+	mock.ExpectExec(qHotelRoomIns).WithArgs(
+		"大床房", int64(42), "30", "1", "0", "1", "199", "N;", sqlmock.AnyArg(), "/r.jpg").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	got := serveParams(t, svc, "operHotel", url.Values{
+		"oper": {"add"}, "title": {"测试酒店"}, "addrid": {"3"}, "pics": {"/a.jpg"},
+		"price": {"199.5"}, "roomlist": {rooms},
+	})
+	if got != `{"state":100,"info":"发布成功！"}` {
+		t.Fatalf("assoc roomlist = %s", got)
+	}
+}
+
+func TestOperAgencyAssocTicketlistStringKeys(t *testing.T) {
+	// array_reverse 对字符串键原样保留：foreach 插入序 [b=第二天, a=第一天]，
+	// 反转后 [a=第一天(weight=a), b=第二天(weight=b)]——weight 是原始键。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectExec(qAgencyInsert).WillReturnResult(sqlmock.NewResult(21, 1))
+	mock.ExpectExec(qAInfoIns).WithArgs("第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "a").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(qAInfoIns).WithArgs("第二天", int64(21), "200", "N;", sqlmock.AnyArg(), "b").
+		WillReturnResult(sqlmock.NewResult(2, 1))
+	got := serveParams(t, svc, "operAgency", url.Values{
+		"oper": {"add"}, "title": {"周边游"}, "typeid": {"1"}, "addrid": {"1"},
+		"address": {"路"}, "pics": {"/a.jpg"},
+		"ticketlist": {`{"b":{"title":"第二天","price":"200","specialtime":""},"a":{"title":"第一天","price":"100","specialtime":""}}`},
+	})
+	if got != `{"state":100,"info":21}` {
+		t.Fatalf("assoc ticketlist = %s", got)
+	}
+}
+
+func TestOperTicketUpdateNotidInsertErrorKeepsRows(t *testing.T) {
+	// INSERT 失败时 PHP 无条件 push lastid 错误串 → NOT IN 列表非法 → DELETE 整条
+	// 报 SQL 错误（dsqlOper 吞掉）→ 已有行不被删除，流程继续（修改成功）。
+	// mock 里不配 DELETE 期望 → 若 Go 误执行 DELETE，ExpectationsWereMet 报未命中。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
+	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", int64(3)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
+		WillReturnError(errors.New("insert failed"))
+	p := ticketParams()
+	p.Set("oper", "update")
+	p.Set("id", "31")
+	p.Set("ticketlist", `[{"id":"3","title":"成人票","price":"80","specialtime":""},{"title":"儿童票","price":"40","specialtime":""}]`)
+	got := serveParams(t, svc, "operTicket", p)
+	if got != `{"state":100,"info":"修改成功！"}` {
+		t.Fatalf("notid error face = %s", got)
+	}
+}
+
+func TestOperHotelUpdateSelectErrorGoesToUpdate(t *testing.T) {
+	// 存在性 SELECT 报错：dsqlOper 错误串 truthy → 继续走 UPDATE → 也报错 → [12][34]。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qHotelExist).WillReturnError(errors.New("select failed"))
+	mock.ExpectExec(qHotelUpdate).WillReturnError(errors.New("update failed"))
+	got := serveParams(t, svc, "operHotel", url.Values{
+		"oper": {"update"}, "id": {"11"}, "title": {"测试酒店"}, "addrid": {"3"}, "pics": {"/a.jpg"},
+	})
+	if got != `{"state":101,"info":"发布到数据时发生错误，请检查字段内容！"}` {
+		t.Fatalf("update select-error face = %s", got)
+	}
+}
+
+func TestOperHotelDelSelectErrorFace(t *testing.T) {
+	// del 存在性 SELECT 报错：$results[0]['userid'] 取到 '{' → 与 userid 不等 → [12][37]。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qHotelDelSel).WillReturnError(errors.New("select failed"))
+	got := serveParams(t, svc, "operHotel", url.Values{"oper": {"del"}, "id": {"11"}})
+	if got != `{"state":101,"info":"权限不足，请确认帐户信息后再进行操作！"}` {
+		t.Fatalf("del select-error face = %s", got)
+	}
+}
+
+func TestStoreGateSelectErrorFace(t *testing.T) {
+	// 店铺门禁 SELECT 报错：错误串 truthy → $userResult[0]['state'] 取到 '{'
+	// → `== 0` 为真 → [12][29]（审核中），不是 [12][28]。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	mock.ExpectQuery(qStoreGate).WillReturnError(errors.New("select failed"))
+	got := serveParams(t, svc, "operRentcar", url.Values{"oper": {"del"}, "id": {"1"}})
+	if got != `{"state":101,"info":"您的公司信息还在审核中，请通过审核后再发布！"}` {
+		t.Fatalf("store gate select-error face = %s", got)
 	}
 }

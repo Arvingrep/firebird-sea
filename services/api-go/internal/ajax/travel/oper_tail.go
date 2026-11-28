@@ -47,7 +47,7 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 	expense := operFiltered(req.ParamsEscaped.Get("expense"))
 	instructions := operFiltered(req.ParamsEscaped.Get("instructions"))
 	itinerary := operRaw(req.ParamsEscaped.Get("routeList")) // PHP $itinerary = $param['routeList']
-	ticketlist := listOf(jsonDecodeList(req.Params.Get("ticketlist")))
+	ticketlist := jsonDecodeList(req.Params.Get("ticketlist"))
 
 	if operUserTypeGate(m) {
 		return ajax.Response{State: stateParamFailed, Info: infoOperAuthFailBang} // travel[12][27]
@@ -88,13 +88,9 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 	pubdate := time.Now().Unix()
 	aid0 := phpInt(id)
 
-	// ticketlist array_reverse 后按下标写 weight（PHP foreach 的 $_k 是反转后的下标）。
-	reversed := make([]map[string]any, 0, len(ticketlist))
-	for i := len(ticketlist) - 1; i >= 0; i-- {
-		if val, ok := ticketlist[i].(map[string]any); ok {
-			reversed = append(reversed, val)
-		}
-	}
+	// ticketlist array_reverse 后写 weight：PHP array_reverse 对数值键重排成新
+	// 连续下标、字符串键原样保留——assoc 形态的 weight 是原始键（SQL 字面量 '$_k'）。
+	reversed := phpArrayReverse(phpForeachItems(ticketlist))
 
 	switch oper {
 	case "add":
@@ -117,12 +113,16 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 			"添加周边游("+title+")", s.urlOf(ctx, host, "agency-detail", strconv.FormatInt(aid, 10)),
 			interpolate(ins, args...))
 
-		for i, val := range reversed {
+		for _, item := range reversed {
+			val, ok := valMapOf(item.val)
+			if !ok {
+				continue
+			}
 			_, _ = s.db.ExecContext(ctx,
 				"INSERT INTO "+infoTable+
 					" (`typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`, `weight`) VALUES ('1', ?, ?, ?, ?, ?, ?)",
 				operRaw(itemStr(val, "title")), aid, operRaw(itemStr(val, "price")),
-				hotelRoomSpecialtime(itemStr(val, "specialtime")), pubdate, i)
+				hotelRoomSpecialtime(itemStr(val, "specialtime")), pubdate, item.key)
 		}
 
 		return ajax.Response{State: ajax.StateOK, Info: aid} // PHP return $aid
@@ -135,9 +135,10 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 		err := s.db.QueryRowContext(ctx,
 			"SELECT l.`id`, l.`level` FROM "+agencyTable+" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			aid0).Scan(&eid, &dbLevel)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
 		}
+		// SQL 错误面：错误串 truthy → 继续走 UPDATE（报错则 [12][34]）。
 
 		// `$level = !$level ? $results[0]['level'] : $level;`
 		levelVal := level
@@ -160,7 +161,11 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 
 		// 先删全部（无 typeid 过滤），再按反转序重插；val.id 非空时带显式 id INSERT。
 		_, _ = s.db.ExecContext(ctx, "DELETE FROM "+infoTable+" WHERE `ticketid` = ?", aid0)
-		for i, val := range reversed {
+		for _, item := range reversed {
+			val, ok := valMapOf(item.val)
+			if !ok {
+				continue
+			}
 			specialtime := hotelRoomSpecialtime(itemStr(val, "specialtime"))
 			vid := itemStr(val, "id")
 			if vid != "" && vid != "0" { // PHP !empty($val['id'])
@@ -168,13 +173,13 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 					"INSERT INTO "+infoTable+
 						" (`id`, `typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`, `weight`) VALUES (?, '1', ?, ?, ?, ?, ?, ?)",
 					phpInt(vid), operRaw(itemStr(val, "title")), aid0,
-					operRaw(itemStr(val, "price")), specialtime, pubdate, i)
+					operRaw(itemStr(val, "price")), specialtime, pubdate, item.key)
 			} else {
 				_, _ = s.db.ExecContext(ctx,
 					"INSERT INTO "+infoTable+
 						" (`typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`, `weight`) VALUES ('1', ?, ?, ?, ?, ?, ?)",
 					operRaw(itemStr(val, "title")), aid0, operRaw(itemStr(val, "price")),
-					specialtime, pubdate, i)
+					specialtime, pubdate, item.key)
 			}
 		}
 
@@ -186,8 +191,12 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 			"SELECT l.`id`, l.`title`, l.`pics`, l.`video`, l.`imglist`, s.`userid` FROM "+agencyTable+
 				" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			aid0).Scan(&did, &dtitle, &dpics, &dvideo, &dimglist, &duserid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
+		}
+		if err != nil {
+			// SQL 错误面：$results[0]['userid'] 取到 '{' → 与 userid 不等 → [12][37]。
+			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm}
 		}
 		if !looseEqNumber(duserid.String, userid) {
 			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm} // 101
@@ -208,12 +217,17 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 // userid=店铺id；不存在 → usertype=0（不报错）。
 func (s *Service) operVideoStoreLook(ctx context.Context, userid int64) (int64, int) {
 	if s.db != nil {
-		var id sql.NullString
+		var id, state sql.NullString
 		err := s.db.QueryRowContext(ctx,
 			"SELECT `id`, `state` FROM `"+s.prefix+"travel_store` WHERE `userid` = ?", userid).
-			Scan(&id, &sql.NullString{})
+			Scan(&id, &state)
 		if err == nil {
 			return 1, phpInt(id.String)
+		}
+		if err != sql.ErrNoRows {
+			// SQL 错误面：$userResult 错误串 truthy → 命中 if($userResult) →
+			// $userResult[0]['id'] 取到 '{' → 落库等价 0。
+			return 1, 0
 		}
 	}
 	return 0, int(userid)
@@ -301,9 +315,10 @@ func (s *Service) operVideo(req *ajax.Request) ajax.Response {
 		err := s.db.QueryRowContext(ctx,
 			"SELECT l.`id` FROM "+videoTable+" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			vid).Scan(&eid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
 		}
+		// SQL 错误面：错误串 truthy → 继续走 UPDATE（报错则 [12][34]）。
 
 		upd := "UPDATE " + videoTable +
 			" SET `usertype` = ?, `userid` = ?, `title` = ?, `litpic` = ?, `video` = ?, `state` = ? WHERE `id` = ?"
@@ -326,8 +341,12 @@ func (s *Service) operVideo(req *ajax.Request) ajax.Response {
 			"SELECT l.`id`, l.`title`, l.`litpic`, l.`video`, l.`userid` FROM "+videoTable+
 				" l WHERE l.`id` = ? AND l.`userid` = ?", vid, ownerid).
 			Scan(&did, &dtitle, &dlitpic, &dvideo2, &duserid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
+		}
+		if err != nil {
+			// SQL 错误面：$results[0]['userid'] 取到 '{' → 与 userid 不等 → [12][37]。
+			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm}
 		}
 		_, _ = s.db.ExecContext(ctx, "DELETE FROM "+videoTable+" WHERE `id` = ?", vid)
 		s.operLog(req.HTTP, int64(ownerid), "travel", "video", int64(vid), "delete",
@@ -423,9 +442,10 @@ func (s *Service) operStrategy(req *ajax.Request) ajax.Response {
 		err := s.db.QueryRowContext(ctx,
 			"SELECT l.`id` FROM "+strategyTable+" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			sid).Scan(&eid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
 		}
+		// SQL 错误面：错误串 truthy → 继续走 UPDATE（报错则 [12][34]）。
 
 		upd := "UPDATE " + strategyTable +
 			" SET `typeid` = ?, `usertype` = ?, `userid` = ?, `title` = ?, `litpic` = ?, `pics` = ?, `note` = ?, `state` = ? WHERE `id` = ?"
@@ -446,8 +466,12 @@ func (s *Service) operStrategy(req *ajax.Request) ajax.Response {
 			"SELECT l.`id`, l.`title`, l.`litpic`, l.`pics`, l.`userid` FROM "+strategyTable+
 				" l WHERE l.`id` = ? AND l.`userid` = ?", sid, ownerid).
 			Scan(&did, &dtitle, &dlitpic, &dpics, &duserid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
+		}
+		if err != nil {
+			// SQL 错误面：$results[0]['userid'] 取到 '{' → 与 userid 不等 → [12][37]。
+			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm}
 		}
 		_, _ = s.db.ExecContext(ctx, "DELETE FROM "+strategyTable+" WHERE `id` = ?", sid)
 		// PHP 这里的 memberLog 传了未定义的 $url（null → 空串）。

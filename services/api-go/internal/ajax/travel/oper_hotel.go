@@ -122,9 +122,10 @@ func (s *Service) operHotel(req *ajax.Request) ajax.Response {
 		err := s.db.QueryRowContext(ctx,
 			"SELECT l.`id` FROM "+hotelTable+" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			phpInt(id)).Scan(&eid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
 		}
+		// SQL 错误面：错误串 truthy → 继续走 UPDATE（报错则 [12][34]）。
 
 		upd := "UPDATE " + hotelTable +
 			" SET `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `typeid` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `price` = ?, `tag` = ?, `factag` = ?, `state` = ? WHERE `id` = ?"
@@ -149,8 +150,12 @@ func (s *Service) operHotel(req *ajax.Request) ajax.Response {
 			"SELECT l.`id`, l.`title`, l.`pics`, l.`video`, s.`userid` FROM "+hotelTable+
 				" l LEFT JOIN `"+s.prefix+"travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?",
 			phpInt(id)).Scan(&rid, &rtitle, &rpics, &rvideo, &ruserid)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
+		}
+		if err != nil {
+			// SQL 错误面：$results[0]['userid'] 取到 '{' → 与 userid 不等 → [12][37]。
+			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm}
 		}
 		if !looseEqNumber(ruserid.String, userid) {
 			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm} // 101
@@ -166,9 +171,10 @@ func (s *Service) operHotel(req *ajax.Request) ajax.Response {
 		var rtitle sql.NullString
 		err := s.db.QueryRowContext(ctx,
 			"SELECT `title` FROM "+roomTable+" WHERE `id` = ?", phpInt(id)).Scan(&rtitle)
-		if err == sql.ErrNoRows || err != nil {
-			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101
+		if err == sql.ErrNoRows {
+			return ajax.Response{State: stateParamFailed, Info: infoOperNotFound} // 101 [12][38]
 		}
+		// SQL 错误面：错误串 truthy → 继续 DELETE（报错 → results != "ok" → [12][37]）。
 		if _, err := s.db.ExecContext(ctx, "DELETE FROM "+roomTable+" WHERE `id` = ?", phpInt(id)); err != nil {
 			return ajax.Response{State: stateParamFailed, Info: infoOperNoPerm} // 101
 		}
@@ -224,9 +230,8 @@ func hotelSaveRooms(ctx context.Context, db *sql.DB, roomTable string, hotelID i
 // 忽略（PHP dsqlOper 失败不中断循环）。
 func saveRooms(ctx context.Context, db *sql.DB, roomTable string, hotelID int64, pubdate int64,
 	roomlist any, build func(val map[string]any, specialtime string) (string, []any)) {
-	list, _ := roomlist.([]any)
-	for _, item := range list {
-		val, ok := item.(map[string]any)
+	for _, item := range phpForeachItems(roomlist) { // PHP foreach：assoc 也迭代
+		val, ok := valMapOf(item.val)
 		if !ok {
 			continue // PHP foreach 对标量项会解包出错面，JSON 域不会出现，跳过。
 		}

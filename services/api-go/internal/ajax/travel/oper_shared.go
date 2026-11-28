@@ -7,6 +7,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"io"
 	"regexp"
 	"sort"
 	"strconv"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
+	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax/member"
 )
 
 // phpFloatPrefixRe 匹配 PHP (float) 强转的数值前缀（含科学计数法、首尾空白）。
@@ -76,11 +79,13 @@ const (
 // 返回 (map, logged)：未登录（-1 / detail 未命中）→ ([], false)。
 func (s *Service) memberInfoOfViewer(req *ajax.Request) (map[string]any, bool) {
 	info := s.userInfoOf(req, "")
-	m, ok := info.(map[string]any)
-	if !ok {
-		return map[string]any{}, false
+	switch x := info.(type) {
+	case *member.Object: // member.detail 生产路径的返回形态（有序对象）
+		return x.Map(), true
+	case map[string]any:
+		return x, true
 	}
-	return m, true
+	return map[string]any{}, false
 }
 
 // infoInt 取 member.info 里的数值键（PHP 侧全是 int/数字字符串混合）。
@@ -120,25 +125,62 @@ func verificationStaffTravel(m map[string]any, typ string) bool {
 	if infoInt(m, "is_staff") != 1 {
 		return false
 	}
-	autharr, ok := infoAny(m, "autharr").(map[string]any)
-	if !ok {
-		return false
+	// autharr 由 member.detail 的 unserializeValue 产出：关联数组是 *member.Object，
+	// 顺序数组是 []any，unserialize 失败是 false（truthy 检查天然排除）。
+	switch arr := infoAny(m, "autharr").(type) {
+	case *member.Object:
+		if v, ok := arr.Get("travel"); ok {
+			return phpInArrayLooseStr(v, typ)
+		}
+	case map[string]any:
+		if v, ok := arr["travel"]; ok {
+			return phpInArrayLooseStr(v, typ)
+		}
 	}
-	list, ok := autharr["travel"].([]any)
-	if !ok {
-		return false
-	}
-	for _, v := range list {
-		switch x := v.(type) {
-		case string:
-			if x == typ {
-				return true
-			}
-		case float64:
-			if strconv.Itoa(int(x)) == typ {
+	return false
+}
+
+// phpInArrayLooseStr 复刻 in_array($type(string), $arr)（松散比较）。
+func phpInArrayLooseStr(list any, needle string) bool {
+	switch l := list.(type) {
+	case []any:
+		for _, v := range l {
+			if looseEqAnyStr(v, needle) {
 				return true
 			}
 		}
+	case *member.Object:
+		for _, v := range l.Map() {
+			if looseEqAnyStr(v, needle) {
+				return true
+			}
+		}
+	case map[string]any:
+		for _, v := range l {
+			if looseEqAnyStr(v, needle) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// looseEqAnyStr 复刻 PHP 7.4 的 `元素 == needle(string)` 松散相等。
+func looseEqAnyStr(v any, s string) bool {
+	switch x := v.(type) {
+	case string:
+		return looseStrEqual(x, s)
+	case int:
+		return phpFloatVal(s) == float64(x)
+	case int64:
+		return phpFloatVal(s) == float64(x)
+	case float64:
+		return phpFloatVal(s) == x
+	case bool: // bool 与字符串比较：字符串转 bool（""/"0" 为假）
+		if x {
+			return s != "" && s != "0"
+		}
+		return s == "" || s == "0"
 	}
 	return false
 }
@@ -168,7 +210,12 @@ func (s *Service) storeGate(ctx context.Context, userid int64) (int64, *ajax.Res
 		"SELECT `id`, `state` FROM `"+s.prefix+"travel_store` WHERE `userid` = ?", userid).
 		Scan(&id, &state)
 	if err != nil {
-		return 0, &ajax.Response{State: stateParamFailed, Info: infoOperNoStore}
+		if err == sql.ErrNoRows {
+			return 0, &ajax.Response{State: stateParamFailed, Info: infoOperNoStore} // [12][28]
+		}
+		// SQL 错误面：dsqlOper 错误串 truthy → 绕过 !$userResult →
+		// $userResult[0]['state'] 取到 '{' → `== 0` 为真 → [12][29]。
+		return 0, &ajax.Response{State: stateParamFailed, Info: infoOperStoreAudit}
 	}
 	if looseStrEqual(state.String, "0") {
 		return 0, &ajax.Response{State: stateParamFailed, Info: infoOperStoreAudit}
@@ -179,20 +226,78 @@ func (s *Service) storeGate(ctx context.Context, userid int64) (int64, *ajax.Res
 	return int64(phpInt(id.String)), nil
 }
 
-// strToTime 是 strtotime() 对常见日期格式的子集实现（应用时区 UTC+8）；失败返回 0
-// （PHP 的 false 拼进 SQL 后等价 0，empty 检查同样命中）。口径同 member/reward.go。
-func strToTime(v string) int64 {
-	v = strings.TrimSpace(v)
-	for _, layout := range []string{
-		"2006-01-02 15:04:05", "2006-01-02 15:04", "2006-1-2 15:04:05", "2006-1-2", "2006-01-02",
-		"2006/01/02 15:04:05", "2006/1/2", "2006/01/02", "2006-01", "2006-1", "2006/01", "2006/1",
-		"20060102", "2006年1月2日", "2006年1月",
-	} {
-		if t, err := time.ParseInLocation(layout, v, gmt8); err == nil {
-			return t.Unix()
+// getMkTime 复刻 GetMkTime（webroot/include/class/time.class.php:49-90）：
+//   - 纯数字（preg_match("/[^0-9]/") 不命中）直接原样返回（时间戳字符串透传）；
+//   - 其余先做 中文单位/分隔符归一（日秒\r\n\t→空格、年→-、月→-、时:分→:），
+//     再按「date time」拆分、date 按 -（缺省 .）拆 ymd、time 按 : 拆 hms，
+//     缺省 [1970,1,1,0,0,0]，两位年补 20 前缀，各段剥前导零；
+//   - mktime 语义（PHP 的 0-69→2000+/70-99→19xx 年映射、越界分量进位）用
+//     time.Date 归一化等价实现；结果为 0（empty(0)）→ time()。
+func getMkTime(dtime string) int64 {
+	if pureDigitRe.MatchString(dtime) {
+		if n, err := strconv.ParseInt(dtime, 10, 64); err == nil {
+			return n
+		}
+		return int64(phpFloatVal(dtime)) // 超出 int64 的罕见数字串
+	}
+	dtime = strings.TrimSpace(dtime)
+	for _, r := range "\r\n\t日秒" {
+		dtime = strings.ReplaceAll(dtime, string(r), " ")
+	}
+	dtime = strings.ReplaceAll(dtime, "年", "-")
+	dtime = strings.ReplaceAll(dtime, "月", "-")
+	dtime = strings.ReplaceAll(dtime, "时", ":")
+	dtime = strings.ReplaceAll(dtime, "分", ":")
+	dtime = strings.TrimSpace(spaceCollapseRe.ReplaceAllString(dtime, " "))
+
+	dt := [6]int64{1970, 1, 1, 0, 0, 0}
+	ds := strings.Split(dtime, " ")
+	ymd := strings.Split(ds[0], "-")
+	if len(ymd) < 2 {
+		ymd = strings.Split(ds[0], ".")
+	}
+	if len(ymd) > 0 {
+		dt[0] = phpInt64(ymd[0])
+	}
+	if len(ymd) > 1 {
+		dt[1] = phpInt64(ymd[1])
+	}
+	if len(ymd) > 2 {
+		dt[2] = phpInt64(ymd[2])
+	}
+	if len(ds) > 1 {
+		hms := strings.Split(ds[1], ":")
+		if len(hms) > 0 {
+			dt[3] = phpInt64(hms[0])
+		}
+		if len(hms) > 1 {
+			dt[4] = phpInt64(hms[1])
+		}
+		if len(hms) > 2 {
+			dt[5] = phpInt64(hms[2])
 		}
 	}
-	return 0
+	// mktime 的年份映射（0-69 → 2000+，70-99 → 19xx）。
+	y := dt[0]
+	if y >= 0 && y <= 69 {
+		y += 2000
+	} else if y >= 70 && y <= 99 {
+		y += 1900
+	}
+	// time.Date 对越界分量（月 0/13、日 0 等）的进位归一与 mktime 一致。
+	mt := time.Date(int(y), time.Month(dt[1]), int(dt[2]), int(dt[3]), int(dt[4]), int(dt[5]), 0, gmt8).Unix()
+	if mt == 0 {
+		return time.Now().Unix()
+	}
+	return mt
+}
+
+var pureDigitRe = regexp.MustCompile(`^[0-9]*$`)
+var spaceCollapseRe = regexp.MustCompile(` {1,}`)
+
+// phpInt64 对应 PHP (int) 字符串强转（前缀数值）。
+func phpInt64(s string) int64 {
+	return int64(phpInt(s))
 }
 
 // phpSerializeValue 复刻 PHP serialize()（json_decode 后的值域）：
@@ -230,17 +335,18 @@ func phpSerializeValue(v any) string {
 		b.WriteString("}")
 		return b.String()
 	case *omap:
-		// assoc 数组按 JSON 序输出（omap 保持插入序）。
+		// assoc 数组按 JSON 序输出（omap 保持插入序）；键按 PHP 数组键规则：
+		// 规范整数字符串（无前导零、int64 域内）转 int 键输出 i:N。
 		var b strings.Builder
 		b.WriteString("a:" + strconv.Itoa(len(x.vals)) + ":{")
 		for _, k := range x.keys {
-			b.WriteString(phpSerializeString(k))
+			b.WriteString(phpSerializeKey(k))
 			b.WriteString(phpSerializeValue(x.vals[k]))
 		}
 		b.WriteString("}")
 		return b.String()
 	case map[string]any:
-		// map 无序，按键字典序输出（与 PHP 侧 ksort 的可重复口径一致）。
+		// map 无序，按键字典序输出（兜底口径；JSON 路径已改走 omap）。
 		keys := make([]string, 0, len(x))
 		for k := range x {
 			keys = append(keys, k)
@@ -249,7 +355,7 @@ func phpSerializeValue(v any) string {
 		var b strings.Builder
 		b.WriteString("a:" + strconv.Itoa(len(x)) + ":{")
 		for _, k := range keys {
-			b.WriteString(phpSerializeString(k))
+			b.WriteString(phpSerializeKey(k))
 			b.WriteString(phpSerializeValue(x[k]))
 		}
 		b.WriteString("}")
@@ -257,6 +363,33 @@ func phpSerializeValue(v any) string {
 	default:
 		return "N;"
 	}
+}
+
+// dsqlOperErrorFace 是 dsqlOper 异常时返回的错误串（cfg_siteDebug=false 的形态，
+// dsql.class.php:1144-1147）。拼进 SQL 即产生非法语句。
+const dsqlOperErrorFace = `{"state": 200, "info": "操作失败！"}`
+
+// allNumericList 检查 NOT IN 列表全部是数值（任一错误串混入 → 整条 DELETE 非法）。
+func allNumericList(list []string) bool {
+	for _, v := range list {
+		if !phpNumericRe.MatchString(v) {
+			return false
+		}
+	}
+	return true
+}
+
+// phpIntKeyRe 是 PHP 数组的规范整数字符串键（"0"、"-5"、"123"；前导零/"+" 不算）。
+var phpIntKeyRe = regexp.MustCompile(`^(0|-?[1-9][0-9]*)$`)
+
+// phpSerializeKey 对应 PHP 数组键的整数字符串自动转换：serialize 时 "1" → i:1;。
+func phpSerializeKey(k string) string {
+	if phpIntKeyRe.MatchString(k) {
+		if n, err := strconv.ParseInt(k, 10, 64); err == nil {
+			return "i:" + strconv.FormatInt(n, 10) + ";"
+		}
+	}
+	return phpSerializeString(k)
 }
 
 // phpSerializeDouble 复刻 serialize_precision=-1 下 PHP 8 的浮点序列化：用最短
@@ -272,64 +405,147 @@ func phpSerializeString(v string) string {
 	return "s:" + strconv.Itoa(len(v)) + ":\"" + v + "\";"
 }
 
-// jsonDecodeList 复刻 json_decode($param, true)：JSON 数字保留字面量形态——无 . /
-// e 的 token 落 int64（serialize 出 i:N），带 . / e 的落 float64（d:X），与 PHP 的
-// int/float 分流一致。解析失败 → nil（PHP 的 null）。
+// jsonDecodeList 复刻 json_decode($param, true)：
+//   - JSON 数字保留字面量形态——无 . / e 的 token 落 int64（serialize 出 i:N），
+//     带 . / e 的落 float64（d:X），与 PHP 的 int/float 分流一致；
+//   - 对象解码成 *omap（保持插入序，PHP 关联数组的键序即插入序）；
+//   - 解析失败或尾部有多余内容 → nil（PHP 的 null）。
 func jsonDecodeList(raw string) any {
 	if strings.TrimSpace(raw) == "" {
 		return nil
 	}
 	dec := json.NewDecoder(strings.NewReader(raw))
-	dec.UseNumber()
-	var v any
-	if err := dec.Decode(&v); err != nil {
+	dec.UseNumber() // 数字先落 json.Number，再按 int/float 字面量分流
+	v, err := decodeJSONOrdered(dec)
+	if err != nil {
 		return nil
 	}
-	return phpJSONNumber(v)
-}
-
-// phpJSONNumber 把 json.Number 落成 int64 / float64（其余递归处理数组/对象）。
-func phpJSONNumber(v any) any {
-	switch x := v.(type) {
-	case json.Number:
-		if !strings.ContainsAny(x.String(), ".eE") {
-			if n, err := strconv.ParseInt(x.String(), 10, 64); err == nil {
-				return n
-			}
-		}
-		f, _ := x.Float64()
-		return f
-	case []any:
-		for i := range x {
-			x[i] = phpJSONNumber(x[i])
-		}
-		return x
-	case map[string]any:
-		for k := range x {
-			x[k] = phpJSONNumber(x[k])
-		}
-		return x
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil // PHP json_decode：尾部垃圾 → null
 	}
 	return v
 }
 
-// assocOf 把 json_decode 出的关联数组统一成 map（list → nil）。
-func assocOf(v any) map[string]any {
+// decodeJSONOrdered 按 token 流解码，保留对象键序。
+func decodeJSONOrdered(dec *json.Decoder) (any, error) {
+	t, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	switch tok := t.(type) {
+	case json.Delim:
+		if tok == '{' {
+			m := newOmap()
+			for dec.More() {
+				kt, err := dec.Token()
+				if err != nil {
+					return nil, err
+				}
+				k, ok := kt.(string)
+				if !ok {
+					return nil, errors.New("json: object key is not a string")
+				}
+				vv, err := decodeJSONOrdered(dec)
+				if err != nil {
+					return nil, err
+				}
+				m.set(k, vv)
+			}
+			if _, err := dec.Token(); err != nil { // '}'
+				return nil, err
+			}
+			return m, nil
+		}
+		if tok == '[' {
+			arr := []any{}
+			for dec.More() {
+				vv, err := decodeJSONOrdered(dec)
+				if err != nil {
+					return nil, err
+				}
+				arr = append(arr, vv)
+			}
+			if _, err := dec.Token(); err != nil { // ']'
+				return nil, err
+			}
+			return arr, nil
+		}
+		return nil, errors.New("json: unexpected delim")
+	case json.Number:
+		if !strings.ContainsAny(tok.String(), ".eE") {
+			if n, err := strconv.ParseInt(tok.String(), 10, 64); err == nil {
+				return n, nil
+			}
+		}
+		f, _ := tok.Float64()
+		return f, nil
+	default:
+		return t, nil // string / bool / nil
+	}
+}
+
+// valMapOf 把 json_decode 出的元素值取成键值视图（map / *omap 皆可）。
+func valMapOf(v any) (map[string]any, bool) {
 	switch x := v.(type) {
 	case map[string]any:
-		return x
+		return x, true
 	case *omap:
-		return x.vals
+		return x.vals, true
+	}
+	return nil, false
+}
+
+// phpItem 是 foreach 迭代的一项：key 为 PHP 数组键的字符串形态（数值键也是）。
+type phpItem struct {
+	key string
+	val any
+}
+
+// phpForeachItems 把 json_decode 出的数组展开成 foreach 序列：list 的 key 是下标；
+// assoc（*omap）按插入序给出原始键；map 无序兜底（按键字典序，仅测试域）。
+func phpForeachItems(v any) []phpItem {
+	switch x := v.(type) {
+	case []any:
+		out := make([]phpItem, len(x))
+		for i, item := range x {
+			out[i] = phpItem{key: strconv.Itoa(i), val: item}
+		}
+		return out
+	case *omap:
+		out := make([]phpItem, 0, len(x.keys))
+		for _, k := range x.keys {
+			out = append(out, phpItem{key: k, val: x.vals[k]})
+		}
+		return out
+	case map[string]any:
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		out := make([]phpItem, 0, len(keys))
+		for _, k := range keys {
+			out = append(out, phpItem{key: k, val: x[k]})
+		}
+		return out
 	}
 	return nil
 }
 
-// listOf 把 json_decode 出的数组统一成 []any（assoc → nil，照 PHP foreach 语义）。
-func listOf(v any) []any {
-	if a, ok := v.([]any); ok {
-		return a
+// phpArrayReverse 复刻 array_reverse($arr)（preserve_keys=false）：顺序反转；
+// 数值键重排成新的连续下标，字符串键原样保留（PHP 数组键语义）。
+func phpArrayReverse(items []phpItem) []phpItem {
+	out := make([]phpItem, 0, len(items))
+	counter := 0
+	for i := len(items) - 1; i >= 0; i-- {
+		if phpIntKeyRe.MatchString(items[i].key) {
+			out = append(out, phpItem{key: strconv.Itoa(counter), val: items[i].val})
+			counter++
+		} else {
+			out = append(out, items[i])
+		}
 	}
-	return nil
+	return out
 }
 
 // itemStr 取 json_decode 关联项里的字符串/数值键值（PHP 数组取值隐式转串）。
