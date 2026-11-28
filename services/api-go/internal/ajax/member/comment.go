@@ -55,6 +55,9 @@ func (o *Object) Set(k string, v any) {
 // Get 读取键。
 func (o *Object) Get(k string) (any, bool) { v, ok := o.vals[k]; return v, ok }
 
+// Map 返回底层键值视图（跨服务消费方只需按键取值，不关心键序）。
+func (o *Object) Map() map[string]any { return o.vals }
+
 // MarshalJSON 按插入顺序输出。
 func (o *Object) MarshalJSON() ([]byte, error) {
 	var b bytes.Buffer
