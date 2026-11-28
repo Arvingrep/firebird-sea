@@ -195,7 +195,7 @@ func (s *Service) operVisa(req *ajax.Request) ajax.Response {
 	typeid := phpInt(req.Params.Get("typeid"))
 	entrytimes := operRaw(req.ParamsEscaped.Get("entrytimes"))
 	staytimes := operRaw(req.ParamsEscaped.Get("staytimes"))
-	earliestdate := getMkTime(req.ParamsEscaped.Get("earliestdate")) // GetMkTime 全语义
+	earliestdate := getMkTime(req.ParamsEscaped.Get("earliestdate")) // GetMkTime 全语义（纯数字透传字符串）
 	valid := operRaw(req.ParamsEscaped.Get("valid"))
 	processingtime := operRaw(req.ParamsEscaped.Get("processingtime"))
 	scope := operRaw(req.ParamsEscaped.Get("scope"))
@@ -246,7 +246,7 @@ func (s *Service) operVisa(req *ajax.Request) ajax.Response {
 		if emptyStr(staytimes) {
 			return ajax.Response{State: stateParamFailed, Info: "请输入停留天数"} // travel[8][72]
 		}
-		if earliestdate == 0 {
+		if earliestdate == "" || earliestdate == "0" { // PHP empty($earliestdate)："00"/"0001" 不是 empty
 			return ajax.Response{State: stateParamFailed, Info: "请选择最早可预订时间"} // travel[8][73]
 		}
 		if emptyStr(valid) {
@@ -278,7 +278,7 @@ func (s *Service) operVisa(req *ajax.Request) ajax.Response {
 			" (`userid`, `company`, `title`, `subtitle`, `country`, `typeid`, `price`, `entrytimes`, `staytimes`, `earliestdate`, `valid`, `processingtime`, `pics`, `video`, `scope`, `materials`, `serviceincludes`, `incumbentsscience`, `retireescience`, `professionalscience`, `studentsscience`, `childrenscience`, `others`, `reminder`, `notice`, `processingflow`, `pubdate`, `state`, `note`) " +
 			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		args := []any{userid, company, title, subtitle, country, typeid, priceStr, entrytimes,
-			staytimes, earliestdate, valid, processingtime, pics, video, scope, materials,
+			staytimes, phpInt64(earliestdate), valid, processingtime, pics, video, scope, materials,
 			serviceincludes, incumbentsscience, retiree, professional, students, children,
 			others, reminder, notice, processingflow, pubdate, s.visaCheck, note}
 		res, err := s.db.ExecContext(ctx, ins, args...)
@@ -312,7 +312,7 @@ func (s *Service) operVisa(req *ajax.Request) ajax.Response {
 		upd := "UPDATE " + visaTable +
 			" SET `userid` = ?, `company` = ?, `title` = ?, `subtitle` = ?, `country` = ?, `typeid` = ?, `price` = ?, `entrytimes` = ?, `staytimes` = ?, `earliestdate` = ?, `valid` = ?, `processingtime` = ?, `pics` = ?, `video` = ?, `scope` = ?, `materials` = ?, `serviceincludes` = ?, `incumbentsscience` = ?, `retireescience` = ?, `professionalscience` = ?, `studentsscience` = ?, `childrenscience` = ?, `others` = ?, `reminder` = ?, `notice` = ?, `processingflow` = ?, `state` = ?, `note` = ? WHERE `id` = ?"
 		args := []any{userid, company, title, subtitle, country, typeid, priceStr, entrytimes,
-			staytimes, earliestdate, valid, processingtime, pics, video, scope, materials,
+			staytimes, phpInt64(earliestdate), valid, processingtime, pics, video, scope, materials,
 			serviceincludes, incumbentsscience, retiree, professional, students, children,
 			others, reminder, notice, processingflow, s.visaCheck, note, vid}
 		if _, err := s.db.ExecContext(ctx, upd, args...); err != nil {

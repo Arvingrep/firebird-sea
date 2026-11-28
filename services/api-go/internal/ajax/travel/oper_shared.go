@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -226,20 +227,23 @@ func (s *Service) storeGate(ctx context.Context, userid int64) (int64, *ajax.Res
 	return int64(phpInt(id.String)), nil
 }
 
-// getMkTime 复刻 GetMkTime（webroot/include/class/time.class.php:49-90）：
-//   - 纯数字（preg_match("/[^0-9]/") 不命中）直接原样返回（时间戳字符串透传）；
+// getMkTime 复刻 GetMkTime 的返回值形态（webroot/include/class/time.class.php:49-90）：
+//   - 纯数字（preg_match("/[^0-9]/") 不命中，含空串）原样返回字符串——PHP 直接
+//     return $dtime，"00"/"0001" 不是 empty（empty 只认 ""/"0"/0），'00' 落列才转 0；
 //   - 其余先做 中文单位/分隔符归一（日秒\r\n\t→空格、年→-、月→-、时:分→:），
 //     再按「date time」拆分、date 按 -（缺省 .）拆 ymd、time 按 : 拆 hms，
 //     缺省 [1970,1,1,0,0,0]，两位年补 20 前缀，各段剥前导零；
 //   - mktime 语义（PHP 的 0-69→2000+/70-99→19xx 年映射、越界分量进位）用
 //     time.Date 归一化等价实现；结果为 0（empty(0)）→ time()。
-func getMkTime(dtime string) int64 {
+func getMkTime(dtime string) string {
 	if pureDigitRe.MatchString(dtime) {
-		if n, err := strconv.ParseInt(dtime, 10, 64); err == nil {
-			return n
-		}
-		return int64(phpFloatVal(dtime)) // 超出 int64 的罕见数字串
+		return dtime // PHP return $dtime（含 "00"、""、超大数字串）
 	}
+	return strconv.FormatInt(getMkTimeCalc(dtime), 10)
+}
+
+// getMkTimeCalc 是 getMkTime 的非纯数字路径（mktime 语义），见 getMkTime。
+func getMkTimeCalc(dtime string) int64 {
 	dtime = strings.TrimSpace(dtime)
 	for _, r := range "\r\n\t日秒" {
 		dtime = strings.ReplaceAll(dtime, string(r), " ")
@@ -376,15 +380,117 @@ func phpSerializeValue(v any) string {
 // dsql.class.php:1144-1147）。拼进 SQL 即产生非法语句。
 const dsqlOperErrorFace = `{"state": 200, "info": "操作失败！"}`
 
-// phpNumListValid 检查逗号 join 的 NOT IN 列表是否构成合法 SQL 数值列表
-// （PHP 裸拼语义：逐段数值字面量才合法；错误串/引号/花括号混入即整条非法）。
+// phpNumListValid 检查逗号 join 的 NOT IN 列表每段是否构成 MySQL 可接受的
+// 数值表达式（PHP 裸拼语义：3、3.5、3+0、(3+0)*2 等合法照删；错误串/引号/字母
+// 混入即整条 SQL 报错 → dsqlOper 吞错、不删行、流程继续）。
 func phpNumListValid(joined string) bool {
 	for _, part := range strings.Split(joined, ",") {
-		if !phpNumericRe.MatchString(part) {
+		if !mysqlNumericExpr(part) {
 			return false
 		}
 	}
 	return true
+}
+
+// mysqlNumericExpr 校验单段是否构成 MySQL 数值表达式：十进制/科学计数数字面量、
+// 一元 +/-、二元 + - * / %、括号嵌套，空白可忽略。这是 PHP 把 $notid 逐段裸拼进
+// SQL（travel.class.php:2206-2208）后「能执行不报错」的白名单。
+// 「合法但恶意」的形态（OR、子查询、引号逃逸等）不通过——与 PHP 的差异仅限该类
+// 请求可控的注入输入，作为已知偏差记录在 #355（Go 侧不复现真正的 SQL 注入面）。
+func mysqlNumericExpr(s string) bool {
+	var p int
+	skip := func() {
+		for p < len(s) && (s[p] == ' ' || s[p] == '\t' || s[p] == '\n' || s[p] == '\r') {
+			p++
+		}
+	}
+	var expr, term func() bool
+	number := func() bool {
+		digits := func() bool {
+			n := 0
+			for p < len(s) && s[p] >= '0' && s[p] <= '9' {
+				p++
+				n++
+			}
+			return n > 0
+		}
+		if p < len(s) && s[p] == '.' {
+			p++
+			return digits()
+		}
+		if !digits() {
+			return false
+		}
+		if p < len(s) && s[p] == '.' {
+			p++
+			digits() // 小数位可空（"3."）
+		}
+		if p < len(s) && (s[p] == 'e' || s[p] == 'E') {
+			p++
+			if p < len(s) && (s[p] == '+' || s[p] == '-') {
+				p++
+			}
+			if !digits() {
+				return false
+			}
+		}
+		return true
+	}
+	term = func() bool {
+		skip()
+		if p < len(s) && s[p] == '(' {
+			p++
+			if !expr() {
+				return false
+			}
+			skip()
+			if p >= len(s) || s[p] != ')' {
+				return false
+			}
+			p++
+			return true
+		}
+		if p < len(s) && (s[p] == '+' || s[p] == '-') { // 一元符号
+			p++
+			return term()
+		}
+		return number()
+	}
+	expr = func() bool {
+		if !term() {
+			return false
+		}
+		skip()
+		for p < len(s) && (s[p] == '+' || s[p] == '-' || s[p] == '*' || s[p] == '/' || s[p] == '%') {
+			p++
+			if !term() {
+				return false
+			}
+			skip()
+		}
+		return true
+	}
+	if !expr() {
+		return false
+	}
+	skip()
+	return p == len(s)
+}
+
+// phpMySQLRowID 判定 PHP 裸拼 `WHERE id = <字面量>` 能否命中整数主键行：
+// 字面量数值上等于整数（3、3.0、3e0 → 命中 id=3；"3.5" 是合法 SQL 但 0 行命中、
+// "abc" 整条语句报错）。返回 (rowid, ok)；!ok 时调用方按 PHP 的 0 行/错误面处理，
+// 不得把字面量 (int) 截断后绑定（"3.5"→3 会误改 id=3 的行，travel.class.php:2189
+// 的裸字面量语义）。
+func phpMySQLRowID(lit string) (int64, bool) {
+	if !phpNumericRe.MatchString(lit) {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(strings.TrimSpace(lit), 64)
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) || f != math.Trunc(f) || f < -9e18 || f > 9e18 {
+		return 0, false
+	}
+	return int64(f), true
 }
 
 // phpIntKeyRe 是 PHP 数组的规范整数字符串键（"0"、"-5"、"123"；前导零/"+" 不算）。

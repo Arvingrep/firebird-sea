@@ -206,9 +206,12 @@ func hotelSaveRooms(ctx context.Context, db *sql.DB, roomTable string, hotelID i
 	saveRooms(ctx, db, roomTable, hotelID, pubdate, roomlist, func(val map[string]any, specialtime string) (string, []any) {
 		vid := itemStr(val, "id")
 		if vid != "" && vid != "0" { // PHP !empty($val['id'])
-			// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：非数值 → SQL 错误面
-			//（dsqlOper 吞掉，不更新行）。跳过执行即该错误面。
-			if !phpNumericRe.MatchString(vid) {
+			// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：非数值 → SQL 错误面、
+			// "3.5" 等小数字面量 → 合法 SQL 但 0 行命中——两种情况都不更新行
+			//（dsqlOper 吞掉/无行受影响）。跳过执行即该错误面；只有整数值字面量
+			//（3、3.0、3e0）才绑定 rowid 执行，不得 (int) 截断。
+			rid, rowok := phpMySQLRowID(vid)
+			if !rowok {
 				return "", nil
 			}
 			q := "UPDATE " + roomTable +
@@ -217,7 +220,7 @@ func hotelSaveRooms(ctx context.Context, db *sql.DB, roomTable string, hotelID i
 				operRaw(itemStr(val, "title")), hotelID, operRaw(itemStr(val, "area")),
 				operRaw(itemStr(val, "iswindow")), operRaw(itemStr(val, "typeid")),
 				operRaw(itemStr(val, "breakfast")), operRaw(itemStr(val, "price")),
-				specialtime, operRaw(itemStr(val, "imgpath")), phpInt(vid),
+				specialtime, operRaw(itemStr(val, "imgpath")), rid,
 			}
 		}
 		q := "INSERT INTO " + roomTable +

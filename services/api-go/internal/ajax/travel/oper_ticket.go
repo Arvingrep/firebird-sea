@@ -182,14 +182,16 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 				specialtime := hotelRoomSpecialtime(itemStr(val, "specialtime"))
 				vid := itemStr(val, "id")
 				if vid != "" && vid != "0" { // PHP !empty($val['id'])
-					// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：非数值（如 "3,4"）
-					// 令 UPDATE 报 SQL 错误（dsqlOper 吞掉）→ 不更新行；notid 仍追加原值。
-					if phpNumericRe.MatchString(vid) {
+					// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：非数值（如 "3,4"）令
+					// UPDATE 报 SQL 错误、"3.5" 等小数字面量是合法 SQL 但 0 行命中——
+					// 都不更新行（dsqlOper 吞掉）；notid 仍追加原值（join 后 3.5 是合法
+					// NOT IN 段，DELETE 照删）。
+					if rowid, rowok := phpMySQLRowID(vid); rowok {
 						_, _ = s.db.ExecContext(ctx,
 							"UPDATE "+infoTable+
 								" SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = ?",
 							operRaw(itemStr(val, "title")), tid, operRaw(itemStr(val, "price")),
-							specialtime, phpInt(vid))
+							specialtime, rowid)
 					}
 					notid = append(notid, vid)
 				} else {

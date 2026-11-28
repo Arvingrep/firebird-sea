@@ -318,6 +318,7 @@ const (
 	qStoreGate       = "SELECT `id`, `state` FROM `huoniao_travel_store` WHERE `userid` = ?"
 	qHotelExist      = "SELECT l.`id` FROM `huoniao_travel_hotel` l LEFT JOIN `huoniao_travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?"
 	qHotelDelSel     = "SELECT l.`id`, l.`title`, l.`pics`, l.`video`, s.`userid` FROM `huoniao_travel_hotel` l LEFT JOIN `huoniao_travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?"
+	qVisaInsert      = "INSERT INTO `huoniao_travel_visa` (`userid`, `company`, `title`, `subtitle`, `country`, `typeid`, `price`, `entrytimes`, `staytimes`, `earliestdate`, `valid`, `processingtime`, `pics`, `video`, `scope`, `materials`, `serviceincludes`, `incumbentsscience`, `retireescience`, `professionalscience`, `studentsscience`, `childrenscience`, `others`, `reminder`, `notice`, `processingflow`, `pubdate`, `state`, `note`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	qHotelInsert     = "INSERT INTO `huoniao_travel_hotel` (`userid`, `company`, `title`, `cityid`, `typeid`, `addrid`, `address`, `pics`, `video`, `price`, `tag`, `pubdate`, `state`, `factag`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	qHotelUpdate     = "UPDATE `huoniao_travel_hotel` SET `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `typeid` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `price` = ?, `tag` = ?, `factag` = ?, `state` = ? WHERE `id` = ?"
 	qHotelRoomIns    = "INSERT INTO `huoniao_travel_hotelroom` (`title`, `hotelid`, `area`, `iswindow`, `typeid`, `breakfast`, `price`, `specialtime`, `pubdate`, `pics`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -664,17 +665,63 @@ func TestOperVisaEarliestdateInvalid(t *testing.T) {
 
 func TestGetMkTime(t *testing.T) {
 	// 期望值全部来自 docker firebird-php（PHP 7.4.33）实测 GetMkTime。
-	cases := map[string]int64{
-		"1768435200":    1768435200, // 纯数字原样透传
-		"2026-01-15":    1768406400, // 2026-01-15 00:00 UTC+8
-		"2026-1-5 8:30": 1767573000, // 2026-01-05 08:30 UTC+8
-		"不是日期":          946656000,  // 年份 0 → 2000 映射
-		"abc":           946656000,  // 同上
-		"":              0,          // PHP 返回 ""（空串拼 SQL 等价 0），Go 收敛为 0
+	// 返回形态与 PHP 一致：纯数字（含空串）原样透传字符串，其余为 mktime 结果串。
+	cases := map[string]string{
+		"1768435200":    "1768435200", // 纯数字原样透传
+		"00":            "00",         // "00" 不是 PHP empty → 校验放行，落列转 0
+		"0001":          "0001",       // 同上，落列转 1
+		"0":             "0",          // empty("0") → 校验拦截
+		"":              "",           // 空串也走纯数字透传 → empty → 校验拦截
+		"2026-01-15":    "1768406400", // 2026-01-15 00:00 UTC+8
+		"2026-1-5 8:30": "1767573000", // 2026-01-05 08:30 UTC+8
+		"不是日期":          "946656000",  // 年份 0 → 2000 映射
+		"abc":           "946656000",  // 同上
 	}
 	for in, want := range cases {
 		if got := getMkTime(in); got != want {
-			t.Errorf("getMkTime(%q) = %d, want %d", in, got, want)
+			t.Errorf("getMkTime(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestPhpMySQLRowID(t *testing.T) {
+	// PHP 裸拼 WHERE id = <字面量>：整数值字面量（3、3.0、3e0）命中行；"3.5" 合法
+	// SQL 但 0 行命中；非数值整条报错。都不得 (int) 截断。
+	cases := []struct {
+		in   string
+		want int64
+		ok   bool
+	}{
+		{"3", 3, true},
+		{"3.0", 3, true},
+		{"3e0", 3, true},
+		{" 3 ", 3, true},
+		{"3.5", 0, false},  // WHERE id = 3.5 命中 0 行
+		{"3,4", 0, false},  // 裸拼令 UPDATE 报 SQL 错误
+		{"abc", 0, false},  // 同上
+		{"", 0, false},
+		{"01", 1, true},
+	}
+	for _, c := range cases {
+		got, ok := phpMySQLRowID(c.in)
+		if got != c.want || ok != c.ok {
+			t.Errorf("phpMySQLRowID(%q) = (%d, %v), want (%d, %v)", c.in, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestMysqlNumericExpr(t *testing.T) {
+	// PHP 裸拼 NOT IN 列表的逐段合法性：算术表达式（3+0）在 MySQL 合法照删。
+	ok := []string{"3", "3.5", "3+0", "(3+0)*2", "1e0", "1+2*3", " 4 ", "-3", ".5", "3.", "1.2E+3"}
+	bad := []string{"", "3;DROP", "3' ", "OR 1=1", "3)", "(3", "3+", "abc", "3 4", "1;2"}
+	for _, in := range ok {
+		if !mysqlNumericExpr(in) {
+			t.Errorf("mysqlNumericExpr(%q) = false, want true", in)
+		}
+	}
+	for _, in := range bad {
+		if mysqlNumericExpr(in) {
+			t.Errorf("mysqlNumericExpr(%q) = true, want false", in)
 		}
 	}
 }
@@ -760,7 +807,8 @@ func TestOperAgencyUpdateReinsertWithID(t *testing.T) {
 	// 反转序：第二天（无 id → 普通 INSERT，weight=0）→ 第一天（id=9 → 带 id INSERT，weight=1）。
 	mock.ExpectExec(qAInfoIns).WithArgs("第二天", int64(21), "200", "N;", sqlmock.AnyArg(), "0").
 		WillReturnResult(sqlmock.NewResult(10, 1))
-	mock.ExpectExec(qAInfoInsID).WithArgs(int64(9), "第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "1").
+	// id 经 phpFloatVal 绑定（float64(9)）→ MySQL int 列收 9，与 PHP 裸拼字面量 9 一致。
+	mock.ExpectExec(qAInfoInsID).WithArgs(float64(9), "第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "1").
 		WillReturnResult(sqlmock.NewResult(9, 1))
 	got := serveParams(t, svc, "operAgency", url.Values{
 		"oper": {"update"}, "id": {"21"}, "title": {"周边游"}, "typeid": {"1"},
@@ -910,6 +958,153 @@ func TestOperHotelAddWritesMemberLog(t *testing.T) {
 	if !strings.HasPrefix(gotSQL, "INSERT INTO `huoniao_travel_hotel`") ||
 		!strings.Contains(gotSQL, "'测试酒店'") {
 		t.Errorf("memberLog sqlText = %q", gotSQL)
+	}
+}
+
+// —— 三轮评审修复的流式验证（fractional id / 算术 NOT IN / earliestdate 透传）——
+
+func TestOperVisaEarliestdatePassthrough(t *testing.T) {
+	// earliestdate="00"：GetMkTime 纯数字透传 "00" → empty("00")=false → 校验放行 →
+	// INSERT 绑定 phpInt64("00")=0（列转义与 PHP '00' 落列一致）。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectExec(qVisaInsert).WillReturnResult(sqlmock.NewResult(66, 1))
+	got := serveParams(t, svc, "operVisa", url.Values{
+		"oper": {"add"}, "title": {"日本签"}, "scope": {"单次"}, "serviceincludes": {"含"},
+		"country": {"3"}, "typeid": {"1"}, "price": {"500"}, "entrytimes": {"1"},
+		"staytimes": {"15"}, "earliestdate": {"00"}, "valid": {"90"},
+		"processingtime": {"7"}, "pics": {"/a.jpg"},
+	})
+	if got != `{"state":100,"info":66}` {
+		t.Fatalf("earliestdate 00 = %s", got)
+	}
+	// "0" / ""：PHP empty → 校验拦截 [8][73]，不触库。
+	for _, ed := range []string{"0", ""} {
+		svc2, mock2 := newOperService(t, 5, operInfo(1, 0, 0))
+		expectStoreOK(mock2)
+		got2 := serveParams(t, svc2, "operVisa", url.Values{
+			"oper": {"add"}, "title": {"日本签"}, "scope": {"单次"}, "serviceincludes": {"含"},
+			"country": {"3"}, "typeid": {"1"}, "price": {"500"}, "entrytimes": {"1"},
+			"staytimes": {"15"}, "earliestdate": {ed}, "valid": {"90"},
+			"processingtime": {"7"}, "pics": {"/a.jpg"},
+		})
+		if got2 != `{"state":101,"info":"请选择最早可预订时间"}` {
+			t.Errorf("earliestdate %q = %s", ed, got2)
+		}
+	}
+	// "0001"：透传 "0001" → 落列 1 → INSERT 成功。
+	svc3, mock3 := newOperService(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock3)
+	mock3.ExpectExec(qVisaInsert).WillReturnResult(sqlmock.NewResult(67, 1))
+	got3 := serveParams(t, svc3, "operVisa", url.Values{
+		"oper": {"add"}, "title": {"日本签"}, "scope": {"单次"}, "serviceincludes": {"含"},
+		"country": {"3"}, "typeid": {"1"}, "price": {"500"}, "entrytimes": {"1"},
+		"staytimes": {"15"}, "earliestdate": {"0001"}, "valid": {"90"},
+		"processingtime": {"7"}, "pics": {"/a.jpg"},
+	})
+	if got3 != `{"state":100,"info":67}` {
+		t.Fatalf("earliestdate 0001 = %s", got3)
+	}
+}
+
+func TestOperTicketTopLevelIDEntryCoerce(t *testing.T) {
+	// 顶层 id="3.5"：入口归一（ajax.php:78 的 convertArrToStrWithComma (int) 强转，
+	// 防表达式注入）先截成 3，handler 收到的就是 "3" —— SELECT 绑定 3，正常走流程。
+	// 与 PHP 完全同构（评审 P1 的「父 id 截断误改行」在 PHP 侧同样发生，非偏差）。
+	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qTicketExist).WithArgs(int64(3)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	p := ticketParams()
+	p.Set("oper", "update")
+	p.Set("id", "3.5")
+	got := serveParams(t, svc, "operTicket", p)
+	if got != `{"state":101,"info":"信息不存在，或已经删除！"}` {
+		t.Fatalf("top id 3.5 = %s", got)
+	}
+	found := false
+	for _, q := range *log {
+		if strings.HasPrefix(q, "SELECT l.`id` FROM `huoniao_travel_ticket`") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("id=3.5 应经入口 (int) 化后照常触库 SELECT")
+	}
+}
+
+func TestOperTicketFractionalElementNoUpdateDeleteKeeps35(t *testing.T) {
+	// 元素 id="3.5"：UPDATE WHERE id = 3.5 合法 SQL 但 0 行命中 → 不执行；
+	// notid 仍追加 "3.5" → join "3.5,4" 是合法 NOT IN → DELETE 照删（保留 3.5/4）。
+	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
+	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(4, 1))
+	mock.ExpectExec("DELETE FROM `huoniao_travel_ticketinfo` WHERE `ticketid` = ? AND `id` NOT IN (3.5,4)").
+		WithArgs(int64(31)).WillReturnResult(sqlmock.NewResult(0, 1))
+	p := ticketParams()
+	p.Set("oper", "update")
+	p.Set("id", "31")
+	p.Set("ticketlist", `[{"id":"3.5","title":"成人票","price":"80","specialtime":""},{"title":"儿童票","price":"40","specialtime":""}]`)
+	got := serveParams(t, svc, "operTicket", p)
+	if got != `{"state":100,"info":"修改成功！"}` {
+		t.Fatalf("element 3.5 = %s", got)
+	}
+	for _, q := range *log {
+		if strings.HasPrefix(q, "UPDATE `huoniao_travel_ticketinfo`") {
+			t.Errorf("id=3.5 的 UPDATE 不应执行（0 行命中面），实际执行了: %s", q)
+		}
+	}
+}
+
+func TestOperTicketArithNotInDeleteRuns(t *testing.T) {
+	// 元素 id="3+0"：UPDATE 裸拼 WHERE id = 3+0 报 SQL 错误（dsqlOper 吞掉）→ 不执行；
+	// join "3+0,4" 是合法 NOT IN 算术表达式 → DELETE 照删（PHP 裸拼语义）。
+	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
+	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(4, 1))
+	mock.ExpectExec("DELETE FROM `huoniao_travel_ticketinfo` WHERE `ticketid` = ? AND `id` NOT IN (3+0,4)").
+		WithArgs(int64(31)).WillReturnResult(sqlmock.NewResult(0, 1))
+	p := ticketParams()
+	p.Set("oper", "update")
+	p.Set("id", "31")
+	p.Set("ticketlist", `[{"id":"3+0","title":"成人票","price":"80","specialtime":""},{"title":"儿童票","price":"40","specialtime":""}]`)
+	got := serveParams(t, svc, "operTicket", p)
+	if got != `{"state":100,"info":"修改成功！"}` {
+		t.Fatalf("element 3+0 = %s", got)
+	}
+	for _, q := range *log {
+		if strings.HasPrefix(q, "UPDATE `huoniao_travel_ticketinfo`") {
+			t.Errorf("id=3+0 的 UPDATE 不应执行（SQL 错误面），实际执行了: %s", q)
+		}
+	}
+}
+
+func TestOperHotelFractionalRoomIDNoUpdate(t *testing.T) {
+	// roomlist 元素 id="3.5"：UPDATE WHERE id = 3.5 合法 SQL 但 0 行命中 → 不执行，
+	// 不得 (int) 截断误改 id=3 的房间行。
+	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qHotelExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
+	mock.ExpectExec(qHotelUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
+	got := serveParams(t, svc, "operHotel", url.Values{
+		"oper": {"update"}, "id": {"11"}, "title": {"测试酒店"}, "addrid": {"3"}, "pics": {"/a.jpg"},
+		"roomlist": {`[{"id":"3.5","title":"大床房","area":"30","iswindow":"1","typeid":"0","breakfast":"1","price":"199","specialtime":"","imgpath":"/r.jpg"}]`},
+	})
+	if got != `{"state":100,"info":"修改成功！"}` {
+		t.Fatalf("fractional room = %s", got)
+	}
+	for _, q := range *log {
+		if strings.HasPrefix(q, "UPDATE `huoniao_travel_hotelroom`") {
+			t.Errorf("id=3.5 的房间 UPDATE 不应执行（0 行命中面），实际执行了: %s", q)
+		}
 	}
 }
 
