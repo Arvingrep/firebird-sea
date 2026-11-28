@@ -10,7 +10,6 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
@@ -171,15 +170,16 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 			vid := itemStr(val, "id")
 			if vid != "" && vid != "0" { // PHP !empty($val['id'])
 				// PHP 是 VALUES ('$val[id]')：带引号的字符串字面量 → MySQL 列转 int
-				//（前缀数值转换，"3+1"→3、".5e1"→5），不是表达式求值。绑定原串让
-				// MySQL 做同样的列转换；含引号/反斜杠的值会破坏 PHP 的字面量 → 整条
-				// INSERT 报 SQL 错误（dsqlOper 吞掉、不插行）→ 跳过即该错误面
+				//（前缀数值转换，"3+1"→3、".5e1"→5），不是表达式求值。按 MySQL 字面量
+				// 转义规则解码后绑定原值（"\3"→"3"、"\"→"\、"\'"→"'"），MySQL 做
+				// 同样的列转换；未转义引号提前终结字面量、结尾反斜杠吞掉收尾引号——
+				// 都使整条 INSERT 报 SQL 错误（dsqlOper 吞掉、不插行）→ 跳过即该错误面
 				//（注入形态不在 Go 复现，已知偏差记 #355）。
-				if !strings.ContainsAny(vid, "'\\") {
+				if decoded, ok := mysqlDecodeStrLit(vid); ok {
 					_, _ = s.db.ExecContext(ctx,
 						"INSERT INTO "+infoTable+
 							" (`id`, `typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`, `weight`) VALUES (?, '1', ?, ?, ?, ?, ?, ?)",
-						vid, operRaw(itemStr(val, "title")), aid0,
+						decoded, operRaw(itemStr(val, "title")), aid0,
 						operRaw(itemStr(val, "price")), specialtime, pubdate, item.key)
 				}
 			} else {

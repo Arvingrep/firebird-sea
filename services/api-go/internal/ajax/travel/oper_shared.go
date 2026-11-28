@@ -502,6 +502,48 @@ func mysqlNumericExpr(s string) bool {
 	return p == len(s)
 }
 
+// mysqlDecodeStrLit 把 PHP 裸插值进单引号 SQL 字面量的字符串按 MySQL 的字面量
+// 转义规则解码成「MySQL 实际收到的列值」：\0 \b \n \r \t \Z 映射控制字符、
+// \' \" \\ \\% \\_ 保留转义后字符（\\% 保留反斜杠）、其余 \x 丢弃反斜杠取 x。
+// 未转义的单引号会提前终结字面量、结尾反斜杠会吞掉收尾引号——两者都使整条语句
+// 报 SQL 错误（dsqlOper 吞掉）→ ok=false。
+func mysqlDecodeStrLit(s string) (string, bool) {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\'' {
+			return "", false // 未转义引号：字面量提前终结 → 语句报错/注入面，不复现
+		}
+		if s[i] != '\\' {
+			b.WriteByte(s[i])
+			continue
+		}
+		if i+1 >= len(s) {
+			return "", false // 结尾反斜杠吞掉收尾引号 → 字面量未终结 → 语句报错
+		}
+		i++
+		switch s[i] {
+		case '0':
+			b.WriteByte(0)
+		case 'b':
+			b.WriteByte('\b')
+		case 'n':
+			b.WriteByte('\n')
+		case 'r':
+			b.WriteByte('\r')
+		case 't':
+			b.WriteByte('\t')
+		case 'Z':
+			b.WriteByte(26)
+		case '%', '_':
+			b.WriteByte('\\') // \%、\_ 保留反斜杠（MySQL 模式转义两字符）
+			b.WriteByte(s[i])
+		default:
+			b.WriteByte(s[i]) // \'→' \\"→" \\\\→\\ 其余：反斜杠丢弃、字符原样
+		}
+	}
+	return b.String(), true
+}
+
 // phpIntKeyRe 是 PHP 数组的规范整数字符串键（"0"、"-5"、"123"；前导零/"+" 不算）。
 var phpIntKeyRe = regexp.MustCompile(`^(0|-?[1-9][0-9]*)$`)
 

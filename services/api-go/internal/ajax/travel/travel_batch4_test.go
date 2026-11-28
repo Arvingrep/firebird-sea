@@ -941,6 +941,54 @@ func TestOperHotelAddWritesMemberLog(t *testing.T) {
 
 // —— 三轮评审修复的流式验证（fractional id / 算术 NOT IN / earliestdate 透传）——
 
+func TestMysqlDecodeStrLit(t *testing.T) {
+	// agency 显式 id 是带引号字符串字面量：MySQL 转义规则解码后的值才是列值。
+	cases := []struct {
+		in   string
+		want string
+		ok   bool
+	}{
+		{"9", "9", true},
+		{"\\3", "3", true},     // \3 → 3（反斜杠丢弃）
+		{"3+1", "3+1", true},   // 列转 int 时前缀数值 → 3
+		{".5e1", ".5e1", true}, // 列转 int → 5
+		{"\\'", "'", true},     // \' → '
+		{"\\\\", "\\", true},   // \\ → \
+		{"\\%", "\\%", true},   // \% 保留反斜杠
+		{"a\tb", "a\tb", true},
+		{"o'k", "", false}, // 未转义引号 → 字面量提前终结 → 语句报错
+		{"3\\", "", false}, // 结尾反斜杠吞收尾引号 → 语句报错
+	}
+	for _, c := range cases {
+		got, ok := mysqlDecodeStrLit(c.in)
+		if got != c.want || ok != c.ok {
+			t.Errorf("mysqlDecodeStrLit(%q) = (%q, %v), want (%q, %v)", c.in, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestOperAgencyEscapedIDInserts(t *testing.T) {
+	// 元素 id 为反斜杠转义形态 "\\3"：PHP 字面量 '\\3' → MySQL 解码 "3" → 列转 int 3，
+	// 照常插入（不得因含反斜杠整行丢弃）。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qAgencyExist).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "level"}).AddRow(21, "4"))
+	mock.ExpectExec("UPDATE `huoniao_travel_agency` SET `tag` = ?, `imglist` = ?, `userid` = ?, `company` = ?, `title` = ?, `typeid` = ?, `cityid` = ?, `addrid` = ?, `address` = ?, `missiontime` = ?, `missiontype` = ?, `pics` = ?, `video` = ?, `travelservice` = ?, `note` = ?, `itinerary` = ?, `expense` = ?, `instructions` = ?, `state` = ?, `level` = ? WHERE `id` = ?").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qAInfoDelAll).WithArgs(int64(21)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qAInfoInsID).WithArgs("3", "第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "0").
+		WillReturnResult(sqlmock.NewResult(9, 1))
+	got := serveParams(t, svc, "operAgency", url.Values{
+		"oper": {"update"}, "id": {"21"}, "title": {"周边游"}, "typeid": {"1"},
+		"addrid": {"1"}, "address": {"路"}, "pics": {"/a.jpg"},
+		"ticketlist": {`[{"id":"\\3","title":"第一天","price":"100","specialtime":""}]`},
+	})
+	if got != `{"state":100,"info":"修改成功！"}` {
+		t.Fatalf("escaped id = %s", got)
+	}
+}
+
 func TestOperVisaEarliestdatePassthrough(t *testing.T) {
 	// earliestdate="00"：GetMkTime 纯数字透传 "00" → empty("00")=false → 校验放行 →
 	// INSERT 绑定 phpInt64("00")=0（列转义与 PHP '00' 落列一致）。
