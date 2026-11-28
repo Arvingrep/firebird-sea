@@ -250,15 +250,22 @@ func getMkTime(dtime string) int64 {
 	dtime = strings.ReplaceAll(dtime, "分", ":")
 	dtime = strings.TrimSpace(spaceCollapseRe.ReplaceAllString(dtime, " "))
 
-	dt := [6]int64{1970, 1, 1, 0, 0, 0}
+	dt := [6]int64{0, 1, 1, 0, 0, 0} // 年由 token（含空覆盖）+ mktime 映射决定
 	ds := strings.Split(dtime, " ")
 	ymd := strings.Split(ds[0], "-")
 	if len(ymd) < 2 {
 		ymd = strings.Split(ds[0], ".")
 	}
+	// 年份：先按 PHP `strlen($dt[0])==2 → '20'.$dt[0]` 补前缀（在 mktime 映射之前，
+	// "70" → 2070 而非 1970），再 (int) 化。空 token 覆盖默认 1970（PHP isset($ymd[0])）。
+	yearToken := ""
 	if len(ymd) > 0 {
-		dt[0] = phpInt64(ymd[0])
+		yearToken = ymd[0]
 	}
+	if len(yearToken) == 2 {
+		yearToken = "20" + yearToken
+	}
+	dt[0] = phpInt64(yearToken)
 	if len(ymd) > 1 {
 		dt[1] = phpInt64(ymd[1])
 	}
@@ -369,10 +376,11 @@ func phpSerializeValue(v any) string {
 // dsql.class.php:1144-1147）。拼进 SQL 即产生非法语句。
 const dsqlOperErrorFace = `{"state": 200, "info": "操作失败！"}`
 
-// allNumericList 检查 NOT IN 列表全部是数值（任一错误串混入 → 整条 DELETE 非法）。
-func allNumericList(list []string) bool {
-	for _, v := range list {
-		if !phpNumericRe.MatchString(v) {
+// phpNumListValid 检查逗号 join 的 NOT IN 列表是否构成合法 SQL 数值列表
+//（PHP 裸拼语义：逐段数值字面量才合法；错误串/引号/花括号混入即整条非法）。
+func phpNumListValid(joined string) bool {
+	for _, part := range strings.Split(joined, ",") {
+		if !phpNumericRe.MatchString(part) {
 			return false
 		}
 	}
@@ -538,7 +546,7 @@ func phpArrayReverse(items []phpItem) []phpItem {
 	out := make([]phpItem, 0, len(items))
 	counter := 0
 	for i := len(items) - 1; i >= 0; i-- {
-		if phpIntKeyRe.MatchString(items[i].key) {
+		if isPhpIntKey(items[i].key) { // 范围感知：int64 域外的数字串是字符串键
 			out = append(out, phpItem{key: strconv.Itoa(counter), val: items[i].val})
 			counter++
 		} else {
@@ -546,6 +554,16 @@ func phpArrayReverse(items []phpItem) []phpItem {
 		}
 	}
 	return out
+}
+
+// isPhpIntKey 是 PHP 数组整数键判定：规范整数字符串且落在 int64 域内
+//（PHP int 是 64 位；域外数字串保留字符串键）。
+func isPhpIntKey(k string) bool {
+	if !phpIntKeyRe.MatchString(k) {
+		return false
+	}
+	_, err := strconv.ParseInt(k, 10, 64)
+	return err == nil
 }
 
 // itemStr 取 json_decode 关联项里的字符串/数值键值（PHP 数组取值隐式转串）。

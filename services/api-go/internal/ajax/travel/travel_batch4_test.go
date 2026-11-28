@@ -4,10 +4,14 @@
 package travel
 
 import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
@@ -64,6 +68,110 @@ func serveParams(t *testing.T, svc *Service, action string, params url.Values) s
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, target, nil))
 	return recorder.Body.String()
+}
+
+// —— exec 追踪（防"意外写被执行但错误被 `_, _ =` 吞掉"的假绿）——
+// sqlmock 不会把意外调用记成未满足期望：unexpected call 只返回一个错误给调用方，
+// 生产代码忽略错误后测试照常通过。因此需要 driver 层记录每条真正到达的语句。
+
+// execRecorder 包装 sqlmock 连接，把每条 Exec/Query 的 SQL 记进 log。
+type execRecorder struct {
+	inner driver.Conn
+	log   *[]string
+}
+
+func (r *execRecorder) Prepare(query string) (driver.Stmt, error) { return r.inner.Prepare(query) }
+func (r *execRecorder) Close() error                              { return r.inner.Close() }
+func (r *execRecorder) Begin() (driver.Tx, error)                 { return r.inner.Begin() }
+
+func (r *execRecorder) ExecContext(ctx context.Context, query string,
+	args []driver.NamedValue) (driver.Result, error) {
+	*r.log = append(*r.log, query)
+	if e, ok := r.inner.(driver.ExecerContext); ok {
+		return e.ExecContext(ctx, query, args)
+	}
+	st, err := r.inner.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	defer st.Close()
+	vals := make([]driver.Value, len(args))
+	for i, a := range args {
+		vals[i] = a.Value
+	}
+	return st.Exec(vals)
+}
+
+func (r *execRecorder) QueryContext(ctx context.Context, query string,
+	args []driver.NamedValue) (driver.Rows, error) {
+	*r.log = append(*r.log, query)
+	if q, ok := r.inner.(driver.QueryerContext); ok {
+		return q.QueryContext(ctx, query, args)
+	}
+	st, err := r.inner.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	defer st.Close()
+	vals := make([]driver.Value, len(args))
+	for i, a := range args {
+		vals[i] = a.Value
+	}
+	return st.Query(vals)
+}
+
+// recorderConnector 单连接 connector：所有语句都经 execRecorder。
+type recorderConnector struct {
+	inner driver.Conn
+	log   *[]string
+}
+
+type unusedDriver struct{}
+
+func (unusedDriver) Open(string) (driver.Conn, error) { return nil, errors.New("unused") }
+
+func (c *recorderConnector) Connect(context.Context) (driver.Conn, error) {
+	return &execRecorder{inner: c.inner, log: c.log}, nil
+}
+func (c *recorderConnector) Driver() driver.Driver { return unusedDriver{} }
+
+// newOperServiceTracked 同 newOperService，但 DB 经 execRecorder 包装，
+// 返回到达 driver 的 SQL 序列（单连接，防池化绕过记录）。
+func newOperServiceTracked(t *testing.T, uid int64, info map[string]any) (*Service, sqlmock.Sqlmock, *[]string) {
+	t.Helper()
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() {
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("expectations not met: %v", err)
+		}
+	})
+	inner, ok := mock.(driver.Conn)
+	if !ok {
+		t.Fatalf("sqlmock 未实现 driver.Conn")
+	}
+	log := &[]string{}
+	svc, err := New(Dep{
+		DB: func() *sql.DB {
+			d := sql.OpenDB(&recorderConnector{inner: inner, log: log})
+			d.SetMaxOpenConns(1)
+			return d
+		}(),
+		TablePrefix: "huoniao_",
+		MemberDetail: func(req *ajax.Request) ajax.Response {
+			return ajax.Response{State: ajax.StateOK, Info: info}
+		},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if uid > 0 {
+		svc.ident = fakeIdentity{uid: uid}
+	}
+	return svc, mock, log
 }
 
 // operInfo 构造 member.info 桩：ut=userType；staff>0 时 is_staff=1、companyuid=staffComp、
@@ -466,6 +574,35 @@ func TestOperTicketUpdateNotidDiff(t *testing.T) {
 	}
 }
 
+func TestOperTicketElementID34UpdateSkippedDeleteStillRuns(t *testing.T) {
+	// 元素 id="3,4"：UPDATE 的 WHERE `id` = 3,4 裸拼报 SQL 错（dsqlOper 吞掉，
+	// 行不更新），但 notid 仍追加原值 → join 出 NOT IN (3,4,5) 是合法 SQL →
+	// DELETE 照删（PHP 逐段数值字面量判定，区别于"错误串混入整条非法"）。
+	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
+	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(5, 1))
+	mock.ExpectExec("DELETE FROM `huoniao_travel_ticketinfo` WHERE `ticketid` = ? AND `id` NOT IN (3,4,5)").
+		WithArgs(int64(31)).WillReturnResult(sqlmock.NewResult(0, 1))
+	p := ticketParams()
+	p.Set("oper", "update")
+	p.Set("id", "31")
+	p.Set("ticketlist", `[{"id":"3,4","title":"成人票","price":"80","specialtime":""},{"title":"儿童票","price":"40","specialtime":""}]`)
+	got := serveParams(t, svc, "operTicket", p)
+	if got != `{"state":100,"info":"修改成功！"}` {
+		t.Fatalf("element 3,4 = %s", got)
+	}
+	// 非数值 id 的 ticketinfo UPDATE 不应到达 driver。
+	for _, q := range *log {
+		if strings.HasPrefix(q, "UPDATE `huoniao_travel_ticketinfo`") {
+			t.Errorf("id=3,4 的 UPDATE 不应执行（裸拼 SQL 错误面），实际执行了: %s", q)
+		}
+	}
+}
+
 func TestOperTicketDelSuccess(t *testing.T) {
 	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
@@ -727,8 +864,14 @@ func TestOperHotelAddWritesMemberLog(t *testing.T) {
 		t.Fatalf("sqlmock: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	var gotNote, gotModule, gotTemp, gotAction string
+	t.Cleanup(func() {
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("expectations not met: %v", err)
+		}
+	})
+	var gotNote, gotModule, gotTemp, gotAction, gotSQL string
 	var gotAid int64
+	var gotUID string
 	svc, err := New(Dep{
 		DB: db, TablePrefix: "huoniao_",
 		MemberDetail: func(req *ajax.Request) ajax.Response {
@@ -736,7 +879,8 @@ func TestOperHotelAddWritesMemberLog(t *testing.T) {
 		},
 		MemberLog: func(req *http.Request, uid, module, temp string, aid int64,
 			action, note, link, sqlText string) {
-			gotNote, gotModule, gotTemp, gotAction, gotAid = note, module, temp, action, aid
+			gotUID, gotNote, gotModule, gotTemp, gotAction, gotAid, gotSQL =
+				uid, note, module, temp, action, aid, sqlText
 		},
 	})
 	if err != nil {
@@ -745,16 +889,27 @@ func TestOperHotelAddWritesMemberLog(t *testing.T) {
 	svc.ident = fakeIdentity{uid: 5}
 
 	expectStoreOK(mock)
-	mock.ExpectExec(qHotelInsert).WillReturnResult(sqlmock.NewResult(42, 1))
+	// WithArgs 断言持久化值：userid=5、company=7（店铺 id）、审核开关 state=1。
+	mock.ExpectExec(qHotelInsert).WithArgs(
+		int64(5), int64(7), "测试酒店", int64(0), int64(0), int64(3), "", "/a.jpg", "",
+		"0", "", sqlmock.AnyArg(), int64(1), "").
+		WillReturnResult(sqlmock.NewResult(42, 1))
 	got := serveParams(t, svc, "operHotel", url.Values{
 		"oper": {"add"}, "title": {"测试酒店"}, "addrid": {"3"}, "pics": {"/a.jpg"},
 	})
 	if got != `{"state":100,"info":"发布成功！"}` {
 		t.Fatalf("add = %s", got)
 	}
+	if gotUID != "5" {
+		t.Errorf("memberLog uid = %q, want \"5\"", gotUID)
+	}
 	if gotNote != "开通酒店店铺(测试酒店)" || gotModule != "travel" || gotTemp != "hotel" ||
 		gotAction != "insert" || gotAid != 42 {
 		t.Fatalf("memberLog = %q/%q/%q/%q/%d", gotNote, gotModule, gotTemp, gotAction, gotAid)
+	}
+	if !strings.HasPrefix(gotSQL, "INSERT INTO `huoniao_travel_hotel`") ||
+		!strings.Contains(gotSQL, "'测试酒店'") {
+		t.Errorf("memberLog sqlText = %q", gotSQL)
 	}
 }
 
@@ -882,8 +1037,10 @@ func TestOperAgencyAssocTicketlistStringKeys(t *testing.T) {
 func TestOperTicketUpdateNotidInsertErrorKeepsRows(t *testing.T) {
 	// INSERT 失败时 PHP 无条件 push lastid 错误串 → NOT IN 列表非法 → DELETE 整条
 	// 报 SQL 错误（dsqlOper 吞掉）→ 已有行不被删除，流程继续（修改成功）。
-	// mock 里不配 DELETE 期望 → 若 Go 误执行 DELETE，ExpectationsWereMet 报未命中。
-	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	// 注意：sqlmock 不会把意外调用记成未满足期望——若 Go 误执行 DELETE，sqlmock
+	// 返回的错误被生产代码 `_, _ =` 吞掉，ExpectationsWereMet 照常通过（假绿）。
+	// 因此用 execRecorder 在 driver 层记录每条语句，显式断言 DELETE 从未到达。
+	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
@@ -899,6 +1056,11 @@ func TestOperTicketUpdateNotidInsertErrorKeepsRows(t *testing.T) {
 	got := serveParams(t, svc, "operTicket", p)
 	if got != `{"state":100,"info":"修改成功！"}` {
 		t.Fatalf("notid error face = %s", got)
+	}
+	for _, q := range *log {
+		if strings.HasPrefix(q, "DELETE FROM `huoniao_travel_ticketinfo`") {
+			t.Errorf("非法 NOT IN 列表不应执行 DELETE，实际执行了: %s", q)
+		}
 	}
 }
 

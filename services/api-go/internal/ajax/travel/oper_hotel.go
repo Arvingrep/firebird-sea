@@ -206,6 +206,11 @@ func hotelSaveRooms(ctx context.Context, db *sql.DB, roomTable string, hotelID i
 	saveRooms(ctx, db, roomTable, hotelID, pubdate, roomlist, func(val map[string]any, specialtime string) (string, []any) {
 		vid := itemStr(val, "id")
 		if vid != "" && vid != "0" { // PHP !empty($val['id'])
+			// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：非数值 → SQL 错误面
+			//（dsqlOper 吞掉，不更新行）。跳过执行即该错误面。
+			if !phpNumericRe.MatchString(vid) {
+				return "", nil
+			}
 			q := "UPDATE " + roomTable +
 				" SET `title` = ?, `hotelid` = ?, `area` = ?, `iswindow` = ?, `typeid` = ?, `breakfast` = ?, `price` = ?, `specialtime` = ?, `pics` = ? WHERE `id` = ?"
 			return q, []any{
@@ -237,6 +242,9 @@ func saveRooms(ctx context.Context, db *sql.DB, roomTable string, hotelID int64,
 		}
 		specialtime := hotelRoomSpecialtime(itemStr(val, "specialtime"))
 		q, args := build(val, specialtime)
+		if q == "" {
+			continue // SQL 错误面：语句不执行（dsqlOper 吞错）
+		}
 		_, _ = db.ExecContext(ctx, q, args...)
 	}
 }

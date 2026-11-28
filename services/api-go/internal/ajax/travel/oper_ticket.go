@@ -182,11 +182,15 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 				specialtime := hotelRoomSpecialtime(itemStr(val, "specialtime"))
 				vid := itemStr(val, "id")
 				if vid != "" && vid != "0" { // PHP !empty($val['id'])
-					_, _ = s.db.ExecContext(ctx,
-						"UPDATE "+infoTable+
-							" SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = ?",
-						operRaw(itemStr(val, "title")), tid, operRaw(itemStr(val, "price")),
-						specialtime, phpInt(vid))
+					// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：非数值（如 "3,4"）
+					// 令 UPDATE 报 SQL 错误（dsqlOper 吞掉）→ 不更新行；notid 仍追加原值。
+					if phpNumericRe.MatchString(vid) {
+						_, _ = s.db.ExecContext(ctx,
+							"UPDATE "+infoTable+
+								" SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = ?",
+							operRaw(itemStr(val, "title")), tid, operRaw(itemStr(val, "price")),
+							specialtime, phpInt(vid))
+					}
 					notid = append(notid, vid)
 				} else {
 					// PHP 无条件 array_push($notid, lastid)：INSERT 失败时 dsqlOper
@@ -209,12 +213,15 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 				}
 			}
 			if len(notid) > 0 { // PHP if($notid)
-				if allNumericList(notid) {
+				joined := strings.Join(notid, ",")
+				// PHP 裸拼 NOT IN ($notid)：join 后逐段是数值字面量才构成合法 SQL
+				//（元素 "3,4" join 出 (3,4) 合法、照删）；错误串混入 → 非法 →
+				// dsqlOper 报错吞掉，不删行、流程继续。
+				if phpNumListValid(joined) {
 					_, _ = s.db.ExecContext(ctx,
 						"DELETE FROM "+infoTable+" WHERE `ticketid` = ? AND `id` NOT IN ("+
-							strings.Join(notid, ",")+")", tid)
+							joined+")", tid)
 				}
-				// 含错误串 → DELETE 语句非法（dsqlOper 报错吞掉），不删行、继续。
 			}
 		}
 
