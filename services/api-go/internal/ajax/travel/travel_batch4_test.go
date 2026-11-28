@@ -956,8 +956,11 @@ func TestMysqlDecodeStrLit(t *testing.T) {
 		{"\\\\", "\\", true},   // \\ → \
 		{"\\%", "\\%", true},   // \% 保留反斜杠
 		{"a\tb", "a\tb", true},
-		{"o'k", "", false}, // 未转义引号 → 字面量提前终结 → 语句报错
-		{"3\\", "", false}, // 结尾反斜杠吞收尾引号 → 语句报错
+		{"3''", "3'", true},   // '' 配对转义 → 一个 '（与 \' 等价）
+		{"a''b", "a'b", true}, // 配对转义位于串中间
+		{"o'k", "", false},    // 未转义引号 → 字面量提前终结 → 语句报错
+		{"3'''", "", false},   // 先解码一对，剩一个不配对引号 → 语句报错
+		{"3\\", "", false},    // 结尾反斜杠吞收尾引号 → 语句报错
 	}
 	for _, c := range cases {
 		got, ok := mysqlDecodeStrLit(c.in)
@@ -986,6 +989,28 @@ func TestOperAgencyEscapedIDInserts(t *testing.T) {
 	})
 	if got != `{"state":100,"info":"修改成功！"}` {
 		t.Fatalf("escaped id = %s", got)
+	}
+}
+
+func TestOperAgencyDoubledQuoteIDInserts(t *testing.T) {
+	// 元素 id 为配对引号转义形态 "3''"：PHP 字面量 '3''' → MySQL 解码 "3'"
+	// （与反斜杠形态 "3\\'" 等价）→ 照常插入绑定 3'，不得因含引号整行丢弃。
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
+	expectStoreOK(mock)
+	mock.ExpectQuery(qAgencyExist).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "level"}).AddRow(21, "4"))
+	mock.ExpectExec("UPDATE `huoniao_travel_agency` SET `tag` = ?, `imglist` = ?, `userid` = ?, `company` = ?, `title` = ?, `typeid` = ?, `cityid` = ?, `addrid` = ?, `address` = ?, `missiontime` = ?, `missiontype` = ?, `pics` = ?, `video` = ?, `travelservice` = ?, `note` = ?, `itinerary` = ?, `expense` = ?, `instructions` = ?, `state` = ?, `level` = ? WHERE `id` = ?").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qAInfoDelAll).WithArgs(int64(21)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qAInfoInsID).WithArgs("3'", "第一天", int64(21), "100", "N;", sqlmock.AnyArg(), "0").
+		WillReturnResult(sqlmock.NewResult(9, 1))
+	got := serveParams(t, svc, "operAgency", url.Values{
+		"oper": {"update"}, "id": {"21"}, "title": {"周边游"}, "typeid": {"1"},
+		"addrid": {"1"}, "address": {"路"}, "pics": {"/a.jpg"},
+		"ticketlist": {`[{"id":"3''","title":"第一天","price":"100","specialtime":""}]`},
+	})
+	if got != `{"state":100,"info":"修改成功！"}` {
+		t.Fatalf("doubled-quote id = %s", got)
 	}
 }
 
