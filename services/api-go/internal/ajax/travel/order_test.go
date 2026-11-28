@@ -471,4 +471,9 @@ func TestOneKeyContinuedSpecialPriceDates(t *testing.T) {
 	if got := phpGetMkTime("99-12-31"); got != want3 {
 		t.Fatalf("phpGetMkTime 两位年 = %d, want %d", got, want3)
 	}
+	// 导零两位年：PHP 对原始年串 strlen==2 判断（"01" → "2001"），phpInt 会吞前导零。
+	want4 := time.Date(2001, 1, 1, 0, 0, 0, 0, gmt8).Unix()
+	if got := phpGetMkTime("01-01-01"); got != want4 {
+		t.Fatalf("phpGetMkTime 导零两位年 = %d, want %d", got, want4)
+	}
 }

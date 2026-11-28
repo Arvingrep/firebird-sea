@@ -290,8 +290,18 @@ func phpGetMkTime(s string) int64 {
 	if len(ymd) < 2 {
 		ymd = strings.Split(ds[0], ".")
 	}
+	// PHP 对原始年串 strlen($dt[0])==2 判断（导零 "01" → "2001"），
+	// 必须在数值化之前做，phpInt 会吞掉前导零（codex 复审指出）。
+	yearStr := ""
 	if len(ymd) > 0 {
-		dt[0] = int64(phpInt(ymd[0]))
+		yearStr = ymd[0]
+	}
+	if len(yearStr) == 2 {
+		yearStr = "20" + yearStr
+	}
+	year := int64(phpInt(yearStr))
+	if yearStr == "" {
+		year = 1970
 	}
 	if len(ymd) > 1 {
 		dt[1] = int64(phpInt(ymd[1]))
@@ -310,10 +320,6 @@ func phpGetMkTime(s string) int64 {
 		if len(hms) > 2 {
 			dt[5] = int64(phpInt(hms[2]))
 		}
-	}
-	year := dt[0]
-	if len(strconv.FormatInt(year, 10)) == 2 {
-		year = 2000 + year
 	}
 	mt := time.Date(int(year), time.Month(dt[1]), int(dt[2]),
 		int(dt[3]), int(dt[4]), int(dt[5]), 0, gmt8).Unix()
