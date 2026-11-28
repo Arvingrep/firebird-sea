@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -393,39 +392,24 @@ func phpNumListValid(joined string) bool {
 }
 
 // mysqlNumericExpr 校验单段是否构成 MySQL 数值表达式：十进制/科学计数数字面量、
-// 一元 +/-、二元 + - * / %、括号嵌套，空白可忽略。这是 PHP 把 $notid 逐段裸拼进
-// SQL（travel.class.php:2206-2208）后「能执行不报错」的白名单。
-// 「合法但恶意」的形态（OR、子查询、引号逃逸等）不通过——与 PHP 的差异仅限该类
-// 请求可控的注入输入，作为已知偏差记录在 #355（Go 侧不复现真正的 SQL 注入面）。
+// 一元 +/-、二元 + - * / %（乘除优先于加减）、括号嵌套，空白可忽略。这是 PHP 把
+// $val['id'] 裸拼进 SQL（travel.class.php:1452、2191 的 `WHERE id = ` 与
+// 2206-2208 的 NOT IN 列表）后「能执行不报错」的白名单。
+// 「合法但恶意」的形态（OR、子查询、引号逃逸等）不通过——语法上无法构造标识符
+// 或字符串（字母只能作数值指数），因此校验通过的片段内嵌进语句与绑定参数同等
+// 安全；与 PHP 的差异仅限白名单外的请求可控注入输入，作为已知偏差记录在 #355。
+// 命中白名单的 UPDATE 一律内嵌表达式原文交 MySQL 求值（精确整数/高精度除法语义
+// 与 PHP 裸拼逐位一致），不做 float64 近似求值（9007199254740993-9007199254740992+3
+// 与 1/3*3 两类用例见 #373 评审）。
 func mysqlNumericExpr(s string) bool {
-	_, _, ok := mysqlExprParse(s, false)
-	return ok
-}
-
-// mysqlNumericExprValue 在 mysqlNumericExpr 语法内求值，用于把裸拼的元素 id 字面量
-// 等价成绑定值：MySQL 对 `WHERE id = <expr>` / `VALUES (<expr>)` 的数值语义与绑定
-// float64 一致（3+0→3、.5e1→5、3.5→无行命中/列舍入）。除以 0 在 MySQL 得 NULL
-// （比较永不命中、NOT IN 全不匹配），等价于跳过执行，故返回 !ok。
-func mysqlNumericExprValue(s string) (float64, bool) {
-	v, divZero, ok := mysqlExprParse(s, true)
-	if divZero {
-		return 0, false
-	}
-	return v, ok
-}
-
-// mysqlExprParse 递归下降解析；wantValue=true 时同步求值。divZero 单独上报：
-// 合法性判定下 3/0 是合法 SQL（执行后语义为 NULL），求值判定下视为不命中。
-func mysqlExprParse(s string, wantValue bool) (val float64, divZero, ok bool) {
 	var p int
 	skip := func() {
 		for p < len(s) && (s[p] == ' ' || s[p] == '\t' || s[p] == '\n' || s[p] == '\r') {
 			p++
 		}
 	}
-	var expr, addmul, muldiv, term func() (float64, bool)
-	number := func() (float64, bool) {
-		start := p
+	var expr, addmul, muldiv, term func() bool
+	number := func() bool {
 		digits := func() bool {
 			n := 0
 			for p < len(s) && s[p] >= '0' && s[p] <= '9' {
@@ -449,131 +433,73 @@ func mysqlExprParse(s string, wantValue bool) (val float64, divZero, ok bool) {
 		if p < len(s) && s[p] == '.' { // 前导点：.5、.5e1
 			p++
 			if !digits() {
-				return 0, false
+				return false
 			}
-			if !exponent() {
-				return 0, false
-			}
-		} else { // 常规：3、3.、3.5、3e0、3.5e-2
-			if !digits() {
-				return 0, false
-			}
-			if p < len(s) && s[p] == '.' {
-				p++
-				digits() // 小数位可空（"3."）
-			}
-			if !exponent() {
-				return 0, false
-			}
+			return exponent()
 		}
-		if !wantValue {
-			return 0, true
+		if !digits() {
+			return false
 		}
-		f, err := strconv.ParseFloat(strings.TrimSpace(s[start:p]), 64)
-		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
-			return 0, false
+		if p < len(s) && s[p] == '.' {
+			p++
+			digits() // 小数位可空（"3."）
 		}
-		return f, true
+		return exponent()
 	}
-	term = func() (float64, bool) {
+	term = func() bool {
 		skip()
 		if p < len(s) && s[p] == '(' {
 			p++
-			v, ok2 := expr()
-			if !ok2 {
-				return 0, false
+			if !expr() {
+				return false
 			}
 			skip()
 			if p >= len(s) || s[p] != ')' {
-				return 0, false
+				return false
 			}
 			p++
-			return v, true
+			return true
 		}
 		if p < len(s) && (s[p] == '+' || s[p] == '-') { // 一元符号
-			op := s[p]
 			p++
-			v, ok2 := term()
-			if !ok2 {
-				return 0, false
-			}
-			if op == '-' {
-				v = -v
-			}
-			return v, true
+			return term()
 		}
 		return number()
 	}
-	// 乘除同级先结合（MySQL 与 PHP 同为 * / % 高于 + -），再加减。
-	muldiv = func() (float64, bool) {
-		v, ok2 := term()
-		if !ok2 {
-			return 0, false
+	muldiv = func() bool { // 乘除同级（结合律不影响合法性）
+		if !term() {
+			return false
 		}
 		skip()
 		for p < len(s) && (s[p] == '*' || s[p] == '/' || s[p] == '%') {
-			op := s[p]
 			p++
-			r, ok3 := term()
-			if !ok3 {
-				return 0, false
-			}
-			if wantValue {
-				switch op {
-				case '*':
-					v *= r
-				case '/':
-					if r == 0 {
-						divZero = true
-					} else {
-						v /= r
-					}
-				case '%':
-					if r == 0 {
-						divZero = true
-					} else {
-						v = math.Mod(v, r)
-					}
-				}
+			if !term() {
+				return false
 			}
 			skip()
 		}
-		return v, true
+		return true
 	}
-	addmul = func() (float64, bool) {
-		v, ok2 := muldiv()
-		if !ok2 {
-			return 0, false
+	addmul = func() bool {
+		if !muldiv() {
+			return false
 		}
 		skip()
 		for p < len(s) && (s[p] == '+' || s[p] == '-') {
-			op := s[p]
 			p++
-			r, ok3 := muldiv()
-			if !ok3 {
-				return 0, false
-			}
-			if wantValue {
-				if op == '+' {
-					v += r
-				} else {
-					v -= r
-				}
+			if !muldiv() {
+				return false
 			}
 			skip()
 		}
-		return v, true
+		return true
 	}
 	expr = addmul
-	v, ok2 := expr()
-	if !ok2 {
-		return 0, divZero, false
+	if !expr() {
+		return false
 	}
 	skip()
-	if p != len(s) {
-		return 0, divZero, false
-	}
-	return v, divZero, true
+	return p == len(s)
 }
 
 // phpIntKeyRe 是 PHP 数组的规范整数字符串键（"0"、"-5"、"123"；前导零/"+" 不算）。

@@ -183,15 +183,15 @@ func (s *Service) operTicket(req *ajax.Request) ajax.Response {
 				vid := itemStr(val, "id")
 				if vid != "" && vid != "0" { // PHP !empty($val['id'])
 					// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：数值表达式（3、3.5、
-					// 3+0、.5e1）按 MySQL 数值语义绑定 float64（3+0 命中行 3、3.5 无行
-					// 命中）；非数值（"3,4"、"abc"）整条报 SQL 错误（dsqlOper 吞掉）。
-					// notid 无条件追加原值（join 后逐段合法 → DELETE 照删）。
-					if rowid, rowok := mysqlNumericExprValue(vid); rowok {
+					// 3+0、.5e1）内嵌原文交 MySQL 求值（精确整数/高精度除法语义与裸拼
+					// 一致，见 mysqlNumericExpr）；白名单外整条报 SQL 错误（dsqlOper
+					// 吞掉）→ 跳过。notid 无条件追加原值（join 后逐段合法 → DELETE 照删）。
+					if mysqlNumericExpr(vid) {
 						_, _ = s.db.ExecContext(ctx,
 							"UPDATE "+infoTable+
-								" SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = ?",
+								" SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = "+vid,
 							operRaw(itemStr(val, "title")), tid, operRaw(itemStr(val, "price")),
-							specialtime, rowid)
+							specialtime)
 					}
 					notid = append(notid, vid)
 				} else {

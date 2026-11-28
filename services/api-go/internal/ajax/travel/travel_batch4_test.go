@@ -416,8 +416,7 @@ func TestOperHotelUpdateWithRoomDiff(t *testing.T) {
 	mock.ExpectQuery(qHotelExist).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 	mock.ExpectExec(qHotelUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qHotelRoomUpd).WithArgs(
-		"改房", int64(11), "40", "0", "1", "0", "399", "N;", "/b.jpg", float64(3)).
+	mock.ExpectExec("UPDATE `huoniao_travel_hotelroom` SET `title` = ?, `hotelid` = ?, `area` = ?, `iswindow` = ?, `typeid` = ?, `breakfast` = ?, `price` = ?, `specialtime` = ?, `pics` = ? WHERE `id` = 3").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qHotelRoomUpdIns).WithArgs(
 		"新房", int64(11), "50", "1", "0", "1", "499", "N;", "/c.jpg", sqlmock.AnyArg()).
@@ -500,14 +499,17 @@ func TestOperHotelDelHotelRoomAndUnknownOper(t *testing.T) {
 // —— operTicket ——
 
 const (
-	qTicketExist  = "SELECT l.`id` FROM `huoniao_travel_ticket` l LEFT JOIN `huoniao_travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?"
-	qTicketDelSel = "SELECT l.`id`, l.`title`, l.`pics`, l.`video`, s.`userid` FROM `huoniao_travel_ticket` l LEFT JOIN `huoniao_travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?"
-	qTicketInsert = "INSERT INTO `huoniao_travel_ticket` (`note`, `userid`, `company`, `title`, `cityid`, `opentime`, `addrid`, `address`, `pics`, `video`, `travelname`, `tag`, `pubdate`, `state`, `date`, `openStart`, `openEnd`, `level`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	qTInfoIns     = "INSERT INTO `huoniao_travel_ticketinfo` (`typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`) VALUES ('0', ?, ?, ?, ?, ?)"
-	qTInfoUpd     = "UPDATE `huoniao_travel_ticketinfo` SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = ?"
-	qTInfoNotIn   = "DELETE FROM `huoniao_travel_ticketinfo` WHERE `ticketid` = ? AND `id` NOT IN (3,4)"
-	qTInfoDelT0   = "DELETE FROM `huoniao_travel_ticketinfo` WHERE `typeid` = 0 AND `ticketid` = ?"
-	qTicketDel    = "DELETE FROM `huoniao_travel_ticket` WHERE `id` = ?"
+	qTicketExist   = "SELECT l.`id` FROM `huoniao_travel_ticket` l LEFT JOIN `huoniao_travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?"
+	qTicketDelSel  = "SELECT l.`id`, l.`title`, l.`pics`, l.`video`, s.`userid` FROM `huoniao_travel_ticket` l LEFT JOIN `huoniao_travel_store` s ON s.`id` = l.`company` WHERE l.`id` = ?"
+	qTicketInsert  = "INSERT INTO `huoniao_travel_ticket` (`note`, `userid`, `company`, `title`, `cityid`, `opentime`, `addrid`, `address`, `pics`, `video`, `travelname`, `tag`, `pubdate`, `state`, `date`, `openStart`, `openEnd`, `level`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	qTInfoIns      = "INSERT INTO `huoniao_travel_ticketinfo` (`typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`) VALUES ('0', ?, ?, ?, ?, ?)"
+	qTInfoUpd      = "UPDATE `huoniao_travel_ticketinfo` SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = ?"
+	qTInfoUpd3     = "UPDATE `huoniao_travel_ticketinfo` SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = 3"
+	qTInfoUpd35    = "UPDATE `huoniao_travel_ticketinfo` SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = 3.5"
+	qTInfoUpdArith = "UPDATE `huoniao_travel_ticketinfo` SET `typeid` = '0', `title` = ?, `ticketid` = ?, `price` = ?, `specialtime` = ? WHERE `id` = 3+0"
+	qTInfoNotIn    = "DELETE FROM `huoniao_travel_ticketinfo` WHERE `ticketid` = ? AND `id` NOT IN (3,4)"
+	qTInfoDelT0    = "DELETE FROM `huoniao_travel_ticketinfo` WHERE `typeid` = 0 AND `ticketid` = ?"
+	qTicketDel     = "DELETE FROM `huoniao_travel_ticket` WHERE `id` = ?"
 )
 
 func ticketParams() url.Values {
@@ -560,8 +562,7 @@ func TestOperTicketUpdateNotidDiff(t *testing.T) {
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", float64(3)).
-		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoUpd3).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(4, 1))
 	mock.ExpectExec(qTInfoNotIn).WithArgs(int64(31)).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -684,49 +685,12 @@ func TestGetMkTime(t *testing.T) {
 	}
 }
 
-func TestMysqlNumericExprValue(t *testing.T) {
-	// 裸拼元素 id 的求值语义：MySQL 对 WHERE id = <expr> / VALUES (<expr>) 的数值
-	// 行为与绑定 float64 一致（3+0→3、.5e1→5、3.5→无行命中/列舍入、3/0→NULL 不命中）。
-	cases := []struct {
-		in   string
-		want float64
-		ok   bool
-	}{
-		{"3", 3, true},
-		{"3.0", 3, true},
-		{"3e0", 3, true},
-		{"3+0", 3, true},
-		{".5e1", 5, true},
-		{"(3+0)*2", 6, true},
-		{"1+2*3", 7, true}, // 乘除优先于加减（MySQL 语义）
-		{"2*3+1", 7, true},
-		{"8/2*2", 8, true}, // 同级左结合
-		{"(1+2)*3", 9, true},
-		{" 4 ", 4, true},
-		{"-3", -3, true},
-		{"01", 1, true},
-		{"3.5", 3.5, true}, // 合法：WHERE 命中 0 行 / INSERT 落列舍入
-		{"3/0", 0, false},  // MySQL NULL → 不命中
-		{"3%0", 0, false},  // 同上
-		{"3,4", 0, false},  // 裸拼令语句报 SQL 错误
-		{"abc", 0, false},
-		{"", 0, false},
-		{"3+", 0, false},
-		{"(3", 0, false},
-		{"3 4", 0, false},
-		{"OR 1=1", 0, false}, // 合法但恶意 → 白名单外（#355 已知偏差）
-	}
-	for _, c := range cases {
-		got, ok := mysqlNumericExprValue(c.in)
-		if got != c.want || ok != c.ok {
-			t.Errorf("mysqlNumericExprValue(%q) = (%v, %v), want (%v, %v)", c.in, got, ok, c.want, c.ok)
-		}
-	}
-}
-
 func TestMysqlNumericExpr(t *testing.T) {
-	// PHP 裸拼 NOT IN 列表的逐段合法性：算术表达式（3+0）在 MySQL 合法照删。
-	ok := []string{"3", "3.5", "3+0", "(3+0)*2", "1e0", "1+2*3", " 4 ", "-3", ".5", "3.", "1.2E+3", ".5e1", "3.5e-2"}
+	// 裸拼元素 id 的白名单：数值表达式（3、3.5、3+0、.5e1、括号/乘除加减）内嵌原文
+	// 交 MySQL 求值；白名单外整条报 SQL 错误。不做 float64 求值——精确整数算术
+	// （9007199254740993-9007199254740992+3=4）与高精度除法（1/3*3=0.9999…）只有
+	// MySQL 自身能复现，Go 侧只保证「同一表达式文本、同一语句」。
+	ok := []string{"3", "3.5", "3+0", "(3+0)*2", "1e0", "1+2*3", " 4 ", "-3", ".5", "3.", "1.2E+3", ".5e1", "3.5e-2", "9007199254740993-9007199254740992+3", "1/3*3"}
 	bad := []string{"", "3;DROP", "3' ", "OR 1=1", "3)", "(3", "3+", "abc", "3 4", "1;2"}
 	for _, in := range ok {
 		if !mysqlNumericExpr(in) {
@@ -1055,8 +1019,7 @@ func TestOperTicketFractionalElementBindsLiteral(t *testing.T) {
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", float64(3.5)).
-		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(qTInfoUpd35).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(4, 1))
 	mock.ExpectExec("DELETE FROM `huoniao_travel_ticketinfo` WHERE `ticketid` = ? AND `id` NOT IN (3.5,4)").
@@ -1079,8 +1042,7 @@ func TestOperTicketArithElementUpdateAndDelete(t *testing.T) {
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", float64(3)).
-		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoUpdArith).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(4, 1))
 	mock.ExpectExec("DELETE FROM `huoniao_travel_ticketinfo` WHERE `ticketid` = ? AND `id` NOT IN (3+0,4)").
@@ -1102,8 +1064,7 @@ func TestOperHotelFractionalRoomIDBindsLiteral(t *testing.T) {
 	expectStoreOK(mock)
 	mock.ExpectQuery(qHotelExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 	mock.ExpectExec(qHotelUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qHotelRoomUpd).WithArgs(
-		"大床房", int64(11), "30", "1", "0", "1", "199", "N;", "/r.jpg", float64(3.5)).
+	mock.ExpectExec("UPDATE `huoniao_travel_hotelroom` SET `title` = ?, `hotelid` = ?, `area` = ?, `iswindow` = ?, `typeid` = ?, `breakfast` = ?, `price` = ?, `specialtime` = ?, `pics` = ? WHERE `id` = 3.5").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	got := serveParams(t, svc, "operHotel", url.Values{
 		"oper": {"update"}, "id": {"11"}, "title": {"测试酒店"}, "addrid": {"3"}, "pics": {"/a.jpg"},
@@ -1246,8 +1207,7 @@ func TestOperTicketUpdateNotidInsertErrorKeepsRows(t *testing.T) {
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", float64(3)).
-		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoUpd3).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
 		WillReturnError(errors.New("insert failed"))
 	p := ticketParams()

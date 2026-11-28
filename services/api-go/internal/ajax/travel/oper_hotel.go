@@ -206,20 +206,20 @@ func hotelSaveRooms(ctx context.Context, db *sql.DB, roomTable string, hotelID i
 	saveRooms(ctx, db, roomTable, hotelID, pubdate, roomlist, func(val map[string]any, specialtime string) (string, []any) {
 		vid := itemStr(val, "id")
 		if vid != "" && vid != "0" { // PHP !empty($val['id'])
-			// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：数值表达式（3、3.5、3+0）
-			// 按 MySQL 数值语义绑定 float64；非数值整条报 SQL 错误（dsqlOper 吞掉、
-			// 不更新行）→ 跳过执行即该错误面，不得 (int) 截断误改行。
-			rid, rowok := mysqlNumericExprValue(vid)
-			if !rowok {
+			// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：数值表达式内嵌原文交
+			// MySQL 求值（精确语义与裸拼一致，见 mysqlNumericExpr）；白名单外整条
+			// 报 SQL 错误（dsqlOper 吞掉、不更新行）→ 跳过执行即该错误面，不得
+			// (int) 截断误改行。
+			if !mysqlNumericExpr(vid) {
 				return "", nil
 			}
 			q := "UPDATE " + roomTable +
-				" SET `title` = ?, `hotelid` = ?, `area` = ?, `iswindow` = ?, `typeid` = ?, `breakfast` = ?, `price` = ?, `specialtime` = ?, `pics` = ? WHERE `id` = ?"
+				" SET `title` = ?, `hotelid` = ?, `area` = ?, `iswindow` = ?, `typeid` = ?, `breakfast` = ?, `price` = ?, `specialtime` = ?, `pics` = ? WHERE `id` = " + vid
 			return q, []any{
 				operRaw(itemStr(val, "title")), hotelID, operRaw(itemStr(val, "area")),
 				operRaw(itemStr(val, "iswindow")), operRaw(itemStr(val, "typeid")),
 				operRaw(itemStr(val, "breakfast")), operRaw(itemStr(val, "price")),
-				specialtime, operRaw(itemStr(val, "imgpath")), rid,
+				specialtime, operRaw(itemStr(val, "imgpath")),
 			}
 		}
 		q := "INSERT INTO " + roomTable +
