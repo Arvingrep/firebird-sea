@@ -169,14 +169,14 @@ func (s *Service) operAgency(req *ajax.Request) ajax.Response {
 			specialtime := hotelRoomSpecialtime(itemStr(val, "specialtime"))
 			vid := itemStr(val, "id")
 			if vid != "" && vid != "0" { // PHP !empty($val['id'])
-				// VALUES 裸拼字面量：非数值 → 整条 INSERT 报 SQL 错误（dsqlOper 吞掉，
-				// 不插行）；数值字面量（3、3.5、3e0）由 MySQL int 列舍入（与裸拼一致，
-				// float 绑定），不得 (int) 截断。
-				if phpNumericRe.MatchString(vid) {
+				// VALUES 裸拼字面量：数值表达式按 MySQL 语义绑定（int 列舍入/表达式
+				// 求值与裸拼一致）；非数值 → 整条 INSERT 报 SQL 错误（dsqlOper 吞掉，
+				// 不插行）→ 跳过。
+				if rowid, rowok := mysqlNumericExprValue(vid); rowok {
 					_, _ = s.db.ExecContext(ctx,
 						"INSERT INTO "+infoTable+
 							" (`id`, `typeid`, `title`, `ticketid`, `price`, `specialtime`, `pubdate`, `weight`) VALUES (?, '1', ?, ?, ?, ?, ?, ?)",
-						phpFloatVal(vid), operRaw(itemStr(val, "title")), aid0,
+						rowid, operRaw(itemStr(val, "title")), aid0,
 						operRaw(itemStr(val, "price")), specialtime, pubdate, item.key)
 				}
 			} else {

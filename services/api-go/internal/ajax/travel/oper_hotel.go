@@ -206,11 +206,10 @@ func hotelSaveRooms(ctx context.Context, db *sql.DB, roomTable string, hotelID i
 	saveRooms(ctx, db, roomTable, hotelID, pubdate, roomlist, func(val map[string]any, specialtime string) (string, []any) {
 		vid := itemStr(val, "id")
 		if vid != "" && vid != "0" { // PHP !empty($val['id'])
-			// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：非数值 → SQL 错误面、
-			// "3.5" 等小数字面量 → 合法 SQL 但 0 行命中——两种情况都不更新行
-			//（dsqlOper 吞掉/无行受影响）。跳过执行即该错误面；只有整数值字面量
-			//（3、3.0、3e0）才绑定 rowid 执行，不得 (int) 截断。
-			rid, rowok := phpMySQLRowID(vid)
+			// PHP 的 WHERE `id` = ".$val['id']" 是裸字面量：数值表达式（3、3.5、3+0）
+			// 按 MySQL 数值语义绑定 float64；非数值整条报 SQL 错误（dsqlOper 吞掉、
+			// 不更新行）→ 跳过执行即该错误面，不得 (int) 截断误改行。
+			rid, rowok := mysqlNumericExprValue(vid)
 			if !rowok {
 				return "", nil
 			}

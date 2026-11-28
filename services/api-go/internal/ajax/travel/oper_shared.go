@@ -398,14 +398,34 @@ func phpNumListValid(joined string) bool {
 // 「合法但恶意」的形态（OR、子查询、引号逃逸等）不通过——与 PHP 的差异仅限该类
 // 请求可控的注入输入，作为已知偏差记录在 #355（Go 侧不复现真正的 SQL 注入面）。
 func mysqlNumericExpr(s string) bool {
+	_, _, ok := mysqlExprParse(s, false)
+	return ok
+}
+
+// mysqlNumericExprValue 在 mysqlNumericExpr 语法内求值，用于把裸拼的元素 id 字面量
+// 等价成绑定值：MySQL 对 `WHERE id = <expr>` / `VALUES (<expr>)` 的数值语义与绑定
+// float64 一致（3+0→3、.5e1→5、3.5→无行命中/列舍入）。除以 0 在 MySQL 得 NULL
+// （比较永不命中、NOT IN 全不匹配），等价于跳过执行，故返回 !ok。
+func mysqlNumericExprValue(s string) (float64, bool) {
+	v, divZero, ok := mysqlExprParse(s, true)
+	if divZero {
+		return 0, false
+	}
+	return v, ok
+}
+
+// mysqlExprParse 递归下降解析；wantValue=true 时同步求值。divZero 单独上报：
+// 合法性判定下 3/0 是合法 SQL（执行后语义为 NULL），求值判定下视为不命中。
+func mysqlExprParse(s string, wantValue bool) (val float64, divZero, ok bool) {
 	var p int
 	skip := func() {
 		for p < len(s) && (s[p] == ' ' || s[p] == '\t' || s[p] == '\n' || s[p] == '\r') {
 			p++
 		}
 	}
-	var expr, term func() bool
-	number := func() bool {
+	var expr, term func() (float64, bool)
+	number := func() (float64, bool) {
+		start := p
 		digits := func() bool {
 			n := 0
 			for p < len(s) && s[p] >= '0' && s[p] <= '9' {
@@ -414,83 +434,124 @@ func mysqlNumericExpr(s string) bool {
 			}
 			return n > 0
 		}
-		if p < len(s) && s[p] == '.' {
-			p++
-			return digits()
-		}
-		if !digits() {
-			return false
-		}
-		if p < len(s) && s[p] == '.' {
-			p++
-			digits() // 小数位可空（"3."）
-		}
-		if p < len(s) && (s[p] == 'e' || s[p] == 'E') {
-			p++
-			if p < len(s) && (s[p] == '+' || s[p] == '-') {
+		exponent := func() bool { // 两种小数形态之后都可带指数（.5e1、3e0）
+			if p < len(s) && (s[p] == 'e' || s[p] == 'E') {
 				p++
+				if p < len(s) && (s[p] == '+' || s[p] == '-') {
+					p++
+				}
+				if !digits() {
+					return false
+				}
 			}
+			return true
+		}
+		if p < len(s) && s[p] == '.' { // 前导点：.5、.5e1
+			p++
 			if !digits() {
-				return false
+				return 0, false
+			}
+			if !exponent() {
+				return 0, false
+			}
+		} else { // 常规：3、3.、3.5、3e0、3.5e-2
+			if !digits() {
+				return 0, false
+			}
+			if p < len(s) && s[p] == '.' {
+				p++
+				digits() // 小数位可空（"3."）
+			}
+			if !exponent() {
+				return 0, false
 			}
 		}
-		return true
+		if !wantValue {
+			return 0, true
+		}
+		f, err := strconv.ParseFloat(strings.TrimSpace(s[start:p]), 64)
+		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+			return 0, false
+		}
+		return f, true
 	}
-	term = func() bool {
+	term = func() (float64, bool) {
 		skip()
 		if p < len(s) && s[p] == '(' {
 			p++
-			if !expr() {
-				return false
+			v, ok2 := expr()
+			if !ok2 {
+				return 0, false
 			}
 			skip()
 			if p >= len(s) || s[p] != ')' {
-				return false
+				return 0, false
 			}
 			p++
-			return true
+			return v, true
 		}
 		if p < len(s) && (s[p] == '+' || s[p] == '-') { // 一元符号
+			op := s[p]
 			p++
-			return term()
+			v, ok2 := term()
+			if !ok2 {
+				return 0, false
+			}
+			if op == '-' {
+				v = -v
+			}
+			return v, true
 		}
 		return number()
 	}
-	expr = func() bool {
-		if !term() {
-			return false
+	expr = func() (float64, bool) {
+		v, ok2 := term()
+		if !ok2 {
+			return 0, false
 		}
 		skip()
 		for p < len(s) && (s[p] == '+' || s[p] == '-' || s[p] == '*' || s[p] == '/' || s[p] == '%') {
+			op := s[p]
 			p++
-			if !term() {
-				return false
+			r, ok3 := term()
+			if !ok3 {
+				return 0, false
+			}
+			if wantValue {
+				switch op {
+				case '+':
+					v += r
+				case '-':
+					v -= r
+				case '*':
+					v *= r
+				case '/':
+					if r == 0 {
+						divZero = true
+					} else {
+						v /= r
+					}
+				case '%':
+					if r == 0 {
+						divZero = true
+					} else {
+						v = math.Mod(v, r)
+					}
+				}
 			}
 			skip()
 		}
-		return true
+		return v, true
 	}
-	if !expr() {
-		return false
+	v, ok2 := expr()
+	if !ok2 {
+		return 0, divZero, false
 	}
 	skip()
-	return p == len(s)
-}
-
-// phpMySQLRowID 判定 PHP 裸拼 `WHERE id = <字面量>` 能否命中整数主键行：
-// 字面量数值上等于整数（3、3.0、3e0 → 命中 id=3；"3.5" 是合法 SQL 但 0 行命中、
-// "abc" 整条语句报错）。返回 (rowid, ok)；!ok 时调用方按 PHP 的 0 行/错误面处理，
-// 不得把字面量 (int) 截断后绑定（"3.5"→3 会误改 id=3 的行，travel.class.php:2189
-// 的裸字面量语义）。
-func phpMySQLRowID(lit string) (int64, bool) {
-	if !phpNumericRe.MatchString(lit) {
-		return 0, false
+	if p != len(s) {
+		return 0, divZero, false
 	}
-	f, err := strconv.ParseFloat(strings.TrimSpace(lit), 64)
-	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) || f != math.Trunc(f) || f < -9e18 || f > 9e18 {
-		return 0, false
-	}
-	return int64(f), true
+	return v, divZero, true
 }
 
 // phpIntKeyRe 是 PHP 数组的规范整数字符串键（"0"、"-5"、"123"；前导零/"+" 不算）。

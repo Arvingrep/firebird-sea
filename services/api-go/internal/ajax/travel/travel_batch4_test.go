@@ -417,7 +417,7 @@ func TestOperHotelUpdateWithRoomDiff(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 	mock.ExpectExec(qHotelUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qHotelRoomUpd).WithArgs(
-		"改房", int64(11), "40", "0", "1", "0", "399", "N;", "/b.jpg", int64(3)).
+		"改房", int64(11), "40", "0", "1", "0", "399", "N;", "/b.jpg", float64(3)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qHotelRoomUpdIns).WithArgs(
 		"新房", int64(11), "50", "1", "0", "1", "499", "N;", "/c.jpg", sqlmock.AnyArg()).
@@ -560,7 +560,7 @@ func TestOperTicketUpdateNotidDiff(t *testing.T) {
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", int64(3)).
+	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", float64(3)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(4, 1))
@@ -684,35 +684,45 @@ func TestGetMkTime(t *testing.T) {
 	}
 }
 
-func TestPhpMySQLRowID(t *testing.T) {
-	// PHP 裸拼 WHERE id = <字面量>：整数值字面量（3、3.0、3e0）命中行；"3.5" 合法
-	// SQL 但 0 行命中；非数值整条报错。都不得 (int) 截断。
+func TestMysqlNumericExprValue(t *testing.T) {
+	// 裸拼元素 id 的求值语义：MySQL 对 WHERE id = <expr> / VALUES (<expr>) 的数值
+	// 行为与绑定 float64 一致（3+0→3、.5e1→5、3.5→无行命中/列舍入、3/0→NULL 不命中）。
 	cases := []struct {
 		in   string
-		want int64
+		want float64
 		ok   bool
 	}{
 		{"3", 3, true},
 		{"3.0", 3, true},
 		{"3e0", 3, true},
-		{" 3 ", 3, true},
-		{"3.5", 0, false}, // WHERE id = 3.5 命中 0 行
-		{"3,4", 0, false}, // 裸拼令 UPDATE 报 SQL 错误
-		{"abc", 0, false}, // 同上
-		{"", 0, false},
+		{"3+0", 3, true},
+		{".5e1", 5, true},
+		{"(3+0)*2", 6, true},
+		{" 4 ", 4, true},
+		{"-3", -3, true},
 		{"01", 1, true},
+		{"3.5", 3.5, true}, // 合法：WHERE 命中 0 行 / INSERT 落列舍入
+		{"3/0", 0, false},  // MySQL NULL → 不命中
+		{"3%0", 0, false},  // 同上
+		{"3,4", 0, false},  // 裸拼令语句报 SQL 错误
+		{"abc", 0, false},
+		{"", 0, false},
+		{"3+", 0, false},
+		{"(3", 0, false},
+		{"3 4", 0, false},
+		{"OR 1=1", 0, false}, // 合法但恶意 → 白名单外（#355 已知偏差）
 	}
 	for _, c := range cases {
-		got, ok := phpMySQLRowID(c.in)
+		got, ok := mysqlNumericExprValue(c.in)
 		if got != c.want || ok != c.ok {
-			t.Errorf("phpMySQLRowID(%q) = (%d, %v), want (%d, %v)", c.in, got, ok, c.want, c.ok)
+			t.Errorf("mysqlNumericExprValue(%q) = (%v, %v), want (%v, %v)", c.in, got, ok, c.want, c.ok)
 		}
 	}
 }
 
 func TestMysqlNumericExpr(t *testing.T) {
 	// PHP 裸拼 NOT IN 列表的逐段合法性：算术表达式（3+0）在 MySQL 合法照删。
-	ok := []string{"3", "3.5", "3+0", "(3+0)*2", "1e0", "1+2*3", " 4 ", "-3", ".5", "3.", "1.2E+3"}
+	ok := []string{"3", "3.5", "3+0", "(3+0)*2", "1e0", "1+2*3", " 4 ", "-3", ".5", "3.", "1.2E+3", ".5e1", "3.5e-2"}
 	bad := []string{"", "3;DROP", "3' ", "OR 1=1", "3)", "(3", "3+", "abc", "3 4", "1;2"}
 	for _, in := range ok {
 		if !mysqlNumericExpr(in) {
@@ -1033,14 +1043,16 @@ func TestOperTicketTopLevelIDEntryCoerce(t *testing.T) {
 	}
 }
 
-func TestOperTicketFractionalElementNoUpdateDeleteKeeps35(t *testing.T) {
-	// 元素 id="3.5"：UPDATE WHERE id = 3.5 合法 SQL 但 0 行命中 → 不执行；
-	// notid 仍追加 "3.5" → join "3.5,4" 是合法 NOT IN → DELETE 照删（保留 3.5/4）。
-	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
+func TestOperTicketFractionalElementBindsLiteral(t *testing.T) {
+	// 元素 id="3.5"：UPDATE WHERE id = 3.5 是合法 SQL（绑定 3.5、命中 0 行，
+	// 与 PHP 裸拼同语义）；notid 仍追加 "3.5" → join "3.5,4" 合法 → DELETE 照删。
+	svc, mock, _ := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", float64(3.5)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(4, 1))
 	mock.ExpectExec("DELETE FROM `huoniao_travel_ticketinfo` WHERE `ticketid` = ? AND `id` NOT IN (3.5,4)").
@@ -1053,20 +1065,17 @@ func TestOperTicketFractionalElementNoUpdateDeleteKeeps35(t *testing.T) {
 	if got != `{"state":100,"info":"修改成功！"}` {
 		t.Fatalf("element 3.5 = %s", got)
 	}
-	for _, q := range *log {
-		if strings.HasPrefix(q, "UPDATE `huoniao_travel_ticketinfo`") {
-			t.Errorf("id=3.5 的 UPDATE 不应执行（0 行命中面），实际执行了: %s", q)
-		}
-	}
 }
 
-func TestOperTicketArithNotInDeleteRuns(t *testing.T) {
-	// 元素 id="3+0"：UPDATE 裸拼 WHERE id = 3+0 报 SQL 错误（dsqlOper 吞掉）→ 不执行；
+func TestOperTicketArithElementUpdateAndDelete(t *testing.T) {
+	// 元素 id="3+0"：UPDATE WHERE id = 3+0 是合法 SQL、命中行 3（求值绑定 3）；
 	// join "3+0,4" 是合法 NOT IN 算术表达式 → DELETE 照删（PHP 裸拼语义）。
-	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
+	svc, mock := newOperService(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", float64(3)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(4, 1))
@@ -1080,31 +1089,24 @@ func TestOperTicketArithNotInDeleteRuns(t *testing.T) {
 	if got != `{"state":100,"info":"修改成功！"}` {
 		t.Fatalf("element 3+0 = %s", got)
 	}
-	for _, q := range *log {
-		if strings.HasPrefix(q, "UPDATE `huoniao_travel_ticketinfo`") {
-			t.Errorf("id=3+0 的 UPDATE 不应执行（SQL 错误面），实际执行了: %s", q)
-		}
-	}
 }
 
-func TestOperHotelFractionalRoomIDNoUpdate(t *testing.T) {
-	// roomlist 元素 id="3.5"：UPDATE WHERE id = 3.5 合法 SQL 但 0 行命中 → 不执行，
-	// 不得 (int) 截断误改 id=3 的房间行。
-	svc, mock, log := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
+func TestOperHotelFractionalRoomIDBindsLiteral(t *testing.T) {
+	// roomlist 元素 id="3.5"：UPDATE WHERE id = 3.5 绑定 3.5（合法 SQL、命中 0 行，
+	// 不得 (int) 截断误改 id=3 的房间行——PHP 裸拼同语义）。
+	svc, mock, _ := newOperServiceTracked(t, 5, operInfo(1, 0, 0))
 	expectStoreOK(mock)
 	mock.ExpectQuery(qHotelExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 	mock.ExpectExec(qHotelUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qHotelRoomUpd).WithArgs(
+		"大床房", int64(11), "30", "1", "0", "1", "199", "N;", "/r.jpg", float64(3.5)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
 	got := serveParams(t, svc, "operHotel", url.Values{
 		"oper": {"update"}, "id": {"11"}, "title": {"测试酒店"}, "addrid": {"3"}, "pics": {"/a.jpg"},
 		"roomlist": {`[{"id":"3.5","title":"大床房","area":"30","iswindow":"1","typeid":"0","breakfast":"1","price":"199","specialtime":"","imgpath":"/r.jpg"}]`},
 	})
 	if got != `{"state":100,"info":"修改成功！"}` {
 		t.Fatalf("fractional room = %s", got)
-	}
-	for _, q := range *log {
-		if strings.HasPrefix(q, "UPDATE `huoniao_travel_hotelroom`") {
-			t.Errorf("id=3.5 的房间 UPDATE 不应执行（0 行命中面），实际执行了: %s", q)
-		}
 	}
 }
 
@@ -1240,7 +1242,7 @@ func TestOperTicketUpdateNotidInsertErrorKeepsRows(t *testing.T) {
 	mock.ExpectQuery(qTicketExist).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectExec("UPDATE `huoniao_travel_ticket` SET `note` = ?, `userid` = ?, `company` = ?, `title` = ?, `cityid` = ?, `opentime` = ?, `addrid` = ?, `address` = ?, `pics` = ?, `video` = ?, `travelname` = ?, `tag` = ?, `state` = ?, `date` = ?, `openStart` = ?, `openEnd` = ?, `level` = ? WHERE `id` = ?").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", int64(3)).
+	mock.ExpectExec(qTInfoUpd).WithArgs("成人票", int64(31), "80", "N;", float64(3)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(qTInfoIns).WithArgs("儿童票", int64(31), "40", "N;", sqlmock.AnyArg()).
 		WillReturnError(errors.New("insert failed"))
