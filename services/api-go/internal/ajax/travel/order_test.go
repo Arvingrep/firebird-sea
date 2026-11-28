@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
@@ -401,7 +402,7 @@ func TestOrderListUnauthenticatedGoesEmpty(t *testing.T) {
 		" AND `orderstate` = 10 and `ret-state` = 1 ",
 		" AND (`orderstate` = 2 or `orderstate` = 4)",
 	} {
-		mock.ExpectQuery(arch+extra).WillReturnRows(empty)
+		mock.ExpectQuery(arch + extra).WillReturnRows(empty)
 	}
 	got := serve(t, svc, "/include/ajax.php?service=travel&action=orderList")
 	want := `{"state":100,"info":{"pageInfo":{"page":1,"pageSize":10,"totalPage":0.0,"totalCount":0,` +
@@ -427,5 +428,47 @@ func TestOrderDetailPaths(t *testing.T) {
 	got = serve(t, svc2, "/include/ajax.php?service=travel&action=orderDetail&id=5")
 	if got != `{"state":102,"info":"No data!"}` {
 		t.Fatalf("orderDetail 无行 = %s", got)
+	}
+}
+
+// oneKeyContinued specialtime 特价：stime/etime 是日期串（GetMkTime 语义，
+// codex 评审 P1——phpInt 会把 "2026-11-29" 截成 2026），命中区间取特价。
+func TestOneKeyContinuedSpecialPriceDates(t *testing.T) {
+	orderCols := []string{"id", "walktime", "departuretime", "orderstate", "proid", "procount", "people", "contact"}
+	special := `a:1:{i:0;a:3:{s:5:"stime";s:10:"2020-01-01";s:5:"etime";s:10:"2099-12-31";s:5:"price";s:6:"188.00";}}`
+	svc, mock := newCommentService(t, 1)
+	mock.ExpectQuery(qOneKeyOrder).WillReturnRows(sqlmock.NewRows(orderCols).AddRow("5", "1000", "900", "3", "200", "2", `[{"name":"张三"}]`, "13800000000"))
+	mock.ExpectQuery(qHotelroom).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "hotelid", "price", "specialtime"}).AddRow("200", "大床房", "20", "288.00", special))
+	mock.ExpectQuery(qHotelDetail).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "userid", "company", "pics", "price", "tag", "factag", "video", "lng", "lat", "cityid", "typeid", "addrid", "address", "click", "pubdate", "state", "note"}).
+			AddRow("20", "酒店A", "2", "2", "", "0.00", "", "", "", "120.1", "30.2", "0", "0", "0", "地址", "5", "1600000000", "1", ""))
+	mock.ExpectQuery(qStoreDetailNested).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "cityid", "title", "userid", "lng", "flag", "lat", "addrid", "address", "tel", "contact", "pics", "video", "note", "license", "servicetime", "click", "pubdate", "state", "bind_module", "date", "openStart", "openEnd", "refuse"}).
+			AddRow("2", "0", "商家A", "2", "", "", "", "0", "", "", "", "", "", "", "", "0", "5", "1600000000", "1", "", "0", "", "", "0"))
+	mock.ExpectExec("INSERT INTO `huoniao_travel_order` (`ordernum`, `store`, `proid`, `userid`, `orderstate`, `orderdate`, `procount`, `people`, `contact`, `orderprice`, `type`, `tab`, `walktime`, `nopaydate`, `departuretime`) VALUES (?, ?, ?, ?, '0', ?, ?, ?, ?, ?, '3', 'travel', ?, ?, ?)").
+		WithArgs(sqlmock.AnyArg(), "2", "200", int64(1), sqlmock.AnyArg(), "2", `[{"name":"张三"}]`, "13800000000", "188.00",
+			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(9, 1))
+	got := serve(t, svc, "/include/ajax.php?service=travel&action=oneKeyContinued&id=5")
+	if got != `{"state":100,"info":""}` {
+		t.Fatalf("oneKeyContinued 日期特价 = %s", got)
+	}
+
+	// phpGetMkTime 语义抽查：日期串、日期时间串、纯数字、两位年。
+	want := time.Date(2026, 11, 29, 0, 0, 0, 0, gmt8).Unix()
+	if got := phpGetMkTime("2026-11-29"); got != want {
+		t.Fatalf("phpGetMkTime(\"2026-11-29\") = %d, want %d", got, want)
+	}
+	want2 := time.Date(2026, 11, 29, 14, 30, 5, 0, gmt8).Unix()
+	if got := phpGetMkTime("2026-11-29 14:30:5"); got != want2 {
+		t.Fatalf("phpGetMkTime(\"2026-11-29 14:30:5\") = %d, want %d", got, want2)
+	}
+	if got := phpGetMkTime("1700000000"); got != 1700000000 {
+		t.Fatalf("phpGetMkTime 纯数字 = %d", got)
+	}
+	want3 := time.Date(2099, 12, 31, 0, 0, 0, 0, gmt8).Unix()
+	if got := phpGetMkTime("99-12-31"); got != want3 {
+		t.Fatalf("phpGetMkTime 两位年 = %d, want %d", got, want3)
 	}
 }

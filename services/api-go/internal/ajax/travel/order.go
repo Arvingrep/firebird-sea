@@ -246,6 +246,83 @@ func todayStart() int64 {
 	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, gmt8).Unix()
 }
 
+// phpGetMkTime 复刻 time.class.php GetMkTime()（codex 评审 P1 修复：specialtime
+// 的 stime/etime 是日期串，phpInt 会把 "2026-11-29" 截成 2026）：
+//   - 纯数字串原样返回（PHP return $dtime → 数值上下文）；
+//   - 否则归一中文分隔符（年月日时分秒）与空白，按 Y-M-D [H:I:S]（点号日期兜底）
+//     解析，两位年补 "20"，空段归 0，mktime 在 Etc/GMT-8 时区取值；
+//   - mktime 结果为 0（PHP !empty 判假）→ 回落 time()。
+func phpGetMkTime(s string) int64 {
+	nonDigit := false
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			nonDigit = true
+			break
+		}
+	}
+	if !nonDigit {
+		return int64(phpInt(s))
+	}
+	s = strings.NewReplacer(
+		"\r", " ", "\n", " ", "\t", " ",
+		"日", " ", "秒", " ",
+		"年", "-", "月", "-", "时", ":", "分", ":",
+	).Replace(strings.TrimSpace(s))
+	var b strings.Builder
+	space := false
+	for _, r := range s {
+		if r == ' ' {
+			if space {
+				continue
+			}
+			space = true
+		} else {
+			space = false
+		}
+		b.WriteRune(r)
+	}
+	s = strings.TrimSpace(b.String())
+
+	var dt [6]int64
+	dt[0], dt[1], dt[2] = 1970, 1, 1
+	ds := strings.Split(s, " ")
+	ymd := strings.Split(ds[0], "-")
+	if len(ymd) < 2 {
+		ymd = strings.Split(ds[0], ".")
+	}
+	if len(ymd) > 0 {
+		dt[0] = int64(phpInt(ymd[0]))
+	}
+	if len(ymd) > 1 {
+		dt[1] = int64(phpInt(ymd[1]))
+	}
+	if len(ymd) > 2 {
+		dt[2] = int64(phpInt(ymd[2]))
+	}
+	if len(ds) > 1 {
+		hms := strings.Split(ds[1], ":")
+		if len(hms) > 0 {
+			dt[3] = int64(phpInt(hms[0]))
+		}
+		if len(hms) > 1 {
+			dt[4] = int64(phpInt(hms[1]))
+		}
+		if len(hms) > 2 {
+			dt[5] = int64(phpInt(hms[2]))
+		}
+	}
+	year := dt[0]
+	if len(strconv.FormatInt(year, 10)) == 2 {
+		year = 2000 + year
+	}
+	mt := time.Date(int(year), time.Month(dt[1]), int(dt[2]),
+		int(dt[3]), int(dt[4]), int(dt[5]), 0, gmt8).Unix()
+	if mt == 0 {
+		return time.Now().Unix()
+	}
+	return mt
+}
+
 // createOrdernum 复刻 create_ordernum()：y(2)+月hex(大写)+d+time 后 5 位+
 // microtime 第 2-5 位（小数前 4 位）+sprintf('%02d', rand(0,99))。
 func createOrdernum() string {
@@ -1263,8 +1340,8 @@ func (s *Service) oneKeyContinued(req *ajax.Request) ajax.Response {
 					if m == nil {
 						continue
 					}
-					stime := int64(phpInt(asString(m.vals["stime"])))
-					etime := int64(phpInt(asString(m.vals["etime"])))
+					stime := phpGetMkTime(asString(m.vals["stime"]))
+					etime := phpGetMkTime(asString(m.vals["etime"]))
 					if newWalktime >= stime && newWalktime < etime {
 						priceArr = append(priceArr, asString(m.vals["price"]))
 					}
