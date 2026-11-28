@@ -1,6 +1,8 @@
 package member
 
 import (
+	"context"
+	"net/http"
 	"net/url"
 
 	"github.com/arvingrep/firebird-sea/services/api-go/internal/ajax"
@@ -23,6 +25,14 @@ func (s *Service) CollectCheck(req *ajax.Request, module, temp, action, id strin
 		},
 	}
 	return infoString(s.collect(sub))
+}
+
+// MemberLog 导出 memberLog（common.func.php:1919-2016）给其它 service 复用
+//（travel 商家后台写 #373 的 oper*/storeConfig 都调 memberLog）。透传参数，
+// 行为（去重、过期清理、脱敏）与 member 自用完全一致。
+func (s *Service) MemberLog(ctx context.Context, req *http.Request, uid, module, temp string, aid int64,
+	action, note, link, sqlText string) {
+	s.memberLog(ctx, req, uid, module, temp, aid, action, note, link, sqlText)
 }
 
 // ZanCheck 复刻 checkIsZan()（common.func.php:6024）：调用 member.getZan（check=1）。

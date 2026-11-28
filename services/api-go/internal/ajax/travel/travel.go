@@ -81,7 +81,23 @@ type Dep struct {
 	// CommentCheck 对应 include/config/travel.inc.php 的 $customCommentCheck
 	// （sendCommon 的 ischeck；仓库/本地/canary 均为 1，main.go 默认 1）。
 	CommentCheck int
-	// Identity 识别当前会员（countryDetail 的 collect 校验用）。nil 时一律按未登录（-1）。
+	// MemberLog 对应 common.func.php 的 memberLog()（批次4 写路径的用户行为日志）。
+	// 由 main.go 注入 member 服务的导出实现；nil 时跳过（不影响响应）。
+	MemberLog func(req *http.Request, uid, module, temp string, aid int64,
+		action, note, link, sqlText string)
+	// HotelCheck / TicketCheck / RentcarCheck / VisaCheck / AgencyCheck /
+	// VideoCheck / StrategyCheck 对应 include/config/travel.inc.php 的
+	// $customtravelhotelCheck 等 7 个审核开关（仓库/本地/canary 均为 '1'）。
+	// nil 时按 1（canary 现值）。
+	HotelCheck, TicketCheck, RentcarCheck, VisaCheck, AgencyCheck, VideoCheck, StrategyCheck *int
+}
+
+// checkOf 取审核开关（nil → 1）。
+func checkOf(p *int) int {
+	if p == nil {
+		return 1
+	}
+	return *p
 }
 
 // Service 是 travel 服务的运行期对象。
@@ -97,6 +113,9 @@ type Service struct {
 	memberDetail ajax.Handler
 	cookiePrefix string
 	commentCheck int
+	memberLog    func(req *http.Request, uid, module, temp string, aid int64,
+		action, note, link, sqlText string)
+	hotelCheck, ticketCheck, rentcarCheck, visaCheck, agencyCheck, videoCheck, strategyCheck int
 }
 
 // defaultTravelLogo / defaultTravelHotline 是 canary 的 $cfg_weblogo / $cfg_hotline
@@ -120,17 +139,25 @@ func New(dep Dep) (*Service, error) {
 		hot = defaultTravelHotline
 	}
 	return &Service{
-		db:           dep.DB,
-		prefix:       dep.TablePrefix,
-		files:        dep.Files,
-		ident:        dep.Identity,
-		logo:         logo,
-		hot:          hot,
-		collectCheck: dep.CollectCheck,
-		zanCheck:     dep.ZanCheck,
-		memberDetail: dep.MemberDetail,
-		cookiePrefix: dep.CookiePrefix,
-		commentCheck: dep.CommentCheck,
+		db:            dep.DB,
+		prefix:        dep.TablePrefix,
+		files:         dep.Files,
+		ident:         dep.Identity,
+		logo:          logo,
+		hot:           hot,
+		collectCheck:  dep.CollectCheck,
+		zanCheck:      dep.ZanCheck,
+		memberDetail:  dep.MemberDetail,
+		cookiePrefix:  dep.CookiePrefix,
+		commentCheck:  dep.CommentCheck,
+		memberLog:     dep.MemberLog,
+		hotelCheck:    checkOf(dep.HotelCheck),
+		ticketCheck:   checkOf(dep.TicketCheck),
+		rentcarCheck:  checkOf(dep.RentcarCheck),
+		visaCheck:     checkOf(dep.VisaCheck),
+		agencyCheck:   checkOf(dep.AgencyCheck),
+		videoCheck:    checkOf(dep.VideoCheck),
+		strategyCheck: checkOf(dep.StrategyCheck),
 	}, nil
 }
 
@@ -186,4 +213,15 @@ func Register(router *ajax.Router, s *Service) {
 	router.Register("travel", "dingCommon", s.dingCommon)
 	router.Register("travel", "sendCommon", s.sendCommon)
 	router.Register("travel", "commentDetail", s.commentDetail)
+
+	// 批次4（#373）：商家后台写 9 个（写路径仅 L1，见 #355）。
+	router.Register("travel", "storeConfig", s.storeConfig)
+	router.Register("travel", "storeConfigModule", s.storeConfigModule)
+	router.Register("travel", "operHotel", s.operHotel)
+	router.Register("travel", "operTicket", s.operTicket)
+	router.Register("travel", "operRentcar", s.operRentcar)
+	router.Register("travel", "operVisa", s.operVisa)
+	router.Register("travel", "operAgency", s.operAgency)
+	router.Register("travel", "operVideo", s.operVideo)
+	router.Register("travel", "operStrategy", s.operStrategy)
 }

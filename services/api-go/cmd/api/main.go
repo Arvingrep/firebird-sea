@@ -649,6 +649,19 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		// sendCommon（#372）的 $customCommentCheck：include/config/travel.inc.php 现值 1
 		//（仓库/本地容器/canary 一致），env 可覆盖。
 		CommentCheck: *envIntPtr("FB_TRAVEL_COMMENT_CHECK", 1),
+		// 批次4（#373）：memberLog 经 member 服务导出实现注入；7 个审核开关取
+		// include/config/travel.inc.php 现值（仓库/本地/canary 均为 '1'），env 可覆盖。
+		MemberLog: func(req *http.Request, uid, module, temp string, aid int64,
+			action, note, link, sqlText string) {
+			memberSvc.MemberLog(req.Context(), req, uid, module, temp, aid, action, note, link, sqlText)
+		},
+		HotelCheck:    envIntPtr("FB_TRAVEL_HOTEL_CHECK", 1),
+		TicketCheck:   envIntPtr("FB_TRAVEL_TICKET_CHECK", 1),
+		RentcarCheck:  envIntPtr("FB_TRAVEL_RENTCAR_CHECK", 1),
+		VisaCheck:     envIntPtr("FB_TRAVEL_VISA_CHECK", 1),
+		AgencyCheck:   envIntPtr("FB_TRAVEL_AGENCY_CHECK", 1),
+		VideoCheck:    envIntPtr("FB_TRAVEL_VIDEO_CHECK", 1),
+		StrategyCheck: envIntPtr("FB_TRAVEL_STRATEGY_CHECK", 1),
 	})
 	if err != nil {
 		panic(fmt.Sprintf("ajax: travel 服务装配失败: %v", err))
