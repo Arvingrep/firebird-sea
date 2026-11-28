@@ -40,7 +40,8 @@ func TestUnsupportedBranches(t *testing.T) {
 		p Params
 		o Options
 	}{
-		{Params{{"service", "member"}, {"template", "index"}}, Options{}},
+		// member 链接自 #374 起支持（orderList/orderDetail 的 cardnumUrl 需要），
+		// 不再是 ErrUnsupported。
 		{Params{{"service", "website"}, {"template", "preview1"}}, Options{}},
 		{Params{{"service", "tieba"}, {"template", "detail"}}, Options{IsAndroidApp: true}},
 		{Params{{"service", "job"}, {"template", "list"}}, Options{IsApp: true}},

@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -646,6 +647,9 @@ func buildAjax(db *sql.DB) *ajax.Router {
 		},
 		MemberDetail: memberSvc.DetailHandler(),
 		CookiePrefix: os.Getenv("COOKIE_PREFIX"),
+		// getCityId 无 cookie 的默认分站兜底（checkDefaultCity → system_site_city.json），
+		// 由 PHP_ROOT 解析；0 表示无默认分站（等同 PHP 最终 (int)$cid = 0）。
+		DefaultCityID: phpDefaultCityID(),
 		// sendCommon（#372）的 $customCommentCheck：include/config/travel.inc.php 现值 1
 		//（仓库/本地容器/canary 一致），env 可覆盖。
 		CommentCheck: *envIntPtr("FB_TRAVEL_COMMENT_CHECK", 1),
@@ -655,6 +659,43 @@ func buildAjax(db *sql.DB) *ajax.Router {
 	}
 	ajaxtravel.Register(router, travelSvc)
 	return router
+}
+
+// phpDefaultCityID 复刻 PHP getCityId() 的默认分站兜底链路（#374 compare 实证）：
+// 无 cityid 参数、无 siteCityInfo cookie 时，ajax.php 引导兜底 checkDefaultCity()
+// → siteConfig->siteCity() 先读 {PHP_ROOT}/data/cache/system_site_city.json
+// （本地/canary 该文件 expire_time=2147483647 恒有效，内置默认分站 cityid=10000），
+// 文件无效才回源 site_city 表（表为空时 PHP 实际仍走 json，故 DB 回源不实现）。
+// checkDefaultCity：仅 1 个分站取该分站，否则取 defaultcity=1 的分站，无则 0。
+// PHP_ROOT 未配置或文件缺失/解析失败 → 0。
+func phpDefaultCityID() int {
+	root := os.Getenv("PHP_ROOT")
+	if root == "" {
+		return 0
+	}
+	b, err := os.ReadFile(filepath.Join(root, "data", "cache", "system_site_city.json"))
+	if err != nil {
+		return 0
+	}
+	var data struct {
+		ExpireTime int64 `json:"expire_time"`
+		Data       []struct {
+			Cityid  int `json:"cityid"`
+			Default int `json:"default"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(b, &data) != nil || data.ExpireTime <= 0 {
+		return 0
+	}
+	if len(data.Data) == 1 {
+		return data.Data[0].Cityid
+	}
+	for _, c := range data.Data {
+		if c.Default == 1 {
+			return c.Cityid
+		}
+	}
+	return 0
 }
 
 func splitOrigins(raw string) []string {
